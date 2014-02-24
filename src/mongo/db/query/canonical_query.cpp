@@ -224,6 +224,7 @@ namespace {
      * Encodes parsed projection into cache key.
      * Does a simple toString() on each projected field
      * in the BSON object.
+     * Orders the encoded elements in the projection by field name.
      * This handles all the special projection types ($meta, $elemMatch, etc.)
      */
     void encodePlanCacheKeyProj(const BSONObj& projObj, mongoutils::str::stream* os) {
@@ -233,9 +234,20 @@ namespace {
 
         *os << "p";
 
+        // Sorts the BSON elements by field name using a map.
+        std::map<StringData, BSONElement> elements;
+
         BSONObjIterator it(projObj);
         while (it.more()) {
             BSONElement elt = it.next();
+            StringData fieldName = elt.fieldNameStringData();
+            elements[fieldName] = elt;
+        }
+
+        // Read elements in order of field name
+        for (std::map<StringData, BSONElement>::const_iterator i = elements.begin();
+             i != elements.end(); ++i) {
+            const BSONElement& elt = (*i).second;
             // BSONElement::toString() arguments
             // includeFieldName - skip field name (appending after toString() result). false.
             // full: choose less verbose representation of child/data values. false.

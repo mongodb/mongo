@@ -470,6 +470,9 @@ namespace {
         testGetPlanCacheKey("{}", "{}", "{a: {$slice: [3, 5]}}", "anp{ $slice: [ 3, 5 ] }a");
         testGetPlanCacheKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "anp{ $elemMatch: { x: 2 } }a");
         testGetPlanCacheKey("{a: 1}", "{}", "{'a.$': 1}", "eqap1a.$");
+        // Projection should be order-insensitive
+        testGetPlanCacheKey("{}", "{}", "{a: 1, b: 1}", "anp1a1b");
+        testGetPlanCacheKey("{}", "{}", "{b: 1, a: 1}", "anp1a1b");
         // With or-elimination and projection
         testGetPlanCacheKey("{$or: [{a: 1}]}", "{}", "{_id: 0, a: 1}", "eqap0_id1a");
         testGetPlanCacheKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqap1a.$");
