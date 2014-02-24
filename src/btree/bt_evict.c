@@ -433,6 +433,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 */
 	__wt_evict_file_exclusive_on(session);
 
+	/* Make sure the oldest transaction ID is up-to-date. */
+	__wt_txn_update_oldest(session);
+
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always walk one page ahead of the page being evicted.
