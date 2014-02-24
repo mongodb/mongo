@@ -539,6 +539,7 @@ namespace mongo {
         // reflecting only the actions taken locally. In particlar, we must have the no-op
         // counter reset so that we can meaningfully comapre it with numMatched above.
         opDebug->nscanned = 0;
+        opDebug->nscannedObjects = 0;
         opDebug->nModified = 0;
 
         // Get the cached document from the update driver.
@@ -610,6 +611,7 @@ namespace mongo {
             opDebug->nscanned++;
 
             // Found a matching document
+            opDebug->nscannedObjects++;
             numMatched++;
 
             // Ask the driver to apply the mods. It may be that the driver can apply those "in

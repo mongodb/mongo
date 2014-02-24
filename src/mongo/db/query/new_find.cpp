@@ -613,10 +613,19 @@ namespace mongo {
                                            shardingState.getVersion(pq.ns()));
         }
 
-        // Get explain information if it is needed by either the profiler
-        // or by an explain() query.
+        // Used to fill in explain and to determine if the query is slow enough to be logged.
+        int elapsedMillis = curop.elapsedMillis();
+
+        // Get explain information if:
+        // 1) it is needed by an explain query;
+        // 2) profiling is enabled; or
+        // 3) profiling is disabled but we still need explain details to log a "slow" query.
+        // Producing explain information is expensive and should be done only if we are certain
+        // the information will be used.
         boost::scoped_ptr<TypeExplain> explain(NULL);
-        if (isExplain || ctx.ctx().db()->getProfilingLevel() > 0) {
+        if (isExplain ||
+            ctx.ctx().db()->getProfilingLevel() > 0 ||
+            elapsedMillis > serverGlobalParams.slowMS) {
             // Ask the runner to produce explain information.
             TypeExplain* bareExplain;
             Status res = runner->getInfo(&bareExplain, NULL);
@@ -648,7 +657,7 @@ namespace mongo {
             explain->setN(numResults);
 
             // Clock the whole operation.
-            explain->setMillis(curop.elapsedMillis());
+            explain->setMillis(elapsedMillis);
 
             BSONObj explainObj = explain->toBSON();
             bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
@@ -723,6 +732,10 @@ namespace mongo {
 
             if (explain->isNScannedSet()) {
                 curop.debug().nscanned = explain->getNScanned();
+            }
+
+            if (explain->isNScannedObjectsSet()) {
+                curop.debug().nscannedObjects = explain->getNScannedObjects();
             }
 
             if (explain->isIDHackSet()) {
