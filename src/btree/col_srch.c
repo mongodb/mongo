@@ -60,7 +60,6 @@ restart:
 			base = indx + 1;
 			--limit;
 		}
-
 descend:	WT_ASSERT(session, ref != NULL);
 
 		/*
@@ -89,6 +88,10 @@ descend:	WT_ASSERT(session, ref != NULL);
 			page = ref->page;
 			continue;
 		}
+		/*
+		 * Restart is returned if we find a page that's been split;
+		 * restart the search from the top of the tree.
+		 */
 		if (ret == WT_RESTART)
 			goto restart;
 		return (ret);

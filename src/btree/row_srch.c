@@ -169,15 +169,62 @@ restart:
 			goto descend;
 
 		/*
-		 * Binary search of internal pages.  There are two versions (a
-		 * default loop and an application-specified collation loop),
-		 * because moving the collation test and error handling inside
-		 * the loop costs about 5%.
+		 * Binary search of internal pages.  There are three versions:
+		 * the case of no application-specified collation where the page
+		 * has not been split into (avoiding indirection through the
+		 * page's index array), the case of no application-specified
+		 * collation where the page has been split into, and the case
+		 * of application-specified collation (application-specified
+		 * collation is likely to dominate, so we don't bother with the
+		 * additional form).
 		 */
 		base = 0;
 		ref = NULL;
 		limit = pindex->entries - 1;
-		if (btree->collator == NULL)
+
+		if (btree->collator == NULL &&
+		    pindex->entries == page->pu_intl_oentries) {
+			for (; limit != 0; limit >>= 1) {
+				indx = base + (limit >> 1);
+				ref = &page->pu_intl_oindex[indx];
+
+				/*
+				 * If about to compare an application key with
+				 * the 0th index on an internal page, pretend
+				 * the 0th index sorts less than any application
+				 * key.  This test is so we don't have to update
+				 * internal pages if the application stores a
+				 * new, "smallest" key in the tree.
+				 */
+				if (indx != 0) {
+					__wt_ref_key(page,
+					    ref, &item->data, &item->size);
+					match = WT_MIN(skiplow, skiphigh);
+					cmp = __wt_lex_compare_skip(
+					    srch_key, item, &match);
+					if (cmp == 0)
+						goto descend;
+					if (cmp < 0) {
+						skiphigh = match;
+						continue;
+					}
+					skiplow = match;
+				}
+				base = indx + 1;
+				--limit;
+			}
+			/*
+			 * Reference the slot used for next step down the tree.
+			 *
+			 * Base is the smallest index greater than key and may
+			 * be the (last + 1) index.  (Base cannot be the 0th
+			 * index as the 0th index always sorts less than any
+			 * application key).  The slot for descent is the one
+			 * before base.
+			 */
+			if (cmp != 0)
+				ref = &page->pu_intl_oindex[base - 1];
+		} else if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				ref = pindex->index[indx];
@@ -197,7 +244,7 @@ restart:
 					cmp = __wt_lex_compare_skip(
 					    srch_key, item, &match);
 					if (cmp == 0)
-						break;
+						goto descend;
 					if (cmp < 0) {
 						skiphigh = match;
 						continue;
@@ -207,7 +254,18 @@ restart:
 				base = indx + 1;
 				--limit;
 			}
-		else
+			/*
+			 * Reference the slot used for next step down the tree.
+			 *
+			 * Base is the smallest index greater than key and may
+			 * be the (last + 1) index.  (Base cannot be the 0th
+			 * index as the 0th index always sorts less than any
+			 * application key).  The slot for descent is the one
+			 * before base.
+			 */
+			if (cmp != 0)
+				ref = pindex->index[base - 1];
+		} else {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				ref = pindex->index[indx];
@@ -226,26 +284,26 @@ restart:
 					    session, btree->collator,
 					    srch_key, item, cmp, &match));
 					if (cmp == 0)
-						break;
+						goto descend;
 					if (cmp < 0)
 						continue;
 				}
 				base = indx + 1;
 				--limit;
 			}
-
+			/*
+			 * Reference the slot used for next step down the tree.
+			 *
+			 * Base is the smallest index greater than key and may
+			 * be the (last + 1) index.  (Base cannot be the 0th
+			 * index as the 0th index always sorts less than any
+			 * application key).  The slot for descent is the one
+			 * before base.
+			 */
+			if (cmp != 0)
+				ref = pindex->index[base - 1];
+		}
 descend:	WT_ASSERT(session, ref != NULL);
-
-		/*
-		 * Reference the slot used for next step down the tree.
-		 *
-		 * Base is the smallest index greater than key and may be the
-		 * (last + 1) index.  (Base cannot be the 0th index as the 0th
-		 * index always sorts less than any application key).  The slot
-		 * for descent is the one before base.
-		 */
-		if (cmp != 0)
-			ref = pindex->index[base - 1];
 
 		/*
 		 * Swap the parent page for the child page; if the page splits
@@ -257,6 +315,10 @@ descend:	WT_ASSERT(session, ref != NULL);
 			page = ref->page;
 			continue;
 		}
+		/*
+		 * Restart is returned if we find a page that's been split;
+		 * restart the search from the top of the tree.
+		 */
 		if (ret == WT_RESTART)
 			goto restart;
 		return (ret);
