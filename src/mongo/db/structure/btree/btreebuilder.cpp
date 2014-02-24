@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+    void keyTooLongAssert( int code, const string& msg );
+
     /* --- BtreeBuilder --- */
 
     template<class V>
@@ -92,9 +94,7 @@ namespace mongo {
                                        << _btreeState->descriptor()->indexNamespace()
                                        << ' ' << key->dataSize() << ' ' << key->toString();
             problem() << msg << endl;
-            if ( isMaster( NULL ) ) {
-                uasserted( 17282, msg );
-            }
+            keyTooLongAssert( 17282, msg );
             return;
         }
 
