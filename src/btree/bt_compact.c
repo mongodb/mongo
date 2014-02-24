@@ -55,7 +55,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 		 */
 		WT_PAGE_LOCK(session, page);
 		ret = bm->compact_page_skip(bm,
-		    session, mod->u.replace.addr, mod->u.replace.size, skipp);
+		    session, mod->replace.addr, mod->replace.size, skipp);
 		WT_PAGE_UNLOCK(session, page);
 		WT_RET(ret);
 	}

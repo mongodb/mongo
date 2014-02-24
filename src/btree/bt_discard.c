@@ -112,7 +112,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Discard any replacement address: this memory is usually moved
 		 * into the parent's WT_REF, but at the root that can't happen.
 		 */
-		__wt_free(session, mod->u.replace.addr);
+		__wt_free(session, mod->replace.addr);
 		break;
 	default:
 		break;

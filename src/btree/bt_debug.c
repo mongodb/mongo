@@ -603,7 +603,7 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 	case WT_PM_REC_REPLACE:
 		__dmsg(ds, "\t" "replacement %s\n",
 		    __wt_addr_string(session, ds->tmp,
-		    mod->u.replace.addr, mod->u.replace.size));
+		    mod->replace.addr, mod->replace.size));
 		break;
 	case WT_PM_REC_SPLIT:
 		__dmsg(ds, "\t" "split page\n");

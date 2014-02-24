@@ -185,8 +185,7 @@ struct __wt_ovfl_txnc {
 
 /*
  * WT_PAGE_MODIFY --
- *	When a page is modified, there's additional information maintained as it
- * is written to disk.
+ *	When a page is modified, there's additional information to maintain.
  */
 struct __wt_page_modify {
 	/*
@@ -204,36 +203,18 @@ struct __wt_page_modify {
 	uint64_t update_txn;
 
 	/*
-	 * When pages are reconciled, the result can be a replacement page or a
-	 * split page.
+	 * When pages are reconciled, the result is one or more replacement
+	 * blocks.  In the case of multiple replacement blocks, some blocks
+	 * may be identical to blocks written after previous reconciliations
+	 * of the page, so add supporting infrastructure to detect when an
+	 * existing block is sufficient and we can skip a write.
 	 */
-	union {
-		WT_ADDR	 replace;	/* Resulting replacement */
-	} u;
-
-	/*
-	 * When pages are split into internal pages, new WT_REF arrays are
-	 * allocated, becoming an entry in the sorted list of WT_REFs.
-	 * XXXKEITH
-	 * Only internal pages have these.
-	 */
-	struct __wt_split_chunk {
-		WT_REF	*refs;		/* Split child WT_REF arrays */
-		uint32_t entries;	/* Array element count */
-	} *splits;
-	uint32_t splits_entries;	/* Split child WT_REFs element count */
-
-	/*
-	 * When reconciled pages are written as multiple blocks, they are
-	 * represented by a WT_REF array.
-	 * XXXKEITH
-	 * Internal and leaf pages can have these.
-	 */
-	struct __wt_multi {
+	WT_ADDR	 replace;		/* Single replacement block */
+	struct __wt_multi {		/* Multiple replacement blocks */
 		WT_ADDR addr;		/* Address */
 		union {
 			uint64_t recno;	/* Column-store: starting recno */
-			WT_IKEY *ikey;	/* Row-store: key */
+			WT_IKEY *ikey;	/* Row-store: variable-length key */
 		} key;
 		uint32_t cksum;		/* Checksum */
 		uint32_t size;		/* Size */
@@ -243,8 +224,24 @@ struct __wt_page_modify {
 	size_t	 multi_size;		/* Multi-block memory footprint */
 
 	/*
-	 * XXXKEITH
-	 * Only root pages have these.
+	 * When pages which have split into multiple blocks are evicted, the
+	 * multiple blocks are converted into a WT_REF array and inserted in
+	 * the parent's child index.  Those arrays live here, appearing only
+	 * in internal pages with children that have split and subsequently
+	 * been evicted.
+	 */
+	struct __wt_split_list {
+		WT_REF	*refs;		/* Split child WT_REF arrays */
+		uint32_t entries;	/* Array element count */
+	} *splits;
+	uint32_t splits_entries;	/* Split child WT_REFs element count */
+
+	/*
+	 * When a root page splits, we create a fake page and write it; that
+	 * fake page can also split and so on, and we continue this process
+	 * until we write a single replacement root block.  We use the root
+	 * split field of this structure to track that list of fake pages, so
+	 * they are discarded when they're no longer needed.
 	 */
 	WT_PAGE *root_split;		/* Linked list of root split pages */
 

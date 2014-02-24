@@ -2457,7 +2457,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 */
 				continue;
 			case WT_PM_REC_REPLACE:
-				addr = &rp->modify->u.replace;
+				addr = &rp->modify->replace;
 				break;
 			case WT_PM_REC_SPLIT:
 				WT_RET(__rec_col_merge(session, r, rp));
@@ -3244,7 +3244,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * If the page is replaced, the page's modify
 				 * structure has the page's address.
 				 */
-				addr = &rp->modify->u.replace;
+				addr = &rp->modify->replace;
 				break;
 			case WT_PM_REC_SPLIT:
 				/*
@@ -3937,11 +3937,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
 			WT_RET(bm->free(bm, session,
-			    mod->u.replace.addr, mod->u.replace.size));
+			    mod->replace.addr, mod->replace.size));
 
 		/* Discard the replacement page's address. */
-		__wt_free(session, mod->u.replace.addr);
-		mod->u.replace.size = 0;
+		__wt_free(session, mod->replace.addr);
+		mod->replace.size = 0;
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
 		/*
@@ -3996,7 +3996,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_bt_write(session,
 			    &r->dsk, NULL, NULL, 1, bnd->already_compressed));
 		else {
-			mod->u.replace = bnd->addr;
+			mod->replace = bnd->addr;
 			bnd->addr.addr = NULL;
 		}
 
