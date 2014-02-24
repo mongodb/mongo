@@ -590,19 +590,24 @@ populate_thread(void *arg)
 				lprintf(cfg, ret, 0, "Failed inserting");
 				goto err;
 			}
-			/* Gather statistics */
-			if (measure_latency) {
-				if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-					lprintf(cfg, ret, 0,
-					    "Get time call failed");
-					goto err;
-				}
-				++trk->latency_ops;
-				usecs = ns_to_us(WT_TIMEDIFF(stop, start));
-				track_operation(trk, usecs);
-			}
-			++thread->insert.ops;	/* Same as trk->ops */
 		}
+		/*
+		 * Gather statistics.
+		 * We measure the latency of inserting a single key.  If there
+		 * are multiple tables, it is the time for insertion into all
+		 * of them.
+		 */
+		if (measure_latency) {
+			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Get time call failed");
+				goto err;
+			}
+			++trk->latency_ops;
+			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+			track_operation(trk, usecs);
+		}
+		++thread->insert.ops;	/* Same as trk->ops */
 
 		if (cfg->populate_ops_per_txn != 0) {
 			if (++opcount < cfg->populate_ops_per_txn)
