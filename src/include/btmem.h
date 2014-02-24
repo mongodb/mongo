@@ -612,9 +612,8 @@ struct __wt_ref {
  * Link a child page into a reference in its parent.
  */
 #define	WT_LINK_PAGE(ppage, pref, cpage) do {				\
-	(pref)->page = (cpage);						\
 	(cpage)->parent = (ppage);					\
-	(cpage)->ref_hint = 0;		/* XXXKEITH: do better */	\
+	(pref)->page = (cpage);						\
 } while (0)
 
 /*

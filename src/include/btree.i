@@ -221,26 +221,21 @@ retry:	parent = page->parent;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
-	 * to the correct location.  It's not an error for the hint to be wrong,
-	 * we don't bother initializing it everywhere, it only implies the first
-	 * retrieval is slower.
+	 * to the correct location.  (It's not an error for a hint to be wrong,
+	 * we usually don't initialize it when a page is first linked into the
+	 * tree, it just means the first retrieval is slower.)  If the page has
+	 * split, we'd expect the hint to point earlier in the array than the
+	 * page's actual WT_REF, so the first loop is from the hint to the end
+	 * of the list and the second loop is from the start of the array to the
+	 * end of the array.  (The second loop overlaps the first, but that will
+	 * only happen in cases where we've deepened the tree and we're going to
+	 * yield the processor anyway.)
 	 */
-	if (page->ref_hint < pindex->entries &&
-	    pindex->index[page->ref_hint]->page == page) {
-		*slotp = page->ref_hint;
-		return (0);
-	}
-
-	for (i = page->ref_hint + 1; i < pindex->entries; ++i)
+	for (i = page->ref_hint; i < pindex->entries; ++i)
 		if (pindex->index[i]->page == page) {
 			*slotp = page->ref_hint = i;
 			return (0);
 		}
-
-	/*
-	 * If we don't find it, the page must have split, start the search from
-	 * the beginning of the page.
-	 */
 	for (i = 0; i < pindex->entries; ++i)
 		if (pindex->index[i]->page == page) {
 			*slotp = page->ref_hint = i;
