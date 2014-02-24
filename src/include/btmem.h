@@ -326,8 +326,8 @@ struct __wt_page {
 		 * because the array reference is updated atomically, but code
 		 * reading the fields multiple times would be a very bad idea.
 		 * Specifically, do not do this:
-		 *	WT_REF **refp = page->pu_intl_index->index;
-		 *	uint32_t entries = page->pu_intl_index->entries;
+		 *	WT_REF **refp = page->pg_intl_index->index;
+		 *	uint32_t entries = page->pg_intl_index->entries;
 		 *
 		 * The field is declared volatile (so the compiler knows not to
 		 * read it multiple times).
@@ -343,19 +343,19 @@ struct __wt_page {
 			WT_REF	*oindex;	/* Original children */
 			uint32_t oentries;	/* Original children count */
 		} intl;
-#undef	pu_intl_recno
-#define	pu_intl_recno		u.intl.recno
-#undef	pu_intl_oindex
-#define	pu_intl_oindex		u.intl.oindex
-#undef	pu_intl_oentries
-#define	pu_intl_oentries	u.intl.oentries
-#undef	pu_intl_index
-#define	pu_intl_index		u.intl.index
+#undef	pg_intl_recno
+#define	pg_intl_recno		u.intl.recno
+#undef	pg_intl_oindex
+#define	pg_intl_oindex		u.intl.oindex
+#undef	pg_intl_oentries
+#define	pg_intl_oentries	u.intl.oentries
+#undef	pg_intl_index
+#define	pg_intl_index		u.intl.index
 #define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
 	uint32_t __entries;						\
-	for (__pindex = (page)->pu_intl_index,				\
+	for (__pindex = (page)->pg_intl_index,				\
 	    __refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
@@ -380,14 +380,14 @@ struct __wt_page {
 
 			uint32_t entries;	/* Entries */
 		} row;
-#undef	pu_row_d
-#define	pu_row_d	u.row.d
-#undef	pu_row_ins
-#define	pu_row_ins	u.row.ins
-#undef	pu_row_upd
-#define	pu_row_upd	u.row.upd
-#define	pu_row_entries	u.row.entries
-#define	pu_row_entries	u.row.entries
+#undef	pg_row_d
+#define	pg_row_d	u.row.d
+#undef	pg_row_ins
+#define	pg_row_ins	u.row.ins
+#undef	pg_row_upd
+#define	pg_row_upd	u.row.upd
+#define	pg_row_entries	u.row.entries
+#define	pg_row_entries	u.row.entries
 
 		/* Fixed-length column-store leaf page. */
 		struct {
@@ -396,12 +396,12 @@ struct __wt_page {
 			uint8_t	*bitf;		/* Values */
 			uint32_t entries;	/* Entries */
 		} col_fix;
-#undef	pu_fix_recno
-#define	pu_fix_recno	u.col_fix.recno
-#undef	pu_fix_bitf
-#define	pu_fix_bitf	u.col_fix.bitf
-#undef	pu_fix_entries
-#define	pu_fix_entries	u.col_fix.entries
+#undef	pg_fix_recno
+#define	pg_fix_recno	u.col_fix.recno
+#undef	pg_fix_bitf
+#define	pg_fix_bitf	u.col_fix.bitf
+#undef	pg_fix_entries
+#define	pg_fix_entries	u.col_fix.entries
 
 		/* Variable-length column-store leaf page. */
 		struct {
@@ -419,16 +419,16 @@ struct __wt_page {
 
 			uint32_t    entries;	/* Entries */
 		} col_var;
-#undef	pu_var_recno
-#define	pu_var_recno	u.col_var.recno
-#undef	pu_var_d
-#define	pu_var_d	u.col_var.d
-#undef	pu_var_repeats
-#define	pu_var_repeats	u.col_var.repeats
-#undef	pu_var_nrepeats
-#define	pu_var_nrepeats	u.col_var.nrepeats
-#undef	pu_var_entries
-#define	pu_var_entries	u.col_var.entries
+#undef	pg_var_recno
+#define	pg_var_recno	u.col_var.recno
+#undef	pg_var_d
+#define	pg_var_d	u.col_var.d
+#undef	pg_var_repeats
+#define	pg_var_repeats	u.col_var.repeats
+#undef	pg_var_nrepeats
+#define	pg_var_nrepeats	u.col_var.nrepeats
+#undef	pg_var_entries
+#define	pg_var_entries	u.col_var.entries
 	} u;
 
 	/* Page's on-disk representation: NULL for pages created in memory. */
@@ -666,11 +666,11 @@ struct __wt_row {
  *	Walk the entries of an in-memory row-store leaf page.
  */
 #define	WT_ROW_FOREACH(page, rip, i)					\
-	for ((i) = (page)->pu_row_entries,				\
-	    (rip) = (page)->pu_row_d; (i) > 0; ++(rip), --(i))
+	for ((i) = (page)->pg_row_entries,				\
+	    (rip) = (page)->pg_row_d; (i) > 0; ++(rip), --(i))
 #define	WT_ROW_FOREACH_REVERSE(page, rip, i)				\
-	for ((i) = (page)->pu_row_entries,				\
-	    (rip) = (page)->pu_row_d + ((page)->pu_row_entries - 1);	\
+	for ((i) = (page)->pg_row_entries,				\
+	    (rip) = (page)->pg_row_d + ((page)->pg_row_entries - 1);	\
 	    (i) > 0; --(rip), --(i))
 
 /*
@@ -678,7 +678,7 @@ struct __wt_row {
  *	Return the 0-based array offset based on a WT_ROW reference.
  */
 #define	WT_ROW_SLOT(page, rip)						\
-	((uint32_t)(((WT_ROW *)rip) - (page)->pu_row_d))
+	((uint32_t)(((WT_ROW *)rip) - (page)->pg_row_d))
 
 /*
  * WT_COL --
@@ -727,15 +727,15 @@ struct __wt_col_rle {
  *	Walk the entries of variable-length column-store leaf page.
  */
 #define	WT_COL_FOREACH(page, cip, i)					\
-	for ((i) = (page)->pu_var_entries,				\
-	    (cip) = (page)->pu_var_d; (i) > 0; ++(cip), --(i))
+	for ((i) = (page)->pg_var_entries,				\
+	    (cip) = (page)->pg_var_d; (i) > 0; ++(cip), --(i))
 
 /*
  * WT_COL_SLOT --
  *	Return the 0-based array offset based on a WT_COL reference.
  */
 #define	WT_COL_SLOT(page, cip)						\
-	((uint32_t)(((WT_COL *)cip) - (page)->pu_var_d))
+	((uint32_t)(((WT_COL *)cip) - (page)->pg_var_d))
 
 /*
  * WT_IKEY --
@@ -884,12 +884,12 @@ struct __wt_insert_head {
  * of pointers and the specific structure exist, else NULL.
  */
 #define	WT_ROW_INSERT_SLOT(page, slot)					\
-	((page)->pu_row_ins == NULL ? NULL : (page)->pu_row_ins[slot])
+	((page)->pg_row_ins == NULL ? NULL : (page)->pg_row_ins[slot])
 #define	WT_ROW_INSERT(page, ip)						\
 	WT_ROW_INSERT_SLOT(page, WT_ROW_SLOT(page, ip))
 #define	WT_ROW_UPDATE(page, ip)						\
-	((page)->pu_row_upd == NULL ?					\
-	    NULL : (page)->pu_row_upd[WT_ROW_SLOT(page, ip)])
+	((page)->pg_row_upd == NULL ?					\
+	    NULL : (page)->pg_row_upd[WT_ROW_SLOT(page, ip)])
 /*
  * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
  * the "one per WT_ROW slot" insert array.  That's because the insert array
@@ -897,8 +897,8 @@ struct __wt_insert_head {
  * original page.
  */
 #define	WT_ROW_INSERT_SMALLEST(page)					\
-	((page)->pu_row_ins == NULL ?					\
-	    NULL : (page)->pu_row_ins[(page)->pu_row_entries])
+	((page)->pg_row_ins == NULL ?					\
+	    NULL : (page)->pg_row_ins[(page)->pg_row_entries])
 
 /*
  * The column-store leaf page update lists are arrays of pointers to structures,

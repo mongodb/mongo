@@ -217,7 +217,7 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
 retry:	parent = page->parent;
-	pindex = *pindexp = parent->pu_intl_index;
+	pindex = *pindexp = parent->pg_intl_index;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
@@ -850,7 +850,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	if (root == NULL)
 		return (0);
 
-	pindex = root->pu_intl_index;
+	pindex = root->pg_intl_index;
 	first = pindex->index[0];
 	if ((child = first->page) == NULL)
 		return (0);

@@ -175,15 +175,15 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 
 	switch (type) {
 	case WT_PAGE_COL_FIX:
-		page->pu_fix_recno = recno;
-		page->pu_fix_entries = alloc_entries;
+		page->pg_fix_recno = recno;
+		page->pg_fix_entries = alloc_entries;
 		break;
 	case WT_PAGE_COL_INT:
-		page->pu_intl_recno = recno;
+		page->pg_intl_recno = recno;
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
-		page->pu_intl_oindex = p;
-		page->pu_intl_oentries = alloc_entries;
+		page->pg_intl_oindex = p;
+		page->pg_intl_oentries = alloc_entries;
 
 		/*
 		 * Internal pages have an array of WT_REF pointers so they can
@@ -198,23 +198,23 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		}
 		size +=
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *);
-		page->pu_intl_index = p;
-		page->pu_intl_index->entries = alloc_entries;
-		page->pu_intl_index->index =
+		page->pg_intl_index = p;
+		page->pg_intl_index->entries = alloc_entries;
+		page->pg_intl_index->index =
 		    (WT_REF **)((WT_PAGE_INDEX *)p + 1);
 		for (i = 0,
-		    refp = page->pu_intl_index->index; i < alloc_entries; ++i)
-			*refp++ = &page->pu_intl_oindex[i];
+		    refp = page->pg_intl_index->index; i < alloc_entries; ++i)
+			*refp++ = &page->pg_intl_oindex[i];
 
 		break;
 	case WT_PAGE_COL_VAR:
-		page->pu_var_recno = recno;
-		page->pu_var_d = p;
-		page->pu_var_entries = alloc_entries;
+		page->pg_var_recno = recno;
+		page->pg_var_d = p;
+		page->pg_var_entries = alloc_entries;
 		break;
 	case WT_PAGE_ROW_LEAF:
-		page->pu_row_entries = alloc_entries;
-		page->pu_row_d = p;
+		page->pg_row_entries = alloc_entries;
+		page->pg_row_d = p;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -348,7 +348,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = S2BT(session);
 	dsk = page->dsk;
 
-	page->pu_fix_bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
+	page->pg_fix_bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
 }
 
 /*
@@ -373,7 +373,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Walk the page, building references: the page contains value items.
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
-	ref = page->pu_intl_oindex;
+	ref = page->pg_intl_oindex;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		ref->addr = cell;
@@ -433,7 +433,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	repeats = NULL;
 	repeat_off = 0;
 	bytes_allocated = 0;
-	recno = page->pu_var_recno;
+	recno = page->pg_var_recno;
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
@@ -441,7 +441,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
 	 */
 	indx = 0;
-	cip = page->pu_var_d;
+	cip = page->pg_var_d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
@@ -460,8 +460,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 				WT_RET(__wt_realloc_def(session,
 				    &bytes_allocated, n + 1, &repeats));
 
-				page->pu_var_repeats = repeats;
-				page->pu_var_nrepeats = n;
+				page->pg_var_repeats = repeats;
+				page->pg_var_nrepeats = n;
 				*sizep += bytes_allocated;
 			}
 			repeats[repeat_off].indx = indx;
@@ -502,7 +502,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * location cookie pairs.  Keys are on-page/overflow items and location
 	 * cookies are WT_CELL_ADDR_XXX items.
 	 */
-	ref = page->pu_intl_oindex;
+	ref = page->pg_intl_oindex;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
@@ -632,7 +632,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	unpack = &_unpack;
 
 	/* Walk the page, building indices. */
-	rip = page->pu_row_d;
+	rip = page->pg_row_d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {

@@ -123,13 +123,13 @@ __col_var_last_recno(WT_PAGE *page)
 	 * records on the page.  This function ignores those records, so our
 	 * callers have to handle that explicitly, if they care.
 	 */
-	if (page->pu_var_nrepeats == 0)
-		return (page->pu_var_entries == 0 ? 0 :
-		    page->pu_var_recno + (page->pu_var_entries - 1));
+	if (page->pg_var_nrepeats == 0)
+		return (page->pg_var_entries == 0 ? 0 :
+		    page->pg_var_recno + (page->pg_var_entries - 1));
 
-	repeat = &page->pu_var_repeats[page->pu_var_nrepeats - 1];
+	repeat = &page->pg_var_repeats[page->pg_var_nrepeats - 1];
 	return ((repeat->recno + repeat->rle) - 1 +
-	    (page->pu_var_entries - (repeat->indx + 1)));
+	    (page->pg_var_entries - (repeat->indx + 1)));
 }
 
 /*
@@ -144,8 +144,8 @@ __col_fix_last_recno(WT_PAGE *page)
 	 * records on the page.  This function ignores those records, so our
 	 * callers have to handle that explicitly, if they care.
 	 */
-	return (page->pu_fix_entries == 0 ? 0 :
-	    page->pu_fix_recno + (page->pu_fix_entries - 1));
+	return (page->pg_fix_entries == 0 ? 0 :
+	    page->pg_fix_recno + (page->pg_fix_entries - 1));
 }
 
 /*
@@ -168,13 +168,13 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 	 * slot for this record number, because we know any intervening records
 	 * have repeat counts of 1.
 	 */
-	for (base = 0, limit = page->pu_var_nrepeats; limit != 0; limit >>= 1) {
+	for (base = 0, limit = page->pg_var_nrepeats; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 
-		repeat = page->pu_var_repeats + indx;
+		repeat = page->pg_var_repeats + indx;
 		if (recno >= repeat->recno &&
 		    recno < repeat->recno + repeat->rle)
-			return (page->pu_var_d + repeat->indx);
+			return (page->pg_var_d + repeat->indx);
 		if (recno < repeat->recno)
 			continue;
 		base = indx + 1;
@@ -187,15 +187,15 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 	 */
 	if (base == 0) {
 		start_indx = 0;
-		start_recno = page->pu_var_recno;
+		start_recno = page->pg_var_recno;
 	} else {
-		repeat = page->pu_var_repeats + (base - 1);
+		repeat = page->pg_var_repeats + (base - 1);
 		start_indx = repeat->indx + 1;
 		start_recno = repeat->recno + repeat->rle;
 	}
 
-	if (recno >= start_recno + (page->pu_var_entries - start_indx))
+	if (recno >= start_recno + (page->pg_var_entries - start_indx))
 		return (NULL);
 
-	return (page->pu_var_d + start_indx + (uint32_t)(recno - start_recno));
+	return (page->pg_var_d + start_indx + (uint32_t)(recno - start_recno));
 }

@@ -106,7 +106,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		} else {
 			WT_PAGE_ALLOC_AND_SWAP(
 			    session, page, page->modify->update,
-			    ins_headp, page->pu_var_entries);
+			    ins_headp, page->pg_var_entries);
 			ins_headp = &page->modify->update[cbt->slot];
 		}
 

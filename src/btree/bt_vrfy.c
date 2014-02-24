@@ -280,13 +280,13 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		recno = page->pu_fix_recno;
+		recno = page->pg_fix_recno;
 		goto recno_chk;
 	case WT_PAGE_COL_INT:
-		recno = page->pu_intl_recno;
+		recno = page->pg_intl_recno;
 		goto recno_chk;
 	case WT_PAGE_COL_VAR:
-		recno = page->pu_var_recno;
+		recno = page->pg_var_recno;
 recno_chk:	if (recno != vs->record_total + 1)
 			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s has a starting record of %" PRIu64
@@ -297,7 +297,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 	}
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		vs->record_total += page->pu_fix_entries;
+		vs->record_total += page->pg_fix_entries;
 		break;
 	case WT_PAGE_COL_VAR:
 		recno = 0;
@@ -509,7 +509,7 @@ __verify_row_leaf_key_order(
 	 * If a tree is empty (just created), it won't have keys; if there
 	 * are no keys, we're done.
 	 */
-	if (page->pu_row_entries == 0)
+	if (page->pg_row_entries == 0)
 		return (0);
 
 	/*
@@ -519,7 +519,7 @@ __verify_row_leaf_key_order(
 	 */
 	if (vs->max_addr->size != 0) {
 		WT_RET(__wt_row_leaf_key_copy(
-		    session, page, page->pu_row_d, vs->tmp1));
+		    session, page, page->pg_row_d, vs->tmp1));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -544,7 +544,7 @@ __verify_row_leaf_key_order(
 
 	/* Update the largest key we've seen to the last key on this page. */
 	WT_RET(__wt_row_leaf_key_copy(session, page,
-	    page->pu_row_d + (page->pu_row_entries - 1), vs->max_key));
+	    page->pg_row_d + (page->pg_row_entries - 1), vs->max_key));
 	(void)__wt_page_addr_string(session, vs->max_addr, page);
 
 	return (0);

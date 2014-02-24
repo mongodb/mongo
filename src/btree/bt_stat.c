@@ -61,12 +61,12 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		WT_STAT_INCR(stats, btree_column_fix);
-		WT_STAT_INCRV(stats, btree_entries, page->pu_fix_entries);
+		WT_STAT_INCRV(stats, btree_entries, page->pg_fix_entries);
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, btree_column_internal);
 		WT_STAT_INCRV(
-		    stats, btree_entries, page->pu_intl_index->entries);
+		    stats, btree_entries, page->pg_intl_index->entries);
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_RET(__stat_page_col_var(page, stats));
@@ -77,7 +77,7 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 	case WT_PAGE_ROW_INT:
 		WT_STAT_INCR(stats, btree_row_internal);
 		WT_STAT_INCRV(
-		    stats, btree_entries, page->pu_intl_index->entries);
+		    stats, btree_entries, page->pg_intl_index->entries);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__stat_page_row_leaf(page, stats));

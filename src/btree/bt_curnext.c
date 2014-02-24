@@ -87,7 +87,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_fix_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, cbt->page->pu_fix_recno);
+		__cursor_set_recno(cbt, cbt->page->pg_fix_recno);
 		goto new_page;
 	}
 
@@ -170,7 +170,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_var_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, cbt->page->pu_var_recno);
+		__cursor_set_recno(cbt, cbt->page->pg_var_recno);
 		goto new_page;
 	}
 
@@ -282,7 +282,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 
 		/* Check for the end of the page. */
 		if (cbt->row_iteration_slot >=
-		    cbt->page->pu_row_entries * 2 + 1)
+		    cbt->page->pg_row_entries * 2 + 1)
 			return (WT_NOTFOUND);
 		++cbt->row_iteration_slot;
 
@@ -300,7 +300,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins = NULL;
 
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
-		rip = &cbt->page->pu_row_d[cbt->slot];
+		rip = &cbt->page->pg_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;

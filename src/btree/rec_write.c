@@ -489,7 +489,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	WT_ERR(__wt_multi_to_ref(session,
-	    next, mod->multi, next->pu_intl_oindex, mod->multi_entries));
+	    next, mod->multi, next->pg_intl_oindex, mod->multi_entries));
 
 	/*
 	 * We maintain a list of pages written for the root in order to free the
@@ -2430,7 +2430,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	unpack = &_unpack;
 
 	WT_RET(__rec_split_init(
-	    session, r, page, page->pu_intl_recno, btree->maxintlpage));
+	    session, r, page, page->pg_intl_recno, btree->maxintlpage));
 
 	/* For each entry in the in-memory page... */
 	WT_INTL_FOREACH_BEGIN(page, ref) {
@@ -2568,15 +2568,15 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Allocate the memory. */
 	WT_RET(__rec_split_init(
-	    session, r, page, page->pu_fix_recno, btree->maxleafpage));
+	    session, r, page, page->pg_fix_recno, btree->maxleafpage));
 
 	/* Copy the updated, disk-image bytes into place. */
-	memcpy(r->first_free, page->pu_fix_bitf,
-	    __bitstr_size((size_t)page->pu_fix_entries * btree->bitcnt));
+	memcpy(r->first_free, page->pg_fix_bitf,
+	    __bitstr_size((size_t)page->pg_fix_entries * btree->bitcnt));
 
 	/* Calculate the number of entries per page remainder. */
-	entry = page->pu_fix_entries;
-	nrecs = WT_FIX_ENTRIES(btree, r->space_avail) - page->pu_fix_entries;
+	entry = page->pg_fix_entries;
+	nrecs = WT_FIX_ENTRIES(btree, r->space_avail) - page->pg_fix_entries;
 	r->recno += entry;
 
 	/* Walk any append list. */
@@ -2656,10 +2656,10 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 	 * don't want to have to retrofit the code later.
 	 */
 	WT_RET(__rec_split_init(
-	    session, r, page, page->pu_fix_recno, btree->maxleafpage));
+	    session, r, page, page->pg_fix_recno, btree->maxleafpage));
 
 	/* We may not be taking all of the entries on the original page. */
-	page_take = salvage->take == 0 ? page->pu_fix_entries : salvage->take;
+	page_take = salvage->take == 0 ? page->pg_fix_entries : salvage->take;
 	page_start = salvage->skip == 0 ? 0 : salvage->skip;
 	for (;;) {
 		/* Calculate the number of entries per page. */
@@ -2673,7 +2673,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 		for (; nrecs > 0 && page_take > 0;
 		    --nrecs, --page_take, ++page_start, ++entry)
 			__bit_setv(r->first_free, entry, btree->bitcnt,
-			    __bit_getv(page->pu_fix_bitf,
+			    __bit_getv(page->pg_fix_bitf,
 				(uint32_t)page_start, btree->bitcnt));
 
 		r->recno += entry;
@@ -2809,7 +2809,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	upd = NULL;
 
 	WT_RET(__rec_split_init(
-	    session, r, page, page->pu_var_recno, btree->maxleafpage));
+	    session, r, page, page->pg_var_recno, btree->maxleafpage));
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there

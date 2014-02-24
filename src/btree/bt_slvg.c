@@ -532,9 +532,9 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 0, &page));
 		WT_ERR(__wt_row_leaf_key_copy(session,
-		    page, &page->pu_row_d[0], &trk->row_start));
+		    page, &page->pg_row_d[0], &trk->row_start));
 		WT_ERR(__wt_row_leaf_key_copy(session, page,
-		    &page->pu_row_d[page->pu_row_entries - 1], &trk->row_stop));
+		    &page->pg_row_d[page->pg_row_entries - 1], &trk->row_stop));
 
 		if (WT_VERBOSE_ISSET(session, salvage)) {
 			WT_ERR(__wt_buf_set_printable(session, ss->tmp1,
@@ -1080,7 +1080,7 @@ __slvg_col_build_internal(
 	page->parent = NULL;				/* Root page */
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (ref = page->pu_intl_oindex, i = 0; i < ss->pages_next; ++i) {
+	for (ref = page->pg_intl_oindex, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
@@ -1146,16 +1146,16 @@ __slvg_col_build_leaf(
 	page = ref->page;
 
 	entriesp = page->type == WT_PAGE_COL_VAR ?
-	    &page->pu_var_entries : &page->pu_fix_entries;
+	    &page->pg_var_entries : &page->pg_fix_entries;
 
-	save_col_var = page->pu_var_d;
+	save_col_var = page->pg_var_d;
 	save_entries = *entriesp;
 
 	/*
 	 * Calculate the number of K/V entries we are going to skip, and
 	 * the total number of K/V entries we'll take from this page.
 	 */
-	cookie->skip = skip = trk->col_start - page->pu_var_recno;
+	cookie->skip = skip = trk->col_start - page->pg_var_recno;
 	cookie->take = take = (trk->col_stop - trk->col_start) + 1;
 
 	WT_VERBOSE_ERR(session, salvage,
@@ -1178,9 +1178,9 @@ __slvg_col_build_leaf(
 	 * reference as well as the page itself.
 	 */
 	if (trk->col_missing == 0)
-		page->pu_var_recno = trk->col_start;
+		page->pg_var_recno = trk->col_start;
 	else {
-		page->pu_var_recno = trk->col_missing;
+		page->pg_var_recno = trk->col_missing;
 		cookie->missing = trk->col_start - trk->col_missing;
 
 		WT_VERBOSE_ERR(session, salvage,
@@ -1189,7 +1189,7 @@ __slvg_col_build_leaf(
 		    session, trk->ss->tmp1, trk->addr.addr, trk->addr.size),
 		    cookie->missing);
 	}
-	ref->key.recno = page->pu_var_recno;
+	ref->key.recno = page->pg_var_recno;
 
 	/*
 	 * We can't discard the original blocks associated with this page now.
@@ -1209,7 +1209,7 @@ __slvg_col_build_leaf(
 	WT_ERR(__wt_rec_write(session, page, cookie, WT_SKIP_UPDATE_ERR));
 
 	/* Reset the page. */
-	page->pu_var_d = save_col_var;
+	page->pg_var_d = save_col_var;
 	*entriesp = save_entries;
 
 	ret = __wt_page_release(session, page);
@@ -1241,7 +1241,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
-	recno = page->pu_var_recno;
+	recno = page->pg_var_recno;
 	start = recno + skip;
 	stop = (recno + skip + take) - 1;
 
@@ -1661,7 +1661,7 @@ __slvg_row_build_internal(
 	page->parent = NULL;
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (ref = page->pu_intl_oindex, i = 0; i < ss->pages_next; ++i) {
+	for (ref = page->pg_intl_oindex, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
@@ -1806,14 +1806,14 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	/* We should have selected some entries, but not the entire page. */
 	WT_ASSERT(session,
 	    skip_start + skip_stop > 0 &&
-	    skip_start + skip_stop < page->pu_row_entries);
+	    skip_start + skip_stop < page->pg_row_entries);
 
 	/*
 	 * Take a copy of this page's first key to define the start of
 	 * its range.  The key may require processing, otherwise, it's
 	 * a copy from the page.
 	 */
-	rip = page->pu_row_d + skip_start;
+	rip = page->pg_row_d + skip_start;
 	WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
 	WT_ERR(__wt_row_ikey_incr(
 	    session, parent, 0, key->data, key->size, &ref->key.ikey));
@@ -1824,7 +1824,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__slvg_row_merge_ovfl(session, trk, page, 0, skip_start));
 	WT_ERR(__slvg_row_merge_ovfl(session, trk, page,
-	    page->pu_row_entries - skip_stop, page->pu_row_entries));
+	    page->pg_row_entries - skip_stop, page->pg_row_entries));
 
 	/*
 	 * If we take all of the keys, we don't write the page and we clear the
@@ -1841,7 +1841,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		 * is no need to copy anything on the page itself, the entries
 		 * value limits the number of page items.
 		 */
-		page->pu_row_entries -= skip_stop;
+		page->pg_row_entries -= skip_stop;
 		cookie->skip = skip_start;
 
 		/*
@@ -1864,7 +1864,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		    session, page, cookie, WT_SKIP_UPDATE_ERR));
 
 		/* Reset the page. */
-		page->pu_row_entries += skip_stop;
+		page->pg_row_entries += skip_stop;
 	}
 
 	/*
@@ -1900,7 +1900,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
-	for (rip = page->pu_row_d + start; start < stop; ++start) {
+	for (rip = page->pg_row_d + start; start < stop; ++start) {
 		ikey = WT_ROW_KEY_COPY(rip);
 		if (__wt_off_page(page, ikey))
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);

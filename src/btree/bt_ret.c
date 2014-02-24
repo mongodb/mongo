@@ -23,7 +23,7 @@ __wt_row_key_get(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 
 	switch (page->type) {
 	case WT_PAGE_ROW_LEAF:
-		rip = &page->pu_row_d[cbt->slot];
+		rip = &page->pg_row_d[cbt->slot];
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the key from
@@ -103,10 +103,10 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			cursor->value.size = upd->size;
 			return (0);
 		}
-		cell = WT_COL_PTR(page, &page->pu_var_d[cbt->slot]);
+		cell = WT_COL_PTR(page, &page->pg_var_d[cbt->slot]);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		rip = &page->pu_row_d[cbt->slot];
+		rip = &page->pg_row_d[cbt->slot];
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the key and

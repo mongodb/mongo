@@ -95,15 +95,15 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 		switch (btree->type) {
 		case BTREE_COL_FIX:
 			if (cbt->recno >=
-			    page->pu_fix_recno + page->pu_fix_entries)
+			    page->pg_fix_recno + page->pg_fix_entries)
 				return (1);
 			break;
 		case BTREE_COL_VAR:
-			if (cbt->slot > page->pu_var_entries)
+			if (cbt->slot > page->pg_var_entries)
 				return (1);
 			break;
 		case BTREE_ROW:
-			if (cbt->slot > page->pu_row_entries)
+			if (cbt->slot > page->pg_row_entries)
 				return (1);
 			break;
 		}
@@ -115,22 +115,22 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	 */
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		if (page->pu_fix_entries == 0)
+		if (page->pg_fix_entries == 0)
 			return (1);
 		break;
 	case BTREE_COL_VAR:
-		if (page->pu_var_entries == 0)
+		if (page->pg_var_entries == 0)
 			return (1);
-		cip = &page->pu_var_d[cbt->slot];
+		cip = &page->pg_var_d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
 		    __wt_cell_type(cell) == WT_CELL_DEL)
 			return (1);
 		break;
 	case BTREE_ROW:
-		if (page->pu_row_entries == 0)
+		if (page->pg_row_entries == 0)
 			return (1);
-		if (page->pu_row_upd != NULL && (upd = __wt_txn_read(session,
-		    page->pu_row_upd[cbt->slot])) != NULL &&
+		if (page->pg_row_upd != NULL && (upd = __wt_txn_read(session,
+		    page->pg_row_upd[cbt->slot])) != NULL &&
 		    WT_UPDATE_DELETED_ISSET(upd))
 			return (1);
 		break;

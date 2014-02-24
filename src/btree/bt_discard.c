@@ -151,7 +151,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Free the insert/update array. */
 	if (mod->update != NULL)
 		__free_skip_array(session, mod->update,
-		    page->type == WT_PAGE_COL_FIX ? 1 : page->pu_var_entries);
+		    page->type == WT_PAGE_COL_FIX ? 1 : page->pg_var_entries);
 
 	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
 	__wt_ovfl_onpage_discard(session, page);
@@ -172,10 +172,10 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free any memory allocated for the original set of WT_REFs. */
 	__wt_free_ref_array(
-	    session, page, page->pu_intl_oindex, page->pu_intl_oentries);
+	    session, page, page->pg_intl_oindex, page->pg_intl_oentries);
 
 	/* Free any memory allocated for the child index array. */
-	__wt_free(session, page->pu_intl_index);
+	__wt_free(session, page->pg_intl_index);
 }
 
 /*
@@ -236,7 +236,7 @@ static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the RLE lookup array. */
-	__wt_free(session, page->pu_var_repeats);
+	__wt_free(session, page->pg_var_repeats);
 }
 
 /*
@@ -270,13 +270,13 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * insert array has an extra slot to hold keys that sort before keys
 	 * found on the original page).
 	 */
-	if (page->pu_row_ins != NULL)
+	if (page->pg_row_ins != NULL)
 		__free_skip_array(
-		    session, page->pu_row_ins, page->pu_row_entries + 1);
+		    session, page->pg_row_ins, page->pg_row_entries + 1);
 
 	/* Free the update array. */
-	if (page->pu_row_upd != NULL)
-		__free_update(session, page->pu_row_upd, page->pu_row_entries);
+	if (page->pg_row_upd != NULL)
+		__free_update(session, page->pg_row_upd, page->pg_row_entries);
 }
 
 /*

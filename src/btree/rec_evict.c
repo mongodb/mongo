@@ -228,7 +228,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	alloc_index = NULL;
 	alloc_ref = NULL;
 
-	pindex = page->pu_intl_index;
+	pindex = page->pg_intl_index;
 	entries = (uint32_t)btree->split_deepen;
 
 	WT_VERBOSE_ERR(session, split,
@@ -297,7 +297,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* Initialize the page, mark it dirty. */
 		if (page->type == WT_PAGE_COL_INT)
-			child->pu_intl_recno = (*refp)->key.recno;
+			child->pg_intl_recno = (*refp)->key.recno;
 		child->parent = page;
 		child->ref_hint = i;
 		child->type = page->type;
@@ -316,7 +316,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * that won't confuse other threads of control in the page.  For
 		 * now, I'm just copying everything.)
 		 */
-		for (ref = child->pu_intl_oindex, incr = 0,
+		for (ref = child->pg_intl_oindex, incr = 0,
 		    j = 0; j < slots; ++refp, ++ref, ++j) {
 			ref->page = (*refp)->page;
 			WT_ERR(__rec_split_copy_addr(
@@ -333,7 +333,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 		if (incr != 0)
 			__wt_cache_page_inmem_incr(session, child, incr);
-		WT_ASSERT(session, ref - child->pu_intl_oindex == slots);
+		WT_ASSERT(session, ref - child->pg_intl_oindex == slots);
 	}
 	if (parent_incr != 0)
 		__wt_cache_page_inmem_incr(session, page, parent_incr);
@@ -357,7 +357,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * will wait for its parent reference to be updated, so once we've
 	 * updated the parent, walk the children and fix them up.
 	 */
-	WT_PUBLISH(page->pu_intl_index, alloc_index);
+	WT_PUBLISH(page->pg_intl_index, alloc_index);
 	alloc_index = NULL;
 	/*
 	 * XXXKEITH
@@ -368,7 +368,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Fix up the children; this is the change that makes the split visible
 	 * to threads already in the tree.
 	 */
-	pindex = page->pu_intl_index;
+	pindex = page->pg_intl_index;
 	for (refp = pindex->index + SPLIT_CORRECT_1,
 	    i = pindex->entries - SPLIT_CORRECT_1; i > 0; ++refp, --i) {
 		parent_ref = *refp;
@@ -459,7 +459,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	parent_mod->splits[i].entries = mod->multi_entries;
 
 	/* Allocate a new WT_REF index array and initialize it. */
-	pindex = parent->pu_intl_index;
+	pindex = parent->pg_intl_index;
 	parent_entries = pindex->entries;
 	split = parent_mod->splits[i].refs;
 	split_entries = parent_mod->splits[i].entries;
@@ -483,7 +483,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * Update the parent page's index: this is the update that splits the
 	 * parent page, making the split visible to other threads.
 	 */
-	WT_PUBLISH(parent->pu_intl_index, alloc_index);
+	WT_PUBLISH(parent->pg_intl_index, alloc_index);
 	alloc_index = NULL;
 	/*
 	 * XXXKEITH

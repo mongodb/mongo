@@ -155,7 +155,7 @@ restart:
 		 * Fast-path internal pages with one child, a common case for
 		 * the root page in new trees.
 		 */
-		pindex = page->pu_intl_index;
+		pindex = page->pg_intl_index;
 		base = pindex->entries;
 		ref = pindex->index[base - 1];
 		if (base == 1)
@@ -183,10 +183,10 @@ restart:
 		limit = pindex->entries - 1;
 
 		if (btree->collator == NULL &&
-		    pindex->entries == page->pu_intl_oentries) {
+		    pindex->entries == page->pg_intl_oentries) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = &page->pu_intl_oindex[indx];
+				ref = &page->pg_intl_oindex[indx];
 
 				/*
 				 * If about to compare an application key with
@@ -223,7 +223,7 @@ restart:
 			 * before base.
 			 */
 			if (cmp != 0)
-				ref = &page->pu_intl_oindex[base - 1];
+				ref = &page->pg_intl_oindex[base - 1];
 		} else if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
@@ -340,11 +340,11 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 */
 	cmp = -1;
 	base = 0;
-	limit = page->pu_row_entries;
+	limit = page->pg_row_entries;
 	if (btree->collator == NULL)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->pu_row_d + indx;
+			rip = page->pg_row_d + indx;
 
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			match = WT_MIN(skiplow, skiphigh);
@@ -363,7 +363,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	else
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->pu_row_d + indx;
+			rip = page->pg_row_d + indx;
 
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			WT_ERR(WT_LEX_CMP_SKIP(session,
@@ -415,7 +415,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * it means the application is inserting a key before any key found on
 	 * the page).
 	 */
-	rip = page->pu_row_d;
+	rip = page->pg_row_d;
 	if (base == 0)
 		cbt->compare = 1;
 	else {
@@ -473,7 +473,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 restart:
 	/* Walk the internal pages of the tree. */
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
-		pindex = page->pu_intl_index;
+		pindex = page->pg_intl_index;
 		ref = pindex->index[__wt_random() % pindex->entries];
 
 		/*
@@ -489,7 +489,7 @@ restart:
 		return (ret);
 	}
 
-	if (page->pu_row_entries != 0) {
+	if (page->pg_row_entries != 0) {
 		/*
 		 * The use case for this call is finding a place to split the
 		 * tree.  Cheat (it's not like this is "random", anyway), and
@@ -501,8 +501,8 @@ restart:
 		cbt->page = page;
 		cbt->compare = 0;
 		cbt->slot =
-		    btree->root_page->pu_intl_index->entries < 2 ?
-		    __wt_random() % page->pu_row_entries : 0;
+		    btree->root_page->pg_intl_index->entries < 2 ?
+		    __wt_random() % page->pg_row_entries : 0;
 		return (0);
 	}
 

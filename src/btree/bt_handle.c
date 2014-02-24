@@ -394,7 +394,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, &root));
 		root->parent = NULL;
 
-		ref = root->pu_intl_index->index[0];
+		ref = root->pg_intl_index->index[0];
 		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -404,7 +404,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, &root));
 		root->parent = NULL;
 
-		ref = root->pu_intl_index->index[0];
+		ref = root->pg_intl_index->index[0];
 		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
