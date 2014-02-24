@@ -340,7 +340,7 @@ __debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 
 /*
  * __debug_shape_info --
- *	Pretty-print information about a node.
+ *	Pretty-print information about a page.
  */
 static char *
 __debug_tree_shape_info(WT_PAGE *page)
@@ -360,7 +360,7 @@ __debug_tree_shape_info(WT_PAGE *page)
 
 /*
  * __debug_tree_shape_worker --
- *	Dump information about the current node and descend.
+ *	Dump information about the current page and descend.
  */
 static void
 __debug_tree_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
