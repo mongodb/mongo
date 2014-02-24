@@ -155,7 +155,8 @@ namespace mongo {
             BSONObj key = a[0].Obj();
             Status indexValid = validateKeyPattern(key);
             if (!indexValid.isOK()) {
-                return BSON("" << BSON("ok" << false << "errmsg" << indexValid.codeString()));
+                return BSON("" << BSON("ok" << false << "type"
+                               << indexValid.codeString() << "errmsg" << indexValid.reason()));
             }
             return BSON("" << BSON("ok" << true));
         }

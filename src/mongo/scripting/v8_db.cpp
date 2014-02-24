@@ -1008,10 +1008,10 @@ namespace mongo {
         if (validForStorage.isOK()) {
             return v8::Null();
         }
-        if (validForStorage.codeString()) {
-            return v8::String::New("Unknown Error");
-        }
-        return v8::String::New(validForStorage.codeString());
+
+        std::string errmsg = str::stream() << validForStorage.codeString()
+                                           << ": "<< validForStorage.reason();
+        return v8::String::New(errmsg.c_str());
     }
 
     v8::Handle<v8::Value> bsonsize(V8Scope* scope, const v8::Arguments& args) {
