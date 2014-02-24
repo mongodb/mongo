@@ -343,7 +343,7 @@ __debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
  *	Pretty-print information about a node.
  */
 static char *
-__debug_shape_info(WT_PAGE *page)
+__debug_tree_shape_info(WT_PAGE *page)
 {
 	uint64_t v;
 	static char buf[32];
@@ -359,24 +359,25 @@ __debug_shape_info(WT_PAGE *page)
 }
 
 /*
- * __debug_shape_worker --
+ * __debug_tree_shape_worker --
  *	Dump information about the current node and descend.
  */
 static void
-__debug_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
+__debug_tree_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 {
 	WT_REF *ref;
 
 	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) {
 		__dmsg(ds, "%*s" "I" "%s\n",
-		    level, " ", __debug_shape_info(page));
+		    level, " ", __debug_tree_shape_info(page));
 		WT_INTL_FOREACH_BEGIN(page, ref) {
 			if (ref->state == WT_REF_MEM)
-				__debug_shape_worker(ds, ref->page, level + 3);
+				__debug_tree_shape_worker(
+				    ds, ref->page, level + 3);
 		} WT_INTL_FOREACH_END;
 	} else
 		__dmsg(ds, "%*s" "L" "%s\n",
-		    level, " ", __debug_shape_info(page));
+		    level, " ", __debug_tree_shape_info(page));
 }
 
 /*
@@ -396,7 +397,7 @@ __wt_debug_tree_shape(
 	if (page == NULL)
 		page = S2BT(session)->root_page;
 
-	__debug_shape_worker(ds, page, 0);
+	__debug_tree_shape_worker(ds, page, 0);
 
 	__dmsg_wrapup(ds);
 	return (0);
