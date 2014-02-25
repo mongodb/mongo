@@ -2910,7 +2910,9 @@ namespace {
         ASSERT_TRUE(b0.ok());
         ASSERT_OK(b0.remove());
         ASSERT_OK(b.pushBack(b0));
-        // Ensure that it compares correctly against the source object.
+
+        // SERVER-12866 Changing an embedded field moves it to the back of the document
+        mmb::sortChildren(doc1.root(), mmb::FieldNameLessThan());
         ASSERT_EQUALS(0, doc1.compareWithBSONObj(obj));
         // Ensure that it compares correctly against a pristine document.
         ASSERT_EQUALS(0, doc1.compareWith(doc1Copy));

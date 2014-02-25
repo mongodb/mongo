@@ -663,10 +663,10 @@ namespace {
 
     TEST(SimpleObjMod, PrepareApplyDotted) {
         Document doc(fromjson("{ _id : 1 , "
-                              "  question : 'a', "
                               "  choices : { "
                               "            first : { choice : 'b' }, "
-                              "            second : { choice : 'c' } }"
+                              "            second : { choice : 'c' } }, "
+                              "  question : 'a' "
                               "}"));
         Mod pushMod(fromjson("{$push: {'choices.first.votes': 1}}"));
 
@@ -681,8 +681,8 @@ namespace {
         ASSERT_EQUALS(fromjson(   "{ _id : 1 , "
                                   "  question : 'a', "
                                   "  choices : { "
-                                  "            first : { choice : 'b', votes: [1]}, "
-                                  "            second : { choice : 'c' } }"
+                                  "            second : { choice : 'c' }, "
+                                  "            first : { choice : 'b', votes: [1]} }"
                                   "}"),
                       doc);
 

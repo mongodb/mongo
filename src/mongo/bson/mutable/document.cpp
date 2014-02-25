@@ -1933,6 +1933,22 @@ namespace mutablebson {
                 ErrorCodes::IllegalOperation,
                 "Attempt to add a child element to a non-object element");
 
+        // Optimization: as we are resizing this container we will end up moving all elements
+        // to the right of this when the document is written.  This will likely cause a full
+        // document re-write.
+        // If the parent of this element is an Object, we can push this Element to the back of
+        // its parent.  And if we do this recursively up the tree, changes which
+        // resize the document will be grouped together at the document's end.
+        // As many drivers don't by default define field order, this reduces the cost of
+        // manipulating small arrays in large documents.
+        Element p = parent();
+        // TODO: Do we want to do this when the parent is an array (given this Element is a
+        //       container?)
+        if (p.ok() && p.getType() == mongo::Object) {
+            remove();
+            p.addChild(*this, false);
+        }
+
         impl.disableInPlaceUpdates();
 
         // TODO: In both of the following cases, we call two public API methods each. We can
