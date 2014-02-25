@@ -171,20 +171,18 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 * The next time this configuration is updated, we don't want to figure
 	 * out which of these pieces of memory were allocated and will need to
 	 * be free'd on close (this isn't a heavily used API and it's too much
-	 * work); add them all to the free-on-close list now.
+	 * work); add them all to the free-on-close list now.  We don't check
+	 * for errors deliberately, we'd have to figure out which elements have
+	 * already been added to the free-on-close array and which have not in
+	 * order to avoid freeing chunks of memory twice.  Again, this isn't a
+	 * commonly used API and it shouldn't ever happen, just leak it.
 	 */
-	WT_ERR(__conn_foc_add(session, entry->base));
-	entry->base = NULL;
-	WT_ERR(__conn_foc_add(session, entry));
-	entry = NULL;
-	WT_ERR(__conn_foc_add(session, checks));
-	checks = NULL;
-	WT_ERR(__conn_foc_add(session, newcheck->type));
-	newcheck->type = NULL;
-	WT_ERR(__conn_foc_add(session, newcheck->checks));
-	newcheck->checks = NULL;
-	WT_ERR(__conn_foc_add(session, newcheck_name));
-	newcheck_name = NULL;
+	(void)__conn_foc_add(session, entry->base);
+	(void)__conn_foc_add(session, entry);
+	(void)__conn_foc_add(session, checks);
+	(void)__conn_foc_add(session, newcheck->type);
+	(void)__conn_foc_add(session, newcheck->checks);
+	(void)__conn_foc_add(session, newcheck_name);
 
 	/*
 	 * Instead of using locks to protect configuration information, assume
