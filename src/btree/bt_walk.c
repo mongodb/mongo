@@ -443,6 +443,11 @@ retry:				if (ref->state != WT_REF_MEM ||
 				PAGE_SWAP(session, couple, page, ref, ret);
 			}
 
+			/*
+			 * Entering a new page: configure for traversal of any
+			 * internal page's children, else return (or optionally
+			 * skip), the leaf page.
+			 */
 			couple = page = ref->page;
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT) {
