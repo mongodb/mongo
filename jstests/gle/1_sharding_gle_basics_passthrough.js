@@ -11,10 +11,19 @@ var lastDB = db;
 
 var coreTests = listFiles("jstests/gle/core");
 
+var testsToSkip = new RegExp('[\\/\\\\](' +
+        'error1' + // getPrevError not supported in sharding
+        ')\.js$');
+
 coreTests.forEach( function(file) {
 
     // Reset global 'db' var
     db = passMongos.getDB("testBasicMongosGLE");
+
+    if (testsToSkip.test(file.name)) {
+        print(" !!!!!!!!!!!!!!! skipping test " + file.name);
+        return;
+    }
 
     print(" *******************************************");
     print("         Test : " + file.name + " ...");
