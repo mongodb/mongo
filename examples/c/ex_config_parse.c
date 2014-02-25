@@ -52,7 +52,11 @@ int main(void)
 		    wiredtiger_strerror(ret));
 		return (ret);
 	}
-	parser->close(parser);
+	if ((ret = parser->close(parser)) != 0) {
+		fprintf(stderr, "Error closing configuration parser: %s\n",
+		    wiredtiger_strerror(ret));
+		return (ret);
+	}
 	/*! [Create a configuration parser] */
 
 	if ((ret = wiredtiger_config_parser_open(
@@ -158,5 +162,5 @@ int main(void)
 	parser->close(parser);
 	}
 
-	return (ret);
+	return (0);
 }
