@@ -21,17 +21,16 @@ __config_parser_close(WT_CONFIG_PARSER *wt_config_parser)
 	if (config_parser == NULL)
 		return (EINVAL);
 
-	__wt_free(config_parser->session, config_parser->config_str);
 	__wt_free(config_parser->session, config_parser);
 	return (0);
 }
 
 /*
- * __config_parser_search --
+ * __config_parser_get --
  *      WT_CONFIG_PARSER->search method.
  */
 static int
-__config_parser_search(WT_CONFIG_PARSER *wt_config_parser,
+__config_parser_get(WT_CONFIG_PARSER *wt_config_parser,
      const char *key, WT_CONFIG_ITEM *cval)
 {
 	WT_CONFIG_PARSER_IMPL *config_parser;
@@ -41,12 +40,8 @@ __config_parser_search(WT_CONFIG_PARSER *wt_config_parser,
 	if (config_parser == NULL)
 		return (EINVAL);
 
-	/*
-	 * TODO: Search needs to feed into next (want to search based
-	 * on our WT_CONFIG, not the config_str.
-	 */
-	return (__wt_config_getones(config_parser->session,
-	    config_parser->config_str, key, cval));
+	return (__wt_config_subgets(config_parser->session,
+	    &config_parser->config_item, key, cval));
 }
 
 /*
@@ -68,24 +63,6 @@ __config_parser_next(WT_CONFIG_PARSER *wt_config_parser,
 }
 
 /*
- * __config_parser_reset --
- *      WT_CONFIG_PARSER->reset method.
- */
-static int
-__config_parser_reset(WT_CONFIG_PARSER *wt_config_parser)
-{
-	WT_CONFIG_PARSER_IMPL *config_parser;
-
-	config_parser = (WT_CONFIG_PARSER_IMPL *)wt_config_parser;
-
-	if (config_parser == NULL)
-		return (EINVAL);
-
-	return (__wt_config_init(config_parser->session,
-	    &config_parser->config, config_parser->config_str));
-}
-
-/*
  * wiredtiger_config_parser_open --
  *	Create a configuration parser.
  */
@@ -96,13 +73,13 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	static const WT_CONFIG_PARSER stds = {
 		__config_parser_close,
 		__config_parser_next,
-		__config_parser_reset,
-		__config_parser_search
+		__config_parser_get
 	};
+	WT_CONFIG_ITEM config_item =
+	    { config, len, 0, WT_CONFIG_ITEM_STRING };
 	WT_CONFIG_PARSER_IMPL *config_parser;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char *config_str;
 
 	*config_parserp = NULL;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -110,21 +87,19 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
 	WT_RET(__wt_calloc_def(session, 1, &config_parser));
 	config_parser->iface = stds;
 	config_parser->session = session;
+
 	/*
-	 * Copy the input string to avoid scope issues with the input buffer,
-	 * this also allows us to ensure that the string is nul terminated.
+	 * Setup a WT_CONFIG_ITEM to be used for get calls and a WT_CONFIG
+	 * structure for iterations through the configuration string.
 	 */
-	WT_ERR(__wt_strndup(session, config, len, &config_str));
-	WT_ERR(__wt_config_init(
-	    session, &config_parser->config, config_str));
-	config_parser->config_str = (const char *)config_str;
+	memcpy(&config_parser->config_item, &config_item, sizeof(config_item));
+	WT_ERR(__wt_config_initn(
+	    session, &config_parser->config, config, len));
 
 	if (ret == 0)
 		*config_parserp = (WT_CONFIG_PARSER *)config_parser;
-	else {
-err:		__wt_free(session, config_str);
-		__wt_free(session, config_parser);
-	}
+	else
+err:		__wt_free(session, config_parser);
 
 	return (ret);
 }

@@ -57,7 +57,7 @@ int main(void)
 	/*
 	 * Retrieve the value of the integer configuration string "page_size".
 	 */
-	if ((ret = parser->search(parser, "page_size", &v)) != 0) {
+	if ((ret = parser->get(parser, "page_size", &v)) != 0) {
 		fprintf(stderr,
 		    "page_size configuration: %s", wiredtiger_strerror(ret));
 		return (ret);

@@ -38,7 +38,7 @@ struct __wt_config_parser_impl {
 
 	WT_SESSION_IMPL *session;
 	WT_CONFIG config;
-	const char *config_str;
+	WT_CONFIG_ITEM config_item;
 };
 
 /*

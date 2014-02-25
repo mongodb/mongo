@@ -1941,9 +1941,7 @@ struct __wt_config_item {
 		/*! A numeric value. */
 		WT_CONFIG_ITEM_NUM,
 		/*! A nested structure or list, including brackets. */
-		WT_CONFIG_ITEM_STRUCT,
-		/*! The final item in a configuration item structure.. */
-		WT_CONFIG_ITEM_END
+		WT_CONFIG_ITEM_STRUCT
 	}
 	/*!
 	 * The type of value determined by the parser.  In all cases,
@@ -2010,15 +2008,6 @@ struct __wt_config_parser {
 	    WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 
 	/*!
-	 * Reset the configuration parser
-	 *
-	 * @param config_parser the configuration parser handle
-	 * @errors
-	 *
-	 */
-	int __F(reset)(WT_CONFIG_PARSER *config_parser);
-
-	/*!
 	 * Return the value of an item in the configuration string.
 	 *
 	 * @param config_parser the configuration parser handle
@@ -2027,7 +2016,7 @@ struct __wt_config_parser {
 	 * @errors
 	 *
 	 */
-	int __F(search)(WT_CONFIG_PARSER *config_parser,
+	int __F(get)(WT_CONFIG_PARSER *config_parser,
 	    const char *key, WT_CONFIG_ITEM *value);
 };
 
