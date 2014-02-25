@@ -349,11 +349,9 @@ struct __wt_page {
 	 * by many threads.  We don't want to update page read generations for
 	 * in-cache workloads and suffer the cache misses, so we don't simply
 	 * increment the read generation value on every access.  Instead, the
-	 * read generation is initialized to 0, then set to a real value if the
-	 * page is ever considered for eviction.  Once set to a real value, the
 	 * read generation is potentially incremented every time the page is
-	 * accessed.  To try and avoid incrementing the page at a fast rate in
-	 * this case, the read generation is incremented to a future point.
+	 * accessed.  To avoid incrementing the page at a fast rate in this
+	 * case, the read generation is incremented to a future point.
 	 *
 	 * The read generation is not declared volatile or published: the read
 	 * generation is set a lot, and we don't want to write it that much.
