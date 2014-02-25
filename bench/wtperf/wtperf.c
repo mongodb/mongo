@@ -31,7 +31,7 @@
 static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
 	"WT_TEST",			/* monitor dir */
-	NULL,				/* uri */
+	NULL,				/* base_uri */
 	NULL,				/* uris */
 	NULL,				/* conn */
 	NULL,				/* logf */
@@ -208,28 +208,21 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
 		goto err;
 	}
-	if (cfg->table_count > 1) {
-		cursors = (WT_CURSOR **)calloc(
-		    cfg->table_count, sizeof(WT_CURSOR *));
-		if (cursors == NULL) {
-			lprintf(cfg, ENOMEM, 0,
-			    "worker: couldn't allocate cursor array");
+	cursors = (WT_CURSOR **)calloc(
+	    cfg->table_count, sizeof(WT_CURSOR *));
+	if (cursors == NULL) {
+		lprintf(cfg, ENOMEM, 0,
+		    "worker: couldn't allocate cursor array");
+		goto err;
+	}
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->open_cursor(session,
+		    cfg->uris[i], NULL, NULL, &cursors[i])) != 0) {
+			lprintf(cfg, ret, 0,
+			    "worker: WT_SESSION.open_cursor: %s",
+			    cfg->uris[i]);
 			goto err;
 		}
-		for (i = 0; i < cfg->table_count; i++) {
-			if ((ret = session->open_cursor(session,
-			    cfg->uris[i], NULL, NULL, &cursors[i])) != 0) {
-				lprintf(cfg, ret, 0,
-				    "worker: WT_SESSION.open_cursor: %s",
-				    cfg->uris[i]);
-				goto err;
-			}
-		}
-	} else if ((ret = session->open_cursor(
-	    session, cfg->uri, NULL, NULL, &cursor)) != 0) {
-		lprintf(cfg,
-		    ret, 0, "worker: WT_SESSION.open_cursor: %s", cfg->uri);
-		goto err;
 	}
 
 	key_buf = thread->key_buf;
@@ -239,10 +232,7 @@ worker(void *arg)
 	op_end = op + sizeof(thread->workload->ops);
 
 	while (!cfg->stop) {
-		/* Pick a cursor if there are multiple tables. */
-		if (cfg->table_count > 1)
-			cursor = cursors[
-			    __wt_random() % (cfg->table_count - 1)];
+		cursor = cursors[__wt_random() % cfg->table_count];
 
 		/*
 		 * Generate the next key and setup operation specific
@@ -530,30 +520,23 @@ populate_thread(void *arg)
 
 	/* Do bulk loads if populate is single-threaded. */
 	cursor_config = cfg->populate_threads == 1 ? "bulk" : NULL;
-	/* Create the cursor or cursors if there are multiple tables. */
-	if (cfg->table_count > 1) {
-		cursors = (WT_CURSOR **)calloc(
-		    cfg->table_count, sizeof(WT_CURSOR *));
-		if (cursors == NULL) {
-			lprintf(cfg, ENOMEM, 0,
-			    "worker: couldn't allocate cursor array");
+	/* Create the cursors. */
+	cursors = (WT_CURSOR **)calloc(
+	    cfg->table_count, sizeof(WT_CURSOR *));
+	if (cursors == NULL) {
+		lprintf(cfg, ENOMEM, 0,
+		    "worker: couldn't allocate cursor array");
+		goto err;
+	}
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->open_cursor(
+		    session, cfg->uris[i], NULL,
+		    cursor_config, &cursors[i])) != 0) {
+			lprintf(cfg, ret, 0,
+			    "populate: WT_SESSION.open_cursor: %s",
+			    cfg->uris[i]);
 			goto err;
 		}
-		for (i = 0; i < cfg->table_count; i++) {
-			if ((ret = session->open_cursor(
-			    session, cfg->uris[i], NULL,
-			    cursor_config, &cursors[i])) != 0) {
-				lprintf(cfg, ret, 0,
-				    "populate: WT_SESSION.open_cursor: %s",
-				    cfg->uris[i]);
-				goto err;
-			}
-		}
-	} else if ((ret = session->open_cursor(
-	    session, cfg->uri, NULL, cursor_config, &cursor)) != 0) {
-		lprintf(cfg,
-		    ret, 0, "populate: WT_SESSION.open_cursor: %s", cfg->uri);
-		goto err;
 	}
 
 	/* Populate the databases. */
@@ -580,8 +563,7 @@ populate_thread(void *arg)
 			goto err;
 		}
 		for (i = 0; i < cfg->table_count; i++) {
-			if (cfg->table_count > 1)
-				cursor = cursors[i];
+			cursor = cursors[i];
 			cursor->set_key(cursor, key_buf);
 			if (cfg->random_value)
 				randomize_value(cfg, value_buf);
@@ -839,6 +821,7 @@ execute_populate(CONFIG *cfg)
 	WT_SESSION *session;
 	struct timespec start, stop;
 	double secs;
+	size_t i;
 	uint64_t last_ops;
 	uint32_t interval;
 	int elapsed, ret, t_ret;
@@ -933,12 +916,17 @@ execute_populate(CONFIG *cfg)
 			lprintf(cfg, ret, 0, "Get time failed in populate.");
 			goto err;
 		}
-		if ((ret = session->compact(
-		    session, cfg->uri, "timeout=0")) != 0) {
-			lprintf(cfg, ret, 0,
-			     "execute_populate: WT_SESSION.compact");
-			goto err;
-		}
+		/*
+		 * We measure how long it takes to compact all tables for this
+		 * workload.
+		 */
+		for (i = 0; i < cfg->table_count; i++)
+			if ((ret = session->compact(
+			    session, cfg->uris[i], "timeout=0")) != 0) {
+				lprintf(cfg, ret, 0,
+				     "execute_populate: WT_SESSION.compact");
+				goto err;
+			}
 		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
 			lprintf(cfg, ret, 0, "Get time failed in populate.");
 			goto err;
@@ -1091,40 +1079,48 @@ find_table_count(CONFIG *cfg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	char *key;
+	size_t i;
+	uint32_t max_icount, table_icount;
 	int ret, t_ret;
 
 	conn = cfg->conn;
 
+	max_icount = 0;
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
-		    "open_session failed finding existing table count");
+		    "find_table_count: open_session failed");
 		goto err;
 	}
-	if ((ret = session->open_cursor(session, cfg->uri,
-	    NULL, NULL, &cursor)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "open_cursor failed finding existing table count");
-		goto err;
-	}
-	if ((ret = cursor->prev(cursor)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "cursor prev failed finding existing table count");
-		goto err;
-	}
-	if ((ret = cursor->get_key(cursor, &key)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "cursor get_key failed finding existing table count");
-		goto err;
-	}
-	cfg->icount = (uint32_t)atoi(key);
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->open_cursor(session, cfg->uris[i],
+		    NULL, NULL, &cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "find_table_count: open_cursor failed");
+			goto err;
+		}
+		if ((ret = cursor->prev(cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "find_table_count: cursor prev failed");
+			goto err;
+		}
+		if ((ret = cursor->get_key(cursor, &key)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "find_table_count: cursor get_key failed");
+			goto err;
+		}
+		table_icount = (uint32_t)atoi(key);
+		if (table_icount > max_icount)
+			max_icount = table_icount;
 
-err:	if ((t_ret = session->close(session, NULL)) != 0) {
-		if (ret == 0)
-			ret = t_ret;
-		lprintf(cfg, ret, 0,
-		    "session close failed finding existing table count");
+err:		if ((t_ret = session->close(session, NULL)) != 0) {
+			if (ret == 0)
+				ret = t_ret;
+			lprintf(cfg, ret, 0,
+			    "find_table_count: session close failed");
+		}
 	}
+	cfg->icount = max_icount;
 	return (ret);
 }
 
@@ -1140,12 +1136,7 @@ create_uris(CONFIG *cfg)
 	uint32_t i;
 
 	ret = 0;
-	if (cfg->table_count < 2) {
-		cfg->uris = NULL;
-		return (0);
-	}
-
-	base_uri_len = strlen(cfg->uri);
+	base_uri_len = strlen(cfg->base_uri);
 	cfg->uris = (char **)calloc(cfg->table_count, sizeof(char *));
 	if (cfg->uris == NULL) {
 		ret = ENOMEM;
@@ -1157,10 +1148,15 @@ create_uris(CONFIG *cfg)
 			ret = ENOMEM;
 			goto err;
 		}
-		memcpy(uri, cfg->uri, base_uri_len);
-		uri[base_uri_len] = uri[base_uri_len + 1] = '0';
-		uri[base_uri_len] = '0' + (i / 10);
-		uri[base_uri_len + 1] = '0' + (i % 10);
+		memcpy(uri, cfg->base_uri, base_uri_len);
+		/*
+		 * If there is only one table, just use base name.
+		 */
+		if (cfg->table_count > 1) {
+			uri[base_uri_len] = uri[base_uri_len + 1] = '0';
+			uri[base_uri_len] = '0' + (i / 10);
+			uri[base_uri_len + 1] = '0' + (i % 10);
+		}
 	}
 err:	if (ret != 0 && cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)
@@ -1183,7 +1179,7 @@ create_tables(CONFIG *cfg)
 	if (cfg->create == 0)
 		return (0);
 
-	uri = cfg->uri;
+	uri = cfg->base_uri;
 	if ((ret = cfg->conn->open_session(
 	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
@@ -1191,12 +1187,11 @@ create_tables(CONFIG *cfg)
 		return (ret);
 	}
 	for (i = 0; i < cfg->table_count; i++) {
-		if (cfg->table_count > 1)
-			uri = cfg->uris[i];
+		uri = cfg->uris[i];
 		if ((ret = session->create(
 		    session, uri, cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
-			    "Error creating table %s", cfg->uri);
+			    "Error creating table %s", cfg->uris[i]);
 			return (ret);
 		}
 	}
@@ -1325,11 +1320,11 @@ main(int argc, char *argv[])
 	/* Build the URI from the table name. */
 	req_len = strlen("table:") +
 	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
-	if ((cfg->uri = calloc(req_len, 1)) == NULL) {
+	if ((cfg->base_uri = calloc(req_len, 1)) == NULL) {
 		ret = enomem(cfg);
 		goto err;
 	}
-	snprintf(cfg->uri, req_len, "table:%s%s%s",
+	snprintf(cfg->base_uri, req_len, "table:%s%s%s",
 	    helium_mount == NULL ? "" : HELIUM_NAME,
 	    helium_mount == NULL ? "" : "/",
 	    cfg->table_name);
