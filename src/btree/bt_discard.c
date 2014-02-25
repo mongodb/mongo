@@ -101,8 +101,8 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_SPLIT:
 		/*
-		 * If a root page split, there may one or more pages linked from
-		 * the page; walk the list, discarding pages.
+		 * If a root page split, there may be one or more pages linked
+		 * from the page; walk the list, discarding pages.
 		 */
 		if (mod->root_split != NULL)
 			__wt_page_out(session, &mod->root_split);
