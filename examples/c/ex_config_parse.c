@@ -39,13 +39,21 @@ const char *home = NULL;
 int main(void)
 {
 	int ret;
-	{
-	/*! [WT_CONFIG_PARSER get] */
-	WT_CONFIG_ITEM v;
-	WT_CONFIG_PARSER *parser;
-	int64_t my_page_size;
 
-	const char *config_string = "path=/dev/loop,page_size=1024";
+	/*! [Create a configuration parser] */
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_PARSER *parser;
+	const char *config_string =
+	    "path=/dev/loop,page_size=1024,log=(archive=true,file_max=20MB)";
+
+	if ((ret = wiredtiger_config_parser_open(
+	    NULL, config_string, strlen(config_string), &parser)) != 0) {
+		fprintf(stderr, "Error creating configuration parser: %s\n",
+		    wiredtiger_strerror(ret));
+		return (ret);
+	}
+	parser->close(parser);
+	/*! [Create a configuration parser] */
 
 	if ((ret = wiredtiger_config_parser_open(
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
@@ -54,6 +62,9 @@ int main(void)
 		return (ret);
 	}
 
+	{
+	/*! [get] */
+	int64_t my_page_size;
 	/*
 	 * Retrieve the value of the integer configuration string "page_size".
 	 */
@@ -63,18 +74,34 @@ int main(void)
 		return (ret);
 	}
 	my_page_size = v.val;
+	/*! [get] */
+
 	ret = parser->close(parser);
-	/*! [WT_CONFIG_PARSER get] */
 
 	(void)my_page_size;
 	}
 
 	{
-	/*! [WT_CONFIG_PARSER nested get] */
-	WT_CONFIG_ITEM v;
-	WT_CONFIG_PARSER *parser;
-
-	const char *config_string = "log=(archive=true,file_max=20MB)";
+	if ((ret = wiredtiger_config_parser_open(
+	    NULL, config_string, strlen(config_string), &parser)) != 0) {
+		fprintf(stderr, "Error creating configuration parser: %s\n",
+		    wiredtiger_strerror(ret));
+		return (ret);
+	}
+	/*! [next] */
+	/*
+	 * Retrieve and print the values of the configuration strings.
+	 */
+	while ((ret = parser->next(parser, &k, &v)) == 0) {
+		printf("%.*s:", (int)k.len, k.str);
+		if (v.type == WT_CONFIG_ITEM_NUM)
+			printf("%d\n", (int)v.val);
+		else
+			printf("%.*s\n", (int)v.len, v.str);
+	}
+	/*! [next] */
+	ret = parser->close(parser);
+	}
 
 	if ((ret = wiredtiger_config_parser_open(
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
@@ -83,8 +110,11 @@ int main(void)
 		return (ret);
 	}
 
+	/*! [nested get] */
 	/*
-	 * Retrieve the value of the integer configuration string "page_size".
+	 * Retrieve the value of the nested log file_max configuration string
+	 * using dot shorthand. Utilize the configuration parsing automatic
+	 * conversion of value strings into an integer.
 	 */
 	v.type = WT_CONFIG_ITEM_NUM;
 	if ((ret = parser->get(parser, "log.file_max", &v)) != 0) {
@@ -93,17 +123,8 @@ int main(void)
 		return (ret);
 	}
 	printf("log file max: %d\n", (int)v.val);
+	/*! [nested get] */
 	ret = parser->close(parser);
-	/*! [WT_CONFIG_PARSER nested get] */
-
-	}
-
-	{
-	/*! [WT_CONFIG_PARSER scan] */
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_PARSER *parser;
-
-	const char *config_string = "path=/dev/loop,page_size=1024";
 
 	if ((ret = wiredtiger_config_parser_open(
 	    NULL, config_string, strlen(config_string), &parser)) != 0) {
@@ -111,19 +132,30 @@ int main(void)
 		    wiredtiger_strerror(ret));
 		return (ret);
 	}
-	/*
-	 * Retrieve the values of the configuration strings.
-	 */
+	/*! [nested traverse] */
+	{
+	WT_CONFIG_PARSER *sub_parser;
 	while ((ret = parser->next(parser, &k, &v)) == 0) {
-		printf("%.*s:", (int)k.len, k.str);
-		if (v.type == WT_CONFIG_ITEM_STRING ||
-		    v.type == WT_CONFIG_ITEM_ID)
-			printf("%.*s\n", (int)v.len, v.str);
-		else if (v.type == WT_CONFIG_ITEM_NUM)
-			printf("%d\n", (int)v.val);
+		if (v.type == WT_CONFIG_ITEM_STRUCT) {
+			printf("Found nested configuration: %.*s\n",
+			    (int)k.len, k.str);
+			if ((ret = wiredtiger_config_parser_open(
+			    NULL, v.str, v.len, &sub_parser)) != 0) {
+				fprintf(stderr,
+				    "Error creating nested configuration "
+				    "parser: %s\n",
+				    wiredtiger_strerror(ret));
+				parser->close(parser);
+				return (ret);
+			}
+			while ((ret = sub_parser->next(
+			    sub_parser, &k, &v)) == 0)
+				printf("\t%.*s\n", (int)k.len, k.str);
+			sub_parser->close(sub_parser);
+		}
 	}
-	ret = parser->close(parser);
-	/*! [WT_CONFIG_PARSER scan] */
+	/*! [nested traverse] */
+	parser->close(parser);
 	}
 
 	return (ret);

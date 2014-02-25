@@ -1958,7 +1958,8 @@ struct __wt_config_item {
  * ::wiredtiger_open.
  * @param session the session handle (or NULL if none available), used for
  *        error reporting if provided
- * @param config the configuration string being parsed
+ * @param config the configuration string being parsed. The string must
+ *        remain valid for the lifetime of the parser handle.
  * @param len the number of valid bytes in \c config
  * @param[out] config_parserp A pointer to the newly opened handle
  * @errors
@@ -1967,13 +1968,39 @@ int wiredtiger_config_parser_open(WT_SESSION *session,
     const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
 
 /*!
- * A handle that can be used to parse and create configuration strings
+ * A handle that can be used to search and traverse configuration strings
  * compatible with WiredTiger APIs.
+ * To parse the contents of a list or nested configuration string use a new
+ * configuration parser handle based on the content of the ::WT_CONFIG_ITEM
+ * retrieved from the parent configuration string.
+ *
+ * @section config_parse_examples Configuration String Parsing examples
+ *
+ * This could be used in C to create a configuration parser as follows:
+ *
+ * @snippet ex_config_parse.c Create a configuration parser
+ *
+ * Once the parser has been created the content can be queried directly:
+ *
+ * @snippet ex_config_parse.c get
+ *
+ * Or the content can be traversed linearly:
+ *
+ * @snippet ex_config_parse.c next
+ *
+ * Nested configuration values can be queried using a shorthand notation:
+ *
+ * @snippet ex_config_parse.c nested get
+ *
+ * Nested configuration values can be traversed using multiple
+ * ::WT_CONFIG_PARSER handles:
+ *
+ * @snippet ex_config_parse.c nested traverse
  */
 struct __wt_config_parser {
 
 	/*!
-	 * Close the configuration scanner
+	 * Close the configuration scanner releasing any resources.
 	 *
 	 * @param config_parser the configuration parser handle
 	 * @errors
@@ -1984,14 +2011,7 @@ struct __wt_config_parser {
 	/*!
 	 * Return the next key/value pair.
 	 *
-	 * If the previous item retrieved from the configuration parser was
-	 * a list or nested configuration this will walk through the subset.
-	 * When the end of the subset is reached the key will be of the
-	 * special type WT_CONFIG_ITEM::WT_CONFIG_ITEM_END and the subsequent
-	 * call to WT_CONFIG_PARSER::config_next will retrieve the following
-	 * item in the configuration string.
-	 *
-	 * When iteration passes the end of the configuration string
+	 * When iteration would pass the end of the configuration string
 	 * ::WT_NOTFOUND will be returned.
 	 *
 	 * If an item has no explicitly assigned value, the item will be

@@ -165,11 +165,6 @@ of a configuration string as follows:
 
 @snippet ex_data_source.c WT_EXTENSION config_get
 
-The WT_DATA_SOURCE::open_cursor method might retrieve the list value
-of a configuration string as follows:
-
-@snippet ex_data_source.c WT_EXTENSION config scan
-
 @subsection custom_ds_config_add Creating data-specific configuration strings
 
 Applications can add their own configuration strings to WiredTiger
