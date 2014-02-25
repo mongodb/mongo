@@ -1079,8 +1079,7 @@ find_table_count(CONFIG *cfg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	char *key;
-	size_t i;
-	uint32_t max_icount, table_icount;
+	uint32_t i, max_icount, table_icount;
 	int ret, t_ret;
 
 	conn = cfg->conn;
@@ -1090,7 +1089,7 @@ find_table_count(CONFIG *cfg)
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
 		    "find_table_count: open_session failed");
-		goto err;
+		goto out;
 	}
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->open_cursor(session, cfg->uris[i],
@@ -1121,7 +1120,7 @@ err:		if ((t_ret = session->close(session, NULL)) != 0) {
 		}
 	}
 	cfg->icount = max_icount;
-	return (ret);
+out:	return (ret);
 }
 
 /*
