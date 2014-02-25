@@ -185,9 +185,11 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		page->pg_intl_orig_entries = alloc_entries;
 
 		/*
-		 * Internal pages have an array of WT_REF pointers so they can
-		 * split.  Allocate and initialize it to point to the first set
-		 * of slots (even though those slots aren't yet initialized).
+		 * Internal pages have an array of references to WT_REF objects
+		 * so they can split.  Allocate and initialize that array to
+		 * point to the initial WT_REF object array, even though the
+		 * WT_REF object array isn't yet initialized (it's initialized
+		 * when our caller reads through the storage image).
 		 */
 		if ((ret = __wt_calloc(session, 1,
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *),
