@@ -1080,7 +1080,7 @@ __slvg_col_build_internal(
 	page->parent = NULL;				/* Root page */
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (ref = page->pg_intl_oindex, i = 0; i < ss->pages_next; ++i) {
+	for (ref = page->pg_intl_orig_index, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
@@ -1661,7 +1661,7 @@ __slvg_row_build_internal(
 	page->parent = NULL;
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (ref = page->pg_intl_oindex, i = 0; i < ss->pages_next; ++i) {
+	for (ref = page->pg_intl_orig_index, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 

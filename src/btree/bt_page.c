@@ -181,8 +181,8 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		page->pg_intl_recno = recno;
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
-		page->pg_intl_oindex = p;
-		page->pg_intl_oentries = alloc_entries;
+		page->pg_intl_orig_index = p;
+		page->pg_intl_orig_entries = alloc_entries;
 
 		/*
 		 * Internal pages have an array of WT_REF pointers so they can
@@ -203,7 +203,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		    (WT_REF **)((WT_PAGE_INDEX *)p + 1);
 		for (i = 0,
 		    refp = page->pg_intl_index->index; i < alloc_entries; ++i)
-			*refp++ = &page->pg_intl_oindex[i];
+			*refp++ = &page->pg_intl_orig_index[i];
 
 		break;
 	case WT_PAGE_COL_VAR:
@@ -372,7 +372,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Walk the page, building references: the page contains value items.
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
-	ref = page->pg_intl_oindex;
+	ref = page->pg_intl_orig_index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		ref->addr = cell;
@@ -501,7 +501,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * location cookie pairs.  Keys are on-page/overflow items and location
 	 * cookies are WT_CELL_ADDR_XXX items.
 	 */
-	ref = page->pg_intl_oindex;
+	ref = page->pg_intl_orig_index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {

@@ -489,7 +489,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	WT_ERR(__wt_multi_to_ref(session,
-	    next, mod->multi, next->pg_intl_oindex, mod->multi_entries));
+	    next, mod->multi, next->pg_intl_orig_index, mod->multi_entries));
 
 	/*
 	 * We maintain a list of pages written for the root in order to free the

@@ -313,7 +313,7 @@ struct __wt_page {
 		 * In-memory internal pages have an array of pointers to child
 		 * structures, maintained in collated order.  When a page is
 		 * read into memory, the initial list of children is stored in
-		 * the "oindex" field, and it and the collated order will be
+		 * the "orig_index" field, and it and the collated order are
 		 * the same.  After a page splits, the collated order and the
 		 * original order will differ.
 		 *
@@ -340,15 +340,15 @@ struct __wt_page {
 				WT_REF	**index;
 			} * volatile index;	/* Collated children */
 
-			WT_REF	*oindex;	/* Original children */
-			uint32_t oentries;	/* Original children count */
+			WT_REF	*orig_index;	/* Original children */
+			uint32_t orig_entries;	/* Original children count */
 		} intl;
 #undef	pg_intl_recno
 #define	pg_intl_recno		u.intl.recno
-#undef	pg_intl_oindex
-#define	pg_intl_oindex		u.intl.oindex
-#undef	pg_intl_oentries
-#define	pg_intl_oentries	u.intl.oentries
+#undef	pg_intl_orig_index
+#define	pg_intl_orig_index	u.intl.orig_index
+#undef	pg_intl_orig_entries
+#define	pg_intl_orig_entries	u.intl.orig_entries
 #undef	pg_intl_index
 #define	pg_intl_index		u.intl.index
 #define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\

@@ -171,8 +171,8 @@ static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free any memory allocated for the original set of WT_REFs. */
-	__wt_free_ref_array(
-	    session, page, page->pg_intl_oindex, page->pg_intl_oentries);
+	__wt_free_ref_array(session,
+	    page, page->pg_intl_orig_index, page->pg_intl_orig_entries);
 
 	/* Free any memory allocated for the child index array. */
 	__wt_free(session, page->pg_intl_index);

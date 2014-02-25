@@ -183,10 +183,10 @@ restart:
 		limit = pindex->entries - 1;
 
 		if (btree->collator == NULL &&
-		    pindex->entries == page->pg_intl_oentries) {
+		    pindex->entries == page->pg_intl_orig_entries) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = &page->pg_intl_oindex[indx];
+				ref = &page->pg_intl_orig_index[indx];
 
 				/*
 				 * If about to compare an application key with
@@ -223,7 +223,7 @@ restart:
 			 * before base.
 			 */
 			if (cmp != 0)
-				ref = &page->pg_intl_oindex[base - 1];
+				ref = &page->pg_intl_orig_index[base - 1];
 		} else if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);

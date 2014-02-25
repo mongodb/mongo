@@ -316,7 +316,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * that won't confuse other threads of control in the page.  For
 		 * now, I'm just copying everything.)
 		 */
-		for (ref = child->pg_intl_oindex, incr = 0,
+		for (ref = child->pg_intl_orig_index, incr = 0,
 		    j = 0; j < slots; ++refp, ++ref, ++j) {
 			ref->page = (*refp)->page;
 			WT_ERR(__rec_split_copy_addr(
@@ -333,7 +333,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 		if (incr != 0)
 			__wt_cache_page_inmem_incr(session, child, incr);
-		WT_ASSERT(session, ref - child->pg_intl_oindex == slots);
+		WT_ASSERT(session, ref - child->pg_intl_orig_index == slots);
 	}
 	if (parent_incr != 0)
 		__wt_cache_page_inmem_incr(session, page, parent_incr);
