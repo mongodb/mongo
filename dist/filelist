@@ -130,6 +130,7 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
+src/session/session_misc.c
 src/session/session_salvage.c
 src/support/cksum.c
 src/support/err.c

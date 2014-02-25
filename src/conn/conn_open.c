@@ -163,6 +163,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		session = conn->default_session = &conn->dummy_session;
 	}
 
+	/*
+	 * Free remaining "free-on-transaction generation" memory for all
+	 * sessions.
+	 */
+	if ((s = conn->sessions) != NULL)
+		for (i = 0; i < conn->session_size; ++s, ++i)
+			__wt_session_fotxn_discard(session, 1);
+
 	/* Free the hazard pointers for all sessions. */
 	if ((s = conn->sessions) != NULL)
 		for (i = 0; i < conn->session_size; ++s, ++i)

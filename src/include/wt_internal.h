@@ -137,6 +137,8 @@ struct __wt_extlist;
     typedef struct __wt_extlist WT_EXTLIST;
 struct __wt_fh;
     typedef struct __wt_fh WT_FH;
+struct __wt_fotxn;
+    typedef struct __wt_fotxn WT_FOTXN;
 struct __wt_hazard;
     typedef struct __wt_hazard WT_HAZARD;
 struct __wt_ikey;

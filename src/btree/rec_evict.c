@@ -348,6 +348,13 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	alloc_ref = NULL;
 
 	/*
+	 * We can't discard the previous page index, there may be threads using
+	 * it.  Add it to the session's discard list, to be freed once we know
+	 * no threads can still be using it.
+	 */
+	WT_ERR(__wt_session_fotxn_add(session, page->pg_intl_index));
+
+	/*
 	 * Update the page's index; this is the change which splits the page,
 	 * making the split visible to threads descending the tree.
 	 *
@@ -359,10 +366,6 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_PUBLISH(page->pg_intl_index, alloc_index);
 	alloc_index = NULL;
-	/*
-	 * XXXKEITH
-	 * We just leaked the old parent index reference.
-	 */
 
 	/*
 	 * Fix up the children; this is the change that makes the split visible
@@ -476,6 +479,13 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 		else
 			refp++;
 
+	/*
+	 * We can't discard the previous page index, there may be threads using
+	 * it.  Add it to the session's discard list, to be freed once we know
+	 * no threads can still be using it.
+	 */
+	WT_ERR(__wt_session_fotxn_add(session, parent->pg_intl_index));
+
 	/* Update the parent page's footprint. */
 	__wt_cache_page_inmem_incr(session, parent, mod->multi_size);
 
@@ -485,10 +495,6 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 */
 	WT_PUBLISH(parent->pg_intl_index, alloc_index);
 	alloc_index = NULL;
-	/*
-	 * XXXKEITH
-	 * We just leaked the old parent index reference.
-	 */
 
 	/*
 	 * The key for the split WT_REF may be an onpage overflow key, and we're
