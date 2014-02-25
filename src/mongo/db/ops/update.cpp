@@ -110,72 +110,91 @@ namespace mongo {
             return Status::OK();
         }
 
+        Status validateDBRef(const mb::ConstElement elem, const bool deep) {
+            mb::ConstElement curr = elem;
+            StringData currName = elem.getFieldName();
+
+            // Found a $db field
+            if (currName == "$db") {
+                if (curr.getType() != String) {
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  str::stream() << "The DBRef $db field must be a String, not a "
+                                  << typeName(curr.getType()));
+                }
+                curr = curr.leftSibling();
+
+                if (!curr.ok() || (curr.getFieldName() != "$id"))
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  "Found $db field without a $id before it, which is invalid.");
+
+                currName = curr.getFieldName();
+            }
+
+            // Found a $id field
+            if (currName == "$id") {
+                Status s = storageValidChildren(curr, deep);
+                if (!s.isOK())
+                    return s;
+
+                curr = curr.leftSibling();
+                if (!curr.ok() || (curr.getFieldName() != "$ref")) {
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  "Found $id field without a $ref before it, which is invalid.");
+                }
+
+                currName = curr.getFieldName();
+            }
+
+            if (currName == "$ref") {
+                if (curr.getType() != String) {
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  str::stream() << "The DBRef $ref field must be a String, not a "
+                                  << typeName(curr.getType()));
+                }
+
+                if (!curr.rightSibling().ok() || curr.rightSibling().getFieldName() != "$id")
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  str::stream() << "The DBRef $ref field must be "
+                                  "following by a $id field");
+            }
+            else {
+                // not an okay, $ prefixed field name.
+                return Status(ErrorCodes::DollarPrefixedFieldName,
+                              str::stream() << elem.getFieldName()
+                              << " is not valid for storage.");
+            }
+
+            return Status::OK();
+        }
+
         Status storageValid(const mb::ConstElement& elem, const bool deep = true) {
             if (!elem.ok())
                 return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
 
-            StringData fieldName = elem.getFieldName();
-            // Cannot start with "$", unless dbref which must start with ($ref, $id)
-            if (fieldName[0] == '$') {
-                // Check if it is a DBRef has this field {$ref, $id, [$db]}
-                mb::ConstElement curr = elem;
-                StringData currName = fieldName;
+            // Field names of elements inside arrays are not meaningful in mutable bson,
+            // so we do not want to validate them.
+            //
+            // TODO: Revisit how mutable handles array field names. We going to need to make
+            // this better if we ever want to support ordered updates that can alter the same
+            // element repeatedly; see SERVER-12848.
+            const bool childOfArray = elem.parent().ok() ?
+                (elem.parent().getType() == mongo::Array) : false;
 
-                // Found a $db field
-                if (currName == "$db") {
-                    if (curr.getType() != String) {
-                        return Status(ErrorCodes::InvalidDBRef,
-                                str::stream() << "The DBRef $db field must be a String, not a "
-                                              << typeName(curr.getType()));
-                    }
-                    curr = curr.leftSibling();
-
-                    if (!curr.ok() || (curr.getFieldName() != "$id"))
-                        return Status(ErrorCodes::InvalidDBRef,
-                                      "Found $db field without a $id before it, which is invalid.");
-
-                    currName = curr.getFieldName();
+            if (!childOfArray) {
+                StringData fieldName = elem.getFieldName();
+                // Cannot start with "$", unless dbref which must start with ($ref, $id)
+                if (fieldName[0] == '$') {
+                    // Check if it is a DBRef has this field {$ref, $id, [$db]}
+                    Status status = validateDBRef(elem, deep);
+                    if (!status.isOK())
+                        return status;
                 }
-
-                // Found a $id field
-                if (currName == "$id") {
-                    Status s = storageValidChildren(curr, deep);
-                    if (!s.isOK())
-                        return s;
-
-                    curr = curr.leftSibling();
-                    if (!curr.ok() || (curr.getFieldName() != "$ref")) {
-                        return Status(ErrorCodes::InvalidDBRef,
-                                     "Found $id field without a $ref before it, which is invalid.");
-                    }
-
-                    currName = curr.getFieldName();
-                }
-
-                if (currName == "$ref") {
-                    if (curr.getType() != String) {
-                        return Status(ErrorCodes::InvalidDBRef,
-                                str::stream() << "The DBRef $ref field must be a String, not a "
-                                              << typeName(curr.getType()));
-                    }
-
-                    if (!curr.rightSibling().ok() || curr.rightSibling().getFieldName() != "$id")
-                        return Status(ErrorCodes::InvalidDBRef,
-                                str::stream() << "The DBRef $ref field must be "
-                                                 "following by a $id field");
-                }
-                else {
-                    // not an okay, $ prefixed field name.
-                    return Status(ErrorCodes::DollarPrefixedFieldName,
+                else if (fieldName.find(".") != string::npos) {
+                    // Field name cannot have a "." in it.
+                    return Status(ErrorCodes::DottedFieldName,
                                   str::stream() << elem.getFieldName()
                                                 << " is not valid for storage.");
                 }
-            }
-
-            // Field name cannot have a "." in it.
-            if (fieldName.find(".") != string::npos) {
-                return Status(ErrorCodes::DottedFieldName,
-                              str::stream() << elem.getFieldName() << " is not valid for storage.");
             }
 
             // Check children if there are any.

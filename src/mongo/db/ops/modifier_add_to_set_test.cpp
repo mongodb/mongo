@@ -368,4 +368,26 @@ namespace {
         ASSERT_EQUALS(fromjson("{ $set : { a : [ 1, 1, 2, 1, 2, 2, 4, 3] } }"), logDoc);
     }
 
+    TEST(Regressions, SERVER_12848) {
+        // Proof that the mod works ok (the real issue was in validate).
+
+        Document doc(fromjson("{ _id : 1, a : [ 1, [ ] ] }"));
+        Mod mod(fromjson("{ $addToSet : { 'a.1' : 1 } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ _id : 1, a : [ 1, [ 1 ] ] }"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson("{ $set : { 'a.1' : [ 1 ] } }"), logDoc);
+    }
+
 } // namespace
