@@ -385,9 +385,44 @@ namespace mongo {
         // Broadcast the mutation so that query results stay correct.
         _cursorCache.invalidateDocument(oldLocation, INVALIDATION_MUTATION);
 
-        //  update in place
-        int sz = objNew.objsize();
-        memcpy(getDur().writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
+        // Minimize the number of pages dirtied by an update.
+        // The alternative is that, for updates to indexed and Array fields,
+        // write size is proportional to document size, rather than update size.
+        const int sz = objNew.objsize();
+        char *existingData = oldRecord->data();
+        const char *newData = objNew.objdata();
+
+        // Region of damage
+        int damage_start = 0, damage_sz = 0;
+
+        // Iterate over the new document Find contiguous regions of changed bytes for writing back
+        for ( int offset = 0; offset < sz; offset += g_minOSPageSizeBytes ) {
+            int curr_end = offset + g_minOSPageSizeBytes;
+            curr_end = curr_end > sz ? sz : curr_end;
+            int cmp_len = curr_end - offset;
+
+            int diff = memcmp(existingData + offset, newData + offset, cmp_len);
+
+            if ( diff ) {
+                if (damage_sz == 0) {
+                    // Set the damage_start to be the current offset
+                    damage_start = offset;
+                }
+                // there's a difference, add to the damaged length
+                damage_sz += cmp_len;
+            } else {
+                if ( damage_sz ) {
+                    // No difference on this page, handle existing damage...
+                    memcpy(getDur().writingPtr(existingData + damage_start, damage_sz), newData + damage_start, damage_sz);
+                    damage_sz = 0;
+                }
+            }
+        }
+
+        if ( damage_sz ) {
+            // Repair the last set of damage
+            memcpy(getDur().writingPtr(existingData + damage_start, damage_sz), newData + damage_start, damage_sz);
+        }
 
         return StatusWith<DiskLoc>( oldLocation );
     }
