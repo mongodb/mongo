@@ -183,6 +183,11 @@ namespace {
                                   .format("(:?syslog)|(:?file)", "(syslog/file)");
 
 #ifndef _WIN32
+        options->addOptionChaining("systemLog.syslog", "syslog", moe::Switch,
+                "log to system's syslog facility instead of file or stdout")
+                                  .incompatibleWith("systemLog.logpath")
+                                  .setSources(moe::SourceAllLegacy);
+
         options->addOptionChaining("systemLog.syslogFacility", "syslogFacility", moe::String,
                 "syslog facility used for monogdb syslog message");
 
@@ -236,11 +241,6 @@ namespace {
 
         options->addOptionChaining("processManagement.fork", "fork", moe::Switch,
                 "fork server process");
-
-        options->addOptionChaining("systemLog.syslog", "syslog", moe::Switch,
-                "log to system's syslog facility instead of file or stdout")
-                                  .incompatibleWith("systemLog.logpath")
-                                  .setSources(moe::SourceAllLegacy);
 
 #endif
 
