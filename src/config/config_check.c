@@ -22,17 +22,6 @@ __conn_foc_add(WT_SESSION_IMPL *session, const void *p)
 	conn = S2C(session);
 
 	/*
-	 * Instead of using locks to protect configuration information, assume
-	 * we can atomically update a pointer to a chunk of memory, and because
-	 * a pointer is never partially written, readers will correctly see the
-	 * original or new versions of the memory.  Readers might be using the
-	 * old version as it's being updated, though, which means we cannot free
-	 * the old chunk of memory until all possible readers have finished.
-	 * Currently, that's on connection close: in other words, we can use
-	 * this because it's small amounts of memory, and we really, really do
-	 * not want to acquire locks every time we access configuration strings,
-	 * since that's done on every API call.
-	 *
 	 * Our caller is expected to be holding any locks we need.
 	 */
 	WT_RET(__wt_realloc_def(
@@ -181,16 +170,35 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	/*
 	 * The next time this configuration is updated, we don't want to figure
 	 * out which of these pieces of memory were allocated and will need to
-	 * be free'd on close, add them all to the free-on-close list now.
+	 * be free'd on close (this isn't a heavily used API and it's too much
+	 * work); add them all to the free-on-close list now.
 	 */
-	WT_ERR(__conn_foc_add(session, entry));
 	WT_ERR(__conn_foc_add(session, entry->base));
+	entry->base = NULL;
+	WT_ERR(__conn_foc_add(session, entry));
+	entry = NULL;
 	WT_ERR(__conn_foc_add(session, checks));
-	WT_ERR(__conn_foc_add(session, newcheck->name));
+	checks = NULL;
 	WT_ERR(__conn_foc_add(session, newcheck->type));
+	newcheck->type = NULL;
 	WT_ERR(__conn_foc_add(session, newcheck->checks));
+	newcheck->checks = NULL;
+	WT_ERR(__conn_foc_add(session, newcheck_name));
+	newcheck_name = NULL;
 
-	*epp = entry;
+	/*
+	 * Instead of using locks to protect configuration information, assume
+	 * we can atomically update a pointer to a chunk of memory, and because
+	 * a pointer is never partially written, readers will correctly see the
+	 * original or new versions of the memory.  Readers might be using the
+	 * old version as it's being updated, though, which means we cannot free
+	 * the old chunk of memory until all possible readers have finished.
+	 * Currently, that's on connection close: in other words, we can use
+	 * this because it's small amounts of memory, and we really, really do
+	 * not want to acquire locks every time we access configuration strings,
+	 * since that's done on every API call.
+	 */
+	WT_PUBLISH(*epp, entry);
 
 	if (0) {
 err:		if (entry != NULL) {
