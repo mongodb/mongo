@@ -37,6 +37,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/multi_plan_runner.h"
+#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
@@ -129,9 +130,9 @@ namespace PlanRankingTests {
 
     DBDirectClient PlanRankingTestBase::_client;
 
-    //
-    // Test that the "prefer ixisect" parameter works.
-    //
+    /** 
+     * Test that the "prefer ixisect" parameter works.
+     */
     class PlanRankingIntersectOverride : public PlanRankingTestBase {
     public:
         void run() {
@@ -180,12 +181,165 @@ namespace PlanRankingTests {
         }
     };
 
+    /**
+     * Two plans hit EOF at the same time, but one is covered. Make sure that we prefer the covered
+     * plan.
+     */
+    class PlanRankingPreferCovered : public PlanRankingTestBase {
+    public:
+        void run() {
+            // Insert data {a:i, b:i}.  Index {a:1} and {a:1, b:1}, query on 'a', projection on 'a'
+            // and 'b'.  Should prefer the second index as we can pull the 'b' data out.
+
+            static const int N = 10000;
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << i << "b" << i));
+            }
+
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("a" << 1 << "b" << 1));
+
+            // Query for a==27 with projection that wants 'a' and 'b'.  BSONObj() is for sort.
+            CanonicalQuery* cq;
+            ASSERT(CanonicalQuery::canonicalize(ns,
+                                                BSON("a" << 27),
+                                                BSONObj(),
+                                                BSON("_id" << 0 << "a" << 1 << "b" << 1),
+                                                &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+
+            // Prefer the fully covered plan.
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
+                        soln->root.get()));
+        }
+    };
+
+    /**
+     * No plan produces any results or hits EOF. In this case we should never choose an index
+     * intersection solution.
+     */
+    class PlanRankingAvoidIntersectIfNoResults : public PlanRankingTestBase {
+    public:
+        void run() {
+            // We insert lots of copies of {a:1, b:1, c: 20}.  We have the indices {a:1} and {b:1},
+            // and the query is {a:1, b:1, c: 999}.  No data that matches the query but we won't
+            // know that during plan ranking.  We don't want to choose an intersection plan here.
+            static const int N = 10000;
+
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "b" << 1 << "c" << 20));
+            }
+
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("b" << 1));
+
+            // There is no data that matches this query but we don't know that until EOF.
+            CanonicalQuery* cq;
+            BSONObj queryObj = BSON("a" << 1 << "b" << 1 << "c" << 99);
+            ASSERT(CanonicalQuery::canonicalize(ns, queryObj, &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+
+            // Anti-prefer the intersection plan.
+            bool bestIsScanOverA = QueryPlannerTestLib::solutionMatches(
+                        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}",
+                        soln->root.get());
+            bool bestIsScanOverB = QueryPlannerTestLib::solutionMatches(
+                        "{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
+                        soln->root.get());
+            ASSERT(bestIsScanOverA || bestIsScanOverB);
+        }
+    };
+
+    /**
+     * No plan produces any results or hits EOF. In this case we should prefer covered solutions to
+     * non-covered solutions.
+     */
+    class PlanRankingPreferCoveredEvenIfNoResults : public PlanRankingTestBase {
+    public:
+        void run() {
+            // We insert lots of copies of {a:1, b:1}.  We have the indices {a:1} and {a:1, b:1},
+            // the query is for a doc that doesn't exist, but there is a projection over 'a' and
+            // 'b'.  We should prefer the index that provides a covered query.
+            static const int N = 10000;
+
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "b" << 1));
+            }
+
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("a" << 1 << "b" << 1));
+
+            // There is no data that matches this query ({a:2}).  Both scans will hit EOF before
+            // returning any data.
+
+            CanonicalQuery* cq;
+            ASSERT(CanonicalQuery::canonicalize(ns,
+                                                BSON("a" << 2),
+                                                BSONObj(),
+                                                BSON("_id" << 0 << "a" << 1 << "b" << 1),
+                                                &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+            // Prefer the fully covered plan.
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
+                        soln->root.get()));
+        }
+    };
+
+    /**
+     * We have an index on "a" which is somewhat selective and an index on "b" which is highly
+     * selective (will cause an immediate EOF). Make sure that a query with predicates on both "a"
+     * and "b" will use the index on "b".
+     */
+    class PlanRankingPreferImmediateEOF : public PlanRankingTestBase {
+    public:
+        void run() {
+            static const int N = 10000;
+
+            // 'a' is very selective, 'b' is not.
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << i << "b" << 1));
+            }
+
+            // Add indices on 'a' and 'b'.
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("b" << 1));
+
+            // Run the query {a:N+1, b:1}.  (No such document.)
+            CanonicalQuery* cq;
+            verify(CanonicalQuery::canonicalize(ns, BSON("a" << N + 1 << "b" << 1), &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // {a: 100} is super selective so choose that.
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}",
+                        soln->root.get()));
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "query_plan_ranking" ) {}
 
         void setupTests() {
             add<PlanRankingIntersectOverride>();
+            add<PlanRankingPreferCovered>();
+            add<PlanRankingAvoidIntersectIfNoResults>();
+            add<PlanRankingPreferCoveredEvenIfNoResults>();
+            add<PlanRankingPreferImmediateEOF>();
         }
     } planRankingAll;
 
