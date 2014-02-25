@@ -232,8 +232,6 @@ worker(void *arg)
 	op_end = op + sizeof(thread->workload->ops);
 
 	while (!cfg->stop) {
-		cursor = cursors[__wt_random() % cfg->table_count];
-
 		/*
 		 * Generate the next key and setup operation specific
 		 * statistics tracking objects.
@@ -268,6 +266,12 @@ worker(void *arg)
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+
+		/*
+		 * Spread the data out around the multiple databases.
+		 */
+		cursor = cursors[next_val % cfg->table_count];
+
 		/*
 		 * Skip the first time we do an operation, when trk->ops
 		 * is 0, to avoid first time latency spikes.
@@ -554,24 +558,26 @@ populate_thread(void *arg)
 			}
 			intxn = 1;
 		}
+		/*
+		 * Figure out which table this op belongs to.
+		 */
+		cursor = cursors[op % cfg->table_count];
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
-		measure_latency = cfg->sample_interval != 0 && (
+		measure_latency = 
+		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
 		    (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
-		for (i = 0; i < cfg->table_count; i++) {
-			cursor = cursors[i];
-			cursor->set_key(cursor, key_buf);
-			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
-			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Failed inserting");
-				goto err;
-			}
+		cursor->set_key(cursor, key_buf);
+		if (cfg->random_value)
+			randomize_value(cfg, value_buf);
+		cursor->set_value(cursor, value_buf);
+		if ((ret = cursor->insert(cursor)) != 0) {
+			lprintf(cfg, ret, 0, "Failed inserting");
+			goto err;
 		}
 		/*
 		 * Gather statistics.
