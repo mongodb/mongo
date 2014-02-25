@@ -319,10 +319,17 @@ namespace mongo {
         
         boost::filesystem::path ProgramRunner::findProgram( const string &prog ) {
             boost::filesystem::path p = prog;
+
 #ifdef _WIN32
-            p = change_extension(p, ".exe");
+            // The system programs either come versioned in the form of <utility>-<major.minor> 
+            // (e.g., mongorestore-2.4) or just <utility>. For windows, the appropriate extension 
+            // needs to be appended.
+            //
+            if (p.extension() != ".exe") {
+                p = prog + ".exe";
+            }
 #endif
-            
+
             if( boost::filesystem::exists(p) ) {
 #ifndef _WIN32
                 p = boost::filesystem::initial_path() / p;
@@ -334,10 +341,12 @@ namespace mongo {
                 boost::filesystem::path t = boost::filesystem::current_path() / p;
                 if( boost::filesystem::exists(t)  ) return t;
             }
+
             {
                 boost::filesystem::path t = boost::filesystem::initial_path() / p;
                 if( boost::filesystem::exists(t)  ) return t;
             }
+
             return p; // not found; might find via system path
         }
 
@@ -620,7 +629,41 @@ namespace mongo {
                 }
                 else {
                     log() << "kill_wrapper OpenEvent failed to open event to the process "
-                        << pid.asUInt32() << ". It has likely died already";
+                        << pid.asUInt32()
+                        << ". It has likely died already or server is running an older version."
+                        << " Attempting to shutdown through admin command.";
+
+                    // Back-off to the old way of shutting down the server on Windows, in case we
+                    // are managing a pre-2.6.0rc0 service, which did not have the event.
+                    //
+                    try {
+                        DBClientConnection conn;
+                        conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
+
+                        BSONElement authObj = opt["auth"];
+
+                        if (!authObj.eoo()){
+                            string errMsg;
+                            conn.auth("admin", authObj["user"].String(),
+                                authObj["pwd"].String(), errMsg);
+
+                            if (!errMsg.empty()) {
+                                cout << "Failed to authenticate before shutdown: "
+                                    << errMsg << endl;
+                            }
+                        }
+
+                        BSONObj info;
+                        BSONObjBuilder b;
+                        b.append("shutdown", 1);
+                        b.append("force", 1);
+                        conn.runCommand("admin", b.done(), info);
+                    }
+                    catch (...) {
+                        // Do nothing. This command never returns data to the client and the driver
+                        // doesn't like that.
+                        //
+                    }
                 }
                 return;
             }
