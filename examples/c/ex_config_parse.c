@@ -40,7 +40,7 @@ int main(void)
 {
 	int ret;
 	{
-	/*! [WT_CONFIG_PARSER search] */
+	/*! [WT_CONFIG_PARSER get] */
 	WT_CONFIG_ITEM v;
 	WT_CONFIG_PARSER *parser;
 	int64_t my_page_size;
@@ -63,9 +63,39 @@ int main(void)
 		return (ret);
 	}
 	my_page_size = v.val;
-	/*! [WT_CONFIG_PARSER search] */
+	ret = parser->close(parser);
+	/*! [WT_CONFIG_PARSER get] */
 
 	(void)my_page_size;
+	}
+
+	{
+	/*! [WT_CONFIG_PARSER nested get] */
+	WT_CONFIG_ITEM v;
+	WT_CONFIG_PARSER *parser;
+
+	const char *config_string = "log=(archive=true,file_max=20MB)";
+
+	if ((ret = wiredtiger_config_parser_open(
+	    NULL, config_string, strlen(config_string), &parser)) != 0) {
+		fprintf(stderr, "Error creating configuration parser: %s\n",
+		    wiredtiger_strerror(ret));
+		return (ret);
+	}
+
+	/*
+	 * Retrieve the value of the integer configuration string "page_size".
+	 */
+	v.type = WT_CONFIG_ITEM_NUM;
+	if ((ret = parser->get(parser, "log.file_max", &v)) != 0) {
+		fprintf(stderr,
+		    "log.file_max configuration: %s", wiredtiger_strerror(ret));
+		return (ret);
+	}
+	printf("log file max: %d\n", (int)v.val);
+	ret = parser->close(parser);
+	/*! [WT_CONFIG_PARSER nested get] */
+
 	}
 
 	{
@@ -86,7 +116,8 @@ int main(void)
 	 */
 	while ((ret = parser->next(parser, &k, &v)) == 0) {
 		printf("%.*s:", (int)k.len, k.str);
-		if (v.type == WT_CONFIG_ITEM_STRING)
+		if (v.type == WT_CONFIG_ITEM_STRING ||
+		    v.type == WT_CONFIG_ITEM_ID)
 			printf("%.*s\n", (int)v.len, v.str);
 		else if (v.type == WT_CONFIG_ITEM_NUM)
 			printf("%d\n", (int)v.val);
