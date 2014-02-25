@@ -2806,18 +2806,18 @@ namespace {
     // SERVER-12196
     TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder1) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
-        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
         runQuery(fromjson("{a:1, b:1}"));
 
         assertNumSolutions(3U);
 
-        assertSolutionExists("{fetch: {filter: null, node: "
-                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {b:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1}}}}}");
         assertSolutionExists("{fetch: {filter: {a:1}, node: "
                                  "{ixscan: {filter: null, pattern: {b:1}}}}}");
-        assertSolutionExists("{fetch: {filter: null, node: {andHash: {nodes: ["
-                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}},"
+        assertSolutionExists("{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                 "{ixscan: {filter: null, pattern: {a:1}}},"
                                  "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
     }
 
@@ -2825,17 +2825,17 @@ namespace {
     TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder2) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
         addIndex(BSON("b" << 1));
-        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("a" << 1));
         runQuery(fromjson("{a:1, b:1}"));
 
         assertNumSolutions(3U);
 
-        assertSolutionExists("{fetch: {filter: null, node: "
-                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {b:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1}}}}}");
         assertSolutionExists("{fetch: {filter: {a:1}, node: "
                                  "{ixscan: {filter: null, pattern: {b:1}}}}}");
-        assertSolutionExists("{fetch: {filter: null, node: {andHash: {nodes: ["
-                                 "{ixscan: {filter: null, pattern: {a:1, b:1}}},"
+        assertSolutionExists("{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                 "{ixscan: {filter: null, pattern: {a:1}}},"
                                  "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
     }
 
@@ -2921,6 +2921,80 @@ namespace {
                                  "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
 
         ASSERT_LESS_THAN(getNumSolutions(), 10U);
+    }
+
+    //
+    // Index intersection cases for SERVER-12825: make sure that
+    // we don't generate an ixisect plan if a compound index is
+    // available instead.
+    //
+
+    // SERVER-12825
+    TEST_F(QueryPlannerTest, IntersectCompoundInsteadBasic) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuery(fromjson("{a: 1, b: 1}"));
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{fetch: {filter: {b:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {a:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1,b:1}}}}}");
+    }
+
+    // SERVER-12825
+    TEST_F(QueryPlannerTest, IntersectCompoundInsteadThreeCompoundIndices) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("c" << 1 << "d" << 1));
+        addIndex(BSON("a" << 1 << "c" << -1 << "b" << -1 << "d" << 1));
+        runQuery(fromjson("{a: 1, b: 1, c: 1, d: 1}"));
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{fetch: {filter: {$and: [{c:1},{d:1}]}, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1,b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {$and:[{a:1},{b:1}]}, node: "
+                                 "{ixscan: {filter: null, pattern: {c:1,d:1}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1,c:-1,b:-1,d:1}}}}}");
+    }
+
+    // SERVER-12825
+    TEST_F(QueryPlannerTest, IntersectCompoundInsteadUnusedField) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+        runQuery(fromjson("{a: 1, b: 1}"));
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{fetch: {filter: {b:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {a:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1,b:1,c:1}}}}}");
+    }
+
+    // SERVER-12825
+    TEST_F(QueryPlannerTest, IntersectCompoundInsteadUnusedField2) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("c" << 1 << "d" << 1));
+        addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+        runQuery(fromjson("{a: 1, c: 1}"));
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{fetch: {filter: {c:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1,b:1}}}}}");
+        assertSolutionExists("{fetch: {filter: {a:1}, node: "
+                                 "{ixscan: {filter: null, pattern: {c:1,d:1}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: "
+                                 "{ixscan: {filter: null, pattern: {a:1,b:1,c:1}}}}}");
     }
 
     //

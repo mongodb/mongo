@@ -480,15 +480,19 @@ namespace mongo {
         //   0. Impose an ordering (idx1, idx2) using the key patterns.
         //   (*See note below.)
         //   1. Assign predicates which prefix idx1 to idx1.
-        //   2. Add assigned indices to a set of indices---the "already
+        //   2. Add assigned predicates to a set of predicates---the "already
         //   assigned set".
         //   3. Assign predicates which prefix idx2 to idx2, as long as they
-        //   been assigned to idx1 already. Add newly assigned indices to
+        //   been assigned to idx1 already. Add newly assigned predicates to
         //   the "already assigned set".
         //   4. Try to assign predicates to idx1 by compounding.
         //   5. Add any predicates assigned to idx1 by compounding to the
         //   "already assigned set",
         //   6. Try to assign predicates to idx2 by compounding.
+        //   7. Determine if we have already assigned all predicates in
+        //   the "already assigned set" to a single index. If so, then
+        //   don't generate an ixisect solution, as compounding will
+        //   be better. Otherwise, output the ixisect assignments.
         //
         // *NOTE on ordering. Suppose we have two indices A and B, and a
         // predicate P1 which is over the prefix of both indices A and B.
@@ -676,6 +680,25 @@ namespace mongo {
                     }
                 }
 
+                // Add predicates in 'secondAssign' to the set of all assigned predicates.
+                for (size_t i = 0; i < secondAssign.preds.size(); ++i) {
+                    if (predsAssigned.end() == predsAssigned.find(secondAssign.preds[i])) {
+                        predsAssigned.insert(secondAssign.preds[i]);
+                    }
+                }
+
+                //
+                // Step #7:
+                // Make sure we haven't already assigned this set of predicates by compounding.
+                // If we have, then bail out for this pair of indices.
+                //
+                if (alreadyCompounded(predsAssigned, andAssignment)) {
+                    // There is no need to add either 'firstAssign' or 'secondAssign'
+                    // to 'andAssignment' in this case because we have already performed
+                    // assignments to single indices in enumerateOneIndex(...).
+                    continue;
+                }
+
                 // We're done with this particular pair of indices; output
                 // the resulting assignments.
                 AndEnumerableState state;
@@ -828,6 +851,48 @@ namespace mongo {
                 }
             }
         }
+    }
+
+    bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssigned,
+                                           const AndAssignment* andAssignment) {
+        for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
+            const AndEnumerableState& state = andAssignment->choices[i];
+
+            // We cannot have assigned this set of predicates already by
+            // compounding unless this is an assignment to a single index.
+            if (state.assignments.size() != 1) {
+                continue;
+            }
+
+            // If the set of preds in 'ixisectAssigned' is a subset of 'oneAssign.preds',
+            // then all the preds can be used by compounding on a single index.
+            const OneIndexAssignment& oneAssign = state.assignments[0];
+
+            // If 'ixisectAssigned' is larger than 'oneAssign.preds', then
+            // it can't be a subset.
+            if (ixisectAssigned.size() > oneAssign.preds.size()) {
+                continue;
+            }
+
+            // Check for subset by counting the number of elements in 'oneAssign.preds'
+            // that are contained in 'ixisectAssigned'. The elements of both 'oneAssign.preds'
+            // and 'ixisectAssigned' are unique (no repeated elements).
+            size_t count = 0;
+            for (size_t j = 0; j < oneAssign.preds.size(); ++j) {
+                if (ixisectAssigned.end() != ixisectAssigned.find(oneAssign.preds[j])) {
+                    ++count;
+                }
+            }
+
+            if (ixisectAssigned.size() == count) {
+                return true;
+            }
+
+            // We cannot assign the preds by compounding on 'oneAssign'.
+            // Move on to the next index.
+        }
+
+        return false;
     }
 
     void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,

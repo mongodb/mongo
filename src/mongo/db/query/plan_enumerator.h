@@ -305,6 +305,28 @@ namespace mongo {
         void getMultikeyCompoundablePreds(const MatchExpression* assigned,
                                           const vector<MatchExpression*>& couldCompound,
                                           vector<MatchExpression*>* out);
+
+        /**
+         * 'andAssignment' contains assignments that we've already committed to outputting,
+         * including both single index assignments and ixisect assignments.
+         *
+         * 'ixisectAssigned' is a set of predicates that we are about to add to 'andAssignment'
+         * as an index intersection assignment.
+         *
+         * Returns true if an single index assignment which is already in 'andAssignment'
+         * contains a superset of the predicates in 'ixisectAssigned'. This means that we
+         * can assign the same preds to a compound index rather than using index intersection.
+         *
+         * Ex.
+         *   Suppose we have indices {a: 1}, {b: 1}, and {a: 1, b: 1} with query
+         *   {a: 2, b: 2}. When we try to intersect {a: 1} and {b: 1} the predicates
+         *   a==2 and b==2 will get assigned to respective indices. But then we will
+         *   call this function with ixisectAssigned equal to the set {'a==2', 'b==2'},
+         *   and notice that we have already assigned this same set of predicates to
+         *   the single index {a: 1, b: 1} via compounding.
+         */
+        bool alreadyCompounded(const set<MatchExpression*>& ixisectAssigned,
+                               const AndAssignment* andAssignment);
         /**
          * Output index intersection assignments inside of an AND node.
          */
