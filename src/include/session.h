@@ -84,34 +84,6 @@ struct __wt_session_impl {
 
 	WT_ITEM	logrec_buf;		/* Buffer for log records */
 
-	WT_TXN_ISOLATION isolation;
-	WT_TXN	txn;			/* Transaction state */
-	u_int	ncursors;		/* Count of active file cursors. */
-	void	*lang_private;		/* Language specific private storage */
-
-	WT_REF **excl;			/* Eviction exclusive list */
-	u_int	 excl_next;		/* Next empty slot */
-	size_t	 excl_allocated;	/* Bytes allocated */
-
-	void	*block_manager;		/* Block-manager support */
-	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
-	void	*reconcile;		/* Reconciliation support */
-	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
-
-	/*
-	 * Sessions can "free" memory that may still be in use, and we use a
-	 * transactional generation to track it, that is, the session stores
-	 * a reference to the memory and a current transaction ID; when the
-	 * oldest transaction ID has moved beyond that point, the memory can
-	 * be discarded for real.
-	 */
-	struct __wt_fotxn {
-		uint64_t    txnid;	/* Transaction ID */
-		const void *p;		/* Memory */
-	} *fotxn;			/* Free-on-transaction array */
-	size_t  fotxn_cnt;		/* Array entries */
-	size_t  fotxn_size;		/* Array size */
-
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */
 #ifdef HAVE_DIAGNOSTIC
@@ -127,11 +99,39 @@ struct __wt_session_impl {
 	} *scratch_track;
 #endif
 
+	WT_TXN_ISOLATION isolation;
+	WT_TXN	txn;			/* Transaction state */
+	u_int	ncursors;		/* Count of active file cursors. */
+	void	*lang_private;		/* Language specific private storage */
+
+	WT_REF **excl;			/* Eviction exclusive list */
+	u_int	 excl_next;		/* Next empty slot */
+	size_t	 excl_allocated;	/* Bytes allocated */
+
+	void	*block_manager;		/* Block-manager support */
+	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
+	void	*reconcile;		/* Reconciliation support */
+	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
+
 	int compaction;			/* Compaction did some work */
 	int skip_schema_lock;		/* Another thread holds the schema lock
 					 * on our behalf */
 
 	uint32_t flags;
+
+	/*
+	 * Sessions can "free" memory that may still be in use, and we use a
+	 * transactional generation to track it, that is, the session stores
+	 * a reference to the memory and a current transaction ID; when the
+	 * oldest transaction ID has moved beyond that point, the memory can
+	 * be discarded for real.
+	 */
+	struct __wt_fotxn {
+		uint64_t    txnid;	/* Transaction ID */
+		const void *p;		/* Memory */
+	} *fotxn;			/* Free-on-transaction array */
+	size_t  fotxn_cnt;		/* Array entries */
+	size_t  fotxn_size;		/* Array size */
 
 	/*
 	 * The hazard pointer must be placed at the end of the structure: the
