@@ -605,7 +605,7 @@ shellPrintHelper = function (x) {
         // TODO: This implicit calling of GLE can cause subtle, hard to track issues - remove?
         if (__callLastError && typeof( db ) != "undefined" &&
                 db.getMongo &&
-                db.getMongo().writeMode == "legacy") {
+                db.getMongo().writeMode() == "legacy") {
 
             __callLastError = false;
             // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad
