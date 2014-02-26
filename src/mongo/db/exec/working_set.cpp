@@ -159,4 +159,25 @@ namespace mongo {
         return false;
     }
 
+    size_t WorkingSetMember::getMemUsage() const {
+        size_t memUsage = 0;
+
+        if (hasLoc()) {
+            memUsage += sizeof(DiskLoc);
+        }
+
+        // XXX: Unowned objects count towards current size.
+        //      See SERVER-12579
+        if (hasObj()) {
+            memUsage += obj.objsize();
+        }
+
+        for (size_t i = 0; i < keyData.size(); ++i) {
+            const IndexKeyDatum& keyDatum = keyData[i];
+            memUsage += keyDatum.keyData.objsize();
+        }
+
+        return memUsage;
+    }
+
 }  // namespace mongo

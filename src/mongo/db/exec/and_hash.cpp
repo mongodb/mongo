@@ -36,23 +36,9 @@
 
 namespace {
 
-    using namespace mongo;
-
     // Upper limit for buffered data.
     // Stage execution will fail once size of all buffered data exceeds this threshold.
     const size_t kDefaultMaxMemUsageBytes = 32 * 1024 * 1024;
-
-    /**
-     * Returns expected memory usage of working set member
-     */
-    size_t getMemberMemUsage(WorkingSetMember* member) {
-        size_t memUsage = 0;
-        for (size_t i = 0; i < member->keyData.size(); ++i) {
-            const IndexKeyDatum& keyDatum = member->keyData[i];
-            memUsage += keyDatum.keyData.objsize();
-        }
-        return memUsage;
-    }
 
 } // namespace
 
@@ -291,7 +277,7 @@ namespace mongo {
             _dataMap[member->loc] = id;
 
             // Update memory stats.
-            _memUsage += getMemberMemUsage(member);
+            _memUsage += member->getMemUsage();
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
@@ -361,12 +347,12 @@ namespace mongo {
                 // We have a hit.  Copy data into the WSM we already have.
                 _seenMap.insert(member->loc);
                 WorkingSetMember* olderMember = _ws->get(_dataMap[member->loc]);
-                size_t memUsageBefore = getMemberMemUsage(olderMember);
+                size_t memUsageBefore = olderMember->getMemUsage();
 
                 AndCommon::mergeFrom(olderMember, *member);
 
                 // Update memory stats.
-                _memUsage += getMemberMemUsage(olderMember) - memUsageBefore;
+                _memUsage += olderMember->getMemUsage() - memUsageBefore;
             }
             _ws->free(id);
             ++_commonStats.needTime;
@@ -385,7 +371,7 @@ namespace mongo {
 
                     // Update memory stats.
                     WorkingSetMember* member = _ws->get(toErase->second);
-                    _memUsage -= getMemberMemUsage(member);
+                    _memUsage -= member->getMemUsage();
 
                     _ws->free(toErase->second);
                     _dataMap.erase(toErase);
@@ -498,7 +484,7 @@ namespace mongo {
             }
 
             // Update memory stats.
-            _memUsage -= getMemberMemUsage(member);
+            _memUsage -= member->getMemUsage();
 
             // The loc is about to be invalidated.  Fetch it and clear the loc.
             WorkingSetCommon::fetchAndInvalidateLoc(member);

@@ -37,24 +37,6 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner.h"
 
-namespace {
-
-    using mongo::DiskLoc;
-    using mongo::WorkingSet;
-    using mongo::WorkingSetID;
-    using mongo::WorkingSetMember;
-
-    /**
-     * Returns expected memory usage of working set member
-     */
-    size_t getMemUsage(WorkingSet* ws, WorkingSetID wsid) {
-        WorkingSetMember* member = ws->get(wsid);
-        size_t memUsage = sizeof(DiskLoc) + member->obj.objsize();
-        return memUsage;
-    }
-
-} // namespace
-
 namespace mongo {
 
     using std::vector;
@@ -476,12 +458,12 @@ namespace mongo {
 
         if (_limit == 0) {
             _data.push_back(item);
-            _memUsage += getMemUsage(_ws, item.wsid);
+            _memUsage += _ws->get(item.wsid)->getMemUsage();
         }
         else if (_limit == 1) {
             if (_data.empty()) {
                 _data.push_back(item);
-                _memUsage = getMemUsage(_ws, item.wsid);
+                _memUsage = _ws->get(item.wsid)->getMemUsage();
                 return;
             }
             wsidToFree = item.wsid;
@@ -490,7 +472,7 @@ namespace mongo {
             if (cmp(item, _data[0])) {
                 wsidToFree = _data[0].wsid;
                 _data[0] = item;
-                _memUsage = getMemUsage(_ws, item.wsid);
+                _memUsage = _ws->get(item.wsid)->getMemUsage();
             }
         }
         else {
@@ -499,7 +481,7 @@ namespace mongo {
             vector<SortableDataItem>::size_type limit(_limit);
             if (_dataSet->size() < limit) {
                 _dataSet->insert(item);
-                _memUsage += getMemUsage(_ws, item.wsid);
+                _memUsage += _ws->get(item.wsid)->getMemUsage();
                 return;
             }
             // Limit will be exceeded - compare with item with lowest key
@@ -510,7 +492,8 @@ namespace mongo {
             const SortableDataItem& lastItem = *lastItemIt;
             const WorkingSetComparator& cmp = *_sortKeyComparator;
             if (cmp(item, lastItem)) {
-                _memUsage += getMemUsage(_ws, item.wsid) - getMemUsage(_ws, lastItem.wsid);
+                _memUsage += _ws->get(item.wsid)->getMemUsage() -
+                             _ws->get(lastItem.wsid)->getMemUsage();
                 wsidToFree = lastItem.wsid;
                 // According to std::set iterator validity rules,
                 // it does not matter which of erase()/insert() happens first.

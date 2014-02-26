@@ -248,6 +248,11 @@ namespace mongo {
          */
         bool getFieldDotted(const string& field, BSONElement* out) const;
 
+        /**
+         * Returns expected memory usage of working set member.
+         */
+        size_t getMemUsage() const;
+
     private:
         boost::scoped_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
     };
