@@ -1217,7 +1217,7 @@ start_all_runs(CONFIG *cfg)
 {
 	CONFIG *next_cfg, **configs;
 	char *cmd_buf, *new_home;
-	int ret;
+	int ret, t_ret;
 	size_t cmd_len, home_len, i;
 	pthread_t *threads;
 
@@ -1253,7 +1253,12 @@ start_all_runs(CONFIG *cfg)
 			goto err;
 
 		/* Setup a unique home directory for each database. */
+		configs[i] = next_cfg;
 		new_home = malloc(home_len + 5);
+		if (new_home == NULL) {
+			ret = ENOMEM;
+			goto err;
+		}
 		sprintf(new_home, "%s/D%02d", cfg->home, (int)i);
 		next_cfg->home = (const char *)new_home;
 
@@ -1273,20 +1278,21 @@ start_all_runs(CONFIG *cfg)
 			lprintf(cfg, ret, 0, "Error creating thread");
 			goto err;
 		}
-		configs[i] = next_cfg;
 	}
 
 	/* Wait for threads to finish. */
 	for (i = 0; i < cfg->database_count; i++) {
-		if ((ret = pthread_join(threads[i], NULL)) != 0) {
+		if ((t_ret = pthread_join(threads[i], NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread");
-			return (ret);
+			if (ret == 0)
+				ret = t_ret;
 		}
 	}
 
 err:	for (i = 0; i < cfg->database_count && configs[i] != NULL; i++) {
 		free((char *)configs[i]->home);
 		config_free(configs[i]);
+		free(configs[i]);
 	}
 	free(configs);
 	free(threads);
