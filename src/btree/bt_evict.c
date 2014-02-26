@@ -731,6 +731,9 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	cache = S2C(session)->cache;
 	retries = 0;
 
+	/* Increment the shared read generation. */
+	__wt_cache_read_gen_incr(session);
+
 	/*
 	 * Set the starting slot in the queue and the maximum pages added
 	 * per walk.
