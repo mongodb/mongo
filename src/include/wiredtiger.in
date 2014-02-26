@@ -1910,7 +1910,7 @@ struct __wt_config_item {
 	 * list or string), the \c str field will reference the value of the
 	 * configuration string.
 	 *
-	 * The bytes referenced by \c str are <b>not</b> be nul-terminated,
+	 * The bytes referenced by \c str are <b>not</b> nul-terminated,
 	 * use the \c len field instead of a terminating nul byte.
 	 */
 	const char *str;
