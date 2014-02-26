@@ -127,7 +127,8 @@ __wt_buf_set(
 	/* Ensure the buffer is large enough. */
 	WT_RET(__wt_buf_initsize(session, buf, size));
 
-	memcpy(buf->mem, data, size);
+	/* Copy, allowing for overlapping strings. */
+	memmove(buf->mem, data, size);
 
 	return (0);
 }
