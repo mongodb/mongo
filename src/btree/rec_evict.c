@@ -147,14 +147,21 @@ static int
 __rec_split_list_alloc(
     WT_SESSION_IMPL *session, WT_PAGE_MODIFY *mod, uint32_t *ip)
 {
+	size_t bytes_allocated;
 	uint32_t i;
 
 	for (i = 0; i < mod->splits_entries; ++i)
 		if (mod->splits[i].refs == NULL)
 			break;
 	if (i == mod->splits_entries) {
-		WT_RET(__wt_realloc(session,
-		    NULL, (i + 5) * sizeof(mod->splits[0]), &mod->splits));
+		/*
+		 * Calculate the bytes-allocated explicitly, this information
+		 * lives in the page-modify structure, and it's worth keeping
+		 * that as small as possible.
+		 */
+		bytes_allocated = mod->splits_entries * sizeof(mod->splits[0]);
+		WT_RET(__wt_realloc(session, &bytes_allocated,
+		    (i + 5) * sizeof(mod->splits[0]), &mod->splits));
 		mod->splits_entries = i + 5;
 	}
 	*ip = i;
