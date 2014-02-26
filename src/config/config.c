@@ -738,10 +738,8 @@ __wt_config_subgetraw(WT_SESSION_IMPL *session,
 __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg, const char *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM key_item;
-
-	key_item.str = key;
-	key_item.len = strlen(key);
+	WT_CONFIG_ITEM key_item =
+	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	return (__wt_config_subgetraw(session, cfg, &key_item, value));
 }

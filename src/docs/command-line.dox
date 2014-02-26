@@ -291,9 +291,6 @@ engine, or, if specified, for the URI on the command-line.
 <code>wt [-Vv] [-C config] [-h directory] stat [-a] [uri]</code>
 
 @subsection util_stat_options Options
-The \c stat command has no command-specific options.
-
-@subsection util_stat_options Options
 The following are command-specific options for the \c stat command:
 
 @par <code>-a</code>
