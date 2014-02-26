@@ -1122,12 +1122,17 @@ find_table_count(CONFIG *cfg)
 		if (table_icount > max_icount)
 			max_icount = table_icount;
 
-err:		if ((t_ret = session->close(session, NULL)) != 0) {
-			if (ret == 0)
-				ret = t_ret;
+		if ((ret = cursor->close(cursor)) != 0) {
 			lprintf(cfg, ret, 0,
-			    "find_table_count: session close failed");
+			    "find_table_count: cursor close failed");
+			goto err;
 		}
+	}
+err:	if ((t_ret = session->close(session, NULL)) != 0) {
+		if (ret == 0)
+			ret = t_ret;
+		lprintf(cfg, ret, 0,
+		    "find_table_count: session close failed");
 	}
 	cfg->icount = max_icount;
 out:	return (ret);
