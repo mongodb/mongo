@@ -1250,11 +1250,8 @@ start_all_runs(CONFIG *cfg)
 		next_cfg = calloc(1, sizeof(CONFIG));
 		if ((ret = config_assign(next_cfg, cfg)) != 0)
 			goto err;
-		/*
-		 * Fixup the home directory.
-		 * TODO: This memory is leaked, since home is usually assigned
-		 * from a const char.
-		 */
+
+		/* Setup a unique home directory for each database. */
 		new_home = malloc(home_len + 5);
 		sprintf(new_home, "%s/D%02d", cfg->home, (int)i);
 		next_cfg->home = (const char *)new_home;
@@ -1286,8 +1283,10 @@ start_all_runs(CONFIG *cfg)
 		}
 	}
 
-err:	for (i = 0; i < cfg->database_count && configs[i] != NULL; i++)
+err:	for (i = 0; i < cfg->database_count && configs[i] != NULL; i++) {
+		free((char *)configs[i]->home);
 		config_free(configs[i]);
+	}
 	free(configs);
 	free(threads);
 	free(cmd_buf);
@@ -1461,12 +1460,12 @@ main(int argc, char *argv[])
 	CONFIG *cfg, _cfg;
 	char *cc_buf, *tc_buf;
 	const char *opts = "C:H:h:m:O:o:T:";
-	const char *user_cconfig, *user_tconfig;
+	const char *config_opts, *user_cconfig, *user_tconfig;
 	int ch, monitor_set, ret;
 	size_t req_len;
 
 	ret = 0;
-	user_cconfig = user_tconfig = NULL;
+	config_opts = user_cconfig = user_tconfig = NULL;
 	cc_buf = tc_buf = NULL;
 
 	/* Setup the default configuration values. */
@@ -1478,6 +1477,18 @@ main(int argc, char *argv[])
 	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
+		case 'C':
+			user_cconfig = optarg;
+			break;
+		case 'H':
+			cfg->helium_mount = optarg;
+			break;
+		case 'O':
+			config_opts = optarg;
+			break;
+		case 'T':
+			user_tconfig = optarg;
+			break;
 		case 'h':
 			cfg->home = optarg;
 			break;
@@ -1492,45 +1503,24 @@ main(int argc, char *argv[])
 		}
 
 	/*
-	 * If the user did not specify a monitor directory
-	 * then set the monitor directory to the home dir.
+	 * If the user did not specify a monitor directory then set the
+	 * monitor directory to the home dir.
 	 */
 	if (!monitor_set)
 		cfg->monitor_dir = cfg->home;
 
-	/*
-	 * Parse different config structures - other options override fields
-	 * within the structure.
-	 */
-	optind = 1;
-	while ((ch = getopt(argc, argv, opts)) != EOF)
-		switch (ch) {
-		case 'O':
-			if (config_opt_file(cfg, optarg) != 0)
-				goto einval;
-			break;
-		default:
-			/* Validation done previously. */
-			break;
-		}
+	/* Parse configuration settings from configuration file. */
+	if (config_opts != NULL && config_opt_file(cfg, config_opts) != 0)
+		goto einval;
 
-	/* Parse other options */
+	/* Parse options that override values set via a configuration file. */
 	optind = 1;
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
-		case 'C':
-			user_cconfig = optarg;
-			break;
-		case 'H':
-			cfg->helium_mount = optarg;
-			break;
 		case 'o':
 			/* Allow -o key=value */
 			if (config_opt_line(cfg, optarg) != 0)
 				goto einval;
-			break;
-		case 'T':
-			user_tconfig = optarg;
 			break;
 		}
 
