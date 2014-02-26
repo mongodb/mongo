@@ -82,9 +82,18 @@ DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
 DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
 DEF_OPT_AS_BOOL(compact, 0, "post-populate compact for LSM merging activity")
+DEF_OPT_AS_STRING(compression, "none",
+    "compression extension.  Allowed configuration values are: "
+    "'none' (default), 'bzip', 'snappy', 'zlib'")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
-DEF_OPT_AS_UINT32(icount, 5000, "number of records to initially populate")
+DEF_OPT_AS_UINT32(database_count, 1,
+    "number of WiredTiger databases to use. Each database will execute the"
+    " workload using a separate home directory and complete set of worker"
+    " threads")
+DEF_OPT_AS_UINT32(icount, 5000,
+    "number of records to initially populate. If multiple tables are "
+    "configured, each table has this many items inserted.")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
@@ -114,6 +123,9 @@ DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",
     "table configuration string")
+DEF_OPT_AS_UINT32(table_count, 1,
+    "number of tables to run operations over. Keys are divided evenly "
+    "over the tables. Default 1, maximum 99.")
 DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "entry is the total number of threads, and the 'insert', 'read' and "
     "'update' entries are the ratios of insert, read and update operations "

@@ -60,6 +60,23 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	config_free(dest);
 	memcpy(dest, src, sizeof(CONFIG));
 
+	if (src->uris != NULL) {
+		dest->uris = (char **)calloc(src->table_count, sizeof(char *));
+		for (i = 0; i < src->table_count; i++)
+			dest->uris[i] = strdup(src->uris[i]);
+	}
+	dest->ckptthreads = NULL;
+	dest->popthreads = NULL;
+	dest->workers = NULL;
+
+	if (src->base_uri != NULL)
+		dest->base_uri = strdup(src->base_uri);
+	if (src->workload != NULL) {
+		dest->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD));
+		memcpy(dest->workload,
+		    src->workload, WORKLOAD_MAX * sizeof(WORKLOAD));
+	}
+
 	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
 		if (config_opts[i].type == STRING_TYPE ||
 		    config_opts[i].type == CONFIG_STRING_TYPE) {
@@ -96,11 +113,50 @@ config_free(CONFIG *cfg)
 				*pstr = NULL;
 			}
 		}
+	if (cfg->uris != NULL) {
+		for (i = 0; i < cfg->table_count; i++)
+			free(cfg->uris[i]);
+		free(cfg->uris);
+	}
 
+	free(cfg->ckptthreads);
 	free(cfg->popthreads);
-	free(cfg->uri);
+	free(cfg->base_uri);
 	free(cfg->workers);
 	free(cfg->workload);
+}
+
+/*
+ * config_compress --
+ *	Parse the compression configuration.
+ */
+int
+config_compress(CONFIG *cfg)
+{
+	int ret;
+	const char *s;
+
+	ret = 0;
+	s = cfg->compression;
+	if (strcmp(s, "none") == 0) {
+		cfg->compress_ext = NULL;
+		cfg->compress_table = NULL;
+	} else if (strcmp(s, "bzip") == 0) {
+		cfg->compress_ext = BZIP_EXT;
+		cfg->compress_table = BZIP_BLK;
+	} else if (strcmp(s, "snappy") == 0) {
+		cfg->compress_ext = SNAPPY_EXT;
+		cfg->compress_table = SNAPPY_BLK;
+	} else if (strcmp(s, "zlib") == 0) {
+		cfg->compress_ext = ZLIB_EXT;
+		cfg->compress_table = ZLIB_BLK;
+	} else {
+		fprintf(stderr,
+	    "invalid compression configuration: %s\n", s);
+		ret = EINVAL;
+	}
+	return (ret);
+
 }
 
 /*
@@ -112,12 +168,10 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 {
 	WORKLOAD *workp;
 	WT_CONFIG_ITEM groupk, groupv, k, v;
-	WT_CONFIG_SCAN *group, *scan;
-	WT_EXTENSION_API *wt_api;
+	WT_CONFIG_PARSER *group, *scan;
 	int ret;
 
-	wt_api = cfg->conn->get_extension_api(cfg->conn);
-
+	group = scan = NULL;
 	/* Allocate the workload array. */
 	if ((cfg->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD))) == NULL)
 		return (enomem(cfg));
@@ -132,12 +186,11 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	 * returned from the original string.
 	 */
 	if ((ret =
-	    wt_api->config_scan_begin(wt_api, NULL, config, len, &group)) != 0)
+	    wiredtiger_config_parser_open(NULL, config, len, &group)) != 0)
 		goto err;
-	while ((ret =
-	    wt_api->config_scan_next(wt_api, group, &groupk, &groupv)) == 0) {
-		if ((ret = wt_api-> config_scan_begin(
-		    wt_api, NULL, groupk.str, groupk.len, &scan)) != 0)
+	while ((ret = group->next(group, &groupk, &groupv)) == 0) {
+		if ((ret = wiredtiger_config_parser_open(
+		    NULL, groupk.str, groupk.len, &scan)) != 0)
 			goto err;
 		
 		/* Move to the next workload slot. */
@@ -150,8 +203,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		}
 		workp = &cfg->workload[cfg->workload_cnt++];
 
-		while ((ret =
-		    wt_api->config_scan_next(wt_api, scan, &k, &v)) == 0) {
+		while ((ret = scan->next(scan, &k, &v)) == 0) {
 			if (STRING_MATCH("count", k.str, k.len)) {
 				if ((workp->threads = v.val) <= 0)
 					goto err;
@@ -181,7 +233,9 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			ret = 0;
 		if (ret != 0 )
 			goto err;
-		if ((ret = wt_api->config_scan_end(wt_api, scan)) != 0)
+		ret = scan->close(scan);
+		scan = NULL;
+		if (ret != 0)
 			goto err;
 
 		if (workp->insert == 0 &&
@@ -190,12 +244,19 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		cfg->workers_cnt += (u_int)workp->threads;
 	}
 
-	if ((ret = wt_api->config_scan_end(wt_api, group)) != 0)
+	ret = group->close(group);
+	group = NULL;
+	if (ret != 0)
 		goto err;
 
 	return (0);
 
-err:	fprintf(stderr,
+err:	if (group != NULL)
+		(void)group->close(group);
+	if (scan != NULL)
+		(void)scan->close(scan);
+		
+	fprintf(stderr,
 	    "invalid thread configuration or scan error: %.*s\n",
 	    (int)len, config);
 	return (EINVAL);
@@ -408,21 +469,17 @@ int
 config_opt_line(CONFIG *cfg, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
-	WT_EXTENSION_API *wt_api;
+	WT_CONFIG_PARSER *scan;
 	int ret, t_ret;
 
-	wt_api = cfg->conn->get_extension_api(cfg->conn);
-
-	if ((ret = wt_api->config_scan_begin(
-	    wt_api, NULL, optstr, strlen(optstr), &scan)) != 0) {
+	if ((ret = wiredtiger_config_parser_open(
+	    NULL, optstr, strlen(optstr), &scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
 
 	while (ret == 0) {
-		if ((ret =
-		    wt_api->config_scan_next(wt_api, scan, &k, &v)) != 0) {
+		if ((ret = scan->next(scan, &k, &v)) != 0) {
 			/* Any parse error has already been reported. */
 			if (ret == WT_NOTFOUND)
 				ret = 0;
@@ -430,7 +487,7 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 		}
 		ret = config_opt(cfg, &k, &v);
 	}
-	if ((t_ret = wt_api->config_scan_end(wt_api, scan)) != 0) {
+	if ((t_ret = scan->close(scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_end");
 		if (ret == 0)
 			ret = t_ret;
@@ -472,6 +529,14 @@ config_sanity(CONFIG *cfg)
 	    cfg->report_interval > cfg->run_time ||
 	    cfg->sample_interval > cfg->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
+		return (1);
+	}
+	if (cfg->table_count > 99) {
+		fprintf(stderr, "table count greater than 99\n");
+		return (1);
+	}
+	if (cfg->database_count > 99) {
+		fprintf(stderr, "database count greater than 99\n");
 		return (1);
 	}
 	return (0);

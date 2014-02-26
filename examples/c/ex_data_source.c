@@ -339,30 +339,6 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	}
 
 	{
-	/*! [WT_EXTENSION config_strget] */
-	WT_CONFIG_ITEM v;
-	int64_t my_data_source_page_size;
-
-	/*
-	 * Retrieve the value of the integer type configuration string
-	 * "page_size" from a local string (as opposed to the provided
-	 * WT_CONFIG_ARG reference).
-	 */
-	const char *config_string = "path=/dev/loop,page_size=1024";
-
-	if ((ret = wt_api->config_strget(
-	    wt_api, session, config_string, "page_size", &v)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "page_size configuration: %s", wiredtiger_strerror(ret));
-		return (ret);
-	}
-	my_data_source_page_size = v.val;
-	/*! [WT_EXTENSION config_strget] */
-
-	(void)my_data_source_page_size;
-	}
-
-	{
 	/*! [WT_EXTENSION config_get] */
 	WT_CONFIG_ITEM v;
 	const char *my_data_source_key;
@@ -389,31 +365,6 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	/*! [WT_EXTENSION config_get] */
 
 	(void)my_data_source_key;
-	}
-
-	{
-	/*! [WT_EXTENSION config scan] */
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
-
-	/*
-	 * Retrieve the value of the list type configuration string "paths".
-	 */
-	if ((ret = wt_api->config_get(
-	    wt_api, session, config, "paths", &v)) != 0) {
-		(void)wt_api->err_printf(wt_api, session,
-		    "paths configuration: %s", wiredtiger_strerror(ret));
-		return (ret);
-	}
-
-	/*
-	 * Step through the list of entries.
-	 */
-	ret = wt_api->config_scan_begin(wt_api, session, v.str, v.len, &scan);
-	while ((ret = wt_api->config_scan_next(wt_api, scan, &k, &v)) == 0)
-		printf("%.*s\n", (int)k.len, k.str);
-	ret = wt_api->config_scan_end(wt_api, scan);
-	/*! [WT_EXTENSION config scan] */
 	}
 
 	{

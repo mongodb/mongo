@@ -464,8 +464,10 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 			 * it.
 			 */
 			grew = 0;
-			adjusted = (cp->chunk > entry->cache_size - reserved) ?
-			    cp->chunk : (entry->cache_size - reserved);
+			if (entry->cache_size - cp->chunk > reserved)
+				adjusted = cp->chunk;
+			else
+				adjusted = entry->cache_size - reserved;
 		} else if (highest > 1 &&
 		    entry->cache_size < cp->size &&
 		     cache->bytes_inmem >=

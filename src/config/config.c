@@ -118,7 +118,7 @@ static const int8_t gostruct[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_LOOP, A_BAD, A_QUP,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_UP, A_DOWN, A_BAD, A_BAD,
-	A_NEXT, A_NUMBARE, A_BAD, A_BARE, A_NUMBARE, A_NUMBARE,
+	A_NEXT, A_NUMBARE, A_BARE, A_BARE, A_NUMBARE, A_NUMBARE,
 	A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE,
 	A_NUMBARE, A_NUMBARE, A_NUMBARE, A_VALUE, A_BAD, A_BAD,
 	A_VALUE, A_BAD, A_BAD, A_BAD, A_BARE, A_BARE, A_BARE, A_BARE,
@@ -738,10 +738,8 @@ __wt_config_subgetraw(WT_SESSION_IMPL *session,
 __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg, const char *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM key_item;
-
-	key_item.str = key;
-	key_item.len = strlen(key);
+	WT_CONFIG_ITEM key_item =
+	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	return (__wt_config_subgetraw(session, cfg, &key_item, value));
 }

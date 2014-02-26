@@ -6,6 +6,7 @@ noinst_PROGRAMS = \
 	ex_all \
 	ex_call_center \
 	ex_config \
+	ex_config_parse \
 	ex_cursor \
 	ex_data_source \
 	ex_extending \
