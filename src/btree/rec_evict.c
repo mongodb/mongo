@@ -508,13 +508,18 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * about to lose track of it.  Add it to the tracking list so it will be
 	 * discarded the next time this page is reconciled.
 	 */
-	ikey = __wt_ref_key_instantiated(parent_ref);
-	if (ikey != NULL && ikey->cell_offset != 0) {
-		cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
-		__wt_cell_unpack(cell, &kpack);
-		if (kpack.ovfl)
-			WT_ERR(__wt_ovfl_onpage_add(
-			    session, parent, kpack.data, kpack.size));
+	switch (parent->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		ikey = __wt_ref_key_instantiated(parent_ref);
+		if (ikey != NULL && ikey->cell_offset != 0) {
+			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
+			__wt_cell_unpack(cell, &kpack);
+			if (kpack.ovfl)
+				WT_ERR(__wt_ovfl_onpage_add(
+				    session, parent, kpack.data, kpack.size));
+		}
+		break;
 	}
 
 	/*
