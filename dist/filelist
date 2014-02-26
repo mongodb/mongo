@@ -50,6 +50,7 @@ src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
 src/config/config.c
+src/config/config_api.c
 src/config/config_check.c
 src/config/config_collapse.c
 src/config/config_concat.c

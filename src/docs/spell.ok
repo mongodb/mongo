@@ -313,6 +313,7 @@ statlog
 str
 strerror
 strftime
+strget
 struct
 structs
 subdatabases

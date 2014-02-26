@@ -33,6 +33,7 @@ static const CONFIG default_cfg = {
 	"WT_TEST",			/* monitor dir */
 	NULL,				/* base_uri */
 	NULL,				/* uris */
+	NULL,				/* helium_mount */
 	NULL,				/* conn */
 	NULL,				/* logf */
 	NULL, NULL,			/* compressor ext, blk */
@@ -78,9 +79,12 @@ static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
 static void	randomize_value(CONFIG *, char *);
+static int	start_all_runs(CONFIG *);
+static int	start_run(CONFIG *);
 static int	 start_threads(CONFIG *,
 		    WORKLOAD *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
+static void	*thread_run_wtperf(void *);
 static void	*worker(void *);
 static uint64_t	 wtperf_rand(CONFIG *);
 static uint64_t	 wtperf_value_range(CONFIG *);
@@ -232,8 +236,6 @@ worker(void *arg)
 	op_end = op + sizeof(thread->workload->ops);
 
 	while (!cfg->stop) {
-		cursor = cursors[__wt_random() % cfg->table_count];
-
 		/*
 		 * Generate the next key and setup operation specific
 		 * statistics tracking objects.
@@ -268,6 +270,12 @@ worker(void *arg)
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+
+		/*
+		 * Spread the data out around the multiple databases.
+		 */
+		cursor = cursors[next_val % cfg->table_count];
+
 		/*
 		 * Skip the first time we do an operation, when trk->ops
 		 * is 0, to avoid first time latency spikes.
@@ -554,24 +562,26 @@ populate_thread(void *arg)
 			}
 			intxn = 1;
 		}
+		/*
+		 * Figure out which table this op belongs to.
+		 */
+		cursor = cursors[op % cfg->table_count];
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
-		measure_latency = cfg->sample_interval != 0 && (
+		measure_latency = 
+		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
 		    (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
-		for (i = 0; i < cfg->table_count; i++) {
-			cursor = cursors[i];
-			cursor->set_key(cursor, key_buf);
-			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
-			cursor->set_value(cursor, value_buf);
-			if ((ret = cursor->insert(cursor)) != 0) {
-				lprintf(cfg, ret, 0, "Failed inserting");
-				goto err;
-			}
+		cursor->set_key(cursor, key_buf);
+		if (cfg->random_value)
+			randomize_value(cfg, value_buf);
+		cursor->set_value(cursor, value_buf);
+		if ((ret = cursor->insert(cursor)) != 0) {
+			lprintf(cfg, ret, 0, "Failed inserting");
+			goto err;
 		}
 		/*
 		 * Gather statistics.
@@ -1203,201 +1213,113 @@ create_tables(CONFIG *cfg)
 }
 
 int
-main(int argc, char *argv[])
+start_all_runs(CONFIG *cfg)
 {
-	CONFIG *cfg, _cfg;
+	CONFIG *next_cfg, **configs;
+	char *cmd_buf, *new_home;
+	int ret;
+	size_t cmd_len, home_len, i;
+	pthread_t *threads;
+
+	ret = 0;
+	configs = NULL;
+	cmd_buf = NULL;
+
+	if (cfg->database_count == 1)
+		return (start_run(cfg));
+
+	/* Allocate an array to hold our config struct copies. */
+	configs = calloc(cfg->database_count, sizeof(CONFIG *));
+	if (configs == NULL)
+		return (ENOMEM);
+
+	/* Allocate an array to hold our thread IDs. */
+	threads = calloc(cfg->database_count, sizeof(pthread_t));
+	if (threads == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
+
+	home_len = strlen(cfg->home);
+	cmd_len = (home_len * 2) + 30; /* Add some slop. */
+	cmd_buf = calloc(cmd_len, 1);
+	if (cmd_buf == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
+	for (i = 0; i < cfg->database_count; i++) {
+		next_cfg = calloc(1, sizeof(CONFIG));
+		if ((ret = config_assign(next_cfg, cfg)) != 0)
+			goto err;
+
+		/* Setup a unique home directory for each database. */
+		new_home = malloc(home_len + 5);
+		sprintf(new_home, "%s/D%02d", cfg->home, (int)i);
+		next_cfg->home = (const char *)new_home;
+
+		/* If the monitor dir is default, update it too. */
+		if (strcmp(cfg->monitor_dir, cfg->home) == 0)
+			next_cfg->monitor_dir = new_home;
+
+		/* Create clean home directories. */
+		snprintf(cmd_buf, cmd_len, "rm -rf %s && mkdir %s",
+		    next_cfg->home, next_cfg->home);
+		if ((ret = system(cmd_buf)) != 0) {
+			fprintf(stderr, "%s: failed\n", cmd_buf);
+			goto err;
+		}
+		if ((ret = pthread_create(
+		    &threads[i], NULL, thread_run_wtperf, next_cfg)) != 0) {
+			lprintf(cfg, ret, 0, "Error creating thread");
+			goto err;
+		}
+		configs[i] = next_cfg;
+	}
+
+	/* Wait for threads to finish. */
+	for (i = 0; i < cfg->database_count; i++) {
+		if ((ret = pthread_join(threads[i], NULL)) != 0) {
+			lprintf(cfg, ret, 0, "Error joining thread");
+			return (ret);
+		}
+	}
+
+err:	for (i = 0; i < cfg->database_count && configs[i] != NULL; i++) {
+		free((char *)configs[i]->home);
+		config_free(configs[i]);
+	}
+	free(configs);
+	free(threads);
+	free(cmd_buf);
+
+	return (ret);
+}
+
+/* Run an instance of wtperf for a given configuration. */
+static void *
+thread_run_wtperf(void *arg)
+{
+	CONFIG *cfg;
+	int ret;
+
+	cfg = (CONFIG *)arg;
+	if ((ret = start_run(cfg)) != 0)
+		lprintf(cfg, ret, 0, "Run failed for: %s.", cfg->home);
+	return (NULL);
+}
+
+int
+start_run(CONFIG *cfg)
+{
+	char helium_buf[256];
+	int monitor_created, monitor_set, ret, t_ret;
 	pthread_t monitor_thread;
-	size_t len;
-	uint64_t req_len, total_ops;
-	int ch, monitor_created, monitor_set, ret, t_ret;
-	const char *helium_mount;
-	const char *opts = "C:H:h:m:O:o:T:";
-	const char *wtperftmp_subdir = "wtperftmp";
-	const char *user_cconfig, *user_tconfig;
-	char *cmd, *cc_buf, *tc_buf, *tmphome;
+	uint64_t total_ops;
 
 	monitor_created = monitor_set = ret = 0;
-	helium_mount = user_cconfig = user_tconfig = NULL;
-	cmd = cc_buf = tc_buf = tmphome = NULL;
-
-	/* Setup the default configuration values. */
-	cfg = &_cfg;
-	memset(cfg, 0, sizeof(*cfg));
-	if (config_assign(cfg, &default_cfg))
-		goto err;
-
-	/* Do a basic validation of options, and home is needed before open. */
-	while ((ch = getopt(argc, argv, opts)) != EOF)
-		switch (ch) {
-		case 'h':
-			cfg->home = optarg;
-			break;
-		case 'm':
-			cfg->monitor_dir = optarg;
-			monitor_set = 1;
-			break;
-		case '?':
-			fprintf(stderr, "Invalid option\n");
-			usage();
-			goto einval;
-		}
-
-	/*
-	 * If the user did not specify a monitor directory
-	 * then set the monitor directory to the home dir.
-	 */
-	if (!monitor_set)
-		cfg->monitor_dir = cfg->home;
-
-	/*
-	 * Create a temporary directory underneath the test directory in which
-	 * we do an initial WiredTiger open, because we need a connection in
-	 * order to use the extension configuration parser.  We will open the
-	 * real WiredTiger database after parsing the options.
-	 */
-	len = strlen(cfg->home) + strlen(wtperftmp_subdir) + 2;
-	if ((tmphome = malloc(len)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	snprintf(tmphome, len, "%s/%s", cfg->home, wtperftmp_subdir);
-	len = len * 2 + 100;
-	if ((cmd = malloc(len)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	snprintf(cmd, len, "rm -rf %s && mkdir %s", tmphome, tmphome);
-	if (system(cmd) != 0) {
-		fprintf(stderr, "%s: failed\n", cmd);
-		goto einval;
-	}
-	if ((ret = wiredtiger_open(
-	    tmphome, NULL, "create", &cfg->conn)) != 0) {
-		lprintf(cfg, ret, 0, "wiredtiger_open: %s", tmphome);
-		goto err;
-	}
-
-	/*
-	 * Then parse different config structures - other options override
-	 * fields within the structure.
-	 */
-	optind = 1;
-	while ((ch = getopt(argc, argv, opts)) != EOF)
-		switch (ch) {
-		case 'O':
-			if (config_opt_file(cfg, optarg) != 0)
-				goto einval;
-			break;
-		default:
-			/* Validation done previously. */
-			break;
-		}
-
-	/* Parse other options */
-	optind = 1;
-	while ((ch = getopt(argc, argv, opts)) != EOF)
-		switch (ch) {
-		case 'C':
-			user_cconfig = optarg;
-			break;
-		case 'H':
-			helium_mount = optarg;
-			break;
-		case 'o':
-			/* Allow -o key=value */
-			if (config_opt_line(cfg, optarg) != 0)
-				goto einval;
-			break;
-		case 'T':
-			user_tconfig = optarg;
-			break;
-		}
-
-	if ((ret = config_compress(cfg)) != 0)
-		goto err;
-
-	/* Build the URI from the table name. */
-	req_len = strlen("table:") +
-	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
-	if ((cfg->base_uri = calloc(req_len, 1)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	snprintf(cfg->base_uri, req_len, "table:%s%s%s",
-	    helium_mount == NULL ? "" : HELIUM_NAME,
-	    helium_mount == NULL ? "" : "/",
-	    cfg->table_name);
 	
 	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
-
-	/* Make stdout line buffered, so verbose output appears quickly. */
-	(void)setvbuf(stdout, NULL, _IOLBF, 0);
-
-	/* Concatenate non-default configuration strings. */
-	if (cfg->verbose > 1 || user_cconfig != NULL ||
-	    cfg->compress_ext != NULL) {
-		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
-		if (user_cconfig != NULL)
-			req_len += strlen(user_cconfig);
-		if (cfg->compress_ext != NULL)
-			req_len += strlen(cfg->compress_ext);
-		if ((cc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
-		/*
-		 * This is getting hard to parse.
-		 */
-		snprintf(cc_buf, req_len, "%s%s%s%s%s%s",
-		    cfg->conn_config,
-		    cfg->compress_ext ? cfg->compress_ext : "",
-		    cfg->verbose > 1 ? ",": "",
-		    cfg->verbose > 1 ? debug_cconfig : "",
-		    user_cconfig ? ",": "",
-		    user_cconfig ? user_cconfig : "");
-		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
-			goto err;
-	}
-	if (cfg->verbose > 1 || helium_mount != NULL || user_tconfig != NULL ||
-	    cfg->compress_table != NULL) {
-		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
-		    strlen(debug_tconfig) + 3;
-		if (user_tconfig != NULL)
-			req_len += strlen(user_tconfig);
-		if (cfg->compress_table != NULL)
-			req_len += strlen(cfg->compress_table);
-		if ((tc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
-		/*
-		 * This is getting hard to parse.
-		 */
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
-		    cfg->table_config,
-		    cfg->compress_table ? cfg->compress_table : "",
-		    cfg->verbose > 1 ? ",": "",
-		    cfg->verbose > 1 ? debug_tconfig : "",
-		    user_tconfig ? ",": "",
-		    user_tconfig ? user_tconfig : "",
-		    helium_mount == NULL ? "" : HELIUM_CONFIG);
-		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
-			goto err;
-	}
-
-	ret = cfg->conn->close(cfg->conn, NULL);
-	cfg->conn = NULL;
-	if (ret != 0) {
-		lprintf(cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
-		goto err;
-	}
-					/* Sanity-check the configuration */
-	if (config_sanity(cfg) != 0)
-		goto err;
-
-	if (cfg->verbose > 1)		/* Display the configuration. */
-		config_print(cfg);
 
 	if ((ret = wiredtiger_open(	/* Open the real connection. */
 	    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0) {
@@ -1405,13 +1327,13 @@ main(int argc, char *argv[])
 		goto err;
 	}
 
-	if (helium_mount != NULL) {	/* Configure optional Helium volume. */
-		char helium_buf[256];
+	/* Configure optional Helium volume. */
+	if (cfg->helium_mount != NULL) {
 		snprintf(helium_buf, sizeof(helium_buf),
 		    "entry=wiredtiger_extension_init,config=["
 		    "%s=[helium_devices=\"he://./%s\","
 		    "helium_o_volume_truncate=1]]",
-		    HELIUM_NAME, helium_mount);
+		    HELIUM_NAME, cfg->helium_mount);
 		if ((ret = cfg->conn->load_extension(
 		    cfg->conn, HELIUM_PATH, helium_buf)) != 0)
 			lprintf(cfg,
@@ -1489,7 +1411,6 @@ main(int argc, char *argv[])
 	}
 
 	if (0) {
-einval:		ret = EINVAL;
 err:		if (ret == 0)
 			ret = EXIT_FAILURE;
 	}
@@ -1531,12 +1452,164 @@ err:		if (ret == 0)
 		if ((t_ret = fclose(cfg->logf)) != 0 && ret == 0)
 			ret = t_ret;
 	}
-	config_free(cfg);
+	return (ret);
+}
 
+int
+main(int argc, char *argv[])
+{
+	CONFIG *cfg, _cfg;
+	char *cc_buf, *tc_buf;
+	const char *opts = "C:H:h:m:O:o:T:";
+	const char *config_opts, *user_cconfig, *user_tconfig;
+	int ch, monitor_set, ret;
+	size_t req_len;
+
+	ret = 0;
+	config_opts = user_cconfig = user_tconfig = NULL;
+	cc_buf = tc_buf = NULL;
+
+	/* Setup the default configuration values. */
+	cfg = &_cfg;
+	memset(cfg, 0, sizeof(*cfg));
+	if (config_assign(cfg, &default_cfg))
+		goto err;
+
+	/* Do a basic validation of options, and home is needed before open. */
+	while ((ch = getopt(argc, argv, opts)) != EOF)
+		switch (ch) {
+		case 'C':
+			user_cconfig = optarg;
+			break;
+		case 'H':
+			cfg->helium_mount = optarg;
+			break;
+		case 'O':
+			config_opts = optarg;
+			break;
+		case 'T':
+			user_tconfig = optarg;
+			break;
+		case 'h':
+			cfg->home = optarg;
+			break;
+		case 'm':
+			cfg->monitor_dir = optarg;
+			monitor_set = 1;
+			break;
+		case '?':
+			fprintf(stderr, "Invalid option\n");
+			usage();
+			goto einval;
+		}
+
+	/*
+	 * If the user did not specify a monitor directory then set the
+	 * monitor directory to the home dir.
+	 */
+	if (!monitor_set)
+		cfg->monitor_dir = cfg->home;
+
+	/* Parse configuration settings from configuration file. */
+	if (config_opts != NULL && config_opt_file(cfg, config_opts) != 0)
+		goto einval;
+
+	/* Parse options that override values set via a configuration file. */
+	optind = 1;
+	while ((ch = getopt(argc, argv, opts)) != EOF)
+		switch (ch) {
+		case 'o':
+			/* Allow -o key=value */
+			if (config_opt_line(cfg, optarg) != 0)
+				goto einval;
+			break;
+		}
+
+	if ((ret = config_compress(cfg)) != 0)
+		goto err;
+
+	/* Build the URI from the table name. */
+	req_len = strlen("table:") +
+	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
+	if ((cfg->base_uri = calloc(req_len, 1)) == NULL) {
+		ret = enomem(cfg);
+		goto err;
+	}
+	snprintf(cfg->base_uri, req_len, "table:%s%s%s",
+	    cfg->helium_mount == NULL ? "" : HELIUM_NAME,
+	    cfg->helium_mount == NULL ? "" : "/",
+	    cfg->table_name);
+
+	/* Make stdout line buffered, so verbose output appears quickly. */
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
+
+	/* Concatenate non-default configuration strings. */
+	if (cfg->verbose > 1 || user_cconfig != NULL ||
+	    cfg->compress_ext != NULL) {
+		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
+		if (user_cconfig != NULL)
+			req_len += strlen(user_cconfig);
+		if (cfg->compress_ext != NULL)
+			req_len += strlen(cfg->compress_ext);
+		if ((cc_buf = calloc(req_len, 1)) == NULL) {
+			ret = enomem(cfg);
+			goto err;
+		}
+		/*
+		 * This is getting hard to parse.
+		 */
+		snprintf(cc_buf, req_len, "%s%s%s%s%s%s",
+		    cfg->conn_config,
+		    cfg->compress_ext ? cfg->compress_ext : "",
+		    cfg->verbose > 1 ? ",": "",
+		    cfg->verbose > 1 ? debug_cconfig : "",
+		    user_cconfig ? ",": "",
+		    user_cconfig ? user_cconfig : "");
+		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
+			goto err;
+	}
+	if (cfg->verbose > 1 || cfg->helium_mount != NULL ||
+	    user_tconfig != NULL || cfg->compress_table != NULL) {
+		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
+		    strlen(debug_tconfig) + 3;
+		if (user_tconfig != NULL)
+			req_len += strlen(user_tconfig);
+		if (cfg->compress_table != NULL)
+			req_len += strlen(cfg->compress_table);
+		if ((tc_buf = calloc(req_len, 1)) == NULL) {
+			ret = enomem(cfg);
+			goto err;
+		}
+		/*
+		 * This is getting hard to parse.
+		 */
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
+		    cfg->table_config,
+		    cfg->compress_table ? cfg->compress_table : "",
+		    cfg->verbose > 1 ? ",": "",
+		    cfg->verbose > 1 ? debug_tconfig : "",
+		    user_tconfig ? ",": "",
+		    user_tconfig ? user_tconfig : "",
+		    cfg->helium_mount == NULL ? "" : HELIUM_CONFIG);
+		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
+			goto err;
+	}
+
+					/* Sanity-check the configuration */
+	if (config_sanity(cfg) != 0)
+		goto err;
+
+	if (cfg->verbose > 1)		/* Display the configuration. */
+		config_print(cfg);
+
+	if ((ret = start_all_runs(cfg)) != 0)
+		goto err;
+
+	if (0)
+einval:		ret = EINVAL;
+err:	config_free(cfg);
 	free(cc_buf);
-	free(cmd);
 	free(tc_buf);
-	free(tmphome);
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
