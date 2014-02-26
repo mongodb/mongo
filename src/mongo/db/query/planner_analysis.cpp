@@ -449,11 +449,13 @@ namespace mongo {
         bool hasSortStage = false;
         solnRoot = analyzeSort(query, params, solnRoot, &hasSortStage);
 
-        // A solution can be blocking if it has a blocking sort stage.
-        soln->hasBlockingStage = hasSortStage;
-
         // This can happen if we need to create a blocking sort stage and we're not allowed to.
         if (NULL == solnRoot) { return NULL; }
+
+        // A solution can be blocking if it has a blocking sort stage or
+        // a hashed AND stage.
+        bool hasAndHashStage = hasNode(solnRoot, STAGE_AND_HASH);
+        soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
         // If we can (and should), add the keep mutations stage.
 
@@ -479,7 +481,7 @@ namespace mongo {
         // Only these stages can produce flagged results.  A stage has to hold state past one call
         // to work(...) in order to possibly flag a result.
         bool couldProduceFlagged = hasNode(solnRoot, STAGE_GEO_2D)
-                                || hasNode(solnRoot, STAGE_AND_HASH)
+                                || hasAndHashStage
                                 || hasNode(solnRoot, STAGE_AND_SORTED)
                                 || hasNode(solnRoot, STAGE_FETCH);
 

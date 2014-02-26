@@ -430,6 +430,10 @@ namespace mongo {
         return true;
     }
 
+    bool MultiPlanRunner::hasBackupPlan() const {
+        return NULL != _backupPlan;
+    }
+
     bool MultiPlanRunner::workAllPlans(BSONObj* objOut) {
         bool planHitEOF = false;
 

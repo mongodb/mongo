@@ -85,6 +85,13 @@ namespace mongo {
          */
         bool pickBestPlan(size_t* out, BSONObj* objOut);
 
+        /**
+         * Returns true if a backup plan was picked.
+         * This is the case when the best plan has a blocking stage.
+         * Exposed for testing.
+         */
+        bool hasBackupPlan() const;
+
         virtual void saveState();
         virtual bool restoreState();
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);

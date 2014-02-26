@@ -57,9 +57,14 @@ namespace PlanRankingTests {
 
     class PlanRankingTestBase {
     public:
-        PlanRankingTestBase() {
+        PlanRankingTestBase() : _forceIntersectionPlans(forceIntersectionPlans) {
             Client::WriteContext ctx(ns);
             _client.dropCollection(ns);
+        }
+
+        virtual ~PlanRankingTestBase() {
+            // Restore external setParameter testing bool.
+            forceIntersectionPlans = _forceIntersectionPlans;
         }
 
         void insert(const BSONObj& obj) {
@@ -126,9 +131,20 @@ namespace PlanRankingTests {
             return solutions[bestPlan];
         }
 
+        /**
+         * Was a backup plan picked during the ranking process?
+         */
+        bool hasBackupPlan() const {
+            ASSERT(NULL != _mpr.get());
+            return _mpr->hasBackupPlan();
+        }
+
     private:
         static DBDirectClient _client;
         scoped_ptr<MultiPlanRunner> _mpr;
+        // Holds the value of global "forceIntersectionPlans" setParameter flag.
+        // Restored at end of test invocation regardless of test result.
+        bool _forceIntersectionPlans;
     };
 
     DBDirectClient PlanRankingTestBase::_client;
@@ -163,6 +179,7 @@ namespace PlanRankingTests {
                         soln->root.get()));
 
             // Turn on the "force intersect" option.
+            // This will be reverted by PlanRankingTestBase's destructor when the test completes.
             forceIntersectionPlans = true;
 
             // And run the same query again.
@@ -178,9 +195,46 @@ namespace PlanRankingTests {
                                      "{ixscan: {filter: null, pattern: {a:1}}},"
                                      "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
                              soln->root.get()));
+        }
+    };
 
-            // Turn off the intersection forcing flag for future tests.
-            forceIntersectionPlans = false;
+    /**
+     * Test that a hashed AND solution plan is picked along with a non-blocking backup solution.
+     */
+    class PlanRankingIntersectWithBackup : public PlanRankingTestBase {
+    public:
+        void run() {
+            static const int N = 10000;
+
+            // 'a' is very selective, 'b' is not.
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << i << "b" << 1));
+            }
+
+            // Add indices on 'a' and 'b'.
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("b" << 1));
+
+            // Run the query {a:1, b:{$gt:1}.
+            CanonicalQuery* cq;
+            verify(CanonicalQuery::canonicalize(ns, BSON("a" << 1 << "b" << BSON("$gt" << 1)),
+                                                &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Turn on the "force intersect" option.
+            // This will be reverted by PlanRankingTestBase's destructor when the test completes.
+            forceIntersectionPlans = true;
+
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                             "{fetch: {filter: null, node: {andHash: {nodes: ["
+                                     "{ixscan: {filter: null, pattern: {a:1}}},"
+                                     "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
+                             soln->root.get()));
+
+            // Confirm that a backup plan is available.
+            ASSERT(hasBackupPlan());
         }
     };
 
@@ -405,6 +459,7 @@ namespace PlanRankingTests {
 
         void setupTests() {
             add<PlanRankingIntersectOverride>();
+            add<PlanRankingIntersectWithBackup>();
             add<PlanRankingPreferCovered>();
             add<PlanRankingAvoidIntersectIfNoResults>();
             add<PlanRankingPreferCoveredEvenIfNoResults>();
