@@ -9,7 +9,10 @@
 
     <Package InstallerVersion="200" Compressed="yes" />
     <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion)" />
-    <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
+    <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Edition)"/>
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFilesFolder">

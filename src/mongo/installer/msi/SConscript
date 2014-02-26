@@ -48,18 +48,22 @@ if 'enterprise' in env['MONGO_MODULES']:
   msi_edition = 'Enterprise'
   msi_flavor = '2008R2Plus'
   msi_platform = 'x64'
+  upgrade_code = 'F395569E-9DD4-49E6-AE8B-16B22BBFE915'
 # Community
 else:
   msi_edition = 'Standard'
   if env['PROCESSOR_ARCHITECTURE'] == 'i386':
     msi_platform = 'x86'
     msi_flavor = ''
+    upgrade_code = '20623330-B71C-4FEB-8B6F-F19FAB27C457'
   else:
     msi_platform = 'x64'
     if env.get('WIN_VERSION_MIN') == 'ws08r2' or env.get('WIN_VERSION_MIN') == 'win7':
       msi_flavor = '2008R2Plus'
+      upgrade_code = 'B5D765D3-7A55-4BD3-9990-A0F85F5DBE2F'
     else:
       msi_flavor = 'Legacy'
+      upgrade_code = '6A44D061-6FA9-438B-8D25-4AF1BBAC61D7'
 
 if msi_platform == 'x64':
   sources.append("wxs/Installer_64.wxs")
@@ -68,20 +72,35 @@ else:
   sources.append("wxs/Installer.wxs")
   objects.append("$BUILD_DIR/msi/Installer.wixobj")
 
+full_version = mongoCodeVersion.partition('-')[0]
+
+# major version is the x.y, not the x.y.z
+major_version = full_version
+mv = major_version.split('.')
+major_version = "%s.%s" % (mv[0], mv[1])
+
+# Currently, we are planning to key the same upgrade code for each
+# (msi_edition, msi_platform, msi_flavor) combination
+# and change MSI ProductId on minor updates, 2.6.0 -> 2.6.1, we let Wix do automatic
+# GUID generation for us rather then build a database of GUIDs in our build system
+# For major updates, we are going to create a new directory/productid/upgrade_code ie, 2.6 -> 2.8
+
+
 # candle: compile .wxs files into .wixobjs
 env.Command(objects,
             sources,
             '"$WIXCANDLE" -wx'
             # cannot have anything other than x.x.x.x in version string.
             # we should choose a fourth version number that reflects pre-ness.
-            ' -dMongoDBVersion=' + mongoCodeVersion.partition('-')[0] +
+            ' -dMongoDBMajorVersion=' + major_version +
+            ' -dMongoDBVersion=' + full_version +
             ' -dLicenseSource=distsrc'
             r' -dEnterpriseBase=' + enterprisebase + '\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
             ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
             ' -dEdition=' + msi_edition +
             ' -d"ProductId=*\"'
-            ' -dUpgradeCode=FCF901F6-E963-40B1-9A17-978242068587'
+            ' -dUpgradeCode=' + upgrade_code +
             ' -dClientSource=' + buildDir + r'\client_build'
             r' -dClientHeaderSource=${INSTALL_DIR}\include\mongo'
             ' -dConfiguration=Release'

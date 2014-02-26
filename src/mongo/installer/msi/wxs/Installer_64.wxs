@@ -8,10 +8,11 @@
            UpgradeCode="$(var.UpgradeCode)">
 
     <Package InstallerVersion="405" Compressed="yes" Platform="x64"/>
+
     <?if $(var.Flavor) = 2008R2Plus?>
-      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
+      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Edition)"/>
     <?else?>
-      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition) Legacy"/>
+      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Edition) Legacy"/>
     <?endif?>
 
     <?if $(var.Edition) = Enterprise ?>
@@ -27,6 +28,9 @@
         <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) (64 bit)" />
       <?endif?>
     <?endif?>
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
