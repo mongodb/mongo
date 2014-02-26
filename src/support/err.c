@@ -19,7 +19,8 @@ __handle_error_default(WT_EVENT_HANDLER *handler,
 	WT_UNUSED(session);
 	WT_UNUSED(error);
 
-	return (fprintf(stderr, "%s\n", errmsg) >= 0 ? 0 : EIO);
+	return (fprintf(stderr, "%s\n", errmsg) >= 0 &&
+	    fflush(stderr) == 0 ? 0 : __wt_errno());
 }
 
 /*
@@ -33,7 +34,8 @@ __handle_message_default(WT_EVENT_HANDLER *handler,
 	WT_UNUSED(handler);
 	WT_UNUSED(session);
 
-	return (printf("%s\n", message) >= 0 ? 0 : EIO);
+	return (printf("%s\n", message) >= 0 &&
+	    fflush(stdout) == 0 ? 0 : __wt_errno());
 }
 
 /*
@@ -171,13 +173,11 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 * first session, but if the allocation of the first session fails, for
 	 * example, we can end up here without a session.)
 	 */
-	if (session == NULL) {
-		WT_RET_TEST((fprintf(stderr, "WiredTiger Error%s%s\n",
+	if (session == NULL)
+		return (fprintf(stderr, "WiredTiger Error%s%s\n",
 		    error == 0 ? "" : ": ",
-		    error == 0 ? "" : wiredtiger_strerror(error)) < 0),
-		    __wt_errno());
-		return (0);
-	}
+		    error == 0 ? "" : wiredtiger_strerror(error)) >= 0 &&
+		    fflush(stderr) == 0 ? 0 : __wt_errno());
 
 	p = s;
 	end = s + sizeof(s);
