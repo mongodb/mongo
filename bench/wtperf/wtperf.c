@@ -71,16 +71,16 @@ static const char * const debug_tconfig = "";
 #endif
 
 static void	*checkpoint_worker(void *);
-static int	create_tables(CONFIG *);
-static int	create_uris(CONFIG *);
+static int	 create_tables(CONFIG *);
+static int	 create_uris(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
-static void	randomize_value(CONFIG *, char *);
-static int	start_all_runs(CONFIG *);
-static int	start_run(CONFIG *);
+static void	 randomize_value(CONFIG *, char *);
+static int	 start_all_runs(CONFIG *);
+static int	 start_run(CONFIG *);
 static int	 start_threads(CONFIG *,
 		    WORKLOAD *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
@@ -1350,7 +1350,8 @@ start_run(CONFIG *cfg)
 		goto err;
 	if ((ret = create_tables(cfg)) != 0)
 		goto err;
-					/* Start the monitor thread. */
+
+	/* Start the monitor thread. */
 	if (cfg->sample_interval != 0) {
 		if ((ret = pthread_create(
 		    &monitor_thread, NULL, monitor, cfg)) != 0) {
@@ -1360,15 +1361,17 @@ start_run(CONFIG *cfg)
 		}
 		monitor_created = 1;
 	}
-					/* If creating, populate the table. */
+
+	/* If creating, populate the table. */
 	if (cfg->create != 0 && execute_populate(cfg) != 0)
 		goto err;
-					/* Optional workload. */
+
+	/* Optional workload. */
 	if (cfg->run_time != 0 || cfg->run_ops != 0) {
-					/* Didn't create, set insert count. */
+		/* Didn't create, set insert count. */
 		if (cfg->create == 0 && find_table_count(cfg) != 0)
 			goto err;
-					/* Start the checkpoint thread. */
+		/* Start the checkpoint thread. */
 		if (cfg->checkpoint_threads != 0) {
 			lprintf(cfg, 0, 1,
 			    "Starting %" PRIu32 " checkpoint thread(s)",
@@ -1383,7 +1386,7 @@ start_run(CONFIG *cfg)
 			    cfg->checkpoint_threads, checkpoint_worker) != 0)
 				goto err;
 		}
-					/* Execute the workload. */
+		/* Execute the workload. */
 		if ((ret = execute_workload(cfg)) != 0)
 			goto err;
 
@@ -1601,11 +1604,12 @@ main(int argc, char *argv[])
 			goto err;
 	}
 
-					/* Sanity-check the configuration */
+	/* Sanity-check the configuration. */
 	if (config_sanity(cfg) != 0)
 		goto err;
 
-	if (cfg->verbose > 1)		/* Display the configuration. */
+	/* Display the configuration. */
+	if (cfg->verbose > 1)
 		config_print(cfg);
 
 	if ((ret = start_all_runs(cfg)) != 0)
