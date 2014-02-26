@@ -1221,6 +1221,7 @@ start_all_runs(CONFIG *cfg)
 	size_t cmd_len, home_len, i;
 	pthread_t *threads;
 
+	ret = 0;
 	configs = NULL;
 	cmd_buf = NULL;
 
