@@ -1125,11 +1125,18 @@ __clsm_put(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * The count is in a shared structure, but it's only approximate, so
-	 * don't worry about protecting access.
+	 * Update the record count.  It is in a shared structure, but it's only
+	 * approximate, so don't worry about protecting access.
+	*
+	 * Throttle if necessary.  Every 100 update operations on each cursor,
+	 * check if throttling is required.  Don't rely only on the shared
+	 * counter because it can race, and because for some workloads, there
+	 * may not be enough records per chunk to get effective throttling.
 	 */
-	if (++clsm->primary_chunk->count % 100 == 0 &&
+	if ((++clsm->primary_chunk->count % 100 == 0 ||
+	    ++clsm->update_count >= 100) &&
 	    lsm_tree->merge_throttle + lsm_tree->ckpt_throttle > 0) {
+		clsm->update_count = 0;
 		WT_STAT_FAST_INCRV(session, &clsm->lsm_tree->stats,
 		    lsm_checkpoint_throttle, (uint64_t)lsm_tree->ckpt_throttle);
 		WT_STAT_FAST_CONN_INCRV(session,

@@ -82,7 +82,7 @@ __wt_lsm_merge(
 		aggressive = 10;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
-	max_level = (id == 0 ? 0 : id - 1) + aggressive;
+	max_level = (lsm_tree->merge_throttle > 0) ? 0 : id + aggressive;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -104,21 +104,17 @@ __wt_lsm_merge(
 	 * Only include chunks that already have a Bloom filter and not
 	 * involved in a merge.
 	 */
-	end_chunk = lsm_tree->nchunks - 1;
-	while (end_chunk > 0 &&
-	    ((chunk = lsm_tree->chunk[end_chunk]) == NULL ||
-	    !F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
-	    F_ISSET(chunk, WT_LSM_CHUNK_MERGING))) {
-		--end_chunk;
-
-		/*
-		 * If we find a chunk on disk without a Bloom filter, give up.
-		 * We may have waited a while to lock the tree, and new chunks
-		 * may have been created in the meantime.
-		 */
-		if (chunk != NULL &&
+	for (end_chunk = lsm_tree->nchunks - 1; end_chunk > 0; --end_chunk) {
+		chunk = lsm_tree->chunk[end_chunk];
+		WT_ASSERT(session, chunk != NULL);
+		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
+			continue;
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+			break;
+		else if ((FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
+		    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-			end_chunk = 0;
+			break;
 	}
 
 	/*
@@ -163,10 +159,14 @@ __wt_lsm_merge(
 
 		/*
 		 * If the size of the chunks selected so far exceeds the
-		 * configured maximum chunk size, stop.
+		 * configured maximum chunk size, stop.  Keep going if we can
+		 * slide the window further into the tree: we don't want to
+		 * leave small chunks in the middle.
 		 */
 		if ((chunk_size += chunk->size) > lsm_tree->chunk_max)
-			break;
+			if (nchunks < merge_min ||
+			    chunk_size - youngest->size > lsm_tree->chunk_max)
+				break;
 
 		/*
 		 * If we have enough chunks for a merge and the next chunk is
@@ -184,7 +184,12 @@ __wt_lsm_merge(
 		record_count += chunk->count;
 		--start_chunk;
 
-		if (nchunks == lsm_tree->merge_max) {
+		/*
+		 * If we have a full window, or the merge would be too big,
+		 * remove the youngest chunk.
+		 */
+		if (nchunks == lsm_tree->merge_max ||
+		    chunk_size > lsm_tree->chunk_max) {
 			WT_ASSERT(session,
 			    F_ISSET(youngest, WT_LSM_CHUNK_MERGING));
 			F_CLR(youngest, WT_LSM_CHUNK_MERGING);

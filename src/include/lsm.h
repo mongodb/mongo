@@ -30,6 +30,8 @@ struct __wt_cursor_lsm {
 	uint64_t *txnid_max;		/* Maximum txn for each chunk */
 	size_t txnid_alloc;
 
+	u_int update_count;		/* Updates performed. */
+
 #define	WT_CLSM_ACTIVE		0x01    /* Incremented the session count */
 #define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration */
 #define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration */
