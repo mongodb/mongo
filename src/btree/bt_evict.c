@@ -879,8 +879,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int internal_pages, levels, modified, pages_walked, restarts;
+	int internal_pages, levels, modified, restarts;
 	uint32_t walk_flags;
+	uint64_t pages_walked;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
@@ -899,7 +900,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	/*
 	 * Get some more eviction candidate pages.
 	 */
-	for (evict = start, internal_pages = pages_walked = restarts = 0;
+	for (evict = start, pages_walked = 0, internal_pages = restarts = 0;
 	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
 	    ret = __wt_tree_walk(session, &btree->evict_page, walk_flags),
 	    ++pages_walked) {
