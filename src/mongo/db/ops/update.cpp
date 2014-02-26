@@ -725,9 +725,6 @@ namespace mongo {
                 }
 
                 newObj = oldObj;
-                if (updatedLocs) {
-                    updatedLocs->insert(loc);
-                }
             }
             else {
 
@@ -740,7 +737,13 @@ namespace mongo {
                 uassertStatusOK(res.getStatus());
                 DiskLoc newLoc = res.getValue();
                 docWasModified = true;
-                if (updatedLocs) {
+
+                // If the document moved, we might see it again in a collection scan (maybe it's
+                // a document after our current document).
+                //
+                // If the document is indexed and the mod changes an indexed value, we might see it
+                // again.  For an example, see the comment above near declaration of updatedLocs.
+                if (updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
                     updatedLocs->insert(newLoc);
                 }
             }
