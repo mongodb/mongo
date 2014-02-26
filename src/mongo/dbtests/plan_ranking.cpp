@@ -37,6 +37,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/multi_plan_runner.h"
+#include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
@@ -82,7 +83,9 @@ namespace PlanRankingTests {
             Collection* collection = ctx.ctx().db()->getCollection(ns);
 
             QueryPlannerParams plannerParams;
-            plannerParams.options |= QueryPlannerParams::INDEX_INTERSECTION;
+            fillOutPlannerParams(collection, cq, &plannerParams);
+            // Turn this off otherwise it pops up in some plans.
+            plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
             // Fill out the available indices.
             IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
@@ -101,8 +104,7 @@ namespace PlanRankingTests {
             Status status = QueryPlanner::plan(*cq, plannerParams, &solutions);
             ASSERT(status.isOK());
 
-            // MPR requires >1 soln.
-            ASSERT_GREATER_THAN(solutions.size(), 1U);
+            ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
             // Fill out the MPR.
             _mpr.reset(new MultiPlanRunner(collection, cq));
@@ -329,6 +331,72 @@ namespace PlanRankingTests {
         }
     };
 
+    /**
+     * We have an index on _id and a query over _id with a sort.  Ensure that we don't pick a
+     * collscan as the best plan even though the _id-scanning solution doesn't produce any results.
+     */
+    class PlanRankingNoCollscan : public PlanRankingTestBase {
+    public:
+        void run() {
+            static const int N = 10000;
+
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("_id" << i));
+            }
+
+            addIndex(BSON("_id" << 1));
+
+            // Run a query with a sort.  The blocking sort won't produce any data during the
+            // evaluation period.
+            CanonicalQuery* cq;
+            BSONObj queryObj = BSON("_id" << BSON("$gte" << 20 << "$lte" << 200));
+            BSONObj sortObj = BSON("c" << 1);
+            BSONObj projObj = BSONObj();
+            ASSERT(CanonicalQuery::canonicalize(ns,
+                                                queryObj,
+                                                sortObj,
+                                                projObj,
+                                                &cq).isOK());
+
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+
+            // The best must not be a collscan.
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{sort: {pattern: {c: 1}, limit: 0, node: {"
+                            "fetch: {filter: null, node: "
+                                "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}}",
+                        soln->root.get()));
+        }
+    };
+
+    /**
+     * No indices are available, output a collscan.
+     */
+    class PlanRankingCollscan : public PlanRankingTestBase {
+    public:
+        void run() {
+            static const int N = 10000;
+
+            // Insert data for which we have no index.
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("foo" << i));
+            }
+
+            // Look for A Space Odyssey.
+            CanonicalQuery* cq;
+            verify(CanonicalQuery::canonicalize(ns, BSON("foo" << 2001), &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+
+            // The best must be a collscan.
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{cscan: {dir: 1, filter: {foo: 2001}}}",
+                        soln->root.get()));
+        }
+    };
 
     class All : public Suite {
     public:
@@ -340,6 +408,8 @@ namespace PlanRankingTests {
             add<PlanRankingAvoidIntersectIfNoResults>();
             add<PlanRankingPreferCoveredEvenIfNoResults>();
             add<PlanRankingPreferImmediateEOF>();
+            add<PlanRankingNoCollscan>();
+            add<PlanRankingCollscan>();
         }
     } planRankingAll;
 

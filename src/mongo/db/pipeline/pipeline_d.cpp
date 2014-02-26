@@ -147,7 +147,6 @@ namespace {
         // cursor.  Either way, we can then apply other optimizations there
         // are tickets for, such as SERVER-4507.
         const size_t runnerOptions = QueryPlannerParams::DEFAULT
-                                   | QueryPlannerParams::INCLUDE_COLLSCAN
                                    | QueryPlannerParams::INCLUDE_SHARD_FILTER
                                    | QueryPlannerParams::NO_BLOCKING_SORT
                                    ;

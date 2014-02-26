@@ -139,6 +139,70 @@ namespace mongo {
         bool turnIxscanIntoCount(QuerySolution* soln);
     }  // namespace
 
+
+    void fillOutPlannerParams(Collection* collection,
+                              CanonicalQuery* canonicalQuery,
+                              QueryPlannerParams* plannerParams) {
+        // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
+        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
+        while (ii.more()) {
+            const IndexDescriptor* desc = ii.next();
+            plannerParams->indices.push_back(IndexEntry(desc->keyPattern(),
+                                                        desc->getAccessMethodName(),
+                                                        desc->isMultikey(),
+                                                        desc->isSparse(),
+                                                        desc->indexName(),
+                                                        desc->infoObj()));
+        }
+
+        // If query supports index filters, filter params.indices by indices in query settings.
+        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
+        AllowedIndices* allowedIndicesRaw;
+
+        // Filter index catalog if index filters are specified for query.
+        // Also, signal to planner that application hint should be ignored.
+        if (querySettings->getAllowedIndices(*canonicalQuery, &allowedIndicesRaw)) {
+            boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
+            filterAllowedIndexEntries(*allowedIndices, &plannerParams->indices);
+            plannerParams->indexFiltersApplied = true;
+        }
+
+        // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
+        // overrides this behavior by not outputting a collscan even if there are no indexed
+        // solutions.
+        if (storageGlobalParams.noTableScan) {
+            const string& ns = canonicalQuery->ns();
+            // There are certain cases where we ignore this restriction:
+            bool ignore = canonicalQuery->getQueryObj().isEmpty()
+                          || (string::npos != ns.find(".system."))
+                          || (0 == ns.find("local."));
+            if (!ignore) {
+                plannerParams->options |= QueryPlannerParams::NO_TABLE_SCAN;
+            }
+        }
+
+        // If the caller wants a shard filter, make sure we're actually sharded.
+        if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            CollectionMetadataPtr collMetadata =
+                shardingState.getCollectionMetadata(canonicalQuery->ns());
+
+            if (collMetadata) {
+                plannerParams->shardKey = collMetadata->getKeyPattern();
+            }
+            else {
+                // If there's no metadata don't bother w/the shard filter since we won't know what
+                // the key pattern is anyway...
+                plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
+        }
+
+        if (enableIndexIntersection) {
+            plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
+        }
+
+        plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
+    }
+
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
@@ -164,32 +228,6 @@ namespace mongo {
             return Status::OK();
         }
 
-        // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
-        QueryPlannerParams plannerParams;
-
-        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
-        while (ii.more()) {
-            const IndexDescriptor* desc = ii.next();
-            plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
-                                                       desc->getAccessMethodName(),
-                                                       desc->isMultikey(),
-                                                       desc->isSparse(),
-                                                       desc->indexName(),
-                                                       desc->infoObj()));
-        }
-
-        // If query supports index filters, filter params.indices by indices in query settings.
-        QuerySettings* querySettings = collection->infoCache()->getQuerySettings();
-        AllowedIndices* allowedIndicesRaw;
-
-        // Filter index catalog if index filters are specified for query.
-        // Also, signal to planner that application hint should be ignored.
-        if (querySettings->getAllowedIndices(*canonicalQuery, &allowedIndicesRaw)) {
-            boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
-            filterAllowedIndexEntries(*allowedIndices, &plannerParams.indices);
-            plannerParams.indexFiltersApplied = true;
-        }
-
         // Tailable: If the query requests tailable the collection must be capped.
         if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
             if (!collection->isCapped()) {
@@ -209,37 +247,10 @@ namespace mongo {
             }
         }
 
-        // Process the planning options.
+        // Fill out the planning params.  We use these for both cached solutions and non-cached.
+        QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;
-        if (storageGlobalParams.noTableScan) {
-            const string& ns = canonicalQuery->ns();
-            // There are certain cases where we ignore this restriction:
-            bool ignore = canonicalQuery->getQueryObj().isEmpty()
-                          || (string::npos != ns.find(".system."))
-                          || (0 == ns.find("local."));
-            if (!ignore) {
-                plannerParams.options |= QueryPlannerParams::NO_TABLE_SCAN;
-            }
-        }
-
-        if (!(plannerParams.options & QueryPlannerParams::NO_TABLE_SCAN)) {
-            plannerParams.options |= QueryPlannerParams::INCLUDE_COLLSCAN;
-        }
-
-        // If the caller wants a shard filter, make sure we're actually sharded.
-        if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            CollectionMetadataPtr collMetadata =
-                shardingState.getCollectionMetadata(canonicalQuery->ns());
-
-            if (collMetadata) {
-                plannerParams.shardKey = collMetadata->getKeyPattern();
-            }
-            else {
-                // If there's no metadata don't bother w/the shard filter since we won't know what
-                // the key pattern is anyway...
-                plannerParams.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-            }
-        }
+        fillOutPlannerParams(collection, rawCanonicalQuery, &plannerParams);
 
         // Try to look up a cached solution for the query.
         //
@@ -309,12 +320,6 @@ namespace mongo {
                 return Status::OK();
             }
         }
-
-        if (enableIndexIntersection) {
-            plannerParams.options |= QueryPlannerParams::INDEX_INTERSECTION;
-        }
-
-        plannerParams.options |= QueryPlannerParams::KEEP_MUTATIONS;
 
         vector<QuerySolution*> solutions;
         Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);

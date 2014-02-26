@@ -9,19 +9,22 @@
  */ 
 
 var t = db.jstests_plan_cache_commands;
-
 t.drop();
 
-t.save({a: 1});
+// Insert some data so we don't go to EOF.
+t.save({a: 1, b: 1});
 t.save({a: 2, b: 2});
 
+// We need two indices so that the MultiPlanRunner is executed.
 t.ensureIndex({a: 1});
+t.ensureIndex({a: 1, b:1});
 
-var queryA1 = {a: 1};
+// Run the query.
+var queryA1 = {a: 1, b:1};
 var projectionA1 = {_id: 0, a: 1};
 var sortA1 = {a: -1};
 assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
-
+// We now expect the two indices to be compared and a cache entry to exist.
 
 
 //
@@ -38,8 +41,8 @@ function getShapes() {
     return res.shapes;
     
 }
-// Attempting to retrieve cache information on non-existent collection
-// is an error.
+
+// Attempting to retrieve cache information on non-existent collection is an error.
 var missingCollection = db.jstests_query_cache_missing;
 missingCollection.drop();
 assert.commandFailed(missingCollection.runCommand('planCacheListQueryShapes'));
@@ -205,12 +208,14 @@ assert.gt(plans[0].feedback.averageScore, 0, 'invalid average score');
 t.drop();
 var n = 200;
 for (var i = 0; i < n; i++) {
-    t.save({b: i});
+    t.save({a:i, b: i});
 }
+t.ensureIndex({a: 1});
 t.ensureIndex({b: 1});
+t.ensureIndex({a: 1, b: 1});
 
 // Repopulate plan cache with 3 query shapes.
-var queryB = {b: {$gte: 0}};
+var queryB = {a: {$gte: 0}, b: {$gte: 0}};
 var projectionB = {_id: 0, b: 1};
 var sortB = {b: -1};
 assert.eq(n, t.find(queryB, projectionB).sort(sortB).itcount(), 'unexpected document count');
@@ -346,6 +351,7 @@ for (var i = 0; i < multiPlanRunnerExplain.allPlans.length; ++i) {
 t.drop();
 
 t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 
 for (var i = 0; i < 200; i++) {
     t.save({a: 1, b: 1});
@@ -361,5 +367,5 @@ assert.eq(1, t.find({a: 2, b: 2}).itcount(), 'unexpected count');
 assert.eq(1, getShapes().length, 'unexpected number of query shapes in plan cache');
 
 // A query that returns results but does not hit EOF will also be cached.
-assert.eq(200, t.find({a: 1}).itcount(), 'unexpected count');
+assert.eq(200, t.find({a: {$gte: 0}, b:1}).itcount(), 'unexpected count');
 assert.eq(2, getShapes().length, 'unexpected number of query shapes in plan cache');

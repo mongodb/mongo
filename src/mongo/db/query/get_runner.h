@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/runner.h"
 
@@ -43,6 +44,13 @@ namespace mongo {
     void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
                                    std::vector<IndexEntry>* indexEntries);
 
+    /**
+     * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
+     * 'collection'.  Exposed for testing.
+     */
+    void fillOutPlannerParams(Collection* collection,
+                              CanonicalQuery* canonicalQuery,
+                              QueryPlannerParams* plannerParams);
 
     /**
      * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
@@ -80,8 +88,11 @@ namespace mongo {
      * the returned runner.  On failure, returns other status values, and '*outRunner' and
      * '*outCanonicalQuery' have unspecified values.
      */
-    Status getRunner(Collection* collection, const std::string& ns, const BSONObj& unparsedQuery,
-                     Runner** outRunner, CanonicalQuery** outCanonicalQuery,
+    Status getRunner(Collection* collection,
+                     const std::string& ns,
+                     const BSONObj& unparsedQuery,
+                     Runner** outRunner,
+                     CanonicalQuery** outCanonicalQuery,
                      size_t plannerOptions = 0);
 
     /*

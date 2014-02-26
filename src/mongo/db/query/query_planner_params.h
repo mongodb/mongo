@@ -52,7 +52,8 @@ namespace mongo {
             // See http://docs.mongodb.org/manual/reference/parameters/
             NO_TABLE_SCAN = 1,
 
-            // Set this if you want a collscan outputted even if there's an ixscan.
+            // Set this if you *always* want a collscan outputted, even if there's an ixscan.  This
+            // makes ranking less accurate, especially in the presence of blocking stages.
             INCLUDE_COLLSCAN = 1 << 1,
 
             // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
