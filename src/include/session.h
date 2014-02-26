@@ -117,6 +117,15 @@ struct __wt_session_impl {
 	int skip_schema_lock;		/* Another thread holds the schema lock
 					 * on our behalf */
 
+	/*
+	 * The free-on-transactional generation" memory and hazard information
+	 * persist past session close, because they are accessed by threads of
+	 * control other than the thread owning the session.  They live at the
+	 * end of the structure so it's somewhat easier to clear everything but
+	 * the fields that persist.
+	 */
+#define	WT_SESSION_CLEAR_SIZE(s)					\
+	(WT_PTRDIFF(&(s)->flags, s) + sizeof((s)->flags))
 	uint32_t flags;
 
 	/*
@@ -134,18 +143,11 @@ struct __wt_session_impl {
 	size_t  fotxn_size;		/* Array size */
 
 	/*
-	 * The hazard pointer must be placed at the end of the structure: the
-	 * structure is cleared when closed, all except the hazard pointer.
-	 * Putting the hazard pointer at the end of the structure allows us to
-	 * easily call a function to clear memory up to, but not including, the
-	 * hazard pointer.
-	 *
+	 * Hazard pointers.
 	 * The number of hazard pointers that can be in use grows dynamically.
 	 */
 #define	WT_HAZARD_INCR		10
 	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
 	uint32_t   nhazard;		/* Count of active hazard pointers */
-
-#define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard pointer array */
 } WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));

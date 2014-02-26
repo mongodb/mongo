@@ -33,27 +33,36 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, const void *p)
 
 	/* See if we can free any previous entries. */
 	if (session->fotxn_cnt > 1)
-		__wt_session_fotxn_discard(session, 0);
+		__wt_session_fotxn_discard(session, session, 0);
 
 	return (0);
 }
 
 /*
  * __wt_session_fotxn_discard --
- *	Discard any memory the session accumulated.
+ *	Discard any memory from the session's free-on-transaction generation
+ * list that we can.
  */
 void
-__wt_session_fotxn_discard(WT_SESSION_IMPL *session, int connection_close)
+__wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
+    WT_SESSION_IMPL *session, int connection_close)
 {
 	WT_FOTXN *fotxn;
 	uint64_t oldest_id;
 	size_t i;
 
 	/*
+	 * This function is called during WT_CONNECTION.close to discard any
+	 * memory that remains.  For that reason, we take two WT_SESSION_IMPL
+	 * arguments: session_safe is still linked to the WT_CONNECTION and
+	 * can be safely used for calls to other WiredTiger functions, while
+	 * session is the WT_SESSION_IMPL we're cleaning up.
+	 *
 	 * Get the oldest transaction ID not yet visible to a running
 	 * transaction.
 	 */
-	oldest_id = S2C(session)->txn_global.oldest_id;
+	if (!connection_close)
+		oldest_id = S2C(session_safe)->txn_global.oldest_id;
 
 	for (i = 0, fotxn = session->fotxn;
 	    session->fotxn_cnt > 0 &&
@@ -74,8 +83,8 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session, int connection_close)
 			}
 #endif
 			--session->fotxn_cnt;
-			__wt_free(session, fotxn->p);
+			__wt_free(session_safe, fotxn->p);
 		}
 	if (connection_close)
-		__wt_free(session, session->fotxn);
+		__wt_free(session_safe, session->fotxn);
 }
