@@ -764,10 +764,11 @@ namespace mongo {
             && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
 
             // See if we have a sort provided from an index already.
+            // This is implied by the presence of a non-blocking solution.
             bool usingIndexToSort = false;
             for (size_t i = 0; i < out->size(); ++i) {
                 QuerySolution* soln = (*out)[i];
-                if (!soln->hasSortStage) {
+                if (!soln->hasBlockingStage) {
                     usingIndexToSort = true;
                     break;
                 }

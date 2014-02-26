@@ -308,11 +308,11 @@ namespace mongo {
         entry->sort = pq.getSort().getOwned();
         entry->projection = pq.getProj().getOwned();
 
-        // If the winning solution uses a blocking sort, then try and
-        // find a fallback solution that has no blocking sort.
-        if (solns[0]->hasSortStage) {
+        // If the winning solution uses a blocking stage, then try and
+        // find a fallback solution that has no blocking stage.
+        if (solns[0]->hasBlockingStage) {
             for (size_t i = 1; i < solns.size(); ++i) {
-                if (!solns[i]->hasSortStage) {
+                if (!solns[i]->hasBlockingStage) {
                     entry->backupSoln.reset(i);
                     break;
                 }

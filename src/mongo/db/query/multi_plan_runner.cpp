@@ -341,10 +341,10 @@ namespace mongo {
         QLOG() << "Winning solution:\n" << _bestSolution->toString() << endl;
 
         size_t backupChild = bestChild;
-        if (_bestSolution->hasSortStage && (0 == _alreadyProduced.size())) {
-            QLOG() << "Winner has blocked sort, looking for backup plan...\n";
+        if (_bestSolution->hasBlockingStage && (0 == _alreadyProduced.size())) {
+            QLOG() << "Winner has blocking stage, looking for backup plan...\n";
             for (size_t i = 0; i < _candidates.size(); ++i) {
-                if (!_candidates[i].solution->hasSortStage) {
+                if (!_candidates[i].solution->hasBlockingStage) {
                     QLOG() << "Candidate " << i << " is backup child\n";
                     backupChild = i;
                     _backupSolution = _candidates[i].solution;

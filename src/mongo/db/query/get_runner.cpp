@@ -386,7 +386,7 @@ namespace mongo {
                 && !canonicalQuery->getParsed().getSort().isEmpty()) {
                 // Look for a solution without a blocking sort stage.
                 for (size_t i = 0; i < solutions.size(); ++i) {
-                    if (!solutions[i]->hasSortStage) {
+                    if (!solutions[i]->hasBlockingStage) {
                         WorkingSet* ws;
                         PlanStage* root;
                         verify(StageBuilder::build(*solutions[i], &root, &ws));

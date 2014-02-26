@@ -155,7 +155,7 @@ namespace mongo {
      * of stages.
      */
     struct QuerySolution {
-        QuerySolution() : hasSortStage(false), indexFilterApplied(false) { }
+        QuerySolution() : hasBlockingStage(false), indexFilterApplied(false) { }
 
         // Owned here.
         scoped_ptr<QuerySolutionNode> root;
@@ -165,9 +165,16 @@ namespace mongo {
 
         string ns;
 
+        // There are two known scenarios in which a query solution might potentially block:
+        //
+        // Sort stage:
         // If the solution has a sort stage, the sort wasn't provided by an index, so we might want
         // to scan an index to provide that sort in a non-blocking fashion.
-        bool hasSortStage;
+        //
+        // Hashed AND stage:
+        // The hashed AND stage buffers data from multiple index scans and could block. In that case,
+        // we would want to fall back on an alternate non-blocking solution.
+        bool hasBlockingStage;
 
         // Runner executing this solution might be interested in knowing
         // if the planning process for this solution was based on filtered indices.
