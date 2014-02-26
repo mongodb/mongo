@@ -385,7 +385,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 * generation number and retry if it has changed under us.
 		 */
 		if (clsm->cursors != NULL && (ngood < clsm->nchunks ||
-		    (F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0))) {
+		    (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0))) {
 			saved_gen = lsm_tree->dsk_gen;
 			locked = 0;
 			WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));

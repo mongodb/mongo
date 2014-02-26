@@ -76,6 +76,19 @@ def munge_dict(values_dict, abstime):
             next_val[title] = value
         ret.append(next_val)
 
+    # After building the series, eliminate constants
+    d0 = ret[0]
+    for t0, v0 in d0.items():
+        skip = True
+        for d in ret:
+            v = d[t0]
+            if v != v0:
+                skip = False
+                break
+        if skip:
+            for dicts in ret:
+                del dicts[t0]
+
     return ret
 
 def addPlotsToChart(chart, graph_data, wtstat_chart = False):

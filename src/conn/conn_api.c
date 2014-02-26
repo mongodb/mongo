@@ -496,6 +496,20 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 	WT_UNUSED(cfg);
 
+	/*
+	 * Rollback all running transactions.
+	 * We do this as a separate pass because an active transaction in one
+	 * session could cause trouble when closing a file, even if that
+	 * session never referenced that file.
+	 */
+	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
+		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL) &&
+		    F_ISSET(&s->txn, TXN_RUNNING)) {
+			wt_session = &s->iface;
+			WT_TRET(wt_session->rollback_transaction(
+			    wt_session, NULL));
+		}
+
 	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
 		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL)) {

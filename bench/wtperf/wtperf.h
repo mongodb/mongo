@@ -83,8 +83,8 @@ typedef struct {
 struct __config {			/* Configuration struction */
 	const char *home;		/* WiredTiger home */
 	const char *monitor_dir;	/* Monitor output dir */
-	char *uri;			/* Object URI */
-	char **uris;			/* URIs if multiple tables */
+	char *base_uri;			/* Base URI name */
+	char **uris;			/* URIs */
 
 	WT_CONNECTION *conn;		/* Database connection */
 
