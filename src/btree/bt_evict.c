@@ -877,8 +877,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int internal_pages, modified, restarts;
 	uint64_t pages_walked;
+	int internal_pages, modified, restarts;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
