@@ -215,10 +215,10 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			ret = 0;
 		if (ret != 0 )
 			goto err;
-		if ((ret = scan->close(scan)) != 0) {
-			scan = NULL;
+		ret = scan->close(scan);
+		scan = NULL;
+		if (ret != 0)
 			goto err;
-		}
 
 		if (workp->insert == 0 &&
 		    workp->read == 0 && workp->update == 0)
@@ -226,10 +226,10 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		cfg->workers_cnt += (u_int)workp->threads;
 	}
 
-	if ((ret = group->close(group)) != 0) {
-		group = NULL;
+	ret = group->close(group);
+	group = NULL;
+	if (ret != 0)
 		goto err;
-	}
 
 	return (0);
 
