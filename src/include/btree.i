@@ -159,6 +159,12 @@ __wt_cache_read_gen(WT_SESSION_IMPL *session)
 	return (S2C(session)->cache->read_gen);
 }
 
+static inline void
+__wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
+{
+	++S2C(session)->cache->read_gen;
+}
+
 static inline uint64_t
 __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 {

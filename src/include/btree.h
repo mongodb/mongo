@@ -113,7 +113,9 @@ struct __wt_btree {
 	uint64_t write_gen;		/* Write generation */
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
-	uint64_t evict_priority;	/* Relative priority of cached pages. */
+	uint64_t evict_priority;	/* Relative priority of cached pages */
+	u_int    evict_walk_period;	/* Skip this many LRU walks */
+	u_int    evict_walk_skips;	/* Number of walks skipped */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
 
 	volatile int checkpointing;	/* Checkpoint in progress */

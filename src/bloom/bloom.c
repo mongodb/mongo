@@ -127,7 +127,7 @@ __bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
 	WT_RET(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 
 	/* XXX Layering violation: bump the cache priority for Bloom filters. */
-	((WT_CURSOR_BTREE *)c)->btree->evict_priority = (1 << 19);
+	((WT_CURSOR_BTREE *)c)->btree->evict_priority = WT_EVICT_INT_SKEW;
 
 	bloom->c = c;
 	return (0);

@@ -16,8 +16,9 @@
 #define	WT_EVICT_WALK_BASE     300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
 
-#define	WT_EVICT_PASS_ALL	0x01
-#define	WT_EVICT_PASS_DIRTY	0x02
+#define	WT_EVICT_PASS_AGGRESSIVE	0x01
+#define	WT_EVICT_PASS_ALL		0x02
+#define	WT_EVICT_PASS_DIRTY		0x04
 
 /*
  * WT_EVICT_ENTRY --

@@ -71,16 +71,16 @@ static const char * const debug_tconfig = "";
 #endif
 
 static void	*checkpoint_worker(void *);
-static int	create_tables(CONFIG *);
-static int	create_uris(CONFIG *);
+static int	 create_tables(CONFIG *);
+static int	 create_uris(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
-static void	randomize_value(CONFIG *, char *);
-static int	start_all_runs(CONFIG *);
-static int	start_run(CONFIG *);
+static void	 randomize_value(CONFIG *, char *);
+static int	 start_all_runs(CONFIG *);
+static int	 start_run(CONFIG *);
 static int	 start_threads(CONFIG *,
 		    WORKLOAD *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
@@ -1122,12 +1122,17 @@ find_table_count(CONFIG *cfg)
 		if (table_icount > max_icount)
 			max_icount = table_icount;
 
-err:		if ((t_ret = session->close(session, NULL)) != 0) {
-			if (ret == 0)
-				ret = t_ret;
+		if ((ret = cursor->close(cursor)) != 0) {
 			lprintf(cfg, ret, 0,
-			    "find_table_count: session close failed");
+			    "find_table_count: cursor close failed");
+			goto err;
 		}
+	}
+err:	if ((t_ret = session->close(session, NULL)) != 0) {
+		if (ret == 0)
+			ret = t_ret;
+		lprintf(cfg, ret, 0,
+		    "find_table_count: session close failed");
 	}
 	cfg->icount = max_icount;
 out:	return (ret);
@@ -1217,7 +1222,7 @@ start_all_runs(CONFIG *cfg)
 {
 	CONFIG *next_cfg, **configs;
 	char *cmd_buf, *new_home;
-	int ret;
+	int ret, t_ret;
 	size_t cmd_len, home_len, i;
 	pthread_t *threads;
 
@@ -1253,7 +1258,12 @@ start_all_runs(CONFIG *cfg)
 			goto err;
 
 		/* Setup a unique home directory for each database. */
+		configs[i] = next_cfg;
 		new_home = malloc(home_len + 5);
+		if (new_home == NULL) {
+			ret = ENOMEM;
+			goto err;
+		}
 		sprintf(new_home, "%s/D%02d", cfg->home, (int)i);
 		next_cfg->home = (const char *)new_home;
 
@@ -1273,20 +1283,21 @@ start_all_runs(CONFIG *cfg)
 			lprintf(cfg, ret, 0, "Error creating thread");
 			goto err;
 		}
-		configs[i] = next_cfg;
 	}
 
 	/* Wait for threads to finish. */
 	for (i = 0; i < cfg->database_count; i++) {
-		if ((ret = pthread_join(threads[i], NULL)) != 0) {
+		if ((t_ret = pthread_join(threads[i], NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread");
-			return (ret);
+			if (ret == 0)
+				ret = t_ret;
 		}
 	}
 
 err:	for (i = 0; i < cfg->database_count && configs[i] != NULL; i++) {
 		free((char *)configs[i]->home);
 		config_free(configs[i]);
+		free(configs[i]);
 	}
 	free(configs);
 	free(threads);
@@ -1344,7 +1355,8 @@ start_run(CONFIG *cfg)
 		goto err;
 	if ((ret = create_tables(cfg)) != 0)
 		goto err;
-					/* Start the monitor thread. */
+
+	/* Start the monitor thread. */
 	if (cfg->sample_interval != 0) {
 		if ((ret = pthread_create(
 		    &monitor_thread, NULL, monitor, cfg)) != 0) {
@@ -1354,15 +1366,17 @@ start_run(CONFIG *cfg)
 		}
 		monitor_created = 1;
 	}
-					/* If creating, populate the table. */
+
+	/* If creating, populate the table. */
 	if (cfg->create != 0 && execute_populate(cfg) != 0)
 		goto err;
-					/* Optional workload. */
+
+	/* Optional workload. */
 	if (cfg->run_time != 0 || cfg->run_ops != 0) {
-					/* Didn't create, set insert count. */
+		/* Didn't create, set insert count. */
 		if (cfg->create == 0 && find_table_count(cfg) != 0)
 			goto err;
-					/* Start the checkpoint thread. */
+		/* Start the checkpoint thread. */
 		if (cfg->checkpoint_threads != 0) {
 			lprintf(cfg, 0, 1,
 			    "Starting %" PRIu32 " checkpoint thread(s)",
@@ -1377,7 +1391,7 @@ start_run(CONFIG *cfg)
 			    cfg->checkpoint_threads, checkpoint_worker) != 0)
 				goto err;
 		}
-					/* Execute the workload. */
+		/* Execute the workload. */
 		if ((ret = execute_workload(cfg)) != 0)
 			goto err;
 
@@ -1595,11 +1609,12 @@ main(int argc, char *argv[])
 			goto err;
 	}
 
-					/* Sanity-check the configuration */
+	/* Sanity-check the configuration. */
 	if (config_sanity(cfg) != 0)
 		goto err;
 
-	if (cfg->verbose > 1)		/* Display the configuration. */
+	/* Display the configuration. */
+	if (cfg->verbose > 1)
 		config_print(cfg);
 
 	if ((ret = start_all_runs(cfg)) != 0)
