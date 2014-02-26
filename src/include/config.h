@@ -33,6 +33,14 @@ struct __wt_config_entry {
 	const WT_CONFIG_CHECK *checks;		/* check array */
 };
 
+struct __wt_config_parser_impl {
+	WT_CONFIG_PARSER iface;
+
+	WT_SESSION_IMPL *session;
+	WT_CONFIG config;
+	WT_CONFIG_ITEM config_item;
+};
+
 /*
  * DO NOT EDIT: automatically built by dist/api_config.py.
  * configuration section: BEGIN
