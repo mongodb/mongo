@@ -8,6 +8,19 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_ext_config_parser_open --
+ *	WT_EXTENSION_API->config_parser_open implementation
+ */
+int
+__wt_ext_config_parser_open(WT_EXTENSION_API *wt_ext, WT_SESSION *wt_session,
+    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp)
+{
+	WT_UNUSED(wt_ext);
+	return (wiredtiger_config_parser_open(
+	    wt_session, config, len, config_parserp));
+}
+
+/*
  * __wt_ext_config_get --
  *	Given a NULL-terminated list of configuration strings, find the final
  * value for a given string key (external API version).

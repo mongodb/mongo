@@ -184,6 +184,12 @@ struct __wt_extension_api {
 	    WT_ITEM *first, WT_ITEM *second, int *cmp);
 
 	/*!
+	 * @copydoc wiredtiger_config_parser_open
+	 */
+	int (*config_parser_open)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
+
+	/*!
 	 * Return the value of a configuration string.
 	 *
 	 * @param wt_api the extension handle
@@ -365,6 +371,11 @@ struct __wt_extension_api {
 	 */
 	int (*transaction_visible)(WT_EXTENSION_API *wt_api,
 	    WT_SESSION *session, uint64_t transaction_id);
+
+	/*!
+	 * @copydoc wiredtiger_version
+	 */
+	const char *(*version)(int *majorp, int *minorp, int *patchp);
 };
 
 /*!

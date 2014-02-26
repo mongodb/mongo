@@ -2167,7 +2167,7 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		if ((ret = master_uri_get(wtds, session, uri, &value)) != 0)
 			goto err;
 
-		if ((ret = wiredtiger_config_parser_open(
+		if ((ret = wtext->config_parser_open(wtext,
 		    session, value, strlen(value), &config_parser)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "Configuration string parser: %s",
@@ -2900,10 +2900,10 @@ helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 	*flagsp = 0;
 
 	/* Traverse the configuration arguments list. */
-	if ((ret = wiredtiger_config_parser_open(
-	    NULL, config->str, config->len, &config_parser)) != 0)
+	if ((ret = wtext->config_parser_open(
+	    wtext, NULL, config->str, config->len, &config_parser)) != 0)
 		ERET(wtext, NULL, ret,
-		    "wiredtiger_config_parser_open: %s",
+		    "WT_EXTENSION_API.config_parser_open: %s",
 		    wtext->strerror(ret));
 	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
 		if (string_match("helium_devices", k.str, k.len)) {
@@ -3367,10 +3367,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		    wtext->strerror(ret));
 
 	/* Step through the list of Helium sources, opening each one. */
-	if ((ret = wiredtiger_config_parser_open(
-	    NULL, v.str, v.len, &config_parser)) != 0)
+	if ((ret = wtext->config_parser_open(
+	    wtext, NULL, v.str, v.len, &config_parser)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "wiredtiger_config_parser_open: config: %s",
+		    "WT_EXTENSION_API.config_parser_open: config: %s",
 		    wtext->strerror(ret));
 	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
 		if (string_match("helium_verbose", k.str, k.len)) {
