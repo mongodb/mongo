@@ -34,6 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -115,6 +116,12 @@ namespace mongo {
                                    "useLegacyWriteOps",
                                    moe::Switch,
                                    "use legacy write ops instead of write commands").hidden();
+
+        options->addOptionChaining("writeMode",
+                                   "writeMode",
+                                   moe::String,
+                                   "mode to determine how writes are done:"
+                                   " commands, compatibility, legacy").hidden();
 
         return Status::OK();
     }
@@ -215,7 +222,16 @@ namespace mongo {
             shellGlobalParams.autoKillOp = true;
         }
         if (params.count("useLegacyWriteOps")) {
-            shellGlobalParams.useWriteCommandsDefault = false;
+            shellGlobalParams.writeMode = "legacy";
+        }
+        if (params.count("writeMode")) {
+            std::string mode = params["writeMode"].as<string>();
+            if (mode != "commands" && mode != "legacy" && mode != "compatibility") {
+                throw MsgAssertionException(17396,
+                                            mongoutils::str::stream() <<
+                                                "Unknown writeMode option: " << mode);
+            }
+            shellGlobalParams.writeMode = mode;
         }
 
         /* This is a bit confusing, here are the rules:

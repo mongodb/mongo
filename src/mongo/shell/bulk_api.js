@@ -913,7 +913,8 @@ var _bulk_api_module = (function() {
       for(var i = 0; i < batches.length; i++) {
 
         // Execute the batch
-        if(useWriteCommands) {
+        if(collection.getMongo().hasWriteCommands() && 
+           collection.getMongo().writeMode() == "commands") {
           executeBatch(batches[i]);
         } else {
           executeBatchWithLegacyOps(batches[i]);

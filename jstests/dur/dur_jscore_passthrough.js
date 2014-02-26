@@ -8,7 +8,7 @@
 conn = startMongodEmpty("--port", 30200, "--dbpath", MongoRunner.dataDir + "/dur_passthrough", "--dur", "--nopreallocj", "--smallfiles",
 "--durOptions", "8");
 db = conn.getDB("test");
-conn._useWriteCommands = true;
+conn.forceWriteMode("commands");
 
 function doTest() {
     var files = listFiles("jstests/core");

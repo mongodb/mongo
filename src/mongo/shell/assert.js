@@ -347,7 +347,7 @@ assert.writeOK = function(res, msg) {
 
     if (!res)
         errMsg = "missing first argument, no response to check"
-    if (!res.getWriteError)
+    else if (!res.getWriteError)
         assert.gleOK(res, msg)
     else {
         if (res.getWriteError()) {
@@ -371,8 +371,7 @@ assert.gleOK = function(res, msg) {
 
     if (!res)
         errMsg = "missing first argument, no response to check"
-
-    if (!res.ok)
+    else if (!res.ok)
         errMsg = "command failed: " + tojson(res);
 
     if ('code' in res || 'errMsg' in res || 'errInfo' in res || 'writeErrors' in res)
@@ -387,11 +386,12 @@ assert.gleOK = function(res, msg) {
     return res;
 }
 
-
 assert.writeError = function(res, msg) {
     var errMsg = "";
 
-    if (!res.getWriteConcernError) {
+    if (!res)
+        errMsg = "The response arg was missing or undefined! -- " + res
+    else if (!res.getWriteConcernError) {
         if (!res.err)
             errMsg = "no error" + tojson(res);
     } else {

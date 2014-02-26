@@ -38,13 +38,6 @@ var executeTests = function() {
     assert.eq(2, result.nInserted);
     assert.eq(1, result.nUpserted);
     assert.eq(2, result.nMatched);
-    if (coll.getMongo().useWriteCommands()) {
-        assert.eq(1, result.nModified);
-    }
-    else {
-        // Legacy updates does not support nModified.
-        assert.eq(0, result.nModified);
-    }
     assert.eq(1, result.nRemoved);
     assert(1, result.getWriteErrorCount());
     var upserts = result.getUpsertedIds();

@@ -5,6 +5,8 @@
 var coll = db.getCollection( "batch_write_update" );
 coll.drop();
 
+assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands")
+
 jsTest.log("Starting update tests...");
 
 var request;

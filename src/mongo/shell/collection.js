@@ -21,6 +21,7 @@ DBCollection.prototype.verify = function(){
     assert.eq( this._fullName , this._db._name + "." + this._shortName , "name mismatch" );
 
     assert( this._mongo , "no mongo in DBCollection" );
+    assert( this.getMongo() , "no mongo from getMongo()" );
 }
 
 DBCollection.prototype.getName = function(){
@@ -132,7 +133,7 @@ DBCollection.prototype._massageObject = function( q ){
 
 DBCollection.prototype._validateObject = function( o ){
     // Hidden property for testing purposes.
-    if (this._mongo._skipValidation) return;
+    if (this.getMongo()._skipValidation) return;
 
     if (typeof(o) != "object")
         throw "attempted to save a " + typeof(o) + " value.  document expected.";
@@ -145,7 +146,7 @@ DBCollection._allowedFields = { $id : 1 , $ref : 1 , $db : 1 };
 
 DBCollection.prototype._validateForStorage = function( o ){
     // Hidden property for testing purposes.
-    if (this._mongo._skipValidation) return;
+    if (this.getMongo()._skipValidation) return;
 
     this._validateObject( o );
     for ( var k in o ){
@@ -225,7 +226,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
 
-    if ( this._mongo.useWriteCommands() ) {
+    if ( this.getMongo().writeMode() != "legacy" ) {
         // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
         var batch = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
 
@@ -253,7 +254,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
             }
         }
 
-        this._mongo.insert( this._fullName , obj, flags );
+        this.getMongo().insert( this._fullName , obj, flags );
 
         // enforce write concern, if required
         if (wc)
@@ -267,7 +268,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
 
 DBCollection.prototype._validateRemoveDoc = function(doc) {
     // Hidden property for testing purposes.
-    if (this._mongo._skipValidation) return;
+    if (this.getMongo()._skipValidation) return;
 
     for (var k in doc) {
         if (k == "_id" && typeof( doc[k] ) == "undefined") {
@@ -292,7 +293,7 @@ DBCollection.prototype.remove = function( t , justOne ){
     if (!wc)
         wc = this.getWriteConcern();
 
-    if ( this._mongo.useWriteCommands() ) {
+    if ( this.getMongo().writeMode() != "legacy" ) {
         var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
         var batch = this.initializeOrderedBulkOp();
         var removeOp = batch.find(query);
@@ -308,7 +309,7 @@ DBCollection.prototype.remove = function( t , justOne ){
     }
     else {
         this._validateRemoveDoc(t);
-        this._mongo.remove(this._fullName, this._massageObject(t), justOne ? true : false );
+        this.getMongo().remove(this._fullName, this._massageObject(t), justOne ? true : false );
         
         // enforce write concern, if required
         if (wc)
@@ -322,7 +323,7 @@ DBCollection.prototype.remove = function( t , justOne ){
 
 DBCollection.prototype._validateUpdateDoc = function(doc) {
     // Hidden property for testing purposes.
-    if (this._mongo._skipValidation) return;
+    if (this.getMongo()._skipValidation) return;
 
     var firstKey = null;
     for (var key in doc) { firstKey = key; break; }
@@ -359,7 +360,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
     if (!wc)
         wc = this.getWriteConcern();
     
-    if ( this._mongo.useWriteCommands() ) {
+    if ( this.getMongo().writeMode() != "legacy" ) {
         var batch = this.initializeOrderedBulkOp();
         var updateOp = batch.find(query);
 
@@ -378,7 +379,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
     }
     else {
         this._validateUpdateDoc(obj);
-        this._mongo.update(this._fullName, query, obj,
+        this.getMongo().update(this._fullName, query, obj,
                            upsert ? true : false, multi ? true : false );
 
         // enforce write concern, if required
@@ -490,8 +491,7 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
 DBCollection.prototype.createIndex = function( keys , options ){
     var o = this._indexSpec( keys, options );
 
-    if ( this._mongo.useWriteCommands() ) {
-
+    if ( this.getMongo().writeMode() != "legacy" ) {
         // TODO: Use createIndexes command once fully supported by upgrade process
         var bulk = this.getDB().system.indexes.initializeOrderedBulkOp();
         bulk.insert(o);

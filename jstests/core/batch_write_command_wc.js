@@ -2,10 +2,10 @@
 // Ensures that the server respects the batch write command WriteConcern, and behaves correctly
 //
 
-
-
 var coll = db.getCollection( "batch_write_wc" );
 coll.drop();
+
+assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands")
 
 jsTest.log("Starting Tests");
 
