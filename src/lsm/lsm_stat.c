@@ -39,7 +39,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 		    "statistics=(%s%s%s)",
 		    cst->stat_clear ? "clear," : "",
 		    cst->stat_all ? "all," : "",
-		    cst->stat_fast ? "fast," : "");
+		    !cst->stat_all && cst->stat_fast ? "fast," : "");
 		cfg[1] = disk_cfg[1] = config;
 	}
 
