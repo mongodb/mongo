@@ -53,9 +53,21 @@ namespace mongo {
     class AndHashStage : public PlanStage {
     public:
         AndHashStage(WorkingSet* ws, const MatchExpression* filter);
+
+        /**
+         * For testing only. Allows tests to set memory usage threshold.
+         */
+        AndHashStage(WorkingSet* ws, const MatchExpression* filter, size_t maxMemUsage);
+
         virtual ~AndHashStage();
 
         void addChild(PlanStage* child);
+
+        /**
+         * Returns memory usage.
+         * For testing only.
+         */
+        size_t getMemUsage() const;
 
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
@@ -106,6 +118,15 @@ namespace mongo {
         // Stats
         CommonStats _commonStats;
         AndHashStats _specificStats;
+
+        // The usage in bytes of all buffered data that we're holding.
+        // Memory usage is calculated from keys held in _dataMap only.
+        // For simplicity, results in _lookAheadResults do not count towards the limit.
+        size_t _memUsage;
+
+        // Upper limit for buffered data memory usage.
+        // Defaults to 32 MB (See kMaxBytes in and_hash.cpp).
+        size_t _maxMemUsage;
     };
 
 }  // namespace mongo

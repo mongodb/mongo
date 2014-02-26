@@ -34,7 +34,31 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/util/mongoutils/str.h"
 
+namespace {
+
+    using namespace mongo;
+
+    // Upper limit for buffered data.
+    // Stage execution will fail once size of all buffered data exceeds this threshold.
+    const size_t kDefaultMaxMemUsageBytes = 32 * 1024 * 1024;
+
+    /**
+     * Returns expected memory usage of working set member
+     */
+    size_t getMemberMemUsage(WorkingSetMember* member) {
+        size_t memUsage = 0;
+        for (size_t i = 0; i < member->keyData.size(); ++i) {
+            const IndexKeyDatum& keyDatum = member->keyData[i];
+            memUsage += keyDatum.keyData.objsize();
+        }
+        return memUsage;
+    }
+
+} // namespace
+
 namespace mongo {
+
+    using std::auto_ptr;
 
     const size_t AndHashStage::kLookAheadWorks = 10;
 
@@ -42,13 +66,27 @@ namespace mongo {
         : _ws(ws),
           _filter(filter),
           _hashingChildren(true),
-          _currentChild(0) {}
+          _currentChild(0),
+          _memUsage(0),
+          _maxMemUsage(kDefaultMaxMemUsageBytes) {}
+
+    AndHashStage::AndHashStage(WorkingSet* ws, const MatchExpression* filter, size_t maxMemUsage)
+        : _ws(ws),
+          _filter(filter),
+          _hashingChildren(true),
+          _currentChild(0),
+          _memUsage(0),
+          _maxMemUsage(maxMemUsage) {}
 
     AndHashStage::~AndHashStage() {
         for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
     }
 
     void AndHashStage::addChild(PlanStage* child) { _children.push_back(child); }
+
+    size_t AndHashStage::getMemUsage() const {
+        return _memUsage;
+    }
 
     bool AndHashStage::isEOF() {
         // This is empty before calling work() and not-empty after.
@@ -139,6 +177,16 @@ namespace mongo {
 
         // We read the first child into our hash table.
         if (_hashingChildren) {
+            // Check memory usage of previously hashed results.
+            if (_memUsage > _maxMemUsage) {
+                mongoutils::str::stream ss;
+                ss << "hashed AND stage buffered data usage of " << _memUsage
+                   << " bytes exceeds internal limit of " << kDefaultMaxMemUsageBytes << " bytes";
+                Status status(ErrorCodes::Overflow, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                return PlanStage::FAILURE;
+            }
+
             if (0 == _currentChild) {
                 return readFirstChild(out);
             }
@@ -241,6 +289,10 @@ namespace mongo {
             verify(_dataMap.end() == _dataMap.find(member->loc));
 
             _dataMap[member->loc] = id;
+
+            // Update memory stats.
+            _memUsage += getMemberMemUsage(member);
+
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
@@ -309,7 +361,12 @@ namespace mongo {
                 // We have a hit.  Copy data into the WSM we already have.
                 _seenMap.insert(member->loc);
                 WorkingSetMember* olderMember = _ws->get(_dataMap[member->loc]);
+                size_t memUsageBefore = getMemberMemUsage(olderMember);
+
                 AndCommon::mergeFrom(olderMember, *member);
+
+                // Update memory stats.
+                _memUsage += getMemberMemUsage(olderMember) - memUsageBefore;
             }
             _ws->free(id);
             ++_commonStats.needTime;
@@ -325,6 +382,11 @@ namespace mongo {
                 if (_seenMap.end() == _seenMap.find(it->first)) {
                     DataMap::iterator toErase = it;
                     ++it;
+
+                    // Update memory stats.
+                    WorkingSetMember* member = _ws->get(toErase->second);
+                    _memUsage -= getMemberMemUsage(member);
+
                     _ws->free(toErase->second);
                     _dataMap.erase(toErase);
                 }
@@ -435,6 +497,9 @@ namespace mongo {
                 ++_specificStats.flaggedButPassed;
             }
 
+            // Update memory stats.
+            _memUsage -= getMemberMemUsage(member);
+
             // The loc is about to be invalidated.  Fetch it and clear the loc.
             WorkingSetCommon::fetchAndInvalidateLoc(member);
 
@@ -449,10 +514,8 @@ namespace mongo {
     PlanStageStats* AndHashStage::getStats() {
         _commonStats.isEOF = isEOF();
 
-        // XXX: populate
-        // _specificStats.memLimit
-        // _specificStats.memUsage
-        // when ben's change is in
+        _specificStats.memLimit = _maxMemUsage;
+        _specificStats.memUsage = _memUsage;
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_HASH));
         ret->specific.reset(new AndHashStats(_specificStats));

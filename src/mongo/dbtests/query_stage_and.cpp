@@ -46,6 +46,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace QueryStageAnd {
 
@@ -62,7 +63,11 @@ namespace QueryStageAnd {
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
-            return coll->getIndexCatalog()->findIndexByKeyPattern( obj );
+            IndexDescriptor* descriptor = coll->getIndexCatalog()->findIndexByKeyPattern( obj );
+            if (NULL == descriptor) {
+                FAIL(mongoutils::str::stream() << "Unable to find index with key pattern " << obj);
+            }
+            return descriptor;
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
@@ -83,11 +88,19 @@ namespace QueryStageAnd {
             _client.remove(ns(), obj);
         }
 
+        /**
+         * Executes plan stage until EOF.
+         * Returns number of results seen if execution reaches EOF successfully.
+         * Otherwise, returns -1 on stage failure.
+         */
         int countResults(PlanStage* stage) {
             int count = 0;
             while (!stage->isEOF()) {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = stage->work(&id);
+                if (PlanStage::FAILURE == status) {
+                    return -1;
+                }
                 if (PlanStage::ADVANCED != status) { continue; }
                 ++count;
             }
@@ -162,6 +175,7 @@ namespace QueryStageAnd {
             // ...invalidate one of the read objects
             set<DiskLoc> data;
             getLocs(&data, coll);
+            size_t memUsageBefore = ah->getMemUsage();
             for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
                 if (it->obj()["foo"].numberInt() == 15) {
                     ah->invalidate(*it, INVALIDATION_DELETION);
@@ -169,7 +183,11 @@ namespace QueryStageAnd {
                     break;
                 }
             }
+            size_t memUsageAfter = ah->getMemUsage();
             ah->recoverFromYield();
+
+            // Invalidating a read object should decrease memory usage.
+            ASSERT_LESS_THAN(memUsageAfter, memUsageBefore);
 
             // And expect to find foo==15 it flagged for review.
             const unordered_set<WorkingSetID>& flagged = ws.getFlagged();
@@ -257,12 +275,19 @@ namespace QueryStageAnd {
             ah->prepareToYield();
             set<DiskLoc> data;
             getLocs(&data, coll);
+
+            size_t memUsageBefore = ah->getMemUsage();
             for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
                 if (0 == deletedObj.woCompare(it->obj())) {
                     ah->invalidate(*it, INVALIDATION_DELETION);
                     break;
                 }
             }
+
+            size_t memUsageAfter = ah->getMemUsage();
+            // Look ahead results do not count towards memory usage.
+            ASSERT_EQUALS(memUsageBefore, memUsageAfter);
+
             ah->recoverFromYield();
 
             // The deleted obj should show up in flagged.
@@ -280,6 +305,155 @@ namespace QueryStageAnd {
             }
 
             ASSERT_EQUALS(count, 20);
+        }
+    };
+
+    // An AND with two children.
+    class QueryStageAndHashTwoLeaf : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1));
+
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL));
+
+            // Foo <= 20
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = -1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Bar >= 10
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            params.bounds.startKey = BSON("" << 10);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // foo == bar == baz, and foo<=20, bar>=10, so our values are:
+            // foo == 10, 11, 12, 13, 14, 15. 16, 17, 18, 19, 20
+            ASSERT_EQUALS(11, countResults(ah.get()));
+        }
+    };
+
+    // An AND with two children.
+    // Add large keys (512 bytes) to index of first child to cause
+    // internal buffer within hashed AND to exceed threshold (32MB)
+    // before gathering all requested results.
+    class QueryStageAndHashTwoLeafFirstChildLargeKeys : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            // Generate large keys for {foo: 1, big: 1} index.
+            std::string big(512, 'a');
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i << "big" << big));
+            }
+
+            addIndex(BSON("foo" << 1 << "big" << 1));
+            addIndex(BSON("bar" << 1));
+
+            // Lower buffer limit to 20 * sizeof(big) to force memory error
+            // before hashed AND is done reading the first child (stage has to
+            // hold 21 keys in buffer for Foo <= 20).
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, 20 * big.size()));
+
+            // Foo <= 20
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1 << "big" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20 << "" << big);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = -1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Bar >= 10
+            params.descriptor = getIndex(BSON("bar" << 1), coll);
+            params.bounds.startKey = BSON("" << 10);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Stage execution should fail.
+            ASSERT_EQUALS(-1, countResults(ah.get()));
+        }
+    };
+
+    // An AND with three children.
+    // Add large keys (512 bytes) to index of last child to verify that
+    // keys in last child are not buffered
+    class QueryStageAndHashTwoLeafLastChildLargeKeys : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            // Generate large keys for {baz: 1, big: 1} index.
+            std::string big(512, 'a');
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i << "big" << big));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1 << "big" << 1));
+
+            // Lower buffer limit to 5 * sizeof(big) to ensure that
+            // keys in last child's index are not buffered. There are 6 keys
+            // that satisfy the criteria Foo <= 20 and Bar >= 10 and 5 <= baz <= 15.
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, 5 * big.size()));
+
+            // Foo <= 20
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = -1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Bar >= 10
+            params.descriptor = getIndex(BSON("bar" << 1 << "big" << 1), coll);
+            params.bounds.startKey = BSON("" << 10 << "" << big);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // foo == bar == baz, and foo<=20, bar>=10, so our values are:
+            // foo == 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.
+            ASSERT_EQUALS(11, countResults(ah.get()));
         }
     };
 
@@ -334,6 +508,70 @@ namespace QueryStageAnd {
             // foo == bar == baz, and foo<=20, bar>=10, 5<=baz<=15, so our values are:
             // foo == 10, 11, 12, 13, 14, 15.
             ASSERT_EQUALS(6, countResults(ah.get()));
+        }
+    };
+
+    // An AND with three children.
+    // Add large keys (512 bytes) to index of second child to cause
+    // internal buffer within hashed AND to exceed threshold (32MB)
+    // before gathering all requested results.
+    // We need 3 children because the hashed AND stage buffered data for
+    // N-1 of its children. If the second child is the last child, it will not
+    // be buffered.
+    class QueryStageAndHashThreeLeafMiddleChildLargeKeys : public QueryStageAndBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            // Generate large keys for {bar: 1, big: 1} index.
+            std::string big(512, 'a');
+            for (int i = 0; i < 50; ++i) {
+                insert(BSON("foo" << i << "bar" << i << "baz" << i << "big" << big));
+            }
+
+            addIndex(BSON("foo" << 1));
+            addIndex(BSON("bar" << 1 << "big" << 1));
+            addIndex(BSON("baz" << 1));
+
+            // Lower buffer limit to 10 * sizeof(big) to force memory error
+            // before hashed AND is done reading the second child (stage has to
+            // hold 11 keys in buffer for Foo <= 20 and Bar >= 10).
+            WorkingSet ws;
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, 10 * big.size()));
+
+            // Foo <= 20
+            IndexScanParams params;
+            params.descriptor = getIndex(BSON("foo" << 1), coll);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = -1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Bar >= 10
+            params.descriptor = getIndex(BSON("bar" << 1 << "big" << 1), coll);
+            params.bounds.startKey = BSON("" << 10 << "" << big);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // 5 <= baz <= 15
+            params.descriptor = getIndex(BSON("baz" << 1), coll);
+            params.bounds.startKey = BSON("" << 5);
+            params.bounds.endKey = BSON("" << 15);
+            params.bounds.endKeyInclusive = true;
+            params.direction = 1;
+            ah->addChild(new IndexScan(params, &ws, NULL));
+
+            // Stage execution should fail.
+            ASSERT_EQUALS(-1, countResults(ah.get()));
         }
     };
 
@@ -865,7 +1103,11 @@ namespace QueryStageAnd {
 
         void setupTests() {
             add<QueryStageAndHashInvalidation>();
+            add<QueryStageAndHashTwoLeaf>();
+            add<QueryStageAndHashTwoLeafFirstChildLargeKeys>();
+            add<QueryStageAndHashTwoLeafLastChildLargeKeys>();
             add<QueryStageAndHashThreeLeaf>();
+            add<QueryStageAndHashThreeLeafMiddleChildLargeKeys>();
             add<QueryStageAndHashWithNothing>();
             add<QueryStageAndHashProducesNothing>();
             add<QueryStageAndHashWithMatcher>();
