@@ -69,8 +69,8 @@ config_assign(CONFIG *dest, const CONFIG *src)
 	dest->popthreads = NULL;
 	dest->workers = NULL;
 
-	if (src->uri != NULL)
-		dest->uri = strdup(src->uri);
+	if (src->base_uri != NULL)
+		dest->base_uri = strdup(src->base_uri);
 	if (src->workload != NULL) {
 		dest->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD));
 		memcpy(dest->workload,
@@ -121,7 +121,7 @@ config_free(CONFIG *cfg)
 
 	free(cfg->ckptthreads);
 	free(cfg->popthreads);
-	free(cfg->uri);
+	free(cfg->base_uri);
 	free(cfg->workers);
 	free(cfg->workload);
 }
@@ -168,9 +168,10 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 {
 	WORKLOAD *workp;
 	WT_CONFIG_ITEM groupk, groupv, k, v;
-	WT_CONFIG_SCAN *group, *scan;
+	WT_CONFIG_PARSER *group, *scan;
 	int ret;
 
+	group = scan = NULL;
 	/* Allocate the workload array. */
 	if ((cfg->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD))) == NULL)
 		return (enomem(cfg));
@@ -185,11 +186,10 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	 * returned from the original string.
 	 */
 	if ((ret =
-	    wiredtiger_config_scan_begin(NULL, config, len, &group)) != 0)
+	    wiredtiger_config_parser_open(NULL, config, len, &group)) != 0)
 		goto err;
-	while ((ret =
-	    wiredtiger_config_scan_next(NULL, group, &groupk, &groupv)) == 0) {
-		if ((ret = wiredtiger_config_scan_begin(
+	while ((ret = group->next(group, &groupk, &groupv)) == 0) {
+		if ((ret = wiredtiger_config_parser_open(
 		    NULL, groupk.str, groupk.len, &scan)) != 0)
 			goto err;
 		
@@ -203,8 +203,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		}
 		workp = &cfg->workload[cfg->workload_cnt++];
 
-		while ((ret =
-		    wiredtiger_config_scan_next(NULL, scan, &k, &v)) == 0) {
+		while ((ret = scan->next(scan, &k, &v)) == 0) {
 			if (STRING_MATCH("count", k.str, k.len)) {
 				if ((workp->threads = v.val) <= 0)
 					goto err;
@@ -234,8 +233,10 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			ret = 0;
 		if (ret != 0 )
 			goto err;
-		if ((ret = wiredtiger_config_scan_end(NULL, scan)) != 0)
+		if ((ret = scan->close(scan)) != 0) {
+			scan = NULL;
 			goto err;
+		}
 
 		if (workp->insert == 0 &&
 		    workp->read == 0 && workp->update == 0)
@@ -243,12 +244,19 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		cfg->workers_cnt += (u_int)workp->threads;
 	}
 
-	if ((ret = wiredtiger_config_scan_end(NULL, group)) != 0)
+	if ((ret = group->close(group)) != 0) {
+		group = NULL;
 		goto err;
+	}
 
 	return (0);
 
-err:	fprintf(stderr,
+err:	if (group != NULL)
+		(void)group->close(group);
+	if (scan != NULL)
+		(void)scan->close(scan);
+		
+	fprintf(stderr,
 	    "invalid thread configuration or scan error: %.*s\n",
 	    (int)len, config);
 	return (EINVAL);
@@ -461,19 +469,17 @@ int
 config_opt_line(CONFIG *cfg, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
+	WT_CONFIG_PARSER *scan;
 	int ret, t_ret;
 
-
-	if ((ret = wiredtiger_config_scan_begin(
+	if ((ret = wiredtiger_config_parser_open(
 	    NULL, optstr, strlen(optstr), &scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
 
 	while (ret == 0) {
-		if ((ret =
-		    wiredtiger_config_scan_next(NULL, scan, &k, &v)) != 0) {
+		if ((ret = scan->next(scan, &k, &v)) != 0) {
 			/* Any parse error has already been reported. */
 			if (ret == WT_NOTFOUND)
 				ret = 0;
@@ -481,7 +487,7 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 		}
 		ret = config_opt(cfg, &k, &v);
 	}
-	if ((t_ret = wiredtiger_config_scan_end(NULL, scan)) != 0) {
+	if ((t_ret = scan->close(scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_end");
 		if (ret == 0)
 			ret = t_ret;

@@ -123,8 +123,8 @@ DEF_OPT_AS_CONFIG_STRING(table_config,
     "leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,",
     "table configuration string")
 DEF_OPT_AS_UINT32(table_count, 1,
-    "number of tables to run operations over. Operations are spread evenly "
-    "over the tables amongst all threads. Default 1, maximum 99.")
+    "number of tables to run operations over. Keys are divided evenly "
+    "over the tables. Default 1, maximum 99.")
 DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "entry is the total number of threads, and the 'insert', 'read' and "
     "'update' entries are the ratios of insert, read and update operations "

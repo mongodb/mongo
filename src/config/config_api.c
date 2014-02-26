@@ -8,89 +8,98 @@
 #include "wt_internal.h"
 
 /*
- * wiredtiger_config_get --
- *	Given a NULL-terminated list of configuration strings, find the final
- * value for a given string key (external API version).
+ * __config_parser_close --
+ *      WT_CONFIG_PARSER->close method.
  */
-int
-wiredtiger_config_get(WT_SESSION *wt_session,
-     WT_CONFIG_ARG *cfg_arg, const char *key, WT_CONFIG_ITEM *cval)
+static int
+__config_parser_close(WT_CONFIG_PARSER *wt_config_parser)
 {
-	WT_SESSION_IMPL *session;
-	const char **cfg;
+	WT_CONFIG_PARSER_IMPL *config_parser;
 
-	session = (WT_SESSION_IMPL *)wt_session;
+	config_parser = (WT_CONFIG_PARSER_IMPL *)wt_config_parser;
 
-	if ((cfg = (const char **)cfg_arg) == NULL)
-		return (WT_NOTFOUND);
-	return (__wt_config_gets(session, cfg, key, cval));
-}
+	if (config_parser == NULL)
+		return (EINVAL);
 
-/*
- * wiredtiger_config_strget --
- *	Given a single configuration string, find the final value for a given
- * string key (external API version).
- */
-int
-wiredtiger_config_strget(WT_SESSION *wt_session,
-    const char *config, const char *key, WT_CONFIG_ITEM *cval)
-{
-	const char *cfg_arg[] = { config, NULL };
-
-	return (wiredtiger_config_get(
-	    wt_session, (WT_CONFIG_ARG *)cfg_arg, key, cval));
-}
-
-/*
- * wiredtiger_config_scan_begin --
- *	Start a scan of a config string.
- */
-int
-wiredtiger_config_scan_begin(WT_SESSION *wt_session,
-    const char *str, size_t len, WT_CONFIG_SCAN **scanp)
-{
-	WT_CONFIG config, *scan;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-
-	/* Note: allocate memory last to avoid cleanup. */
-	WT_CLEAR(config);
-	WT_RET(__wt_config_initn(session, &config, str, len));
-	WT_RET(__wt_calloc_def(session, 1, &scan));
-	*scan = config;
-	*scanp = (WT_CONFIG_SCAN *)scan;
+	__wt_free(config_parser->session, config_parser);
 	return (0);
 }
 
 /*
- * wiredtiger_config_scan_end --
- *	End a scan of a config string.
+ * __config_parser_get --
+ *      WT_CONFIG_PARSER->search method.
  */
-int
-wiredtiger_config_scan_end(WT_SESSION *wt_session, WT_CONFIG_SCAN *scan)
+static int
+__config_parser_get(WT_CONFIG_PARSER *wt_config_parser,
+     const char *key, WT_CONFIG_ITEM *cval)
 {
-	WT_CONFIG *conf;
+	WT_CONFIG_PARSER_IMPL *config_parser;
 
-	WT_UNUSED(wt_session);
+	config_parser = (WT_CONFIG_PARSER_IMPL *)wt_config_parser;
 
-	conf = (WT_CONFIG *)scan;
-	__wt_free(conf->session, scan);
-	return (0);
+	if (config_parser == NULL)
+		return (EINVAL);
+
+	return (__wt_config_subgets(config_parser->session,
+	    &config_parser->config_item, key, cval));
 }
 
 /*
- * wiredtiger_config_scan_next --
- *	Get the next key/value pair from a config scan.
+ * __config_parser_next --
+ *	WT_CONFIG_PARSER->next method.
+ */
+static int
+__config_parser_next(WT_CONFIG_PARSER *wt_config_parser,
+     WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *cval)
+{
+	WT_CONFIG_PARSER_IMPL *config_parser;
+
+	config_parser = (WT_CONFIG_PARSER_IMPL *)wt_config_parser;
+
+	if (config_parser == NULL)
+		return (EINVAL);
+
+	return (__wt_config_next(&config_parser->config, key, cval));
+}
+
+/*
+ * wiredtiger_config_parser_open --
+ *	Create a configuration parser.
  */
 int
-wiredtiger_config_scan_next(WT_SESSION *wt_session,
-    WT_CONFIG_SCAN *scan, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+wiredtiger_config_parser_open(WT_SESSION *wt_session,
+    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp)
 {
-	WT_CONFIG *conf;
+	static const WT_CONFIG_PARSER stds = {
+		__config_parser_close,
+		__config_parser_next,
+		__config_parser_get
+	};
+	WT_CONFIG_ITEM config_item =
+	    { config, len, 0, WT_CONFIG_ITEM_STRING };
+	WT_CONFIG_PARSER_IMPL *config_parser;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(wt_session);
+	*config_parserp = NULL;
+	session = (WT_SESSION_IMPL *)wt_session;
 
-	conf = (WT_CONFIG *)scan;
-	return (__wt_config_next(conf, key, value));
+	WT_RET(__wt_calloc_def(session, 1, &config_parser));
+	config_parser->iface = stds;
+	config_parser->session = session;
+
+	/*
+	 * Setup a WT_CONFIG_ITEM to be used for get calls and a WT_CONFIG
+	 * structure for iterations through the configuration string.
+	 */
+	memcpy(&config_parser->config_item, &config_item, sizeof(config_item));
+	WT_ERR(__wt_config_initn(
+	    session, &config_parser->config, config, len));
+
+	if (ret == 0)
+		*config_parserp = (WT_CONFIG_PARSER *)config_parser;
+	else
+err:		__wt_free(session, config_parser);
+
+	return (ret);
 }

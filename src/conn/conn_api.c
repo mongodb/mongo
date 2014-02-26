@@ -105,11 +105,8 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.scr_free = __wt_ext_scr_free;
 	conn->extension_api.collator_config = ext_collator_config;
 	conn->extension_api.collate = ext_collate;
+	conn->extension_api.config_parser_open = __wt_ext_config_parser_open;
 	conn->extension_api.config_get = __wt_ext_config_get;
-	conn->extension_api.config_strget = __wt_ext_config_strget;
-	conn->extension_api.config_scan_begin = __wt_ext_config_scan_begin;
-	conn->extension_api.config_scan_end = __wt_ext_config_scan_end;
-	conn->extension_api.config_scan_next = __wt_ext_config_scan_next;
 	conn->extension_api.metadata_insert = __wt_ext_metadata_insert;
 	conn->extension_api.metadata_remove = __wt_ext_metadata_remove;
 	conn->extension_api.metadata_search = __wt_ext_metadata_search;
@@ -123,6 +120,7 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.transaction_notify = __wt_ext_transaction_notify;
 	conn->extension_api.transaction_oldest = __wt_ext_transaction_oldest;
 	conn->extension_api.transaction_visible = __wt_ext_transaction_visible;
+	conn->extension_api.version = wiredtiger_version;
 
 	return (&conn->extension_api);
 }
@@ -497,6 +495,20 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 	WT_UNUSED(cfg);
+
+	/*
+	 * Rollback all running transactions.
+	 * We do this as a separate pass because an active transaction in one
+	 * session could cause trouble when closing a file, even if that
+	 * session never referenced that file.
+	 */
+	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
+		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL) &&
+		    F_ISSET(&s->txn, TXN_RUNNING)) {
+			wt_session = &s->iface;
+			WT_TRET(wt_session->rollback_transaction(
+			    wt_session, NULL));
+		}
 
 	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
