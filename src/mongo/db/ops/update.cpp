@@ -529,8 +529,18 @@ namespace mongo {
 
         int numMatched = 0;
 
-        // NOTE: When doing a multi-update, we only store the locs of moved docs, since the
-        // runner will keep track of the rest.
+        // If the update was in-place, we may see it again.  This only matters if we're doing
+        // a multi-update; if we're not doing a multi-update we stop after one update and we
+        // won't see any more docs.
+        //
+        // For example: If we're scanning an index {x:1} and performing {$inc:{x:5}}, we'll keep
+        // moving the document forward and it will continue to reappear in our index scan.
+        // Unless the index is multikey, the underlying query machinery won't de-dup.
+        //
+        // If the update wasn't in-place we may see it again.  Our query may return the new
+        // document and we wouldn't want to update that.
+        //
+        // So, no matter what, we keep track of where the doc wound up.
         typedef unordered_set<DiskLoc, DiskLoc::Hasher> DiskLocSet;
         const scoped_ptr<DiskLocSet> updatedLocs(request.isMulti() ? new DiskLocSet : NULL);
 
@@ -599,7 +609,6 @@ namespace mongo {
                 uassertStatusOK(recoverFromYield(request, driver, collection));
 
             // We fill this with the new locs of moved doc so we don't double-update.
-            // NOTE: The runner will de-dup non-moved things.
             if (updatedLocs && updatedLocs->count(loc) > 0) {
                 continue;
             }
@@ -607,7 +616,7 @@ namespace mongo {
             // We count how many documents we scanned even though we may skip those that are
             // deemed duplicated. The final 'numMatched' and 'nscanned' numbers may differ for
             // that reason.
-            // XXX: pull this out of the plan.
+            // TODO: Do we want to pull this out of the underlying query plan?
             opDebug->nscanned++;
 
             // Found a matching document
@@ -714,7 +723,11 @@ namespace mongo {
                     docWasModified = true;
                     opDebug->fastmod = true;
                 }
+
                 newObj = oldObj;
+                if (updatedLocs) {
+                    updatedLocs->insert(loc);
+                }
             }
             else {
 
@@ -726,16 +739,10 @@ namespace mongo {
                                                                      opDebug);
                 uassertStatusOK(res.getStatus());
                 DiskLoc newLoc = res.getValue();
-
-                // If we are tracking updated DiskLocs because we are doing a multi-update, and
-                // if we've moved this object to a new location, make sure we don't apply that
-                // update again if our traversal picks the object again. NOTE: The runner takes
-                // care of deduping non-moved docs.
-                if (updatedLocs && (newLoc != loc)) {
+                docWasModified = true;
+                if (updatedLocs) {
                     updatedLocs->insert(newLoc);
                 }
-
-                docWasModified = true;
             }
 
             // Restore state after modification
