@@ -87,6 +87,14 @@
           <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
                 DiskId="1" KeyPath="yes" />
         </Component>
+      <?endif ?>
+    </DirectoryRef>
+    <DirectoryRef Id="SNMP">
+      <?if $(var.Edition) = Enterprise ?>
+      <Component Id="c_snmpReadme" Guid="B968FBAC-1813-4039-9FED-A607A0E4CBB3">
+          <File Id="f_snmpReadme" Name="README-snmp.txt" Source="$(var.EnterpriseBase)\docs\README-snmp.txt"
+                DiskId="1" KeyPath="yes" />
+        </Component>
         <Component Id="c_snmpConfMaster" Guid="0C8CAA6C-1473-4B14-9EE5-AF5A35B1DD8D">
           <File Id="f_snmpConfMaster" Name="mongod.conf.master" Source="$(var.EnterpriseBase)\docs\mongod.conf.master"
                 DiskId="1" KeyPath="yes" />
@@ -124,6 +132,7 @@
         <ComponentGroupRef Id="cg_EnterpriseBase" />
         <ComponentRef Id="c_snmp" />
         <ComponentRef Id="c_snmpPdb" />
+        <ComponentRef Id="c_snmpReadme" />
         <ComponentRef Id="c_snmpConfMaster" />
         <ComponentRef Id="c_snmpConfSubagent" />
         <ComponentRef Id="c_snmpMongodMib" />

@@ -32,6 +32,7 @@
       <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
           <Directory Id="BIN" Name="bin" />
+          <Directory Id="SNMP" Name="snmp" />
         </Directory>
       </Directory>
     </Directory>
