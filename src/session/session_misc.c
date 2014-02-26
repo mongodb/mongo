@@ -43,7 +43,7 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, const void *p)
  *	Discard any memory the session accumulated.
  */
 void
-__wt_session_fotxn_discard(WT_SESSION_IMPL *session, int final)
+__wt_session_fotxn_discard(WT_SESSION_IMPL *session, int connection_close)
 {
 	WT_FOTXN *fotxn;
 	uint64_t oldest_id;
@@ -59,7 +59,7 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session, int final)
 	    session->fotxn_cnt > 0 &&
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
 		if (fotxn->p != NULL &&
-		    (final || TXNID_LT(fotxn->txnid, oldest_id))) {
+		    (connection_close || TXNID_LT(fotxn->txnid, oldest_id))) {
 #ifdef HAVE_DIAGNOSTIC
 			/*
 			 * It's a bad thing if another thread is in this array
@@ -76,4 +76,6 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session, int final)
 			--session->fotxn_cnt;
 			__wt_free(session, fotxn->p);
 		}
+	if (connection_close)
+		__wt_free(session, session->fotxn);
 }
