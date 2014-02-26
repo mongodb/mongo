@@ -2102,7 +2102,7 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
-	int locked, ret, t_ret;
+	int locked, ret, tret;
 	const char *value;
 
 	*new_cursor = NULL;
@@ -2113,7 +2113,7 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	wtext = ds->wtext;
 	ws = NULL;
 	locked = 0;
-	ret = t_ret = 0;
+	ret = tret = 0;
 	value = NULL;
 
 	/* Allocate and initialize a cursor. */
@@ -2227,9 +2227,11 @@ err:		if (ws != NULL && locked)
 			ESET(unlock(wtext, session, &ws->lock));
 		cursor_destroy(cursor);
 	}
-	if (config_parser != NULL && (t_ret =
-	    (void)config_parser->close(config_parser)) != 0 && ret == 0)
-		ret = t_ret;
+	if (config_parser != NULL &&
+	    (tret = config_parser->close(config_parser)) != 0)
+		EMSG(wtext, session, tret,
+		    "WT_CONFIG_PARSER.close: %s", wtext->strerror(tret));
+
 	free((void *)value);
 	return (ret);
 }
