@@ -146,9 +146,9 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			/*
 			 * We don't publish the hazard pointer clear in the
 			 * general case.  It's not required for correctness;
-			 * it gives the page server thread faster access to the
+			 * it gives an eviction thread faster access to the
 			 * page were the page selected for eviction, but the
-			 * generation number was just set, so it's unlikely the
+			 * generation number was just set, it's unlikely the
 			 * page will be selected for eviction.
 			 */
 			hp->page = NULL;
