@@ -443,8 +443,10 @@ def runTest(test, result):
             path = argv[1]
     elif ext == ".js":
         argv = [shell_executable, "--port", mongod_port, '--authenticationMechanism', authMechanism]
-        if not use_write_commands:
-            argv += ["--useLegacyWriteOps"]
+        if use_write_commands:
+            argv += ["--writeMode", "commands"]
+        else:
+            argv += ["--writeMode", shell_write_mode]
         if not usedb:
             argv += ["--nodb"]
         if small_oplog or small_oplog_rs:
@@ -935,7 +937,7 @@ def set_globals(options, tests):
     global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
     global use_ssl, use_x509
     global file_of_commands_mode
-    global report_file, use_write_commands
+    global report_file, shell_write_mode, use_write_commands
     global temp_path
     start_mongod = options.start_mongod
     if hasattr(options, 'use_ssl'):
@@ -998,6 +1000,7 @@ def set_globals(options, tests):
     temp_path = options.temp_path
 
     use_write_commands = options.use_write_commands
+    shell_write_mode = options.shell_write_mode
 
 def file_version():
     return md5(open(__file__, 'r').read()).hexdigest()
@@ -1166,7 +1169,9 @@ def main():
                       help='Path to generate detailed json report containing all test details')
     parser.add_option('--use-write-commands', dest='use_write_commands', default=False,
                       action='store_true',
-                      help='Sets the shell to use write commands by default')
+                      help='Deprecated(use --shell-write-mode): Sets the shell to use write commands by default')
+    parser.add_option('--shell-write-mode', dest='shell_write_mode', default="legacy",
+                      help='Sets the shell to use a specific write mode: commands/compatibility/legacy (default:legacy)')
 
     global tests
     (options, tests) = parser.parse_args()
