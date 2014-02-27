@@ -8,7 +8,14 @@ documentUpgradeCheck = function(indexes, doc) {
     indexes.forEach(function(idx) {
         if (keyTooLong({index: idx, doc: doc})) {
             print("Document:\n\t" + tojson(doc) + "\n\tcannot be indexed by: " + idx.name);
-            print("Remove this document via the _id field");
+            if (idx.name === "_id_") {
+                print("As a result, this document cannot be removed by its _id index. Instead, " +
+                      "try to remove it by all other fields (omit any fields that have been " +
+                      "identified as unindexable by the upgrade checker).");
+            }
+            else {
+                print("Remove this document via the _id field");
+            }
             goodSoFar = false;
         }
     });
