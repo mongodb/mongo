@@ -61,8 +61,8 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
 	 * Get the oldest transaction ID not yet visible to a running
 	 * transaction.
 	 */
-	if (!connection_close)
-		oldest_id = S2C(session_safe)->txn_global.oldest_id;
+	oldest_id = connection_close ?
+	    WT_TXN_NONE : S2C(session_safe)->txn_global.oldest_id;
 
 	for (i = 0, fotxn = session->fotxn;
 	    session->fotxn_cnt > 0 &&
