@@ -89,8 +89,8 @@
         </Component>
       <?endif ?>
     </DirectoryRef>
-    <DirectoryRef Id="SNMP">
-      <?if $(var.Edition) = Enterprise ?>
+    <?if $(var.Edition) = Enterprise ?>
+      <DirectoryRef Id="SNMP">
       <Component Id="c_snmpReadme" Guid="B968FBAC-1813-4039-9FED-A607A0E4CBB3">
           <File Id="f_snmpReadme" Name="README-snmp.txt" Source="$(var.EnterpriseBase)\docs\README-snmp.txt"
                 DiskId="1" KeyPath="yes" />
@@ -111,8 +111,8 @@
           <File Id="f_snmpMongodbincMib" Name="MONGODBINC-MIB.txt" Source="$(var.EnterpriseBase)\docs\MONGODBINC-MIB.txt"
                 DiskId="1" KeyPath="yes" />
         </Component>
-      <?endif ?>
-    </DirectoryRef>
+      </DirectoryRef>
+    <?endif ?>
 
     <!--
     Only use VC redistributable on builds with /MD - for now, just Enterprise 
