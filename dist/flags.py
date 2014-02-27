@@ -32,6 +32,7 @@ flags = {
 	'page_read' : [
 		'READ_CACHE_ONLY',
 		'READ_NO_BUMP',
+		'READ_NO_WAIT',
 	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',

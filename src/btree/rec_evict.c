@@ -336,7 +336,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 				WT_RET(__rec_review(session, ref, ref->page,
 				    exclusive, merge, 0, inmem_split, istree));
 				break;
-			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 				return (EBUSY);

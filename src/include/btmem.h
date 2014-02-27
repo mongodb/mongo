@@ -410,10 +410,6 @@ struct __wt_page {
  *	row-store leaf pages without reading them if they don't reference
  *	overflow items.
  *
- * WT_REF_EVICT_WALK:
- *	The next page to be walked for LRU eviction.  This page is available
- *	for reads but not eviction.
- *
  * WT_REF_LOCKED:
  *	Locked for exclusive access.  In eviction, this page or a parent has
  *	been selected for eviction; once hazard pointers are checked, the page
@@ -452,7 +448,6 @@ struct __wt_page {
 enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
-	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
 	WT_REF_READING			/* Page being read */

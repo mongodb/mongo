@@ -64,7 +64,6 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 			(*visit)(page, ref, state);
 			break;
 
-		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 		case WT_REF_READING:
 		WT_ILLEGAL_VALUE(session);

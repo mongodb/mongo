@@ -634,10 +634,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 
 		/*
 		 * The second pass walks all cache internal pages, waiting for
-		 * concurrent activity to be resolved.  We don't acquire hazard
-		 * references in this pass, using the EVICT_WALK state prevents
-		 * eviction from getting underneath an internal page that is
-		 * being evicted.
+		 * concurrent activity to be resolved.
 		 */
 		flags = WT_TREE_EVICT | WT_TREE_SKIP_LEAF | WT_TREE_WAIT;
 		WT_ERR(__wt_tree_walk(session, &page, flags));

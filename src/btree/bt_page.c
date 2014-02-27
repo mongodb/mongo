@@ -47,14 +47,15 @@ __wt_page_in_func(
 			WT_RET(__wt_cache_read(session, parent, ref));
 			oldgen = F_ISSET(session, WT_SESSION_NO_CACHE) ? 1 : 0;
 			continue;
-		case WT_REF_LOCKED:
 		case WT_REF_READING:
-			/*
-			 * The page is being read or considered for eviction --
-			 * wait for that to be resolved.
-			 */
+			if (LF_ISSET(WT_READ_CACHE_ONLY))
+				return (WT_NOTFOUND);
+			/* FALLTHROUGH */
+		case WT_REF_LOCKED:
+			if (LF_ISSET(WT_READ_NO_WAIT))
+				return (WT_NOTFOUND);
+			/* The page is busy -- wait. */
 			break;
-		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 			/*
 			 * The page is in memory: get a hazard pointer, update
