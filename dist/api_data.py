@@ -609,7 +609,7 @@ methods = {
 	Config('create', 'false', r'''
 	    create the database if it does not exist''',
 	    type='boolean'),
-	Config('direct_io', 'checkpoint', r'''
+	Config('direct_io', '', r'''
 	    Use \c O_DIRECT to access files.  Options are given as a list,
 	    such as <code>"direct_io=[data]"</code>.  Configuring
 	    \c direct_io requires care, see @ref

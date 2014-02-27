@@ -606,17 +606,14 @@ process(void)
 	const char *key, *value;
 	WT_SESSION *session;
 	char config[256];
-	uint32_t config_offset;
 
 	/* Salvage. */
-	config_offset = 0;
 	config[0] = '\0';
 	if (verbose)
-		config_offset += (uint32_t)snprintf(config, sizeof(config),
+		(void)snprintf(config, sizeof(config),
 		    "error_prefix=\"%s\",verbose=[salvage,verify],",
 		    progname);
-	snprintf(config + config_offset, sizeof(config) - config_offset,
-	    "log=(enabled=false),buffer_alignment=%d", PSIZE);
+	strcat(config, "log=(enabled=false)");
 
 	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);

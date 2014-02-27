@@ -1494,7 +1494,7 @@ struct __wt_connection {
  * list\, such as <code>"direct_io=[data]"</code>. Configuring \c direct_io
  * requires care\, see @ref tuning_system_buffer_cache_direct_io for important
  * warnings., a list\, with values chosen from the following options: \c
- * "checkpoint"\, \c "data"\, \c "log"; default \c checkpoint.}
+ * "checkpoint"\, \c "data"\, \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
