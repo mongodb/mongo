@@ -245,11 +245,23 @@ namespace mongo {
             return;
         }
 
-        _conn->auth(BSON(saslCommandUserDBFieldName << getAuthenticationDatabase() <<
-                         saslCommandUserFieldName << toolGlobalParams.username <<
-                         saslCommandPasswordFieldName << toolGlobalParams.password  <<
-                         saslCommandMechanismFieldName <<
-                         toolGlobalParams.authenticationMechanism));
+        BSONObjBuilder authParams;
+        authParams <<
+            saslCommandUserDBFieldName << getAuthenticationDatabase() <<
+            saslCommandUserFieldName << toolGlobalParams.username <<
+            saslCommandPasswordFieldName << toolGlobalParams.password  <<
+            saslCommandMechanismFieldName <<
+            toolGlobalParams.authenticationMechanism;
+
+        if (!toolGlobalParams.gssapiServiceName.empty()) {
+            authParams << saslCommandServiceNameFieldName << toolGlobalParams.gssapiServiceName;
+        }
+
+        if (!toolGlobalParams.gssapiHostName.empty()) {
+            authParams << saslCommandServiceHostnameFieldName << toolGlobalParams.gssapiHostName;
+        }
+
+        _conn->auth(authParams.obj());
     }
 
     BSONTool::BSONTool() : Tool() { }

@@ -33,6 +33,7 @@
 #include "pcrecpp.h"
 
 #include "mongo/base/status.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
@@ -114,6 +115,13 @@ namespace mongo {
                 moe::String, "authentication mechanism")
                                   .setDefault(moe::Value(std::string("MONGODB-CR")));
 
+        options->addOptionChaining("gssapiServiceName", "gssapiServiceName",
+                 moe::String,
+                "Service name to use when authenticating using GSSAPI/Kerberos")
+            .setDefault(moe::Value(std::string(saslDefaultServiceName)));
+
+        options->addOptionChaining("gssapiHostName", "gssapiHostName", moe::String,
+                "Remote host name to use for purpose of GSSAPI/Kerberos authentication");
 
         return Status::OK();
     }
@@ -223,6 +231,13 @@ namespace mongo {
                 params["authenticationMechanism"].as<string>();
         }
 
+        if (params.count("gssapiServiceName")) {
+            toolGlobalParams.gssapiServiceName = params["gssapiServiceName"].as<string>();
+        }
+
+        if (params.count("gssapiHostName")) {
+            toolGlobalParams.gssapiHostName = params["gssapiHostName"].as<string>();
+        }
         if (params.count("verbose")) {
             logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
         }

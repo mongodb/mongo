@@ -55,6 +55,8 @@ namespace mongo {
         std::string password;
         std::string authenticationDatabase;
         std::string authenticationMechanism;
+        std::string gssapiServiceName;
+        std::string gssapiHostName;
 
         bool quiet;
         bool canUseStdout;
