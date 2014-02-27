@@ -113,8 +113,10 @@ namespace mongo {
         if (!modExpr.isNumber()) {
             // TODO: Context for mod error messages would be helpful
             // include mod code, etc.
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Cannot increment with non-numeric argument: {"
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream() << "Cannot "
+                                        << (_mode == MODE_INC ? "increment" : "multiply")
+                                        << " with non-numeric argument: {"
                                         << modExpr << "}");
         }
 
@@ -191,7 +193,7 @@ namespace mongo {
         if (!_preparedState->elemFound.isNumeric()) {
             mb::Element idElem = mb::findFirstChildNamed(root, "_id");
             return Status(
-                ErrorCodes::BadValue,
+                ErrorCodes::TypeMismatch,
                 str::stream() << "Cannot apply "
                               << (_mode == MODE_INC ? "$inc" : "$mul")
                               << " to a value of non-numeric type. {"
