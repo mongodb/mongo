@@ -16,6 +16,9 @@ env['WIXCANDLE'] = r'$WIXPATH\candle.exe'
 env['WIXLIGHT'] = r'$WIXPATH\light.exe'
 env['WIXUIEXT'] = r'$WIXPATH\WixUIExtension.dll'
 env['MERGEMODULESBASEPATH'] = os.environ.get('MERGEMODULESBASEPATH')
+if env['MERGEMODULESBASEPATH'] == None and os.environ.get('ProgramFiles(x86)') != None:
+    env['MERGEMODULESBASEPATH'] = (os.environ.get('ProgramFiles(x86)') +
+            r"\Common Files\Merge Modules")
 
 sources = [ "wxs/BinaryFragment.wxs",
             "wxs/FeatureFragment.wxs",
@@ -31,11 +34,11 @@ buildDir = Dir(env["BUILD_DIR"]).path
 
 enterprisebase = 'src\mongo\db\modules\enterprise'
 
-# Set up parameters to pass to wix - 
+# Set up parameters to pass to wix -
 #
 # msi_edition - "Enterprise" or "Standard"
 # msi_platform - "x64" or "x86"
-# msi_flavor - "2008R2Plus" or "" 
+# msi_flavor - "2008R2Plus" or ""
 #
 
 
@@ -53,7 +56,7 @@ else:
     msi_flavor = ''
   else:
     msi_platform = 'x64'
-    if env.get('WIN_VERSION_MIN') == 'ws08r2':
+    if env.get('WIN_VERSION_MIN') == 'ws08r2' or env.get('WIN_VERSION_MIN') == 'win7':
       msi_flavor = '2008R2Plus'
     else:
       msi_flavor = 'Legacy'
@@ -66,7 +69,7 @@ else:
   objects.append("$BUILD_DIR/msi/Installer.wixobj")
 
 # candle: compile .wxs files into .wixobjs
-env.Command(objects, 
+env.Command(objects,
             sources,
             '"$WIXCANDLE" -wx'
             # cannot have anything other than x.x.x.x in version string.

@@ -7,7 +7,7 @@
            Manufacturer="MongoDB" 
            UpgradeCode="$(var.UpgradeCode)">
 
-		<Package InstallerVersion="200" Compressed="yes" />
+    <Package InstallerVersion="200" Compressed="yes" />
     <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion)" />
     <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
 
@@ -29,6 +29,12 @@
     <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />
   More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
     -->
+
+    <Property Id="ARPPRODUCTICON" Value="MongoDBIcon" />
+    <Property Id="ARPHELPLINK" Value="http://www.mongodb.org/" />
+    <Property Id="ARPURLINFOABOUT" Value="http://www.mongodb.org/" />
+
+    <Icon Id="MongoDBIcon" SourceFile="$(var.ProjectDir)Installer_Icon_32x32.ico" />
 
     <FeatureGroupRef Id="fg_MongoDBAll" />
     
