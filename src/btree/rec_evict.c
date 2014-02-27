@@ -312,7 +312,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 		 * assume a non-NULL reference on the queue is pointing at
 		 * valid memory.
 		 */
-		__wt_evict_list_clr_page(session, page);
+		__wt_evict_list_clear_page(session, page);
 	}
 
 	/*

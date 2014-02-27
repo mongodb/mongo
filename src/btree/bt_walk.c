@@ -160,9 +160,10 @@ int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_PAGE *couple, *page;
 	WT_REF *ref;
-	uint32_t slot;
+	uint32_t read_flags, slot;
 	int cache, compact, discard, eviction, prev, set_read_gen;
 	int skip, skip_intl, skip_leaf;
 
@@ -177,6 +178,15 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
 	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
 	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
+
+	/* XXX Fix up the eviction flag. */
+	read_flags = 0;
+	cache = cache || eviction;
+	if (cache)
+		read_flags |= WT_READ_CACHE_ONLY;
+	if (eviction)
+		read_flags |= WT_READ_NO_BUMP;
+	eviction = 0;
 
 	/*
 	 * Ordinary walks use hazard-pointer coupling through the tree and
@@ -280,7 +290,8 @@ ascend:	/*
 					    __wt_page_release(session, couple));
 				else
 					WT_RET(__wt_page_swap(
-					    session, couple, page, page->ref));
+					    session, couple, page, page->ref,
+					    read_flags));
 			}
 
 			*pagep = page;
@@ -326,35 +337,25 @@ retry:				if (ref->state != WT_REF_MEM ||
 					    ref->state == WT_REF_DISK)
 						break;
 
-					/*
-					 * A walk to checkpoint the file may
-					 * collide with the current LRU
-					 * eviction walk.
-					 *
-					 * If so, clear the LRU walk, or the
-					 * checkpoint will be blocked until the
-					 * eviction thread next wakes up and
-					 * decides to search for some more
-					 * pages to evict.
-					 */
-					__wt_evict_clear_tree_walk(
-					    session, NULL);
+					WT_ASSERT(session,
+					    ref->state != WT_REF_EVICT_WALK);
 					__wt_yield();
 					goto retry;
 				}
 			} else if (cache) {
-				/*
-				 * Only look at unlocked pages in memory.
-				 * There is a race here, but worse case is that
-				 * the page will be read back in to cache.
-				 */
+				/* Only look at unlocked pages in memory. */
 				if (ref->state == WT_REF_DELETED ||
 				    ref->state == WT_REF_DISK ||
 				    (ref->state == WT_REF_LOCKED &&
 				    !LF_ISSET(WT_TREE_WAIT)))
 					break;
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				ret = __wt_page_swap(
+				    session, couple, page, ref, read_flags);
+				if (ret == WT_NOTFOUND) {
+					ret = 0;
+					break;
+				}
+				WT_RET(ret);
 			} else if (discard) {
 				/*
 				 * If deleting a range, try to delete the page
@@ -364,8 +365,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 				    session, page, ref, &skip));
 				if (skip)
 					break;
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				WT_RET(__wt_page_swap(
+				    session, couple, page, ref, read_flags));
 			} else if (compact) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
@@ -398,8 +399,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 					if (skip)
 						break;
 				}
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				WT_RET(__wt_page_swap(
+				    session, couple, page, ref, read_flags));
 				if (set_read_gen)
 					ref->page->read_gen =
 					    WT_READ_GEN_OLDEST;
@@ -412,8 +413,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 				if (skip)
 					break;
 
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				WT_RET(__wt_page_swap(
+				    session, couple, page, ref, read_flags));
 			}
 
 			couple = page = ref->page;

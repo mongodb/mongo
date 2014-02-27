@@ -29,6 +29,10 @@ flags = {
 		'LOG_DSYNC',
 		'LOG_FSYNC'
 	],
+	'page_read' : [
+		'READ_CACHE_ONLY',
+		'READ_NO_BUMP',
+	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',

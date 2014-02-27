@@ -1147,7 +1147,7 @@ __slvg_col_build_leaf(
 	WT_CLEAR(*cookie);
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_RET(__wt_page_in(session, parent, ref));
+	WT_RET(__wt_page_in(session, parent, ref, 0));
 	page = ref->page;
 	save_col_var = page->u.col_var.d;
 	save_entries = page->entries;
@@ -1739,7 +1739,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_ERR(__wt_page_in(session, parent, ref));
+	WT_ERR(__wt_page_in(session, parent, ref, 0));
 	page = ref->page;
 
 	/*

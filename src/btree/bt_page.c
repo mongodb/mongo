@@ -22,7 +22,7 @@ static int  __inmem_row_leaf_entries(
  */
 int
 __wt_page_in_func(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -36,6 +36,9 @@ __wt_page_in_func(
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
+			if (LF_ISSET(WT_READ_CACHE_ONLY))
+				return (WT_NOTFOUND);
+
 			/*
 			 * The page isn't in memory, attempt to read it.
 			 * Make sure there is space in the cache.
@@ -78,7 +81,8 @@ __wt_page_in_func(
 			 * That is, if the updates on the page are visible to
 			 * the running transaction.
 			 */
-			if (force_attempts < 10 &&
+			if (!LF_ISSET(WT_READ_NO_BUMP) &&
+			    force_attempts < 10 &&
 			    __wt_eviction_force_check(session, page) &&
 			    __wt_eviction_force_txn_check(session, page)) {
 				++force_attempts;
@@ -101,7 +105,8 @@ __wt_page_in_func(
 			 */
 			if (oldgen && page->read_gen == WT_READ_GEN_NOTSET)
 				page->read_gen = WT_READ_GEN_OLDEST;
-			else if (page->read_gen < __wt_cache_read_gen(session))
+			else if (!LF_ISSET(WT_READ_NO_BUMP) &&
+			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
 				    __wt_cache_read_gen_set(session);
 

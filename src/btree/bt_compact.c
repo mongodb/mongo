@@ -115,7 +115,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	__wt_spin_lock(session, &conn->checkpoint_lock);
 	conn->compact_in_memory_pass = 1;
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
-	__wt_evict_file_exclusive_on(session);
+	WT_RET(__wt_evict_file_exclusive_on(session));
 	__wt_evict_file_exclusive_off(session);
 
 	/* Start compaction. */

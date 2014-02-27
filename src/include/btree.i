@@ -618,8 +618,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
  * coupling up/down the tree.
  */
 static inline int
-__wt_page_swap_func(
-    WT_SESSION_IMPL *session, WT_PAGE *out, WT_PAGE *in, WT_REF *inref
+__wt_page_swap_func(WT_SESSION_IMPL *session,
+    WT_PAGE *out, WT_PAGE *in, WT_REF *inref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -633,15 +633,19 @@ __wt_page_swap_func(
 	 * pointer coupling so we never leave a hazard pointer dangling.  The
 	 * assumption is we're holding a hazard pointer on "out", and want to
 	 * read page "in", acquiring a hazard pointer on it, then release page
-	 * "out" and its hazard pointer.  If something fails, discard it all.
+	 * "out" and its hazard pointer.
+	 *
+	 * If something fails, discard it all, except in the expected case of
+	 * WT_NOTFOUND when doing a cache-only read.
 	 */
-	ret = __wt_page_in_func(session, in, inref
+	ret = __wt_page_in_func(session, in, inref, flags
 #ifdef HAVE_DIAGNOSTIC
 	    , file, line
 #endif
 	    );
 	acquired = ret == 0;
-	WT_TRET(__wt_page_release(session, out));
+	if (!(LF_ISSET(WT_READ_CACHE_ONLY) && ret == WT_NOTFOUND))
+		WT_TRET(__wt_page_release(session, out));
 
 	if (ret != 0 && acquired)
 		WT_TRET(__wt_page_release(session, inref->page));

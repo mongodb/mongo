@@ -253,7 +253,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * checking code complains if we use WT_RET after a jump to an
 		 * error label.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref)) != 0)
+		if ((ret = __wt_page_swap(session, page, page, ref, 0)) != 0)
 			return (ret);
 		page = ref->page;
 	}
@@ -411,7 +411,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * Swap the parent page for the child page; return on error,
 		 * the swap function ensures we're holding nothing on failure.
 		 */
-		WT_RET(__wt_page_swap(session, page, page, ref));
+		WT_RET(__wt_page_swap(session, page, page, ref, 0));
 		page = ref->page;
 	}
 
