@@ -91,9 +91,6 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		 * find here is the page for us to use.)
 		 */
 		if (ref->page == hp->page && ref->state == WT_REF_MEM) {
-			WT_VERBOSE_RET(session, hazard,
-			    "session %p hazard %p: set", session, ref->page);
-
 			++session->nhazard;
 			return (0);
 		}
@@ -149,9 +146,9 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			/*
 			 * We don't publish the hazard pointer clear in the
 			 * general case.  It's not required for correctness;
-			 * it gives the page server thread faster access to the
+			 * it gives an eviction thread faster access to the
 			 * page were the page selected for eviction, but the
-			 * generation number was just set, so it's unlikely the
+			 * generation number was just set, it's unlikely the
 			 * page will be selected for eviction.
 			 */
 			hp->page = NULL;

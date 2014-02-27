@@ -467,7 +467,7 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 
 /*
  * __wt_evict_file --
- *	Flush pages for a specific file as part of a close operation.
+ *	Discard pages for a specific file.
  */
 int
 __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
@@ -564,8 +564,7 @@ err:		/* On error, clear any left-over tree walk. */
 
 /*
  * __wt_sync_file --
- *	Flush pages for a specific file as part of a checkpoint or compaction
- * operation.
+ *	Flush pages for a specific file.
  */
 int
 __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
