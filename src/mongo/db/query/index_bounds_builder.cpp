@@ -254,7 +254,22 @@ namespace mongo {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else if (MatchExpression::NOT == expr->matchType()) {
-            if (Indexability::nodeCanUseIndexOnOwnField(expr->getChild(0))) {
+            MatchExpression* child = expr->getChild(0);
+
+            // If we have a NOT -> EXISTS, we must handle separately.
+            if (MatchExpression::EXISTS == child->matchType()) {
+                // We should never try to use a sparse index for $exists:false.
+                invariant(!index.sparse);
+                BSONObjBuilder bob;
+                bob.appendNull("");
+                bob.appendNull("");
+                BSONObj dataObj = bob.obj();
+                oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+                
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+                return;
+            }
+            else if (Indexability::nodeCanUseIndexOnOwnField(child)) {
                 // We have a NOT of a bounds-generating expression. Get the
                 // bounds of the NOT's child and then complement them.
                 translate(expr->getChild(0), elt, index, oilOut, tightnessOut);
@@ -268,6 +283,43 @@ namespace mongo {
                 // and the query is {a: {$elemMatch: {$not: {$gte: 6}}}}.
                 oilOut->intervals.push_back(allValues());
                 *tightnessOut = INEXACT_FETCH;
+            }
+        }
+        else if (MatchExpression::EXISTS == expr->matchType()) {
+            // We only handle the {$exists:true} case, as {$exists:false}
+            // will have been translated to {$not:{ $exists:true }}.
+            //
+            // Documents with a missing value are stored *as if* they were
+            // explicitly given the value 'null'.  Given:
+            //    X = { b : 1 }
+            //    Y = { a : null, b : 1 }
+            // X and Y look identical from within a standard index on { a : 1 }.
+            // HOWEVER a sparse index on { a : 1 } will treat X and Y differently,
+            // storing Y and not storing X.
+            //
+            // We can safely use an index in the following cases:
+            // {a:{ $exists:true }} - normal index helps, but we must still fetch
+            // {a:{ $exists:true }} - sparse index is exact
+            // {a:{ $exists:false }} - normal index requires a fetch
+            // {a:{ $exists:false }} - sparse indexes cannot be used at all.
+            //
+            // Noted in SERVER-12869, in case this ever changes some day.
+            if (index.sparse) {
+                oilOut->intervals.push_back(allValues());
+                // A sparse, compound index on { a:1, b:1 } will include entries
+                // for all of the following documents:
+                //    { a:1 }, { b:1 }, { a:1, b:1 }
+                // So we must use INEXACT bounds in this case.
+                if ( 1 < index.keyPattern.nFields() ) {
+                    *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+                }
+                else {
+                    *tightnessOut = IndexBoundsBuilder::EXACT;
+                }
+            }
+            else {
+                oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             }
         }
         else if (MatchExpression::EQ == expr->matchType()) {

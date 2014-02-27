@@ -451,7 +451,7 @@ namespace {
     TEST_F(QueryPlannerTest, ExistsTrue) {
         addIndex(BSON("x" << 1));
 
-        runQuery(fromjson("{x: 1, y: {$exists: true}}"));
+        runQuery(fromjson("{x: {$exists: true}}"));
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
@@ -461,7 +461,7 @@ namespace {
     TEST_F(QueryPlannerTest, ExistsFalse) {
         addIndex(BSON("x" << 1));
 
-        runQuery(fromjson("{x: 1, y: {$exists: false}}"));
+        runQuery(fromjson("{x: {$exists: false}}"));
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
@@ -471,7 +471,7 @@ namespace {
     TEST_F(QueryPlannerTest, ExistsTrueSparseIndex) {
         addIndex(BSON("x" << 1), false, true);
 
-        runQuery(fromjson("{x: 1, y: {$exists: true}}"));
+        runQuery(fromjson("{x: {$exists: true}}"));
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
@@ -479,6 +479,45 @@ namespace {
     }
 
     TEST_F(QueryPlannerTest, ExistsFalseSparseIndex) {
+        addIndex(BSON("x" << 1), false, true);
+
+        runQuery(fromjson("{x: {$exists: false}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    TEST_F(QueryPlannerTest, ExistsTrueOnUnindexedField) {
+        addIndex(BSON("x" << 1));
+
+        runQuery(fromjson("{x: 1, y: {$exists: true}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ExistsFalseOnUnindexedField) {
+        addIndex(BSON("x" << 1));
+
+        runQuery(fromjson("{x: 1, y: {$exists: false}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ExistsTrueSparseIndexOnOtherField) {
+        addIndex(BSON("x" << 1), false, true);
+
+        runQuery(fromjson("{x: 1, y: {$exists: true}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ExistsFalseSparseIndexOnOtherField) {
         addIndex(BSON("x" << 1), false, true);
 
         runQuery(fromjson("{x: 1, y: {$exists: false}}"));

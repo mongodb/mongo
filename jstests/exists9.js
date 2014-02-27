@@ -25,8 +25,7 @@ assert.eq( 1, t.count( {a:{$exists:false}} ) );
 t.ensureIndex( {a:1} );
 assert.eq( 1, t.find( {a:{$exists:true}} ).hint( {a:1} ).itcount() );
 assert.eq( 1, t.find( {a:{$exists:false}} ).hint( {a:1} ).itcount() );
-// An {$exists: false} requires a collection scan.
-assert.eq( 2, t.find( {a:{$exists:false}} ).hint( {a:1} ).explain().nscanned );
+assert.eq( 1, t.find( {a:{$exists:false}} ).hint( {a:1} ).explain().nscanned );
 
 t.drop();
 
