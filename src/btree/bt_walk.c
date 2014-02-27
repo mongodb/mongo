@@ -284,9 +284,8 @@ ascend:	/*
 			if (WT_PAGE_IS_ROOT(page))
 				WT_RET(__wt_page_release(session, couple));
 			else
-				WT_RET(__wt_page_swap(
-				    session, couple, page, page->ref,
-				    read_flags));
+				WT_RET(__wt_page_swap(session,
+				    couple, page, page->ref, read_flags));
 
 			*pagep = page;
 			return (0);
