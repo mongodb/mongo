@@ -652,6 +652,7 @@ def write_rpm_macros_file(path, topdir, release_dist):
     try:
         f.write("%%_topdir	%s\n" % topdir)
         f.write("%%dist	.%s\n" % release_dist)
+        f.write("%%%_use_internal_dependency_generator 0\n")
     finally:
         f.close()
 
