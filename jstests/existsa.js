@@ -24,8 +24,7 @@ function assertPrefix( prefix, str ) {
 
 /** @return count when hinting the index to use. */
 function hintedCount( query ) {
-    // SERVER-12262: $exists currently will never use an index.
-    //assertPrefix( indexCursorName, t.find( query ).hint( indexKeySpec ).explain().cursor );
+    assertPrefix( indexCursorName, t.find( query ).hint( indexKeySpec ).explain().cursor );
     return t.find( query ).hint( indexKeySpec ).itcount();
 }
 
@@ -35,25 +34,23 @@ function assertMissing( query, expectedMissing, expectedIndexedMissing ) {
     expectedIndexedMissing = expectedIndexedMissing || 0;
     assert.eq( expectedMissing, t.count( query ) );
     assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
-    // SERVER-12262: $exists currently will never use an index.
     // We also shouldn't get a different count depending on whether
     // an index is used or not.
-    // assert.eq( expectedIndexedMissing, hintedCount( query ) );
+    assert.eq( expectedIndexedMissing, hintedCount( query ) );
 }
 
 /** The query field exists and the sparse index is used without a hint. */
 function assertExists( query, expectedExists ) {
     expectedExists = expectedExists || 2;
     assert.eq( expectedExists, t.count( query ) );
-    assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
+    assert.eq( 0, t.find( query ).explain().cursor.indexOf('BtreeCursor') );
     // An $exists:true predicate generates no index filters.  Add another predicate on the index key
     // to trigger use of the index.
     andClause = {}
     andClause[ indexKeyField ] = { $ne:null };
     Object.extend( query, { $and:[ andClause ] } );
     assert.eq( expectedExists, t.count( query ) );
-    // SERVER-12262: $exists currently will never use an index.
-    // assertPrefix( indexCursorName, t.find( query ).explain().cursor );
+    assertPrefix( indexCursorName, t.find( query ).explain().cursor );
     assert.eq( expectedExists, hintedCount( query ) );
 }
 
@@ -82,21 +79,21 @@ assertMissing( { 'a.x':{ $exists:false } }, 2, 1 );
 // Currently a sparse index is disallowed even if the $exists:false query is on a different field.
 assertMissing( { b:{ $exists:false } }, 2, 1 );
 assertMissing( { b:{ $exists:false }, a:{ $ne:6 } }, 2, 1 );
+assertMissing( { b:{ $not:{ $exists:true } } }, 2, 1 );
 
-// Top level $exists:true queries match the proper number of documents and allow the sparse index.
+// Top level $exists:true queries match the proper number of documents
+// and use the sparse index on { a : 1 }.
 assertExists( { a:{ $exists:true } } );
-assertExists( { 'a.x':{ $exists:true } }, 1 );
-assertExists( { b:{ $exists:true } }, 1 );
-assertExists( { a:{ $not:{ $exists:false } } } );
 
 // Nested $exists queries match the proper number of documents and disallow the sparse index.
 assertExistsUnindexed( { $nor:[ { a:{ $exists:false } } ] } );
 assertExistsUnindexed( { $nor:[ { 'a.x':{ $exists:false } } ] }, 1 );
+assertExistsUnindexed( { a:{ $not:{ $exists:false } } } );
 
 // Nested $exists queries disallow the sparse index in some cases where it is not strictly
 // necessary to do so.  (Descriptive tests.)
 assertExistsUnindexed( { $nor:[ { b:{ $exists:false } } ] }, 1 );  // Unindexed field.
-assertExistsUnindexed( { $or:[ { a:{ $exists:true } } ] } );  // $exists:true not $exists:false.
+assertExists( { $or:[ { a:{ $exists:true } } ] } );  // $exists:true not $exists:false.
 
 // Behavior is similar with $elemMatch.
 t.drop();
@@ -106,13 +103,12 @@ t.save( { a:[ { b:1 } ] } );
 setIndex( 'a.b' );
 
 assertMissing( { a:{ $elemMatch:{ b:{ $exists:false } } } } );
-// A $elemMatch predicate is treated as nested, and the index is disallowed even for $exists:true.
-assertExistsUnindexed( { a:{ $elemMatch:{ b:{ $exists:true } } } } );
+// A $elemMatch predicate is treated as nested, and the index should be used for $exists:true.
+assertExists( { a:{ $elemMatch:{ b:{ $exists:true } } } } );
 
 // A non sparse index will not be disallowed.
 t.drop();
 t.save( {} );
 t.ensureIndex( { a:1 } );
 assert.eq( 1, t.find( { a:{ $exists:false } } ).itcount() );
-// SERVER-12262: $exists currently will never use an index.
-//assert.eq( 'BtreeCursor a_1', t.find( { a:{ $exists:false } } ).explain().cursor );
+assert.eq( 'BtreeCursor a_1', t.find( { a:{ $exists:false } } ).explain().cursor );

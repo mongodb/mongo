@@ -8,45 +8,64 @@ t.save( {} );
 t.save( {b:1} );
 t.save( {b:null} );
 
-checkExists = function( query ) {
-    // Index range constraint on 'b' is universal, so a BasicCursor is the default cursor type.
+//---------------------------------
+
+function checkIndexUse( query, usesIndex, index, bounds ) {
     var x = t.find( query ).explain()
-    assert.eq( 'BasicCursor', x.cursor , tojson(x) );
-    // Index bounds include all elements.
+    if ( usesIndex ) {
+        assert.eq( x.cursor.indexOf(index), 0 , tojson(x) );
+        if ( ! x.indexBounds ) x.indexBounds = {}
+        assert.eq( bounds, x.indexBounds.b , tojson(x) );
+    }
+    else {
+        assert.eq( 'BasicCursor', x.cursor, tojson(x) );
+    }
+}
 
-    var x = t.find( query ).hint( {b:1} ).explain()
-    if ( ! x.indexBounds ) x.indexBounds = {}
-    // SERVER-12262: currently we never use an index for $exists queries.
-    // Tests which rely on an indexed solution being chosen are unsafe
-    // and should be moved into unit tests.
-    /*
-    assert.eq( [ [ { $minElement:1 }, { $maxElement:1 } ] ], x.indexBounds.b , tojson(x) );
-    // All keys must be scanned.
-    assert.eq( 3, t.find( query ).hint( {b:1} ).explain().nscanned );
+function checkExists( query, usesIndex, bounds ) {
+    checkIndexUse( query, usesIndex, 'BtreeCursor b_1', bounds );
+    // Whether we use an index or not, we will always scan all docs.
+    assert.eq( 3, t.find( query ).explain().nscanned );
     // 2 docs will match.
-    */
-    assert.eq( 2, t.find( query ).hint( {b:1} ).itcount() );
+    assert.eq( 2, t.find( query ).itcount() );
 }
-checkExists( {b:{$exists:true}} );
-checkExists( {b:{$not:{$exists:false}}} );
 
-checkMissing = function( query ) {
-    // SERVER-12262: currently we never use an index for $exists queries.
-    // Tests which rely on an indexed solution being chosen are unsafe
-    // and should be moved into unit tests.
-    /*
-    // Index range constraint on 'b' is not universal, so a BtreeCursor is the default cursor type.
-    assert.eq( 'BtreeCursor b_1', t.find( query ).explain().cursor );
-    // Scan null index keys.
-    assert.eq( [ [ null, null ] ], t.find( query ).explain().indexBounds.b );
-    // Two existing null keys will be scanned.
-    assert.eq( 2, t.find( query ).explain().nscanned );
-    */
-    // One doc is missing 'b'.
-    assert.eq( 1, t.find( query ).hint( {b:1} ).itcount() );
+function checkMissing( query, usesIndex, bounds ) {
+    checkIndexUse( query, usesIndex, 'BtreeCursor b_1', bounds );
+    // Nscanned changes based on index usage.
+    if ( usesIndex ) assert.eq( 2, t.find( query ).explain().nscanned );
+    else assert.eq( 3, t.find( query ).explain().nscanned );
+    // 1 doc is missing 'b'.
+    assert.eq( 1, t.find( query ).itcount() );
 }
-checkMissing( {b:{$exists:false}} );
-checkMissing( {b:{$not:{$exists:true}}} );
+
+function checkExistsCompound( query, usesIndex, bounds ) {
+    checkIndexUse( query, usesIndex, 'BtreeCursor', bounds );
+    if ( usesIndex ) assert.eq( 3, t.find( query ).explain().nscanned );
+    else assert.eq( 3, t.find( query ).explain().nscanned );
+    // 2 docs have a:1 and b:exists.
+    assert.eq( 2, t.find( query ).itcount() );
+}
+
+function checkMissingCompound( query, usesIndex, bounds ) {
+    checkIndexUse( query, usesIndex, 'BtreeCursor', bounds );
+    // two possible indexes to use
+    // 1 doc should match
+    assert.eq( 1, t.find( query ).itcount() );
+}
+
+//---------------------------------
+
+var allValues = [ [ { $minElement:1 }, { $maxElement:1 } ] ];
+var nullNull = [ [ null, null ] ];
+
+// Basic cases
+checkExists( {b:{$exists:true}}, true, allValues );
+// We change this to not -> not -> exists:true, and get allValue for bounds
+// but we use a BasicCursor?
+checkExists( {b:{$not:{$exists:false}}}, false, allValues );
+checkMissing( {b:{$exists:false}}, true, nullNull );
+checkMissing( {b:{$not:{$exists:true}}}, true, nullNull );
 
 // Now check existence of second compound field.
 t.ensureIndex( {a:1,b:1} );
@@ -54,34 +73,7 @@ t.save( {a:1} );
 t.save( {a:1,b:1} );
 t.save( {a:1,b:null} );
 
-checkExists = function( query ) {
-    // SERVER-12262: currently we never use an index for $exists queries.
-    // Tests which rely on an indexed solution being chosen are unsafe
-    // and should be moved into unit tests.
-    /*
-    // Index bounds include all elements.
-    assert.eq( [ [ { $minElement:1 }, { $maxElement:1 } ] ], t.find( query ).explain().indexBounds.b );
-    // All keys must be scanned.
-    assert.eq( 3, t.find( query ).explain().nscanned );
-    */
-    // 2 docs will match.
-    assert.eq( 2, t.find( query ).hint( {a:1,b:1} ).itcount() );
-}
-checkExists( {a:1,b:{$exists:true}} );
-checkExists( {a:1,b:{$not:{$exists:false}}} );
-
-checkMissing = function( query ) {
-    // SERVER-12262: currently we never use an index for $exists queries.
-    // Tests which rely on an indexed solution being chosen are unsafe
-    // and should be moved into unit tests.
-    /*
-    // Scan null index keys.
-    assert.eq( [ [ null, null ] ], t.find( query ).explain().indexBounds.b );
-    // Two existing null keys will be scanned.
-    assert.eq( 2, t.find( query ).explain().nscanned );
-    */
-    // One doc is missing 'b'.
-    assert.eq( 1, t.find( query ).hint( {a:1,b:1} ).itcount() );
-}
-checkMissing( {a:1,b:{$exists:false}} );
-checkMissing( {a:1,b:{$not:{$exists:true}}} );
+checkExistsCompound( {a:1,b:{$exists:true}}, true, allValues );
+checkExistsCompound( {a:1,b:{$not:{$exists:false}}}, true, allValues );
+checkMissingCompound( {a:1,b:{$exists:false}}, true, nullNull );
+checkMissingCompound( {a:1,b:{$not:{$exists:true}}}, true, nullNull );

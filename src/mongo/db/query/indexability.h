@@ -61,6 +61,7 @@ namespace mongo {
                    || me->matchType() == MatchExpression::TYPE_OPERATOR
                    || me->matchType() == MatchExpression::GEO
                    || me->matchType() == MatchExpression::GEO_NEAR
+                   || me->matchType() == MatchExpression::EXISTS
                    || me->matchType() == MatchExpression::TEXT;
         }
 
