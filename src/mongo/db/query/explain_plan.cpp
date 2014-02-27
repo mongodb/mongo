@@ -448,6 +448,8 @@ namespace mongo {
             AndHashStats* spec = static_cast<AndHashStats*>(stats.specific.get());
             bob->appendNumber("flaggedButPassed", spec->flaggedButPassed);
             bob->appendNumber("flaggedInProgress", spec->flaggedInProgress);
+            bob->appendNumber("memUsage", spec->memUsage);
+            bob->appendNumber("memLimit", spec->memLimit);
             for (size_t i = 0; i < spec->mapAfterChild.size(); ++i) {
                 bob->appendNumber(string(stream() << "mapAfterChild_" << i), spec->mapAfterChild[i]);
             }
@@ -520,6 +522,8 @@ namespace mongo {
         else if (STAGE_SORT == stats.stageType) {
             SortStats* spec = static_cast<SortStats*>(stats.specific.get());
             bob->appendNumber("forcedFetches", spec->forcedFetches);
+            bob->appendNumber("memUsage", spec->memUsage);
+            bob->appendNumber("memLimit", spec->memLimit);
         }
         else if (STAGE_SORT_MERGE == stats.stageType) {
             MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());

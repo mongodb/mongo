@@ -235,12 +235,22 @@ namespace mongo {
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
                 // Propagate this error to caller.
                 if (Runner::RUNNER_ERROR == state) {
+                    // Stats are helpful when errors occur.
+                    TypeExplain* bareExplain;
+                    Status res = runner->getInfo(&bareExplain, NULL);
+                    if (res.isOK()) {
+                        boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
+                        error() << "Runner error, stats:\n"
+                                << errorExplain->stats.jsonString(Strict, true);
+                    }
+
                     uasserted(17406, "getMore runner error: " +
                               WorkingSetCommon::toStatusString(obj));
                 }
 
                 // If we're dead there's no way to get more results.
                 saveClientCursor = false;
+
                 // In the old system tailable capped cursors would be killed off at the
                 // cursorid level.  If a tailable capped cursor is nuked the cursorid
                 // would vanish.
@@ -587,6 +597,13 @@ namespace mongo {
 
         // Caller expects exceptions thrown in certain cases.
         if (Runner::RUNNER_ERROR == state) {
+            TypeExplain* bareExplain;
+            Status res = runner->getInfo(&bareExplain, NULL);
+            if (res.isOK()) {
+                boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
+                error() << "Runner error, stats:\n"
+                        << errorExplain->stats.jsonString(Strict, true);
+            }
             uasserted(17144, "Runner error: " + WorkingSetCommon::toStatusString(obj));
         }
 

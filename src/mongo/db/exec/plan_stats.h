@@ -129,7 +129,9 @@ namespace mongo {
 
     struct AndHashStats : public SpecificStats {
         AndHashStats() : flaggedButPassed(0),
-                         flaggedInProgress(0) { }
+                         flaggedInProgress(0),
+                         memUsage(0),
+                         memLimit(0) { }
 
         virtual ~AndHashStats() { }
 
@@ -152,6 +154,12 @@ namespace mongo {
 
         // mapAfterChild[mapAfterChild.size() - 1] WSMswere match tested.
         // commonstats.advanced is how many passed.
+
+        // What's our current memory usage?
+        size_t memUsage;
+
+        // What's our memory limit?
+        size_t memLimit;
     };
 
     struct AndSortedStats : public SpecificStats {
@@ -303,7 +311,7 @@ namespace mongo {
     };
 
     struct SortStats : public SpecificStats {
-        SortStats() : forcedFetches(0) { }
+        SortStats() : forcedFetches(0), memUsage(0), memLimit(0) { }
 
         virtual ~SortStats() { }
 
@@ -314,6 +322,12 @@ namespace mongo {
 
         // How many records were we forced to fetch as the result of an invalidation?
         size_t forcedFetches;
+
+        // What's our current memory usage?
+        size_t memUsage;
+
+        // What's our memory limit?
+        size_t memLimit;
     };
 
     struct MergeSortStats : public SpecificStats {

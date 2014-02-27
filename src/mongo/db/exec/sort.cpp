@@ -432,6 +432,8 @@ namespace mongo {
 
     PlanStageStats* SortStage::getStats() {
         _commonStats.isEOF = isEOF();
+        _specificStats.memLimit = kMaxBytes;
+        _specificStats.memUsage = _memUsage;
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT));
         ret->specific.reset(new SortStats(_specificStats));
