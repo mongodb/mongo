@@ -55,7 +55,10 @@ namespace {
         LiteParsedQuery* lpqRaw;
         ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
                                         fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), false, &lpqRaw));
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
@@ -139,7 +142,10 @@ namespace {
         LiteParsedQuery* lpqRaw;
         ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
                                         fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), false, &lpqRaw));
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
@@ -233,7 +239,10 @@ namespace {
         LiteParsedQuery* lpqRaw;
         ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
                                         fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), false, &lpqRaw));
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
@@ -271,7 +280,10 @@ namespace {
         BSONObj sort = fromjson("{$natural: 1}");
         ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
                                         sort, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), false, &lpqRaw));
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
@@ -291,7 +303,10 @@ namespace {
         BSONObj sort = fromjson("{$natural: -1}");
         ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
                                         sort, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), false, &lpqRaw));
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
@@ -311,7 +326,10 @@ namespace {
         BSONObj hint = fromjson("{a: 1}");
         ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
                                         fromjson("{}"), hint, fromjson("{}"),
-                                        fromjson("{}"), false, &lpqRaw));
+                                        fromjson("{}"),
+                                        false, // snapshot
+                                        false, // explain
+                                        &lpqRaw));
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
@@ -331,7 +349,10 @@ namespace {
         bool snapshot = true;
         ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
                                         fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), snapshot, &lpqRaw));
+                                        fromjson("{}"),
+                                        snapshot,
+                                        false, // explain
+                                        &lpqRaw));
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;

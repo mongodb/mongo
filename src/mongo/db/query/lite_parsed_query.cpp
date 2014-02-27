@@ -48,6 +48,7 @@ namespace mongo {
                                  const BSONObj& hint,
                                  const BSONObj& minObj, const BSONObj& maxObj,
                                  bool snapshot,
+                                 bool explain,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_sort = sort;
@@ -55,6 +56,7 @@ namespace mongo {
         pq->_min = minObj;
         pq->_max = maxObj;
         pq->_snapshot = snapshot;
+        pq->_explain = explain;
 
         Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
         if (status.isOK()) { *out = pq.release(); }

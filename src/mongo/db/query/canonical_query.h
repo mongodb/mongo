@@ -71,7 +71,9 @@ namespace mongo {
                                    long long skip, long long limit,
                                    const BSONObj& hint,
                                    const BSONObj& minObj, const BSONObj& maxObj,
-                                   bool snapshot, CanonicalQuery** out);
+                                   bool snapshot,
+                                   bool explain,
+                                   CanonicalQuery** out);
 
         /**
          * Returns true if "query" describes an exact-match query on _id, possibly with

@@ -43,7 +43,9 @@ namespace {
         LiteParsedQuery* lpq = NULL;
         Status result = LiteParsedQuery::make("testns", 0, 1, 0, BSONObj(), BSONObj(),
                                               fromjson("{a: 1}"), BSONObj(),
-                                              BSONObj(), BSONObj(), false,
+                                              BSONObj(), BSONObj(),
+                                              false, // snapshot
+                                              false, // explain
                                               &lpq);
         ASSERT_OK(result);
     }
@@ -52,7 +54,9 @@ namespace {
         LiteParsedQuery* lpq = NULL;
         Status result = LiteParsedQuery::make("testns", 0, 1, 0, BSONObj(), BSONObj(),
                                               fromjson("{a: \"\"}"), BSONObj(),
-                                              BSONObj(), BSONObj(), false,
+                                              BSONObj(), BSONObj(),
+                                              false, // snapshot
+                                              false, // explain
                                               &lpq);
         ASSERT_NOT_OK(result);
     }
@@ -62,7 +66,9 @@ namespace {
         Status result = LiteParsedQuery::make("testns", 5, 6, 9, BSON( "x" << 5 ), BSONObj(),
                                               BSONObj(), BSONObj(),
                                               BSONObj(), BSONObj(),
-                                              false, &lpq);
+                                              false, // snapshot
+                                              false, // explain
+                                              &lpq);
         ASSERT_OK(result);
         ASSERT_EQUALS(BSON("x" << 5 ), lpq->getFilter());
     }
@@ -72,7 +78,9 @@ namespace {
         Status result = LiteParsedQuery::make("testns", 5, 6, 9, BSON( "x" << 5 ), BSONObj(),
                                               BSONObj(), BSONObj(),
                                               BSONObj(), BSONObj(),
-                                              false, &lpq);
+                                              false, // snapshot
+                                              false, // explain
+                                              &lpq);
         ASSERT_OK(result);
         ASSERT_EQUALS(6, lpq->getNumToReturn());
         ASSERT(lpq->wantMore());
@@ -81,7 +89,9 @@ namespace {
         result = LiteParsedQuery::make("testns", 5, -6, 9, BSON( "x" << 5 ), BSONObj(),
                                        BSONObj(), BSONObj(),
                                        BSONObj(), BSONObj(),
-                                       false, &lpq);
+                                       false, // snapshot
+                                       false, // explain
+                                       &lpq);
         ASSERT_OK(result);
         ASSERT_EQUALS(6, lpq->getNumToReturn());
         ASSERT(!lpq->wantMore());
@@ -92,7 +102,9 @@ namespace {
         Status result = LiteParsedQuery::make("testns", 0, 0, 0, BSONObj(), BSONObj(),
                                               BSONObj(), BSONObj(),
                                               fromjson("{a: 1}"), fromjson("{b: 1}"),
-                                              false, &lpq);
+                                              false, // snapshot
+                                              false, // explain
+                                              &lpq);
         ASSERT_NOT_OK(result);
     }
 
@@ -101,7 +113,9 @@ namespace {
         Status result = LiteParsedQuery::make("testns", 0, 0, 0, BSONObj(), BSONObj(),
                                               BSONObj(), BSONObj(),
                                               fromjson("{a: 1, b: 1}"), fromjson("{a: 1}"),
-                                              false, &lpq);
+                                              false, // snapshot
+                                              false, // explain
+                                              &lpq);
         ASSERT_NOT_OK(result);
     }
 
@@ -110,7 +124,9 @@ namespace {
         Status result = LiteParsedQuery::make("testns", 0, 0, 0, BSONObj(), BSONObj(),
                                               BSONObj(), BSONObj(),
                                               fromjson("{a: 1}"), fromjson("{a: 1, b: 1}"),
-                                              false, &lpq);
+                                              false, // snapshot
+                                              false, // explain
+                                              &lpq);
         ASSERT_NOT_OK(result);
     }
 
@@ -119,7 +135,10 @@ namespace {
     Status makeLiteParsedQuery(const BSONObj& query, const BSONObj& proj, const BSONObj& sort) {
         LiteParsedQuery* lpqRaw;
         Status result = LiteParsedQuery::make("testns", 0, 0, 0, query, proj, sort, BSONObj(),
-                                              BSONObj(), BSONObj(), false, &lpqRaw);
+                                              BSONObj(), BSONObj(),
+                                              false, // snapshot
+                                              false, // explain
+                                              &lpqRaw);
         if (result.isOK()) {
             boost::scoped_ptr<LiteParsedQuery> lpq(lpqRaw);
         }
