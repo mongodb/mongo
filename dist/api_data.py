@@ -613,7 +613,12 @@ methods = {
 	    Use \c O_DIRECT to access files.  Options are given as a list,
 	    such as <code>"direct_io=[data]"</code>.  Configuring
 	    \c direct_io requires care, see @ref
-	    tuning_system_buffer_cache_direct_io for important warnings''',
+	    tuning_system_buffer_cache_direct_io for important warnings.
+		Including \c "data" will cause WiredTiger data files to use
+		\c O_DIRECT, including \c "log" will cause WiredTiger log files
+		to use \c O_DIRECT, and including \c "checkpoint" will cause
+		WiredTiger data files opened at a checkpoint (i.e: read only) to
+		use \c O_DIRECT''',
 	    type='list', choices=['checkpoint', 'data', 'log']),
 	Config('extensions', '', r'''
 	    list of shared library extensions to load (using dlopen).

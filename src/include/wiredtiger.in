@@ -1493,8 +1493,12 @@ struct __wt_connection {
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
  * list\, such as <code>"direct_io=[data]"</code>. Configuring \c direct_io
  * requires care\, see @ref tuning_system_buffer_cache_direct_io for important
- * warnings., a list\, with values chosen from the following options: \c
- * "checkpoint"\, \c "data"\, \c "log"; default empty.}
+ * warnings.  Including \c "data" will cause WiredTiger data files to use \c
+ * O_DIRECT\, including \c "log" will cause WiredTiger log files to use \c
+ * O_DIRECT\, and including \c "checkpoint" will cause WiredTiger data files
+ * opened at a checkpoint (i.e: read only) to use \c O_DIRECT., a list\, with
+ * values chosen from the following options: \c "checkpoint"\, \c "data"\, \c
+ * "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
