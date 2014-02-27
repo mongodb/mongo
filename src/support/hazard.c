@@ -91,9 +91,6 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		 * find here is the page for us to use.)
 		 */
 		if (ref->page == hp->page && ref->state == WT_REF_MEM) {
-			WT_VERBOSE_RET(session, hazard,
-			    "session %p hazard %p: set", session, ref->page);
-
 			++session->nhazard;
 			return (0);
 		}
