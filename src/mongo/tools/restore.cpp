@@ -588,11 +588,13 @@ public:
             if (_curdb == "admin" && obj.hasField("credentials")) { // Treat non-admin db like 2.4
                 if (_serverAuthzVersion == AuthorizationManager::schemaVersion24) {
                     // v3 user, v1 system
-                    toolError() << "Server has authorization schema version " <<
-                            AuthorizationManager::schemaVersion24 << ", but found a schema "
-                            "version " << AuthorizationManager::schemaVersion26Final << " user: " <<
-                            obj.toString() << endl;
-                    exit(EXIT_FAILURE);
+                    uasserted(17407,
+                              mongoutils::str::stream()
+                                      << "Server has authorization schema version "
+                                      << AuthorizationManager::schemaVersion24
+                                      << ", but found a schema version "
+                                      << AuthorizationManager::schemaVersion26Final << " user: "
+                                      << obj.toString());
                 } else {
                     // v3 user, v3 system
                     if (mongoRestoreGlobalParams.drop && _users.count(UserName(obj["user"].String(),
@@ -626,11 +628,13 @@ public:
                     // v1 user, v3 system
                     // TODO(spencer): SERVER-12491 Rather than failing here, we should convert the
                     // v1 user to an equivalent v3 schema user
-                    toolError() << "Server has authorization schema version " <<
-                            AuthorizationManager::schemaVersion26Final << ", but found a schema "
-                            "version " << AuthorizationManager::schemaVersion24 << " user: " <<
-                            obj.toString() << endl;
-                    exit(EXIT_FAILURE);
+                    uasserted(17408,
+                              mongoutils::str::stream()
+                                      << "Server has authorization schema version "
+                                      << AuthorizationManager::schemaVersion26Final
+                                      << ", but found a schema version "
+                                      << AuthorizationManager::schemaVersion24 << " user: "
+                                      << obj.toString());
                 }
             }
         }
