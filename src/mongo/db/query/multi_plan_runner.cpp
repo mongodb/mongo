@@ -219,7 +219,7 @@ namespace mongo {
 
         // If we haven't picked the best plan yet...
         if (NULL == _bestPlan) {
-            if (!pickBestPlan(NULL)) {
+            if (!pickBestPlan(NULL, objOut)) {
                 verify(_failure || _killed);
                 if (_killed) { return Runner::RUNNER_DEAD; }
                 if (_failure) { return Runner::RUNNER_ERROR; }
@@ -311,12 +311,12 @@ namespace mongo {
         return state;
     }
 
-    bool MultiPlanRunner::pickBestPlan(size_t* out) {
+    bool MultiPlanRunner::pickBestPlan(size_t* out, BSONObj* objOut) {
         static const int timesEachPlanIsWorked = 100;
 
         // Run each plan some number of times.
         for (int i = 0; i < timesEachPlanIsWorked; ++i) {
-            bool moreToDo = workAllPlans();
+            bool moreToDo = workAllPlans(objOut);
             if (!moreToDo) { break; }
         }
 
@@ -430,7 +430,7 @@ namespace mongo {
         return true;
     }
 
-    bool MultiPlanRunner::workAllPlans() {
+    bool MultiPlanRunner::workAllPlans(BSONObj* objOut) {
         bool planHitEOF = false;
 
         for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -500,6 +500,11 @@ namespace mongo {
 
                 candidate.failed = true;
                 ++_failureCount;
+
+                // Propage most recent seen failure to parent.
+                if (PlanStage::FAILURE == state) {
+                    WorkingSetCommon::getStatusMemberObject(*candidate.ws, id, objOut);
+                }
 
                 if (_failureCount == _candidates.size()) {
                     _failure = true;

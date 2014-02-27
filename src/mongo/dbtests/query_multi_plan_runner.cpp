@@ -136,7 +136,8 @@ namespace QueryMultiPlanRunner {
 
             // Plan 0 aka the first plan aka the index scan should be the best.
             size_t best;
-            ASSERT(mpr.pickBestPlan(&best));
+            BSONObj unused;
+            ASSERT(mpr.pickBestPlan(&best, &unused));
             ASSERT_EQUALS(size_t(0), best);
 
             // Get all our results out.

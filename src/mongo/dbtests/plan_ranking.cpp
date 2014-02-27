@@ -120,7 +120,8 @@ namespace PlanRankingTests {
 
             // And return a pointer to the best solution.  The MPR owns the pointer.
             size_t bestPlan = numeric_limits<size_t>::max();
-            ASSERT(_mpr->pickBestPlan(&bestPlan));
+            BSONObj unused;
+            ASSERT(_mpr->pickBestPlan(&bestPlan, &unused));
             ASSERT_LESS_THAN(bestPlan, solutions.size());
             return solutions[bestPlan];
         }

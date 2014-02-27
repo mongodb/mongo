@@ -79,10 +79,11 @@ namespace mongo {
          * All further calls to getNext(...) will return results from the best plan.
          *
          * Returns true if a best plan was picked, false if there was an error.
+         * If there was a failure in the underlying plan, *objOut may hold error details.
          *
          * If out is not-NULL, set *out to the index of the picked plan.
          */
-        bool pickBestPlan(size_t* out);
+        bool pickBestPlan(size_t* out, BSONObj* objOut);
 
         virtual void saveState();
         virtual bool restoreState();
@@ -107,8 +108,10 @@ namespace mongo {
     private:
         /**
          * Have all our candidate plans do something.
+         * If all our candidate plans fail, *objOut will contain
+         * information on the failure.
          */
-        bool workAllPlans();
+        bool workAllPlans(BSONObj* objOut);
         void allPlansSaveState();
         void allPlansRestoreState();
 
