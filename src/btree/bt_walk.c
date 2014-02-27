@@ -170,22 +170,26 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	btree = S2BT(session);
 
 	/*
-	 * There are several reasons to walk an in-memory tree:
+	 * There are multiple reasons and approaches to walking the in-memory
+	 * tree:
 	 *
-	 * (1) to find pages to evict;
-	 * (2) to write internal nodes (checkpoint, compaction);
-	 * (3) to write all dirty leaf nodes;
-	 * (4) to close a file, discarding pages;
-	 * (5) to perform cursor scans.
+	 * (1) finding pages to evict (the eviction server);
+	 * (2) writing just dirty leaves or internal nodes (checkpoint);
+	 * (3) discarding pages (close);
+	 * (4) skipping pages based on outside information (compaction);
+	 * (5) cursor scans (applications).
 	 *
-	 * In all cases, hazard pointers protect the page from
-	 * eviction.  Case (1) should update read generations.
+	 * Except for cursor scans and compaction, the walk is limited to the
+	 * cache, no pages are read.  In all cases, hazard pointers protect the
+	 * walked pages from eviction.
+	 *
+	 * !!!
+	 * Fast-discard currently only works on row-store trees.
 	 */
+	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
 	compact = LF_ISSET(WT_TREE_COMPACT) ? 1 : 0;
-	/* Fast-discard currently only works on row-store trees. */
 	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;
 	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
-	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
 	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
 	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
 	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
@@ -199,6 +203,8 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 		if (eviction)
 			read_flags |= WT_READ_NO_BUMP;
 	}
+	if (compact)
+		read_flags |= WT_READ_NO_BUMP;
 
 	/*
 	 * Cursor scans use hazard-pointer coupling through the tree and that's
