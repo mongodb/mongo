@@ -126,6 +126,7 @@ extern int __wt_block_manager_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *cfg[],
     int forced_salvage,
+    int readonly,
     uint32_t allocsize,
     WT_BM **bmp);
 extern int __wt_block_manager_truncate( WT_SESSION_IMPL *session,
@@ -138,6 +139,7 @@ extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *cfg[],
     int forced_salvage,
+    int readonly,
     uint32_t allocsize,
     WT_BLOCK **blockp);
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
