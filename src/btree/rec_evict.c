@@ -238,6 +238,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	pindex = page->pg_intl_index;
 	entries = (uint32_t)btree->split_deepen;
 
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_VERBOSE_ERR(session, split,
 	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
 	    page, pindex->entries, entries);
@@ -537,7 +538,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 
 	/*
 	 * We're already holding the parent page locked, see if the parent needs
-	 * to split.
+	 * to split, deepening the tree.
 	 *
 	 * Page splits trickle up the tree, that is, as leaf pages grow large
 	 * enough, they'll split into their parent, as that parent grows large

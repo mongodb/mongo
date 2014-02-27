@@ -4010,12 +4010,13 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			WT_STAT_FAST_DATA_INCR(session, rec_split_internal);
+			WT_STAT_FAST_DATA_INCR(
+			    session, rec_multiblock_internal);
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_ROW_LEAF:
-			WT_STAT_FAST_DATA_INCR(session, rec_split_leaf);
+			WT_STAT_FAST_DATA_INCR(session, rec_multiblock_leaf);
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -4061,7 +4062,7 @@ err:			__wt_scr_free(&tkey);
 		if (r->bnd_next > r->bnd_next_max) {
 			r->bnd_next_max = r->bnd_next;
 			WT_STAT_FAST_DATA_SET(
-			    session, rec_split_max, r->bnd_next_max);
+			    session, rec_multiblock_max, r->bnd_next_max);
 		}
 
 		switch (page->type) {
