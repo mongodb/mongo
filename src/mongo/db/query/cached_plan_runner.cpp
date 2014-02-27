@@ -161,8 +161,8 @@ namespace mongo {
             // If plan cache/collection is not available (due to runner being killed),
             // leave alternate plans out of explain.
             if (_collection == NULL) {
-                warning() << "unable to get stats for alternate plans for explain - "
-                          << "collection is not available. killed: " << _killed;
+                LOG(2) << "unable to get stats for alternate plans for explain - "
+                       << "collection is not available. killed: " << _killed;
                 std::vector<PlanStageStats*> emptyStats;
                 return explainMultiPlan(*stats, emptyStats, _solution.get(), explain);
             }
@@ -174,16 +174,16 @@ namespace mongo {
             // As long as we have the winning stats, we should always try
             // to generate the explain report even if the candidate stats are not available.
             if (!result.isOK()) {
-                warning() << "unable to get stats for alternate plans for explain - "
-                          << "plan cache not available: " << result;
+                LOG(2) << "unable to get stats for alternate plans for explain - "
+                       << "plan cache not available: " << result;
                 std::vector<PlanStageStats*> emptyStats;
                 return explainMultiPlan(*stats, emptyStats, _solution.get(), explain);
             }
             scoped_ptr<PlanCacheEntry> entry(entryRaw);
 
             if (entry->decision->stats.empty()) {
-                warning() << "unable to get stats for alternate plans for explain - "
-                          << "plan cache is missing stats";
+                LOG(2) << "unable to get stats for alternate plans for explain - "
+                       << "plan cache is missing stats";
                 std::vector<PlanStageStats*> emptyStats;
                 return explainMultiPlan(*stats, emptyStats, _solution.get(), explain);
             }
