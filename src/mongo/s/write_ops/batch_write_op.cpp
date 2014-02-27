@@ -77,11 +77,6 @@ namespace mongo {
         _clientRequest = clientRequest;
     }
 
-    static void buildTargetError( const Status& errStatus, WriteErrorDetail* details ) {
-        details->setErrCode( errStatus.code() );
-        details->setErrMessage( errStatus.reason() );
-    }
-
     // Arbitrary endpoint ordering, needed for grouping by endpoint
     static int compareEndpoints( const ShardEndpoint* endpointA, const ShardEndpoint* endpointB ) {
 
@@ -110,6 +105,27 @@ namespace mongo {
         };
 
         typedef std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp> TargetedBatchMap;
+    }
+
+    static void buildTargetError( const Status& errStatus, WriteErrorDetail* details ) {
+        details->setErrCode( errStatus.code() );
+        details->setErrMessage( errStatus.reason() );
+    }
+
+    // Helper to determine whether a number of targeted writes require a new targeted batch
+    static bool isNewBatchRequired( const vector<TargetedWrite*>& writes,
+                                    const TargetedBatchMap& batchMap ) {
+
+        for ( vector<TargetedWrite*>::const_iterator it = writes.begin(); it != writes.end();
+            ++it ) {
+
+            TargetedWrite* write = *it;
+            if ( batchMap.find( &write->endpoint ) == batchMap.end() ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Helper function to cancel all the write ops of targeted batch.
@@ -163,15 +179,46 @@ namespace mongo {
                                       bool recordTargetErrors,
                                       vector<TargetedWriteBatch*>* targetedBatches ) {
 
+        //
+        // Targeting of unordered batches is fairly simple - each remaining write op is targeted,
+        // and each of those targeted writes are grouped into a batch for a particular shard
+        // endpoint.
+        //
+        // Targeting of ordered batches is a bit more complex - to respect the ordering of the
+        // batch, we can only send:
+        // A) a single targeted batch to one shard endpoint
+        // B) multiple targeted batches, but only containing targeted writes for a single write op
+        //
+        // This means that any multi-shard write operation must be targeted and sent one-by-one.
+        // Subsequent single-shard write operations can be batched together if they go to the same
+        // place.
+        //
+        // Ex: ShardA : { skey : a->k }, ShardB : { skey : k->z }
+        //
+        // Ordered insert batch of: [{ skey : a }, { skey : b }, { skey : x }]
+        // broken into: 
+        //  [{ skey : a }, { skey : b }],
+        //  [{ skey : x }]
+        //
+        // Ordered update Batch of :
+        //  [{ skey : a }{ $push }, 
+        //   { skey : b }{ $push }, 
+        //   { skey : [c, x] }{ $push },
+        //   { skey : y }{ $push },
+        //   { skey : z }{ $push }]
+        // broken into: 
+        //  [{ skey : a }, { skey : b }],
+        //  [{ skey : [c,x] }], 
+        //  [{ skey : y }, { skey : z }]
+        //
+
+        const bool ordered = _clientRequest->getOrdered();
+
         TargetedBatchMap batchMap;
         int numTargetErrors = 0;
 
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         for ( size_t i = 0; i < numWriteOps; ++i ) {
-
-            // Only do one-at-a-time ops if COE is false (and break at first target error)
-            if ( _clientRequest->getOrdered() && ( !batchMap.empty() || numTargetErrors != 0 ) )
-                break;
 
             WriteOp& writeOp = _writeOps[i];
 
@@ -190,24 +237,52 @@ namespace mongo {
 
             if ( !targetStatus.isOK() ) {
 
-                //
-                // We're not sure how to target here, so either record the error or cancel the
-                // current batches.
-                //
-
                 WriteErrorDetail targetError;
                 buildTargetError( targetStatus, &targetError );
 
-                if ( recordTargetErrors ) {
-                    writeOp.setOpError( targetError );
-                    ++numTargetErrors;
-                    continue;
-                }
-                else {
+                if ( !recordTargetErrors ) {
+
                     // Cancel current batch state with an error
+
                     cancelBatches( targetError, _writeOps, &batchMap );
                     dassert( batchMap.empty() );
                     return targetStatus;
+                }
+                else if ( !ordered || batchMap.empty() ) {
+
+                    // Record an error for this batch
+
+                    writeOp.setOpError( targetError );
+                    ++numTargetErrors;
+
+                    if ( ordered )
+                        return Status::OK();
+
+                    continue;
+                }
+                else {
+                    dassert( ordered && !batchMap.empty() );
+
+                    // Send out what we have, but don't record an error yet, since there may be an
+                    // error in the writes before this point.
+
+                    writeOp.cancelWrites( &targetError );
+                    break;
+                }
+            }
+
+            //
+            // If ordered and we have a previous endpoint, make sure we don't need to send these
+            // targeted writes to any other endpoints.
+            //
+
+            if ( ordered && !batchMap.empty() ) {
+
+                dassert( batchMap.size() == 1u );
+                if ( isNewBatchRequired( writes, batchMap ) ) {
+
+                    writeOp.cancelWrites( NULL );
+                    break;
                 }
             }
 
@@ -232,6 +307,14 @@ namespace mongo {
 
             // Relinquish ownership of TargetedWrites, now the TargetedBatches own them
             writesOwned.mutableVector().clear();
+
+            //
+            // Break if we're ordered and we have more than one endpoint - later writes cannot be
+            // enforced as ordered across multiple shard endpoints.
+            //
+
+            if ( ordered && batchMap.size() > 1u )
+                break;
         }
 
         //
@@ -241,6 +324,9 @@ namespace mongo {
         for ( TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it ) {
 
             TargetedWriteBatch* batch = it->second;
+
+            if ( batch->getWrites().empty() )
+                continue;
 
             // Remember targeted batch for reporting
             _targeted.insert( batch );
