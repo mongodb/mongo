@@ -52,13 +52,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         "checkpoint-9": ((400, 920), 0)
         }
 
-    # Set buffer alignment so we can use small pages.
-    def setUpConnectionOpen(self, dir):
-        wtopen_args = 'create,buffer_alignment=512'
-        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
-        self.pr(`conn`)
-        return conn
-
     # Add a set of records for a checkpoint.
     def add_records(self, name):
         cursor = self.session.open_cursor(self.uri, None, "overwrite")

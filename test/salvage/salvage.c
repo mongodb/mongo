@@ -461,10 +461,8 @@ build(int ikey, int ivalue, int cnt)
 	 * Disable logging: we're modifying files directly, we don't want to
 	 * run recovery.
 	 */
-	(void)snprintf(config, sizeof(config),
-	    "create,log=(enabled=false),buffer_alignment=%d", PSIZE);
 	assert(wiredtiger_open(
-	    NULL, NULL, config, &conn) == 0);
+	    NULL, NULL, "create,log=(enabled=false)", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->drop(session, "file:" LOAD, "force") == 0);
 
@@ -605,15 +603,15 @@ process(void)
 	WT_CURSOR *cursor;
 	const char *key, *value;
 	WT_SESSION *session;
-	char config[256];
+	char config[100];
 
 	/* Salvage. */
 	config[0] = '\0';
 	if (verbose)
-		(void)snprintf(config, sizeof(config),
+		snprintf(config, sizeof(config),
 		    "error_prefix=\"%s\",verbose=[salvage,verify],",
 		    progname);
-	strcat(config, "log=(enabled=false)");
+	strcat(config, "log=(enabled=false),");
 
 	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
