@@ -335,6 +335,22 @@ namespace {
         assertShouldCacheQuery(*cq);
     }
 
+    /**
+     * Explain queries are not-cacheable because of allPlans cannot
+     * be accurately generated from stale cached stats in the plan cache for
+     * non-winning plans.
+     */
+    TEST(PlanCacheTest, ShouldNotCacheQueryExplain) {
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}", 0, 0, "{}",
+                                                 "{}", "{}", // min, max
+                                                 false, // snapshot
+                                                 true // explain
+                                                 ));
+        const LiteParsedQuery& pq = cq->getParsed();
+        ASSERT_TRUE(pq.isExplain());
+        assertShouldNotCacheQuery(*cq);
+    }
+
     // Adding an empty vector of query solutions should fail.
     TEST(PlanCacheTest, AddEmptySolutions) {
         PlanCache planCache;
