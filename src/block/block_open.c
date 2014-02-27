@@ -158,8 +158,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 #endif
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(
-	    session, filename, 0, 0,
+	WT_ERR(__wt_open(session, filename, 0, 0,
 	    readonly ? WT_FILE_TYPE_CHECKPOINT : WT_FILE_TYPE_DATA,
 	    &block->fh));
 

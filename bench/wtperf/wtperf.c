@@ -194,11 +194,11 @@ worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
-	char *value_buf, *key_buf, *value;
-	int measure_latency, ret;
 	size_t i;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
+	int measure_latency, ret;
+	char *value_buf, *key_buf, *value;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -502,12 +502,12 @@ populate_thread(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
+	size_t i;
+	uint64_t op, usecs;
+	uint32_t opcount;
+	int intxn, measure_latency, ret;
 	char *value_buf, *key_buf;
 	const char *cursor_config;
-	int intxn, measure_latency, ret;
-	size_t i;
-	uint32_t opcount;
-	uint64_t op, usecs;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -640,16 +640,16 @@ monitor(void *arg)
 	struct tm *tm, _tm;
 	CONFIG *cfg;
 	FILE *fp;
-	char buf[64], *path;
-	int ret;
+	size_t len;
 	uint64_t reads, inserts, updates;
 	uint64_t cur_reads, cur_inserts, cur_updates;
 	uint64_t last_reads, last_inserts, last_updates;
 	uint32_t read_avg, read_min, read_max;
 	uint32_t insert_avg, insert_min, insert_max;
 	uint32_t update_avg, update_min, update_max;
-	size_t len;
 	u_int i;
+	int ret;
+	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
 	assert(cfg->sample_interval != 0);
@@ -827,9 +827,9 @@ err:		cfg->error = cfg->stop = 1;
 static int
 execute_populate(CONFIG *cfg)
 {
+	struct timespec start, stop;
 	CONFIG_THREAD *popth;
 	WT_SESSION *session;
-	struct timespec start, stop;
 	double secs;
 	size_t i;
 	uint64_t last_ops;
@@ -1088,9 +1088,9 @@ find_table_count(CONFIG *cfg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	char *key;
 	uint32_t i, max_icount, table_icount;
 	int ret, t_ret;
+	char *key;
 
 	conn = cfg->conn;
 
@@ -1144,10 +1144,10 @@ out:	return (ret);
 static int
 create_uris(CONFIG *cfg)
 {
-	char *uri;
-	int ret;
 	size_t base_uri_len;
 	uint32_t i;
+	int ret;
+	char *uri;
 
 	ret = 0;
 	base_uri_len = strlen(cfg->base_uri);
@@ -1185,9 +1185,9 @@ static int
 create_tables(CONFIG *cfg)
 {
 	WT_SESSION *session;
-	char *uri;
-	int ret;
 	size_t i;
+	int ret;
+	char *uri;
 
 	session = NULL;
 	if (cfg->create == 0)
@@ -1217,14 +1217,14 @@ create_tables(CONFIG *cfg)
 	return (ret);
 }
 
-int
+static int
 start_all_runs(CONFIG *cfg)
 {
 	CONFIG *next_cfg, **configs;
-	char *cmd_buf, *new_home;
-	int ret, t_ret;
-	size_t cmd_len, home_len, i;
 	pthread_t *threads;
+	size_t cmd_len, home_len, i;
+	int ret, t_ret;
+	char *cmd_buf, *new_home;
 
 	ret = 0;
 	configs = NULL;
@@ -1319,15 +1319,15 @@ thread_run_wtperf(void *arg)
 	return (NULL);
 }
 
-int
+static int
 start_run(CONFIG *cfg)
 {
-	char helium_buf[256];
-	int monitor_created, monitor_set, ret, t_ret;
 	pthread_t monitor_thread;
 	uint64_t total_ops;
+	int monitor_created, ret, t_ret;
+	char helium_buf[256];
 
-	monitor_created = monitor_set = ret = 0;
+	monitor_created = ret = 0;
 	
 	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
@@ -1473,15 +1473,15 @@ int
 main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
+	size_t req_len;
+	int ch, monitor_set, ret;
 	char *cc_buf, *tc_buf;
 	const char *opts = "C:H:h:m:O:o:T:";
 	const char *config_opts, *user_cconfig, *user_tconfig;
-	int ch, monitor_set, ret;
-	size_t req_len;
 
-	ret = 0;
-	config_opts = user_cconfig = user_tconfig = NULL;
+	monitor_set = ret = 0;
 	cc_buf = tc_buf = NULL;
+	config_opts = user_cconfig = user_tconfig = NULL;
 
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
