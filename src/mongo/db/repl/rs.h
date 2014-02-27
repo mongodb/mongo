@@ -69,6 +69,8 @@ namespace mongo {
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
+    extern int maxSyncSourceLagSecs;
+
     class ReplSetCmdline;
 
     // Main entry point for replica sets
@@ -603,8 +605,6 @@ namespace mongo {
         static const int replPrefetcherThreadCount;
         threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
-
-        static const int maxSyncSourceLagSecs;
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks

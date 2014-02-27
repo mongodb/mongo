@@ -44,6 +44,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/db/commands/server_status.h"
@@ -57,12 +58,18 @@ namespace mongo {
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
 
-    const int ReplSetImpl::maxSyncSourceLagSecs = 30;
-
     // For testing network failures in percolate() for chaining
     MONGO_FP_DECLARE(rsChaining1);
     MONGO_FP_DECLARE(rsChaining2);
     MONGO_FP_DECLARE(rsChaining3);
+
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSyncSourceLagSecs, int, 30);
+    MONGO_INITIALIZER(maxSyncSourceLagSecsCheck) (InitializerContext*) {
+        if (maxSyncSourceLagSecs < 1) {
+            return Status(ErrorCodes::BadValue, "maxSyncSourceLagSecs must be > 0");
+        }
+        return Status::OK();
+    }
 
 namespace replset {
 
