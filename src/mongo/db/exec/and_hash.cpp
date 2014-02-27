@@ -32,6 +32,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -108,6 +109,16 @@ namespace mongo {
                     else if (PlanStage::FAILURE == childStatus) {
                         // Propage error to parent.
                         *out = _lookAheadResults[i];
+                        // If a stage fails, it may create a status WSM to indicate why it
+                        // failed, in which case 'id' is valid.  If ID is invalid, we
+                        // create our own error message.
+                        if (WorkingSet::INVALID_ID == *out) {
+                            mongoutils::str::stream ss;
+                            ss << "hashed AND stage failed to read in look ahead results "
+                               << "from child " << i;
+                            Status status(ErrorCodes::InternalError, ss);
+                            *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                        }
 
                         _hashingChildren = false;
                         _dataMap.clear();
@@ -250,6 +261,15 @@ namespace mongo {
         }
         else if (PlanStage::FAILURE == childStatus) {
             *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "hashed AND stage failed to read in results to from first child";
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            }
             return childStatus;
         }
         else {
@@ -333,6 +353,16 @@ namespace mongo {
         }
         else if (PlanStage::FAILURE == childStatus) {
             *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "hashed AND stage failed to read in results from other child "
+                   << _currentChild;
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            }
             return childStatus;
         }
         else {

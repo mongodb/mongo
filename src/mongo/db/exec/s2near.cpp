@@ -258,7 +258,13 @@ namespace mongo {
         double minDistance = numeric_limits<double>::max();
         BSONObj minDistanceObj;
         for (BSONElementSet::iterator git = geom.begin(); git != geom.end(); ++git) {
-            if (!git->isABSONObj()) { return PlanStage::FAILURE; }
+            if (!git->isABSONObj()) {
+                mongoutils::str::stream ss;
+                ss << "s2near stage read invalid geometry element " << *git << " from child";
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                return PlanStage::FAILURE;
+            }
             BSONObj obj = git->Obj();
 
             double distToObj;

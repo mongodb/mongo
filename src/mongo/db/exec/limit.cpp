@@ -27,6 +27,8 @@
  */
 
 #include "mongo/db/exec/limit.h"
+#include "mongo/db/exec/working_set_common.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -54,6 +56,15 @@ namespace mongo {
         }
         else if (PlanStage::FAILURE == status) {
             *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "limit stage failed to read in results from child";
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            }
             return status;
         }
         else {
