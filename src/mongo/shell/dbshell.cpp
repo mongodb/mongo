@@ -699,33 +699,44 @@ int _main( int argc, char* argv[], char **envp ) {
     //  }())
     stringstream authStringStream;
     authStringStream << "(function() { " << endl;
-    if ( !shellGlobalParams.authenticationMechanism.empty() ) {
+    if (!shellGlobalParams.authenticationMechanism.empty()) {
         authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
-            shellGlobalParams.authenticationMechanism << "\";" << endl;
+            escape(shellGlobalParams.authenticationMechanism) << "\";" << endl;
+    }
+
+    if (!shellGlobalParams.gssapiServiceName.empty()) {
+        authStringStream << "DB.prototype._defaultGssapiServiceName = \"" <<
+            escape(shellGlobalParams.gssapiServiceName) << "\";" << endl;
     }
 
     if (!shellGlobalParams.nodb && shellGlobalParams.username.size()) {
-        authStringStream << "var username = \"" << shellGlobalParams.username << "\";" << endl;
+        authStringStream << "var username = \"" << escape(shellGlobalParams.username) << "\";" <<
+            endl;
         if (shellGlobalParams.usingPassword) {
-            authStringStream << "var password = \"" << shellGlobalParams.password << "\";" << endl;
+            authStringStream << "var password = \"" << escape(shellGlobalParams.password) << "\";"
+                             << endl;
         }
         if (shellGlobalParams.authenticationDatabase.empty()) {
             authStringStream << "var authDb = db;" << endl;
         }
         else {
             authStringStream << "var authDb = db.getSiblingDB(\""
-                             << shellGlobalParams.authenticationDatabase << "\");" << endl;
+                             << escape(shellGlobalParams.authenticationDatabase) << "\");" << endl;
         }
         authStringStream << "authDb._authOrThrow({ " <<
             saslCommandUserFieldName << ": username ";
         if (shellGlobalParams.usingPassword) { 
             authStringStream << ", " << saslCommandPasswordFieldName << ": password ";
         }
+
+        if (!shellGlobalParams.gssapiHostName.empty()) {
+            authStringStream << ", " << saslCommandServiceHostnameFieldName << ": \""
+                             << escape(shellGlobalParams.gssapiHostName) << '"' << endl;
+        }
         authStringStream << "});" << endl;
     }
     authStringStream << "}())";
     mongo::shell_utils::_dbAuth = authStringStream.str();
-
 
     mongo::ScriptEngine::setConnectCallback( mongo::shell_utils::onConnect );
     mongo::ScriptEngine::setup();

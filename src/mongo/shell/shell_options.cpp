@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/server_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/mongoutils/str.h"
@@ -63,20 +64,32 @@ namespace mongo {
 
         options->addOptionChaining("eval", "eval", moe::String, "evaluate javascript");
 
-        options->addOptionChaining("username", "username,u", moe::String,
+        moe::OptionSection authenticationOptions("Authentication Options");
+
+        authenticationOptions.addOptionChaining("username", "username,u", moe::String,
                 "username for authentication");
 
-        options->addOptionChaining("password", "password,p", moe::String,
+        authenticationOptions.addOptionChaining("password", "password,p", moe::String,
                 "password for authentication")
                                   .setImplicit(moe::Value(std::string("")));
 
-        options->addOptionChaining("authenticationDatabase", "authenticationDatabase", moe::String,
-                "user source (defaults to dbname)")
+        authenticationOptions.addOptionChaining("authenticationDatabase", "authenticationDatabase",
+                moe::String, "user source (defaults to dbname)")
                                   .setDefault(moe::Value(std::string("")));
 
-        options->addOptionChaining("authenticationMechanism", "authenticationMechanism",
-                moe::String, "authentication mechanism")
+        authenticationOptions.addOptionChaining("authenticationMechanism",
+                "authenticationMechanism", moe::String, "authentication mechanism")
                                   .setDefault(moe::Value(std::string("MONGODB-CR")));
+
+        authenticationOptions.addOptionChaining("gssapiServiceName", "gssapiServiceName",
+                 moe::String,
+                 "Service name to use when authenticating using GSSAPI/Kerberos")
+            .setDefault(moe::Value(std::string(saslDefaultServiceName)));
+
+        authenticationOptions.addOptionChaining("gssapiHostName", "gssapiHostName", moe::String,
+                "Remote host name to use for purpose of GSSAPI/Kerberos authentication");
+
+        options->addSection(authenticationOptions);
 
         options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
 
@@ -201,6 +214,14 @@ namespace mongo {
         if (params.count("authenticationMechanism")) {
             shellGlobalParams.authenticationMechanism =
                 params["authenticationMechanism"].as<string>();
+        }
+
+        if (params.count("gssapiServiceName")) {
+            shellGlobalParams.gssapiServiceName = params["gssapiServiceName"].as<string>();
+        }
+
+        if (params.count("gssapiHostName")) {
+            shellGlobalParams.gssapiHostName = params["gssapiHostName"].as<string>();
         }
 
         if (params.count("shell")) {

@@ -1178,6 +1178,7 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
 }
 
 DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+DB.prototype._defaultGssapiServiceName = null;
 
 DB.prototype._authOrThrow = function () {
     var params;
@@ -1199,6 +1200,13 @@ DB.prototype._authOrThrow = function () {
 
     if (params.db !== undefined) {
         throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");
+    }
+
+    if (params.mechanism == "GSSAPI" &&
+        params.serviceName == null &&
+        this._defaultGssapiServiceName != null) {
+
+        params.serviceName = this._defaultGssapiServiceName;
     }
 
     params.db = this.getName();

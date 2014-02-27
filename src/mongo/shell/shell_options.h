@@ -53,6 +53,8 @@ namespace mongo {
         bool usingPassword;
         std::string authenticationMechanism;
         std::string authenticationDatabase;
+        std::string gssapiServiceName;
+        std::string gssapiHostName;
 
         bool runShell;
         bool nodb;
