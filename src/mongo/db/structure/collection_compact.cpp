@@ -168,7 +168,7 @@ namespace mongo {
                     // remove the old records (orphan them) periodically so our commit block doesn't get too large
                     bool stopping = false;
                     RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
-                    if( stopping || getDur().aCommitIsNeeded() ) {
+                    if( stopping || getDur().isCommitNeeded() ) {
                         e->firstRecord.writing() = L;
                         Record *r = L.rec();
                         getDur().writingInt(r->prevOfs()) = DiskLoc::NullOfs;

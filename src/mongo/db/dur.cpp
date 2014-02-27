@@ -270,8 +270,9 @@ namespace mongo {
             return p;
         }
 
-        bool DurableImpl::aCommitIsNeeded() const {
+        bool DurableImpl::isCommitNeeded() const {
             DEV commitJob._nSinceCommitIfNeededCall = 0;
+            unspoolWriteIntents();
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
