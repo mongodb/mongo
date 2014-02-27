@@ -1024,6 +1024,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		const char *name;
 		uint32_t flag;
 	} *ft, file_types[] = {
+		{ "checkpoint",	WT_FILE_TYPE_CHECKPOINT },
 		{ "data",	WT_FILE_TYPE_DATA },
 		{ "log",	WT_FILE_TYPE_LOG },
 		{ NULL, 0 }

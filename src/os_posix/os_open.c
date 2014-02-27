@@ -107,7 +107,8 @@ __wt_open(WT_SESSION_IMPL *session,
 #endif
 #ifdef O_NOATIME
 	/* Avoid updating metadata for read-only workloads. */
-	if (dio_type == WT_FILE_TYPE_DATA)
+	if (dio_type == WT_FILE_TYPE_DATA ||
+	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		f |= O_NOATIME;
 #endif
 
@@ -157,7 +158,8 @@ __wt_open(WT_SESSION_IMPL *session,
 
 #if defined(HAVE_POSIX_FADVISE)
 	/* Disable read-ahead on trees: it slows down random read workloads. */
-	if (dio_type == WT_FILE_TYPE_DATA)
+	if (dio_type == WT_FILE_TYPE_DATA ||
+	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
 #endif
 
@@ -174,7 +176,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_filesize(session, fh, &fh->size));
 
 	/* Configure file extension. */
-	if (dio_type == WT_FILE_TYPE_DATA)
+	if (dio_type == WT_FILE_TYPE_DATA ||
+	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		fh->extend_len = conn->data_extend_len;
 
 	/*

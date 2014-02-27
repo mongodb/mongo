@@ -15,6 +15,7 @@ flags = {
 		'SYNC_WRITE_LEAVES',
 	],
 	'file_types' : [
+		'FILE_TYPE_CHECKPOINT',
 		'FILE_TYPE_DATA',
 		'FILE_TYPE_LOG'
 	],
