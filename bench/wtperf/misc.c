@@ -58,9 +58,8 @@ setup_log_file(CONFIG *cfg)
 	free(fname);
 
 	if (cfg->logf == NULL) {
-		fprintf(stderr,
-		    "Failed to open log file: %s\n", strerror(errno));
-		return (EINVAL);
+		fprintf(stderr, "%s: %s\n", fname, strerror(errno));
+		return (errno);
 	}
 
 	/* Use line buffering for the log file. */
