@@ -16,26 +16,43 @@ s = startParallelShell(
     'assert.soon(function() {' +
     '   current = db.currentOp({"ns": db.count10.getFullName(), ' +
     '                           "query.count": db.count10.getName()}); ' +
-    '   if (!current) return false; ' +
+
+    // Check that we found the count op. If not, return false so
+    // that assert.soon will retry.
+    '   assert("inprog" in current); ' +
+    '   if (current.inprog.length === 0) { ' +
+    '       jsTest.log("count10.js: did not find count op, retrying"); ' +
+    '       printjson(current); ' +
+    '       return false; ' +
+    '   } ' +
     '   countOp = current.inprog[0]; ' +
-    '   assert(countOp, "missing countOp"); ' +
-    '   db.killOp(countOp.opid); ' +
+    '   if (!countOp) { ' +
+    '       jsTest.log("count10.js: did not find count op, retrying"); ' +
+    '       printjson(current); ' +
+    '       return false; ' +
+    '   } ' +
+
+    // Found the count op. Try to kill it.
+    '   jsTest.log("count10.js: found count op:"); ' +
+    '   printjson(current); ' +
+    '   printjson(db.killOp(countOp.opid)); ' +
     '   return true; ' +
-    '}, "could not kill count op");'
+    '}, "count10.js: could not find count op after retrying, gave up");'
 );
 
 function getKilledCount() {
     try {
         db.count10.find("sleep(1000)").count();
+        jsTest.log("count10.js: count op completed without being killed");
     } catch (e) {
         return e;
     }
 }
 
 var res = getKilledCount();
-jsTest.log("killed count output start");
+jsTest.log("count10.js: killed count output start");
 printjson(res);
-jsTest.log("killed count output end");
+jsTest.log("count10.js: killed count output end");
 assert(res);
 assert(res.match(/count failed/) !== null);
 assert(res.match(/\"code\"/) !== null);
