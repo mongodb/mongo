@@ -64,6 +64,8 @@ namespace mongo {
     }
 
     bool IndexDetails::areIndexOptionsEquivalent(const BSONObj& newSpec ) const {
+        // Handle the special cases first.
+
         if ( dropDups() != newSpec["dropDups"].trueValue() ) {
             return false;
         }
@@ -74,17 +76,49 @@ namespace mongo {
             return false;
         }
 
-        // Note: { _id: 1 } or { _id: -1 } implies unique: true.
         if ( !isIdIndex() &&
              unique() != newSpec["unique"].trueValue() ) {
+            // Note: { _id: 1 } or { _id: -1 } implies unique: true.
             return false;
         }
 
-        const BSONElement existingExpireSecs =
-                info.obj().getField("expireAfterSeconds");
-        const BSONElement newExpireSecs = newSpec["expireAfterSeconds"];
+        // Then compare the rest of the options.
 
-        return existingExpireSecs == newExpireSecs;
+        std::map<StringData, BSONElement> existingOptionsMap;
+        BSONObjIterator existingSpecIt( info.obj() );
+        while ( existingSpecIt.more() ) {
+            const BSONElement e = existingSpecIt.next();
+            StringData fieldName = e.fieldNameStringData();
+            if ( fieldName == "key" ||
+                 fieldName == "ns" ||
+                 fieldName == "name" ||
+                 fieldName == "v" ||
+                 fieldName == "dropDups" ||
+                 fieldName == "sparse" ||
+                 fieldName == "unique" ) {
+                continue;
+            }
+            existingOptionsMap[ fieldName ] = e;
+        }
+
+        std::map<StringData, BSONElement> newOptionsMap;
+        BSONObjIterator newSpecIt( newSpec );
+        while ( newSpecIt.more() ) {
+            const BSONElement e = newSpecIt.next();
+            StringData fieldName = e.fieldNameStringData();
+            if ( fieldName == "key" ||
+                 fieldName == "ns" ||
+                 fieldName == "name" ||
+                 fieldName == "v" ||
+                 fieldName == "dropDups" ||
+                 fieldName == "sparse" ||
+                 fieldName == "unique" ) {
+                continue;
+            }
+            newOptionsMap[ fieldName ] = e;
+        }
+
+        return existingOptionsMap == newOptionsMap;
     }
 
 }
