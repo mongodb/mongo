@@ -194,6 +194,7 @@ namespace mongo {
 
             if ( !status.isOK() ) {
                 response->clear();
+                response->setOk( false );
                 response->setErrCode( status.code() );
                 response->setErrMessage( status.reason() );
                 return;
@@ -275,6 +276,7 @@ namespace mongo {
 
                     if ( !status.isOK() ) {
                         response->clear();
+                        response->setOk( false );
                         response->setErrCode( status.code() );
                         response->setErrMessage( status.reason() );
                         return;

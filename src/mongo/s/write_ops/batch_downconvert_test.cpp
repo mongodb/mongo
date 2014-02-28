@@ -272,6 +272,28 @@ namespace {
         ASSERT( !response.isWriteConcernErrorSet() );
     }
 
+    TEST(WriteBatchDownconvert, GLENotOk) {
+
+        vector<BSONObj> gleResponses;
+        gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'message', code: 1234}" ) );
+
+        MockSafeWriter mockWriter( gleResponses );
+        BatchSafeWriter batchWriter( &mockWriter );
+
+        BatchedCommandRequest cmdRequest( BatchedCommandRequest::BatchType_Insert );
+        cmdRequest.setNS( "foo.bar" );
+        BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
+        request.addToDocuments(BSONObj());
+
+        BatchedCommandResponse response;
+        batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
+
+        ASSERT( response.isOkSet() );
+        ASSERT( !response.getOk() );
+        ASSERT_EQUALS( response.getErrCode(), 1234 );
+        ASSERT_EQUALS( response.getErrMessage(), "message" );
+    }
+
     TEST(WriteBatchDownconvert, BasicUpsert) {
 
         vector<BSONObj> gleResponses;
