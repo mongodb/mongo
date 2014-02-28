@@ -141,12 +141,6 @@ namespace mongo {
             try {
                 r.init();
                 r.process();
-
-                // Release connections after non-write op 
-                if ( r.expectResponse() ) {
-                    LOG(2) << "release thread local connections back to pool" << endl;
-                    ShardConnection::releaseMyConnections();
-                }
             }
             catch ( const AssertionException& ex ) {
 
@@ -176,6 +170,9 @@ namespace mongo {
                 // We *always* populate the last error for now
                 le->raiseError( ex.getCode() , ex.what() );
             }
+
+            // Release connections back to pool, if any still cached
+            ShardConnection::releaseMyConnections();
         }
 
         virtual void disconnected( AbstractMessagingPort* p ) {
