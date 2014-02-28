@@ -4079,7 +4079,7 @@ err:			__wt_scr_free(&tkey);
 	 * cache's dirty statistics.
 	 */
 	if (!r->upd_skipped) {
-		mod->disk_txn = r->max_txn;
+		mod->rec_max_txn = r->max_txn;
 
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
