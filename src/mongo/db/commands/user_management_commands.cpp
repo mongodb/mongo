@@ -365,6 +365,14 @@ namespace mongo {
                                " with '$external' as the user's source db"));
             }
 
+            if (args.hasHashedPassword && args.userName.getDB() == "$external") {
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "Cannot set the password for users defined on the '$external' "
+                                       "database"));
+            }
+
             if (!args.hasRoles) {
                 return appendCommandStatus(
                         result,
@@ -540,6 +548,14 @@ namespace mongo {
                         result,
                         Status(ErrorCodes::BadValue,
                                "Must specify at least one field to update in updateUser"));
+            }
+
+            if (args.hasHashedPassword && args.userName.getDB() == "$external") {
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue,
+                               "Cannot set the password for users defined on the '$external' "
+                                       "database"));
             }
 
             BSONObjBuilder updateSetBuilder;
