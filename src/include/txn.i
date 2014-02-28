@@ -166,8 +166,9 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 /*
  * __wt_txn_read_skip --
- *	Get the first visible update in a list (or NULL if none are visible),
- *	and report whether there are an uncommitted changes in the list.
+ *	Get the first visible update in a list (or NULL if none are visible).
+ *	Report the maximum transaction ID in the list and whether any updates
+ *	were skipped to find the visible update.
  */
 static inline WT_UPDATE *
 __wt_txn_read_skip(
@@ -175,6 +176,18 @@ __wt_txn_read_skip(
 {
 	WT_UPDATE *first_upd;
 
+	/*
+	 * Track the largest transaction ID on this page.  We store this in the
+	 * page at the end of reconciliation if no updates are skipped.  It is
+	 * used to avoid evicting a clean page from memory with changes that
+	 * are required to satisfy a snapshot read.
+	 *
+	 * Record whether any updates were skipped on the way to finding the
+	 * first visible update.  That determines whether a future read with no
+	 * intervening modifications to the page could see a different value.
+	 * If not, the page can safely be marked clean, and does not need to be
+	 * reconciled until it is modified again.
+	 */
 	*skipp = 0;
 	for (first_upd = NULL; upd != NULL; upd = upd->next)
 		if (upd->txnid != WT_TXN_ABORTED) {
