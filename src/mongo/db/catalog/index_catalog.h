@@ -145,7 +145,7 @@ namespace mongo {
                             bool mayInterrupt,
                             ShutdownBehavior shutdownBehavior = SHUTDOWN_CLEANUP );
 
-        Status okToAddIndex( const BSONObj& spec ) const;
+        StatusWith<BSONObj> prepareSpecForCreate( const BSONObj& original ) const;
 
         Status dropAllIndexes( bool includingIdIndex );
 
@@ -238,8 +238,6 @@ namespace mongo {
 
         // public static helpers
 
-        static BSONObj fixIndexSpec( const BSONObj& spec );
-
         static BSONObj fixIndexKey( const BSONObj& key );
 
     private:
@@ -287,6 +285,12 @@ namespace mongo {
 
         // descriptor ownership passes to _setupInMemoryStructures
         IndexCatalogEntry* _setupInMemoryStructures( IndexDescriptor* descriptor );
+
+        static BSONObj _fixIndexSpec( const BSONObj& spec );
+
+        Status _isSpecOk( const BSONObj& spec ) const;
+
+        Status _doesSpecConflictWithExisting( const BSONObj& spec ) const;
 
         int _magic;
         Collection* _collection;

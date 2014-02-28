@@ -257,6 +257,25 @@ namespace mongo {
         return Status::OK();
     }
 
+    StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate( const BSONObj& original ) const {
+        Status status = _isSpecOk( original );
+        if ( !status.isOK() )
+            return StatusWith<BSONObj>( status );
+
+        BSONObj fixed = _fixIndexSpec( original );
+
+        // we double check with new index spec
+        status = _isSpecOk( fixed );
+        if ( !status.isOK() )
+            return StatusWith<BSONObj>( status );
+
+        status = _doesSpecConflictWithExisting( fixed );
+        if ( !status.isOK() )
+            return StatusWith<BSONObj>( status );
+
+        return StatusWith<BSONObj>( fixed );
+    }
+
     Status IndexCatalog::createIndex( BSONObj spec,
                                       bool mayInterrupt,
                                       ShutdownBehavior shutdownBehavior ) {
@@ -266,16 +285,11 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        status = okToAddIndex( spec );
+        StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate( spec );
+        status = statusWithSpec.getStatus();
         if ( !status.isOK() )
             return status;
-
-        spec = fixIndexSpec( spec );
-
-        // we double check with new index spec
-        status = okToAddIndex( spec );
-        if ( !status.isOK() )
-            return status;
+        spec = statusWithSpec.getValue();
 
         string pluginName = IndexNames::findPluginName( spec["key"].Obj() );
         if ( pluginName.size() ) {
@@ -513,7 +527,7 @@ namespace mongo {
 
 
 
-    Status IndexCatalog::okToAddIndex( const BSONObj& spec ) const {
+    Status IndexCatalog::_isSpecOk( const BSONObj& spec ) const {
 
         const NamespaceString& nss = _collection->ns();
 
@@ -575,6 +589,14 @@ namespace mongo {
             }
         }
 
+        return Status::OK();
+    }
+
+    Status IndexCatalog::_doesSpecConflictWithExisting( const BSONObj& spec ) const {
+        const char *name = spec.getStringField("name");
+        invariant( name[0] );
+
+        const BSONObj key = spec.getObjectField("key");
 
         {
             // Check both existing and in-progress indexes (2nd param = true)
@@ -1211,7 +1233,7 @@ namespace mongo {
     }
 
 
-    BSONObj IndexCatalog::fixIndexSpec( const BSONObj& spec ) {
+    BSONObj IndexCatalog::_fixIndexSpec( const BSONObj& spec ) {
         BSONObj o = IndexLegacy::adjustIndexSpecObject( spec );
 
         BSONObjBuilder b;

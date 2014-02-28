@@ -295,11 +295,16 @@ namespace mongo {
     Status MultiIndexBlock::init( std::vector<BSONObj>& indexSpecs ) {
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
             BSONObj info = indexSpecs[i];
-            info = _collection->getIndexCatalog()->fixIndexSpec( info );
+            StatusWith<BSONObj> statusWithInfo =
+                _collection->getIndexCatalog()->prepareSpecForCreate( info );
+            Status status = statusWithInfo.getStatus();
+            if ( !status.isOK() )
+                return status;
+            info = statusWithInfo.getValue();
 
             IndexState state;
             state.block.reset( new IndexCatalog::IndexBuildBlock( _collection, info ) );
-            Status status = state.block->init();
+            status = state.block->init();
             if ( !status.isOK() )
                 return status;
 

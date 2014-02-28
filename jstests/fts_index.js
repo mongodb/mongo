@@ -73,30 +73,47 @@ coll.drop();
 // 3. Collections may have at most one text index.
 //
 
-coll.ensureIndex({a: "text"});
+coll.ensureIndex({a: 1, b: "text", c: 1});
 assert(!db.getLastError());
+assert.eq(2, coll.getIndexes().length);
 
-coll.ensureIndex({a: "text"});
+// ensureIndex() becomes a no-op on an equivalent index spec.
+coll.ensureIndex({a: 1, b: "text", c: 1});
+assert(!db.getLastError());
+assert.eq(2, coll.getIndexes().length);
+coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {b: 1}});
+assert(!db.getLastError());
+assert.eq(2, coll.getIndexes().length);
+coll.ensureIndex({a: 1, b: "text", c: 1}, {default_language: "english"});
+assert(!db.getLastError());
+assert.eq(2, coll.getIndexes().length);
+coll.ensureIndex({a: 1, b: "text", c: 1}, {textIndexVersion: 2});
+assert(!db.getLastError());
+assert.eq(2, coll.getIndexes().length);
+coll.ensureIndex({a: 1, b: "text", c: 1}, {language_override: "language"});
+assert(!db.getLastError());
+assert.eq(2, coll.getIndexes().length);
+
+// ensureIndex() fails if a second text index would be built.
+coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {d: 1}});
+assert(db.getLastError());
+coll.ensureIndex({a: 1, b: "text", c: 1}, {default_language: "none"});
+assert(db.getLastError());
+coll.ensureIndex({a: 1, b: "text", c: 1}, {textIndexVersion: 1});
+assert(db.getLastError());
+coll.ensureIndex({a: 1, b: "text", c: 1}, {language_override: "idioma"});
+assert(db.getLastError());
+coll.ensureIndex({a: 1, b: "text", c: 1}, {weights: {d: 1}});
+assert(db.getLastError());
+coll.ensureIndex({a: 1, b: "text", d: 1});
+assert(db.getLastError());
+coll.ensureIndex({a: 1, d: "text", c: 1});
 assert(db.getLastError());
 coll.ensureIndex({b: "text"});
 assert(db.getLastError());
 coll.ensureIndex({b: "text", c: 1});
 assert(db.getLastError());
-coll.ensureIndex({b: 1, c: "text"});
-assert(db.getLastError());
-
-coll.dropIndexes();
-
-coll.ensureIndex({a: 1, b: "text", c: 1});
-assert(!db.getLastError());
-
-coll.ensureIndex({a: 1, b: "text", c: 1});
-assert(db.getLastError());
-coll.ensureIndex({b: "text"});
-assert(db.getLastError());
-coll.ensureIndex({b: "text", c: 1});
-assert(db.getLastError());
-coll.ensureIndex({b: 1, c: "text"});
+coll.ensureIndex({a: 1, b: "text"});
 assert(db.getLastError());
 
 coll.dropIndexes();
