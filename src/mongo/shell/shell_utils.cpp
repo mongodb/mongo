@@ -144,7 +144,8 @@ namespace mongo {
             BSONObjSet keys;
             getKeysForUpgradeChecking(index, doc, &keys);
             for (BSONObjSet::const_iterator key = keys.begin(); key != keys.end(); ++key) { 
-                if (key->objsize() > 1024) {
+                // recreation of the logic in KeyV1::dataSize() and BtreeBucket<V>::getKeyMax()
+                if (key->objsize() + 1 > 1024) {
                     return BSON("" << true);
                 }
             }                                                                           
