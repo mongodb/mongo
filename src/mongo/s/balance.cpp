@@ -484,6 +484,7 @@ namespace mongo {
                         conn.done();
                         warning() << "Skipping balancing round because data inconsistency"
                                   << " was detected amongst the config servers." << endl;
+                        sleepsecs( sleepTime );
                         continue;
                     }
 
