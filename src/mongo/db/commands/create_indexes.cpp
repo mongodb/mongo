@@ -150,7 +150,6 @@ namespace mongo {
                         result.append( "numIndexesBefore",
                                        collection->getIndexCatalog()->numIndexesTotal() );
                         result.append( "note", "all indexes already exist" );
-                        result.appendBool( "noChangesMade", true );
                         return true;
                     }
 
