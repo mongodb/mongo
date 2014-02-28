@@ -123,8 +123,7 @@ __wt_lsm_merge_worker(void *vargs)
 		session->dhandle = NULL;
 
 		/* Try to create a Bloom filter. */
-		if (!F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) &&
-		    __lsm_bloom_work(session, lsm_tree) == 0)
+		if (__lsm_bloom_work(session, lsm_tree) == 0)
 			progress = 1;
 
 		/* If we didn't create a Bloom filter, try to merge. */
@@ -218,10 +217,14 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    chunk->count == 0)
 			continue;
 
-		/* See if we win the race to switch on the "busy" flag. */
+		/*
+		 * See if we win the race to switch on the "busy" flag and
+		 * recheck that the chunk still needs a Bloom filter.
+		 */
 		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
-			ret = __lsm_bloom_create(
-			    session, lsm_tree, chunk, (u_int)i);
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+				ret = __lsm_bloom_create(
+				    session, lsm_tree, chunk, (u_int)i);
 			chunk->bloom_busy = 0;
 			break;
 		}
