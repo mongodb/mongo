@@ -170,17 +170,22 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
  *	and report whether there are an uncommitted changes in the list.
  */
 static inline WT_UPDATE *
-__wt_txn_read_skip(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
+__wt_txn_read_skip(
+    WT_SESSION_IMPL *session, WT_UPDATE *upd, uint64_t *max_txn, int *skipp)
 {
 	WT_UPDATE *first_upd;
 
 	*skipp = 0;
 	for (first_upd = NULL; upd != NULL; upd = upd->next)
 		if (upd->txnid != WT_TXN_ABORTED) {
-			if (!__wt_txn_visible(session, upd->txnid))
-				*skipp = 1;
-			else if (first_upd == NULL)
-				first_upd = upd;
+			if (TXNID_LT(*max_txn, upd->txnid))
+				*max_txn = upd->txnid;
+			if (first_upd == NULL) {
+				if (__wt_txn_visible(session, upd->txnid))
+					first_upd = upd;
+				else
+					*skipp = 1;
+			}
 		}
 
 	return (first_upd);
