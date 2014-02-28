@@ -123,8 +123,7 @@ __wt_lsm_merge_worker(void *vargs)
 		session->dhandle = NULL;
 
 		/* Try to create a Bloom filter. */
-		if (!F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) &&
-		    __lsm_bloom_work(session, lsm_tree) == 0)
+		if (__lsm_bloom_work(session, lsm_tree) == 0)
 			progress = 1;
 
 		/* If we didn't create a Bloom filter, try to merge. */

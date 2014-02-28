@@ -111,8 +111,7 @@ __wt_lsm_merge(
 			continue;
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 			break;
-		else if ((FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
-		    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) &&
+		else if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			break;
 	}
@@ -154,7 +153,7 @@ __wt_lsm_merge(
 			break;
 
 		WT_ASSERT(session, F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
-		    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) ||
+		    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
 		    start_chunk == 1);
 
 		/*
