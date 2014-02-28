@@ -111,7 +111,7 @@ __wt_lsm_merge(
 			continue;
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 			break;
-		else if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
+		else if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			break;
 	}
