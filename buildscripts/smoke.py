@@ -352,16 +352,20 @@ def check_db_hashes(master, slave):
             stats = {'hashes': {'master': mhash, 'slave': shash},
                      'counts':{'master': mCount, 'slave': sCount}}
             try:
-                stats["docs"] = {'master':list(mTestDB[coll].find(limit=10)),
-                                  'slave':list(sTestDB[coll].find(limit=10))}
+                stats["docs"] = {'master':list(mTestDB[coll].find(limit=10).sort("$natural", -1)),
+                                  'slave':list(sTestDB[coll].find(limit=10).sort("$natural", -1))}
             except Exception, e:
                 stats["error-docs"] = e;
 
             screwy_in_slave[coll] = stats
             if mhash == "no _id _index":
-                msg = "collection with no _id index:" + \
-                      " %s -- slave has these indexes: %s"
-                print msg % (coll, sTestDB[coll].index_information())
+                mOplog = mTestDB.connection.local["oplog.$main"];
+                oplog_entries = list(mOplog.find({"$or": [{"ns":mTestDB[coll].full_name}, \
+                                                          {"op":"c"}]}).sort("$natural", 1))
+                print "oplog for %s" % mTestDB[coll].full_name
+                for doc in oplog_entries:
+                    pprint.pprint(doc, width=200)
+
 
     for db in slave.dict.keys():
         if db not in master.dict:
