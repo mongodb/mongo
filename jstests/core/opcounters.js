@@ -38,20 +38,28 @@ assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
 opCounters = db.serverStatus().opcounters;
 res = t.insert({_id:0})
 assert.writeError(res);
-assert.eq(opCounters.insert + 1, db.serverStatus().opcounters.insert);
+if (t.getMongo().writeMode() == "commands")
+    assert.eq(opCounters.insert + 1, db.serverStatus().opcounters.insert);
+else
+    assert.eq(opCounters.insert, db.serverStatus().opcounters.insert);
 
 // Bulk insert, with error, ordered.
 opCounters = db.serverStatus().opcounters;
 res = t.insert([{_id:3},{_id:3},{_id:4}])
 assert.writeError(res);
-assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
-
+if (t.getMongo().writeMode() == "commands")
+    assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
+else
+    assert.eq(opCounters.insert + 1, db.serverStatus().opcounters.insert);
 // Bulk insert, with error, unordered.
 var continueOnErrorFlag = 1;
 opCounters = db.serverStatus().opcounters;
 res = t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
 assert.writeError(res);
-assert.eq(opCounters.insert + 3, db.serverStatus().opcounters.insert);
+if (t.getMongo().writeMode() == "commands")
+    assert.eq(opCounters.insert + 3, db.serverStatus().opcounters.insert);
+else
+    assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
 
 //
 // 2. Update.

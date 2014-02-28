@@ -16,7 +16,8 @@ printjson( result = coll.insert({ foo : "bar" }) );
 assert.eq(result.nInserted, 1);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-assert.eq(result.nModified, 0);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(result.nModified, 0);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
 assert(!result.getWriteConcernError());
@@ -31,7 +32,8 @@ printjson( result = coll.save({ _id : id, foo : "bar" }) );
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 1);
 assert.eq(result.nMatched, 0);
-assert.eq(result.nModified, 0);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(result.nModified, 0);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
 assert(!result.getWriteConcernError());
@@ -46,7 +48,8 @@ printjson( result = coll.update({ foo : "bar" }, { $set : { foo : "baz" } }) );
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 1);
-assert.eq(result.nModified, 1);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(result.nModified, 1);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
 assert(!result.getWriteConcernError());
@@ -64,7 +67,8 @@ printjson( result = coll.update({ foo : "bar" },
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 2);
-assert.eq(result.nModified, 1);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(result.nModified, 1);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
 assert(!result.getWriteConcernError());
@@ -79,7 +83,8 @@ printjson( result = coll.remove({}) );
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-assert.eq(result.nModified, 0);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(result.nModified, 0);
 assert.eq(result.nRemoved, 1);
 assert(!result.getWriteError());
 assert(!result.getWriteConcernError());
@@ -105,7 +110,8 @@ coll.insert({ foo : "bar" });
 printjson( result = coll.update({ foo : "bar" }, { $invalid : "expr" }) );
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-assert.eq(result.nModified, 0);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(result.nModified, 0);
 assert(result.getWriteError());
 assert(result.getWriteError().errmsg);
 assert(!result.getUpsertedId());
@@ -124,7 +130,8 @@ printjson( result = coll.update({},
                                 { multi : true }) );
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-assert.eq(result.nModified, 0);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(result.nModified, 0);
 assert(result.getWriteError());
 assert(result.getWriteError().errmsg);
 assert(!result.getUpsertedId());
@@ -171,7 +178,11 @@ coll.setWriteConcern({ w : "invalid" });
 assert.throws( function() {
     printjson( coll.insert({ foo : "bar" }) );
 });
-assert.eq(coll.count(), 0);
+if (coll.getMongo().writeMode() == "commands")
+    assert.eq(coll.count(), 0);
+else 
+    assert.eq(coll.count(), 1);
+
 coll.unsetWriteConcern();
 
 
