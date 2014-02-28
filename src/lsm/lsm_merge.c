@@ -146,9 +146,16 @@ __wt_lsm_merge(
 		youngest = lsm_tree->chunk[end_chunk];
 		nchunks = (end_chunk + 1) - start_chunk;
 
-		/* If the chunk is already involved in a merge, stop. */
-		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
+		/*
+		 * If the chunk is already involved in a merge or a Bloom
+		 * filter is being built for it, stop.
+		 */
+		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING) || chunk->bloom_busy)
 			break;
+
+		WT_ASSERT(session, F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
+		    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING) ||
+		    start_chunk == 1);
 
 		/*
 		 * Look for small merges before trying a big one: some threads
