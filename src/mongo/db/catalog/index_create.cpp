@@ -293,6 +293,20 @@ namespace mongo {
     }
 
     Status MultiIndexBlock::init( std::vector<BSONObj>& indexSpecs ) {
+
+        for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
+            BSONObj info = indexSpecs[i];
+
+            string pluginName = IndexNames::findPluginName( info["key"].Obj() );
+            if ( pluginName.size() ) {
+                Status s =
+                    _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(pluginName);
+                if ( !s.isOK() )
+                    return s;
+            }
+
+        }
+
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
             BSONObj info = indexSpecs[i];
             StatusWith<BSONObj> statusWithInfo =

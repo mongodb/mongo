@@ -236,6 +236,8 @@ namespace mongo {
             return _getAccessMethodName( keyPattern );
         }
 
+        Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
+
         // public static helpers
 
         static BSONObj fixIndexKey( const BSONObj& key );
@@ -245,8 +247,6 @@ namespace mongo {
         // creates a new thing, no caching
         IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
                                                 IndexCatalogEntry* entry );
-
-        Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
 
         int _removeFromSystemIndexes( const StringData& indexName );
 
