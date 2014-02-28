@@ -668,26 +668,12 @@ static inline int
 __rec_txn_read(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
 {
-	uint64_t txnid;
 	int skip, retried;
 
 	retried = 0;
-retry:	*updp = __wt_txn_read_skip(session, upd, &skip);
-	if (!skip) {
-		/*
-		 * Track the largest transaction ID written to disk for this
-		 * page.  We store this in the page at the end of
-		 * reconciliation if no updates are skipped.  It is used to
-		 * avoid evicting a clean page from memory with changes that
-		 * are required to satisfy a snapshot read.
-		 */
-		if (*updp != NULL) {
-			txnid = (*updp)->txnid;
-			if (TXNID_LT(r->max_txn, txnid))
-				r->max_txn = txnid;
-		}
+retry:	*updp = __wt_txn_read_skip(session, upd, &r->max_txn, &skip);
+	if (!skip)
 		return (0);
-	}
 
 	/*
 	 * If skipping this update will cause reconciliation to quit, update
@@ -4093,7 +4079,7 @@ err:			__wt_scr_free(&tkey);
 	 * cache's dirty statistics.
 	 */
 	if (!r->upd_skipped) {
-		mod->disk_txn = r->max_txn;
+		mod->rec_max_txn = r->max_txn;
 
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);

@@ -498,7 +498,7 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 * cache.
 	 */
 	if (!exclusive && mod != NULL &&
-	    !__wt_txn_visible_all(session, mod->disk_txn))
+	    !__wt_txn_visible_all(session, mod->rec_max_txn))
 		return (EBUSY);
 
 	/*
