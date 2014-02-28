@@ -219,10 +219,7 @@ namespace mongo {
                     // 'res' takes ownership of 'childExplain'.
                     res->addToClauses(childExplain);
                     nScanned += childExplain->getNScanned();
-
-                    // We don't necessarilly fetch on a branch, but the old query framework
-                    // did. We're still emulating the number it would have produced.
-                    nScannedObjects += childExplain->getNScanned();
+                    nScannedObjects += childExplain->getNScannedObjects();
                 }
             }
             // We set the cursor name for backwards compatibility with 2.4.
