@@ -196,8 +196,8 @@ struct __wt_page_modify {
 	 */
 	uint64_t disk_snap_min;
 
-	/* The largest transaction ID written to disk for the page. */
-	uint64_t disk_txn;
+	/* The largest transaction ID seen on the page by reconciliation. */
+	uint64_t rec_max_txn;
 
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
