@@ -152,10 +152,6 @@ __wt_lsm_merge(
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING) || chunk->bloom_busy)
 			break;
 
-		WT_ASSERT(session, F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
-		    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
-		    chunk->generation > 0);
-
 		/*
 		 * Look for small merges before trying a big one: some threads
 		 * should stay in low levels until we get more aggressive.
