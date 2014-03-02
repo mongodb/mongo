@@ -101,18 +101,17 @@ __wt_lsm_merge(
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
 	/*
-	 * Only include chunks that already have a Bloom filter and not
-	 * involved in a merge.
+	 * Only include chunks that already have a Bloom filter or are the
+	 * result of a merge and not involved in a merge.
 	 */
 	for (end_chunk = lsm_tree->nchunks - 1; end_chunk > 0; --end_chunk) {
 		chunk = lsm_tree->chunk[end_chunk];
 		WT_ASSERT(session, chunk != NULL);
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
 			continue;
-		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) || chunk->generation > 0)
 			break;
-		else if ((FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) ||
-		    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) &&
+		else if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			break;
 	}
@@ -146,8 +145,11 @@ __wt_lsm_merge(
 		youngest = lsm_tree->chunk[end_chunk];
 		nchunks = (end_chunk + 1) - start_chunk;
 
-		/* If the chunk is already involved in a merge, stop. */
-		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
+		/*
+		 * If the chunk is already involved in a merge or a Bloom
+		 * filter is being built for it, stop.
+		 */
+		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING) || chunk->bloom_busy)
 			break;
 
 		/*
