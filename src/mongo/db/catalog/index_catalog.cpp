@@ -338,7 +338,7 @@ namespace mongo {
                   << " error: " << exc;
 
             if ( shutdownBehavior == SHUTDOWN_LEAVE_DIRTY &&
-                 exc.getCode() == InterruptedAtShutdown ) {
+                 exc.getCode() == ErrorCodes::InterruptedAtShutdown ) {
                 indexBuildBlock.abort();
             }
             else {

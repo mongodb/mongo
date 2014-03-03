@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/extsort.h"
@@ -419,7 +420,8 @@ namespace mongo {
                         throw;
                     }
 
-                    if( e.interrupted() ) {
+                    if (ErrorCodes::isInterruption(
+                            DBException::convertExceptionCode(e.getCode()))) {
                         killCurrentOp.checkForInterrupt();
                     }
 

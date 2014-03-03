@@ -654,7 +654,6 @@ namespace mongo {
                     if ( request.getOrdered() )
                         break;
                 }
-                killCurrentOp.checkForInterrupt();
             }
         }
         else {
@@ -669,7 +668,6 @@ namespace mongo {
                     if ( request.getOrdered() )
                         break;
                 }
-                killCurrentOp.checkForInterrupt();
             }
         }
 
@@ -772,7 +770,11 @@ namespace mongo {
                         }
                     }
                     catch ( const DBException& ex ) {
-                        currResult.error = toWriteError( ex.toStatus() );
+                        Status stat(ex.toStatus());
+                        if (ErrorCodes::isInterruption(stat.code())) {
+                            throw;
+                        }
+                        currResult.error = toWriteError(stat);
                     }
 
                     //
@@ -999,7 +1001,11 @@ namespace mongo {
             result->fault = new PageFaultException( ex );
         }
         catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
+            Status stat(ex.toStatus());
+            if (ErrorCodes::isInterruption(stat.code())) {
+                throw;
+            }
+            result->error = toWriteError(stat);
         }
 
     }
@@ -1039,7 +1045,11 @@ namespace mongo {
             result->fault = new PageFaultException( ex );
         }
         catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
+            Status stat(ex.toStatus());
+            if (ErrorCodes::isInterruption(stat.code())) {
+                throw;
+            }
+            result->error = toWriteError(stat);
         }
     }
 
@@ -1089,7 +1099,11 @@ namespace mongo {
             result->stats.upsertedID = resUpsertedID;
         }
         catch (const DBException& ex) {
-            result->error = toWriteError(ex.toStatus());
+            Status stat(ex.toStatus());
+            if (ErrorCodes::isInterruption(stat.code())) {
+                throw;
+            }
+            result->error = toWriteError(stat);
         }
     }
 
@@ -1119,7 +1133,11 @@ namespace mongo {
             result->fault = new PageFaultException( ex );
         }
         catch ( const DBException& ex ) {
-            result->error = toWriteError( ex.toStatus() );
+            Status stat(ex.toStatus());
+            if (ErrorCodes::isInterruption(stat.code())) {
+                throw;
+            }
+            result->error = toWriteError(stat);
         }
     }
 

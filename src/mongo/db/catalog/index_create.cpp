@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/index_create.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
@@ -128,7 +129,7 @@ namespace mongo {
                 }
             }
             catch( AssertionException& e ) {
-                if( e.interrupted() ) {
+                if (ErrorCodes::isInterruption(DBException::convertExceptionCode(e.getCode()))) {
                     killCurrentOp.checkForInterrupt();
                 }
 

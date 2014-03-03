@@ -84,9 +84,11 @@ error_code("NoClientContext", 81)
 error_code("NoProgressMade", 82)
 
 # Non-sequential error codes (for compatibility only)
-error_code("DuplicateKey", 11000)
 error_code("NotMaster", 10107) #this comes from assert_util.h
+error_code("DuplicateKey", 11000)
+error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
 error_code("OutOfDiskSpace", 14031 )
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
+error_class("Interruption", ["Interrupted", "InterruptedAtShutdown", "ExceededTimeLimit"])

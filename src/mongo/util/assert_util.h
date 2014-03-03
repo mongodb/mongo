@@ -31,7 +31,6 @@ namespace mongo {
     enum CommonErrorCodes {
         OkCode = 0,
         DatabaseDifferCaseCode = 13297 ,  // uassert( 13297 )
-        InterruptedAtShutdown = 11600 ,   // uassert( 11600 )
         SendStaleConfigCode = 13388 ,     // uassert( 13388 )
         RecvStaleConfigCode = 9996,       // uassert( 9996 )
         PrepareConfigsFailedCode = 13104, // uassert( 13104 )
@@ -144,12 +143,6 @@ namespace mongo {
 
         virtual bool severe() const { return true; }
         virtual bool isUserAssertion() const { return false; }
-
-        /* true if an interrupted exception - see KillCurrentOp */
-        bool interrupted() {
-            return _ei.code == InterruptedAtShutdown || _ei.code == 11601 ||
-                   _ei.code == ErrorCodes::ExceededTimeLimit;
-        }
     };
 
     /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */

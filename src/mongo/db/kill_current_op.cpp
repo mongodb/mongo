@@ -170,7 +170,7 @@ namespace {
             return;
         }
 
-        uassert(InterruptedAtShutdown, "interrupted at shutdown", !_globalKill);
+        uassert(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown", !_globalKill);
 
         if (c.curop()->maxTimeHasExpired()) {
             c.curop()->kill();
