@@ -140,7 +140,7 @@ namespace mongo {
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         // Grab the next (key, value) from the index.
-        BSONObj ownedKeyObj = _indexCursor->getKey().getOwned();
+        BSONObj keyObj = _indexCursor->getKey();
         DiskLoc loc = _indexCursor->getValue();
 
         // Move to the next result.
@@ -162,27 +162,33 @@ namespace mongo {
             }
         }
 
-        WorkingSetID id = _workingSet->allocate();
-        WorkingSetMember* member = _workingSet->get(id);
-        member->loc = loc;
-        member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), ownedKeyObj));
-        member->state = WorkingSetMember::LOC_AND_IDX;
-
-        if (Filter::passes(member, _filter)) {
+        if (Filter::passes(keyObj, _descriptor->keyPattern(), _filter)) {
             if (NULL != _filter) {
                 ++_specificStats.matchTested;
             }
+
+            // We must make a copy of the on-disk data since it can mutate during the execution of
+            // this query.
+            BSONObj ownedKeyObj = keyObj.getOwned();
+
+            // Fill out the WSM.
+            WorkingSetID id = _workingSet->allocate();
+            WorkingSetMember* member = _workingSet->get(id);
+            member->loc = loc;
+            member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), ownedKeyObj));
+            member->state = WorkingSetMember::LOC_AND_IDX;
+
             if (_params.addKeyMetadata) {
                 BSONObjBuilder bob;
                 bob.appendKeys(_descriptor->keyPattern(), ownedKeyObj);
                 member->addComputed(new IndexKeyComputedData(bob.obj()));
             }
+
             *out = id;
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
 
-        _workingSet->free(id);
         ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }
