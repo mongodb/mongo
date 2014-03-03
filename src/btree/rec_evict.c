@@ -439,13 +439,33 @@ __wt_multi_inmem_build(
 	 *
 	 * Create an in-memory version of the page, and link it to its parent.
 	 */
-	WT_RET(__wt_page_inmem(
-	    session, NULL, NULL, multi->skip_dsk, 0, &ref->page));
+	WT_RET(__wt_page_inmem(session,
+	    NULL, NULL, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &ref->page));
 	multi->skip_dsk = NULL;
 	new = ref->page;
 
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip) {
+		/*
+		 * XXXKEITH:
+		 * Remove the WT_UPDATE from the page/list it's on and move it
+		 * to a different page/list.   This is a problem: on failure,
+		 * discarding the created page will free it, and that's wrong.
+		 * This problem needs to be revisted once we decide this whole
+		 * approach is a viable one.
+		 */
+		if (skip->is_insert)
+			updp = &((WT_INSERT *)skip->head)->upd;
+		else
+			updp = &page->pg_row_upd[
+			    WT_ROW_SLOT(page, skip->head)];
+		for (; *updp != NULL; updp = &(*updp)->next)
+			if (*updp == skip->upd)
+				break;
+		WT_ASSERT(session, *updp != NULL);
+		*updp = (*updp)->next;
+		skip->upd->next = NULL;
+
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
@@ -481,26 +501,6 @@ __wt_multi_inmem_build(
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/*
-		 * XXXKEITH: the WT_UPDATE now appears on two lists.  If
-		 * we succeed, discarding the original page frees it, if
-		 * we fail, discarding the created page will free it.
-		 * A session aborting a transaction can modify it at any
-		 * time, and this is a problem.  For now, I'm removing
-		 * it from the original page, but this problem needs to
-		 * be revisted once we decide this whole approach is a
-		 * viable one.
-		 */
-		if (skip->is_insert)
-			updp = &((WT_INSERT *)skip->head)->upd;
-		else
-			updp = &page->pg_row_upd[
-			    WT_ROW_SLOT(page, skip->head)];
-		for (; *updp != NULL; updp = &(*updp)->next)
-			if (*updp == skip->upd)
-				break;
-		WT_ASSERT(session, *updp != NULL);
-		*updp = (*updp)->next;
 	}
 	__wt_free(session, multi->skip);
 
