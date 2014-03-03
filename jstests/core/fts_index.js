@@ -68,6 +68,8 @@ assert.eq(2, coll.getIndexes().length);
 // ensureIndex() becomes a no-op on an equivalent index spec.
 assert.writeOK(coll.ensureIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
+assert.writeOK(coll.ensureIndex({a: 1, b: "text", c: 1}, {background: true}));
+assert.eq(2, coll.getIndexes().length);
 assert.writeOK(coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {b: 1}}));
 assert.eq(2, coll.getIndexes().length);
 assert.writeOK(coll.ensureIndex({a: 1, b: "text", c: 1}, {default_language: "english"}));

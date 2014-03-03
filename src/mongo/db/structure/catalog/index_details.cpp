@@ -93,6 +93,7 @@ namespace mongo {
                  fieldName == "ns" ||
                  fieldName == "name" ||
                  fieldName == "v" ||
+                 fieldName == "background" ||
                  fieldName == "dropDups" ||
                  fieldName == "sparse" ||
                  fieldName == "unique" ) {
@@ -110,6 +111,7 @@ namespace mongo {
                  fieldName == "ns" ||
                  fieldName == "name" ||
                  fieldName == "v" ||
+                 fieldName == "background" ||
                  fieldName == "dropDups" ||
                  fieldName == "sparse" ||
                  fieldName == "unique" ) {
