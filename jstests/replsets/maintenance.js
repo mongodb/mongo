@@ -1,14 +1,18 @@
 
 
 var replTest = new ReplSetTest( {name: 'unicomplex', nodes: 2} );
-var conns = replTest.startSet();
+var conns = replTest.startSet({ verbose: 1 });
 replTest.initiate();
 
 // Make sure we have a master
 var master = replTest.getMaster();
 
-for (i=0;i<10000; i++) { master.getDB("bar").foo.insert({x:1,y:i,abc:123,str:"foo bar baz"}); }
-for (i=0;i<1000; i++) { master.getDB("bar").foo.update({y:i},{$push :{foo : "barrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"}}); }
+for (i = 0; i < 20; i++) {
+    master.getDB("bar").foo.insert({x:1,y:i,abc:123,str:"foo bar baz"});
+}
+for (i = 0; i < 20; i++) {
+    master.getDB("bar").foo.update({ y: i }, { $push: { foo: "barrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"}});
+}
 
 replTest.awaitReplication();
 
@@ -46,8 +50,8 @@ result = master.getDB("admin").runCommand({replSetMaintenance : 1});
 assert.eq(result.ok, 0, tojson(result));
 
 print("check getMore works on a secondary, not on a recovering node");
-var cursor = conns[1].getDB("bar").foo.find();
-for (var i=0; i<50; i++) {
+var cursor = conns[1].getDB("bar").foo.find().batchSize(2);
+for (var i = 0; i < 5; i++) {
     cursor.next();
 }
 

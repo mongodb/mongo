@@ -34,20 +34,20 @@ assert.soon(function () {
     return res.myState == 7;
 }, "Arbiter failed to initialize.");
 
-A.foo.update({key:'value1'}, {$set: {req: 'req'}}, true);
-A.foo.runCommand({getLastError : 1, w : 2, wtimeout : 60000});
+var options = { writeConcern: { w: 2, wtimeout: 60000 }, upsert: true };
+assert.writeOK(A.foo.update({ key: 'value1' }, { $set: { req: 'req' }}, options));
 replTest.stop(AID);
 
 master = replTest.getMaster();
 assert(b_conn.host == master.host);
-B.foo.update({key:'value1'}, {$set: {res: 'res'}}, true);
-B.foo.runCommand({getLastError : 1, w : 1, wtimeout : 60000});
+options = { writeConcern: { w: 1, wtimeout: 60000 }, upsert: true };
+assert.writeOK(B.foo.update({key:'value1'}, {$set: {res: 'res'}}, options));
 replTest.stop(BID);
 replTest.restart(AID);
 master = replTest.getMaster();
 assert(a_conn.host == master.host);
-A.foo.update({key:'value2'}, {$set: {req: 'req'}}, true);
-A.foo.runCommand({getLastError : 1, w : 1, wtimeout : 60000});
+options = { writeConcern: { w: 1, wtimeout: 60000 }, upsert: true };
+assert.writeOK(A.foo.update({ key: 'value2' }, { $set: { req: 'req' }}, options));
 replTest.restart(BID); // should rollback
 reconnect(B);
 

@@ -35,9 +35,11 @@ var admin_s1 = slave1.getDB("admin");
 var local_s1 = slave1.getDB("local");
 
 print("2. Insert some data");
-for (var i=0; i<10000; i++) {
-  foo.bar.insert({date : new Date(), x : i, str : "all the talk on the market"});
+var bulk = foo.bar.initializeUnorderedBulkOp();
+for (var i = 0; i < 100; i++) {
+  bulk.insert({ date: new Date(), x: i, str: "all the talk on the market" });
 }
+assert.writeOK(bulk.execute());
 print("total in foo: "+foo.bar.count());
 
 
@@ -119,10 +121,11 @@ wait(function() {
 
 print("10. Insert some stuff");
 master = replTest.getMaster();
-for (var i=0; i<10000; i++) {
-  foo.bar.insert({date : new Date(), x : i, str : "all the talk on the market"});
+bulk = foo.bar.initializeUnorderedBulkOp();
+for (var i = 0; i < 100; i++) {
+  bulk.insert({ date: new Date(), x: i, str: "all the talk on the market" });
 }
-
+assert.writeOK(bulk.execute());
 
 print("11. Everyone happy eventually");
 replTest.awaitReplication(300000);

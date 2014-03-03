@@ -1,4 +1,12 @@
 /**
+ * TODO: SERVER-13204
+ * This  tests inserts a huge number of documents, initiates a background index build
+ * and tries to perform another task in parallel while the background index task is
+ * active. The problem is that this is timing dependent and the current test setup
+ * tries to achieve this by inserting insane amount of documents.
+ */
+
+/**
  * Starts a replica set with arbiter, builds an index in background,
  * run through drop indexes, drop collection, drop database. 
  */
@@ -45,7 +53,7 @@ var dropAction = [
     {dropIndexes: collection, index: "i_1"},
     {drop: collection},
     {dropDatabase: 1 },
-    {convertToCapped: collection, size: 20000}
+    {convertToCapped: collection, size: 20}
 ];
 
 
@@ -56,9 +64,11 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     // set up collections
     masterDB.dropDatabase();
     jsTest.log("creating test data " + size + " documents");
+    var bulk = masterDB.getCollection(collection).initializeUnorderedBulkOp();
     for(var i = 0; i < size; ++i ) {
-        masterDB.getCollection(collection).save( {i:i} );
+        bulk.insert({ i: i });
     }
+    assert.writeOK(bulk.execute());
 
     jsTest.log("Starting background indexing for test of: " + JSON.stringify(dc));
     masterDB.getCollection(collection).ensureIndex( {i:1}, {background:true} );

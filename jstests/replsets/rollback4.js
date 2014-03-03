@@ -24,9 +24,8 @@ printjson(master.adminCommand("replSetGetStatus"));
 
 var mColl = master.getCollection('test.foo');
 
-mColl.insert({});
+assert.writeOK(mColl.insert({}, { writeConcern: { w: 7, wtimeout: 30*1000 }}));
 printjson(master.adminCommand("replSetGetStatus"));
-printjson(master.adminCommand({getLastError:1, w:7, wtimeout:30*1000}));
 
 // partition 012 | 3456 with 0 and 6 the old and new master
 
@@ -49,16 +48,15 @@ printjson({endPartition: new Date()});
 var gotThrough = 0
 try {
     while (true){
-        mColl.insert({})
-        out = master.adminCommand({getLastError:1, w:3});
-        if (out.err)
+        res = mColl.insert({}, { writeConcern: { w: 3 }});
+        if (res.hasWriteErrors())
             break;
 
         gotThrough++;
     }
 }
 catch (e) {
-    print("caught exception");
+    print("caught exception: " + tojson(e));
 }
 
 printjson({gotThrough: gotThrough});
@@ -76,8 +74,7 @@ printjson(master2.adminCommand("replSetGetStatus"));
 var m2Coll = master2.getCollection('test.foo');
 
 var sentinel = {_id: 'sentinel'} // used to detect which master's data is used
-m2Coll.insert(sentinel);
-printjson(master2.adminCommand({getLastError:1, w:4, wtimeout:30*1000}));
+assert.writeOK(m2Coll.insert(sentinel, { writeConcern: { w: 4, wtimeout: 30*1000 }}));
 printjson(master2.adminCommand("replSetGetStatus"));
 
 m2Coll.insert({}); // this shouldn't be necessary but the next GLE doesn't work without it
@@ -99,12 +96,11 @@ printjson({endUnPartition: new Date()});
 
 assert.soon(function() {
     try {
-        printjson(master2.adminCommand({getLastError:1, w:7, wtimeout:30*1000}));
+        m2Coll.insert({}, { writeConcern: { w: 7, wtimeout: 10*1000 }});
         return true;
     }
     catch (e) {
-        print("getLastError returned an exception; retrying");
-        print(e);
+        print("getLastError returned an exception; retrying: " + tojson(e));
         return false;
     }
 });

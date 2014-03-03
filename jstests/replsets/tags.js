@@ -98,27 +98,26 @@ master = replTest.getMaster();
 
 printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
 
-var timeout = 20000;
+var timeout = 3000;
 
-master.getDB("foo").bar.insert({x:1});
-var result = master.getDB("foo").runCommand({getLastError:1,w:"3 or 4",wtimeout:timeout});
-printjson(result);
-assert.eq(result.err, "timeout");
+var options = { writeConcern: { w: "3 or 4", wtimeout: timeout }};
+var result = master.getDB("foo").bar.insert({ x: 1 }, options);
+assert.neq(null, result.getWriteConcernError());
+assert(result.getWriteConcernError().errInfo.wtimeout);
 
 replTest.unPartition(1,4);
 
 myprint("partitions: [1-4] [0-1-2-0] [3]");
 myprint("test2");
-master.getDB("foo").bar.insert({x:1});
-result = master.getDB("foo").runCommand({getLastError:1,w:"3 or 4",wtimeout:timeout});
-printjson(result);
-assert.eq(result.err, null);
+options = { writeConcern: { w: "3 or 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("partitions: [1-4] [0-1-2-0] [3]");
 myprint("test3");
-result = master.getDB("foo").runCommand({getLastError:1,w:"3 and 4",wtimeout:timeout});
-printjson(result);
-assert.eq(result.err, "timeout");
+options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
+result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
+assert.neq(null, result.getWriteConcernError());
+assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result.getWriteConcernError()));
 
 replTest.unPartition(3,4);
 
@@ -126,33 +125,26 @@ myprint("partitions: [0-4-3] [0-1-2-0]");
 myprint("31004 should sync from 31001 (31026)");
 myprint("31003 should sync from 31004 (31024)");
 myprint("test4");
-result = master.getDB("foo").runCommand({getLastError:1,w:"3 and 4",wtimeout:timeout});
-printjson(result);
-assert.eq(result.err, null);
+options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("non-existent w");
-result = master.getDB("foo").runCommand({getLastError:1,w:"blahblah",wtimeout:timeout});
-printjson(result);
-assert.eq(result.code, 79);
-assert.eq(result.ok, 0);
+options = { writeConcern: { w: "blahblah", wtimeout: timeout }};
+result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
+assert.neq(null, result.getWriteConcernError());
+assert.eq(79, result.getWriteConcernError().code, tojson(result.getWriteConcernError()));
 
 myprint("test mode 2");
-master.getDB("foo").bar.insert({x:1});
-result = master.getDB("foo").runCommand({getLastError:1,w:"2",wtimeout:0});
-printjson(result);
-assert.eq(result.err, null);
+options = { writeConcern: { w: "2", wtimeout: 0 }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("test two on the primary");
-master.getDB("foo").bar.insert({x:1});
-result = master.getDB("foo").runCommand({getLastError:1,w:"1 and 2",wtimeout:0});
-printjson(result);
-assert.eq(result.err, null);
+options = { writeConcern: { w: "1 and 2", wtimeout: 0 }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("test5");
-master.getDB("foo").bar.insert({x:1});
-result = master.getDB("foo").runCommand({getLastError:1,w:"2 dc and 3 server",wtimeout:timeout});
-printjson(result);
-assert.eq(result.err, null);
+options = { writeConcern: { w: "2 dc and 3 server", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 replTest.unPartition(1,3);
 
@@ -160,20 +152,19 @@ replTest.partition(2, 0);
 replTest.partition(2, 1);
 replTest.stop(2);
 
-myprint("1 must become primary here because otherwise the other members will take too long timing out their old sync threads");
+myprint("1 must become primary here because otherwise the other members will take too long " +
+        "timing out their old sync threads");
 master = replTest.getMaster();
 
 myprint("test6");
-master.getDB("foo").bar.insert({x:1});
-result = master.getDB("foo").runCommand({getLastError:1,w:"3 and 4",wtimeout:timeout});
-printjson(result);
-assert.eq(result.err, null);
+options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("test mode 2");
-master.getDB("foo").bar.insert({x:1});
-result = master.getDB("foo").runCommand({getLastError:1,w:"2",wtimeout:timeout});
-printjson(result);
-assert.eq(result.err, "timeout");
+options = { writeConcern: { w: "2", wtimeout: timeout }};
+result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
+assert.neq(null, result.getWriteConcernError());
+assert(result.getWriteConcernError().errInfo.wtimeout);
 
 replTest.stopSet();
 myprint("\n\ntags.js SUCCESS\n\n");

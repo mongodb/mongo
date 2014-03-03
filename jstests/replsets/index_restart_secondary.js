@@ -26,9 +26,11 @@ var secondDB = second.getDB('fgIndexSec');
 var size = 500000;
 
 jsTest.log("creating test data " + size + " documents");
+var bulk = masterDB.jstests_fgsec.initializeUnorderedBulkOp();
 for(var i = 0; i < size; ++i) {
-    masterDB.jstests_fgsec.save( {i:i} );
+    bulk.insert({ i: i });
 }
+assert.writeOK(bulk.execute());
 
 jsTest.log("Creating index");
 masterDB.jstests_fgsec.ensureIndex( {i:1} );

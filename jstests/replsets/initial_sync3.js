@@ -97,10 +97,8 @@ rs2.awaitReplication();
 
 master = rs2.getMaster();
 
-master.getDB("foo").bar.baz.insert({x:2});
-var x = master.getDB("foo").runCommand({getLastError : 1, w : 3, wtimeout : 60000});
-printjson(x);
-assert.eq(null, x.err);
+var option = { writeConcern: { w : 3, wtimeout : 60000 }};
+assert.writeOK(master.getDB("foo").bar.baz.insert({ x: 2 }, option));
 
 rs2.stopSet();
 

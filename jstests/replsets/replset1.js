@@ -68,10 +68,11 @@ doTest = function( signal ) {
     assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 2" );
 
     // Now let's write some documents to the new master
+    var bulk = new_master.getDB("bar").bar.initializeUnorderedBulkOp();
     for(var i=0; i<1000; i++) {
-        new_master.getDB("bar").bar.save({a: i});
+        bulk.insert({ a: i });
     }
-    new_master.getDB("admin").runCommand({getlasterror: 1});
+    bulk.execute();
 
     // Here's how to restart the old master node:
     slave = replTest.restart(master_id);

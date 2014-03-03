@@ -1,4 +1,12 @@
 /**
+ * TODO: SERVER-13204
+ * This  tests inserts a huge number of documents, initiates a background index build
+ * and tries to perform another task in parallel while the background index task is
+ * active. The problem is that this is timing dependent and the current test setup
+ * tries to achieve this by inserting insane amount of documents.
+ */
+
+/**
  * Starts a replica set with arbiter, build an index 
  * drop index once secondary starts building index, 
  * index should not exist on secondary afterwards
@@ -36,12 +44,14 @@ var second = replTest.getSecondary();
 var masterDB = master.getDB('fgIndexSec');
 var secondDB = second.getDB('fgIndexSec');
 
-var size = 500000;
+var size = 50000;
 
 jsTest.log("creating test data " + size + " documents");
+var bulk = masterDB.jstests_fgsec.initializeUnorderedBulkOp();
 for(var i = 0; i < size; ++i) {
-    masterDB.jstests_fgsec.save( {i:i} );
+    bulk.insert({ i: i });
 }
+assert.writeOK(bulk.execute());
 
 jsTest.log("Creating index");
 masterDB.jstests_fgsec.ensureIndex( {i:1} );

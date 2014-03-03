@@ -1,4 +1,12 @@
 /**
+ * TODO: SERVER-13204
+ * This  tests inserts a huge number of documents, initiates a background index build
+ * and tries to perform another task in parallel while the background index task is
+ * active. The problem is that this is timing dependent and the current test setup
+ * tries to achieve this by inserting insane amount of documents.
+ */
+
+/**
  * Starts a replica set, builds an index in background
  * restart secondary once it starts building index. Secondary is issued SIGKILL
  * Start with noIndexBuildRetry option, should *not* build index on secondary
@@ -54,9 +62,11 @@
     var size = 500000;
 
     jsTest.log("creating test data " + size + " documents");
+    var bulk = masterDB.jstests_bgsec.initializeUnorderedBulkOp();
     for( i = 0; i < size; ++i ) {
-        masterDB.jstests_bgsec.save( {i:i} );
+        bulk.insert({ i: i });
     }
+    assert.writeOK(bulk.execute());
 
     jsTest.log("Starting background indexing");
     masterDB.jstests_bgsec.ensureIndex( {i:1}, {background:true} );

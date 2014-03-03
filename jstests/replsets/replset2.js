@@ -2,10 +2,7 @@ load("jstests/replsets/rslib.js");
 
 doTest = function (signal) {
 
-    // FAILING TEST
-    // See below:
-
-    // Test replication with getLastError
+    // Test replication with write concern.
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
@@ -34,37 +31,21 @@ doTest = function (signal) {
     var slaves = replTest.liveNodes.slaves;
     slaves.forEach(function (slave) { slave.setSlaveOk(); });
 
-    var failed = false;
-    var callGetLastError = function (w, timeout, db) {
-        try {
-            var result = master.getDB(db).getLastErrorObj(w, timeout);
-            print("replset2.js getLastError result: " + tojson(result));
-            if (result['ok'] != 1) {
-                print("replset2.js FAILURE getlasterror not ok");
-                failed = true;
-            }
-        }
-        catch (e) {
-            print("\nreplset2.js exception in getLastError: " + e + '\n');
-            throw e;
-        }
-    }
-
-    // Test getlasterror with multiple inserts
-    // TEST FAILS HEREg
+    // Test write concern with multiple inserts.
     print("\n\nreplset2.js **** Try inserting a multiple records -- first insert ****")
 
     printjson(master.getDB("admin").runCommand("replSetGetStatus"));
 
-    master.getDB(testDB).foo.insert({ n: 1 });
-    master.getDB(testDB).foo.insert({ n: 2 });
-    master.getDB(testDB).foo.insert({ n: 3 });
+    var bulk = master.getDB(testDB).foo.initializeUnorderedBulkOp();
+    bulk.insert({ n: 1 });
+    bulk.insert({ n: 2 });
+    bulk.insert({ n: 3 });
 
     print("\nreplset2.js **** TEMP 1 ****")
 
     printjson(master.getDB("admin").runCommand("replSetGetStatus"));
 
-    callGetLastError(3, 25000, testDB);
+    assert.writeOK(bulk.execute({ w: 3, wtimeout: 25000 }));
 
     print("replset2.js **** TEMP 1a ****")
 
@@ -80,11 +61,11 @@ doTest = function (signal) {
     var s1 = slaves[1].getDB(testDB).foo.findOne({ n: 1 });
     assert(s1['n'] == 1, "replset2.js Failed to replicate to slave 1 on multiple inserts");
 
-    // Test getlasterror with a simple insert
+    // Test write concern with a simple insert
     print("replset2.js **** Try inserting a single record ****")
     master.getDB(testDB).dropDatabase();
-    master.getDB(testDB).foo.insert({ n: 1 });
-    callGetLastError(3, 10000, testDB);
+    var options = { writeConcern: { w: 3, wtimeout: 10000 }};
+    assert.writeOK(master.getDB(testDB).foo.insert({ n: 1 }, options));
 
     m1 = master.getDB(testDB).foo.findOne({ n: 1 });
     printjson(m1);
@@ -99,28 +80,27 @@ doTest = function (signal) {
     // Test getlasterror with large insert
     print("replset2.js **** Try inserting many records ****")
     try {
-    bigData = new Array(2000).toString()
-    for (var n = 0; n < 1000; n++) {
-        master.getDB(testDB).baz.insert({ n: n, data: bigData });
-    }
-    callGetLastError(3, 60000, testDB);
+      var bigData = new Array(2000).toString();
+      bulk = master.getDB(testDB).baz.initializeUnorderedBulkOp();
+      for (var n = 0; n < 1000; n++) {
+          bulk.insert({ n: n, data: bigData });
+      }
+      assert.writeOK(bulk.execute({ w: 3, wtimeout: 60000 }));
 
-    print("replset2.js **** V1 ")
+      print("replset2.js **** V1 ")
 
-    var verifyReplication = function (nodeName, collection) {
-        data = collection.findOne({ n: 1 });
-        assert(data['n'] == 1, "replset2.js Failed to save to " + nodeName);
-        data = collection.findOne({ n: 999 });
-        assert(data['n'] == 999, "replset2.js Failed to save to " + nodeName);
-    }
+      var verifyReplication = function (nodeName, collection) {
+          data = collection.findOne({ n: 1 });
+          assert(data['n'] == 1, "replset2.js Failed to save to " + nodeName);
+          data = collection.findOne({ n: 999 });
+          assert(data['n'] == 999, "replset2.js Failed to save to " + nodeName);
+      };
 
-    print("replset2.js **** V2 ")
+      print("replset2.js **** V2 ");
 
-    verifyReplication("master", master.getDB(testDB).baz);
-    verifyReplication("slave 0", slaves[0].getDB(testDB).baz);
-    verifyReplication("slave 1", slaves[1].getDB(testDB).baz);
-
-    assert(failed == false, "replset2.js Replication with getLastError failed. See errors.");
+      verifyReplication("master", master.getDB(testDB).baz);
+      verifyReplication("slave 0", slaves[0].getDB(testDB).baz);
+      verifyReplication("slave 1", slaves[1].getDB(testDB).baz);
     }
     catch(e) {
       print("ERROR: " + e);
@@ -130,8 +110,8 @@ doTest = function (signal) {
       printjson(slaves[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
       print("Slave 1 oplog findOne:");
       printjson(slaves[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+      // TODO: SERVER-13203
     }
-
 
     replTest.stopSet(signal);
 }

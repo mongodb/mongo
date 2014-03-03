@@ -35,24 +35,24 @@ var secondary = rt.getSecondary();
 var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
-testDB.b.insert( {} );
-printjson( testDB.getLastErrorObj(2) );
+assert.writeOK(testDB.b.insert({}, { writeConcern: { w: 2 }}));
 
 var ss = secondary.getDB("test").serverStatus();
 var secondaryBaseOplogInserts = ss.metrics.repl.apply.ops;
 
 //add test docs
-for(x=0;x<10000;x++){ testDB.a.insert({}) }
+var bulk = testDB.a.initializeUnorderedBulkOp();
+for(x = 0; x < 1000; x++) {
+    bulk.insert({});
+}
+assert.writeOK(bulk.execute({ w: 2 }));
 
-testDB.getLastError(2);
+testSecondaryMetrics(secondary, 1000, secondaryBaseOplogInserts );
 
-testSecondaryMetrics(secondary, 10000, secondaryBaseOplogInserts );
+var options = { writeConcern: { w: 2 }, multi: true, upsert: true };
+assert.writeOK(testDB.a.update({}, { $set: { d: new Date() }}, options));
 
-testDB.a.update({}, {$set:{d:new Date()}},true, true)
-testDB.getLastError(2);
-
-testSecondaryMetrics(secondary, 20000, secondaryBaseOplogInserts );
-
+testSecondaryMetrics(secondary, 2000, secondaryBaseOplogInserts );
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
 var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis
@@ -60,19 +60,20 @@ var startNum = testDB.serverStatus().metrics.getLastError.wtime.num
 
 printjson(primary.getDB("test").serverStatus().metrics);
 
-testDB.getLastError(1, 50 );
+assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 1, wtimeout: 50 }}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-testDB.getLastError(-11, 50 );
+assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: -11, wtimeout: 50 }}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-testDB.getLastError(2, 50 );
+assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 2, wtimeout: 50 }}));
 assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
 
-testDB.getLastError(3, 50 );
+// Write will fail because there are only 2 nodes
+assert.writeError(testDB.a.insert({ x: 1 }, { writeConcern: { w: 3, wtimeout: 50 }}));
 assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis + 50);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
 

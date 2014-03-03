@@ -27,8 +27,7 @@ doTest = function( signal ) {
   waitForAllMembers(master);
 
   // insert a record
-  master.foo.insert({x:1});
-  master.runCommand({getlasterror:1, w:2});
+  assert.writeOK(master.foo.insert({ x: 1 }, { writeConcern: { w: 2 }}));
 
   var doc = master.foo.findOne();
   assert.eq(doc.x, 1);
@@ -69,8 +68,7 @@ doTest = function( signal ) {
   // wait for the node to catch up
   replTest.awaitReplication();
 
-  master.foo.insert({_id : 123, "x" : "foo"});
-  master.runCommand({getlasterror:1,w:2});
+  assert.writeOK(master.foo.insert({ _id: 123, x: 'foo' }, { writeConcern: { w: 2 }}));
 
   for (var i=0; i<8; i++) {
       assert.eq(conn.getDB(name).foo.findOne({_id:123}), null);
