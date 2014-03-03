@@ -439,8 +439,10 @@ __wt_multi_inmem_build(
 	 *
 	 * Create an in-memory version of the page, and link it to its parent.
 	 */
-	WT_RET(__wt_page_inmem(session, NULL, NULL, multi->skip_dsk, 0, &new));
-	ref->page = new;
+	WT_RET(__wt_page_inmem(
+	    session, NULL, NULL, multi->skip_dsk, 0, &ref->page));
+	multi->skip_dsk = NULL;
+	new = ref->page;
 
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip) {
@@ -500,6 +502,7 @@ __wt_multi_inmem_build(
 		WT_ASSERT(session, *updp != NULL);
 		*updp = (*updp)->next;
 	}
+	__wt_free(session, multi->skip);
 
 	WT_LINK_PAGE(page->parent, ref, new);
 
