@@ -1,5 +1,5 @@
 /*
- * 1. insert 100000 objects
+ * 1. insert 10000 objects
  * 2. export to two dbpaths
  * 3. add one node w/fastsync
  * 4. check that we never get "errmsg" : "initial sync cloning db: whatever"
@@ -74,11 +74,12 @@ assert.soon(function() { result = false;
     });
 
 print("1");
-for (var i=0; i<100000; i++) {
-  foo.bar.insert({date : new Date(), x : i, str : "all the talk on the market"});
+var bulk = foo.bar.initializeUnorderedBulkOp();
+for (var i=0; i<10000; i++) {
+  bulk.insert({ date: new Date(), x: i, str: "all the talk on the market" });
 }
+assert.writeOK(bulk.execute());
 print("total in foo: "+foo.bar.count());
-
 
 print("2");
 admin.runCommand( {fsync:1,lock:1} );

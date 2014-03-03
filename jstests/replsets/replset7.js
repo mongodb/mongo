@@ -11,14 +11,14 @@ var md = master.getDB( 'd' );
 var mdc = md[ 'c' ];
 
 // prep the data
-var doccount = 50000;
+var doccount = 5000;
+var bulk = mdc.initializeUnorderedBulkOp();
 for( i = 0; i < doccount; ++i ) {
-    mdc.insert( { _id:i, x:i } );
+    bulk.insert( { _id:i, x:i } );
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
 
-mdc.ensureIndex( { x : 1 }, { unique: true } );
-md.getLastError();
+assert.writeOK(mdc.ensureIndex( { x : 1 }, { unique: true } ));
 
 // add a secondary
 var slave = rt.add();
@@ -32,11 +32,14 @@ slave.setSlaveOk();
 
 
 // Move all documents to the end by growing it
+bulk = mdc.initializeUnorderedBulkOp();
+var bigStr = "ayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayay" +
+        "ayayayayayayayayayayayay";
 for (i = 0; i < doccount; ++i) {
-    mdc.remove( { _id:i, x:i } );
-    mdc.insert( { _id:doccount+i, x:i, bigstring: "ayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayayay" } );
-    md.getLastError();
+    bulk.find({ _id: i, x: i }).remove();
+    bulk.insert({ _id: doccount + i, x: i, bigstring: bigStr  });
 }
+assert.writeOK(bulk.execute());
 
 // Wait for replication to catch up.
 rt.awaitSecondaryNodes();

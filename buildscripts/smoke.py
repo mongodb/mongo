@@ -468,7 +468,7 @@ def runTest(test, result):
             path = argv[1]
     elif ext == ".js":
         argv = [shell_executable, "--port", mongod_port, '--authenticationMechanism', authMechanism]
-        if use_write_commands or "aggregation" in path:
+        if use_write_commands or "aggregation" in path or "replsets" in path:
             argv += ["--writeMode", "commands"]
         else:
             argv += ["--writeMode", shell_write_mode]

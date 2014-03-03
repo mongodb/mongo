@@ -18,17 +18,19 @@ mdc.insert( { _id:-1, x:"dummy" } );
 
 // Make this db big so that cloner takes a while.
 print ("inserting bigstrings");
+var bulk = mdc.initializeUnorderedBulkOp();
 for( i = 0; i < doccount; ++i ) {
-    mdc.insert( { _id:i, x:bigstring } );
+    mdc.insert({ _id: i, x: bigstring });
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
 
 // Insert some docs to update and remove
 print ("inserting x");
+bulk = mdc.initializeUnorderedBulkOp();
 for( i = doccount; i < doccount*2; ++i ) {
-    mdc.insert( { _id:i, bs:bigstring, x:i } );
+    bulk.insert({ _id: i, bs: bigstring, x: i });
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
 
 // add a secondary; start cloning
 var slave = rt.add();
@@ -57,12 +59,14 @@ var sc = slave.getDB( 'd' )[ 'c' ];
 slave.setSlaveOk();
 
 print ("updating and deleting documents");
+bulk = mdc.initializeUnorderedBulkOp();
 for (i = doccount*4; i > doccount; --i) {
-    mdc.update( { _id:i }, { $inc: { x : 1 } } );
-    mdc.remove( { _id:i } );
-    mdc.insert( { bs:bigstring } );
+    bulk.find({ _id: i }).update({ $inc: { x: 1 }});
+    bulk.find({ _id: i }).remove();
+    bulk.insert({ bs: bigstring });
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
+
 print ("finished");
 // Wait for replication to catch up.
 rt.awaitReplication(640000);
