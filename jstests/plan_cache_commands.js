@@ -272,6 +272,27 @@ assert.eq(getPlans(queryB, sortB, {}), planCache.getPlansByQuery(queryB, undefin
 assert.eq(getPlans(queryB, {}, {}), planCache.getPlansByQuery(queryB),
           'plans from collection.getPlanCache().getPlansByQuery() different from command result');
 
+// getPlansByQuery() will also accept a single argument with the query shape object
+// as an alternative to specifying the query, sort and projection parameters separately.
+// Format of query shape object:
+// {
+//     query: <query>,
+//     projection: <projection>,
+//     sort: <sort>
+// }
+var shapeB = {query: queryB, projection: projectionB, sort: sortB};
+assert.eq(getPlans(queryB, sortB, projectionB),
+          planCache.getPlansByQuery(shapeB),
+          'collection.getPlanCache().getPlansByQuery() did not accept query shape object');
+
+// Should error on missing or extra fields in query shape object.
+assert.throws(function() { planCache.getPlansByQuery({query: queryB}) });
+assert.throws(function() { planCache.getPlansByQuery({query: queryB, sort: sortB,
+                                                      projection: projectionB,
+                                                      unknown_field: 1}) });
+
+
+
 //
 // collection.getPlanCache().clearPlansByQuery
 //
@@ -297,6 +318,30 @@ assert.eq(1, getShapes().length,
 planCache.clearPlansByQuery(queryB);
 assert.eq(0, getShapes().length,
           'query shape not dropped after running collection.getPlanCache().clearPlansByQuery()');
+
+// clearPlansByQuery() will also accept a single argument with the query shape object
+// as an alternative to specifying the query, sort and projection parameters separately.
+// Format of query shape object:
+// {
+//     query: <query>,
+//     projection: <projection>,
+//     sort: <sort>
+// }
+
+// Repopulate cache
+assert.eq(n, t.find(queryB, projectionB).sort(sortB).itcount(), 'unexpected document count');
+
+// Clear using query shape object.
+planCache.clearPlansByQuery(shapeB);
+assert.eq(0, getShapes().length,
+          'collection.getPlanCache().clearPlansByQuery() did not accept query shape object');
+
+// Should error on missing or extra fields in query shape object.
+assert.throws(function() { planCache.clearPlansByQuery({query: queryB}) });
+assert.throws(function() { planCache.clearPlansByQuery({query: queryB, sort: sortB,
+                                                        projection: projectionB,
+                                                        unknown_field: 1}) });
+
 
 
 //

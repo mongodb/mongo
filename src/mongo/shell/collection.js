@@ -1491,6 +1491,18 @@ PlanCache.prototype._parseQueryShape = function(query, projection, sort) {
     if (query == undefined) {
         throw new Error("required parameter query missing");
     }
+
+    // Accept query shape object as only argument.
+    // Query shape contains exactly 3 fields (query, projection and sort)
+    // as generated in the listQueryShapes() result.
+    if (typeof(query) == 'object' && projection == undefined && sort == undefined) {
+        var keysSorted = Object.keys(query).sort();
+        // Expected keys must be sorted for the comparison to work.
+        if (bsonWoCompare(keysSorted, ['projection', 'query', 'sort']) == 0) {
+            return query;
+        }
+    }
+
     var shape = {
         query: query,
         projection: projection == undefined ? {} : projection,
