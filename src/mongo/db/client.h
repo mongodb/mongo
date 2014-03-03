@@ -100,9 +100,6 @@ namespace mongo {
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
 
-        /** caution -- use Context class instead */
-        void setContext(Context *c) { _context = c; }
-
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) const;
 
