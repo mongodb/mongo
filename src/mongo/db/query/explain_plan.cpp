@@ -204,6 +204,18 @@ namespace mongo {
                 TypeExplain* childExplain = NULL;
                 explainPlan(**it, &childExplain, false /* no full details */);
                 if (childExplain) {
+                    // Override child's indexOnly value if we have a non-covered
+                    // query (implied by a FETCH stage).
+                    //
+                    // As we run explain on each child, explainPlan() sets indexOnly
+                    // based only on the information in each child. This does not
+                    // consider the possibility of a FETCH stage above the OR/MERGE_SORT
+                    // stage, in which case the child's indexOnly may be erroneously set
+                    // to true.
+                    if (!covered && childExplain->isIndexOnlySet()) {
+                        childExplain->setIndexOnly(false);
+                    }
+
                     // 'res' takes ownership of 'childExplain'.
                     res->addToClauses(childExplain);
                     nScanned += childExplain->getNScanned();
