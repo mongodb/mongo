@@ -89,7 +89,8 @@ namespace mongo {
 
         // Compute score for each tree.  Record the best.
         for (size_t i = 0; i < statTrees.size(); ++i) {
-            QLOG() << "scoring plan " << i << ":\n"
+            QLOG() << "scoring plan " << i << ":"
+                   << candidates[i].solution->toString() << "\n stats:\n"
                    << statsToBSON(*statTrees[i]).jsonString(Strict, true);
             double score = scoreTree(statTrees[i]);
             QLOG() << "score = " << score << endl;

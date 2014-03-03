@@ -526,6 +526,14 @@ namespace mongo {
             // have at least 2 scans (one predicate per scan as the planner can't
             // intersect bounds when the index is multikey), so we stop here.
             if (oneIndex.multikey && oneAssign.preds.size() > 1) {
+                // One could imagine an enormous auto-generated $all query with too many clauses to
+                // have an ixscan per clause.
+                static const size_t kMaxSelfIntersections = 10;
+                if (oneAssign.preds.size() > kMaxSelfIntersections) {
+                    // Only take the first kMaxSelfIntersections preds.
+                    oneAssign.preds.resize(kMaxSelfIntersections);
+                    oneAssign.positions.resize(kMaxSelfIntersections);
+                }
                 AndEnumerableState state;
                 state.assignments.push_back(oneAssign);
                 andAssignment->choices.push_back(state);
