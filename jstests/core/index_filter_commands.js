@@ -47,8 +47,11 @@ var sortA1 = {a: -1};
 //
 
 // Utility function to list index filters.
-function getFilters() {
-    var res = t.runCommand('planCacheListFilters');
+function getFilters(collection) {
+    if (collection == undefined) {
+        collection = t;
+    }
+    var res = collection.runCommand('planCacheListFilters');
     print('planCacheListFilters() = ' + tojson(res));
     assert.commandWorked(res, 'planCacheListFilters failed');
     assert(res.hasOwnProperty('filters'), 'filters missing from planCacheListFilters result');
@@ -56,10 +59,12 @@ function getFilters() {
     
 }
 
-// Check if key is in plan cache.
+// If query shape is in plan cache,
+// planCacheListPlans returns non-empty array of plans.
 function planCacheContains(shape) {
     var res = t.runCommand('planCacheListPlans', shape);
-    return res.ok;
+    assert.commandWorked(res);
+    return res.plans.length > 0;
 }
 
 // Utility function to list plans for a query.
@@ -71,10 +76,12 @@ function getPlans(shape) {
     return res.plans;
 }
 
-// It is an error to retrieve index filters on a non-existent collection.
+// Attempting to retrieve index filters on a non-existent collection
+// will return empty results.
 var missingCollection = db.jstests_index_filter_commands_missing;
 missingCollection.drop();
-assert.commandFailed(missingCollection.runCommand('planCacheListFilters'));
+assert.eq(0, getFilters(missingCollection),
+          'planCacheListFilters should return empty array on non-existent collection');
 
 // Retrieve index filters from an empty test collection.
 var filters = getFilters();
@@ -87,6 +94,10 @@ var planBeforeSetFilter = getPlans(shape)[0];
 print('Winning plan (before setting index filters) = ' + tojson(planBeforeSetFilter));
 // Check filterSet field in plan details
 assert.eq(false, planBeforeSetFilter.filterSet, 'missing or invalid filterSet field in plan details');
+
+// Adding index filters to a non-existent collection should be an error.
+assert.commandFailed(missingCollection.runCommand('planCacheSetFilter',
+        {query: queryA1, sort: sortA1, projection: projectionA1, indexes: [indexA1B1, indexA1C1]}));
 
 // Add index filters for simple query.
 assert.commandWorked(t.runCommand('planCacheSetFilter',
@@ -117,6 +128,9 @@ assert.eq(true, planAfterSetFilter.filterSet, 'missing or invalid filterSet fiel
 t.find(queryA1, projectionA1).sort(sortA1).hint(indexA1).itcount();
 
 // Clear filters
+// Clearing filters on a missing collection should be a no-op.
+assert.commandWorked(missingCollection.runCommand('planCacheClearFilters'));
+// Clear the filters set earlier.
 assert.commandWorked(t.runCommand('planCacheClearFilters'));
 filters = getFilters();
 assert.eq(0, filters.length, 'filters not cleared after successful planCacheClearFilters command');

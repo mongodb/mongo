@@ -211,7 +211,10 @@ namespace mongo {
         PlanCache* planCache;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
-            return status;
+            // No collection - return results with empty shapes array.
+            BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
+            arrayBuilder.doneFast();
+            return Status::OK();
         }
         return list(*planCache, bob);
     }
@@ -254,7 +257,8 @@ namespace mongo {
         PlanCache* planCache;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
-            return status;
+            // No collection - nothing to do. Return OK status.
+            return Status::OK();
         }
         return clear(planCache, ns, cmdObj);
     }
@@ -277,7 +281,12 @@ namespace mongo {
             scoped_ptr<CanonicalQuery> cq(cqRaw);
 
             if (!planCache->contains(*cq)) {
-                return Status(ErrorCodes::NoSuchKey, "query shape doesn't exist in PlanCache");
+                // Log if asked to clear non-existent query shape.
+                LOG(1) << ns << ": query shape doesn't exist in PlanCache - "
+                       << cq->getQueryObj().toString()
+                       << "(sort: " << cq->getParsed().getSort()
+                       << "; projection: " << cq->getParsed().getProj() << ")";
+                return Status::OK();
             }
 
             Status result = planCache->remove(*cq);
@@ -317,7 +326,10 @@ namespace mongo {
         PlanCache* planCache;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
-            return status;
+            // No collection - return empty plans array.
+            BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
+            plansBuilder.doneFast();
+            return Status::OK();
         }
         return list(*planCache, ns, cmdObj, bob);
     }
@@ -334,7 +346,11 @@ namespace mongo {
         scoped_ptr<CanonicalQuery> cq(cqRaw);
 
         if (!planCache.contains(*cq)) {
-            return Status(ErrorCodes::NoSuchKey, "query shape doesn't exist in PlanCache");
+            // Return empty plans in results if query shape does not
+            // exist in plan cache.
+            BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
+            plansBuilder.doneFast();
+            return Status::OK();
         }
 
         PlanCacheEntry* entryRaw;
