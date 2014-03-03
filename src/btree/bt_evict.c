@@ -735,6 +735,14 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	__wt_cache_read_gen_incr(session);
 
 	/*
+	 * Update the oldest ID: we use it to decide whether pages are
+	 * candidates for eviction.  Without this, if all threads are blocked
+	 * after a long-running transaction (such as a checkpoint) completes,
+	 * we may never start evicting again.
+	 */
+	__wt_txn_update_oldest(session);
+
+	/*
 	 * Set the starting slot in the queue and the maximum pages added
 	 * per walk.
 	 */
