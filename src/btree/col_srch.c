@@ -12,7 +12,8 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_col_search(WT_SESSION_IMPL *session,
+    uint64_t recno, WT_PAGE *leaf_page, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -22,14 +23,21 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
-	uint64_t recno;
 	uint32_t base, indx, limit;
 	int depth;
 
 	btree = S2BT(session);
 
-	recno = cbt->iface.recno;
 	__cursor_search_clear(cbt);
+
+	/*
+	 * In the service of eviction splits, we're only searching a single leaf
+	 * page, not a full tree.
+	 */
+	if (leaf_page != NULL) {
+		page = leaf_page;
+		goto leaf_only;
+	}
 
 restart:
 	/* Search the internal pages of the tree. */
@@ -97,13 +105,11 @@ descend:	WT_ASSERT(session, ref != NULL);
 		return (ret);
 	}
 
-	/*
-	 * We want to know how deep the tree gets because excessive depth can
-	 * happen because of how WiredTiger splits.
-	 */
+	/* Track how deep the tree gets. */
 	if (depth > btree->maximum_depth)
 		btree->maximum_depth = depth;
 
+leaf_only:
 	cbt->page = page;
 	cbt->recno = recno;
 	cbt->compare = 0;

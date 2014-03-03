@@ -784,7 +784,9 @@ __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * give other transactions a chance to complete.
 	 */
 	__wt_txn_update_oldest(session);
-	if (__wt_txn_visible_all(session, page->modify->update_txn)) {
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_FORCE) ||
+	    __wt_txn_visible_all(session, page->modify->update_txn)) {
+		F_SET_ATOMIC(page, WT_PAGE_EVICT_FORCE);
 		page->read_gen = WT_READ_GEN_OLDEST;
 		WT_RET(__wt_page_release(session, page));
 		WT_RET(__wt_evict_server_wake(session));

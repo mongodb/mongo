@@ -139,6 +139,11 @@ typedef struct {
 		WT_ADDR addr;		/* Split's written location */
 		uint32_t size;		/* Split's size */
 		uint32_t cksum;		/* Split's checksum */
+		void    *dsk;		/* Split's disk image */
+
+		WT_UPD_SKIPPED *skip;	/* Skipped updates */
+		uint32_t	skip_next;
+		size_t		skip_allocated;
 
 		/*
 		 * The key for a row-store page; no column-store key is needed
@@ -394,53 +399,6 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_multi_to_ref --
- *	Copy a list of blocks into an array of WT_REF structures.
- */
-int
-__wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_MULTI *multi, WT_REF *refarg, uint32_t entries)
-{
-	WT_ADDR *addr;
-	WT_DECL_RET;
-	WT_REF *ref;
-	uint32_t i;
-
-	addr = NULL;
-	for (ref = refarg, i = 0; i < entries; ++multi, ++ref, ++i) {
-		ref->page = NULL;
-
-		WT_ERR(__wt_calloc_def(session, 1, &addr));
-		ref->addr = addr;
-		addr->size = multi->addr.size;
-		addr->type = multi->addr.type;
-		WT_ERR(__wt_strndup(session,
-		    multi->addr.addr, addr->size = multi->addr.size,
-		    &addr->addr));
-
-		switch (page->type) {
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			WT_ERR(__wt_strndup(session,
-			    multi->key.ikey,
-			    multi->key.ikey->size + sizeof(WT_IKEY),
-			    &ref->key.ikey));
-			break;
-		default:
-			ref->key.recno = multi->key.recno;
-			break;
-		}
-
-		ref->txnid = 0;
-		ref->state = WT_REF_DISK;
-	}
-	return (0);
-
-err:	__wt_free_ref_array(session, page, refarg, entries);
-	return (ret);
-}
-
-/*
  * __rec_root_write --
  *	Handle the write of a root page.
  */
@@ -550,8 +508,12 @@ __rec_write_init(
 			WT_ASSERT(session, bnd->addr.addr == NULL);
 			bnd->addr.size = 0;
 			bnd->addr.type = 0;
-
 			bnd->size = bnd->cksum = 0;
+			__wt_free(session, bnd->dsk);
+
+			__wt_free(session, bnd->skip);
+			bnd->skip_next = 0;
+			bnd->skip_allocated = 0;
 
 			/* Leave the key alone, it's space we re-use. */
 
@@ -696,13 +658,11 @@ __rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	r->upd_skipped = 1;
 
-	switch (F_ISSET(r, WT_SKIP_UPDATE_ERR | WT_SKIP_UPDATE_QUIT)) {
+	switch (F_ISSET(r, WT_SKIP_UPDATE_ERR | WT_SKIP_UPDATE_RESTORE)) {
 	case WT_SKIP_UPDATE_ERR:
 		WT_PANIC_RETX(
 		    session, "reconciliation illegally skipped an update");
-	case WT_SKIP_UPDATE_QUIT:
-		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
-		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
+	case WT_SKIP_UPDATE_RESTORE:
 		return (EBUSY);
 	case 0:
 	default:
@@ -712,33 +672,78 @@ __rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
+ * __rec_upd_skip_save --
+ *	Save a key/WT_UPDATE pair for later restoration.
+ */
+static int
+__rec_upd_skip_save(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, void *head, int is_insert, WT_UPDATE *upd)
+{
+	WT_BOUNDARY *bnd;
+
+	bnd = &r->bnd[r->bnd_next];
+	WT_RET(__wt_realloc_def(
+	    session, &bnd->skip_allocated, bnd->skip_next + 1, &bnd->skip));
+	bnd->skip[bnd->skip_next].upd = upd;
+	bnd->skip[bnd->skip_next].head = head;
+	bnd->skip[bnd->skip_next].is_insert = is_insert;
+	++bnd->skip_next;
+	return (0);
+}
+
+/*
  * __rec_txn_read --
- *	Return the update structure that's visible, or fail if there's a change
- * that's not globally visible and we can't skip changes.
+ *	Return the first visible update in a list (or NULL if none are visible).
+ * Track the maximum transaction ID in the list and whether updates were skipped
+ * to find the visible update, an optionally save away skipped updates.
  */
 static inline int
-__rec_txn_read(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
+__rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
+    void *head, int is_insert, WT_UPDATE *upd, WT_UPDATE **updp)
 {
-	int skip, retried;
+	*updp = NULL;
+	for (; upd != NULL; upd = upd->next) {
+		if (upd->txnid == WT_TXN_ABORTED)
+			continue;
 
-	retried = 0;
-retry:	*updp = __wt_txn_read_skip(session, upd, &r->max_txn, &skip);
-	if (!skip)
-		return (0);
+		/*
+		 * Track the largest transaction ID on this page.  We store this
+		 * in the page at the end of reconciliation if no updates are
+		 * skipped, and used to avoid evicting clean pages from memory
+		 * with changes that are required to satisfy a snapshot read.
+		 */
+		if (TXNID_LT(r->max_txn, upd->txnid))
+			r->max_txn = upd->txnid;
 
-	/*
-	 * If skipping this update will cause reconciliation to quit, update
-	 * the oldest transaction ID and retry, in case some transactions have
-	 * committed while we have been working.
-	 */
-	if (F_ISSET(r, WT_SKIP_UPDATE_QUIT) && !retried) {
-		__wt_txn_update_oldest(session);
-		retried = 1;
-		goto retry;
+		if (*updp != NULL)
+			continue;
+		if (__wt_txn_visible(session, upd->txnid)) {
+			*updp = upd;
+			continue;
+		}
+
+		/*
+		 * Record whether any updates were skipped on the way to finding
+		 * the first visible update.  That determines if a future read
+		 * with no intervening modifications to the page could see a
+		 * different value.  If not, the page can safely be marked clean
+		 * and does not need to be reconciled until modified again.
+		 */
+		r->upd_skipped = 1;
+
+		/*
+		 * If evicting and there's an update that's in-flight, save the
+		 * information about the update so we can restore it on a newly
+		 * instantiated page.  It's tricky: a transaction references
+		 * the physical WT_UPDATE, so we must move the structure itself,
+		 * not a copy of it.
+		 */
+		if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
+			WT_RET(__rec_upd_skip_save(
+			    session, r, head, is_insert, upd));
 	}
 
-	return (__rec_txn_skip_chk(session, r));
+	return (0);
 }
 
 /*
@@ -1889,6 +1894,19 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	WT_ILLEGAL_VALUE(session);
 	}
 
+	/*
+	 * If we're doing an eviction, and we skipped an update, it only pays
+	 * off to continue if writing multiple blocks.  This should be unlikely
+	 * (why did eviction pick a small block that was recently written), but
+	 * it's possible.
+	 */
+	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
+	    r->bnd_next == 0 && r->upd_skipped) {
+		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
+		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
+		return (EBUSY);
+	}
+
 	/* Set the boundary reference and increment the count. */
 	bnd = &r->bnd[r->bnd_next++];
 	bnd->entries = r->entries;
@@ -2063,6 +2081,17 @@ __rec_split_write(
 	WT_ILLEGAL_VALUE(session);
 	}
 
+	bnd->size = (uint32_t)buf->size;
+	bnd->cksum = 0;
+
+	/*
+	 * If we had to skip updates in order to build this disk image, we can't
+	 * actually write it. Instead, we will re-instantiate the page using the
+	 * disk image and the list of updates we skipped.
+	 */
+	if (bnd->skip != NULL)
+		return (__wt_strndup(session, buf->data, buf->size, &bnd->dsk));
+
 	/*
 	 * If we wrote this block before, re-use it.  Pages get written in the
 	 * same block order every time, only check the appropriate slot.  The
@@ -2073,8 +2102,6 @@ __rec_split_write(
 	 * time, but that test won't calculate a checksum on the first block
 	 * the first time the page splits.
 	 */
-	bnd->size = (uint32_t)buf->size;
-	bnd->cksum = 0;
 	if (mod->multi != NULL || r->bnd_next > 1) {
 		/*
 		 * There are page header fields which need to be cleared to get
@@ -2545,7 +2572,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		WT_RET(__rec_txn_read(session, r, ins->upd, &upd));
+		WT_RET(__rec_txn_read(session, r, ins, 1, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		__bit_setv_recno(page, WT_INSERT_RECNO(ins),
@@ -2568,7 +2595,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		WT_RET(__rec_txn_read(session, r, ins->upd, &upd));
+		WT_RET(__rec_txn_read(session, r, ins, 1, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		for (;;) {
@@ -2889,8 +2916,8 @@ record_loop:	/*
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
 			upd = NULL;
 			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
-				WT_ERR(
-				    __rec_txn_read(session, r, ins->upd, &upd));
+				WT_ERR(__rec_txn_read(
+				    session, r, ins, 1, ins->upd, &upd));
 				ins = WT_SKIP_NEXT(ins);
 			}
 			if (upd != NULL) {
@@ -3048,7 +3075,7 @@ compare:		/*
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		WT_ERR(__rec_txn_read(session, r, ins->upd, &upd));
+		WT_ERR(__rec_txn_read(session, r, ins, 1, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
@@ -3460,8 +3487,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		dictionary = 0;
 		if ((val_cell = __wt_row_leaf_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
-		WT_ERR(
-		    __rec_txn_read(session, r, WT_ROW_UPDATE(page, rip), &upd));
+		WT_ERR(__rec_txn_read(
+		    session, r, rip, 0, WT_ROW_UPDATE(page, rip), &upd));
 		if (upd == NULL) {
 			/*
 			 * When the page was read into memory, there may not
@@ -3723,7 +3750,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 		if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT(page, rip))) != NULL)
-			WT_ERR(__rec_row_leaf_insert(session, r, ins));
+		    WT_ERR(__rec_row_leaf_insert(session, r, ins));
 	}
 
 	/* Write the remnant page. */
@@ -3752,7 +3779,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		/* Build value cell. */
-		WT_RET(__rec_txn_read(session, r, ins->upd, &upd));
+		WT_RET(__rec_txn_read(session, r, ins, 1, ins->upd, &upd));
 		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 		if (upd->size == 0)
@@ -4077,6 +4104,14 @@ err:			__wt_scr_free(&tkey);
 	 * there's no risk of that happening).
 	 */
 	if (r->upd_skipped) {
+		/*
+		 * In some cases (for example, when closing a file), there had
+		 * better not be any updates we can't write.
+		 */
+		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
+			WT_PANIC_RETX(session,
+			    "reconciliation illegally skipped an update");
+
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 	}
@@ -4160,17 +4195,25 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	for (multi = mod->multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
-		multi->addr = bnd->addr;
-		bnd->addr.addr = NULL;
-		incr += sizeof(WT_ADDR) + multi->addr.size;
-
 		WT_RET(__wt_row_ikey(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 		incr += sizeof(WT_IKEY) + bnd->key.size;
 
-		multi->size = bnd->size;
-		multi->cksum = bnd->cksum;
-		multi->reuse = 0;
+		if (bnd->skip == NULL) {
+			multi->addr = bnd->addr;
+			bnd->addr.addr = NULL;
+			incr += sizeof(WT_ADDR) + multi->addr.size;
+
+			multi->size = bnd->size;
+			multi->cksum = bnd->cksum;
+			multi->reuse = 0;
+		} else {
+			multi->skip = bnd->skip;
+			multi->skip_entries = bnd->skip_next;
+			bnd->skip = NULL;
+			multi->skip_dsk = bnd->dsk;
+			bnd->dsk = NULL;
+		}
 	}
 
 	__wt_cache_page_inmem_incr(session, page, incr);
@@ -4202,15 +4245,23 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	for (multi = mod->multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
-		multi->addr = bnd->addr;
-		bnd->addr.addr = NULL;
-		incr += sizeof(WT_ADDR) + multi->addr.size;
-
 		multi->key.recno = bnd->recno;
 
-		multi->size = bnd->size;
-		multi->cksum = bnd->cksum;
-		multi->reuse = 0;
+		if (bnd->skip == NULL) {
+			multi->addr = bnd->addr;
+			bnd->addr.addr = NULL;
+			incr += sizeof(WT_ADDR) + multi->addr.size;
+
+			multi->size = bnd->size;
+			multi->cksum = bnd->cksum;
+			multi->reuse = 0;
+		} else {
+			multi->skip = bnd->skip;
+			multi->skip_entries = bnd->skip_next;
+			bnd->skip = NULL;
+			multi->skip_dsk = bnd->dsk;
+			bnd->dsk = NULL;
+		}
 	}
 
 	__wt_cache_page_inmem_incr(session, page, incr);

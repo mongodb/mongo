@@ -32,7 +32,7 @@ flags = {
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',
-		'SKIP_UPDATE_QUIT',
+		'SKIP_UPDATE_RESTORE'
 	],
 	'shared_cache' : [
 		'CACHE_POOL_RUN'

@@ -15,25 +15,26 @@ static int __col_insert_alloc(
  *	Column-store delete, insert, and update.
  */
 int
-__wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
+__wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
+    uint64_t recno, WT_ITEM *value, WT_UPDATE *upd, int is_remove)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head, **ins_headp;
-	WT_ITEM *value, _value;
+	WT_ITEM _value;
 	WT_PAGE *page;
-	WT_UPDATE *old_upd, *upd;
+	WT_UPDATE *old_upd;
 	size_t ins_size, upd_size;
-	uint64_t recno;
 	u_int i, skipdepth;
 	int append, logged;
 
 	btree = cbt->btree;
+	ins = NULL;
 	page = cbt->page;
-	recno = cbt->iface.recno;
 	append = logged = 0;
 
+	/* This code expects a remove to have a NULL value. */
 	if (is_remove) {
 		if (btree->type == BTREE_COL_FIX) {
 			value = &_value;
@@ -42,8 +43,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		} else
 			value = NULL;
 	} else {
-		value = &cbt->iface.value;
-
 		/*
 		 * There's some chance the application specified a record past
 		 * the last record on the page.  If that's the case, and we're
@@ -60,9 +59,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	/* If we don't yet have a modify structure, we'll need one. */
 	WT_RET(__wt_page_modify_init(session, page));
 
-	ins = NULL;
-	upd = NULL;
-
 	/*
 	 * Delete, insert or update a column-store entry.
 	 *
@@ -75,13 +71,20 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	 * the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
-		/* Make sure the update can proceed. */
-		WT_ERR(__wt_txn_update_check(session, old_upd = cbt->ins->upd));
+		if (upd == NULL) {
+			/* Make sure the update can proceed. */
+			WT_ERR(__wt_txn_update_check(
+			    session, old_upd = cbt->ins->upd));
 
-		/* Allocate the WT_UPDATE structure and transaction ID. */
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
-		WT_ERR(__wt_txn_modify(session, cbt, upd));
-		logged = 1;
+			/* Allocate a WT_UPDATE structure and transaction ID. */
+			WT_ERR(
+			    __wt_update_alloc(session, value, &upd, &upd_size));
+			WT_ERR(__wt_txn_modify(session, cbt, upd));
+			logged = 1;
+		} else {
+			upd_size = sizeof(WT_UPDATE) + upd->size;
+			old_upd = cbt->ins->upd;
+		}
 
 		/*
 		 * Point the new WT_UPDATE item to the next element in the list.
@@ -119,22 +122,23 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/*
 		 * Allocate a WT_INSERT/WT_UPDATE pair and transaction ID, and
-		 * update the cursor to reference it.
+		 * update the cursor to reference it (the WT_INSERT_HEAD might
+		 * be allocated, the WT_INSERT was allocated).
 		 */
 		WT_ERR(__col_insert_alloc(
 		    session, recno, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
-		ins->upd = upd;
-		ins_size += upd_size;
-
-		/*
-		 * Update the cursor: the insert head may have been allocated,
-		 * the ins field was allocated.
-		 */
 		cbt->ins_head = ins_head;
 		cbt->ins = ins;
-		WT_ERR(__wt_txn_modify(session, cbt, upd));
-		logged = 1;
+
+		if (upd == NULL) {
+			WT_ERR(
+			    __wt_update_alloc(session, value, &upd, &upd_size));
+			WT_ERR(__wt_txn_modify(session, cbt, upd));
+			logged = 1;
+		} else
+			upd_size = sizeof(WT_UPDATE) + upd->size;
+		ins->upd = upd;
+		ins_size += upd_size;
 
 		/*
 		 * If there was no insert list during the search, or there was
@@ -206,42 +210,4 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
 	*insp = ins;
 	*ins_sizep = ins_size;
 	return (0);
-}
-
-/*
- * __wt_col_leaf_obsolete --
- *	Discard all obsolete updates on a column-store leaf page.
- */
-void
-__wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_COL *cip;
-	WT_INSERT *ins;
-	WT_UPDATE *upd;
-	uint32_t i;
-
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-		WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
-			if ((upd = __wt_update_obsolete_check(
-			    session, ins->upd)) != NULL)
-				__wt_update_obsolete_free(session, page, upd);
-		break;
-
-	case WT_PAGE_COL_VAR:
-		WT_COL_FOREACH(page, cip, i)
-			WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip))
-				if ((upd = __wt_update_obsolete_check(
-				    session, ins->upd)) != NULL)
-					__wt_update_obsolete_free(
-					    session, page, upd);
-		break;
-	}
-
-	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		if ((upd =
-		    __wt_update_obsolete_check(session, ins->upd)) != NULL)
-			__wt_update_obsolete_free(session, page, upd);
-	}
 }
