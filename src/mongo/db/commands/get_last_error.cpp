@@ -238,7 +238,7 @@ namespace mongo {
 
             WriteConcernResult wcResult;
             status = waitForWriteConcern( writeConcern, lastOpTime, &wcResult );
-            wcResult.appendTo( &result );
+            wcResult.appendTo( writeConcern, &result );
 
             // For backward compatibility with 2.4, wtimeout returns ok : 1.0
             if ( wcResult.wTimedOut ) {

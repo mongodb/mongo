@@ -78,7 +78,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    void WriteConcernResult::appendTo( BSONObjBuilder* result ) const {
+    void WriteConcernResult::appendTo( const WriteConcernOptions& writeConcern,
+                                       BSONObjBuilder* result ) const {
+
         if ( syncMillis >= 0 )
             result->appendNumber( "syncMillis", syncMillis );
 
@@ -104,6 +106,22 @@ namespace mongo {
             result->appendNull( "err" );
         else
             result->append( "err", err );
+
+        // *** 2.4 SyncClusterConnection compatibility ***
+        // 2.4 expects either fsync'd files, or a "waited" field exist after running an fsync : true
+        // GLE, but with journaling we don't actually need to run the fsync (fsync command is
+        // preferred in 2.6).  So we add a "waited" field if one doesn't exist.
+
+        if ( writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
+
+            if ( fsyncFiles < 0 && ( wTime < 0 || !wTimedOut ) ) {
+                dassert( result->asTempObj()["waited"].eoo() );
+                result->appendNumber( "waited", syncMillis );
+            }
+
+            dassert( result->asTempObj()["fsyncFiles"].numberInt() > 0 ||
+                     !result->asTempObj()["waited"].eoo() );
+        }
     }
 
     Status waitForWriteConcern( const WriteConcernOptions& writeConcern,
