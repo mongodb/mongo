@@ -180,10 +180,14 @@ namespace mongo {
         // be greater than that.
         double baseScore = 1;
 
+        // How many "units of work" did the plan perform. Each call to work(...)
+        // counts as one unit, and each NEED_FETCH is penalized as an additional work unit.
+        size_t workUnits = stats->common.works + stats->common.needFetch;
+
         // How much did a plan produce?
         // Range: [0, 1]
         double productivity = static_cast<double>(stats->common.advanced)
-                            / static_cast<double>(stats->common.works);
+                            / static_cast<double>(workUnits);
 
         // If we have to perform a fetch, that's not great.
         //
@@ -215,7 +219,13 @@ namespace mongo {
         double score = baseScore + productivity + noFetchBonus + noIxisectBonus;
 
         QLOG() << "score (" << score << ") = baseScore(" << baseScore << ")"
-                                     <<  " + productivity(" << productivity << ")"
+                                     <<  " + productivity((" << stats->common.advanced
+                                                             << " advanced)/("
+                                                             << stats->common.works
+                                                             << " works + "
+                                                             << stats->common.needFetch
+                                                             << " needFetch) = "
+                                                             << productivity << ")"
                                      <<  " + noFetchBonus(" << noFetchBonus << ")"
                                      <<  " + noIxisectBonus(" << noIxisectBonus << ")"
                                      << endl;

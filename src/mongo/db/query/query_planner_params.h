@@ -38,7 +38,7 @@ namespace mongo {
     struct QueryPlannerParams {
 
         // How many indexed solutions are we willing to output?
-        static const size_t kDefaultMaxIndexedSolutions = 5;
+        static const size_t kDefaultMaxIndexedSolutions = 6;
 
         QueryPlannerParams() : options(DEFAULT),
                                indexFiltersApplied(false),
