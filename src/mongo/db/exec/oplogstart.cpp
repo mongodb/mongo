@@ -28,8 +28,12 @@
 
 #include "mongo/db/exec/oplogstart.h"
 
-#include "mongo/db/pdfile.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/record.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
@@ -52,7 +56,8 @@ namespace mongo {
             params.ns = _ns;
             params.direction = CollectionScanParams::BACKWARD;
             _cs.reset(new CollectionScan(params, _workingSet, NULL));
-            _nsd = nsdetails(_ns.c_str());
+            Collection* collection = cc().database()->getCollection( _ns );
+            _nsd = collection->details();
             _needInit = false;
             _backwardsScanning = true;
             _timer.reset();

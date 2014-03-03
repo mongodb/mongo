@@ -162,12 +162,12 @@ namespace mongo {
                 }
 
                 {
-                    const NamespaceDetails *nsd = nsdetails( source );
+
                     indexesInProg = stopIndexBuilds( srcCtx.db(), cmdObj );
-                    capped = nsd->isCapped();
-                    if ( capped )
-                        for( DiskLoc i = nsd->firstExtent(); !i.isNull(); i = i.ext()->xnext )
-                            size += i.ext()->length;
+                    capped = sourceColl->isCapped();
+                    if ( capped ) {
+                        size = sourceColl->storageSize();
+                    }
                 }
             }
 

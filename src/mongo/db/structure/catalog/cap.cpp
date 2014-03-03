@@ -330,7 +330,6 @@ namespace mongo {
     }
 
     void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive) {
-        DEV verify( this == nsdetails(ns) );
         verify( cappedLastDelRecLastExtent().isValid() );
 
         // We iteratively remove the newest document until the newest document
@@ -425,7 +424,6 @@ namespace mongo {
     }
 
     void NamespaceDetails::emptyCappedCollection( const char *ns ) {
-        DEV verify( this == nsdetails(ns) );
         massert( 13424, "collection must be capped", isCapped() );
         massert( 13425, "background index build in progress", !_indexBuildsInProgress );
 

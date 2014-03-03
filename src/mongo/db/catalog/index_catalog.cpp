@@ -1094,9 +1094,13 @@ namespace mongo {
     }
 
     const IndexAccessMethod* IndexCatalog::getIndex( const IndexDescriptor* desc ) const {
+        return getEntry( desc )->accessMethod();
+    }
+
+    const IndexCatalogEntry* IndexCatalog::getEntry( const IndexDescriptor* desc ) const {
         const IndexCatalogEntry* entry = _entries.find( desc );
         massert( 17357, "cannot find index entry", entry );
-        return entry->accessMethod();
+        return entry;
     }
 
     IndexAccessMethod* IndexCatalog::_createAccessMethod( const IndexDescriptor* desc,

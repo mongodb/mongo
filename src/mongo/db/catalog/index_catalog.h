@@ -103,6 +103,8 @@ namespace mongo {
                               bool includeUnfinishedIndexes = false ) const;
 
         // never returns NULL
+        const IndexCatalogEntry* getEntry( const IndexDescriptor* desc ) const;
+
         IndexAccessMethod* getIndex( const IndexDescriptor* desc );
         const IndexAccessMethod* getIndex( const IndexDescriptor* desc ) const;
 
