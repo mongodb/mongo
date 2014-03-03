@@ -177,7 +177,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 	 * page.  In other words, the goal is to avoid some number of updates
 	 * immediately after each update we have to make.
 	 */
-	return (++S2C(session)->cache->read_gen + WT_READ_GEN_STEP);
+	return (__wt_cache_read_gen(session) + WT_READ_GEN_STEP);
 }
 
 /*
