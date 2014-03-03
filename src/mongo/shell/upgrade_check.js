@@ -1,40 +1,41 @@
-documentUpgradeCheck = function(indexes, doc) {
+(function() {
+"use strict";
+
+var documentUpgradeCheck = function(indexes, doc) {
     var goodSoFar = true;
     var invalidForStorage = Object.invalidForStorage(doc);
     if (invalidForStorage) {
-        print("Document:\n\t" + tojson(doc) + "\n\tis no longer valid in 2.6: " + invalidForStorage);
+        print("Document Error: document is no longer valid in 2.6 because " + invalidForStorage +
+              ": "+ tojson(doc));
         goodSoFar = false;
     }
     indexes.forEach(function(idx) {
         if (keyTooLong({index: idx, doc: doc})) {
-            print("Document:\n\t" + tojson(doc) + "\n\tcannot be indexed by: " + idx.name);
-            if (idx.name === "_id_") {
-                print("As a result, this document cannot be removed by its _id index. Instead, " +
-                      "try to remove it by all other fields (omit any fields that have been " +
-                      "identified as unindexable by the upgrade checker).");
-            }
-            else {
-                print("Remove this document via the _id field");
-            }
+            print("Document Error: key for index '" + idx.name + "' (" + tojson(idx.key) + ")" +
+                  " too long for document: " +tojson(doc));
             goodSoFar = false;
         }
     });
     return goodSoFar;
-}
+};
 
-indexUpgradeCheck = function(index) {
+var indexUpgradeCheck = function(index) {
     var goodSoFar = true;
     var indexValid = validateIndexKey(index.key);
     if (!indexValid.ok) {
-        print("Index: " + index.name + " is invalid: " + index.key);
+        print("Index Error: invalid index spec for index '" + index.name + "': " +
+              tojson(index.key));
         goodSoFar = false;
     }
     return goodSoFar;
-}
+};
 
-collUpgradeCheck = function(dbName, collName) {
-    var fullName = dbName + '.' + collName;
-    print("\tChecking collection " + fullName);
+var collUpgradeCheck = function(collObj) {
+    var fullName = collObj.getFullName();
+    var collName = collObj.getName();
+    var dbName = collObj.getDB().getName();
+    print("\nChecking collection " + fullName);
+    var dbObj = collObj.getDB();
     var goodSoFar = true;
 
     // check for _id index if and only if it should be present
@@ -42,19 +43,16 @@ collUpgradeCheck = function(dbName, collName) {
     if (collName.indexOf('$') === -1 && 
         collName.indexOf("system.") !== 0 &&
         (dbName !== "local" || collName.indexOf("oplog.") !== 0)) {
-        var idIdx = db.getSiblingDB(dbName).system.indexes.find({ns: fullName, name: "_id_"});
+        var idIdx = dbObj.getSiblingDB(dbName).system.indexes.find({ns: fullName, name: "_id_"});
         if (!idIdx.hasNext()) {
-            print(dbName + '.' + collName +
-                  " lacks an _id index; to fix this please run the following in the MongoDB shell");
-            print("db.getSiblingDB('" + dbName + "')." + collName +
-                  ".ensureIndex({_id: 1}, {unique: true});");
+            print("Collection Error: lack of _id index on collection: " + fullName);
             goodSoFar = false;
         }
     }
 
     var indexes = [];
     // run index level checks on each index on the collection
-    db.getSiblingDB(dbName).system.indexes.find({ns: fullName}).forEach(function(index) {
+    dbObj.getSiblingDB(dbName).system.indexes.find({ns: fullName}).forEach( function(index) {
         if (!indexUpgradeCheck(index)) {
             goodSoFar = false;
         }
@@ -72,7 +70,7 @@ collUpgradeCheck = function(dbName, collName) {
     }
 
     // run document level checks on each document in the collection
-    db.getSiblingDB(dbName).getCollection(collName).find().sort({$natural: 1}).forEach(
+    dbObj.getSiblingDB(dbName).getCollection(collName).find().sort({$natural: 1}).forEach(
         function(doc) {
             if (!documentUpgradeCheck(indexes, doc)) {
                 goodSoFar = false;
@@ -80,75 +78,86 @@ collUpgradeCheck = function(dbName, collName) {
     });
 
     return goodSoFar;
-}
+};
 
-dbUpgradeCheck = function(dbName) {
-    print("\tChecking database " + dbName);
+var dbUpgradeCheck = function(dbObj) {
+    print("\nChecking database " + dbObj.getName());
     var goodSoFar = true;
 
     // run collection level checks on each collection in the db
-    db.getSiblingDB(dbName).getCollectionNames().forEach(function(collName) {
-        if (!collUpgradeCheck(dbName, collName)) {
+    dbObj.getCollectionNames().forEach(function(collName) {
+        if (!collUpgradeCheck(dbObj.getCollection(collName))) {
             goodSoFar = false;
         }
     });
 
     return goodSoFar;
-}
+};
 
-upgradeCheck = function(obj) { 
+DB.prototype.upgradeCheck = function(obj) { 
+    var self = this;
     // parse args if there are any
     if (obj) {
         // check collection if a collection is passed
         if (obj["collection"]) {
             // make sure a string was passed in for the collection
             if (typeof obj["collection"] !== "string") {
-                print("The collection field must contain a string");
-                return false;
+                throw Error("The collection field must contain a string");
             }
-        }
-
-        if (obj["db"]) {
-            // make sure a string was passed in for the db
-            if (typeof obj["db"] !== "string") {
-                print("The db field must contain a string");
-                return false;
-            }
-
-            // check only the collection if it was passed it
-            if (obj["collection"]) {
-                print("\tChecking collection '" + obj["db"] + '.' + obj["collection"] +
+            else {
+                print("Checking collection '" + self.getName() + '.' + obj["collection"] +
                       "' for 2.6 upgrade compatibility");
-                return collUpgradeCheck(obj["db"], obj["collection"]);
+                if (collUpgradeCheck(self.getCollection(obj["collection"]))) {
+                    print("Everything in '" + self.getName() + '.' + obj["collection"] +
+                           "' is ready for the upgrade!");
+                    return true;
+                }
+                print("To fix the problems above please consult " +
+                       "http://dochub.mongodb.org/core/upgrade_checker_help");
+                return false;
             }
-
-            //otherwise check entire db
-            print("\tChecking database '" + obj["db"] + "' for 2.6 upgrade compatibility");
-            return dbUpgradeCheck(obj["db"]);
         }
-        if (obj["collection"]) {
-            print("\tChecking collection '" + db.getName() + '.' + obj["collection"] +
-                  "' for 2.6 upgrade compatibility");
-            return collUpgradeCheck(db.getName(), obj["collection"]);
+        else {
+            throw Error("When providing an argument to upgradeCheck, it must be of the form " +
+                        "{collection: <collectionNameString>}. Otherwise, it will check every " +
+                        "collection in the database. If you would like to check all databases, " +
+                        "run db.upgradeCheckAllDbs() from the admin database.");
         }
-        print("When passing an argument to upgradeCheck, it must be of the form {db: " +
-              "<dbNameString>, collection: <collectionNameString>} (either field may be omitted)");
-        return false;
     }
 
-    print("\tChecking mongod instance for 2.6 upgrade compatibility");
-    var dbs = db.getMongo().getDBs();
+    print("database '" + self.getName() + "' for 2.6 upgrade compatibility");
+    if (dbUpgradeCheck(self, true)) {
+        print("Everything in '" + dbName + "' is ready for the upgrade!");
+        return true;
+    }
+    print("To fix the problems above please consult " +
+          "http://dochub.mongodb.org/core/upgrade_checker_help");
+    return false;
+};
+
+DB.prototype.upgradeCheckAllDbs = function() {
+    var self = this;
+    if (self.getName() !== "admin") {
+        throw Error("db.upgradeCheckAllDbs() can only be run from the admin database");
+    }
+
+    var dbs = self.getMongo().getDBs();
     var goodSoFar = true;
 
     // run db level checks on each db
     dbs.databases.forEach(function(dbObj) {
-        if (!dbUpgradeCheck(dbObj.name)) {
+        if (!dbUpgradeCheck(self.getSiblingDB(dbObj.name))) {
             goodSoFar = false;
         }
     });
 
     if (goodSoFar) {
-        return "Everything is ready for the upgrade!";
+        print("Everything is ready for the upgrade!");
+        return true;
     }
-    return "The above comments explain the problems that should be fixed prior to upgrading";
-}
+    print("To fix the problems above please consult " +
+          "http://dochub.mongodb.org/core/upgrade_checker_help");
+    return false;
+};
+
+})();
