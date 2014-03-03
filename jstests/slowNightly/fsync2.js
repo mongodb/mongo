@@ -13,7 +13,9 @@ if ( db.getSisterDB("local").slaves.count() > 0 ) {
 
 function doTest() {
     db.fsync2.drop();
-    
+    // Make write ops asynchronous so the test won't hang when in fsync lock mode.
+    db.getMongo().forceWriteMode('legacy');
+
     db.fsync2.save( {x:1} );
     
     d = db.getSisterDB( "admin" );
