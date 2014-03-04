@@ -37,8 +37,9 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/server.h"
+#include "mongo/util/mmap.h"
 
-namespace mongo { 
+namespace mongo {
 
     PageFaultException::PageFaultException(const Record *_r)
     {

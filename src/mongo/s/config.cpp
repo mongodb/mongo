@@ -34,6 +34,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/write_concern.h"

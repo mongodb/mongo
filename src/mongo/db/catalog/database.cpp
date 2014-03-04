@@ -48,6 +48,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 

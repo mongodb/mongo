@@ -20,9 +20,12 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using namespace mongoutils::str;
 
     extern BSONObj staticNull;
     extern BSONObj staticUndefined;

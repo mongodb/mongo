@@ -30,11 +30,13 @@
 
 #include "mongo/db/structure/record_store.h"
 
-#include "mongo/db/storage/extent.h"
 #include "mongo/db/catalog/collection.h"
-
-
-#include "mongo/db/pdfile.h" // XXX-ERH
+#include "mongo/db/dur.h"
+#include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/record.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/util/mmap.h"
 
 namespace mongo {
 

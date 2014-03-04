@@ -37,34 +37,19 @@
 
 #pragma once
 
-#include "mongo/db/client.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/diskloc.h"
-#include "mongo/db/storage/data_file.h"
-#include "mongo/db/storage/durable_mapped_file.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/structure/catalog/namespace_details-inl.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pdfile_version.h"
-#include "mongo/platform/cstdint.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
+#include <string>
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/storage/record.h"
 
 namespace mongo {
 
-    class DataFileHeader;
-    class Extent;
-    class OpDebug;
-    class Record;
-
     void dropDatabase(const std::string& db);
 
-    bool userCreateNS(const char *ns, BSONObj j, string& err,
+    bool userCreateNS(const char *ns, BSONObj j, std::string& err,
                       bool logForReplication, bool createDefaultIndexes = true );
 
     /*---------------------------------------------------------------------*/
-
-    BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
     inline BSONObj BSONObj::make(const Record* r ) {
         return BSONObj( r->data() );

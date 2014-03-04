@@ -31,11 +31,13 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryUtilTests {

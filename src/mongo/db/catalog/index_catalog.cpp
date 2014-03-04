@@ -60,7 +60,6 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/storage/data_file.h"
-#include "mongo/db/structure/catalog/namespace_details-inl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

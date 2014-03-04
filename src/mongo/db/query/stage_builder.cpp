@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/stage_builder.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/exec/2d.h"
 #include "mongo/db/exec/2dnear.h"
 #include "mongo/db/exec/and_hash.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 
 namespace mongo {
 

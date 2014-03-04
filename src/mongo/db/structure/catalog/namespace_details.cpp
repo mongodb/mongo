@@ -474,6 +474,13 @@ namespace mongo {
         return e->details[i];
     }
 
+    NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d,
+                                                   bool includeBackgroundInProgress) {
+        d = _d;
+        i = 0;
+        n = includeBackgroundInProgress ? d->getTotalIndexCount() : d->_nIndexes;
+    }
+
     // must be called when renaming a NS to fix up extra
     void NamespaceDetails::copyingFrom( const char* thisns,
                                         NamespaceIndex& ni,

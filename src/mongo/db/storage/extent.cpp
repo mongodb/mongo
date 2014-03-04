@@ -33,11 +33,10 @@
 #include "mongo/db/storage/extent.h"
 
 #include "mongo/db/dur.h"
+#include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/util/mongoutils/str.h"
-
-// XXX-ERH
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 

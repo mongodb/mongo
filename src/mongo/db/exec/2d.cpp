@@ -28,6 +28,8 @@
 
 #include "mongo/db/exec/2d.h"
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/catalog/collection.h"

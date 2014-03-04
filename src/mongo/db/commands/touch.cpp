@@ -40,6 +40,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/d_concurrency.h"

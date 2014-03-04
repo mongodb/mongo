@@ -36,6 +36,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/data_file.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {

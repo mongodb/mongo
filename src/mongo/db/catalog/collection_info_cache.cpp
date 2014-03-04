@@ -32,13 +32,11 @@
 
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/structure/catalog/namespace_details-inl.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/debug_util.h"
 
 #include "mongo/db/structure/catalog/index_details.h" // XXX
-#include "mongo/db/pdfile.h" // XXX
 
 namespace mongo {
 
