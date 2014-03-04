@@ -15,4 +15,4 @@ populate_threads=1
 report_interval=5
 random_value=true
 run_time=300
-threads=((count=20,read=1,update=1))
+threads=((count=10,read=1),(count=10,update=1))
