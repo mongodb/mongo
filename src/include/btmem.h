@@ -189,15 +189,12 @@ struct __wt_ovfl_txnc {
  * Those updates are copied and then restored when the page is re-instantiated.
  */
 struct __wt_upd_skipped {
-	WT_UPDATE	*upd;		/* Skipped update */
-
 	/*
-	 * Skipped updates have to be moved to another page, so they come with
-	 * either a pointer to the WT_INSERT list, or a pointer to a row-store
-	 * leaf page update list.
+	 * Skipped updates are based on either a WT_INSERT reference or a
+	 * row-store leaf page WT_UPDATE list.
 	 */
-	void		*head;		/* (WT_UPDATE **) or (WT_INSERT *) */
-	uint8_t	is_insert;	/* (WT_INSERT *) */
+	void	*head;		/* (WT_UPDATE **) or (WT_INSERT *) */
+	uint8_t	 is_insert;	/* (WT_INSERT *) */
 };
 
 /*

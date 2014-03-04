@@ -676,15 +676,14 @@ __rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
  *	Save a key/WT_UPDATE pair for later restoration.
  */
 static int
-__rec_upd_skip_save(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, void *head, int is_insert, WT_UPDATE *upd)
+__rec_upd_skip_save(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, void *head, int is_insert)
 {
 	WT_BOUNDARY *bnd;
 
 	bnd = &r->bnd[r->bnd_next];
 	WT_RET(__wt_realloc_def(
 	    session, &bnd->skip_allocated, bnd->skip_next + 1, &bnd->skip));
-	bnd->skip[bnd->skip_next].upd = upd;
 	bnd->skip[bnd->skip_next].head = head;
 	bnd->skip[bnd->skip_next].is_insert = is_insert;
 	++bnd->skip_next;
@@ -701,8 +700,11 @@ static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     void *head, int is_insert, WT_UPDATE *upd, WT_UPDATE **updp)
 {
+	int skipped;
+
 	*updp = NULL;
-	for (; upd != NULL; upd = upd->next) {
+
+	for (skipped = 0; upd != NULL; upd = upd->next) {
 		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
 
@@ -715,32 +717,38 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if (TXNID_LT(r->max_txn, upd->txnid))
 			r->max_txn = upd->txnid;
 
-		if (*updp != NULL)
-			continue;
-		if (__wt_txn_visible(session, upd->txnid)) {
-			*updp = upd;
-			continue;
-		}
-
 		/*
 		 * Record whether any updates were skipped on the way to finding
-		 * the first visible update.  That determines if a future read
-		 * with no intervening modifications to the page could see a
-		 * different value.  If not, the page can safely be marked clean
-		 * and does not need to be reconciled until modified again.
+		 * the first visible update.
 		 */
+		if (__wt_txn_visible(session, upd->txnid)) {
+			if (*updp == NULL)
+				*updp = upd;
+		} else
+			skipped = 1;
+	}
+
+	/*
+	 * If updates were skipped, future reads without intervening
+	 * modifications to the page could see a different value; if no updates
+	 * were skipped, the page can safely be marked clean and does not need
+	 * to be reconciled until modified again.
+	 */
+	if (skipped)
 		r->upd_skipped = 1;
 
-		/*
-		 * If evicting and there's an update that's in-flight, save the
-		 * information about the update so we can restore it on a newly
-		 * instantiated page.  It's tricky: a transaction references
-		 * the physical WT_UPDATE, so we must move the structure itself,
-		 * not a copy of it.
-		 */
-		if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
-			WT_RET(__rec_upd_skip_save(
-			    session, r, head, is_insert, upd));
+	/*
+	 * If evicting and updates were skipped, remember the list of WT_UPDATEs
+	 * so we can restore it on a newly instantiated page.  (The order of the
+	 * updates matters, we can't move only unresolved WT_UPDATEs, we have to
+	 * move the entire list.
+	 *
+	 * Additionally, in this case we don't write any WT_UPDATEs at all, we
+	 * don't want to move an insert into a different position on the page.
+	 */
+	 if (skipped && F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
+		*updp = NULL;
+		WT_RET(__rec_upd_skip_save(session, r, head, is_insert));
 	}
 
 	return (0);

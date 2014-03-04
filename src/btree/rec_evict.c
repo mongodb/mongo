@@ -420,7 +420,7 @@ __wt_multi_inmem_build(
 	WT_CURSOR_BTREE cbt;
 	WT_ITEM key;
 	WT_PAGE *new;
-	WT_UPDATE **updp;
+	WT_UPDATE *upd, **updp;
 	WT_UPD_SKIPPED *skip;
 	uint64_t recno;
 	uint32_t i;
@@ -448,10 +448,11 @@ __wt_multi_inmem_build(
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip) {
 		/*
 		 * XXXKEITH:
-		 * Remove the WT_UPDATE from the page/list it's on and move it
-		 * to a different page/list.   This is a problem: on failure,
+		 * Remove the list of WT_UPDATEs from the row-leaf WT_UPDATE
+		 * array or arbitrary WT_INSERT list, and move it to a
+		 * different page/list.   This is a problem: on failure,
 		 * discarding the created page will free it, and that's wrong.
-		 * This problem needs to be revisted once we decide this whole
+		 * This problem needs to be revisited once we decide this whole
 		 * approach is a viable one.
 		 */
 		if (skip->is_insert)
@@ -459,12 +460,8 @@ __wt_multi_inmem_build(
 		else
 			updp = &page->pg_row_upd[
 			    WT_ROW_SLOT(page, skip->head)];
-		for (; *updp != NULL; updp = &(*updp)->next)
-			if (*updp == skip->upd)
-				break;
-		WT_ASSERT(session, *updp != NULL);
-		*updp = (*updp)->next;
-		skip->upd->next = NULL;
+		upd = *updp;
+		*updp = NULL;
 
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
@@ -477,15 +474,13 @@ __wt_multi_inmem_build(
 
 			/* Apply the modification. */
 			WT_RET(__wt_col_modify(session, &cbt, recno,
-			    NULL, skip->upd,
-			    WT_UPDATE_DELETED_ISSET(skip->upd)));
+			    NULL, upd, WT_UPDATE_DELETED_ISSET(upd)));
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
 			if (skip->is_insert) {
 				key.data = WT_INSERT_KEY(skip->head);
-				key.size =
-				    WT_INSERT_KEY_SIZE(skip->head);
+				key.size = WT_INSERT_KEY_SIZE(skip->head);
 			} else
 				WT_RET(__wt_row_leaf_key(session,
 				    page, skip->head, &key, 0));
@@ -495,8 +490,7 @@ __wt_multi_inmem_build(
 
 			/* Apply the modification. */
 			WT_RET(__wt_row_modify(session, &cbt, &key,
-			    NULL, skip->upd,
-			    WT_UPDATE_DELETED_ISSET(skip->upd)));
+			    NULL, upd, WT_UPDATE_DELETED_ISSET(upd)));
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
