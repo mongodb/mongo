@@ -25,16 +25,16 @@ st.printShardingStatus();
 
 jsTest.log( "Inserting some regular docs..." );
 
-for ( var i = -50; i < 50; i++ ) coll.insert({ _id : i });
-assert.eq( null, coll.getDB().getLastError() );
+var bulk = coll.initializeUnorderedBulkOp();
+for ( var i = -50; i < 50; i++ ) bulk.insert({ _id : i });
+assert.writeOK( bulk.execute() );
 
 // Half of the data is on each shard
 
 jsTest.log( "Inserting some orphaned docs..." );
 
 var shard0Coll = st.shard0.getCollection( coll + "" );
-shard0Coll.insert({ _id : 10 });
-assert.eq( null, shard0Coll.getDB().getLastError() );
+assert.writeOK( shard0Coll.insert({ _id : 10 }));
 
 assert.neq( 50, shard0Coll.count() );
 assert.eq( 100, coll.find().itcount() );
@@ -68,12 +68,13 @@ assert( admin.runCommand({ moveChunk : coll + "",
 
 jsTest.log( "Inserting some more orphaned docs..." );
 
+st.printShardingStatus();
+
 var shard0Coll = st.shard0.getCollection( coll + "" );
-shard0Coll.insert({ _id : -36 });
-shard0Coll.insert({ _id : -10 });
-shard0Coll.insert({ _id : 0 });
-shard0Coll.insert({ _id : 10 });
-assert.eq( null, shard0Coll.getDB().getLastError() );
+assert.writeOK(shard0Coll.insert({ _id : -35 }));
+assert.writeOK(shard0Coll.insert({ _id : -11 }));
+assert.writeOK(shard0Coll.insert({ _id : 0 }));
+assert.writeOK(shard0Coll.insert({ _id : 10 }));
 
 assert.neq( 25, shard0Coll.count() );
 assert.eq( 100, coll.find().itcount() );

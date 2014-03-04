@@ -9,10 +9,9 @@ conn1 = startMongodTest( 29000 );
 db1 = conn1.getDB( "testDB" );
 numObjs = 0;
 for (i=0; i<3; i++){
-    db1.foo.save( { a : i } );
+    assert.writeOK(db1.foo.save( { a : i } ));
     numObjs++;
 }
-db1.getLastError()
 
 newShard = "myShard";
 assert( s.admin.runCommand( { addshard: "localhost:29000" , name: newShard } ).ok, "did not accepted non-duplicated shard" );
@@ -20,11 +19,9 @@ assert( s.admin.runCommand( { addshard: "localhost:29000" , name: newShard } ).o
 // a mongod with an existing database name should not be allowed to become a shard
 conn2 = startMongodTest( 29001 );
 db2 = conn2.getDB( "otherDB" );
-db2.foo.save( {a:1} );
-db2.getLastError()
+assert.writeOK(db2.foo.save({ a: 1 }));
 db3 = conn2.getDB( "testDB" );
-db3.foo.save( {a:1} );
-db3.getLastError()
+assert.writeOK(db3.foo.save({ a: 1 } ));
 
 s.config.databases.find().forEach( printjson )
 rejectedShard = "rejectedShard";

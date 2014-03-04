@@ -442,7 +442,7 @@ def skipTest(path):
 
     return False
 
-forceCommandsForDirs = ["aggregation", "auth", "core", "parallel", "replsets"]
+forceCommandsForDirs = ["aggregation", "auth", "core", "parallel", "replsets", "sharding"]
 # look for jstests and one of the above suites separated by either posix or windows slashes
 forceCommandsRE = re.compile(r"jstests[/\\](%s)" % ('|'.join(forceCommandsForDirs)))
 def setShellWriteModeForTest(path, argv):

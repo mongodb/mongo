@@ -1,3 +1,5 @@
+// TODO: move back to sharding suite after SERVER-13402 is fixed
+
 /**
  * This tests using DB commands with authentication enabled when sharded.
  */

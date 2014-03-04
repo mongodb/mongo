@@ -11,11 +11,10 @@ var doc2 = { path: "thisisabigString", val: true }
 
 col.insert([doc1, doc2])
 printjson(col.find({ path : /isa/ }).explain());
-col.update({ path : /isa/ }, { "$set" : { val : false } }, {multi:true});
-var leObj = col.getDB().getLastErrorObj();
+var res  = col.update({ path : /isa/ }, { $set: { val: false }}, { multi: true });
 var result  = col.findOne();
 
 assert.eq(false, result.val);
-assert.eq(2, leObj['n']);
+assert.eq(2, res.nModified);
 
 st.stop();

@@ -16,10 +16,10 @@ for ( i=0; i<N; i+=(N/12) ) {
 }
 
 s.setBalancer( true )
+var bulk = db.foo.initializeUnorderedBulkOp();
 for ( i=0; i<N; i++ )
-    db.foo.insert( { _id : i } )
-db.getLastError();
-
+    bulk.insert({ _id: i });
+assert.writeOK(bulk.execute());
 
 doCommand = function( dbname , cmd ) {
     x = benchRun( { ops : [ { op : "findOne" , ns : dbname + ".$cmd" , query : cmd } ] , 

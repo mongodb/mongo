@@ -30,10 +30,11 @@ s.adminCommand({moveChunk: "test.foo", find: {_id: 3},
 s.setBalancer(true)
 
 // insert 10k small documents into the sharded collection
+var bulk = db.foo.initializeUnorderedBulkOp();
 for (i = 0; i < numDocs; i++)
-    db.foo.insert({_id: i});
+    bulk.insert({ _id: i });
+assert.writeOK(bulk.execute());
 
-db.getLastError();
 var x = db.foo.stats();
 
 // verify the colleciton has been sharded and documents are evenly distributed

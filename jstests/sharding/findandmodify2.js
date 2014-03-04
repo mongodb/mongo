@@ -45,7 +45,6 @@ function via_fam() {
         { big: big }
     }});
   }
-  db.getLastError();
 }
 
 // upsert via findAndModify
@@ -55,7 +54,6 @@ function via_fam_upsert() {
         { big: big }
     }, upsert: true});
   }
-  db.getLastError();
 }
 
 // update data using basic update
@@ -69,7 +67,6 @@ function via_update() {
         { big: big }
     });
   }
-  db.getLastError();
 }
 
 // upsert data using basic update
@@ -79,7 +76,6 @@ function via_update_upsert() {
         { big: big }
     }, true);
   }
-  db.getLastError();
 }
 
 print("---------- Update via findAndModify...");

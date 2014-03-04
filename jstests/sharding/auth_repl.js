@@ -11,8 +11,7 @@ var conn = new Mongo(replTest.getURL());
 var testDB = conn.getDB('test');
 var testColl = testDB.user;
 
-testColl.insert({ x: 1 });
-testDB.runCommand({ getLastError: 1, w: nodeCount });
+assert.writeOK(testColl.insert({ x: 1 }, { writeConcern: { w: nodeCount }}));
 
 // Setup the cached connection for primary and secondary in DBClientReplicaSet
 // before setting up authentication

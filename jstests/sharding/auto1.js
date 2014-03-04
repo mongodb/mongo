@@ -14,10 +14,11 @@ coll = db.foo;
 
 var i=0;
 
+var bulk = coll.initializeUnorderedBulkOp();
 for ( ; i<100; i++ ){
-    coll.save( { num : i , s : bigString } );
+    bulk.insert( { num : i , s : bigString } );
 }
-db.getLastError();
+assert.writeOK( bulk.execute() );
 
 primary = s.getServer( "test" ).getDB( "test" );
 
@@ -29,28 +30,31 @@ assert.eq( 100 , primary.foo.count() );
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
 
+bulk = coll.initializeUnorderedBulkOp();
 for ( ; i<200; i++ ){
-    coll.save( { num : i , s : bigString } );
+    bulk.insert( { num : i , s : bigString } );
 }
-db.getLastError();
+assert.writeOK( bulk.execute() );
 
 s.printChunks()
 s.printChangeLog()
 counts.push( s.config.chunks.count() );
 
+bulk = coll.initializeUnorderedBulkOp();
 for ( ; i<400; i++ ){
-    coll.save( { num : i , s : bigString } );
+    bulk.insert( { num : i , s : bigString } );
 }
-db.getLastError();
+assert.writeOK( bulk.execute() );
 
 s.printChunks();
 s.printChangeLog()
 counts.push( s.config.chunks.count() );
 
+bulk = coll.initializeUnorderedBulkOp();
 for ( ; i<700; i++ ){
-    coll.save( { num : i , s : bigString } );
+    bulk.insert( { num : i , s : bigString } );
 }
-db.getLastError();
+assert.writeOK( bulk.execute() );
 
 s.printChunks();
 s.printChangeLog()

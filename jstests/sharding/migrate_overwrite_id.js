@@ -24,11 +24,8 @@ var id = 12345;
 
 jsTest.log( "Inserting a document with id : 12345 into both shards with diff shard key..." );
 
-coll.insert({ _id : id, skey : -1 });
-assert.eq( null, coll.getDB().getLastError() );
-
-coll.insert({ _id : id, skey : 1 });
-assert.eq( null, coll.getDB().getLastError() );
+assert.writeOK(coll.insert({ _id : id, skey : -1 }));
+assert.writeOK(coll.insert({ _id : id, skey : 1 }));
 
 printjson( shards[0].conn.getCollection( coll + "" ).find({ _id : id }).toArray() );
 printjson( shards[1].conn.getCollection( coll + "" ).find({ _id : id }).toArray() );

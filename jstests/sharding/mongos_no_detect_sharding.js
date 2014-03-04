@@ -29,10 +29,11 @@ print( "Seeing if data gets inserted unsharded..." )
 print( "No splits occur here!" )
 
 // Insert a bunch of data which should trigger a split
+var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < 100; i++ ){
-    coll.insert({ i : i + 1 })
+    bulk.insert({ i : i + 1 });
 }
-coll.getDB().getLastError()
+assert.writeOK(bulk.execute());
 
 config.printShardingStatus( true )
 

@@ -39,12 +39,10 @@ coll.ensureIndex({ b : 1 })
 printjson( admin.runCommand({ shardCollection : coll + "", key : { b : 1 } }) )
 
 // Make sure that we can successfully insert, even though we have stale state
-staleCollA.insert({ b : "b" })
-assert.eq( null, staleCollA.getDB().getLastError() )
+assert.writeOK(staleCollA.insert({ b : "b" }));
 
 // Make sure we unsuccessfully insert with old info
-staleCollB.insert({ a : "a" })
-assert.neq( null, staleCollB.getDB().getLastError() )
+assert.writeError(staleCollB.insert({ a : "a" }));
 
 // Change the collection sharding state
 coll.drop()
@@ -52,12 +50,10 @@ coll.ensureIndex({ c : 1 })
 printjson( admin.runCommand({ shardCollection : coll + "", key : { c : 1 } }) )
 
 // Make sure we can successfully upsert, even though we have stale state
-staleCollA.update({ c : "c" }, { c : "c" }, true )
-assert.eq( null, staleCollA.getDB().getLastError() )
+assert.writeOK(staleCollA.update({ c : "c" }, { c : "c" }, true ));
 
 // Make sure we unsuccessfully upsert with old info
-staleCollB.update({ b : "b" }, { b : "b" }, true )
-assert.neq( null, staleCollB.getDB().getLastError() )
+assert.writeError(staleCollB.update({ b : "b" }, { b : "b" }, true ));
 
 // Change the collection sharding state
 coll.drop()
@@ -65,16 +61,13 @@ coll.ensureIndex({ d : 1 })
 printjson( admin.runCommand({ shardCollection : coll + "", key : { d : 1 } }) )
 
 // Make sure we can successfully update, even though we have stale state
-coll.insert({ d : "d" })
-coll.getDB().getLastError();
+assert.writeOK(coll.insert({ d : "d" }));
 
-staleCollA.update({ d : "d" }, { $set : { x : "x" } }, false, false )
-assert.eq( null, staleCollA.getDB().getLastError() )
+assert.writeOK(staleCollA.update({ d : "d" }, { $set : { x : "x" } }, false, false ));
 assert.eq( staleCollA.findOne().x, "x" )
 
 // Make sure we unsuccessfully update with old info
-staleCollB.update({ c : "c" }, { $set : { x : "y" } }, false, false )
-assert.neq( null, staleCollB.getDB().getLastError() )
+assert.writeError(staleCollB.update({ c : "c" }, { $set : { x : "y" } }, false, false ));
 assert.eq( staleCollB.findOne().x, "x" )
 
 // Change the collection sharding state
@@ -87,16 +80,12 @@ printjson( admin.runCommand({ split : coll + "", middle : { e : 0 } }) )
 printjson( admin.runCommand({ moveChunk : coll + "", find : { e : 0 }, to : "shard0001" }) )
 
 // Make sure we can successfully remove, even though we have stale state
-coll.insert({ e : "e" })
-// Need to make sure the insert makes it to the shard
-assert.eq( null, coll.getDB().getLastError() )
+assert.writeOK(coll.insert({ e : "e" }));
 
-staleCollA.remove({ e : "e" }, true)
-assert.eq( null, staleCollA.getDB().getLastError() )
+assert.writeOK(staleCollA.remove({ e : "e" }, true));
 assert.eq( null, staleCollA.findOne() )
 
 // Make sure we unsuccessfully remove with old info
-staleCollB.remove({ d : "d" }, true )
-assert.neq( null, staleCollB.getDB().getLastError() )
+assert.writeError(staleCollB.remove({ d : "d" }, true ));
 
 st.stop()

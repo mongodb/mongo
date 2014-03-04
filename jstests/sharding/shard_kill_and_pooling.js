@@ -29,10 +29,9 @@ if ( is32Bits && _isWindows() ) {
 else {
     
     // Non-Win32 platform
-    
-    coll.insert({ hello : "world" })
-    assert.eq( null, coll.getDB().getLastError() );
-    
+
+    assert.writeOK(coll.insert({ hello: "world" }));
+
     jsTest.log("Creating new connections...");
     
     // Create a bunch of connections to the primary node through mongos.

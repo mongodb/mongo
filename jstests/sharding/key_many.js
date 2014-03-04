@@ -137,12 +137,12 @@ for ( var i=0; i<types.length; i++ ){
     assert.eq( 1 , c.find( { xx : { $exists : true } } ).count() , curT.name + " xx 2 " );
     assert.eq( curT.values[3] , getKey( c.findOne( { xx : 17 } ) ) , curT.name + " xx 3 " );
 
-    c.update( makeObjectDotted( curT.values[3] ) , { $set : { xx : 17 } } , {upsert: true});
-    assert.eq( null , db.getLastError() , curT.name + " upserts should work if they include the shard key in the query" );
+    assert.writeOK(c.update( makeObjectDotted( curT.values[3] ),
+                             { $set: { xx: 17 }},
+                             { upsert: true }));
 
-    c.ensureIndex( { _id : 1 } , { unique : true } );
-    assert.eq( null , db.getLastError() , curT.name + " creating _id index should be ok" );
-    
+    assert.commandWorked(c.ensureIndex( { _id: 1 } , { unique: true } ));
+
     // multi update
     var mysum = 0;
     c.find().forEach( function(z){ mysum += z.xx || 0; } );

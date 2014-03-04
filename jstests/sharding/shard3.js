@@ -61,8 +61,7 @@ function doCounts( name , total , onlyItCounts ){
 }
 
 var total = doCounts( "before wrong save" )
-secondary.save( { _id : 111 , num : -3 } );
-printjson( secondary.getDB().getLastError() )
+assert.writeOK(secondary.insert( { _id : 111 , num : -3 } ));
 doCounts( "after wrong save" , total , true )
 e = a.find().explain();
 assert.eq( 3 , e.n , "ex1" )
@@ -158,7 +157,6 @@ dbb = s2.getDB( "test2" );
 dba.foo.save( { num : 1 } );
 dba.foo.save( { num : 2 } );
 dba.foo.save( { num : 3 } );
-dba.getLastError();
 
 assert.eq( 1 , s.onNumShards( "foo" , "test2" ) , "B on 1 shards" );
 assert.eq( 3 , dba.foo.count() , "Ba" );

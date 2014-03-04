@@ -53,9 +53,7 @@ var inserts = [{_id : -1},
                {_id : 1000}];
 
 collOneShard.insert(inserts);
-collAllShards.insert(inserts);
-
-assert.eq(null, collOneShard.getDB().getLastError());
+assert.writeOK(collAllShards.insert(inserts));
 
 var returnPartialFlag = 1 << 7;
 

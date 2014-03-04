@@ -18,10 +18,12 @@ for ( j=0; j<30; j++ ){
     print( "j:" + j + " : " + 
            Date.timeFunc( 
                function(){
+                   var bulk = coll.initializeUnorderedBulkOp();
                    for ( var k=0; k<100; k++ ){
-                       coll.save( { num : i , s : bigString } );
+                       bulk.insert( { num : i , s : bigString } );
                        i++;
                    }
+                   assert.writeOK(bulk.execute());
                } 
            ) );
     
@@ -29,7 +31,6 @@ for ( j=0; j<30; j++ ){
 assert.eq( i , j * 100 , "setup" );
 // Until SERVER-9715 is fixed, the sync command must be run on a diff connection
 new Mongo( s.s.host ).adminCommand( "connpoolsync" );
-db.getLastError();
 
 print( "done inserting data" );
 

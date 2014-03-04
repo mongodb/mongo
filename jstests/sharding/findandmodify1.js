@@ -16,10 +16,11 @@ s.adminCommand( { shardcollection : "test.stuff"  , key : {_id:1} } );
 s.adminCommand( { split: "test.stuff" , middle : { _id : numObjs/2 } } );
 s.adminCommand( { movechunk : "test.stuff" , find : { _id : numObjs/2 } , to : secondary.getMongo().name } ) ;
 
+var bulk = db.stuff.initializeUnorderedBulkOp();
 for (var i=0; i < numObjs; i++){
-    db.stuff.insert({_id: i});
+    bulk.insert({_id: i});
 }
-db.getLastError()
+assert.writeOK(bulk.execute());
 
 // put two docs in each chunk (avoid the split in 0, since there are no docs less than 0)
 for (var i=2; i < numObjs; i+=2){
