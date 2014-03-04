@@ -1,5 +1,20 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_211 Upgrading to Version 2.1.1
+<dl>
+
+<dt>WT_EXTENSION_API::config methods</dt>
+<dd>
+In the 2.1.1 release of WiredTiger the configuration string parsing API
+has been changed and added to a new public handle. The
+WT_EXTENSION_API::config_strget, WT_EXTENSION_API::config_scan_begin,
+WT_EXTENSION_API::config_scan_next and WT_EXTENSION_API::config_scan_end
+have been removed. They have been replaced by a
+WT_EXTENSION_API::config_parser_open method, which can be used to parse
+configuration strings. See the WT_CONFIG_PARSER documentation for
+examples on how to use the updated API.
+</dd>
+
 @section version_21 Upgrading to Version 2.1
 <dl>
 

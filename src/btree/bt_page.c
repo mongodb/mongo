@@ -93,21 +93,17 @@ __wt_page_in_func(
 			}
 
 			/*
-			 * If this page has ever been considered for eviction,
-			 * and its generation is aging, update it.
-			 */
-			if (page->read_gen != WT_READ_GEN_NOTSET &&
-			    page->read_gen < __wt_cache_read_gen(session))
-				page->read_gen =
-				    __wt_cache_read_gen_set(session);
-
-			/*
 			 * If we read the page and we are configured to not
 			 * trash the cache, set the oldest read generation so
 			 * the page is forcibly evicted as soon as possible.
+			 *
+			 * Otherwise, update the page's read generation.
 			 */
 			if (oldgen && page->read_gen == WT_READ_GEN_NOTSET)
 				page->read_gen = WT_READ_GEN_OLDEST;
+			else if (page->read_gen < __wt_cache_read_gen(session))
+				page->read_gen =
+				    __wt_cache_read_gen_set(session);
 
 			return (0);
 		WT_ILLEGAL_VALUE(session);

@@ -153,6 +153,9 @@ connection_stats = [
 	##########################################
 	# LSM statistics
 	##########################################
+	Stat('lsm_checkpoint_throttle',
+	    'sleep for LSM checkpoint throttle'),
+	Stat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
 	Stat('lsm_rows_merged', 'rows merged in an LSM tree'),
 
 	##########################################
@@ -244,6 +247,8 @@ dsrc_stats = [
 	    'bloom filter pages evicted from cache'),
 	Stat('bloom_page_read', 'bloom filter pages read into cache'),
 	Stat('bloom_size', 'total size of bloom filters', 'no_scale'),
+	Stat('lsm_checkpoint_throttle',
+	    'sleep for LSM checkpoint throttle'),
 	Stat('lsm_chunk_count',
 	    'chunks in the LSM tree', 'no_aggregate,no_scale'),
 	Stat('lsm_generation_max',
@@ -252,6 +257,7 @@ dsrc_stats = [
 	Stat('lsm_lookup_no_bloom',
 	    'queries that could have benefited ' +
 	    'from a Bloom filter that did not exist'),
+	Stat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
 
 	##########################################
 	# Block manager statistics

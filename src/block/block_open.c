@@ -95,7 +95,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename, const char *cfg[],
-    int forced_salvage, uint32_t allocsize, WT_BLOCK **blockp)
+    int forced_salvage, int readonly, uint32_t allocsize, WT_BLOCK **blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
@@ -158,8 +158,9 @@ __wt_block_open(WT_SESSION_IMPL *session,
 #endif
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(
-	    session, filename, 0, 0, WT_FILE_TYPE_DATA, &block->fh));
+	WT_ERR(__wt_open(session, filename, 0, 0,
+	    readonly ? WT_FILE_TYPE_CHECKPOINT : WT_FILE_TYPE_DATA,
+	    &block->fh));
 
 	/* Initialize the live checkpoint's lock. */
 	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));

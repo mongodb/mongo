@@ -11,7 +11,7 @@ static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_preload(WT_SESSION_IMPL *);
-static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
+static int __btree_tree_open_empty(WT_SESSION_IMPL *, int, int);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, int);
@@ -69,8 +69,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
 
-	WT_ERR(__wt_block_manager_open(session, filename,
-	    dhandle->cfg, forced_salvage, btree->allocsize, &btree->bm));
+	WT_ERR(__wt_block_manager_open(session, filename, dhandle->cfg,
+	    forced_salvage, readonly, btree->allocsize, &btree->bm));
 	bm = btree->bm;
 
 	/*
@@ -102,7 +102,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		    ckpt.raw.data, ckpt.raw.size,
 		    root_addr, &root_addr_size, readonly));
 		if (creation || root_addr_size == 0)
-			WT_ERR(__btree_tree_open_empty(session, creation));
+			WT_ERR(__btree_tree_open_empty(
+			    session, creation, readonly));
 		else {
 			WT_ERR(__wt_btree_tree_open(
 			    session, root_addr, root_addr_size));
@@ -355,7 +356,7 @@ err:		__wt_buf_free(session, &dsk);
  *	Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -423,23 +424,31 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	 * the root page dirty to force a write, and without reconciling the
 	 * leaf page we won't realize there's no records to write, we'll write
 	 * a root page, which isn't correct for an empty tree.
-	 *    Earlier versions of this code kept the leaf page clean, but with
-	 * the "empty" flag set in the leaf page's modification structure; in
-	 * that case, checkpoints works (forced reconciliation of a root with
-	 * a single "empty" page wouldn't write any blocks). That version had
+	 *
+	 * Earlier versions of this code kept the leaf page clean, but with the
+	 * "empty" flag set in the leaf page's modification structure; in that
+	 * case, checkpoints works (forced reconciliation of a root with a
+	 * single "empty" page wouldn't write any blocks). That version had
 	 * memory leaks because the eviction code didn't correctly handle pages
 	 * that were "clean" (and so never reconciled), yet "modified" with an
 	 * "empty" flag.  The goal of this code is to mimic a real tree that
 	 * simply has no records, for whatever reason, and trust reconciliation
 	 * to figure out it's empty and not write any blocks.
-	 *    We do not set the tree's modified flag because the checkpoint code
-	 * skips unmodified files in closing checkpoints (checkpoints that don't
-	 * require a write unless the file is actually dirty).  There's no need
-	 * to reconcile this file unless the application does a real checkpoint
-	 * or it's actually modified.
+	 *
+	 * We do not set the tree's modified flag because the checkpoint code
+	 * skips unmodified files in closing checkpoints (checkpoints that
+	 * don't require a write unless the file is actually dirty).  There's
+	 * no need to reconcile this file unless the application does a real
+	 * checkpoint or it's actually modified.
+	 *
+	 * Only do this for a live tree, not for checkpoints.  If we open an
+	 * empty checkpoint, the leaf page cannot be dirty or eviction may try
+	 * to write it, which will fail because checkpoints are read-only.
 	 */
-	WT_ERR(__wt_page_modify_init(session, leaf));
-	__wt_page_only_modify_set(session, leaf);
+	if (!readonly) {
+		WT_ERR(__wt_page_modify_init(session, leaf));
+		__wt_page_only_modify_set(session, leaf);
+	}
 
 	btree->root_page = root;
 

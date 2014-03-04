@@ -71,6 +71,9 @@ extern "C" {
  *******************************************/
 struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
 struct __wt_compressor;	    typedef struct __wt_compressor WT_COMPRESSOR;
+struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
+struct __wt_config_parser;
+	typedef struct __wt_config_parser WT_CONFIG_PARSER;
 struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
 struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
 struct __wt_data_source;    typedef struct __wt_data_source WT_DATA_SOURCE;
@@ -1490,8 +1493,12 @@ struct __wt_connection {
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
  * list\, such as <code>"direct_io=[data]"</code>. Configuring \c direct_io
  * requires care\, see @ref tuning_system_buffer_cache_direct_io for important
- * warnings., a list\, with values chosen from the following options: \c
- * "data"\, \c "log"; default empty.}
+ * warnings.  Including \c "data" will cause WiredTiger data files to use \c
+ * O_DIRECT\, including \c "log" will cause WiredTiger log files to use \c
+ * O_DIRECT\, and including \c "checkpoint" will cause WiredTiger data files
+ * opened at a checkpoint (i.e: read only) to use \c O_DIRECT., a list\, with
+ * values chosen from the following options: \c "checkpoint"\, \c "data"\, \c
+ * "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
@@ -1890,6 +1897,153 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
  */
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 
+/*!
+ * @name Configuration string parsing
+ * @{
+ */
+
+/*!
+ * The configuration information returned by the WiredTiger configuration
+ * parsing functions in the WT_EXTENSION_API and the public API.
+ */
+struct __wt_config_item {
+	/*!
+	 * The value of a configuration string.
+	 *
+	 * Regardless of the type of the configuration string (boolean, int,
+	 * list or string), the \c str field will reference the value of the
+	 * configuration string.
+	 *
+	 * The bytes referenced by \c str are <b>not</b> nul-terminated,
+	 * use the \c len field instead of a terminating nul byte.
+	 */
+	const char *str;
+
+	/*! The number of bytes in the value referenced by \c str. */
+	size_t len;
+
+	/*!
+	 * The value of a configuration boolean or integer.
+	 *
+	 * If the configuration string's value is "true" or "false", the
+	 * \c val field will be set to 1 (true), or 0 (false).
+	 *
+	 * If the configuration string can be legally interpreted as an integer,
+	 * using the strtoll function rules as specified in ISO/IEC 9899:1990
+	 * ("ISO C90"), that integer will be stored in the \c val field.
+	 */
+	int64_t val;
+
+	/*! Permitted values of the \c type field. */
+	enum {
+		/*! A string value with quotes stripped. */
+		WT_CONFIG_ITEM_STRING,
+		/*! A boolean literal ("true" or "false"). */
+		WT_CONFIG_ITEM_BOOL,
+		/*! An unquoted identifier: a string value without quotes. */
+		WT_CONFIG_ITEM_ID,
+		/*! A numeric value. */
+		WT_CONFIG_ITEM_NUM,
+		/*! A nested structure or list, including brackets. */
+		WT_CONFIG_ITEM_STRUCT
+	}
+	/*!
+	 * The type of value determined by the parser.  In all cases,
+	 * the \c str and \c len fields are set.
+	 */
+	type;
+};
+
+/*!
+ * Create a handle that can be used to parse or create configuration strings
+ * compatible with WiredTiger APIs.
+ * This API is outside the scope of a WiredTiger connection handle, since
+ * applications may need to generate configuration strings prior to calling
+ * ::wiredtiger_open.
+ * @param session the session handle to be used for error reporting. If NULL
+ *        error messages will be written to stdout.
+ * @param config the configuration string being parsed. The string must
+ *        remain valid for the lifetime of the parser handle.
+ * @param len the number of valid bytes in \c config
+ * @param[out] config_parserp A pointer to the newly opened handle
+ * @errors
+ */
+int wiredtiger_config_parser_open(WT_SESSION *session,
+    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
+
+/*!
+ * A handle that can be used to search and traverse configuration strings
+ * compatible with WiredTiger APIs.
+ * To parse the contents of a list or nested configuration string use a new
+ * configuration parser handle based on the content of the ::WT_CONFIG_ITEM
+ * retrieved from the parent configuration string.
+ *
+ * @section config_parse_examples Configuration String Parsing examples
+ *
+ * This could be used in C to create a configuration parser as follows:
+ *
+ * @snippet ex_config_parse.c Create a configuration parser
+ *
+ * Once the parser has been created the content can be queried directly:
+ *
+ * @snippet ex_config_parse.c get
+ *
+ * Or the content can be traversed linearly:
+ *
+ * @snippet ex_config_parse.c next
+ *
+ * Nested configuration values can be queried using a shorthand notation:
+ *
+ * @snippet ex_config_parse.c nested get
+ *
+ * Nested configuration values can be traversed using multiple
+ * ::WT_CONFIG_PARSER handles:
+ *
+ * @snippet ex_config_parse.c nested traverse
+ */
+struct __wt_config_parser {
+
+	/*!
+	 * Close the configuration scanner releasing any resources.
+	 *
+	 * @param config_parser the configuration parser handle
+	 * @errors
+	 *
+	 */
+	int __F(close)(WT_CONFIG_PARSER *config_parser);
+
+	/*!
+	 * Return the next key/value pair.
+	 *
+	 * When iteration would pass the end of the configuration string
+	 * ::WT_NOTFOUND will be returned.
+	 *
+	 * If an item has no explicitly assigned value, the item will be
+	 * returned in \c key and the \c value will be set to the boolean
+	 * \c "true" value.
+	 *
+	 * @param config_parser the configuration parser handle
+	 * @param key the returned key
+	 * @param value the returned value
+	 * @errors
+	 *
+	 */
+	int __F(next)(WT_CONFIG_PARSER *config_parser,
+	    WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
+
+	/*!
+	 * Return the value of an item in the configuration string.
+	 *
+	 * @param config_parser the configuration parser handle
+	 * @param key configuration key string
+	 * @param value the returned value
+	 * @errors
+	 *
+	 */
+	int __F(get)(WT_CONFIG_PARSER *config_parser,
+	    const char *key, WT_CONFIG_ITEM *value);
+};
+
 #endif /* !defined(SWIG) */
 /*!
  * @}
@@ -1985,9 +2139,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 /*******************************************
  * Forward structure declarations for the extension API
  *******************************************/
-struct __wt_config_arg;	    typedef struct __wt_config_arg WT_CONFIG_ARG;
-struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
-struct __wt_config_scan;    typedef struct __wt_config_scan WT_CONFIG_SCAN;
+struct __wt_config_arg;     typedef struct __wt_config_arg WT_CONFIG_ARG;
 
 /*!
  * The interface implemented by applications to provide custom ordering of
@@ -2588,42 +2740,46 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_SYNC				1063
 /*! log: log write operations */
 #define	WT_STAT_CONN_LOG_WRITES				1064
+/*! sleep for LSM checkpoint throttle */
+#define	WT_STAT_CONN_LSM_CHECKPOINT_THROTTLE		1065
+/*! sleep for LSM merge throttle */
+#define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1066
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			1065
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			1067
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1066
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1068
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1067
+#define	WT_STAT_CONN_MEMORY_FREE			1069
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1068
+#define	WT_STAT_CONN_MEMORY_GROW			1070
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1069
+#define	WT_STAT_CONN_READ_IO				1071
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1070
+#define	WT_STAT_CONN_REC_PAGES				1072
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1071
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1073
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1072
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1074
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1073
+#define	WT_STAT_CONN_RWLOCK_READ			1075
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1074
+#define	WT_STAT_CONN_RWLOCK_WRITE			1076
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1075
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1077
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1076
+#define	WT_STAT_CONN_TXN_BEGIN				1078
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1077
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1079
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1078
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1080
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1079
+#define	WT_STAT_CONN_TXN_COMMIT				1081
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1080
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1082
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1081
+#define	WT_STAT_CONN_TXN_ROLLBACK			1083
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1082
+#define	WT_STAT_CONN_WRITE_IO				1084
 
 /*!
  * @}
@@ -2767,43 +2923,47 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CURSOR_UPDATE			2066
 /*! cursor-update value bytes updated */
 #define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2067
+/*! sleep for LSM checkpoint throttle */
+#define	WT_STAT_DSRC_LSM_CHECKPOINT_THROTTLE		2068
 /*! chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2068
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2069
 /*! highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2069
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2070
 /*! queries that could have benefited from a Bloom filter that did not
  * exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2070
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2071
+/*! sleep for LSM merge throttle */
+#define	WT_STAT_DSRC_LSM_MERGE_THROTTLE			2072
 /*! reconciliation dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			2071
+#define	WT_STAT_DSRC_REC_DICTIONARY			2073
 /*! reconciliation internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2072
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2074
 /*! reconciliation leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2073
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2075
 /*! reconciliation overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2074
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2076
 /*! reconciliation pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2075
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2077
 /*! reconciliation pages merged */
-#define	WT_STAT_DSRC_REC_PAGE_MERGE			2076
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			2078
 /*! page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2077
+#define	WT_STAT_DSRC_REC_PAGES				2079
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2078
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2080
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2079
+#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2081
 /*! reconciliation internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2080
+#define	WT_STAT_DSRC_REC_SPLIT_INTERNAL			2082
 /*! reconciliation leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			2081
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			2083
 /*! reconciliation maximum splits for a page */
-#define	WT_STAT_DSRC_REC_SPLIT_MAX			2082
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			2084
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2083
+#define	WT_STAT_DSRC_SESSION_COMPACT			2085
 /*! open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2084
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2086
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2085
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2087
 /*! @} */
 /*
  * Statistics section: END

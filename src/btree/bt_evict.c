@@ -229,7 +229,8 @@ __evict_worker(WT_SESSION_IMPL *session)
 
 		/* Check to see if the eviction server should run. */
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
-			flags = WT_EVICT_PASS_ALL;
+			flags = (loop > 10) ?
+			    WT_EVICT_PASS_AGGRESSIVE : WT_EVICT_PASS_ALL;
 		else if (dirty_inuse >
 		    (cache->eviction_dirty_target * bytes_max) / 100)
 			/* Ignore clean pages unless the cache is too large */
@@ -244,7 +245,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		F_SET(cache, WT_EVICT_ACTIVE);
 		WT_VERBOSE_RET(session, evictserver,
 		    "Eviction pass with: Max: %" PRIu64
-		    " In use: %" PRIu64 " Dirty: %" PRIu64 " Internal: %s",
+		    " In use: %" PRIu64 " Dirty: %" PRIu64 " Merge: %s",
 		    bytes_max, bytes_inuse, dirty_inuse,
 		    LF_ISSET(WT_EVICT_PASS_INTERNAL) ? "yes" : "no");
 
@@ -435,6 +436,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 * and drain any blocks already queued.
 	 */
 	__wt_evict_file_exclusive_on(session);
+
+	/* Make sure the oldest transaction ID is up-to-date. */
+	__wt_txn_update_oldest(session);
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
@@ -721,11 +725,22 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int slot, max_entries, retries;
+	u_int max_entries, old_slot, retries, slot;
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
 	retries = 0;
+
+	/* Increment the shared read generation. */
+	__wt_cache_read_gen_incr(session);
+
+	/*
+	 * Update the oldest ID: we use it to decide whether pages are
+	 * candidates for eviction.  Without this, if all threads are blocked
+	 * after a long-running transaction (such as a checkpoint) completes,
+	 * we may never start evicting again.
+	 */
+	__wt_txn_update_oldest(session);
 
 	/*
 	 * Set the starting slot in the queue and the maximum pages added
@@ -751,9 +766,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 
 		/*
 		 * Each time we reenter this function, start at the next handle
-		 * on the list.  We use the address of the handle's name as the
-		 * handle's unique identifier, that should be unique, and is
-		 * unlikely to cause a false positive if freed and reallocated.
+		 * on the list.
 		 */
 		if (cache->evict_file_next != NULL &&
 		    cache->evict_file_next != dhandle)
@@ -769,8 +782,28 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		 */
 		btree = dhandle->handle;
 		if (btree->root_page == NULL ||
-		    F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->bulk_load_ok)
+		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+		    btree->bulk_load_ok)
 			continue;
+
+		/*
+		 * Also skip files that are configured to stick in cache until
+		 * we get aggressive.
+		 */
+		if (btree->evict_priority != 0 &&
+		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
+			continue;
+
+		/*
+		 * If we are filling the queue, skip files that haven't been
+		 * useful in the past.
+		 */
+		if (btree->evict_walk_period != 0 &&
+		    cache->evict_entries >= WT_EVICT_WALK_BASE &&
+		    btree->evict_walk_skips++ < btree->evict_walk_period)
+			continue;
+		btree->evict_walk_skips = 0;
+		old_slot = slot;
 
 		__wt_spin_lock(session, &cache->evict_walk_lock);
 
@@ -783,6 +816,17 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 			    ret = __evict_walk_file(session, &slot, flags));
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
+
+		/*
+		 * If we didn't find enough candidates in the file, skip it
+		 * next time.
+		 */
+		if (slot >= old_slot + WT_EVICT_WALK_PER_FILE ||
+		    slot >= max_entries)
+			btree->evict_walk_period = 0;
+		else
+			btree->evict_walk_period = WT_MIN(
+			    WT_MAX(1, 2 * btree->evict_walk_period), 1000);
 
 		if (ret != 0 || slot >= max_entries)
 			break;
@@ -843,15 +887,15 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int modified, restarts, levels;
+	int internal_pages, levels, modified, restarts;
 	uint32_t walk_flags;
+	uint64_t pages_walked;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	start = cache->evict + *slotp;
-	end = start + WT_EVICT_WALK_PER_FILE;
-	if (end > cache->evict + cache->evict_slots)
-		end = cache->evict + cache->evict_slots;
+	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
+	    cache->evict + cache->evict_slots);
 
 	WT_ASSERT(session, btree->evict_page == NULL ||
 	    WT_PAGE_IS_ROOT(btree->evict_page) ||
@@ -860,28 +904,27 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	walk_flags = WT_TREE_EVICT;
 	if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
 		walk_flags |= WT_TREE_SKIP_LEAF;
+
 	/*
 	 * Get some more eviction candidate pages.
 	 */
-	for (evict = start, restarts = 0;
+	for (evict = start, pages_walked = 0, internal_pages = restarts = 0;
 	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
-	    ret = __wt_tree_walk(session, &btree->evict_page, walk_flags)) {
+	    ret = __wt_tree_walk(session, &btree->evict_page, walk_flags),
+	    ++pages_walked) {
 		if ((page = btree->evict_page) == NULL) {
 			ret = 0;
 			/*
 			 * Take care with terminating this loop.
 			 *
 			 * Don't make an extra call to __wt_tree_walk: that
-			 * will leave a page in the WT_REF_EVICT_WALK state,
-			 * unable to be evicted, which may prevent any work
+			 * will leave a page pinned, which may prevent any work
 			 * from being done.
 			 */
 			if (++restarts == 2)
 				break;
 			continue;
 		}
-
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_walk);
 
 		/* Ignore root pages entirely. */
 		if (WT_PAGE_IS_ROOT(page))
@@ -940,6 +983,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		} else if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
 			continue;
 
+		/* Limit internal pages to 50% unless we get aggressive. */
+		if ((page->type == WT_PAGE_COL_INT ||
+		    page->type == WT_PAGE_ROW_INT) &&
+		    ++internal_pages > WT_EVICT_WALK_PER_FILE / 2 &&
+		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
+			break;
+
 		/*
 		 * If this page has never been considered for eviction,
 		 * set its read generation to a little bit in the
@@ -975,6 +1025,15 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		/*
+		 * If the page is clean but has modifications that appear too
+		 * new to evict, skip it.
+		 */
+		if (!modified && page->modify != NULL &&
+		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
+		    !__wt_txn_visible_all(session, page->modify->rec_max_txn))
+			continue;
+
+		/*
 		 * If the oldest transaction hasn't changed since the
 		 * last time this page was written, it's unlikely that
 		 * we can make progress.  Similarly, if the most recent
@@ -988,7 +1047,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * since rolled back, or we can help get the checkpoint
 		 * completed sooner.
 		 */
-		if (modified && !F_ISSET(cache, WT_EVICT_STUCK) &&
+		if (modified && !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
 		    (page->modify->disk_snap_min ==
 		    S2C(session)->txn_global.oldest_id ||
 		    !__wt_txn_visible_all(session,
@@ -1004,6 +1063,7 @@ add:		WT_ASSERT(session, evict->page == NULL);
 	}
 
 	*slotp += (u_int)(evict - start);
+	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, pages_walked);
 	return (ret);
 }
 
@@ -1160,7 +1220,8 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_PAGE *page;
-	uint64_t file_bytes, file_dirty, file_pages, total_bytes;
+	uint64_t file_intl_pages, file_leaf_pages;
+	uint64_t file_bytes, file_dirty, total_bytes;
 
 	conn = S2C(session);
 	total_bytes = 0;
@@ -1176,22 +1237,28 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		    btree->bulk_load_ok)
 			continue;
 
-		file_bytes = file_dirty = file_pages = 0;
+		file_bytes = file_dirty = file_intl_pages = file_leaf_pages = 0;
 		page = NULL;
 		session->dhandle = dhandle;
 		while (__wt_tree_walk(session, &page, WT_TREE_CACHE) == 0 &&
 		    page != NULL) {
-			++file_pages;
+			if (page->type == WT_PAGE_COL_INT ||
+			    page->type == WT_PAGE_ROW_INT)
+				++file_intl_pages;
+			else
+				++file_leaf_pages;
 			file_bytes += page->memory_footprint;
 			if (__wt_page_is_modified(page))
 				file_dirty += page->memory_footprint;
 		}
 		session->dhandle = NULL;
 
-		printf("cache dump: %s [%s]: %"
-		    PRIu64 " pages, %" PRIu64 "MB, %" PRIu64 "MB dirty\n",
+		printf("cache dump: %s [%s]:"
+		    " %" PRIu64 " intl pages, %" PRIu64 " leaf pages,"
+		    " %" PRIu64 "MB, %" PRIu64 "MB dirty\n",
 		    dhandle->name, dhandle->checkpoint,
-		    file_pages, file_bytes >> 20, file_dirty >> 20);
+		    file_intl_pages, file_leaf_pages,
+		    file_bytes >> 20, file_dirty >> 20);
 
 		total_bytes += file_bytes;
 	}

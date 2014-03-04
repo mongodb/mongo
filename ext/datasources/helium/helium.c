@@ -2098,19 +2098,22 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	CURSOR *cursor;
 	DATA_SOURCE *ds;
 	WT_CONFIG_ITEM v;
+	WT_CONFIG_PARSER *config_parser;
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
-	int locked, ret = 0;
+	int locked, ret, tret;
 	const char *value;
 
 	*new_cursor = NULL;
 
+	config_parser = NULL;
 	cursor = NULL;
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 	ws = NULL;
 	locked = 0;
+	ret = tret = 0;
 	value = NULL;
 
 	/* Allocate and initialize a cursor. */
@@ -2164,23 +2167,28 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		if ((ret = master_uri_get(wtds, session, uri, &value)) != 0)
 			goto err;
 
-		if ((ret = wtext->config_strget(
-		    wtext, session, value, "key_format", &v)) != 0)
+		if ((ret = wtext->config_parser_open(wtext,
+		    session, value, strlen(value), &config_parser)) != 0)
+			EMSG_ERR(wtext, session, ret,
+			    "Configuration string parser: %s",
+			    wtext->strerror(ret));
+		if ((ret = config_parser->get(
+		    config_parser, "key_format", &v)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "key_format configuration: %s",
 			    wtext->strerror(ret));
 		ws->config_recno = v.len == 1 && v.str[0] == 'r';
 
-		if ((ret = wtext->config_strget(
-		    wtext, session, value, "value_format", &v)) != 0)
+		if ((ret = config_parser->get(
+		    config_parser, "value_format", &v)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "value_format configuration: %s",
 			    wtext->strerror(ret));
 		ws->config_bitfield =
 		    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
-		if ((ret = wtext->config_strget(
-		    wtext, session, value, "helium_o_compress", &v)) != 0)
+		if ((ret = config_parser->get(
+		    config_parser, "helium_o_compress", &v)) != 0)
 			EMSG_ERR(wtext, session, ret,
 			    "helium_o_compress configuration: %s",
 			    wtext->strerror(ret));
@@ -2219,6 +2227,11 @@ err:		if (ws != NULL && locked)
 			ESET(unlock(wtext, session, &ws->lock));
 		cursor_destroy(cursor);
 	}
+	if (config_parser != NULL &&
+	    (tret = config_parser->close(config_parser)) != 0)
+		EMSG(wtext, session, tret,
+		    "WT_CONFIG_PARSER.close: %s", wtext->strerror(tret));
+
 	free((void *)value);
 	return (ret);
 }
@@ -2882,19 +2895,19 @@ helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
     char **devicep, HE_ENV *envp, int *env_setp, int *flagsp)
 {
 	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
+	WT_CONFIG_PARSER *config_parser;
 	int ret = 0, tret;
 
 	*env_setp = 0;
 	*flagsp = 0;
 
-	/* Set up the scan of the configuration arguments list. */
-	if ((ret = wtext->config_scan_begin(
-	    wtext, NULL, config->str, config->len, &scan)) != 0)
+	/* Traverse the configuration arguments list. */
+	if ((ret = wtext->config_parser_open(
+	    wtext, NULL, config->str, config->len, &config_parser)) != 0)
 		ERET(wtext, NULL, ret,
-		    "WT_EXTENSION_API.config_scan_begin: %s",
+		    "WT_EXTENSION_API.config_parser_open: %s",
 		    wtext->strerror(ret));
-	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
+	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
 		if (string_match("helium_devices", k.str, k.len)) {
 			if ((*devicep = calloc(1, v.len + 1)) == NULL)
 				return (os_errno());
@@ -2924,13 +2937,11 @@ helium_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 		ret = 0;
 	if (ret != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API.config_scan_next: %s",
-		    wtext->strerror(ret));
+		    "WT_CONFIG_PARSER.next: %s", wtext->strerror(ret));
 
-err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
+err:	if ((tret = config_parser->close(config_parser)) != 0)
 		EMSG(wtext, NULL, tret,
-		    "WT_EXTENSION_API.config_scan_end: %s",
-		    wtext->strerror(tret));
+		    "WT_CONFIG_PARSER.close: %s", wtext->strerror(tret));
 
 	return (ret);
 }
@@ -3320,11 +3331,12 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	DATA_SOURCE *ds;
 	HELIUM_SOURCE *hs;
 	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
+	WT_CONFIG_PARSER *config_parser;
 	WT_EXTENSION_API *wtext;
 	int vmajor, vminor, ret = 0;
 	const char **p;
 
+	config_parser = NULL;
 	ds = NULL;
 
 	wtext = connection->get_extension_api(connection);
@@ -3357,12 +3369,12 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		    wtext->strerror(ret));
 
 	/* Step through the list of Helium sources, opening each one. */
-	if ((ret =
-	    wtext->config_scan_begin(wtext, NULL, v.str, v.len, &scan)) != 0)
+	if ((ret = wtext->config_parser_open(
+	    wtext, NULL, v.str, v.len, &config_parser)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API.config_scan_begin: config: %s",
+		    "WT_EXTENSION_API.config_parser_open: config: %s",
 		    wtext->strerror(ret));
-	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
+	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
 		if (string_match("helium_verbose", k.str, k.len)) {
 			verbose = v.val == 0 ? 0 : 1;
 			continue;
@@ -3372,12 +3384,13 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	}
 	if (ret != WT_NOTFOUND)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API.config_scan_next: config: %s",
+		    "WT_CONFIG_PARSER.next: config: %s",
 		    wtext->strerror(ret));
-	if ((ret = wtext->config_scan_end(wtext, scan)) != 0)
+	if ((ret = config_parser->close(config_parser)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API.config_scan_end: config: %s",
+		    "WT_CONFIG_PARSER.close: config: %s",
 		    wtext->strerror(ret));
+	config_parser = NULL;
 
 	/* Find and open the database transaction store. */
 	if ((ret = helium_source_open_txn(ds)) != 0)
@@ -3414,6 +3427,8 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 err:	if (ds != NULL)
 		ESET(helium_terminate((WT_DATA_SOURCE *)ds, NULL));
+	if (config_parser != NULL)
+		(void)config_parser->close(config_parser);
 	return (ret);
 }
 

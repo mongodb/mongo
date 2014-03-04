@@ -692,9 +692,9 @@ __wt_lsm_tree_throttle(
 	else if (!decrease_only)
 		WT_LSM_MERGE_THROTTLE_INCREASE(lsm_tree->merge_throttle);
 
-	/* Put an upper bound of 100ms on both throttle calculations. */
-	lsm_tree->ckpt_throttle = WT_MIN(100000, lsm_tree->ckpt_throttle);
-	lsm_tree->merge_throttle = WT_MIN(100000, lsm_tree->merge_throttle);
+	/* Put an upper bound of 1s on both throttle calculations. */
+	lsm_tree->ckpt_throttle = WT_MIN(1000000, lsm_tree->ckpt_throttle);
+	lsm_tree->merge_throttle = WT_MIN(1000000, lsm_tree->merge_throttle);
 
 	/*
 	 * Update our estimate of how long each in-memory chunk stays active.
@@ -1035,7 +1035,13 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 
 	WT_RET(__wt_seconds(session, &begin));
 
+	/*
+	 * Set the compacting flag and clear the current merge throttle
+	 * setting, so that all merge threads look for merges at all levels of
+	 * the tree.
+	 */
 	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+	lsm_tree->merge_throttle = 0;
 
 	/* Wake up the merge threads. */
 	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));

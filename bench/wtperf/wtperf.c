@@ -31,67 +31,35 @@
 static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
 	"WT_TEST",			/* monitor dir */
-	NULL,				/* uri */
+	NULL,				/* base_uri */
+	NULL,				/* uris */
+	NULL,				/* helium_mount */
 	NULL,				/* conn */
 	NULL,				/* logf */
+	NULL, NULL,			/* compressor ext, blk */
 	NULL, NULL,			/* populate, checkpoint threads */
 
 	NULL,				/* worker threads */
 	0,				/* worker thread count */
 	NULL,				/* workloads */
 	0,				/* workload count */
+	0,				/* checkpoint operations */
+	0,				/* insert operations */
+	0,				/* read operations */
+	0,				/* update operations */
+	0,				/* insert key */
+	0,				/* checkpoint in progress */
+	0,				/* thread error */
+	0,				/* notify threads to stop */
+	0,				/* total seconds running */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
 #undef OPT_DEFINE_DEFAULT
 };
 
-static const char * const small_config_str =
-    "conn_config=\"cache_size=500MB\","
-    "table_config=\"lsm=(chunk_size=5MB)\","
-    "icount=500000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=20,"
-    "populate_threads=1,"
-    "threads=((count=8,read=1)),";
-
-static const char * const med_config_str =
-    "conn_config=\"cache_size=1GB\","
-    "table_config=\"lsm=(chunk_size=20MB)\","
-    "icount=50000000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=100,"
-    "populate_threads=1,"
-    "threads=((count=16,read=1)),";
-
-static const char * const large_config_str =
-    "conn_config=\"cache_size=2GB\","
-    "table_config=\"lsm=(chunk_size=50MB)\","
-    "icount=500000000,"
-    "value_sz=100,"
-    "key_sz=20,"
-    "report_interval=5,"
-    "run_time=600,"
-    "populate_threads=1,"
-    "threads=((count=16,read=1)),";
-
 static const char * const debug_cconfig = "verbose=[lsm]";
 static const char * const debug_tconfig = "";
-
-static uint64_t g_ckpt_ops;		/* checkpoint operations */
-static uint64_t g_insert_ops;		/* insert operations */
-static uint64_t g_read_ops;		/* read operations */
-static uint64_t g_update_ops;		/* update operations */
-
-static uint64_t g_insert_key;		/* insert key */
-
-static volatile int g_ckpt;		/* checkpoint in progress */
-static volatile int g_error;		/* thread error */
-static volatile int g_stop;		/* notify threads to stop */
 
 /*
  * Atomic update where needed.
@@ -103,15 +71,20 @@ static volatile int g_stop;		/* notify threads to stop */
 #endif
 
 static void	*checkpoint_worker(void *);
+static int	 create_tables(CONFIG *);
+static int	 create_uris(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
-static void	randomize_value(CONFIG *, char *);
+static void	 randomize_value(CONFIG *, char *);
+static int	 start_all_runs(CONFIG *);
+static int	 start_run(CONFIG *);
 static int	 start_threads(CONFIG *,
 		    WORKLOAD *, CONFIG_THREAD *, u_int, void *(*)(void *));
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
+static void	*thread_run_wtperf(void *);
 static void	*worker(void *);
 static uint64_t	 wtperf_rand(CONFIG *);
 static uint64_t	 wtperf_value_range(CONFIG *);
@@ -130,9 +103,9 @@ extern uint32_t	__wt_random(void);
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
-get_next_incr(void)
+get_next_incr(CONFIG *cfg)
 {
-	return (ATOMIC_ADD(g_insert_key, 1));
+	return (ATOMIC_ADD(cfg->insert_key, 1));
 }
 
 static void
@@ -219,16 +192,18 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
+	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
+	size_t i;
 	uint64_t next_val, usecs;
-	int measure_latency, ret;
 	uint8_t *op, *op_end;
+	int measure_latency, ret;
 	char *value_buf, *key_buf, *value;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
 	conn = cfg->conn;
+	cursors = NULL;
 	session = NULL;
 	trk = NULL;
 
@@ -237,11 +212,21 @@ worker(void *arg)
 		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
 		goto err;
 	}
-	if ((ret = session->open_cursor(
-	    session, cfg->uri, NULL, NULL, &cursor)) != 0) {
-		lprintf(cfg,
-		    ret, 0, "worker: WT_SESSION.open_cursor: %s", cfg->uri);
+	cursors = (WT_CURSOR **)calloc(
+	    cfg->table_count, sizeof(WT_CURSOR *));
+	if (cursors == NULL) {
+		lprintf(cfg, ENOMEM, 0,
+		    "worker: couldn't allocate cursor array");
 		goto err;
+	}
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->open_cursor(session,
+		    cfg->uris[i], NULL, NULL, &cursors[i])) != 0) {
+			lprintf(cfg, ret, 0,
+			    "worker: WT_SESSION.open_cursor: %s",
+			    cfg->uris[i]);
+			goto err;
+		}
 	}
 
 	key_buf = thread->key_buf;
@@ -250,7 +235,7 @@ worker(void *arg)
 	op = thread->workload->ops;
 	op_end = op + sizeof(thread->workload->ops);
 
-	while (!g_stop) {
+	while (!cfg->stop) {
 		/*
 		 * Generate the next key and setup operation specific
 		 * statistics tracking objects.
@@ -262,7 +247,7 @@ worker(void *arg)
 			if (cfg->random_range)
 				next_val = wtperf_rand(cfg);
 			else
-				next_val = cfg->icount + get_next_incr();
+				next_val = cfg->icount + get_next_incr(cfg);
 			break;
 		case WORKER_READ:
 			trk = &thread->read;
@@ -285,7 +270,18 @@ worker(void *arg)
 		}
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
-		measure_latency = cfg->sample_interval != 0 && (
+
+		/*
+		 * Spread the data out around the multiple databases.
+		 */
+		cursor = cursors[next_val % cfg->table_count];
+
+		/*
+		 * Skip the first time we do an operation, when trk->ops
+		 * is 0, to avoid first time latency spikes.
+		 */
+		measure_latency =
+		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
 		    (ret = __wt_epoch(NULL, &start)) != 0) {
@@ -385,8 +381,10 @@ op_err:			lprintf(cfg, ret, 0,
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
+	if (cursors != NULL)
+		free(cursors);
 
 	return (NULL);
 }
@@ -502,17 +500,20 @@ populate_thread(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
+	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
-	uint32_t opcount;
+	size_t i;
 	uint64_t op, usecs;
+	uint32_t opcount;
 	int intxn, measure_latency, ret;
 	char *value_buf, *key_buf;
+	const char *cursor_config;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	session = NULL;
+	cursors = NULL;
 	ret = 0;
 	trk = &thread->insert;
 
@@ -525,17 +526,30 @@ populate_thread(void *arg)
 		goto err;
 	}
 
-	/* Do a bulk load if populate is single-threaded. */
-	if ((ret = session->open_cursor(session, cfg->uri, NULL,
-	    cfg->populate_threads == 1 ? "bulk" : NULL, &cursor)) != 0) {
-		lprintf(cfg,
-		    ret, 0, "populate: WT_SESSION.open_cursor: %s", cfg->uri);
+	/* Do bulk loads if populate is single-threaded. */
+	cursor_config = cfg->populate_threads == 1 ? "bulk" : NULL;
+	/* Create the cursors. */
+	cursors = (WT_CURSOR **)calloc(
+	    cfg->table_count, sizeof(WT_CURSOR *));
+	if (cursors == NULL) {
+		lprintf(cfg, ENOMEM, 0,
+		    "worker: couldn't allocate cursor array");
 		goto err;
 	}
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->open_cursor(
+		    session, cfg->uris[i], NULL,
+		    cursor_config, &cursors[i])) != 0) {
+			lprintf(cfg, ret, 0,
+			    "populate: WT_SESSION.open_cursor: %s",
+			    cfg->uris[i]);
+			goto err;
+		}
+	}
 
-	/* Populate the database. */
+	/* Populate the databases. */
 	for (intxn = 0, opcount = 0;;) {
-		op = get_next_incr();
+		op = get_next_incr(cfg);
 		if (op > cfg->icount)
 			break;
 
@@ -548,8 +562,13 @@ populate_thread(void *arg)
 			}
 			intxn = 1;
 		}
+		/*
+		 * Figure out which table this op belongs to.
+		 */
+		cursor = cursors[op % cfg->table_count];
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
-		measure_latency = cfg->sample_interval != 0 && (
+		measure_latency = 
+		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
 		    (ret = __wt_epoch(NULL, &start)) != 0) {
@@ -564,7 +583,12 @@ populate_thread(void *arg)
 			lprintf(cfg, ret, 0, "Failed inserting");
 			goto err;
 		}
-		/* Gather statistics */
+		/*
+		 * Gather statistics.
+		 * We measure the latency of inserting a single key.  If there
+		 * are multiple tables, it is the time for insertion into all
+		 * of them.
+		 */
 		if (measure_latency) {
 			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
 				lprintf(cfg, ret, 0,
@@ -601,8 +625,10 @@ populate_thread(void *arg)
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
+	if (cursors != NULL)
+		free(cursors);
 
 	return (NULL);
 }
@@ -614,16 +640,16 @@ monitor(void *arg)
 	struct tm *tm, _tm;
 	CONFIG *cfg;
 	FILE *fp;
-	char buf[64], *path;
-	int ret;
+	size_t len;
 	uint64_t reads, inserts, updates;
 	uint64_t cur_reads, cur_inserts, cur_updates;
 	uint64_t last_reads, last_inserts, last_updates;
 	uint32_t read_avg, read_min, read_max;
 	uint32_t insert_avg, insert_min, insert_max;
 	uint32_t update_avg, update_min, update_max;
-	size_t len;
 	u_int i;
+	int ret;
+	char buf[64], *path;
 
 	cfg = (CONFIG *)arg;
 	assert(cfg->sample_interval != 0);
@@ -643,28 +669,32 @@ monitor(void *arg)
 	}
 	/* Set line buffering for monitor file. */
 	(void)setvbuf(fp, NULL, _IOLBF, 0);
-#ifdef __WRITE_A_HEADER
 	fprintf(fp,
 	    "#time,"
-	    "read operations,insert operations,update operations,"
+	    "totalsec,"
+	    "read ops per second,"
+	    "insert ops per second,"
+	    "update ops per second,"
 	    "checkpoints,"
-	    "read average latency(NS),read minimum latency(NS),"
-	    "read maximum latency(NS),"
-	    "insert average latency(NS),insert min latency(NS),"
-	    "insert maximum latency(NS),"
-	    "update average latency(NS),update min latency(NS),"
-	    "update maximum latency(NS)"
+	    "read average latency(uS),"
+	    "read minimum latency(uS),"
+	    "read maximum latency(uS),"
+	    "insert average latency(uS),"
+	    "insert min latency(uS),"
+	    "insert maximum latency(uS),"
+	    "update average latency(uS),"
+	    "update min latency(uS),"
+	    "update maximum latency(uS)"
 	    "\n");
-#endif
 	last_reads = last_inserts = last_updates = 0;
-	while (!g_stop) {
+	while (!cfg->stop) {
 		for (i = 0; i < cfg->sample_interval; i++) {
 			sleep(1);
-			if (g_stop)
+			if (cfg->stop)
 				break;
 		}
 		/* If the workers are done, don't bother with a final call. */
-		if (g_stop)
+		if (cfg->stop)
 			break;
 
 		if ((ret = __wt_epoch(NULL, &t)) != 0) {
@@ -694,18 +724,18 @@ monitor(void *arg)
 			cur_inserts = inserts - last_inserts;
 
 		(void)fprintf(fp,
-		    "%s"
+		    "%s,%" PRIu32
 		    ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
 		    ",%c"
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    "\n",
-		    buf,
+		    buf, cfg->totalsec,
 		    cur_reads / cfg->sample_interval,
 		    cur_inserts / cfg->sample_interval,
 		    cur_updates / cfg->sample_interval,
-		    g_ckpt ? 'Y' : 'N',
+		    cfg->ckpt ? 'Y' : 'N',
 		    read_avg, read_min, read_max,
 		    insert_avg, insert_min, insert_max,
 		    update_avg, update_min, update_max);
@@ -717,7 +747,7 @@ monitor(void *arg)
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
 
 	if (fp != NULL)
@@ -750,27 +780,27 @@ checkpoint_worker(void *arg)
 		goto err;
 	}
 
-	while (!g_stop) {
+	while (!cfg->stop) {
 		/* Break the sleep up, so we notice interrupts faster. */
 		for (i = 0; i < cfg->checkpoint_interval; i++) {
 			sleep(1);
-			if (g_stop)
+			if (cfg->stop)
 				break;
 		}
 		/* If the workers are done, don't bother with a final call. */
-		if (g_stop)
+		if (cfg->stop)
 			break;
 
 		if ((ret = __wt_epoch(NULL, &s)) != 0) {
 			lprintf(cfg, ret, 0, "Get time failed in checkpoint.");
 			goto err;
 		}
-		g_ckpt = 1;
+		cfg->ckpt = 1;
 		if ((ret = session->checkpoint(session, NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Checkpoint failed.");
 			goto err;
 		}
-		g_ckpt = 0;
+		cfg->ckpt = 0;
 		++thread->ckpt.ops;
 
 		if ((ret = __wt_epoch(NULL, &e)) != 0) {
@@ -788,7 +818,7 @@ checkpoint_worker(void *arg)
 
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
-err:		g_error = g_stop = 1;
+err:		cfg->error = cfg->stop = 1;
 	}
 
 	return (NULL);
@@ -797,13 +827,14 @@ err:		g_error = g_stop = 1;
 static int
 execute_populate(CONFIG *cfg)
 {
+	struct timespec start, stop;
 	CONFIG_THREAD *popth;
 	WT_SESSION *session;
-	struct timespec start, stop;
 	double secs;
+	size_t i;
 	uint64_t last_ops;
-	uint32_t interval, total;
-	int elapsed, ret;
+	uint32_t interval;
+	int elapsed, ret, t_ret;
 
 	session = NULL;
 	lprintf(cfg, 0, 1,
@@ -816,14 +847,14 @@ execute_populate(CONFIG *cfg)
 	    cfg->popthreads, cfg->populate_threads, populate_thread)) != 0)
 		return (ret);
 
-	g_insert_key = 0;
+	cfg->insert_key = 0;
 
 	if ((ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
 		return (ret);
 	}
-	for (elapsed = 0, interval = 0, last_ops = 0, total = 0;
-	    g_insert_key < cfg->icount && g_error == 0;) {
+	for (elapsed = 0, interval = 0, last_ops = 0;
+	    cfg->insert_key < cfg->icount && cfg->error == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
 		 * granularity, each 100th increment of elapsed is a single
@@ -836,14 +867,14 @@ execute_populate(CONFIG *cfg)
 		if (++interval < cfg->report_interval)
 			continue;
 		interval = 0;
-		total += cfg->report_interval;
-		g_insert_ops = sum_pop_ops(cfg);
+		cfg->totalsec += cfg->report_interval;
+		cfg->insert_ops = sum_pop_ops(cfg);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " populate inserts (%" PRIu64 " of %"
 		    PRIu32 ") in %" PRIu32 " secs (%" PRIu32 " total secs)",
-		    g_insert_ops - last_ops, g_insert_ops,
-		    cfg->icount, cfg->report_interval, total);
-		last_ops = g_insert_ops;
+		    cfg->insert_ops - last_ops, cfg->insert_ops,
+		    cfg->icount, cfg->report_interval, cfg->totalsec);
+		last_ops = cfg->insert_ops;
 	}
 	if ((ret = __wt_epoch(NULL, &stop)) != 0) {
 		lprintf(cfg, ret, 0, "Get time failed in populate.");
@@ -864,7 +895,7 @@ execute_populate(CONFIG *cfg)
 		return (ret);
 
 	/* Report if any worker threads didn't finish. */
-	if (g_error != 0) {
+	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
 		    "Populate thread(s) exited without finishing.");
 		return (WT_ERROR);
@@ -879,7 +910,9 @@ execute_populate(CONFIG *cfg)
 	    "Load time: %.2f\n" "load ops/sec: %.2f", secs, cfg->icount / secs);
 
 	/*
-	 * If configured, compact to allow LSM merging to complete.
+	 * If configured, compact to allow LSM merging to complete.  We
+	 * set an unlimited timeout because if we close the connection
+	 * then any in-progress compact/merge is aborted.
 	 */
 	if (cfg->compact) {
 		if ((ret = cfg->conn->open_session(
@@ -889,16 +922,34 @@ execute_populate(CONFIG *cfg)
 			return (ret);
 		}
 		lprintf(cfg, 0, 1, "Compact after populate");
-		if ((ret = session->compact(session, cfg->uri, NULL)) != 0) {
-			lprintf(cfg, ret, 0,
-			     "execute_populate: WT_SESSION.compact");
-			return (ret);
+		if ((ret = __wt_epoch(NULL, &start)) != 0) {
+			lprintf(cfg, ret, 0, "Get time failed in populate.");
+			goto err;
 		}
-		if ((ret = session->close(session, NULL)) != 0) {
-			lprintf(cfg, ret, 0,
+		/*
+		 * We measure how long it takes to compact all tables for this
+		 * workload.
+		 */
+		for (i = 0; i < cfg->table_count; i++)
+			if ((ret = session->compact(
+			    session, cfg->uris[i], "timeout=0")) != 0) {
+				lprintf(cfg, ret, 0,
+				     "execute_populate: WT_SESSION.compact");
+				goto err;
+			}
+		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+			lprintf(cfg, ret, 0, "Get time failed in populate.");
+			goto err;
+		}
+		secs = stop.tv_sec + stop.tv_nsec / (double)BILLION;
+		secs -= start.tv_sec + start.tv_nsec / (double)BILLION;
+		lprintf(cfg, 0, 1, "Compact completed in %.2f seconds", secs);
+err:
+		if ((t_ret = session->close(session, NULL)) != 0)
+			lprintf(cfg, t_ret, 0,
 			     "execute_populate: WT_SESSION.close");
+		if (ret != 0 || (ret = t_ret) != 0)
 			return (ret);
-		}
 	}
 
 	/*
@@ -926,12 +977,12 @@ execute_workload(CONFIG *cfg)
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
 	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
-	uint32_t interval, run_ops, run_time, total;
+	uint32_t interval, run_ops, run_time;
 	u_int i;
 	int ret, t_ret;
 
-	g_insert_key = 0;
-	g_insert_ops = g_read_ops = g_update_ops = 0;
+	cfg->insert_key = 0;
+	cfg->insert_ops = cfg->read_ops = cfg->update_ops = 0;
 
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
@@ -963,8 +1014,8 @@ execute_workload(CONFIG *cfg)
 		threads += workp->threads;
 	}
 
-	for (interval = cfg->report_interval, total = 0,
-	    run_time = cfg->run_time, run_ops = cfg->run_ops; g_error == 0;) {
+	for (interval = cfg->report_interval, run_time = cfg->run_time,
+	    run_ops = cfg->run_ops; cfg->error == 0;) {
 		/*
 		 * Sleep for one second at a time.
 		 * If we are tracking run time, check to see if we're done, and
@@ -979,46 +1030,46 @@ execute_workload(CONFIG *cfg)
 		}
 
 		/* Sum the operations we've done. */
-		g_ckpt_ops = sum_ckpt_ops(cfg);
-		g_insert_ops = sum_insert_ops(cfg);
-		g_read_ops = sum_read_ops(cfg);
-		g_update_ops = sum_update_ops(cfg);
+		cfg->ckpt_ops = sum_ckpt_ops(cfg);
+		cfg->insert_ops = sum_insert_ops(cfg);
+		cfg->read_ops = sum_read_ops(cfg);
+		cfg->update_ops = sum_update_ops(cfg);
 
 		/* If we're checking total operations, see if we're done. */
-		if (run_ops != 0 &&
-		    run_ops <= g_insert_ops + g_read_ops + g_update_ops)
+		if (run_ops != 0 && run_ops <=
+		    cfg->insert_ops + cfg->read_ops + cfg->update_ops)
 			break;
 
 		/* If writing out throughput information, see if it's time. */
 		if (interval == 0 || --interval > 0)
 			continue;
 		interval = cfg->report_interval;
-		total += cfg->report_interval;
+		cfg->totalsec += cfg->report_interval;
 
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
 		    " updates, %" PRIu64 " checkpoints in %" PRIu32
 		    " secs (%" PRIu32 " total secs)",
-		    g_read_ops - last_reads,
-		    g_insert_ops - last_inserts,
-		    g_update_ops - last_updates,
-		    g_ckpt_ops - last_ckpts,
-		    cfg->report_interval, total);
-		last_reads = g_read_ops;
-		last_inserts = g_insert_ops;
-		last_updates = g_update_ops;
-		last_ckpts = g_ckpt_ops;
+		    cfg->read_ops - last_reads,
+		    cfg->insert_ops - last_inserts,
+		    cfg->update_ops - last_updates,
+		    cfg->ckpt_ops - last_ckpts,
+		    cfg->report_interval, cfg->totalsec);
+		last_reads = cfg->read_ops;
+		last_inserts = cfg->insert_ops;
+		last_updates = cfg->update_ops;
+		last_ckpts = cfg->ckpt_ops;
 	}
 
 	/* Notify the worker threads they are done. */
-err:	g_stop = 1;
+err:	cfg->stop = 1;
 
 	if ((t_ret = stop_threads(
 	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
 		ret = t_ret;
 
 	/* Report if any worker threads didn't finish. */
-	if (g_error != 0) {
+	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
 		    "Worker thread(s) exited without finishing.");
 		if (ret == 0)
@@ -1037,235 +1088,249 @@ find_table_count(CONFIG *cfg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	char *key;
+	uint32_t i, max_icount, table_icount;
 	int ret, t_ret;
+	char *key;
 
 	conn = cfg->conn;
 
+	max_icount = 0;
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
 		lprintf(cfg, ret, 0,
-		    "open_session failed finding existing table count");
-		goto err;
+		    "find_table_count: open_session failed");
+		goto out;
 	}
-	if ((ret = session->open_cursor(session, cfg->uri,
-	    NULL, NULL, &cursor)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "open_cursor failed finding existing table count");
-		goto err;
-	}
-	if ((ret = cursor->prev(cursor)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "cursor prev failed finding existing table count");
-		goto err;
-	}
-	if ((ret = cursor->get_key(cursor, &key)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "cursor get_key failed finding existing table count");
-		goto err;
-	}
-	cfg->icount = (uint32_t)atoi(key);
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->open_cursor(session, cfg->uris[i],
+		    NULL, NULL, &cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "find_table_count: open_cursor failed");
+			goto err;
+		}
+		if ((ret = cursor->prev(cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "find_table_count: cursor prev failed");
+			goto err;
+		}
+		if ((ret = cursor->get_key(cursor, &key)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "find_table_count: cursor get_key failed");
+			goto err;
+		}
+		table_icount = (uint32_t)atoi(key);
+		if (table_icount > max_icount)
+			max_icount = table_icount;
 
+		if ((ret = cursor->close(cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "find_table_count: cursor close failed");
+			goto err;
+		}
+	}
 err:	if ((t_ret = session->close(session, NULL)) != 0) {
 		if (ret == 0)
 			ret = t_ret;
 		lprintf(cfg, ret, 0,
-		    "session close failed finding existing table count");
+		    "find_table_count: session close failed");
+	}
+	cfg->icount = max_icount;
+out:	return (ret);
+}
+
+/*
+ * Populate the uri array if more than one table is being used.
+ */
+static int
+create_uris(CONFIG *cfg)
+{
+	size_t base_uri_len;
+	uint32_t i;
+	int ret;
+	char *uri;
+
+	ret = 0;
+	base_uri_len = strlen(cfg->base_uri);
+	cfg->uris = (char **)calloc(cfg->table_count, sizeof(char *));
+	if (cfg->uris == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
+	for (i = 0; i < cfg->table_count; i++) {
+		uri = cfg->uris[i] = (char *)calloc(base_uri_len + 3, 1);
+		if (uri == NULL) {
+			ret = ENOMEM;
+			goto err;
+		}
+		memcpy(uri, cfg->base_uri, base_uri_len);
+		/*
+		 * If there is only one table, just use base name.
+		 */
+		if (cfg->table_count > 1) {
+			uri[base_uri_len] = uri[base_uri_len + 1] = '0';
+			uri[base_uri_len] = '0' + (i / 10);
+			uri[base_uri_len + 1] = '0' + (i % 10);
+		}
+	}
+err:	if (ret != 0 && cfg->uris != NULL) {
+		for (i = 0; i < cfg->table_count; i++)
+			free(cfg->uris[i]);
+		free(cfg->uris);
+		cfg->uris = NULL;
 	}
 	return (ret);
 }
 
-int
-main(int argc, char *argv[])
+static int
+create_tables(CONFIG *cfg)
 {
-	CONFIG *cfg, _cfg;
 	WT_SESSION *session;
-	pthread_t monitor_thread;
-	size_t len;
-	uint64_t req_len, total_ops;
-	int ch, monitor_created, monitor_set, ret, t_ret;
-	const char *helium_mount;
-	const char *opts = "C:H:h:LMm:O:o:ST:";
-	const char *wtperftmp_subdir = "wtperftmp";
-	const char *user_cconfig, *user_tconfig;
-	char *cmd, *cc_buf, *tc_buf, *tmphome;
+	size_t i;
+	int ret;
+	char *uri;
 
 	session = NULL;
-	monitor_created = monitor_set = ret = 0;
-	helium_mount = user_cconfig = user_tconfig = NULL;
-	cmd = cc_buf = tc_buf = tmphome = NULL;
+	if (cfg->create == 0)
+		return (0);
 
-	/* Setup the default configuration values. */
-	cfg = &_cfg;
-	memset(cfg, 0, sizeof(*cfg));
-	if (config_assign(cfg, &default_cfg))
-		goto err;
-
-	/* Do a basic validation of options, and home is needed before open. */
-	while ((ch = getopt(argc, argv, opts)) != EOF)
-		switch (ch) {
-		case 'h':
-			cfg->home = optarg;
-			break;
-		case 'm':
-			cfg->monitor_dir = optarg;
-			monitor_set = 1;
-			break;
-		case '?':
-			fprintf(stderr, "Invalid option\n");
-			usage();
-			goto einval;
+	uri = cfg->base_uri;
+	if ((ret = cfg->conn->open_session(
+	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
+		lprintf(cfg, ret, 0,
+		    "Error opening a session on %s", cfg->home);
+		return (ret);
+	}
+	for (i = 0; i < cfg->table_count; i++) {
+		uri = cfg->uris[i];
+		if ((ret = session->create(
+		    session, uri, cfg->table_config)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error creating table %s", cfg->uris[i]);
+			return (ret);
 		}
+	}
+	if ((ret = session->close(session, NULL)) != 0) {
+		lprintf(cfg,
+		    ret, 0, "Error closing session");
+		return (ret);
+	}
+	return (ret);
+}
 
-	/*
-	 * If the user did not specify a monitor directory
-	 * then set the monitor directory to the home dir.
-	 */
-	if (!monitor_set)
-		cfg->monitor_dir = cfg->home;
+static int
+start_all_runs(CONFIG *cfg)
+{
+	CONFIG *next_cfg, **configs;
+	pthread_t *threads;
+	size_t cmd_len, home_len, i;
+	int ret, t_ret;
+	char *cmd_buf, *new_home;
 
-	/*
-	 * Create a temporary directory underneath the test directory in which
-	 * we do an initial WiredTiger open, because we need a connection in
-	 * order to use the extension configuration parser.  We will open the
-	 * real WiredTiger database after parsing the options.
-	 */
-	len = strlen(cfg->home) + strlen(wtperftmp_subdir) + 2;
-	if ((tmphome = malloc(len)) == NULL) {
-		ret = enomem(cfg);
+	ret = 0;
+	configs = NULL;
+	cmd_buf = NULL;
+
+	if (cfg->database_count == 1)
+		return (start_run(cfg));
+
+	/* Allocate an array to hold our config struct copies. */
+	configs = calloc(cfg->database_count, sizeof(CONFIG *));
+	if (configs == NULL)
+		return (ENOMEM);
+
+	/* Allocate an array to hold our thread IDs. */
+	threads = calloc(cfg->database_count, sizeof(pthread_t));
+	if (threads == NULL) {
+		ret = ENOMEM;
 		goto err;
 	}
-	snprintf(tmphome, len, "%s/%s", cfg->home, wtperftmp_subdir);
-	len = len * 2 + 100;
-	if ((cmd = malloc(len)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
-	}
-	snprintf(cmd, len, "rm -rf %s && mkdir %s", tmphome, tmphome);
-	if (system(cmd) != 0) {
-		fprintf(stderr, "%s: failed\n", cmd);
-		goto einval;
-	}
-	if ((ret = wiredtiger_open(
-	    tmphome, NULL, "create", &cfg->conn)) != 0) {
-		lprintf(cfg, ret, 0, "wiredtiger_open: %s", tmphome);
-		goto err;
-	}
 
-	/*
-	 * Then parse different config structures - other options override
-	 * fields within the structure.
-	 */
-	optind = 1;
-	while ((ch = getopt(argc, argv, opts)) != EOF)
-		switch (ch) {
-		case 'S':
-			if (config_opt_line(cfg, small_config_str) != 0)
-				goto einval;
-			break;
-		case 'M':
-			if (config_opt_line(cfg, med_config_str) != 0)
-				goto einval;
-			break;
-		case 'L':
-			if (config_opt_line(cfg, large_config_str) != 0)
-				goto einval;
-			break;
-		case 'O':
-			if (config_opt_file(cfg, optarg) != 0)
-				goto einval;
-			break;
-		default:
-			/* Validation done previously. */
-			break;
+	home_len = strlen(cfg->home);
+	cmd_len = (home_len * 2) + 30; /* Add some slop. */
+	cmd_buf = calloc(cmd_len, 1);
+	if (cmd_buf == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
+	for (i = 0; i < cfg->database_count; i++) {
+		next_cfg = calloc(1, sizeof(CONFIG));
+		if ((ret = config_assign(next_cfg, cfg)) != 0)
+			goto err;
+
+		/* Setup a unique home directory for each database. */
+		configs[i] = next_cfg;
+		new_home = malloc(home_len + 5);
+		if (new_home == NULL) {
+			ret = ENOMEM;
+			goto err;
 		}
+		sprintf(new_home, "%s/D%02d", cfg->home, (int)i);
+		next_cfg->home = (const char *)new_home;
 
-	/* Parse other options */
-	optind = 1;
-	while ((ch = getopt(argc, argv, opts)) != EOF)
-		switch (ch) {
-		case 'C':
-			user_cconfig = optarg;
-			break;
-		case 'H':
-			helium_mount = optarg;
-			break;
-		case 'o':
-			/* Allow -o key=value */
-			if (config_opt_line(cfg, optarg) != 0)
-				goto einval;
-			break;
-		case 'T':
-			user_tconfig = optarg;
-			break;
+		/* If the monitor dir is default, update it too. */
+		if (strcmp(cfg->monitor_dir, cfg->home) == 0)
+			next_cfg->monitor_dir = new_home;
+
+		/* Create clean home directories. */
+		snprintf(cmd_buf, cmd_len, "rm -rf %s && mkdir %s",
+		    next_cfg->home, next_cfg->home);
+		if ((ret = system(cmd_buf)) != 0) {
+			fprintf(stderr, "%s: failed\n", cmd_buf);
+			goto err;
 		}
-
-	/* Build the URI from the table name. */
-	req_len = strlen("table:") +
-	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
-	if ((cfg->uri = calloc(req_len, 1)) == NULL) {
-		ret = enomem(cfg);
-		goto err;
+		if ((ret = pthread_create(
+		    &threads[i], NULL, thread_run_wtperf, next_cfg)) != 0) {
+			lprintf(cfg, ret, 0, "Error creating thread");
+			goto err;
+		}
 	}
-	snprintf(cfg->uri, req_len, "table:%s%s%s",
-	    helium_mount == NULL ? "" : HELIUM_NAME,
-	    helium_mount == NULL ? "" : "/",
-	    cfg->table_name);
+
+	/* Wait for threads to finish. */
+	for (i = 0; i < cfg->database_count; i++) {
+		if ((t_ret = pthread_join(threads[i], NULL)) != 0) {
+			lprintf(cfg, ret, 0, "Error joining thread");
+			if (ret == 0)
+				ret = t_ret;
+		}
+	}
+
+err:	for (i = 0; i < cfg->database_count && configs[i] != NULL; i++) {
+		free((char *)configs[i]->home);
+		config_free(configs[i]);
+		free(configs[i]);
+	}
+	free(configs);
+	free(threads);
+	free(cmd_buf);
+
+	return (ret);
+}
+
+/* Run an instance of wtperf for a given configuration. */
+static void *
+thread_run_wtperf(void *arg)
+{
+	CONFIG *cfg;
+	int ret;
+
+	cfg = (CONFIG *)arg;
+	if ((ret = start_run(cfg)) != 0)
+		lprintf(cfg, ret, 0, "Run failed for: %s.", cfg->home);
+	return (NULL);
+}
+
+static int
+start_run(CONFIG *cfg)
+{
+	pthread_t monitor_thread;
+	uint64_t total_ops;
+	int monitor_created, ret, t_ret;
+	char helium_buf[256];
+
+	monitor_created = ret = 0;
 	
 	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
-
-	/* Make stdout line buffered, so verbose output appears quickly. */
-	(void)setvbuf(stdout, NULL, _IOLBF, 0);
-
-	/* Concatenate non-default configuration strings. */
-	if (cfg->verbose > 1 || user_cconfig != NULL) {
-		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
-		if (user_cconfig != NULL)
-			req_len += strlen(user_cconfig);
-		if ((cc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
-		snprintf(cc_buf, req_len, "%s%s%s%s%s",
-		    cfg->conn_config,
-		    cfg->verbose > 1 ? "," : "",
-		    cfg->verbose > 1 ? debug_cconfig : "",
-		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
-		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
-			goto err;
-	}
-	if (cfg->verbose > 1 || helium_mount != NULL || user_tconfig != NULL) {
-		req_len = strlen(cfg->table_config) +
-		    strlen(HELIUM_CONFIG) + strlen(debug_tconfig) + 3;
-		if (user_tconfig != NULL)
-			req_len += strlen(user_tconfig);
-		if ((tc_buf = calloc(req_len, 1)) == NULL) {
-			ret = enomem(cfg);
-			goto err;
-		}
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s",
-		    cfg->table_config,
-		    cfg->verbose > 1 ? "," : "",
-		    cfg->verbose > 1 ? debug_tconfig : "",
-		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "",
-		    helium_mount == NULL ? "" : HELIUM_CONFIG);
-		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
-			goto err;
-	}
-
-	ret = cfg->conn->close(cfg->conn, NULL);
-	cfg->conn = NULL;
-	if (ret != 0) {
-		lprintf(cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
-		goto err;
-	}
-					/* Sanity-check the configuration */
-	if (config_sanity(cfg) != 0)
-		goto err;
-
-	if (cfg->verbose > 1)		/* Display the configuration. */
-		config_print(cfg);
 
 	if ((ret = wiredtiger_open(	/* Open the real connection. */
 	    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0) {
@@ -1273,40 +1338,25 @@ main(int argc, char *argv[])
 		goto err;
 	}
 
-	if (helium_mount != NULL) {	/* Configure optional Helium volume. */
-		char helium_buf[256];
+	/* Configure optional Helium volume. */
+	if (cfg->helium_mount != NULL) {
 		snprintf(helium_buf, sizeof(helium_buf),
 		    "entry=wiredtiger_extension_init,config=["
 		    "%s=[helium_devices=\"he://./%s\","
 		    "helium_o_volume_truncate=1]]",
-		    HELIUM_NAME, helium_mount);
+		    HELIUM_NAME, cfg->helium_mount);
 		if ((ret = cfg->conn->load_extension(
 		    cfg->conn, HELIUM_PATH, helium_buf)) != 0)
 			lprintf(cfg,
 			    ret, 0, "Error loading Helium: %s", helium_buf);
 	}
 
-	if (cfg->create != 0) {		/* If creating, create the table. */
-		if ((ret = cfg->conn->open_session(
-		    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
-			lprintf(cfg, ret, 0,
-			    "Error opening a session on %s", cfg->home);
-			goto err;
-		}
-		if ((ret = session->create(
-		    session, cfg->uri, cfg->table_config)) != 0) {
-			lprintf(cfg,
-			    ret, 0, "Error creating table %s", cfg->uri);
-			goto err;
-		}
-		if ((ret = session->close(session, NULL)) != 0) {
-			lprintf(cfg,
-			    ret, 0, "Error closing session");
-			goto err;
-		}
-		session = NULL;
-	}
-					/* Start the monitor thread. */
+	if ((ret = create_uris(cfg)) != 0)
+		goto err;
+	if ((ret = create_tables(cfg)) != 0)
+		goto err;
+
+	/* Start the monitor thread. */
 	if (cfg->sample_interval != 0) {
 		if ((ret = pthread_create(
 		    &monitor_thread, NULL, monitor, cfg)) != 0) {
@@ -1316,15 +1366,17 @@ main(int argc, char *argv[])
 		}
 		monitor_created = 1;
 	}
-					/* If creating, populate the table. */
+
+	/* If creating, populate the table. */
 	if (cfg->create != 0 && execute_populate(cfg) != 0)
 		goto err;
-					/* Optional workload. */
+
+	/* Optional workload. */
 	if (cfg->run_time != 0 || cfg->run_ops != 0) {
-					/* Didn't create, set insert count. */
+		/* Didn't create, set insert count. */
 		if (cfg->create == 0 && find_table_count(cfg) != 0)
 			goto err;
-					/* Start the checkpoint thread. */
+		/* Start the checkpoint thread. */
 		if (cfg->checkpoint_threads != 0) {
 			lprintf(cfg, 0, 1,
 			    "Starting %" PRIu32 " checkpoint thread(s)",
@@ -1339,47 +1391,46 @@ main(int argc, char *argv[])
 			    cfg->checkpoint_threads, checkpoint_worker) != 0)
 				goto err;
 		}
-					/* Execute the workload. */
+		/* Execute the workload. */
 		if ((ret = execute_workload(cfg)) != 0)
 			goto err;
 
 		/* One final summation of the operations we've completed. */
-		g_read_ops = sum_read_ops(cfg);
-		g_insert_ops = sum_insert_ops(cfg);
-		g_update_ops = sum_update_ops(cfg);
-		g_ckpt_ops = sum_ckpt_ops(cfg);
-		total_ops = g_read_ops + g_insert_ops + g_update_ops;
+		cfg->read_ops = sum_read_ops(cfg);
+		cfg->insert_ops = sum_insert_ops(cfg);
+		cfg->update_ops = sum_update_ops(cfg);
+		cfg->ckpt_ops = sum_ckpt_ops(cfg);
+		total_ops = cfg->read_ops + cfg->insert_ops + cfg->update_ops;
 
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " read operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
-		    g_read_ops, (g_read_ops * 100) / total_ops,
-		    g_read_ops / cfg->run_time);
+		    cfg->read_ops, (cfg->read_ops * 100) / total_ops,
+		    cfg->read_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " insert operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
-		    g_insert_ops, (g_insert_ops * 100) / total_ops,
-		    g_insert_ops / cfg->run_time);
+		    cfg->insert_ops, (cfg->insert_ops * 100) / total_ops,
+		    cfg->insert_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
-		    g_update_ops, (g_update_ops * 100) / total_ops,
-		    g_update_ops / cfg->run_time);
+		    cfg->update_ops, (cfg->update_ops * 100) / total_ops,
+		    cfg->update_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " checkpoint operations",
-		    g_ckpt_ops);
+		    cfg->ckpt_ops);
 
 		latency_print(cfg);
 	}
 
 	if (0) {
-einval:		ret = EINVAL;
 err:		if (ret == 0)
 			ret = EXIT_FAILURE;
 	}
 
 	/* Notify the worker threads they are done. */
-	g_stop = 1;
+	cfg->stop = 1;
 
 	if ((t_ret = stop_threads(cfg, 1, cfg->ckptthreads)) != 0)
 		if (ret == 0)
@@ -1415,12 +1466,165 @@ err:		if (ret == 0)
 		if ((t_ret = fclose(cfg->logf)) != 0 && ret == 0)
 			ret = t_ret;
 	}
-	config_free(cfg);
+	return (ret);
+}
 
+int
+main(int argc, char *argv[])
+{
+	CONFIG *cfg, _cfg;
+	size_t req_len;
+	int ch, monitor_set, ret;
+	char *cc_buf, *tc_buf;
+	const char *opts = "C:H:h:m:O:o:T:";
+	const char *config_opts, *user_cconfig, *user_tconfig;
+
+	monitor_set = ret = 0;
+	cc_buf = tc_buf = NULL;
+	config_opts = user_cconfig = user_tconfig = NULL;
+
+	/* Setup the default configuration values. */
+	cfg = &_cfg;
+	memset(cfg, 0, sizeof(*cfg));
+	if (config_assign(cfg, &default_cfg))
+		goto err;
+
+	/* Do a basic validation of options, and home is needed before open. */
+	while ((ch = getopt(argc, argv, opts)) != EOF)
+		switch (ch) {
+		case 'C':
+			user_cconfig = optarg;
+			break;
+		case 'H':
+			cfg->helium_mount = optarg;
+			break;
+		case 'O':
+			config_opts = optarg;
+			break;
+		case 'T':
+			user_tconfig = optarg;
+			break;
+		case 'h':
+			cfg->home = optarg;
+			break;
+		case 'm':
+			cfg->monitor_dir = optarg;
+			monitor_set = 1;
+			break;
+		case '?':
+			fprintf(stderr, "Invalid option\n");
+			usage();
+			goto einval;
+		}
+
+	/*
+	 * If the user did not specify a monitor directory then set the
+	 * monitor directory to the home dir.
+	 */
+	if (!monitor_set)
+		cfg->monitor_dir = cfg->home;
+
+	/* Parse configuration settings from configuration file. */
+	if (config_opts != NULL && config_opt_file(cfg, config_opts) != 0)
+		goto einval;
+
+	/* Parse options that override values set via a configuration file. */
+	optind = 1;
+	while ((ch = getopt(argc, argv, opts)) != EOF)
+		switch (ch) {
+		case 'o':
+			/* Allow -o key=value */
+			if (config_opt_line(cfg, optarg) != 0)
+				goto einval;
+			break;
+		}
+
+	if ((ret = config_compress(cfg)) != 0)
+		goto err;
+
+	/* Build the URI from the table name. */
+	req_len = strlen("table:") +
+	    strlen(HELIUM_NAME) + strlen(cfg->table_name) + 2;
+	if ((cfg->base_uri = calloc(req_len, 1)) == NULL) {
+		ret = enomem(cfg);
+		goto err;
+	}
+	snprintf(cfg->base_uri, req_len, "table:%s%s%s",
+	    cfg->helium_mount == NULL ? "" : HELIUM_NAME,
+	    cfg->helium_mount == NULL ? "" : "/",
+	    cfg->table_name);
+
+	/* Make stdout line buffered, so verbose output appears quickly. */
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
+
+	/* Concatenate non-default configuration strings. */
+	if (cfg->verbose > 1 || user_cconfig != NULL ||
+	    cfg->compress_ext != NULL) {
+		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
+		if (user_cconfig != NULL)
+			req_len += strlen(user_cconfig);
+		if (cfg->compress_ext != NULL)
+			req_len += strlen(cfg->compress_ext);
+		if ((cc_buf = calloc(req_len, 1)) == NULL) {
+			ret = enomem(cfg);
+			goto err;
+		}
+		/*
+		 * This is getting hard to parse.
+		 */
+		snprintf(cc_buf, req_len, "%s%s%s%s%s%s",
+		    cfg->conn_config,
+		    cfg->compress_ext ? cfg->compress_ext : "",
+		    cfg->verbose > 1 ? ",": "",
+		    cfg->verbose > 1 ? debug_cconfig : "",
+		    user_cconfig ? ",": "",
+		    user_cconfig ? user_cconfig : "");
+		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
+			goto err;
+	}
+	if (cfg->verbose > 1 || cfg->helium_mount != NULL ||
+	    user_tconfig != NULL || cfg->compress_table != NULL) {
+		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
+		    strlen(debug_tconfig) + 3;
+		if (user_tconfig != NULL)
+			req_len += strlen(user_tconfig);
+		if (cfg->compress_table != NULL)
+			req_len += strlen(cfg->compress_table);
+		if ((tc_buf = calloc(req_len, 1)) == NULL) {
+			ret = enomem(cfg);
+			goto err;
+		}
+		/*
+		 * This is getting hard to parse.
+		 */
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
+		    cfg->table_config,
+		    cfg->compress_table ? cfg->compress_table : "",
+		    cfg->verbose > 1 ? ",": "",
+		    cfg->verbose > 1 ? debug_tconfig : "",
+		    user_tconfig ? ",": "",
+		    user_tconfig ? user_tconfig : "",
+		    cfg->helium_mount == NULL ? "" : HELIUM_CONFIG);
+		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
+			goto err;
+	}
+
+	/* Sanity-check the configuration. */
+	if (config_sanity(cfg) != 0)
+		goto err;
+
+	/* Display the configuration. */
+	if (cfg->verbose > 1)
+		config_print(cfg);
+
+	if ((ret = start_all_runs(cfg)) != 0)
+		goto err;
+
+	if (0)
+einval:		ret = EINVAL;
+err:	config_free(cfg);
 	free(cc_buf);
-	free(cmd);
 	free(tc_buf);
-	free(tmphome);
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -1507,7 +1711,7 @@ wtperf_value_range(CONFIG *cfg)
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
 
-	return (cfg->icount + g_insert_key - (u_int)(cfg->workers_cnt + 1));
+	return (cfg->icount + cfg->insert_key - (u_int)(cfg->workers_cnt + 1));
 }
 
 static uint64_t

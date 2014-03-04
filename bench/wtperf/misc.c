@@ -44,24 +44,27 @@ enomem(const CONFIG *cfg)
 int
 setup_log_file(CONFIG *cfg)
 {
+	int ret;
 	char *fname;
+
+	ret = 0;
 
 	if (cfg->verbose < 1)
 		return (0);
 
-	if ((fname = calloc(strlen(cfg->home) +
+	if ((fname = calloc(strlen(cfg->monitor_dir) +
 	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL)
 		return (enomem(cfg));
 
-	sprintf(fname, "%s/%s.stat", cfg->home, cfg->table_name);
-	cfg->logf = fopen(fname, "a");
-	free(fname);
-
+	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, cfg->table_name);
+	cfg->logf = fopen(fname, "w");
 	if (cfg->logf == NULL) {
-		fprintf(stderr,
-		    "Failed to open log file: %s\n", strerror(errno));
-		return (EINVAL);
+		ret = errno;
+		fprintf(stderr, "%s: %s\n", fname, strerror(ret));
 	}
+	free(fname);
+	if (cfg->logf == NULL)
+		return (ret);
 
 	/* Use line buffering for the log file. */
 	(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);

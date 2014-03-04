@@ -104,7 +104,7 @@ __wt_lsm_merge_worker(void *vargs)
 	session = lsm_tree->worker_sessions[id];
 	__wt_free(session, args);
 
-	aggressive = stallms = 0;
+	aggressive = chunk_wait = stallms = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		/*
@@ -127,7 +127,7 @@ __wt_lsm_merge_worker(void *vargs)
 			progress = 1;
 
 		/* If we didn't create a Bloom filter, try to merge. */
-		if (progress == 0 &&
+		if ((id != 0 || progress == 0) &&
 		    __wt_lsm_merge(session, lsm_tree, id, aggressive) == 0)
 			progress = 1;
 
@@ -185,7 +185,8 @@ err:		__wt_err(session, ret, "LSM merge worker failed");
 
 /*
  * __lsm_bloom_work --
- *	Try to create a Bloom filter for the newest on-disk chunk.
+ *	Try to create a Bloom filter for the newest on-disk chunk that doesn't
+ *	have one.
  */
 static int
 __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
@@ -216,10 +217,14 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    chunk->count == 0)
 			continue;
 
-		/* See if we win the race to switch on the "busy" flag. */
+		/*
+		 * See if we win the race to switch on the "busy" flag and
+		 * recheck that the chunk still needs a Bloom filter.
+		 */
 		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
-			ret = __lsm_bloom_create(
-			    session, lsm_tree, chunk, (u_int)i);
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+				ret = __lsm_bloom_create(
+				    session, lsm_tree, chunk, (u_int)i);
 			chunk->bloom_busy = 0;
 			break;
 		}
