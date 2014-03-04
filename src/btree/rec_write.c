@@ -2059,6 +2059,7 @@ __rec_split_write(
 	WT_MULTI *multi;
 	WT_PAGE_HEADER *dsk;
 	WT_PAGE_MODIFY *mod;
+	ptrdiff_t bnd_slot;
 	size_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
@@ -2112,7 +2113,8 @@ __rec_split_write(
 	 * time, but that test won't calculate a checksum on the first block
 	 * the first time the page splits.
 	 */
-	if (mod->u.m.multi != NULL || r->bnd_next > 1) {
+	bnd_slot = bnd - r->bnd;
+	if (mod->u.m.multi != NULL || bnd_slot > 1) {
 		/*
 		 * There are page header fields which need to be cleared to get
 		 * consistent checksums: specifically, the write generation and
@@ -2124,8 +2126,8 @@ __rec_split_write(
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (mod->u.m.multi_entries > r->bnd_next) {
-			multi = &mod->u.m.multi[r->bnd_next - 1];
+		if (mod->u.m.multi_entries > bnd_slot) {
+			multi = &mod->u.m.multi[bnd_slot];
 			if (multi->size == bnd->size &&
 			    multi->cksum == bnd->cksum) {
 				WT_RET(__wt_strndup(session,
