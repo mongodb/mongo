@@ -726,6 +726,27 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "createIndexes",
+            command: {createIndexes: "x", indexes: [{ns: firstDbName + ".x", key: {a:1}, name: "a_1"}] },
+            teardown: function (db) { db.x.drop(); },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: Object.extend({readWrite: 1,
+                                          readWriteAnyDatabase: 1,
+                                          dbAdmin: 1,
+                                          dbAdminAnyDatabase: 1,
+                                          dbOwner: 1,
+                                          restore: 1,
+                                          root: 1,
+                                          __system: 1}),
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "x"}, actions: ["createIndex"] }
+                    ]
+                }
+            ]
+        },
+        {
             testname: "cursorInfo",
             command: {cursorInfo: 1},
             testcases: [

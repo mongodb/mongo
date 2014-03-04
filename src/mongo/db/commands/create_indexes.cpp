@@ -39,7 +39,7 @@
 namespace mongo {
 
     /**
-     * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 } } ] }
+     * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
      */
     class CmdCreateIndex : public Command {
     public:
