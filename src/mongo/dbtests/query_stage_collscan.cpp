@@ -150,7 +150,9 @@ namespace QueryStageCollectionScan {
 
         static const char *ns() { return "unittests.QueryStageCollectionScanCapped"; }
 
-        static NamespaceDetails *nsd() { return nsdetails(ns()); }
+        Database* db() { return _context.db(); }
+        Collection* collection() { return db()->getCollection( ns() ); }
+        NamespaceDetails *nsd() { return collection()->details(); }
 
     private:
         Lock::GlobalWrite lk_;

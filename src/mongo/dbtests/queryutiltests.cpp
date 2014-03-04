@@ -1594,8 +1594,11 @@ namespace QueryUtilTests {
             }
         protected:
             static const char *ns() { return "unittests.FieldRangeSetPairTests"; }
-            static NamespaceDetails *nsd() { return nsdetails( ns() ); }
             Client::Context* ctx() { return &_ctx; }
+            Database* db() { return _ctx.db(); }
+            Collection* collection() { return db()->getCollection( ns() ); }
+            NamespaceDetails *nsd() { return collection()->details(); }
+
             IndexDetails *index( const BSONObj &key, int* indexNoOut = NULL ) {
                 stringstream ss;
                 ss << indexNum_++;

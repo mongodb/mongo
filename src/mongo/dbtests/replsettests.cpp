@@ -173,14 +173,13 @@ namespace ReplSetTests {
 
         void drop() {
             Client::WriteContext c(ns());
-            string errmsg;
-            BSONObjBuilder result;
+            Database* db = c.ctx().db();
 
-            if (nsdetails(ns()) == NULL) {
+            if ( db->getCollection( ns() ) == NULL ) {
                 return;
             }
 
-            c.ctx().db()->dropCollection(ns());
+            db->dropCollection(ns());
         }
         static void setup() {
             replSettings.replSet = "foo";
@@ -323,10 +322,9 @@ namespace ReplSetTests {
 
         void dropCapped() {
             Client::Context c(_cappedNs);
-            if (nsdetails(_cappedNs) != NULL) {
-                string errmsg;
-                BSONObjBuilder result;
-                c.db()->dropCollection( _cappedNs );
+            Database* db = c.db();
+            if ( db->getCollection( _cappedNs ) ) {
+                db->dropCollection( _cappedNs );
             }
         }
 

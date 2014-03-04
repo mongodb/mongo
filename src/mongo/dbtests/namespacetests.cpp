@@ -1075,11 +1075,14 @@ namespace NamespaceTests {
                 return ns_;
             }
             NamespaceDetails *nsd() const {
-                return nsdetails( ns() )->writingWithExtra();
+                return collection()->details()->writingWithExtra();
+            }
+            Database* db() const {
+                return _context.db();
             }
             Collection* collection() const {
-                Collection* c =  _context.db()->getCollection( ns() );
-                verify(c);
+                Collection* c =  db()->getCollection( ns() );
+                invariant(c);
                 return c;
             }
             IndexCatalog* indexCatalog() const { 
@@ -1451,7 +1454,7 @@ namespace NamespaceTests {
                 IndexDescriptor* desc = indexCatalog()->findIdIndex();
                 string indexNamespace = desc->indexNamespace();
                 ASSERT( !NamespaceString::normal( indexNamespace ) );
-                NamespaceDetails* indexNsd = nsdetails( indexNamespace );
+                NamespaceDetails* indexNsd = db()->namespaceIndex().details(indexNamespace);
 
                 // Check that no quantization is performed.
                 DiskLoc actualLocation = indexNsd->alloc( NULL, indexNamespace.c_str(), 300 );
@@ -1469,7 +1472,7 @@ namespace NamespaceTests {
                 IndexDescriptor* desc = indexCatalog()->findIdIndex();
                 string indexNamespace = desc->indexNamespace();
                 ASSERT( !NamespaceString::normal( indexNamespace.c_str() ) );
-                NamespaceDetails* indexNsd = nsdetails( indexNamespace.c_str() );
+                NamespaceDetails* indexNsd = db()->namespaceIndex().details(indexNamespace);
 
                 // Check that multiple of 4 quantization is performed.
                 DiskLoc actualLocation = indexNsd->alloc( NULL, indexNamespace.c_str(), 298 );
@@ -1604,7 +1607,7 @@ namespace NamespaceTests {
                 }
                 ASSERT( nRecords() < N );
 
-                NamespaceDetails *nsd = nsdetails(ns());
+                NamespaceDetails*nsd = collection()->details();
 
                 DiskLoc last, first;
                 {
@@ -1664,10 +1667,12 @@ namespace NamespaceTests {
                 nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted().writing() = DiskLoc();
                 nsd()->cappedLastDelRecLastExtent().Null();
                 NamespaceDetails *d = nsd();
+
                 zero( &d->capExtent() );
                 zero( &d->capFirstNewRecord() );
 
-                nsd();
+                // this has a side effect of called NamespaceDetails::cappedCheckMigrate
+                db()->namespaceIndex().details( ns() );
 
                 ASSERT( nsd()->firstExtent() == nsd()->capExtent() );
                 ASSERT( nsd()->capExtent().getOfs() != 0 );
@@ -1716,7 +1721,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                NamespaceDetails *nsd = nsdetails(ns());
+                NamespaceDetails *nsd = collection()->details();
 
                 // Set 2 & 54 as multikey
                 nsd->setIndexIsMultikey(2, true);

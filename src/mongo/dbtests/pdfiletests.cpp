@@ -46,16 +46,16 @@ namespace PdfileTests {
             Base() : _context( ns() ) {
             }
             virtual ~Base() {
-                if ( !nsd() )
+                if ( !collection() )
                     return;
                 _context.db()->dropCollection( ns() );
             }
         protected:
-            static const char *ns() {
+            const char *ns() {
                 return "unittests.pdfiletests.Insert";
             }
-            static NamespaceDetails *nsd() {
-                return nsdetails( ns() );
+            Collection* collection() {
+                return _context.db()->getCollection( ns() );
             }
 
             Lock::GlobalWrite lk_;

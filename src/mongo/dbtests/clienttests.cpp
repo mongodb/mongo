@@ -31,8 +31,9 @@
 #include "mongo/pch.h"
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace ClientTests {
@@ -128,7 +129,11 @@ namespace ClientTests {
             db.insert(ns(), BSON("x" << 1 << "y" << 2));
             db.insert(ns(), BSON("x" << 2 << "y" << 2));
 
-            ASSERT_EQUALS(1, nsdetails(ns())->getCompletedIndexCount());
+            Collection* collection = ctx.ctx().db()->getCollection( ns() );
+            ASSERT( collection );
+            IndexCatalog* indexCatalog = collection->getIndexCatalog();
+
+            ASSERT_EQUALS(1, indexCatalog->numIndexesReady());
             // _id index
             ASSERT_EQUALS(1U, db.count("test.system.indexes"));
             // test.buildindex
@@ -138,13 +143,13 @@ namespace ClientTests {
 
             db.ensureIndex(ns(), BSON("y" << 1), true);
 
-            ASSERT_EQUALS(1, nsdetails(ns())->getCompletedIndexCount());
+            ASSERT_EQUALS(1, indexCatalog->numIndexesReady());
             ASSERT_EQUALS(1U, db.count("test.system.indexes"));
             ASSERT_EQUALS(3U, db.count("test.system.namespaces"));
 
             db.ensureIndex(ns(), BSON("x" << 1), true);
 
-            ASSERT_EQUALS(2, nsdetails(ns())->getCompletedIndexCount());
+            ASSERT_EQUALS(2, indexCatalog->numIndexesReady());
             ASSERT_EQUALS(2U, db.count("test.system.indexes"));
             ASSERT_EQUALS(4U, db.count("test.system.namespaces"));
         }
