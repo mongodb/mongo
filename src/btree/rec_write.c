@@ -748,7 +748,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * Additionally, in this case we don't write any WT_UPDATEs at all, we
 	 * don't want to move an insert into a different position on the page.
 	 */
-	 if (skipped_any && F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
+	if (skipped_any && F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
 		*updp = NULL;
 		WT_RET(__rec_upd_skip_save(session, r, head, is_insert));
 	}
