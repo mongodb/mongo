@@ -333,7 +333,7 @@ struct __wt_page {
 		 *
 		 * The page record number is only used by column-store, but it
 		 * makes some things simpler and it doesn't cost us any memory,
-		 * other structures in this union are still larger.
+		 * other structures in this union are still as large.
 		 *
 		 * In-memory internal pages have an array of pointers to child
 		 * structures, maintained in collated order.  When a page is
