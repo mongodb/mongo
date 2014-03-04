@@ -184,20 +184,6 @@ struct __wt_ovfl_txnc {
 };
 
 /*
- * WT_UPD_SKIPPED --
- *	When a page is reconciled, there may be updates that cannot be written.
- * Those updates are copied and then restored when the page is re-instantiated.
- */
-struct __wt_upd_skipped {
-	/*
-	 * Skipped updates are based on either a WT_INSERT reference or a
-	 * row-store leaf page WT_UPDATE list.
-	 */
-	void	*head;		/* (WT_UPDATE **) or (WT_INSERT *) */
-	uint8_t	 is_insert;	/* (WT_INSERT *) */
-};
-
-/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information to maintain.
  */
@@ -218,35 +204,61 @@ struct __wt_page_modify {
 
 	/*
 	 * When pages are reconciled, the result is one or more replacement
-	 * blocks.  In the case of multiple replacement blocks, some blocks
-	 * may be identical to blocks written after previous reconciliations
-	 * of the page, so add supporting infrastructure to detect when an
-	 * existing block is sufficient and we can skip a write.
+	 * blocks.  A replacement block can be in one of two states: it was
+	 * written to disk, and so we have a block address, or it contained
+	 * unresolved modifications and we have a disk image for it with a
+	 * list of those unresolved modifications.  The former is the common
+	 * case: we only build lists of unresolved modifications when we're
+	 * evicting a page, and we only expect to see unresolved modifications
+	 * on a page being evicted in the case of a hot page that's too large
+	 * to keep in memory as it is.  In other words, checkpoints will skip
+	 * unresolved modifications, but will still write the blocks rather
+	 * than build lists of unresolved modifications.
 	 */
-	WT_ADDR	 replace;		/* Single replacement block */
-	struct __wt_multi {		/* Multiple replacement blocks */
+	union {
+	WT_ADDR	 replace;		/* Single, written replacement block */
+
+	struct {			/* Multiple replacement blocks */
+	struct __wt_multi {
+		/*
+		 * Block's key: either a column-store record number or a
+		 * row-store variable length byte string.
+		 */
 		union {
-			uint64_t recno;	/* Column-store: starting recno */
-			WT_IKEY *ikey;	/* Row-store: variable-length key */
+			uint64_t recno;
+			WT_IKEY *ikey;
 		} key;
 
 		/*
-		 * XXXKEITH
-		 * These two sets of fields should be a union, only one gets
-		 * filled in, it's either an address or a skipped update.
+		 * Eviction, but block wasn't written: unresolved updates and
+		 * associated disk image.
+		 *
+		 * Skipped updates are either a WT_INSERT, or a row-store leaf
+		 * page entry.
 		 */
-		WT_UPD_SKIPPED *skip;	/* Skipped updates */
+		struct __wt_upd_skipped {
+			WT_INSERT *ins;
+			WT_ROW	  *rip;
+		} *skip;
 		uint32_t skip_entries;
-		void *skip_dsk;		/* Page's disk image */
+		void	*skip_dsk;
 
-		WT_ADDR	 addr;		/* Address */
-		uint32_t size;		/* Size */
-		uint32_t cksum;		/* Checksum */
-		uint8_t	 reuse;		/* Being reused */
-
+		/*
+		 * Block was written: address, size and checksum.
+		 * On subsequent reconciliations of this page, we avoid writing
+		 * the block if it's unchanged by comparing size and checksum;
+		 * the reuse flag is set when the block is unchanged and we're
+		 * reusing a previous address.
+		 */
+		WT_ADDR	 addr;
+		uint32_t size;
+		uint32_t cksum;
+		uint8_t	 reuse;
 	} *multi;
-	uint32_t multi_entries;		/* Multi-block element count */
-	size_t	 multi_size;		/* Multi-block memory footprint */
+	uint32_t multi_entries;		/* Multiple blocks element count */
+	size_t   multi_size;		/* Multiple blocks memory footprint */
+	} m;
+	} u;
 
 	/*
 	 * When pages which have split into multiple blocks are evicted, the

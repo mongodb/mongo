@@ -112,25 +112,29 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Discard any replacement address: this memory is usually moved
 		 * into the parent's WT_REF, but at the root that can't happen.
 		 */
-		__wt_free(session, mod->replace.addr);
+		__wt_free(session, mod->u.replace.addr);
 		break;
 	default:
 		break;
 	}
 
 	/* Free any reconciliation-created list of replacement blocks. */
-	for (i = 0; i < mod->multi_entries; ++i) {
-		switch (page->type) {
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			__wt_free(session, mod->multi[i].key.ikey);
-			break;
+	if (mod->u.m.multi != NULL) {
+		for (i = 0; i < mod->u.m.multi_entries; ++i) {
+			switch (page->type) {
+			case WT_PAGE_ROW_INT:
+			case WT_PAGE_ROW_LEAF:
+				__wt_free(session, mod->u.m.multi[i].key.ikey);
+				break;
+			}
+
+			__wt_free(session, mod->u.m.multi[i].skip);
+			__wt_free(session, mod->u.m.multi[i].skip_dsk);
+
+			__wt_free(session, mod->u.m.multi[i].addr.addr);
 		}
-		__wt_free(session, mod->multi[i].skip);
-		__wt_free(session, mod->multi[i].skip_dsk);
-		__wt_free(session, mod->multi[i].addr.addr);
+		__wt_free(session, mod->u.m.multi);
 	}
-	__wt_free(session, mod->multi);
 
 	/*
 	 * Free any split chunks created when underlying pages split into this

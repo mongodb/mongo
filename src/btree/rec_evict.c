@@ -421,7 +421,7 @@ __wt_multi_inmem_build(
 	WT_CURSOR_BTREE cbt;
 	WT_ITEM key;
 	WT_PAGE *new;
-	WT_UPDATE *upd, **updp;
+	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *skip;
 	uint64_t recno;
 	uint32_t i;
@@ -456,19 +456,19 @@ __wt_multi_inmem_build(
 		 * This problem needs to be revisited once we decide this whole
 		 * approach is a viable one.
 		 */
-		if (skip->is_insert)
-			updp = &((WT_INSERT *)skip->head)->upd;
-		else
-			updp = &page->pg_row_upd[
-			    WT_ROW_SLOT(page, skip->head)];
-		upd = *updp;
-		*updp = NULL;
+		if (skip->ins == NULL) {
+			upd = page->pg_row_upd[WT_ROW_SLOT(page, skip->rip)];
+			page->pg_row_upd[WT_ROW_SLOT(page, skip->rip)] = NULL;
+		} else {
+			upd = skip->ins->upd;
+			skip->ins->upd = NULL;
+		}
 
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 			/* Build a key. */
-			recno = WT_INSERT_RECNO(skip->head);
+			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
 			WT_RET(__wt_col_search(session, recno, new, &cbt));
@@ -479,12 +479,13 @@ __wt_multi_inmem_build(
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
-			if (skip->is_insert) {
-				key.data = WT_INSERT_KEY(skip->head);
-				key.size = WT_INSERT_KEY_SIZE(skip->head);
-			} else
-				WT_RET(__wt_row_leaf_key(session,
-				    page, skip->head, &key, 0));
+			if (skip->ins == NULL)
+				WT_RET(__wt_row_leaf_key(
+				    session, page, skip->rip, &key, 0));
+			else {
+				key.data = WT_INSERT_KEY(skip->ins);
+				key.size = WT_INSERT_KEY_SIZE(skip->ins);
+			}
 
 			/* Search the page. */
 			WT_RET(__wt_row_search(session, &key, new, &cbt));
@@ -590,9 +591,9 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * Allocate an array of WT_REF structures, and move the page's multiple
 	 * block reconciliation information into it.
 	 */
-	WT_RET(__wt_calloc_def(session, mod->multi_entries, &alloc_ref));
+	WT_RET(__wt_calloc_def(session, mod->u.m.multi_entries, &alloc_ref));
 	WT_ERR(__wt_multi_to_ref(
-	    session, page, mod->multi, alloc_ref, mod->multi_entries));
+	    session, page, mod->u.m.multi, alloc_ref, mod->u.m.multi_entries));
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -612,7 +613,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	WT_ERR(__rec_split_list_alloc(session, parent_mod, &i));
 	parent_mod->splits[i].refs = alloc_ref;
 	alloc_ref = NULL;
-	parent_mod->splits[i].entries = mod->multi_entries;
+	parent_mod->splits[i].entries = mod->u.m.multi_entries;
 
 	/* Allocate a new WT_REF index array and initialize it. */
 	pindex = parent->pg_intl_index;
@@ -641,7 +642,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	    sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *)));
 
 	/* Update the parent page's footprint. */
-	__wt_cache_page_inmem_incr(session, parent, mod->multi_size);
+	__wt_cache_page_inmem_incr(session, parent, mod->u.m.multi_size);
 
 	/*
 	 * Update the parent page's index: this is the update that splits the
@@ -712,7 +713,7 @@ err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
 
 	__wt_free(session, alloc_index);
-	__wt_free_ref_array(session, page, alloc_ref, mod->multi_entries);
+	__wt_free_ref_array(session, page, alloc_ref, mod->u.m.multi_entries);
 	__wt_free(session, alloc_ref);
 
 	return (ret);
@@ -769,9 +770,9 @@ __rec_page_dirty_update(
 		 * before the state change makes the page available to readers.
 		 */
 		WT_RET(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
-		*addr = mod->replace;
-		mod->replace.addr = NULL;
-		mod->replace.size = 0;
+		*addr = mod->u.replace;
+		mod->u.replace.addr = NULL;
+		mod->u.replace.size = 0;
 
 		parent_ref->page = NULL;
 		parent_ref->addr = addr;
