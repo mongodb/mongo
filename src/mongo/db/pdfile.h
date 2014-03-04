@@ -79,11 +79,6 @@ namespace mongo {
         return &database->namespaceIndex();
     }
 
-    inline NamespaceDetails* nsdetails(const StringData& ns) {
-        // if this faults, did you set the current db first?  (Client::Context + dblock)
-        return nsindex(ns)->details(ns);
-    }
-
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
     inline BSONObj BSONObj::make(const Record* r ) {
