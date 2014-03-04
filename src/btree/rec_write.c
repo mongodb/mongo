@@ -161,7 +161,7 @@ typedef struct {
 	} *bnd;				/* Saved boundaries */
 	uint32_t bnd_next;		/* Next boundary slot */
 	uint32_t bnd_next_max;		/* Maximum boundary slots used */
-	uint32_t bnd_entries;		/* Total boundary slots */
+	size_t	 bnd_entries;		/* Total boundary slots */
 	size_t   bnd_allocated;		/* Bytes allocated */
 
 	/*
@@ -1135,23 +1135,15 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 static int
 __rec_split_bnd_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	uint32_t incr;
-
 	/*
-	 * Make sure there's enough room in which to save another boundary.
-	 *
-	 * The calculation is actually +1, because we save the start point one
-	 * past the current entry; normal reconciliation generally doesn't use
-	 * a lot of buffers, but we grow aggressively anyway, bulk load eats up
-	 * a lot of these entries because we have an entry for each page that's
-	 * created by the bulk load.
+	 * Make sure there's enough room in which to save another boundary.  The
+	 * calculation is +2, because we save a start point one past the current
+	 * entry.
 	 */
-	if (r->bnd_next + 1 >= r->bnd_entries) {
-		incr = r->bnd_entries + r->bnd_entries / 2 + 20;
-		WT_RET(__wt_realloc(session,
-		    &r->bnd_allocated, incr * sizeof(*r->bnd), &r->bnd));
-		r->bnd_entries = incr;
-	}
+	WT_RET(__wt_realloc_def(
+	    session, &r->bnd_allocated, r->bnd_next + 2, &r->bnd));
+
+	r->bnd_entries = r->bnd_allocated / sizeof(r->bnd[0]);
 	return (0);
 }
 
