@@ -700,11 +700,11 @@ static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     void *head, int is_insert, WT_UPDATE *upd, WT_UPDATE **updp)
 {
-	int skipped;
+	int skipped_any;
 
 	*updp = NULL;
 
-	for (skipped = 0; upd != NULL; upd = upd->next) {
+	for (skipped_any = 0; upd != NULL; upd = upd->next) {
 		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
 
@@ -724,18 +724,20 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if (__wt_txn_visible(session, upd->txnid)) {
 			if (*updp == NULL)
 				*updp = upd;
-		} else
-			skipped = 1;
-	}
+		} else {
+			/*
+			 * If updates were skipped before the one being written,
+			 * future reads without intervening modifications to the
+			 * page could see a different value; if no updates were
+			 * skipped, the page can safely be marked clean and does
+			 * not need to be reconciled until modified again.
+			 */
+			if (*updp == NULL)
+				r->upd_skipped = 1;
 
-	/*
-	 * If updates were skipped, future reads without intervening
-	 * modifications to the page could see a different value; if no updates
-	 * were skipped, the page can safely be marked clean and does not need
-	 * to be reconciled until modified again.
-	 */
-	if (skipped)
-		r->upd_skipped = 1;
+			skipped_any = 1;
+		}
+	}
 
 	/*
 	 * If evicting and updates were skipped, remember the list of WT_UPDATEs
@@ -746,7 +748,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * Additionally, in this case we don't write any WT_UPDATEs at all, we
 	 * don't want to move an insert into a different position on the page.
 	 */
-	 if (skipped && F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
+	 if (skipped_any && F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
 		*updp = NULL;
 		WT_RET(__rec_upd_skip_save(session, r, head, is_insert));
 	}
