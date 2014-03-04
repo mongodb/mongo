@@ -168,7 +168,7 @@ namespace {
          * @param params operation parameters (see AnalyzeParams for details)
          */
         static RecPos from(int recOfs, int recLen, int extentOfs, const AnalyzeParams& params) {
-            RecPos res;
+            RecPos res = {};
             res.numberOfSlices = params.numberOfSlices;
             // startsAt and endsAt are extent-relative
             int startsAt = recOfs - extentOfs;
