@@ -1201,9 +1201,6 @@ namespace mongo {
             // install db access functions in the global object
             installDBAccess();
 
-            // add global load() helper
-            injectV8Function("load", load);
-
             // install the Mongo function object and instantiate the 'db' global
             _MongoFT = FTPtr::New(getMongoFunctionTemplate(this, true));
             injectV8Function("Mongo", MongoFT(), _global);
