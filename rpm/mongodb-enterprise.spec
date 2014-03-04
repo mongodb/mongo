@@ -93,24 +93,16 @@ mkdir -p $RPM_BUILD_ROOT/var/lib/mongodb
 mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
 mkdir -p $RPM_BUILD_ROOT/var/run/mongodb
 touch $RPM_BUILD_ROOT/var/log/mongodb/mongod.log
-%doc snmp/MONGOD-MIB.txt
-%doc snmp/MONGODBINC-MIB.txt
-%doc snmp/mongod.conf.master
-%doc snmp/mongod.conf.subagent
-%doc snmp/README-snmp.txt
-%doc LICENSE.txt
-%doc README
-%doc THIRD-PARTY-NOTICES
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %pre server
-if ! /usr/bin/id -g mongodb &>/dev/null; then
-    /usr/sbin/groupadd -r mongodb
+if ! /usr/bin/id -g mongod &>/dev/null; then
+    /usr/sbin/groupadd -r mongod
 fi
-if ! /usr/bin/id mongodb &>/dev/null; then
-    /usr/sbin/useradd -M -r -g mongodb -d /var/lib/mongodb -s /bin/false 	-c mongodb mongodb > /dev/null 2>&1
+if ! /usr/bin/id mongod &>/dev/null; then
+    /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongodb -s /bin/false 	-c mongod mongod > /dev/null 2>&1
 fi
 
 %post server
@@ -140,10 +132,20 @@ fi
 %{_mandir}/man1/mongod.1*
 /etc/rc.d/init.d/mongod
 /etc/sysconfig/mongod
-%attr(0755,mongodb,mongodb) %dir /var/lib/mongodb
-%attr(0755,mongodb,mongodb) %dir /var/log/mongodb
-%attr(0755,mongodb,mongodb) %dir /var/run/mongodb
-%attr(0640,mongodb,mongodb) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
+%attr(0755,mongod,mongod) %dir /var/lib/mongodb
+%attr(0755,mongod,mongod) %dir /var/log/mongodb
+%attr(0755,mongod,mongod) %dir /var/run/mongodb
+%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
+%doc snmp/MONGOD-MIB.txt
+%doc snmp/MONGODBINC-MIB.txt
+%doc snmp/mongod.conf.master
+%doc snmp/mongod.conf.subagent
+%doc snmp/README-snmp.txt
+%doc LICENSE.txt
+%doc README
+%doc THIRD-PARTY-NOTICES
+
+
 
 %files shell
 %defattr(-,root,root,-)
