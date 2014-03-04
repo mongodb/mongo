@@ -74,7 +74,8 @@ public:
     int _serverAuthzVersion; // authSchemaVersion of the cluster being restored into.
     int _dumpFileAuthzVersion; // version extracted from admin.system.version file in dump.
     bool _serverAuthzVersionDocExists; // Whether the remote cluster has an admin.system.version doc
-    Restore() : BSONTool() { }
+    Restore() : BSONTool(), _oplogEntrySkips(0), _oplogEntryApplies(0), _serverAuthzVersion(0),
+            _dumpFileAuthzVersion(0), _serverAuthzVersionDocExists(false) { }
 
     virtual void printHelp(ostream& out) {
         printMongoRestoreHelp(&out);
@@ -130,9 +131,9 @@ public:
             _serverBinVersion = out["version"].String();
         }
 
-        storeRemoteAuthzVersion(); // populate _serverAuthzVersion
-
         if (mongoRestoreGlobalParams.restoreUsersAndRoles) {
+            storeRemoteAuthzVersion(); // populate _serverAuthzVersion
+
             if (_serverAuthzVersion == AuthorizationManager::schemaVersion26Final) {
                 uassert(17410,
                         mongoutils::str::stream() << mongoRestoreGlobalParams.tempUsersColl <<
@@ -623,6 +624,7 @@ public:
                             AuthorizationManager::schemaVersion26Final <<
                             ". Found server version " << _serverBinVersion << " with "
                             "authorization schema version " << _serverAuthzVersion,
+                    _curdb != "admin" ||
                     versionCmp(_serverBinVersion, "2.5.4") < 0 ||
                     _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
 
@@ -650,7 +652,8 @@ public:
                     conn().insert(mongoRestoreGlobalParams.tempUsersColl, obj);
                 }
             } else {
-                if (_serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
+                if (_curdb == "admin" &&
+                        _serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
                         !_serverAuthzVersionDocExists) {
                     // server with schemaVersion26Final implies it is running 2.5.4 or greater.
                     uasserted(17415,
