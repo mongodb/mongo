@@ -113,11 +113,12 @@ __wt_search_insert(WT_SESSION_IMPL *session,
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_row_search(WT_SESSION_IMPL *session,
+    WT_ITEM *srch_key, WT_PAGE *leaf_page, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_ITEM *item, _item, *srch_key;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
@@ -130,7 +131,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	rip = NULL;
 	match = 0;				/* -Wuninitialized */
 
-	srch_key = &cbt->iface.key;
 	__cursor_search_clear(cbt);
 
 	item = &_item;
@@ -146,6 +146,15 @@ restart:
 	 * compare as we descend the tree.
 	 */
 	skiphigh = skiplow = 0;
+
+	/*
+	 * In the service of eviction splits, we're only searching a single leaf
+	 * page, not a full tree.
+	 */
+	if (leaf_page != NULL) {
+		page = leaf_page;
+		goto leaf_only;
+	}
 
 	/* Search the internal pages of the tree. */
 	cmp = -1;
@@ -324,13 +333,11 @@ descend:	WT_ASSERT(session, ref != NULL);
 		return (ret);
 	}
 
-	/*
-	 * We want to know how deep the tree gets because excessive depth can
-	 * happen because of how WiredTiger splits.
-	 */
+	/* Track how deep the tree gets. */
 	if (depth > btree->maximum_depth)
 		btree->maximum_depth = depth;
 
+leaf_only:
 	/*
 	 * Binary search of the leaf page.  There are two versions (a default
 	 * loop and an application-specified collation loop), because moving

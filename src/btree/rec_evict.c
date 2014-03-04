@@ -409,6 +409,150 @@ err:		__wt_free(session, alloc_index);
 }
 
 /*
+ * __wt_multi_inmem_build --
+ *	Instantiate a page in a multi-block set, when an update couldn't be
+ * written.
+ */
+static int
+__wt_multi_inmem_build(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, WT_MULTI *multi)
+{
+	WT_CURSOR_BTREE cbt;
+	WT_ITEM key;
+	WT_PAGE *new;
+	WT_UPDATE *upd, **updp;
+	WT_UPD_SKIPPED *skip;
+	uint64_t recno;
+	uint32_t i;
+
+	WT_CLEAR(key);
+
+	/*
+	 * When a page is evicted, we can find unresolved updates, which cannot
+	 * be written.  We simply fail those evictions in most cases, but one
+	 * case we must handle is when forcibly evicting a page grown too-large
+	 * because the application inserted lots of new records.  In that case,
+	 * the page is expected to split into many on-disk chunks we write, plus
+	 * some on-disk chunks we don't write.  This code deals with the latter:
+	 * any chunk we didn't write is re-created as a page, and then we apply
+	 * the unresolved updates to that page.
+	 *
+	 * Create an in-memory version of the page, and link it to its parent.
+	 */
+	WT_RET(__wt_page_inmem(session,
+	    NULL, NULL, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &ref->page));
+	multi->skip_dsk = NULL;
+	new = ref->page;
+
+	/* Re-create each modification we couldn't write. */
+	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip) {
+		/*
+		 * XXXKEITH:
+		 * Remove the list of WT_UPDATEs from the row-leaf WT_UPDATE
+		 * array or arbitrary WT_INSERT list, and move it to a
+		 * different page/list.   This is a problem: on failure,
+		 * discarding the created page will free it, and that's wrong.
+		 * This problem needs to be revisited once we decide this whole
+		 * approach is a viable one.
+		 */
+		if (skip->is_insert)
+			updp = &((WT_INSERT *)skip->head)->upd;
+		else
+			updp = &page->pg_row_upd[
+			    WT_ROW_SLOT(page, skip->head)];
+		upd = *updp;
+		*updp = NULL;
+
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			/* Build a key. */
+			recno = WT_INSERT_RECNO(skip->head);
+
+			/* Search the page. */
+			WT_RET(__wt_col_search(session, recno, new, &cbt));
+
+			/* Apply the modification. */
+			WT_RET(__wt_col_modify(session, &cbt, recno,
+			    NULL, upd, WT_UPDATE_DELETED_ISSET(upd)));
+			break;
+		case WT_PAGE_ROW_LEAF:
+			/* Build a key. */
+			if (skip->is_insert) {
+				key.data = WT_INSERT_KEY(skip->head);
+				key.size = WT_INSERT_KEY_SIZE(skip->head);
+			} else
+				WT_RET(__wt_row_leaf_key(session,
+				    page, skip->head, &key, 0));
+
+			/* Search the page. */
+			WT_RET(__wt_row_search(session, &key, new, &cbt));
+
+			/* Apply the modification. */
+			WT_RET(__wt_row_modify(session, &cbt, &key,
+			    NULL, upd, WT_UPDATE_DELETED_ISSET(upd)));
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
+
+	}
+	__wt_free(session, multi->skip);
+
+	WT_LINK_PAGE(page->parent, ref, new);
+
+	return (0);
+}
+
+/*
+ * __wt_multi_to_ref --
+ *	Move a multi-block list into an array of WT_REF structures.
+ */
+int
+__wt_multi_to_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_MULTI *multi, WT_REF *refarg, uint32_t entries)
+{
+	WT_ADDR *addr;
+	WT_DECL_RET;
+	WT_REF *ref;
+	uint32_t i;
+
+	addr = NULL;
+	for (ref = refarg, i = 0; i < entries; ++multi, ++ref, ++i) {
+		if (multi->skip == NULL) {
+			WT_ERR(__wt_calloc_def(session, 1, &addr));
+			ref->addr = addr;
+			addr->size = multi->addr.size;
+			addr->type = multi->addr.type;
+			WT_ERR(__wt_strndup(session,
+			    multi->addr.addr, addr->size = multi->addr.size,
+			    &addr->addr));
+		} else
+			WT_ERR(
+			    __wt_multi_inmem_build(session, page, ref, multi));
+
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			WT_ERR(__wt_strndup(session,
+			    multi->key.ikey,
+			    multi->key.ikey->size + sizeof(WT_IKEY),
+			    &ref->key.ikey));
+			break;
+		default:
+			ref->key.recno = multi->key.recno;
+			break;
+		}
+
+		ref->txnid = 0;
+		ref->state = ref->page == NULL ? WT_REF_DISK : WT_REF_MEM;
+	}
+	return (0);
+
+err:	__wt_free_ref_array(session, page, refarg, entries);
+	return (ret);
+}
+
+/*
  * __rec_split_evict --
  *	Resolve a page split, inserting new information into the parent.
  */
@@ -442,7 +586,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	__wt_page_only_modify_set(session, parent);
 
 	/*
-	 * Allocate an array of WT_REF structures, and copy the page's multiple
+	 * Allocate an array of WT_REF structures, and move the page's multiple
 	 * block reconciliation information into it.
 	 */
 	WT_RET(__wt_calloc_def(session, mod->multi_entries, &alloc_ref));
@@ -685,7 +829,6 @@ __rec_review(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE *page, int exclusive, int top, int *istree)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE *t;
 
@@ -830,43 +973,22 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 * know the final state.
 	 */
 	if (__wt_page_is_modified(page)) {
-		ret = __wt_rec_write(session, page,
-		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_QUIT);
+		WT_RET(__wt_rec_write(session, page,
+		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_RESTORE));
 
 		/*
 		 * Update the page's modification reference, reconciliation
 		 * might have changed it.
+		 *
+		 * XXXKEITH: I don't think this is true, I don't think the
+		 * page's modify reference ever moves (or can move).
 		 */
 		mod = page->modify;
-		if (ret == EBUSY) {
-			/* Give up if there are unwritten changes */
-			WT_VERBOSE_RET(session, evict,
-			    "eviction failed, reconciled page"
-			    " contained active updates");
-
-			/* 
-			 * We may be able to discard any "update" memory the
-			 * page no longer needs.
-			 */
-			switch (page->type) {
-			case WT_PAGE_COL_FIX:
-			case WT_PAGE_COL_VAR:
-				__wt_col_leaf_obsolete(session, page);
-				break;
-			case WT_PAGE_ROW_LEAF:
-				__wt_row_leaf_obsolete(session, page);
-				break;
-			}
-		}
-		WT_RET(ret);
-
-		WT_ASSERT(session, !__wt_page_is_modified(page));
 	}
 
 	/*
-	 * If the page is clean, but was ever modified, make sure all of the
-	 * updates on the page are old enough that they can be discarded from
-	 * cache.
+	 * If the page was ever modified, make sure all of the updates on the
+	 * page are old enough that they can be discarded from cache.
 	 */
 	if (!exclusive && mod != NULL &&
 	    !__wt_txn_visible_all(session, mod->rec_max_txn))

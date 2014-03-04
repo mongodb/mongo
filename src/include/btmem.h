@@ -184,6 +184,20 @@ struct __wt_ovfl_txnc {
 };
 
 /*
+ * WT_UPD_SKIPPED --
+ *	When a page is reconciled, there may be updates that cannot be written.
+ * Those updates are copied and then restored when the page is re-instantiated.
+ */
+struct __wt_upd_skipped {
+	/*
+	 * Skipped updates are based on either a WT_INSERT reference or a
+	 * row-store leaf page WT_UPDATE list.
+	 */
+	void	*head;		/* (WT_UPDATE **) or (WT_INSERT *) */
+	uint8_t	 is_insert;	/* (WT_INSERT *) */
+};
+
+/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information to maintain.
  */
@@ -211,14 +225,25 @@ struct __wt_page_modify {
 	 */
 	WT_ADDR	 replace;		/* Single replacement block */
 	struct __wt_multi {		/* Multiple replacement blocks */
-		WT_ADDR addr;		/* Address */
 		union {
 			uint64_t recno;	/* Column-store: starting recno */
 			WT_IKEY *ikey;	/* Row-store: variable-length key */
 		} key;
-		uint32_t cksum;		/* Checksum */
+
+		/*
+		 * XXXKEITH
+		 * These two sets of fields should be a union, only one gets
+		 * filled in, it's either an address or a skipped update.
+		 */
+		WT_UPD_SKIPPED *skip;	/* Skipped updates */
+		uint32_t skip_entries;
+		void *skip_dsk;		/* Page's disk image */
+
+		WT_ADDR	 addr;		/* Address */
 		uint32_t size;		/* Size */
-		uint8_t reuse;		/* Being reused */
+		uint32_t cksum;		/* Checksum */
+		uint8_t	 reuse;		/* Being reused */
+
 	} *multi;
 	uint32_t multi_entries;		/* Multi-block element count */
 	size_t	 multi_size;		/* Multi-block memory footprint */
@@ -483,6 +508,7 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
+#define	WT_PAGE_EVICT_FORCE	0x10	/* Page being forcibly evicted */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -816,10 +842,10 @@ struct __wt_insert {
 		} key;
 	} u;
 
-#define	WT_INSERT_KEY_SIZE(ins) ((ins)->u.key.size)
+#define	WT_INSERT_KEY_SIZE(ins) (((WT_INSERT *)ins)->u.key.size)
 #define	WT_INSERT_KEY(ins)						\
-	((void *)((uint8_t *)(ins) + (ins)->u.key.offset))
-#define	WT_INSERT_RECNO(ins)	((ins)->u.recno)
+	((void *)((uint8_t *)(ins) + ((WT_INSERT *)ins)->u.key.offset))
+#define	WT_INSERT_RECNO(ins)	(((WT_INSERT *)ins)->u.recno)
 
 	WT_INSERT *next[0];			/* forward-linked skip list */
 };

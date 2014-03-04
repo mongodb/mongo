@@ -378,12 +378,22 @@ extern int __wt_tree_walk(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
+    uint64_t recno,
+    WT_ITEM *value,
+    WT_UPDATE *upd,
     int is_remove);
-extern void __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
+extern int __wt_col_search(WT_SESSION_IMPL *session,
+    uint64_t recno,
+    WT_PAGE *leaf_page,
+    WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
     int exclusive);
+extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_MULTI *multi,
+    WT_REF *refarg,
+    uint32_t entries);
 extern int __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
     uint8_t type,
     uint32_t entries,
@@ -429,11 +439,6 @@ extern int __wt_rec_write(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage,
     uint32_t flags);
-extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    WT_MULTI *multi,
-    WT_REF *refarg,
-    uint32_t entries);
 extern int __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk);
@@ -462,6 +467,9 @@ extern int __wt_row_ikey(WT_SESSION_IMPL *session,
     void *ikeyp);
 extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
+    WT_ITEM *key,
+    WT_ITEM *value,
+    WT_UPDATE *upd,
     int is_remove);
 extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *key,
@@ -477,12 +485,14 @@ extern WT_UPDATE *__wt_update_obsolete_check(WT_SESSION_IMPL *session,
 extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_UPDATE *upd);
-extern void __wt_row_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     WT_INSERT_HEAD *inshead,
     WT_ITEM *srch_key);
-extern int __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
+extern int __wt_row_search(WT_SESSION_IMPL *session,
+    WT_ITEM *srch_key,
+    WT_PAGE *leaf_page,
+    WT_CURSOR_BTREE *cbt);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,
     WT_CONFIG *conf,

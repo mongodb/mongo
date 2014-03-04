@@ -118,6 +118,20 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	}
 
+	/* Free any reconciliation-created list of replacement blocks. */
+	for (i = 0; i < mod->multi_entries; ++i) {
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			__wt_free(session, mod->multi[i].key.ikey);
+			break;
+		}
+		__wt_free(session, mod->multi[i].skip);
+		__wt_free(session, mod->multi[i].skip_dsk);
+		__wt_free(session, mod->multi[i].addr.addr);
+	}
+	__wt_free(session, mod->multi);
+
 	/*
 	 * Free any split chunks created when underlying pages split into this
 	 * page.
@@ -128,18 +142,6 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, mod->splits[i].refs);
 	}
 	__wt_free(session, mod->splits);
-
-	/* Free any reconciliation-created list of replacement blocks. */
-	for (i = 0; i < mod->multi_entries; ++i) {
-		__wt_free(session, mod->multi[i].addr);
-		switch (page->type) {
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			__wt_free(session, mod->multi[i].key.ikey);
-			break;
-		}
-	}
-	__wt_free(session, mod->multi);
 
 	/* Free the append array. */
 	if ((append = WT_COL_APPEND(page)) != NULL) {
@@ -352,12 +354,13 @@ __free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_UPDATE *next;
 
-	do {
-		next = upd->next;
+	for (; upd != NULL; upd = next) {
 		/* Everything we free should be visible to everyone. */
 		WT_ASSERT(session,
 		    upd->txnid == WT_TXN_ABORTED ||
 		    __wt_txn_visible_all(session, upd->txnid));
+
+		next = upd->next;
 		__wt_free(session, upd);
-	} while ((upd = next) != NULL);
+	}
 }
