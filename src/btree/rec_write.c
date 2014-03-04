@@ -693,18 +693,20 @@ __rec_upd_skip_save(
 /*
  * __rec_txn_read --
  *	Return the first visible update in a list (or NULL if none are visible).
- * Track the maximum transaction ID in the list and whether updates were skipped
- * to find the visible update, an optionally save away skipped updates.
+ *
+ *	Track the maximum transaction ID in the list and whether updates were
+ *	skipped to find the visible update.  Optionally save any updates that
+ *	cannot be discarded.
  */
 static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_UPDATE *upd, WT_INSERT *ins, WT_ROW *rip, WT_UPDATE **updp)
 {
-	int skipped_any;
+	uint64_t max_txn;
 
 	*updp = NULL;
 
-	for (skipped_any = 0; upd != NULL; upd = upd->next) {
+	for (max_txn = WT_TXN_NONE; upd != NULL; upd = upd->next) {
 		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
 
@@ -714,30 +716,29 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * skipped, and used to avoid evicting clean pages from memory
 		 * with changes that are required to satisfy a snapshot read.
 		 */
-		if (TXNID_LT(r->max_txn, upd->txnid))
-			r->max_txn = upd->txnid;
+		if (TXNID_LT(max_txn, upd->txnid))
+			max_txn = upd->txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
 		 * the first visible update.
+		 *
+		 * If updates were skipped before the one being written, future
+		 * reads without intervening modifications to the page could
+		 * see a different value; if no updates were skipped, the page
+		 * can safely be marked clean and does not need to be
+		 * reconciled until modified again.
 		 */
-		if (__wt_txn_visible(session, upd->txnid)) {
-			if (*updp == NULL)
+		if (*updp == NULL) {
+			if (__wt_txn_visible(session, upd->txnid))
 				*updp = upd;
-		} else {
-			/*
-			 * If updates were skipped before the one being written,
-			 * future reads without intervening modifications to the
-			 * page could see a different value; if no updates were
-			 * skipped, the page can safely be marked clean and does
-			 * not need to be reconciled until modified again.
-			 */
-			if (*updp == NULL)
+			else
 				r->upd_skipped = 1;
-
-			skipped_any = 1;
 		}
 	}
+
+	if (TXNID_LT(r->max_txn, max_txn))
+		r->max_txn = max_txn;
 
 	/*
 	 * If evicting and updates were skipped, remember the list of WT_UPDATEs
@@ -748,7 +749,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * Additionally, in this case we don't write any WT_UPDATEs at all, we
 	 * don't want to move an insert into a different position on the page.
 	 */
-	if (skipped_any && F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
+	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
+	    !__wt_txn_visible_all(session, max_txn)) {
 		*updp = NULL;
 		WT_RET(__rec_upd_skip_save(session, r, ins, rip));
 	}
