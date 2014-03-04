@@ -125,6 +125,10 @@ namespace mongo {
         return Status::OK();
     }
 
+    size_t WriteOp::getNumTargeted() {
+        return _childOps.size();
+    }
+
     static bool isRetryErrCode( int errCode ) {
         return errCode == ErrorCodes::StaleShardVersion;
     }

@@ -514,9 +514,14 @@ namespace mongo {
         // Go through all pending responses of the op and sorted remote reponses, populate errors
         // This will either set all errors to the batch error or apply per-item errors as-needed
         //
+        // If the batch is ordered, cancel all writes after the first error for retargeting.
+        //
+
+        bool ordered = _clientRequest->getOrdered();
 
         vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
         int index = 0;
+        WriteErrorDetail* lastError = NULL;
         for ( vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
             it != targetedBatch.getWrites().end(); ++it, ++index ) {
 
@@ -536,10 +541,18 @@ namespace mongo {
 
             // Finish the response (with error, if needed)
             if ( NULL == writeError ) {
-                writeOp.noteWriteComplete( *write );
+                if ( !ordered || !lastError ){
+                    writeOp.noteWriteComplete( *write );
+                }
+                else {
+                    // We didn't actually apply this write - cancel so we can retarget
+                    dassert( writeOp.getNumTargeted() == 1u );
+                    writeOp.cancelWrites( lastError );
+                }
             }
             else {
                 writeOp.noteWriteError( *write, *writeError );
+                lastError = writeError;
             }
         }
 

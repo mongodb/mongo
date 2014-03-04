@@ -125,6 +125,11 @@ namespace mongo {
                              std::vector<TargetedWrite*>* targetedWrites );
 
         /**
+         * Returns the number of child writes that were last targeted.
+         */
+        size_t getNumTargeted();
+
+        /**
          * Resets the state of this write op to _Ready and stops waiting for any outstanding
          * TargetedWrites.  Optional error can be provided for reporting.
          *
