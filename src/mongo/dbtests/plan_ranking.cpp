@@ -700,6 +700,45 @@ namespace PlanRankingTests {
         }
     };
 
+    /**
+     * When no other information is available, prefer solutions without
+     * a blocking sort stage.
+     */
+    class PlanRankingAvoidBlockingSort : public PlanRankingTestBase {
+    public:
+        void run() {
+            static const int N = 10000;
+
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1 << "d" << i));
+            }
+
+            // The index {d: 1, e: 1} provides the desired sort order,
+            // while index {a: 1, b: 1} can be used to answer the
+            // query predicate, but does not provide the sort.
+            addIndex(BSON("a" << 1 << "b" << 1));
+            addIndex(BSON("d" << 1 << "e" << 1));
+
+            // Query: find({a: 1}).sort({d: 1})
+            CanonicalQuery* cq;
+            ASSERT(CanonicalQuery::canonicalize(ns,
+                                                BSON("a" << 1),
+                                                BSON("d" << 1), // sort
+                                                BSONObj(), // projection
+                                                &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // No results will be returned during the trial period,
+            // so we expect to choose {d: 1, e: 1}, as it allows us
+            // to avoid the sort stage.
+            QuerySolution* soln = pickBestPlan(cq);
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{fetch: {filter: {a:1}, node: "
+                            "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
+                        soln->root.get()));
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query_plan_ranking" ) {}
@@ -718,6 +757,7 @@ namespace PlanRankingTests {
             add<PlanRankingNonCoveredIxisectFetchesLess>();
             add<PlanRankingIxisectHitsEOFFirst>();
             add<PlanRankingChooseBetweenIxisectPlans>();
+            add<PlanRankingAvoidBlockingSort>();
         }
     } planRankingAll;
 

@@ -189,17 +189,23 @@ namespace mongo {
         double productivity = static_cast<double>(stats->common.advanced)
                             / static_cast<double>(workUnits);
 
-        // If we have to perform a fetch, that's not great.
+        // Just enough to break a tie.
+        static const double epsilon = 0.0001;
+
+        // We prefer covered projections.
         //
         // We only do this when we have a projection stage because we have so many jstests that
         // check bounds even when a collscan plan is just as good as the ixscan'd plan :(
-        double noFetchBonus = 1;
-        double epsilon = 0.001;
-
-        // We prefer covered projections.
+        double noFetchBonus = epsilon;
         if (hasStage(STAGE_PROJECTION, stats) && hasStage(STAGE_FETCH, stats)) {
-            // Just enough to break a tie.
-            noFetchBonus = 1 - epsilon;
+            noFetchBonus = 0;
+        }
+
+        // In the case of ties, prefer solutions without a blocking sort
+        // to solutions with a blocking sort.
+        double noSortBonus = epsilon;
+        if (hasStage(STAGE_SORT, stats)) {
+            noSortBonus = 0;
         }
 
         // In the case of ties, prefer single index solutions to ixisect. Index
@@ -216,7 +222,8 @@ namespace mongo {
             noIxisectBonus = 0;
         }
 
-        double score = baseScore + productivity + noFetchBonus + noIxisectBonus;
+        double tieBreakers = noFetchBonus + noSortBonus + noIxisectBonus;
+        double score = baseScore + productivity + tieBreakers;
 
         QLOG() << "score (" << score << ") = baseScore(" << baseScore << ")"
                                      <<  " + productivity((" << stats->common.advanced
@@ -226,8 +233,13 @@ namespace mongo {
                                                              << stats->common.needFetch
                                                              << " needFetch) = "
                                                              << productivity << ")"
-                                     <<  " + noFetchBonus(" << noFetchBonus << ")"
-                                     <<  " + noIxisectBonus(" << noIxisectBonus << ")"
+                                     <<  " + tieBreakers(" << noFetchBonus
+                                                           << " noFetchBonus + "
+                                                           << noSortBonus
+                                                           << " noSortBonus + "
+                                                           << noIxisectBonus
+                                                           << " noIxisectBonus = "
+                                                           << tieBreakers << ")"
                                      << endl;
 
         if (forceIntersectionPlans) {
