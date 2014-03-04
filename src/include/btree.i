@@ -452,6 +452,33 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 }
 
 /*
+ * __wt_cursor_row_leaf_key --
+ *	Set a buffer to reference a cursor-referenced row-store leaf page key.
+ */
+static inline int
+__wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
+{
+	WT_PAGE *page;
+	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
+
+	/*
+	 * If the cursor references a WT_INSERT item, take the key from there,
+	 * else take the key from the original page.
+	 */
+	if (cbt->ins == NULL) {
+		session = (WT_SESSION_IMPL *)cbt->iface.session;
+		page = cbt->page;
+		rip = &page->u.row.d[cbt->slot];
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
+	} else {
+		key->data = WT_INSERT_KEY(cbt->ins);
+		key->size = WT_INSERT_KEY_SIZE(cbt->ins);
+	}
+	return (0);
+}
+
+/*
  * __wt_row_leaf_value --
  *	Return a pointer to the value cell for a row-store leaf page key, or
  * NULL if there isn't one.
