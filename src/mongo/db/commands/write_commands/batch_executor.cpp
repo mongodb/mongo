@@ -717,7 +717,13 @@ namespace mongo {
 
             WriteOpResult currResult;
 
-            {
+            // Don't (re-)acquire locks and create database until it's necessary
+            if ( !normalInserts[currInsertItem->getItemIndex()].isOK() ) {
+                currResult.error =
+                    toWriteError( normalInserts[currInsertItem->getItemIndex()].getStatus() );
+            }
+            else {
+
                 PageFaultRetryableSection pFaultSection;
 
                 ////////////////////////////////////

@@ -10,7 +10,5 @@ t.drop();
 assert.isnull( t.findOne() , "A" )
 assert.writeError(t.insert( { z : 1 ,  $inc : { x : 1 } } , 0, true ));
 assert.isnull( t.findOne() , "B" )
-
-// TODO: b/c of SERVER-12993 - remove below line once the bug which 
-// causes the server to create the collection is fixed
-t.drop()
+// Collection should not exist
+assert.commandFailed( t.stats() );
