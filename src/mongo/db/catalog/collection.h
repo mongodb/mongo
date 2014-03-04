@@ -243,6 +243,7 @@ namespace mongo {
         friend class FlatIterator;
         friend class CappedIterator;
         friend class IndexCatalog;
+        friend class NamespaceDetails;
     };
 
 }

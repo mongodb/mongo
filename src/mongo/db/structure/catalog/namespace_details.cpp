@@ -375,25 +375,25 @@ namespace mongo {
         return cappedAlloc(collection, ns,len);
     }
 
-    NamespaceDetails::Extra* NamespaceDetails::allocExtra(const char *ns, int nindexessofar) {
+    NamespaceDetails::Extra* NamespaceDetails::allocExtra( const StringData& ns,
+                                                           NamespaceIndex& ni,
+                                                           int nindexessofar) {
         Lock::assertWriteLocked(ns);
-
-        NamespaceIndex *ni = nsindex(ns);
 
         int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
         verify( i >= 0 && i <= 1 );
 
-        Namespace fullns(ns);
-        Namespace extrans(fullns.extraName(i)); // throws userexception if ns name too long
+        Namespace fullns( ns );
+        Namespace extrans( fullns.extraName(i) ); // throws UserException if ns name too long
 
-        massert( 10350 ,  "allocExtra: base ns missing?", this );
-        massert( 10351 ,  "allocExtra: extra already exists", ni->details(extrans) == 0 );
+        massert( 10350, "allocExtra: base ns missing?", this );
+        massert( 10351, "allocExtra: extra already exists", ni.details(extrans) == 0 );
 
         Extra temp;
         temp.init();
 
-        ni->add_ns( extrans, reinterpret_cast<NamespaceDetails*>( &temp ) );
-        Extra* e = reinterpret_cast<NamespaceDetails::Extra*>( ni->details( extrans ) );
+        ni.add_ns( extrans, reinterpret_cast<NamespaceDetails*>( &temp ) );
+        Extra* e = reinterpret_cast<NamespaceDetails::Extra*>( ni.details( extrans ) );
 
         long ofs = e->ofsFrom(this);
         if( i == 0 ) {
@@ -436,13 +436,15 @@ namespace mongo {
         return true;
     }
 
-    IndexDetails& NamespaceDetails::getNextIndexDetails(const char* thisns) {
+    IndexDetails& NamespaceDetails::getNextIndexDetails(Collection* collection) {
         IndexDetails *id;
         try {
             id = &idx(getTotalIndexCount(), true);
         }
         catch(DBException&) {
-            allocExtra(thisns, getTotalIndexCount());
+            allocExtra(collection->ns().ns(),
+                       collection->_database->namespaceIndex(),
+                       getTotalIndexCount());
             id = &idx(getTotalIndexCount(), false);
         }
         return *id;
@@ -473,18 +475,20 @@ namespace mongo {
     }
 
     // must be called when renaming a NS to fix up extra
-    void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) {
+    void NamespaceDetails::copyingFrom( const char* thisns,
+                                        NamespaceIndex& ni,
+                                        NamespaceDetails* src) {
         _extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
         Extra *se = src->extra();
         int n = NIndexesBase;
         if( se ) {
-            Extra *e = allocExtra(thisns, n);
+            Extra *e = allocExtra(thisns, ni, n);
             while( 1 ) {
                 n += NIndexesExtra;
                 e->copy(this, *se);
                 se = se->next(src);
                 if( se == 0 ) break;
-                Extra *nxt = allocExtra(thisns, n);
+                Extra *nxt = allocExtra(thisns, ni, n);
                 e->setNext( nxt->ofsFrom(this) );
                 e = nxt;
             }

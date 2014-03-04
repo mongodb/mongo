@@ -64,21 +64,6 @@ namespace mongo {
 
     /*---------------------------------------------------------------------*/
 
-    inline NamespaceIndex* nsindex(const StringData& ns) {
-        Database *database = cc().database();
-        verify( database );
-        DEV {
-            StringData dbname = nsToDatabaseSubstring( ns );
-            if ( database->name() != dbname ) {
-                out() << "ERROR: attempt to write to wrong database\n";
-                out() << " ns:" << ns << '\n';
-                out() << " database->name:" << database->name() << endl;
-                verify( database->name() == dbname );
-            }
-        }
-        return &database->namespaceIndex();
-    }
-
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
     inline BSONObj BSONObj::make(const Record* r ) {

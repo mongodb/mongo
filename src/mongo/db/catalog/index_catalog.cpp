@@ -412,7 +412,7 @@ namespace mongo {
             return systemIndexesEntry.getStatus();
 
         // 2) collection's NamespaceDetails
-        IndexDetails& indexDetails = _collection->details()->getNextIndexDetails( _ns.c_str() );
+        IndexDetails& indexDetails = _collection->details()->getNextIndexDetails( _collection );
 
         try {
             getDur().writingDiskLoc( indexDetails.info ) = systemIndexesEntry.getValue();

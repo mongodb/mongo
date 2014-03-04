@@ -156,8 +156,13 @@ namespace mongo {
             return (Extra *) (((char *) this) + _extraOffset);
         }
         /* add extra space for indexes when more than 10 */
-        Extra* allocExtra(const char *ns, int nindexessofar);
-        void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
+        Extra* allocExtra( const StringData& ns,
+                           NamespaceIndex& ni,
+                           int nindexessofar );
+
+        void copyingFrom( const char* thisns,
+                          NamespaceIndex& ni,
+                          NamespaceDetails *src); // must be called when renaming a NS to fix up extra
 
     public:
         const DiskLoc& capExtent() const { return _capExtent; }
@@ -285,7 +290,7 @@ namespace mongo {
          * This fetches the IndexDetails for the next empty index slot. The caller must populate
          * returned object.  This handles allocating extra index space, if necessary.
          */
-        IndexDetails& getNextIndexDetails(const char* thisns);
+        IndexDetails& getNextIndexDetails(Collection* collection);
 
         /**
          * @return the actual size to create

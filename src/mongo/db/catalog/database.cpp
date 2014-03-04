@@ -579,7 +579,9 @@ namespace mongo {
         NamespaceDetails* toDetails = _namespaceIndex.details( toNS );
 
         try {
-            toDetails->copyingFrom(toNSString.c_str(), fromDetails); // fixes extraOffset
+            toDetails->copyingFrom(toNSString.c_str(),
+                                   _namespaceIndex,
+                                   fromDetails); // fixes extraOffset
         }
         catch( DBException& ) {
             // could end up here if .ns is full - if so try to clean up / roll back a little
