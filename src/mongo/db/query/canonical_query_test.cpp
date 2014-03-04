@@ -475,28 +475,60 @@ namespace {
 
     TEST(PlanCacheTest, GetPlanCacheKey) {
         // Generated cache keys should be treated as opaque to the user.
+
         // No sorts
         testGetPlanCacheKey("{}", "{}", "{}", "an");
-        testGetPlanCacheKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "oreqaeqb");
+        testGetPlanCacheKey("{$or: [{a: 1}, {b: 2}]}", "{}", "{}", "or[eqa,eqb]");
+        testGetPlanCacheKey("{$or: [{a: 1}, {b: 1}, {c: 1}], d: 1}", "{}", "{}",
+                            "an[or[eqa,eqb,eqc],eqd]");
+        testGetPlanCacheKey("{$or: [{a: 1}, {b: 1}], c: 1, d: 1}", "{}", "{}",
+                            "an[or[eqa,eqb],eqc,eqd]");
+        testGetPlanCacheKey("{a: 1, b: 1, c: 1}", "{}", "{}", "an[eqa,eqb,eqc]");
+        testGetPlanCacheKey("{a: 1, beqc: 1}", "{}", "{}", "an[eqa,eqbeqc]");
+        testGetPlanCacheKey("{ap1a: 1}", "{}", "{}", "eqap1a");
+        testGetPlanCacheKey("{aab: 1}", "{}", "{}", "eqaab");
+
         // With sort
-        testGetPlanCacheKey("{}", "{a: 1}", "{}", "anaa");
-        testGetPlanCacheKey("{}", "{a: -1}", "{}", "anda");
+        testGetPlanCacheKey("{}", "{a: 1}", "{}", "an~aa");
+        testGetPlanCacheKey("{}", "{a: -1}", "{}", "an~da");
         testGetPlanCacheKey("{}", "{a: {$meta: 'textScore'}}", "{a: {$meta: 'textScore'}}",
-                            "antap{ $meta: \"textScore\" }a");
+                            "an~ta|{ $meta: \"textScore\" }a");
+        testGetPlanCacheKey("{a: 1}", "{b: 1}", "{}", "eqa~ab");
+
         // With projection
-        testGetPlanCacheKey("{}", "{}", "{a: 1}", "anp1a");
-        testGetPlanCacheKey("{}", "{}", "{a: 0}", "anp0a");
-        testGetPlanCacheKey("{}", "{}", "{a: 99}", "anp99a");
-        testGetPlanCacheKey("{}", "{}", "{a: 'foo'}", "anp\"foo\"a");
-        testGetPlanCacheKey("{}", "{}", "{a: {$slice: [3, 5]}}", "anp{ $slice: [ 3, 5 ] }a");
-        testGetPlanCacheKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}", "anp{ $elemMatch: { x: 2 } }a");
-        testGetPlanCacheKey("{a: 1}", "{}", "{'a.$': 1}", "eqap1a.$");
+        testGetPlanCacheKey("{}", "{}", "{a: 1}", "an|1a");
+        testGetPlanCacheKey("{}", "{}", "{a: 0}", "an|0a");
+        testGetPlanCacheKey("{}", "{}", "{a: 99}", "an|99a");
+        testGetPlanCacheKey("{}", "{}", "{a: 'foo'}", "an|\"foo\"a");
+        testGetPlanCacheKey("{}", "{}", "{a: {$slice: [3, 5]}}", "an|{ $slice: \\[ 3\\, 5 \\] }a");
+        testGetPlanCacheKey("{}", "{}", "{a: {$elemMatch: {x: 2}}}",
+                            "an|{ $elemMatch: { x: 2 } }a");
+        testGetPlanCacheKey("{a: 1}", "{}", "{'a.$': 1}", "eqa|1a.$");
+        testGetPlanCacheKey("{a: 1}", "{}", "{a: 1}", "eqa|1a");
+
         // Projection should be order-insensitive
-        testGetPlanCacheKey("{}", "{}", "{a: 1, b: 1}", "anp1a1b");
-        testGetPlanCacheKey("{}", "{}", "{b: 1, a: 1}", "anp1a1b");
+        testGetPlanCacheKey("{}", "{}", "{a: 1, b: 1}", "an|1a1b");
+        testGetPlanCacheKey("{}", "{}", "{b: 1, a: 1}", "an|1a1b");
+
         // With or-elimination and projection
-        testGetPlanCacheKey("{$or: [{a: 1}]}", "{}", "{_id: 0, a: 1}", "eqap0_id1a");
-        testGetPlanCacheKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqap1a.$");
+        testGetPlanCacheKey("{$or: [{a: 1}]}", "{}", "{_id: 0, a: 1}", "eqa|0_id1a");
+        testGetPlanCacheKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqa|1a.$");
+    }
+
+    // Delimiters found in user field names or non-standard projection field values
+    // must be escaped.
+    TEST(PlanCacheTest, GetPlanCacheKeyEscaped) {
+        // Field name in query.
+        testGetPlanCacheKey("{'a,[]~|': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|");
+
+        // Field name in sort.
+        testGetPlanCacheKey("{}", "{'a,[]~|': 1}", "{}", "an~aa\\,\\[\\]\\~\\|");
+
+        // Field name in projection.
+        testGetPlanCacheKey("{}", "{}", "{'a,[]~|': 1}", "an|1a\\,\\[\\]\\~\\|");
+
+        // Value in projection.
+        testGetPlanCacheKey("{}", "{}", "{a: 'foo,[]~|'}", "an|\"foo\\,\\[\\]\\~\\|\"a");
     }
 
     // Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should

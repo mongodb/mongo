@@ -39,6 +39,35 @@ namespace {
     using std::string;
     using namespace mongo;
 
+    // Delimiters for cache key encoding.
+    const char kEncodeChildrenBegin = '[';
+    const char kEncodeChildrenEnd = ']';
+    const char kEncodeChildrenSeparator = ',';
+    const char kEncodeSortSection = '~';
+    const char kEncodeProjectionSection = '|';
+
+    /**
+     * Encode user-provided string. Cache key delimiters seen in the
+     * user string are escaped with a backslash.
+     */
+    void encodeUserString(const StringData& s, mongoutils::str::stream* os) {
+        for (size_t i = 0; i < s.size(); ++i) {
+            char c = s[i];
+            switch (c) {
+            case kEncodeChildrenBegin:
+            case kEncodeChildrenEnd:
+            case kEncodeChildrenSeparator:
+            case kEncodeSortSection:
+            case kEncodeProjectionSection:
+            case '\\':
+                  *os << '\\';
+                // Fall through to default case.
+            default:
+                *os << c;
+            }
+        }
+    }
+
     void encodePlanCacheKeyTree(const MatchExpression* tree, mongoutils::str::stream* os);
 
     /**
@@ -179,7 +208,9 @@ namespace {
      */
     void encodePlanCacheKeyTree(const MatchExpression* tree, mongoutils::str::stream* os) {
         // Encode match type and path.
-        *os << encodeMatchType(tree->matchType()) << tree->path();
+        *os << encodeMatchType(tree->matchType());
+
+        encodeUserString(tree->path(), os);
 
         // GEO and GEO_NEAR require additional encoding.
         if (MatchExpression::GEO == tree->matchType()) {
@@ -190,8 +221,19 @@ namespace {
         }
 
         // Traverse child nodes.
+        // Enclose children in [].
+        if (tree->numChildren() > 0) {
+            *os << kEncodeChildrenBegin;
+        }
+        // Use comma to separate children encoding.
         for (size_t i = 0; i < tree->numChildren(); ++i) {
+            if (i > 0) {
+                *os << kEncodeChildrenSeparator;
+            }
             encodePlanCacheKeyTree(tree->getChild(i), os);
+        }
+        if (tree->numChildren() > 0) {
+            *os << kEncodeChildrenEnd;
         }
     }
 
@@ -201,6 +243,12 @@ namespace {
      * LiteParsedQuery.
      */
     void encodePlanCacheKeySort(const BSONObj& sortObj, mongoutils::str::stream* os) {
+        if (sortObj.isEmpty()) {
+            return;
+        }
+
+        *os << kEncodeSortSection;
+
         BSONObjIterator it(sortObj);
         while (it.more()) {
             BSONElement elt = it.next();
@@ -216,7 +264,7 @@ namespace {
             else {
                 *os << "d";
             }
-            *os << elt.fieldName();
+            encodeUserString(elt.fieldName(), os);
         }
     }
 
@@ -232,7 +280,7 @@ namespace {
             return;
         }
 
-        *os << "p";
+        *os << kEncodeProjectionSection;
 
         // Sorts the BSON elements by field name using a map.
         std::map<StringData, BSONElement> elements;
@@ -251,8 +299,8 @@ namespace {
             // BSONElement::toString() arguments
             // includeFieldName - skip field name (appending after toString() result). false.
             // full: choose less verbose representation of child/data values. false.
-            *os << elt.toString(false, false);
-            *os << elt.fieldName();
+            encodeUserString(elt.toString(false, false), os);
+            encodeUserString(elt.fieldName(), os);
         }
     }
 
