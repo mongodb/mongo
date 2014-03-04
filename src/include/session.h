@@ -137,7 +137,8 @@ struct __wt_session_impl {
 	 */
 	struct __wt_fotxn {
 		uint64_t    txnid;	/* Transaction ID */
-		const void *p;		/* Memory */
+		void *p;		/* Memory, length */
+		size_t	    len;
 	} *fotxn;			/* Free-on-transaction array */
 	size_t  fotxn_cnt;		/* Array entries */
 	size_t  fotxn_size;		/* Array size */

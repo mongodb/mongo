@@ -356,11 +356,12 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	alloc_ref = NULL;
 
 	/*
-	 * We can't discard the previous page index, there may be threads using
+	 * We can't free the previous page index, there may be threads using
 	 * it.  Add it to the session's discard list, to be freed once we know
 	 * no threads can still be using it.
 	 */
-	WT_ERR(__wt_session_fotxn_add(session, page->pg_intl_index));
+	WT_ERR(__wt_session_fotxn_add(session, pindex,
+	    sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *)));
 
 	/*
 	 * Update the page's index; this is the change which splits the page,
@@ -632,11 +633,12 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 			refp++;
 
 	/*
-	 * We can't discard the previous page index, there may be threads using
+	 * We can't free the previous page index, there may be threads using
 	 * it.  Add it to the session's discard list, to be freed once we know
 	 * no threads can still be using it.
 	 */
-	WT_ERR(__wt_session_fotxn_add(session, parent->pg_intl_index));
+	WT_ERR(__wt_session_fotxn_add(session, pindex,
+	    sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *)));
 
 	/* Update the parent page's footprint. */
 	__wt_cache_page_inmem_incr(session, parent, mod->multi_size);

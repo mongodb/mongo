@@ -12,7 +12,7 @@
  *	Add a new entry into the session's free-on-transaction generation list.
  */
 int
-__wt_session_fotxn_add(WT_SESSION_IMPL *session, const void *p)
+__wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 {
 	WT_FOTXN *fotxn;
 	size_t i;
@@ -25,8 +25,9 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, const void *p)
 	for (i = 0, fotxn = session->fotxn;
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
 		if (fotxn->p == NULL) {
-			fotxn->p = p;
 			fotxn->txnid = S2C(session)->txn_global.current;
+			fotxn->p = p;
+			fotxn->len = len;
 			break;
 		}
 	++session->fotxn_cnt;
@@ -69,21 +70,15 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
 		if (fotxn->p != NULL &&
 		    (connection_close || TXNID_LT(fotxn->txnid, oldest_id))) {
-#ifdef HAVE_DIAGNOSTIC
-			/*
-			 * It's a bad thing if another thread is in this array
-			 * after we free it, and it's a race I want to find.
-			 * Make sure nothing good happens to that thread.
-			 */
-			{
-			WT_PAGE_INDEX *pindex = (WT_PAGE_INDEX *)fotxn->p;
-			memset(pindex, WT_DEBUG_BYTE,
-			    sizeof(WT_PAGE_INDEX) +
-			    pindex->entries * sizeof(WT_REF *));
-			}
-#endif
 			--session->fotxn_cnt;
-			__wt_free(session_safe, fotxn->p);
+
+			/*
+			 * It's a bad thing if another thread is in this memory
+			 * after we free it, make sure nothing good happens to
+			 * that thread.
+			 */
+			__wt_overwrite_and_free_len(
+			    session_safe, fotxn->p, fotxn->len);
 		}
 	if (connection_close)
 		__wt_free(session_safe, session->fotxn);
