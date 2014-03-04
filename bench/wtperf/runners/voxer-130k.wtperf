@@ -14,6 +14,6 @@ value_sz=130000
 populate_threads=1
 report_interval=10
 random_value=true
-run_time=3600
+run_time=18000
 sample_interval=10
 threads=((count=20,read=1,update=1))
