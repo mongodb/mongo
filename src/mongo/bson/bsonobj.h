@@ -96,8 +96,6 @@ namespace mongo {
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();
 
-        static BSONObj make( const Record* r );
-
         ~BSONObj() {
             _objdata = 0; // defensive
         }

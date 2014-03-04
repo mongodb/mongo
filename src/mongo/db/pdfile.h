@@ -40,7 +40,6 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/record.h"
 
 namespace mongo {
 
@@ -49,10 +48,5 @@ namespace mongo {
     bool userCreateNS(const char *ns, BSONObj j, std::string& err,
                       bool logForReplication, bool createDefaultIndexes = true );
 
-    /*---------------------------------------------------------------------*/
-
-    inline BSONObj BSONObj::make(const Record* r ) {
-        return BSONObj( r->data() );
-    }
 
 } // namespace mongo

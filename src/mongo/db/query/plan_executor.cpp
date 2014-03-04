@@ -32,7 +32,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/storage/record.h"
 
 namespace mongo {
 

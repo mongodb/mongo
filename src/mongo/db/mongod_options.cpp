@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"

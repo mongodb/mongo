@@ -31,6 +31,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 

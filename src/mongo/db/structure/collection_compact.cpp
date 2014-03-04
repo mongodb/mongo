@@ -112,8 +112,8 @@ namespace mongo {
             if( !L.isNull() ) {
                 while( 1 ) {
                     Record *recOld = L.rec();
+                    BSONObj objOld = docFor( L );
                     L = getExtentManager()->getNextRecordInExtent(L);
-                    BSONObj objOld = BSONObj::make(recOld);
 
                     if ( compactOptions->validateDocuments && !objOld.valid() ) {
                         // object is corrupt!

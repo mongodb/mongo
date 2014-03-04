@@ -154,7 +154,7 @@ namespace mongo {
 
     BSONObj Collection::docFor( const DiskLoc& loc ) {
         Record* rec = getExtentManager()->recordFor( loc );
-        return BSONObj::make( rec->accessed() );
+        return BSONObj( rec->accessed()->data() );
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( const DocWriter* doc, bool enforceQuota ) {
@@ -284,7 +284,7 @@ namespace mongo {
                                                     OpDebug* debug ) {
 
         Record* oldRecord = getExtentManager()->recordFor( oldLocation );
-        BSONObj objOld = BSONObj::make( oldRecord );
+        BSONObj objOld( oldRecord->accessed()->data() );
 
         if ( objOld.hasElement( "_id" ) ) {
             BSONElement oldId = objOld["_id"];

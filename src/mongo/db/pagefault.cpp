@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/server.h"
 #include "mongo/util/mmap.h"
 

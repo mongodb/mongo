@@ -540,7 +540,7 @@ namespace mongo {
     }
 
     BSONObj DiskLoc::obj() const {
-        return BSONObj::make(rec()->accessed());
+        return BSONObj( rec()->accessed()->data() );
     }
 
     void Record::_accessing() const {

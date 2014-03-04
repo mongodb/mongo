@@ -271,7 +271,7 @@ namespace mongo {
                         }
 
                         if (full){
-                            BSONObj obj = BSONObj::make(r);
+                            BSONObj obj = collection->docFor(cl);
                             const Status status = validateBSON(obj.objdata(), obj.objsize());
                             if (!status.isOK()) {
                                 valid = false;
