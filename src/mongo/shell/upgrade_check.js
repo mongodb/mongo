@@ -69,11 +69,22 @@ var collUpgradeCheck = function(collObj) {
         return goodSoFar;
     }
 
+    var lastAlertTime = Date.now();
+    var alertInterval = 10 * 1000; // 10 seconds
+    var numDocs = 0;
     // run document level checks on each document in the collection
     dbObj.getSiblingDB(dbName).getCollection(collName).find().sort({$natural: 1}).forEach(
         function(doc) {
+            numDocs++;
+
             if (!documentUpgradeCheck(indexes, doc)) {
                 goodSoFar = false;
+                lastAlertTime = Date.now();
+            }
+            var nowTime = Date.now();
+            if (nowTime - lastAlertTime > alertInterval) {
+                print(numDocs + " documents processed");
+                lastAlertTime = nowTime;
             }
     });
 
