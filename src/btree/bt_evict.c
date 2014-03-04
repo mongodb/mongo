@@ -732,6 +732,14 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	__wt_cache_read_gen_incr(session);
 
 	/*
+	 * Update the oldest ID: we use it to decide whether pages are
+	 * candidates for eviction.  Without this, if all threads are blocked
+	 * after a long-running transaction (such as a checkpoint) completes,
+	 * we may never start evicting again.
+	 */
+	__wt_txn_update_oldest(session);
+
+	/*
 	 * Set the starting slot in the queue and the maximum pages added
 	 * per walk.
 	 */
@@ -963,6 +971,15 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		/*
+		 * If the page is clean but has modifications that appear too
+		 * new to evict, skip it.
+		 */
+		if (!modified && page->modify != NULL &&
+		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
+		    !__wt_txn_visible_all(session, page->modify->rec_max_txn))
+			continue;
+
+		/*
 		 * If the oldest transaction hasn't changed since the
 		 * last time this page was written, it's unlikely that
 		 * we can make progress.  Similarly, if the most recent
@@ -976,7 +993,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * since rolled back, or we can help get the checkpoint
 		 * completed sooner.
 		 */
-		if (modified && !F_ISSET(cache, WT_EVICT_STUCK) &&
+		if (modified && !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
 		    (page->modify->disk_snap_min ==
 		    S2C(session)->txn_global.oldest_id ||
 		    !__wt_txn_visible_all(session,

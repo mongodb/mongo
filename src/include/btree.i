@@ -177,7 +177,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 	 * page.  In other words, the goal is to avoid some number of updates
 	 * immediately after each update we have to make.
 	 */
-	return (++S2C(session)->cache->read_gen + WT_READ_GEN_STEP);
+	return (__wt_cache_read_gen(session) + WT_READ_GEN_STEP);
 }
 
 /*
@@ -527,6 +527,33 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 }
 
 /*
+ * __wt_cursor_row_leaf_key --
+ *	Set a buffer to reference a cursor-referenced row-store leaf page key.
+ */
+static inline int
+__wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
+{
+	WT_PAGE *page;
+	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
+
+	/*
+	 * If the cursor references a WT_INSERT item, take the key from there,
+	 * else take the key from the original page.
+	 */
+	if (cbt->ins == NULL) {
+		session = (WT_SESSION_IMPL *)cbt->iface.session;
+		page = cbt->page;
+		rip = &page->u.row.d[cbt->slot];
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
+	} else {
+		key->data = WT_INSERT_KEY(cbt->ins);
+		key->size = WT_INSERT_KEY_SIZE(cbt->ins);
+	}
+	return (0);
+}
+
+/*
  * __wt_row_leaf_value --
  *	Return a pointer to the value cell for a row-store leaf page key, or
  * NULL if there isn't one.
@@ -666,28 +693,25 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (page->read_gen != WT_READ_GEN_OLDEST)
 		goto skip;
-	if (WT_TXN_ACTIVE(&session->txn))
-		goto skip;
+
 	ref = __wt_page_ref(session, page);
 	if (WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
 			ref->state = WT_REF_MEM;
 			return (ret);
 		}
-
-		WT_TRET(__wt_evict_page(session, &page));
-		if (ret == 0)
+		if ((ret = __wt_evict_page(session, &page)) == 0)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-		else
+		else {
 			WT_STAT_FAST_CONN_INCR(
 			    session, cache_eviction_force_fail);
-		if (ret == EBUSY)
-			ret = 0;
+			if (ret == EBUSY)
+				ret = 0;
+		}
 		return (ret);
 	}
 
-skip:
-	return (__wt_hazard_clear(session, page));
+skip:	return (__wt_hazard_clear(session, page));
 }
 
 /*
