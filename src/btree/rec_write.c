@@ -741,10 +741,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		r->max_txn = max_txn;
 
 	/*
-	 * If evicting and updates were skipped, remember the list of WT_UPDATEs
-	 * so we can restore it on a newly instantiated page.  (The order of the
-	 * updates matters, we can't move only unresolved WT_UPDATEs, we have to
-	 * move the entire list.
+	 * If evicting and some updates are not stable, remember the list of
+	 * WT_UPDATEs so we can restore it on a newly instantiated page.
+	 * (The order of the updates matters, we can't move only unresolved
+	 * WT_UPDATEs, we have to move the entire list.
 	 *
 	 * Additionally, in this case we don't write any WT_UPDATEs at all, we
 	 * don't want to move an insert into a different position on the page.
