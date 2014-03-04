@@ -1,3 +1,29 @@
+WiredTiger release 2.1.1, 2014-03-04
+------------------------------------
+
+The WiredTiger 2.1.1 release contains new features, performance enhancements
+and bug fixes.  Significant changes include:
+
+Fix a bug where a page could be marked clean when it contained uncommitted
+changes.  This bug could cause undefined behavior in transaction rollback
+under load.
+
+Fix a bug with shared caches when rebalancing between connections.
+
+Add a new public API to WiredTiger that provides the ability to parse
+WiredTiger compatible configuration strings. See the upgrading documentation
+for further information. [#873]
+
+A number of performance enhancements to the LSM implementation, particularly
+for long running workloads.
+
+A number of performance enhancements and bug fixes to cache eviction code.
+
+Add an option to use direct I/O when reading from checkpoints. To enabled
+the functionality add "direct_io=[checkpoint]" to your wiredtiger_open
+configuration string. [#847]
+
+
 WiredTiger release 2.1.0, 2014-02-04
 ------------------------------------
 
