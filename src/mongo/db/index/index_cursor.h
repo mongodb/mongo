@@ -54,12 +54,6 @@ namespace mongo {
     public:
         virtual ~IndexCursor() { }
 
-        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
-        virtual DiskLoc getBucket() const { return DiskLoc(); }
-
-        // XXX SHORT TERM HACKS THAT MUST DIE: 2d index
-        virtual int getKeyOfs() const { return 0; }
-
         /**
          * Set options on the cursor (direction).  See CursorOptions below.
          */
@@ -131,7 +125,7 @@ namespace mongo {
 
         /**
          *  Add debugging info to the provided builder.
-         * TODO(hk/alerner): We can do this better, perhaps with a more structured format.
+         * TODO(hk): We can do this better, perhaps with a more structured format.
          */
         virtual void explainDetails(BSONObjBuilder* b) { }
     };
