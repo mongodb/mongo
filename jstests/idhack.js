@@ -41,3 +41,8 @@ var hintExplain = t.find( query ).hint( { _id : 1 , a : 1 } ).explain();
 print( "explain for hinted query = " + tojson( hintExplain ) );
 assert.neq( explain.cursor, hintExplain.cursor, "E1" );
 
+// ID hack cannot be used with skip().
+var skipExplain = t.find( query ).skip(1).explain();
+print( "explain for skip query = " + tojson( skipExplain ) );
+assert.neq( explain.cursor, skipExplain.cursor, "F1" );
+

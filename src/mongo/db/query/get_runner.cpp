@@ -59,6 +59,7 @@ namespace mongo {
     static bool canUseIDHack(const CanonicalQuery& query) {
         return !query.getParsed().showDiskLoc()
             && query.getParsed().getHint().isEmpty()
+            && 0 == query.getParsed().getSkip()
             && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
             && !query.getParsed().hasOption(QueryOption_CursorTailable);
     }
