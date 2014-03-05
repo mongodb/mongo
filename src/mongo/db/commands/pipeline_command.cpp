@@ -341,15 +341,22 @@ namespace {
             }
 
             try {
+                // Unless set to true, the ClientCursor created above will be deleted on block exit.
+                bool keepCursor = false;
+
+                // If both explain and cursor are specified, explain wins.
                 if (pPipeline->isExplain()) {
                     result << "stages" << Value(pPipeline->writeExplainOps());
                 }
                 else if (isCursorCommand(cmdObj)) {
                     handleCursorCommand(ns, pin.get(), runner, cmdObj, result);
+                    keepCursor = true;
                 }
                 else {
                     pPipeline->run(result);
                 }
+
+                if (!keepCursor && pin) pin->deleteUnderlying();
             }
             catch (...) {
                 // Clean up cursor on way out of scope.
