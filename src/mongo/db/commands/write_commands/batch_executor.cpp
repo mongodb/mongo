@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -832,6 +833,16 @@ namespace mongo {
                                                                 currInsertItem->getItemIndex()
                                                                 + 1 ) );
                         currResult.reset();
+
+                        // Destruct curop so that our parent curop is restored, so that we
+                        // record the yield count in the parent.
+                        currentOp.reset(NULL);
+
+                        // yield sometimes
+                        int micros = ClientCursor::suggestYieldMicros();
+                        if (micros > 0) {
+                            ClientCursor::staticYield(micros, "", NULL);
+                        }
                     }
                 }
 
