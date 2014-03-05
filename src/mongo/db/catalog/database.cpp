@@ -679,12 +679,13 @@ namespace mongo {
         NamespaceDetails* nsd = collection->details();
 
         // allocation strategy set explicitly in flags or by server-wide default
-        // need to check validity before creating the collection
-        if ( options.flagsSet ) {
-            nsd->setUserFlag( options.flags );
-        }
-        else if ( !options.capped ) {
-            nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+        if ( !options.capped ) {
+            if ( options.flagsSet ) {
+                nsd->setUserFlag( options.flags );
+            }
+            else if ( newCollectionsUsePowerOf2Sizes ) {
+                nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+            }
         }
 
         if ( options.cappedMaxDocs > 0 )
