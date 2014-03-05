@@ -86,7 +86,6 @@ namespace mongo {
             }
         }
 
-        // QLOG() << "Outputting collscan " << soln->toString() << endl;
         return csn;
     }
 
@@ -96,7 +95,6 @@ namespace mongo {
                                                         size_t pos,
                                                         MatchExpression* expr,
                                                         IndexBoundsBuilder::BoundsTightness* tightnessOut) {
-        // QLOG() << "making leaf node for " << expr->toString() << endl;
         // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
         // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
         // This saves our bacon when we have {foo: 1, bar: "2dsphere"} and the predicate on bar is a
@@ -148,8 +146,6 @@ namespace mongo {
             return ret;
         }
         else {
-            // QLOG() << "making ixscan for " << expr->toString() << endl;
-
             // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
             // because expr might be inside an array operator that provides a path prefix.
             IndexScanNode* isn = new IndexScanNode();
@@ -172,7 +168,6 @@ namespace mongo {
             IndexBoundsBuilder::translate(expr, keyElt, index, &isn->bounds.fields[pos],
                                           tightnessOut);
 
-            // QLOG() << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
             return isn;
         }
     }

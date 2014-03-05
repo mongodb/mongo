@@ -48,7 +48,7 @@ namespace mongo {
 
     void TextMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace(debug, level);
-        debug << "TEXT : query=" << _query << ", language = " << _language << ", tag=";
+        debug << "TEXT : query=" << _query << ", language=" << _language << ", tag=";
         MatchExpression::TagData* td = getTag();
         if ( NULL != td ) {
             td->debugString( &debug );

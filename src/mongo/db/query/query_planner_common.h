@@ -104,7 +104,7 @@ namespace mongo {
                 }
 
                 if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
-                    QLOG() << "invalid bounds: " << isn->bounds.toString() << endl;
+                    QLOG() << "Invalid bounds: " << isn->bounds.toString() << endl;
                     verify(0);
                 }
 

@@ -35,6 +35,7 @@
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
+#include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/idhack_runner.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -295,6 +296,8 @@ namespace mongo {
                         return Status::OK();
                     }
                 }
+
+                LOG(2) << "Using cached query plan: " << getPlanSummary(*qs);
 
                 WorkingSet* ws;
                 PlanStage* root;

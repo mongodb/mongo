@@ -92,7 +92,7 @@ namespace mongo {
         *ss <<  "ns = " << name << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString();
+            *ss << "filter = " << filter->toString();
         }
         addCommon(ss, indent);
     }
@@ -323,14 +323,12 @@ namespace mongo {
         *ss << "keyPattern = " << indexKeyPattern << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter= " << filter->toString() << '\n';
+            *ss << "filter = " << filter->toString();
         }
         addIndent(ss, indent + 1);
         *ss << "direction = " << direction << '\n';
         addIndent(ss, indent + 1);
         *ss << "bounds = " << bounds.toString() << '\n';
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << '\n';
         addCommon(ss, indent);
     }
 

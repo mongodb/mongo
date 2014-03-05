@@ -28,8 +28,6 @@
 
 #include "mongo/db/query/explain_plan.h"
 
-#include <boost/algorithm/string/join.hpp>
-
 #include "mongo/db/exec/2dcommon.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/type_explain.h"
@@ -606,14 +604,27 @@ namespace mongo {
 
     } // namespace
 
+    std::string getPlanSummary(const QuerySolution& soln) {
+        std::vector<std::string> leaves;
+        getLeafStrings(soln.root.get(), leaves);
+
+        mongoutils::str::stream ss;
+        for (size_t i = 0; i < leaves.size(); i++) {
+            ss << leaves[i];
+            if ((leaves.size() - 1) != i) {
+                ss << ", ";
+            }
+        }
+
+        return ss;
+    }
+
     void getPlanInfo(const QuerySolution& soln, PlanInfo** infoOut) {
         if (NULL == infoOut) { return; }
 
         *infoOut = new PlanInfo();
 
-        std::vector<std::string> leaves;
-        getLeafStrings(soln.root.get(), leaves);
-        (*infoOut)->planSummary = boost::algorithm::join(leaves, ", ");
+        (*infoOut)->planSummary = getPlanSummary(soln);
     }
 
 } // namespace mongo

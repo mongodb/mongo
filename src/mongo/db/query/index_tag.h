@@ -95,7 +95,7 @@ namespace mongo {
         std::string pathPrefix;
 
         virtual void debugString(StringBuilder* builder) const {
-            *builder << "First: ";
+            *builder << " || First: ";
             for (size_t i = 0; i < first.size(); ++i) {
                 *builder << first[i] << " ";
             }

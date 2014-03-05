@@ -367,7 +367,7 @@ namespace mongo {
         BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
         if (sorts.end() != sorts.find(reverseSort)) {
             QueryPlannerCommon::reverseScans(solnRoot);
-            QLOG() << "Reversing ixscan to provide sort.  Result: "
+            QLOG() << "Reversing ixscan to provide sort. Result: "
                    << solnRoot->toString() << endl;
             return solnRoot;
         }
@@ -524,7 +524,7 @@ namespace mongo {
                 bool covered = true;
                 for (size_t i = 0; i < fields.size(); ++i) {
                     if (!solnRoot->hasField(fields[i])) {
-                        QLOG() << "PROJECTION: not covered cuz doesn't have field "
+                        QLOG() << "PROJECTION: not covered due to field "
                              << fields[i] << endl;
                         covered = false;
                         break;

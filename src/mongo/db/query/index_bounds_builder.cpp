@@ -717,7 +717,6 @@ namespace mongo {
 
         const string start = simpleRegex(rme->getString().c_str(), rme->getFlags().c_str(), tightnessOut);
 
-        // QLOG() << "regex bounds start is " << start << endl;
         // Note that 'tightnessOut' is set by simpleRegex above.
         if (!start.empty()) {
             string end = start;
@@ -831,7 +830,6 @@ namespace mongo {
                 std::reverse(iv.begin(), iv.end());
                 // Step 2: reverse each interval.
                 for (size_t i = 0; i < iv.size(); ++i) {
-                    QLOG() << "reversing " << iv[i].toString() << endl;
                     iv[i].reverse();
                 }
             }
@@ -839,9 +837,9 @@ namespace mongo {
         }
 
         if (!bounds->isValidFor(kp, scanDir)) {
-            QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl;
-            QLOG() << "kp = " << kp.toString() << endl;
-            QLOG() << "scanDir = " << scanDir << endl;
+            QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl
+                   << "kp = " << kp.toString() << endl
+                   << "scanDir = " << scanDir << endl;
             verify(0);
         }
     }

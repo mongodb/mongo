@@ -275,7 +275,7 @@ namespace mongo {
         RunnerState state = _bestPlan->getNext(objOut, dlOut);
 
         if (Runner::RUNNER_ERROR == state && (NULL != _backupSolution)) {
-            QLOG() << "Best plan errored out switching to backup\n";
+            QLOG() << "Best plan errored out; switching to backup.\n";
             // Uncache the bad solution if we fall back
             // on the backup solution.
             //
@@ -299,7 +299,7 @@ namespace mongo {
         }
 
         if (NULL != _backupSolution && Runner::RUNNER_ADVANCED == state) {
-            QLOG() << "Best plan had a blocking sort, became unblocked, deleting backup plan\n";
+            QLOG() << "Best plan had a blocking sort, became unblocked; deleting backup plan.\n";
             delete _backupSolution;
             delete _backupPlan;
             _backupSolution = NULL;
@@ -339,13 +339,14 @@ namespace mongo {
         _bestSolution.reset(_candidates[bestChild].solution);
 
         QLOG() << "Winning solution:\n" << _bestSolution->toString() << endl;
+        LOG(2) << "Winning plan: " << getPlanSummary(*_bestSolution);
 
         size_t backupChild = bestChild;
         if (_bestSolution->hasBlockingStage && (0 == _alreadyProduced.size())) {
-            QLOG() << "Winner has blocking stage, looking for backup plan...\n";
+            QLOG() << "Winner has blocking stage, looking for backup plan.\n";
             for (size_t i = 0; i < _candidates.size(); ++i) {
                 if (!_candidates[i].solution->hasBlockingStage) {
-                    QLOG() << "Candidate " << i << " is backup child\n";
+                    QLOG() << "Candidate " << i << " is backup child.\n";
                     backupChild = i;
                     _backupSolution = _candidates[i].solution;
                     _backupAlreadyProduced = _candidates[i].results;

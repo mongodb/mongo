@@ -136,7 +136,7 @@ namespace mongo {
         Collection* collection = ctx->ctx().db()->getCollection(ns);
         uassert( 17356, "collection dropped between getMore calls", collection );
 
-        QLOG() << "running getMore in new system, cursorid " << cursorid << endl;
+        QLOG() << "Running getMore, cursorid: " << cursorid << endl;
 
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), the only state where
@@ -275,7 +275,7 @@ namespace mongo {
                 // cc is now invalid, as is the runner
                 cursorid = 0;
                 cc = NULL;
-                QLOG() << "getMore NOT saving client cursor, ended w/state "
+                QLOG() << "getMore NOT saving client cursor, ended with state "
                        << Runner::statestr(state)
                        << endl;
             }
@@ -283,7 +283,7 @@ namespace mongo {
                 // Continue caching the ClientCursor.
                 cc->incPos(numResults);
                 runner->saveState();
-                QLOG() << "getMore saving client cursor ended w/state "
+                QLOG() << "getMore saving client cursor ended with state "
                        << Runner::statestr(state)
                        << endl;
 
@@ -416,7 +416,10 @@ namespace mongo {
         }
         verify(cq);
 
-        QLOG() << "Running query on new system: " << cq->toString();
+        QLOG() << "Running query:\n" << cq->toString();
+        LOG(2) << "Running query: query " << cq->getParsed().getFilter().toString()
+               << " sort " << cq->getParsed().getSort().toString()
+               << " projection " << cq->getParsed().getProj().toString();
 
         // Parse, canonicalize, plan, transcribe, and get a runner.
         Runner* rawRunner = NULL;
@@ -720,7 +723,7 @@ namespace mongo {
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
         }
         else {
-            QLOG() << "not caching runner but returning " << numResults << " results\n";
+            QLOG() << "Not caching runner but returning " << numResults << " results.\n";
         }
 
         // Add the results from the query into the output buffer.

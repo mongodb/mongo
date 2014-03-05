@@ -64,8 +64,6 @@ namespace mongo {
     }
 
     Status PlanEnumerator::init() {
-        QLOG() << "enumerator received root:\n" << _root->toString() << endl;
-
         // Fill out our memo structure from the tagged _root.
         _done = !prepMemo(_root, PrepMemoContext());
 
@@ -75,43 +73,47 @@ namespace mongo {
         return Status::OK();
     }
 
-    void PlanEnumerator::dumpMemo() {
+    std::string PlanEnumerator::dumpMemo() {
+        mongoutils::str::stream ss;
         for (size_t i = 0; i < _memo.size(); ++i) {
-            QLOG() << "[Node #" << i << "]: " << _memo[i]->toString() << endl;
+            ss << "[Node #" << i << "]: " << _memo[i]->toString() << "\n";
         }
+        return ss;
     }
 
     string PlanEnumerator::NodeAssignment::toString() const {
         if (NULL != pred) {
             mongoutils::str::stream ss;
-            ss << "predicate, first indices: [";
+            ss << "predicate\n";
+            ss << "\tfirst indices: [";
             for (size_t i = 0; i < pred->first.size(); ++i) {
                 ss << pred->first[i];
                 if (i < pred->first.size() - 1)
                     ss << ", ";
             }
-            ss << "], pred: " << pred->expr->toString();
-            ss << " indexToAssign: " << pred->indexToAssign;
+            ss << "]\n";
+            ss << "\tpred: " << pred->expr->toString();
+            ss << "\tindexToAssign: " << pred->indexToAssign;
             return ss;
         }
         else if (NULL != andAssignment) {
             mongoutils::str::stream ss;
             ss << "AND enumstate counter " << andAssignment->counter;
             for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
-                ss << "\nchoice " << i << ":\n";
+                ss << "\n\tchoice " << i << ":\n";
                 const AndEnumerableState& state = andAssignment->choices[i];
-                ss << "\tsubnodes: ";
+                ss << "\t\tsubnodes: ";
                 for (size_t j = 0; j < state.subnodesToIndex.size(); ++j) {
                     ss << state.subnodesToIndex[j] << " ";
                 }
                 ss << '\n';
                 for (size_t j = 0; j < state.assignments.size(); ++j) {
                     const OneIndexAssignment& oie = state.assignments[j];
-                    ss << "\tidx[" << oie.index << "]\n";
+                    ss << "\t\tidx[" << oie.index << "]\n";
 
                     for (size_t k = 0; k < oie.preds.size(); ++k) {
-                        ss << "\t\tpos " << oie.positions[k]
-                           << " pred " << oie.preds[k]->toString() << '\n';
+                        ss << "\t\t\tpos " << oie.positions[k]
+                           << " pred " << oie.preds[k]->toString();
                     }
                 }
             }
@@ -119,9 +121,9 @@ namespace mongo {
         }
         else if (NULL != arrayAssignment) {
             mongoutils::str::stream ss;
-            ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [";
+            ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [ ";
             for (size_t i = 0; i < arrayAssignment->subnodes.size(); ++i) {
-                ss << " " << arrayAssignment->subnodes[i];
+                ss << arrayAssignment->subnodes[i] << " ";
             }
             ss << "]";
             return ss;
@@ -129,9 +131,9 @@ namespace mongo {
         else {
             verify(NULL != orAssignment);
             mongoutils::str::stream ss;
-            ss << "ALL OF: [";
+            ss << "ALL OF: [ ";
             for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
-                ss << " " << orAssignment->subnodes[i];
+                ss << orAssignment->subnodes[i] << " ";
             }
             ss << "]";
             return ss;
@@ -149,11 +151,8 @@ namespace mongo {
         sortUsingTags(*tree);
 
         _root->resetTag();
-        QLOG() << "Enumerator: memo right before moving:\n";
-        dumpMemo();
+        QLOG() << "Enumerator: memo just before moving:" << endl << dumpMemo();
         _done = nextMemo(_nodeToId[_root]);
-        QLOG() << "Enumerator: memo right after moving:\n";
-        dumpMemo();
         return true;
     }
 

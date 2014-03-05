@@ -360,7 +360,7 @@ namespace mongo {
                       const IndexEntry& thisIndex,
                       OneIndexAssignment* assign);
 
-        void dumpMemo();
+        std::string dumpMemo();
 
         // Map from expression to its MemoID.
         unordered_map<MatchExpression*, MemoID> _nodeToId;

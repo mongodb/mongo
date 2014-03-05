@@ -35,7 +35,7 @@ namespace mongo {
     extern bool verboseQueryLogging;
 
 // With a #define like this, we don't evaluate the costly toString()s that are QLOG'd
-#define QLOG() if (verboseQueryLogging) log()
+#define QLOG() if (verboseQueryLogging) log() << "[QLOG] "
 
     bool qlogOff();
     bool qlogOn();
