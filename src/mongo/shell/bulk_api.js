@@ -46,13 +46,6 @@ var _bulk_api_module = (function() {
     return db.runCommand( cmd );
   };
 
-  var enforceWriteConcern = function(db, options) {
-    // Reset previous errors so we can apply the write concern no matter what
-    // as long as it is valid.
-    db.runCommand({ resetError: 1 });
-    return executeGetLastError(db, options);
-  };
-
   /**
    * Wraps the result for write commands and presents a convenient api for accessing
    * single results & errors (returns the last one if there are multiple).
@@ -888,12 +881,27 @@ var _bulk_api_module = (function() {
         }
       }
 
-      // The write concern may have not been enforced if we did it earlier and a write
-      // error occurs, so we apply the actual write concern at the end.
-      if (batchResult.writeErrors.length == 0 ||
-              !ordered && (batchResult.writeErrors.length < batch.operations.length)) {
-        result = enforceWriteConcern(collection.getDB(), writeConcern);
-        extractedError = extractGLEErrors(result);
+      var needToEnforceWC = writeConcern != null &&
+            bsonWoCompare(writeConcern, { w: 1 }) != 0 &&
+            bsonWoCompare(writeConcern, { w: 0 }) != 0;
+
+      if (needToEnforceWC &&
+            (batchResult.writeErrors.length == 0 ||
+              (!ordered &&
+               // not all errored.
+               batchResult.writeErrors.length < batch.operations.length))) {
+
+          // if last write errored
+          if( batchResult.writeErrors.length > 0 &&
+              batchResult.writeErrors[batchResult.writeErrors.length - 1].index ==
+              (batch.operations.length - 1)) {
+              // Reset previous errors so we can apply the write concern no matter what
+              // as long as it is valid.
+              collection.getDB().runCommand({ resetError: 1 });
+          }
+
+          result = executeGetLastError(collection.getDB(), writeConcern);
+          extractedError = extractGLEErrors(result);
       }
 
       if (extractedError != null && extractedError.wcError != null) {

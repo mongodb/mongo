@@ -28,6 +28,7 @@
 
 #include "mongo/s/write_ops/batch_downconvert.h"
 
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -175,19 +176,14 @@ namespace mongo {
                 break;
 
             BatchItemRef itemRef( &request, static_cast<int>( i ) );
-            bool isLastItem = ( i == request.sizeWriteOps() - 1 );
-
-            BSONObj writeConcern;
-            if ( isLastItem && request.isWriteConcernSet() ) {
-                writeConcern = request.getWriteConcern();
-                // Pre-2.4.2 mongods react badly to 'w' being set on config servers
-                if ( nss.db() == "config" )
-                    writeConcern = fixWCForConfig( writeConcern );
-            }
 
             BSONObj gleResult;
             GLEErrors errors;
-            Status status = _safeWriter->safeWrite( conn, itemRef, writeConcern, &gleResult );
+            Status status = _safeWriter->safeWrite( conn,
+                                                    itemRef,
+                                                    WriteConcernOptions::Acknowledged,
+                                                    &gleResult );
+
             if ( status.isOK() ) {
                 status = extractGLEErrors( gleResult, &errors );
             }
@@ -198,6 +194,10 @@ namespace mongo {
                 response->setErrCode( status.code() );
                 response->setErrMessage( status.reason() );
                 return;
+            }
+
+            if ( errors.wcError.get() ) {
+                response->setWriteConcernError( errors.wcError.release() );
             }
 
             //
@@ -227,66 +227,87 @@ namespace mongo {
 
             response->setLastOp( stats.lastOp );
 
-            //
-            // WRITE ERROR HANDLING
-            //
-
-            // If any error occurs (except stale config) the previous GLE was not enforced
-            bool enforcedWC = !errors.writeError.get()
-                              || errors.writeError->getErrCode() == ErrorCodes::StaleShardVersion;
-
             // Save write error
             if ( errors.writeError.get() ) {
                 errors.writeError->setIndex( i );
                 response->addToErrDetails( errors.writeError.release() );
             }
+        }
 
-            //
-            // WRITE CONCERN ERROR HANDLING
-            //
+        //
+        // WRITE CONCERN ERROR HANDLING
+        //
 
-            // The last write is weird, since we enforce write concern and check the error through
-            // the same GLE if possible.  If the last GLE was an error, the write concern may not
-            // have been enforced in that same GLE, so we need to send another after resetting the
-            // error.
-            if ( isLastItem ) {
+        // The last write is weird, since we enforce write concern and check the error through
+        // the same GLE if possible.  If the last GLE was an error, the write concern may not
+        // have been enforced in that same GLE, so we need to send another after resetting the
+        // error.
 
-                // Try to enforce the write concern if everything succeeded (unordered or ordered)
-                // OR if something succeeded and we're unordered.
-                bool needToEnforceWC =
-                    !response->isErrDetailsSet()
-                    || ( !request.getOrdered()
-                         && response->sizeErrDetails() < request.sizeWriteOps() );
+        BSONObj writeConcern;
+        if ( request.isWriteConcernSet() ) {
+            writeConcern = request.getWriteConcern();
+            // Pre-2.4.2 mongods react badly to 'w' being set on config servers
+            if ( nss.db() == "config" )
+                writeConcern = fixWCForConfig( writeConcern );
+        }
 
-                if ( !enforcedWC && needToEnforceWC ) {
-                    dassert( !errors.writeError.get() ); // emptied above
+        bool needToEnforceWC = WriteConcernOptions::Acknowledged.woCompare(writeConcern) != 0 &&
+                WriteConcernOptions::Unacknowledged.woCompare(writeConcern) != 0;
 
-                    // Might have gotten a write concern validity error earlier, these are
-                    // enforced even if the wc isn't applied, so we ignore.
-                    errors.wcError.reset();
+        if ( needToEnforceWC &&
+                ( !response->isErrDetailsSet() ||
+                        ( !request.getOrdered() &&
+                                // Not all errored. Note: implicit response->isErrDetailsSet().
+                                response->sizeErrDetails() < request.sizeWriteOps() ))) {
 
-                    Status status = _safeWriter->enforceWriteConcern( conn,
-                                                                      nss.db().toString(),
-                                                                      writeConcern,
-                                                                      &gleResult );
+            // Might have gotten a write concern validity error earlier, these are
+            // enforced even if the wc isn't applied, so we ignore.
+            response->unsetWriteConcernError();
 
-                    if ( status.isOK() ) {
-                        status = extractGLEErrors( gleResult, &errors );
-                    }
+            const string dbName( nss.db().toString() );
 
-                    if ( !status.isOK() ) {
-                        response->clear();
-                        response->setOk( false );
-                        response->setErrCode( status.code() );
-                        response->setErrMessage( status.reason() );
-                        return;
-                    }
+            Status status( Status::OK() );
+
+            if ( response->isErrDetailsSet() ) {
+                const WriteErrorDetail* lastError = response->getErrDetails().back();
+
+                // If last write op was an error.
+                if ( lastError->getIndex() == static_cast<int>( request.sizeWriteOps() - 1 )) {
+                    // Reset previous errors so we can apply the write concern no matter what
+                    // as long as it is valid.
+                    status = _safeWriter->clearErrors( conn, dbName );
                 }
-                // END Write concern retry
+            }
 
-                if ( errors.wcError.get() ) {
-                    response->setWriteConcernError( errors.wcError.release() );
-                }
+            if ( !status.isOK() ) {
+                response->clear();
+                response->setOk( false );
+                response->setErrCode( status.code() );
+                response->setErrMessage( status.reason() );
+                return;
+            }
+
+            BSONObj gleResult;
+            status = _safeWriter->enforceWriteConcern( conn,
+                                                       dbName,
+                                                       writeConcern,
+                                                       &gleResult );
+
+            GLEErrors errors;
+            if ( status.isOK() ) {
+                status = extractGLEErrors( gleResult, &errors );
+            }
+
+            if ( !status.isOK() ) {
+                response->clear();
+                response->setOk( false );
+                response->setErrCode( status.code() );
+                response->setErrMessage( status.reason() );
+                return;
+            }
+
+            if ( errors.wcError.get() ) {
+                response->setWriteConcernError( errors.wcError.release() );
             }
         }
 

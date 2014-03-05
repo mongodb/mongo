@@ -96,14 +96,24 @@ namespace mongo {
                                                     BSONObj* gleResponse ) {
 
         try {
-            BSONObj resetResponse; // ignored, always ok
-            conn->runCommand( dbName.toString(), BSON( "resetError" << 1 ), resetResponse );
-
             BSONObjBuilder gleCmdB;
             gleCmdB.append( "getLastError", true );
             gleCmdB.appendElements( writeConcern );
 
             conn->runCommand( dbName.toString(), gleCmdB.obj(), *gleResponse );
+        }
+        catch ( const DBException& ex ) {
+            return ex.toStatus();
+        }
+
+        return Status::OK();
+    }
+
+    Status DBClientSafeWriter::clearErrors( DBClientBase* conn,
+                                            const StringData& dbName ) {
+        try {
+            BSONObj resetResponse; // ignored, always ok.
+            conn->runCommand( dbName.toString(), BSON( "resetError" << 1 ), resetResponse );
         }
         catch ( const DBException& ex ) {
             return ex.toStatus();
