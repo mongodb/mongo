@@ -221,7 +221,8 @@ namespace {
     public:
 
         MockSafeWriter( const vector<BSONObj>& gleResponses ) :
-            _gleResponses( gleResponses.begin(), gleResponses.end() ) {
+            _gleResponses( gleResponses.begin(), gleResponses.end() ),
+            _isClearCalled( false ) {
         }
 
         virtual ~MockSafeWriter() {
@@ -241,19 +242,37 @@ namespace {
                                     const StringData& dbName,
                                     const BSONObj& writeConcern,
                                     BSONObj* gleResponse ) {
+            if (_gleResponses.empty()) {
+                return Status(ErrorCodes::IllegalOperation, "No more gle responses");
+            }
+
             BSONObj response = _gleResponses.front();
+            *gleResponse = response.getOwned();
             _gleResponses.pop_front();
-            *gleResponse = response;
             return Status::OK();
         }
 
+        Status clearErrors( DBClientBase* conn,
+                          const StringData& dbName ) {
+            _isClearCalled = true;
+            return Status::OK();
+        }
+
+        bool isClearCalled() const {
+            return _isClearCalled;
+        }
+
         deque<BSONObj> _gleResponses;
+
+    private:
+        bool _isClearCalled;
     };
 
     TEST(WriteBatchDownconvert, Basic) {
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0}" ) );
 
         MockSafeWriter mockWriter( gleResponses );
         BatchSafeWriter batchWriter( &mockWriter );
@@ -270,12 +289,14 @@ namespace {
         ASSERT_EQUALS( response.getN(), 1 );
         ASSERT( !response.isErrDetailsSet() );
         ASSERT( !response.isWriteConcernErrorSet() );
+        ASSERT( !mockWriter.isClearCalled() );
     }
 
     TEST(WriteBatchDownconvert, GLENotOk) {
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 0.0, errmsg: 'message', code: 1234}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0}" ) );
 
         MockSafeWriter mockWriter( gleResponses );
         BatchSafeWriter batchWriter( &mockWriter );
@@ -292,12 +313,14 @@ namespace {
         ASSERT( !response.getOk() );
         ASSERT_EQUALS( response.getErrCode(), 1234 );
         ASSERT_EQUALS( response.getErrMessage(), "message" );
+        ASSERT( !mockWriter.isClearCalled() );
     }
 
     TEST(WriteBatchDownconvert, BasicUpsert) {
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 1.0, err: null, n: 1, upserted : 'abcde'}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0}" ) );
 
         MockSafeWriter mockWriter( gleResponses );
         BatchSafeWriter batchWriter( &mockWriter );
@@ -318,6 +341,7 @@ namespace {
                        "abcde" );
         ASSERT( !response.isErrDetailsSet() );
         ASSERT( !response.isWriteConcernErrorSet() );
+        ASSERT( !mockWriter.isClearCalled() );
     }
 
     TEST(WriteBatchDownconvert, WriteError) {
@@ -327,6 +351,7 @@ namespace {
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 1.0, err: 'message', code: 12345}" ) );
         gleResponses.push_back( fromjson( "{ok: 1.0, err: null}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0}" ) );
 
         MockSafeWriter mockWriter( gleResponses );
         BatchSafeWriter batchWriter( &mockWriter );
@@ -348,6 +373,7 @@ namespace {
         ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrMessage(), "message" );
         ASSERT_EQUALS( response.getErrDetailsAt(0)->getErrCode(), 12345 );
         ASSERT( !response.isWriteConcernErrorSet() );
+        ASSERT( !mockWriter.isClearCalled() );
     }
 
     TEST(WriteBatchDownconvert, WriteErrorAndReplError) {
@@ -356,6 +382,7 @@ namespace {
 
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 1.0, err: 'message', code: 12345}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0}" ) );
         gleResponses.push_back( fromjson( "{ok: 1.0, err: 'norepl', wnote: 'message'}" ) );
 
         MockSafeWriter mockWriter( gleResponses );
@@ -370,7 +397,6 @@ namespace {
 
         BatchedCommandResponse response;
         batchWriter.safeWriteBatch( NULL, cmdRequest, &response );
-
         ASSERT( response.getOk() );
         ASSERT_EQUALS( response.getN(), 1 );
         ASSERT_EQUALS( response.sizeErrDetails(), 1u );
@@ -381,6 +407,7 @@ namespace {
         ASSERT_EQUALS( response.getWriteConcernError()->getErrMessage(), "message" );
         ASSERT_EQUALS( response.getWriteConcernError()->getErrCode(),
                        ErrorCodes::WriteConcernFailed );
+        ASSERT( !mockWriter.isClearCalled() );
     }
 
     TEST(WriteBatchDownconvert, FinalWriteErrorAndReplError) {
@@ -417,6 +444,7 @@ namespace {
         ASSERT_EQUALS( response.getWriteConcernError()->getErrMessage(), "message" );
         ASSERT_EQUALS( response.getWriteConcernError()->getErrCode(),
                        ErrorCodes::WriteConcernFailed );
+        ASSERT( mockWriter.isClearCalled() );
     }
 
     TEST(WriteBatchDownconvert, ReportOpTime) {
@@ -427,6 +455,7 @@ namespace {
         vector<BSONObj> gleResponses;
         gleResponses.push_back( fromjson( "{ok: 1.0, err: null, lastOp: Timestamp(10, 0)}" ) );
         gleResponses.push_back( fromjson( "{ok: 1.0, err: null, lastOp: Timestamp(20, 0)}" ) );
+        gleResponses.push_back( fromjson( "{ok: 1.0}" ) );
 
         MockSafeWriter mockWriter( gleResponses );
         BatchSafeWriter batchWriter( &mockWriter );
@@ -445,6 +474,7 @@ namespace {
         ASSERT( !response.isErrDetailsSet() );
         ASSERT( !response.isWriteConcernErrorSet() );
         ASSERT_EQUALS( response.getLastOp().toStringPretty(), OpTime(20, 0).toStringPretty() );
+        ASSERT( !mockWriter.isClearCalled() );
     }
 
     //

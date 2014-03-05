@@ -175,8 +175,15 @@ namespace mongo {
         }
         else if ( response.isErrDetailsSet() ) {
             // The last error in the batch is always reported - this matches expected COE
-            // semantics for insert batches and works for single writes
-            lastBatchError = response.getErrDetails().back();
+            // semantics for insert batches. For updates and deletes, error is only reported
+            // if the error was on the last item.
+
+            const bool lastOpErrored = response.getErrDetails().back()->getIndex() ==
+                    static_cast<int>(request.sizeWriteOps() - 1);
+            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ||
+                    lastOpErrored ) {
+                lastBatchError = response.getErrDetails().back();
+            }
         }
         else {
             // We don't care about write concern errors, these happen in legacy mode in GLE.
