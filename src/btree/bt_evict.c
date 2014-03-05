@@ -159,12 +159,6 @@ __wt_cache_evict_server(void *arg)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	/*
-	 * Disable forced eviction from the eviction server thread: we don't
-	 * expect pages to disappear from under us.
-	 */
-	F_SET(session, WT_SESSION_NO_CACHE_FORCE);
-
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));

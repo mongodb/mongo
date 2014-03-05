@@ -639,7 +639,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Try to immediately evict pages if they have the special "oldest"
 	 * read generation and we have some chance of succeeding.
 	 */
-	if (!F_ISSET(session, WT_SESSION_NO_CACHE_FORCE) &&
+	if (!F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION) &&
 	    page->read_gen == WT_READGEN_OLDEST &&
 	    __wt_eviction_force_txn_check(session, page) &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
