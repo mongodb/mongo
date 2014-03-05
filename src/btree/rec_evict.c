@@ -851,7 +851,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		 * assume a non-NULL reference on the queue is pointing at
 		 * valid memory.
 		 */
-		__wt_evict_list_clr_page(session, page);
+		__wt_evict_list_clear_page(session, page);
 	}
 
 	/*
@@ -875,7 +875,6 @@ __rec_review(WT_SESSION_IMPL *session,
 				WT_RET(__rec_review(session,
 				    ref, ref->page, exclusive, 0, istree));
 				break;
-			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 			case WT_REF_SPLIT:		/* Being split */

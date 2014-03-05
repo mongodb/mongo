@@ -410,7 +410,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			}
 
 			/* Verify the subtree. */
-			WT_RET(__wt_page_in(session, page, ref));
+			WT_RET(__wt_page_in(session, page, ref, 0));
 			ret = __verify_tree(session, ref->page, vs);
 			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);
@@ -438,7 +438,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 				    session, page, ref, entry, vs));
 
 			/* Verify the subtree. */
-			WT_RET(__wt_page_in(session, page, ref));
+			WT_RET(__wt_page_in(session, page, ref, 0));
 			ret = __verify_tree(session, ref->page, vs);
 			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);

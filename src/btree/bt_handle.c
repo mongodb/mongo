@@ -544,7 +544,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 
 	page = NULL;
-	WT_RET(__wt_tree_walk(session, &page, WT_TREE_PREV));
+	WT_RET(__wt_tree_walk(session, &page, WT_READ_PREV));
 	if (page == NULL)
 		return (WT_NOTFOUND);
 

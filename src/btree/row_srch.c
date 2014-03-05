@@ -320,7 +320,8 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * return on error, the swap call ensures we're holding nothing
 		 * on failure.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref, 1)) == 0) {
+		if ((ret =
+		    __wt_page_swap(session, page, page, ref, 1, 0)) == 0) {
 			page = ref->page;
 			continue;
 		}
@@ -487,7 +488,8 @@ restart:
 		 * Swap the parent page for the child page; return on error,
 		 * the swap function ensures we're holding nothing on failure.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref, 1)) == 0) {
+		if ((ret =
+		    __wt_page_swap(session, page, page, ref, 1, 0)) == 0) {
 			page = ref->page;
 			continue;
 		}

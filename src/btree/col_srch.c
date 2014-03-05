@@ -92,7 +92,8 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * while we're waiting for it, restart the search, otherwise
 		 * return on error.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref, 1)) == 0) {
+		if ((ret =
+		    __wt_page_swap(session, page, page, ref, 1, 0)) == 0) {
 			page = ref->page;
 			continue;
 		}
