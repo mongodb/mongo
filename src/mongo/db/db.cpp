@@ -115,8 +115,8 @@ namespace mongo {
 #ifdef _WIN32
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
         L"MongoDB",
-        L"Mongo DB",
-        L"Mongo DB Server"
+        L"MongoDB",
+        L"MongoDB Server"
     };
 #endif
 
