@@ -711,7 +711,7 @@ namespace mongo {
     } cmdCopyDBGetNonce;
 
     /* Usage:
-       admindb.$cmd.findOne( { copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
+       admindb.$cmd.findOne( { copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
     */
     class CmdCopyDb : public Command {
     public:
@@ -730,8 +730,7 @@ namespace mongo {
         }
         virtual void help( stringstream &help ) const {
             help << "copy a database from another host to this host\n";
-            help << "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
-                 << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
+            help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
@@ -754,8 +753,7 @@ namespace mongo {
 
             string todb = cmdObj.getStringField("todb");
             if ( fromhost.empty() || todb.empty() || cloneOptions.fromDB.empty() ) {
-                errmsg = "parms missing - {copydb: 1, fromhost: <connection string>, "
-                         "fromdb: <db>, todb: <db>}";
+                errmsg = "parms missing - {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
                 return false;
             }
 
@@ -785,21 +783,11 @@ namespace mongo {
             else if (!fromSelf) {
                 // If fromSelf leave the cloner's conn empty, it will use a DBDirectClient instead.
 
-                ConnectionString cs = ConnectionString::parse(fromhost, errmsg);
-                if (!cs.isValid()) {
-                    return false;
-                }
-                DBClientBase* conn = cs.connect(errmsg);
-                if (!conn) {
-                    return false;
-                }
-                if (!replAuthenticate(conn)) {
-                    // Include the thread name in the error message to make it easier to correlate
-                    // this failure with the relevant log messages.
-                    errmsg = mongoutils::str::stream() << "Failed to authenticate connection";
-                    return false;
-                }
+                DBClientConnection* conn = new DBClientConnection();
                 cloner.setConnection(conn);
+                if (!conn->connect(fromhost, errmsg)) {
+                    return false;
+                }
             }
             Client::Context ctx(todb);
             return cloner.go(ctx, fromhost, cloneOptions, NULL, errmsg );
