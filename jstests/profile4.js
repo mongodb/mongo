@@ -53,6 +53,7 @@ try {
 
     // check write lock stats are set
     o = lastOp();
+
     assert.eq('insert', o.op);
     assert.eq( 0, o.lockStats.timeLockedMicros.r );
     assert.lt( 0, o.lockStats.timeLockedMicros.w );

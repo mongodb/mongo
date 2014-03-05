@@ -53,7 +53,14 @@ try {
 
     // check write lock stats are set
     o = lastOp();
-    assert.eq('insert', o.op);
+    if (db.getMongo().writeMode() == 'commands') {
+        // insert write commands are profiled both as individual inserts and as a write command
+        assert.eq('command', o.op);
+    } 
+    else {
+        assert.eq('insert', o.op);
+    }
+
     assert.eq( 0, o.lockStats.timeLockedMicros.r );
     assert.lt( 0, o.lockStats.timeLockedMicros.w );
     assert.eq( 0, o.lockStats.timeAcquiringMicros.r );

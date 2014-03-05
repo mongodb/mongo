@@ -454,7 +454,8 @@ namespace mongo {
         currentOp->debug().op = currentOp->getOp();
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
-            // No-op for insert, we don't update query or updateobj
+            currentOp->setQuery( currWrite.getDocument() );
+            currentOp->debug().query = currWrite.getDocument();
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
             currentOp->setQuery( currWrite.getUpdate()->getQuery() );
@@ -473,7 +474,7 @@ namespace mongo {
     void WriteBatchExecutor::incOpStats( const BatchItemRef& currWrite ) {
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
-            // No-op, for inserts we increment not on the op but once for each write
+            _opCounters->gotInsert();
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
             _opCounters->gotUpdate();
@@ -490,8 +491,6 @@ namespace mongo {
                                             CurOp* currentOp ) {
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
-            // We increment batch inserts like individual inserts
-            _opCounters->gotInsert();
             _stats->numInserted += stats.n;
             _le->nObjects = stats.n;
             currentOp->debug().ninserted += stats.n;
@@ -632,8 +631,6 @@ namespace mongo {
 
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
             execInserts( request, errors );
-            // Note: not checking for interrupt in bulk inserts, as we are not yet
-            // handling the curops/profiling properly.
         }
         else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
             for ( size_t i = 0; i < request.sizeWriteOps(); i++ ) {
@@ -708,21 +705,12 @@ namespace mongo {
         const NamespaceString nss( request.getTargetingNS() );
         scoped_ptr<BatchItemRef> currInsertItem( new BatchItemRef( &request, 0 ) );
 
-        //
-        // BEGIN CURRENT OP
-        //
-
-        scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, *currInsertItem ) );
-        incOpStats( *currInsertItem );
-
         // Go through our request and do some preprocessing on insert documents outside the lock to
         // validate and put them in a normalized form - i.e. put _id in front and fill in
         // timestamps.  The insert document may also be invalid.
         // TODO:  Might be more efficient to do in batches.
         vector<StatusWith<BSONObj> > normalInserts;
         normalizeInserts( request, &normalInserts );
-
-        WriteErrorDetail* lastOpError = NULL;
 
         while ( currInsertItem->getItemIndex() < static_cast<int>( request.sizeWriteOps() ) ) {
 
@@ -785,6 +773,13 @@ namespace mongo {
                             && currInsertItem->getItemIndex()
                                < static_cast<int>( request.sizeWriteOps() ) ) {
 
+                        //
+                        // BEGIN CURRENT OP
+                        //
+
+                        scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, *currInsertItem ) );
+                        incOpStats( *currInsertItem ); 
+
                         // Get the actual document we want to write, assuming it's valid
                         const StatusWith<BSONObj>& normalInsert = //
                             normalInserts[currInsertItem->getItemIndex()];
@@ -812,6 +807,12 @@ namespace mongo {
                                                &currResult );
                         }
 
+                        //
+                        // END CURRENT OP
+                        //
+
+                        finishCurrentOp( _client, currentOp.get(), currResult.error );
+  
                         // Faults release the write lock
                         if ( currResult.fault )
                             break;
@@ -840,8 +841,6 @@ namespace mongo {
             // Store the current error if it exists
             //
 
-            lastOpError = currResult.error;
-
             if ( currResult.error ) {
 
                 errors->push_back( currResult.releaseError() );
@@ -857,7 +856,6 @@ namespace mongo {
             //
 
             if ( currResult.fault ) {
-                dassert( !lastOpError );
                 // Check page fault out of lock
                 currResult.fault->touch();
             }
@@ -868,11 +866,6 @@ namespace mongo {
             }
         }
 
-        //
-        // END CURRENT OP
-        //
-
-        finishCurrentOp( _client, currentOp.get(), lastOpError );
     }
 
     void WriteBatchExecutor::execUpdate( const BatchItemRef& updateItem,
