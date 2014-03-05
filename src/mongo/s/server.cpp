@@ -90,8 +90,8 @@ namespace mongo {
 #if defined(_WIN32)
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
         L"MongoS",
-        L"Mongo DB Router",
-        L"Mongo DB Sharding Router"
+        L"MongoDB Router",
+        L"MongoDB Sharding Router"
     };
     static void initService();
 #endif
