@@ -392,8 +392,7 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 			continue;
 		WT_ASSERT(session, child->parent == page);
 		WT_INTL_FOREACH_BEGIN(child, ref) {
-			if (ref->state == WT_REF_MEM) {
-				WT_ASSERT(session, ref->page->parent == page);
+			if (ref->page->parent == page) {
 				ref->page->parent = child;
 				ref->page->ref_hint = 0;
 			}
