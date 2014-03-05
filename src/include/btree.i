@@ -721,7 +721,7 @@ skip:	return (__wt_hazard_clear(session, page));
  */
 static inline int
 __wt_page_swap_func(WT_SESSION_IMPL *session, WT_PAGE *held,
-    WT_PAGE *parent, WT_REF *ref, int cleanup, uint32_t flags
+    WT_PAGE *parent, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -747,17 +747,17 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_PAGE *held,
 	if (LF_ISSET(WT_READ_CACHE) && ret == WT_NOTFOUND)
 		return (WT_NOTFOUND);
 
-	/*
-	 * If we got the page we wanted, or we're discarding all hazard pointers
-	 * on error, discard the original held pointer.
-	 */
+	/* An expected failure: WT_RESTART */
+	if (ret == WT_RESTART)
+		return (WT_RESTART);
+
+	/* Discard the original held page. */
 	acquired = ret == 0;
-	if (acquired || cleanup)
-		WT_TRET(__wt_page_release(session, held));
+	WT_TRET(__wt_page_release(session, held));
 
 	/*
-	 * If there was an error discarding the original held pointer, discard
-	 * the acquired pointer too, keeping it is never useful.
+	 * If there was an error discarding the original held page, discard
+	 * the acquired page too, keeping it is never useful.
 	 */
 	if (acquired && ret != 0)
 		WT_TRET(__wt_page_release(session, ref->page));

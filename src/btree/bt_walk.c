@@ -160,7 +160,7 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 #undef	PAGE_SWAP
 #define	PAGE_SWAP(session, couple, page, ref, flags, ret) do {		\
 	if (((ret) = __wt_page_swap(					\
-	    session, couple, page, ref, 0, flags)) == WT_RESTART)	\
+	    session, couple, page, ref, flags)) == WT_RESTART)		\
 		goto restart;						\
 } while (0)
 
@@ -278,12 +278,13 @@ ascend:	/*
 			 * Can this page-swap function return restart because of
 			 * a page split?  I don't think so (this is an internal
 			 * page that's pinned in memory), but I'm not 100% sure.
+			 * Note we're not handling a return of WT_RESTART.
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				WT_RET(__wt_page_release(session, couple));
 			else
 				WT_RET(__wt_page_swap(session, couple, page,
-				    __wt_page_ref(session, page), 1, flags));
+				    __wt_page_ref(session, page), flags));
 
 			*pagep = page;
 			return (0);

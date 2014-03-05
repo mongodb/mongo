@@ -191,14 +191,13 @@
 	__wt_scr_alloc_func(session, size, scratchp, __FILE__, __LINE__)
 #define	__wt_page_in(session, parent, ref, flags)			\
 	__wt_page_in_func(session, parent, ref, flags, __FILE__, __LINE__)
-#define	__wt_page_swap(session, out, in, inref, cleanup, flags)		\
-	__wt_page_swap_func(						\
-	    session, out, in, inref, cleanup, flags, __FILE__, __LINE__)
+#define	__wt_page_swap(session, out, in, inref, flags)			\
+	__wt_page_swap_func(session, out, in, inref, flags, __FILE__, __LINE__)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
 #define	__wt_page_in(session, parent, ref, flags)			\
-	__wt_page_in_func(session, parent, ref)
-#define	__wt_page_swap(session, out, in, inref, cleanup, flags)		\
-	__wt_page_swap_func(session, out, in, inref, cleanup)
+	__wt_page_in_func(session, parent, ref, flags)
+#define	__wt_page_swap(session, out, in, inref, flags)			\
+	__wt_page_swap_func(session, out, in, inref, flags)
 #endif

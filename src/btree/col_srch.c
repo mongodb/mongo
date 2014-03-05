@@ -92,16 +92,17 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * while we're waiting for it, restart the search, otherwise
 		 * return on error.
 		 */
-		if ((ret =
-		    __wt_page_swap(session, page, page, ref, 1, 0)) == 0) {
+		if ((ret = __wt_page_swap(session, page, page, ref, 0)) == 0) {
 			page = ref->page;
 			continue;
 		}
 		/*
-		 * Restart is returned if we find a page that's been split;
-		 * restart the search from the top of the tree.
+		 * Restart is returned if we find a page that's been split; the
+		 * held page isn't discarded when restart is returned, discard
+		 * it and restart the search from the top of the tree.
 		 */
-		if (ret == WT_RESTART)
+		if (ret == WT_RESTART &&
+		    (ret = __wt_page_release(session, page)) == 0)
 			goto restart;
 		return (ret);
 	}
