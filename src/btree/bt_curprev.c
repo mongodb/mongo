@@ -463,7 +463,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
  *	Move to the previous record in the tree.
  */
 int
-__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncate)
+__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -477,7 +477,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncate)
 	WT_STAT_FAST_DATA_INCR(session, cursor_prev);
 
 	flags = WT_READ_PREV | WT_READ_SKIP_INTL;	/* Tree walk flags. */
-	if (truncate)
+	if (truncating)
 		LF_SET(WT_READ_TRUNCATE);
 
 	WT_RET(__cursor_func_init(cbt, 0));
