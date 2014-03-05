@@ -965,7 +965,6 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "evict",		WT_VERB_evict },
 		{ "evictserver",	WT_VERB_evictserver },
 		{ "fileops",		WT_VERB_fileops },
-		{ "hazard",		WT_VERB_hazard },
 		{ "log",		WT_VERB_log },
 		{ "lsm",		WT_VERB_lsm },
 		{ "mutex",		WT_VERB_mutex },

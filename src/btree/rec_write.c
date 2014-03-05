@@ -741,29 +741,6 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			goto done;
 
-		case WT_REF_EVICT_WALK:
-			/*
-			 * The child is locked by a checkpoint or eviction walk
-			 * of the tree.
-			 *
-			 * We should not be here if called by the eviction
-			 * server (the eviction server doesn't evict the page
-			 * that marks its walk in the tree, further, a child
-			 * page in this state within an evicted page's subtree
-			 * would cause the eviction review process to fail).
-			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
-
-			/*
-			 * We can be here if called by checkpoint (for example,
-			 * the leaf page pass of checkpoint is based on hazard
-			 * references, and so it can collide with the eviction
-			 * server's walk).  The child can't be evicted, it's an
-			 * in-memory case.
-			 */
-			 goto in_memory;
-
 		case WT_REF_LOCKED:
 			/*
 			 * If being called by the eviction server, the evicted
@@ -4139,7 +4116,7 @@ __rec_split_merge_new(WT_SESSION_IMPL *session,
 	page->ref = orig->ref;
 	if (type == WT_PAGE_COL_INT)
 		page->u.intl.recno = r->bnd[0].recno;
-	page->read_gen = WT_READ_GEN_NOTSET;
+	page->read_gen = WT_READGEN_NOTSET;
 	page->entries = r->bnd_next;
 
 	/*

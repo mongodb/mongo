@@ -475,7 +475,7 @@ __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
 
 	/* Allocate a new page and fill it in. */
 	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
-	newpage->read_gen = WT_READ_GEN_NOTSET;
+	newpage->read_gen = WT_READGEN_NOTSET;
 	newpage->entries = entries;
 
 	WT_ERR(__wt_page_modify_init(session, newpage));
@@ -578,7 +578,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 
 	page = NULL;
-	WT_RET(__wt_tree_walk(session, &page, WT_TREE_PREV));
+	WT_RET(__wt_tree_walk(session, &page, WT_READ_PREV));
 	if (page == NULL)
 		return (WT_NOTFOUND);
 

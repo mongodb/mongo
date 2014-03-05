@@ -1080,7 +1080,7 @@ __slvg_col_build_internal(
 	WT_RET(__wt_page_alloc(session, WT_PAGE_COL_INT, leaf_cnt, &page));
 	page->parent = NULL;				/* Root page */
 	page->ref = NULL;
-	page->read_gen = WT_READ_GEN_NOTSET;
+	page->read_gen = WT_READGEN_NOTSET;
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
 	WT_ERR(__slvg_modify_init(session, page));
@@ -1147,7 +1147,7 @@ __slvg_col_build_leaf(
 	WT_CLEAR(*cookie);
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_RET(__wt_page_in(session, parent, ref));
+	WT_RET(__wt_page_in(session, parent, ref, 0));
 	page = ref->page;
 	save_col_var = page->u.col_var.d;
 	save_entries = page->entries;
@@ -1661,7 +1661,7 @@ __slvg_row_build_internal(
 	WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_INT, leaf_cnt, &page));
 	page->parent = NULL;
 	page->ref = NULL;
-	page->read_gen = WT_READ_GEN_NOTSET;
+	page->read_gen = WT_READGEN_NOTSET;
 	page->entries = leaf_cnt;
 	WT_ERR(__slvg_modify_init(session, page));
 
@@ -1739,7 +1739,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_ERR(__wt_page_in(session, parent, ref));
+	WT_ERR(__wt_page_in(session, parent, ref, 0));
 	page = ref->page;
 
 	/*

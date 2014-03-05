@@ -115,7 +115,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	__wt_spin_lock(session, &conn->checkpoint_lock);
 	conn->compact_in_memory_pass = 1;
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
-	__wt_evict_file_exclusive_on(session);
+	WT_RET(__wt_evict_file_exclusive_on(session));
 	__wt_evict_file_exclusive_off(session);
 
 	/* Start compaction. */
@@ -123,7 +123,14 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Walk the tree. */
 	for (page = NULL;;) {
-		WT_ERR(__wt_tree_walk(session, &page, WT_TREE_COMPACT));
+		/*
+		 * Pages read for compaction aren't "useful"; don't update the
+		 * read generation of pages already in memory, and if a page is
+		 * read, set its generation to a low value so it is evicted
+		 * quickly.
+		 */
+		WT_ERR(__wt_tree_walk(session, &page,
+		    WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
 		if (page == NULL)
 			break;
 

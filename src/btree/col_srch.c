@@ -80,7 +80,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * Swap the parent page for the child page; return on error,
 		 * the swap function ensures we're holding nothing on failure.
 		 */
-		WT_RET(__wt_page_swap(session, page, page, ref));
+		WT_RET(__wt_page_swap(session, page, page, ref, 0));
 		page = ref->page;
 	}
 

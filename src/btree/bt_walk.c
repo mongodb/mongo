@@ -160,59 +160,58 @@ int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_PAGE *couple, *page;
 	WT_REF *ref;
 	uint32_t slot;
-	int cache, compact, discard, eviction, prev, set_read_gen;
-	int skip, skip_intl, skip_leaf;
+	int prev, skip;
 
 	btree = S2BT(session);
 
-	/* Fast-discard currently only works on row-store trees. */
-	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;
+	/*
+	 * !!!
+	 * Fast-truncate currently only works on row-store trees.
+	 */
+	if (btree->type != BTREE_ROW)
+		LF_CLR(WT_READ_TRUNCATE);
 
-	compact = LF_ISSET(WT_TREE_COMPACT) ? 1 : 0;
-	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
-	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
-	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
-	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
-	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
+	prev = LF_ISSET(WT_READ_PREV) ? 1 : 0;
 
 	/*
-	 * Ordinary walks use hazard-pointer coupling through the tree and
-	 * that's OK (hazard pointers can't deadlock, so there's none of the
-	 * usual problems found when logically locking up a btree).  If the
-	 * eviction thread tries to evict the active page, it fails because of
-	 * our hazard pointer.  If eviction tries to evict our parent, that
-	 * fails because the parent has a child page that can't be discarded.
-	 * We do play one game: don't couple up to our parent and then back
-	 * down to a new leaf, couple to the next page to which we're
-	 * descending, it saves a hazard-pointer swap for each cursor page
-	 * movement.
+	 * There are multiple reasons and approaches to walking the in-memory
+	 * tree:
 	 *
-	 * The eviction thread uses the special state WT_REF_EVICT_WALK to
-	 * protect pages while they are being walked.  This state allows
-	 * ordinary access to the page (just like WT_REF_MEM), except that the
-	 * page cannot be locked for eviction.  All the pages below the root
-	 * down to the current walk point have this state.  Once the walk moves
-	 * on, the state is switched back to WT_REF_MEM, and another thread may
-	 * choose that page to evict.
+	 * (1) finding pages to evict (the eviction server);
+	 * (2) writing just dirty leaves or internal nodes (checkpoint);
+	 * (3) discarding pages (close);
+	 * (4) truncating pages in a range (fast truncate);
+	 * (5) skipping pages based on outside information (compaction);
+	 * (6) cursor scans (applications).
+	 *
+	 * Except for cursor scans and compaction, the walk is limited to the
+	 * cache, no pages are read.  In all cases, hazard pointers protect the
+	 * walked pages from eviction.
+	 *
+	 * Walks use hazard-pointer coupling through the tree and that's OK
+	 * (hazard pointers can't deadlock, so there's none of the usual
+	 * problems found when logically locking up a btree).  If the eviction
+	 * thread tries to evict the active page, it fails because of our
+	 * hazard pointer.  If eviction tries to evict our parent, that fails
+	 * because the parent has a child page that can't be discarded.  We do
+	 * play one game: don't couple up to our parent and then back down to a
+	 * new leaf, couple to the next page to which we're descending, it
+	 * saves a hazard-pointer swap for each cursor page movement.
 	 *
 	 * !!!
-	 * NOTE: we don't bother checking if we're hazard-pointer coupling when
-	 * setting the variable couple in this code.  We never actually use the
-	 * variable couple if the variable eviction is true.
-	 *
 	 * NOTE: we depend on the fact it's OK to release a page we don't hold,
 	 * that is, it's OK to release couple when couple is set to NULL.
 	 *
 	 * Take a copy of any held page and clear the return value.  Remember
 	 * the hazard pointer we're currently holding.
 	 *
-	 * We may be clearing btree->evict_page here.  We check when discarding
-	 * pages that we're not discarding that page, so for the eviction
-	 * thread, this must be cleared before the page's state is switched to
-	 * WT_REF_MEM.
+	 * We may be passed a pointer to btree->evict_page that we are clearing
+	 * here.  We check when discarding pages that we're not discarding that
+	 * page, so this clear must be done before the page is released.
 	 */
 	couple = page = *pagep;
 	*pagep = NULL;
@@ -230,7 +229,7 @@ ascend:	/*
 	 * Release any hazard-pointer we're holding.
 	 */
 	if (WT_PAGE_IS_ROOT(page))
-		return (eviction ? 0 : __wt_page_release(session, couple));
+		return (__wt_page_release(session, couple));
 
 	/*
 	 * Figure out the current slot in the parent page's WT_REF array and
@@ -239,18 +238,6 @@ ascend:	/*
 	ref = page->ref;
 	slot = (uint32_t)(ref - page->parent->u.intl.t);
 	page = page->parent;
-
-	/* If the eviction thread, clear the page's walk status.
-	 *
-	 * !!!
-	 * Don't do this any earlier: after this, another thread could select
-	 * the page for eviction, so this is the only thing that makes it safe
-	 * to look inside the page structure.
-	 */
-	if (eviction) {
-		WT_ASSERT(session, ref->state == WT_REF_EVICT_WALK);
-		ref->state = WT_REF_MEM;
-	}
 
 	for (;;) {
 		/*
@@ -261,7 +248,7 @@ ascend:	/*
 		if ((prev && slot == 0) ||
 		    (!prev && slot == page->entries - 1)) {
 			/* Optionally skip internal pages. */
-			if (skip_intl)
+			if (LF_ISSET(WT_READ_SKIP_INTL))
 				goto ascend;
 
 			/*
@@ -274,14 +261,11 @@ ascend:	/*
 			 * it's simpler if callers just know they hold a hazard
 			 * pointer on any page they're using.
 			 */
-			if (!eviction) {
-				if (WT_PAGE_IS_ROOT(page))
-					WT_RET(
-					    __wt_page_release(session, couple));
-				else
-					WT_RET(__wt_page_swap(
-					    session, couple, page, page->ref));
-			}
+			if (WT_PAGE_IS_ROOT(page))
+				WT_RET(__wt_page_release(session, couple));
+			else
+				WT_RET(__wt_page_swap(session,
+				    couple, page, page->ref, flags));
 
 			*pagep = page;
 			return (0);
@@ -295,67 +279,23 @@ descend:	for (;;) {
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT)
 				ref = &page->u.intl.t[slot];
-			else if (skip_leaf)
+			else if (LF_ISSET(WT_READ_SKIP_LEAF))
 				goto ascend;
 			else {
 				*pagep = page;
 				return (0);
 			}
 
-			/*
-			 * There are several reasons to walk an in-memory tree:
-			 *
-			 * (1) to find pages to evict;
-			 * (2) to write internal nodes (checkpoint, compaction);
-			 * (3) to write all dirty leaf nodes;
-			 * (4) to close a file, discarding pages;
-			 * (5) to perform cursor scans.
-			 *
-			 * For cases 1 and 2, "eviction" is configured and we
-			 * swap the state to WT_REF_EVICT_WALK temporarily to
-			 * mark the page and to avoid the page being evicted by
-			 * another thread.  The other cases get hazard pointers
-			 * and protect the page from eviction that way.
-			 */
-			if (eviction) {
-retry:				if (ref->state != WT_REF_MEM ||
-				    !WT_ATOMIC_CAS(ref->state,
-				    WT_REF_MEM, WT_REF_EVICT_WALK)) {
-					if (!LF_ISSET(WT_TREE_WAIT) ||
-					    ref->state == WT_REF_DELETED ||
-					    ref->state == WT_REF_DISK)
-						break;
-
-					/*
-					 * A walk to checkpoint the file may
-					 * collide with the current LRU
-					 * eviction walk.
-					 *
-					 * If so, clear the LRU walk, or the
-					 * checkpoint will be blocked until the
-					 * eviction thread next wakes up and
-					 * decides to search for some more
-					 * pages to evict.
-					 */
-					__wt_evict_clear_tree_walk(
-					    session, NULL);
-					__wt_yield();
-					goto retry;
-				}
-			} else if (cache) {
-				/*
-				 * Only look at unlocked pages in memory.
-				 * There is a race here, but worse case is that
-				 * the page will be read back in to cache.
-				 */
-				if (ref->state == WT_REF_DELETED ||
-				    ref->state == WT_REF_DISK ||
-				    (ref->state == WT_REF_LOCKED &&
-				    !LF_ISSET(WT_TREE_WAIT)))
+			if (LF_ISSET(WT_READ_CACHE)) {
+				/* Only look at unlocked pages in memory. */
+				ret = __wt_page_swap(
+				    session, couple, page, ref, flags);
+				if (ret == WT_NOTFOUND) {
+					ret = 0;
 					break;
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
-			} else if (discard) {
+				}
+				WT_RET(ret);
+			} else if (LF_ISSET(WT_READ_TRUNCATE)) {
 				/*
 				 * If deleting a range, try to delete the page
 				 * without instantiating it.
@@ -364,9 +304,9 @@ retry:				if (ref->state != WT_REF_MEM ||
 				    session, page, ref, &skip));
 				if (skip)
 					break;
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
-			} else if (compact) {
+				WT_RET(__wt_page_swap(
+				    session, couple, page, ref, flags));
+			} else if (LF_ISSET(WT_READ_COMPACT)) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
 				 * seem useful.
@@ -382,27 +322,15 @@ retry:				if (ref->state != WT_REF_MEM ||
 				 * location).  If the page isn't in-memory, test
 				 * if the page will help with compaction, don't
 				 * read it if we don't have to.
-				 *
-				 * Pages read for compaction aren't "useful";
-				 * reset the page generation to a low value so
-				 * the page is quickly chosen for eviction.
-				 * (This can race of course, but it's unlikely
-				 * and will only result in an incorrectly low
-				 * page read generation and possible eviction.)
 				 */
-				set_read_gen = 0;
 				if (ref->state == WT_REF_DISK) {
-					set_read_gen = 1;
 					WT_RET(__wt_compact_page_skip(
 					    session, page, ref, &skip));
 					if (skip)
 						break;
 				}
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
-				if (set_read_gen)
-					ref->page->read_gen =
-					    WT_READ_GEN_OLDEST;
+				WT_RET(__wt_page_swap(
+				    session, couple, page, ref, flags));
 			} else {
 				/*
 				 * If iterating a cursor, skip deleted pages
@@ -412,8 +340,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 				if (skip)
 					break;
 
-				WT_RET(
-				    __wt_page_swap(session, couple, page, ref));
+				WT_RET(__wt_page_swap(
+				    session, couple, page, ref, flags));
 			}
 
 			couple = page = ref->page;
