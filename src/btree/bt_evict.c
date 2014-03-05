@@ -305,6 +305,7 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	WT_PAGE *page;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -327,9 +328,14 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 
 		btree = dhandle->handle;
 		session->dhandle = dhandle;
-		if (btree->evict_page != NULL) {
-			WT_TRET(__wt_page_release(session, btree->evict_page));
+		if ((page = btree->evict_page) != NULL) {
+			/*
+			 * Clear evict_page first, in case releasing it forces
+			 * eviction (we check that we never try to evict the
+			 * current eviction walk point.
+			 */
 			btree->evict_page = NULL;
+			WT_TRET(__wt_page_release(session, page));
 		}
 		session->dhandle = NULL;
 	}
