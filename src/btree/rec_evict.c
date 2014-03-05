@@ -377,8 +377,15 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	alloc_index = NULL;
 
 	/*
-	 * Fix up the children; this is the change that makes the split visible
-	 * to threads already in the tree.
+	 * The children of the newly created pages reference the wrong parent
+	 * page, and we have to fix that up.   As soon as a thread tries to get
+	 * the page's WT_REF structure, it will block (because it's searching
+	 * the wrong page, their WT_REF structure is no longer referenced from
+	 * that parent page), and wait for this thread to update their parent
+	 * point to the correct page.
+	 *
+	 * We don't have locks or hazard pointers for those underlying pages,
+	 * they can be evicted out from underneath us.
 	 */
 	pindex = page->pg_intl_index;
 	for (refp = pindex->index + SPLIT_CORRECT_1,
@@ -392,7 +399,8 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 			continue;
 		WT_ASSERT(session, child->parent == page);
 		WT_INTL_FOREACH_BEGIN(child, ref) {
-			if (ref->page->parent == page) {
+			if (ref->state == WT_REF_MEM &&
+			    ref->page->parent == page) {
 				ref->page->parent = child;
 				ref->page->ref_hint = 0;
 			}
