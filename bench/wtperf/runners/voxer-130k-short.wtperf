@@ -1,4 +1,4 @@
-# wtperf options file: simulate riak and its test1 and test2 configuration
+# wtperf options file: simulate riak and a short form of its voxer config.
 # The configuration for the connection and table are from riak and the
 # specification of the data (count, size, threads) is from basho_bench.
 #
@@ -12,8 +12,7 @@ icount=15000
 key_sz=40
 value_sz=130000
 populate_threads=1
-report_interval=10
+report_interval=5
 random_value=true
-run_time=18000
-sample_interval=10
-threads=((count=20,read=1,update=1))
+run_time=300
+threads=((count=10,read=1),(count=10,update=1))

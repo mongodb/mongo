@@ -358,6 +358,14 @@ op_err:			lprintf(cfg, ret, 0,
 			goto err;		/* can't happen */
 		}
 
+		/* Release the cursor, if we have multiple tables. */
+		if (cfg->table_count > 1) {
+			if ((ret = cursor->reset(cursor)) != 0) {
+				lprintf(cfg, ret, 0, "Cursor reset failed");
+				goto err;
+			}
+		}
+
 		/* Gather statistics */
 		if (measure_latency) {
 			if ((ret = __wt_epoch(NULL, &stop)) != 0) {

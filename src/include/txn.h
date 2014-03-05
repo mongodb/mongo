@@ -131,6 +131,3 @@ struct __wt_txn {
 #define	TXN_RUNNING	0x08
 	uint32_t flags;
 };
-
-#define	WT_TXN_ACTIVE(txn)						\
-	(F_ISSET((txn), TXN_RUNNING) && (txn)->mod_count > 0)

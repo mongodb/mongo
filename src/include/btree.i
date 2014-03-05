@@ -177,7 +177,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 	 * page.  In other words, the goal is to avoid some number of updates
 	 * immediately after each update we have to make.
 	 */
-	return (++S2C(session)->cache->read_gen + WT_READ_GEN_STEP);
+	return (__wt_cache_read_gen(session) + WT_READ_GEN_STEP);
 }
 
 /*
@@ -452,6 +452,33 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 }
 
 /*
+ * __wt_cursor_row_leaf_key --
+ *	Set a buffer to reference a cursor-referenced row-store leaf page key.
+ */
+static inline int
+__wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
+{
+	WT_PAGE *page;
+	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
+
+	/*
+	 * If the cursor references a WT_INSERT item, take the key from there,
+	 * else take the key from the original page.
+	 */
+	if (cbt->ins == NULL) {
+		session = (WT_SESSION_IMPL *)cbt->iface.session;
+		page = cbt->page;
+		rip = &page->u.row.d[cbt->slot];
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
+	} else {
+		key->data = WT_INSERT_KEY(cbt->ins);
+		key->size = WT_INSERT_KEY_SIZE(cbt->ins);
+	}
+	return (0);
+}
+
+/*
  * __wt_row_leaf_value --
  *	Return a pointer to the value cell for a row-store leaf page key, or
  * NULL if there isn't one.
@@ -569,6 +596,30 @@ __wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_eviction_force_txn_check --
+ *	Check if the current transaction permits forced eviction of a page.
+ */
+static inline int
+__wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_TXN_STATE *txn_state;
+
+	/*
+	 * Only try if there is a chance of success.  If the page has already
+	 * been split and this transaction is already pinning the oldest ID so
+	 * that the page can't be evicted, it has to complete before eviction
+	 * can succeed.
+	 */
+	txn_state = &S2C(session)->txn_global.states[session->id];
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
+	    txn_state->snap_min == WT_TXN_NONE ||
+	    TXNID_LT(page->modify->update_txn, txn_state->snap_min))
+		return (1);
+
+	return (0);
+}
+
+/*
  * __wt_page_release --
  *	Release a reference to a page.
  */
@@ -588,10 +639,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Try to immediately evict pages if they have the special "oldest"
 	 * read generation and we have some chance of succeeding.
 	 */
-	if (!WT_TXN_ACTIVE(&session->txn) &&
-	    (page->modify == NULL ||
-	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) &&
-	    page->read_gen == WT_READ_GEN_OLDEST &&
+	if (page->read_gen == WT_READ_GEN_OLDEST &&
+	    __wt_eviction_force_txn_check(session, page) &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
 			page->ref->state = WT_REF_MEM;
@@ -684,30 +733,6 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 				return (hp);
 	}
 	return (NULL);
-}
-
-/*
- * __wt_eviction_force --
- *	Check if the current transaction permits forced eviction of a page.
- */
-static inline int
-__wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_TXN_STATE *txn_state;
-
-	/*
-	 * Only try if there is a chance of success.  If the page has already
-	 * been split and this transaction is already pinning the oldest ID so
-	 * that the page can't be evicted, it has to complete before eviction
-	 * can succeed.
-	 */
-	txn_state = &S2C(session)->txn_global.states[session->id];
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
-	    txn_state->snap_min == WT_TXN_NONE ||
-	    TXNID_LT(page->modify->update_txn, txn_state->snap_min))
-		return (1);
-
-	return (0);
 }
 
 /*

@@ -5,6 +5,7 @@
  * See the file LICENSE for redistribution information.
  */
 
+static inline int  __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *, WT_ITEM *);
 static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
@@ -62,7 +63,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	    TXN_OP_INMEM : TXN_OP_BASIC;
 	/* If we are logging, we need a reference to the key. */
 	if (cbt->btree->type == BTREE_ROW && S2C(session)->logging)
-		WT_ERR(__wt_row_key_get(cbt, &op->u.op.key));
+		WT_ERR(__wt_cursor_row_leaf_key(cbt, &op->u.op.key));
 	op->u.op.ins = cbt->ins;
 	op->u.op.upd = upd;
 	op->fileid = S2BT(session)->id;
@@ -175,6 +176,7 @@ __wt_txn_read_skip(
     WT_SESSION_IMPL *session, WT_UPDATE *upd, uint64_t *max_txn, int *skipp)
 {
 	WT_UPDATE *first_upd;
+        uint64_t txnid;
 
 	/*
 	 * Track the largest transaction ID on this page.  We store this in the
@@ -190,11 +192,11 @@ __wt_txn_read_skip(
 	 */
 	*skipp = 0;
 	for (first_upd = NULL; upd != NULL; upd = upd->next)
-		if (upd->txnid != WT_TXN_ABORTED) {
-			if (TXNID_LT(*max_txn, upd->txnid))
-				*max_txn = upd->txnid;
+		if ((txnid = upd->txnid) != WT_TXN_ABORTED) {
+			if (TXNID_LT(*max_txn, txnid))
+				*max_txn = txnid;
 			if (first_upd == NULL) {
-				if (__wt_txn_visible(session, upd->txnid))
+				if (__wt_txn_visible(session, txnid))
 					first_upd = upd;
 				else
 					*skipp = 1;

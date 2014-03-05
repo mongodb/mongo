@@ -582,19 +582,21 @@ typedef int int_void;
 
 /* Add event handler support. */
 %{
+/* Write to and flush the stream. */
 static int
 writeToPythonStream(const char *streamname, const char *message)
 {
-	PyObject *sys, *se, *sys_stderr_write, *written, *arglist;
+	PyObject *sys, *se, *write_method, *flush_method, *written,
+	    *arglist, *arglist2;
 	char *msg;
 	int ret;
 	size_t msglen;
 
 	sys = NULL;
 	se = NULL;
-	sys_stderr_write = NULL;
+	write_method = flush_method = NULL;
 	written = NULL;
-	arglist = NULL;
+	arglist = arglist2 = NULL;
 	msglen = strlen(message);
 	msg = malloc(msglen + 2);
 	strcpy(msg, message);
@@ -608,21 +610,30 @@ writeToPythonStream(const char *streamname, const char *message)
 		goto err;
 	if ((se = PyObject_GetAttrString(sys, streamname)) == NULL)
 		goto err;
-	if ((sys_stderr_write = PyObject_GetAttrString(se, "write")) == NULL)
+	if ((write_method = PyObject_GetAttrString(se, "write")) == NULL)
+		goto err;
+	if ((flush_method = PyObject_GetAttrString(se, "flush")) == NULL)
 		goto err;
 	if ((arglist = Py_BuildValue("(s)", msg)) == NULL)
 		goto err;
+	if ((arglist2 = Py_BuildValue("()", msg)) == NULL)
+		goto err;
 
-	written = PyObject_CallObject(sys_stderr_write, arglist);
+	written = PyObject_CallObject(write_method, arglist);
+	(void)PyObject_CallObject(flush_method, arglist2);
 	ret = 0;
 
 err:    /* Release python Global Interpreter Lock */
 	SWIG_PYTHON_THREAD_END_BLOCK;
 
+	if (arglist2)
+		Py_XDECREF(arglist2);
 	if (arglist)
 		Py_XDECREF(arglist);
-	if (sys_stderr_write)
-		Py_XDECREF(sys_stderr_write);
+	if (flush_method)
+		Py_XDECREF(flush_method);
+	if (write_method)
+		Py_XDECREF(write_method);
 	if (se)
 		Py_XDECREF(se);
 	if (sys)
