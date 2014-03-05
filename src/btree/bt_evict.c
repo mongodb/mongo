@@ -159,6 +159,12 @@ __wt_cache_evict_server(void *arg)
 	conn = S2C(session);
 	cache = conn->cache;
 
+	/*
+	 * Disable forced eviction from the eviction server thread: we don't
+	 * expect pages to disappear from under us.
+	 */
+	F_SET(session, WT_SESSION_NO_CACHE_FORCE);
+
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
@@ -490,16 +496,11 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always walk one page ahead of the page being evicted.
-	 *
-	 * Make sure the page we're about to evict is not forcibly evicted when
-	 * released by the walk by resetting its read generation.
 	 */
 	next_page = NULL;
 	WT_RET(__wt_tree_walk(
 	    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 	while ((page = next_page) != NULL) {
-		page->read_gen = WT_READGEN_NOTSET;
-
 		WT_ERR(__wt_tree_walk(
 		    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 
