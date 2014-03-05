@@ -80,8 +80,8 @@ __evict_list_clear(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 /*
  * __wt_evict_list_clear_page --
  *	Make sure a page is not in the LRU eviction list.  This called from the
- * page eviction code to make sure there is no attempt to evict a child page
- * multiple times.
+ *	page eviction code to make sure there is no attempt to evict a child
+ *	page multiple times.
  */
 void
 __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -490,13 +490,18 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always walk one page ahead of the page being evicted.
+	 *
+	 * Make sure the page we're about to evict is not forcibly evicted when
+	 * released by the walk by resetting its read generation.
 	 */
 	next_page = NULL;
-	WT_RET(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
+	WT_RET(__wt_tree_walk(
+	    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 	while ((page = next_page) != NULL) {
-		/* Make sure the page isn't evicted during the walk. */
-		next_page->read_gen = WT_READ_GEN_NOTSET;
-		WT_ERR(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
+		page->read_gen = WT_READGEN_NOTSET;
+
+		WT_ERR(__wt_tree_walk(
+		    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 
 		switch (syncop) {
 		case WT_SYNC_DISCARD:
@@ -589,9 +594,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * concurrent activity in a page to be resolved, acquiring
 		 * hazard pointers to prevent eviction.
 		 */
-		flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL;
-		if (syncop == WT_SYNC_CHECKPOINT)
-			flags |= WT_TREE_WAIT;
+		flags = WT_READ_CACHE | WT_READ_SKIP_INTL;
+		if (syncop == WT_SYNC_WRITE_LEAVES)
+			flags |= WT_READ_NO_WAIT;
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
 			/* Write dirty pages if nobody beat us to it. */
@@ -635,7 +640,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * The second pass walks all cache internal pages, waiting for
 		 * concurrent activity to be resolved.
 		 */
-		flags = WT_TREE_EVICT | WT_TREE_SKIP_LEAF | WT_TREE_WAIT;
+		flags = WT_READ_CACHE | WT_READ_NO_GEN | WT_READ_SKIP_LEAF;
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
 			/* Write dirty pages. */
@@ -941,9 +946,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
 	    cache->evict + cache->evict_slots);
 
-	walk_flags = WT_TREE_EVICT;
+	walk_flags = WT_READ_CACHE | WT_READ_NO_GEN;
 	if (LF_ISSET(WT_EVICT_PASS_INTERNAL))
-		walk_flags |= WT_TREE_SKIP_LEAF;
+		walk_flags |= WT_READ_SKIP_LEAF;
 
 	/*
 	 * Get some more eviction candidate pages.
@@ -1036,7 +1041,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * future and move on, give readers a chance to start
 		 * updating the read generation.
 		 */
-		if (page->read_gen == WT_READ_GEN_NOTSET) {
+		if (page->read_gen == WT_READGEN_NOTSET) {
 			page->read_gen =
 			    __wt_cache_read_gen_set(session);
 			continue;
@@ -1280,7 +1285,8 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		file_bytes = file_dirty = file_intl_pages = file_leaf_pages = 0;
 		page = NULL;
 		session->dhandle = dhandle;
-		while (__wt_tree_walk(session, &page, WT_TREE_CACHE) == 0 &&
+		while (__wt_tree_walk(
+		    session, &page, WT_READ_CACHE | WT_READ_NO_WAIT) == 0 &&
 		    page != NULL) {
 			if (page->type == WT_PAGE_COL_INT ||
 			    page->type == WT_PAGE_ROW_INT)

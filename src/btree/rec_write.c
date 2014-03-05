@@ -4116,7 +4116,7 @@ __rec_split_merge_new(WT_SESSION_IMPL *session,
 	page->ref = orig->ref;
 	if (type == WT_PAGE_COL_INT)
 		page->u.intl.recno = r->bnd[0].recno;
-	page->read_gen = WT_READ_GEN_NOTSET;
+	page->read_gen = WT_READGEN_NOTSET;
 	page->entries = r->bnd_next;
 
 	/*

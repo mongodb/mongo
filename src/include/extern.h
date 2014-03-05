@@ -240,9 +240,9 @@ extern int __wt_compact_page_skip( WT_SESSION_IMPL *session,
     WT_REF *ref,
     int *skipp);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
-extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard);
+extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncate);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard);
+extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncate);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp);

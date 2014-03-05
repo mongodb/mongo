@@ -36,7 +36,7 @@ __wt_page_in_func(
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
-			if (LF_ISSET(WT_READ_CACHE_ONLY))
+			if (LF_ISSET(WT_READ_CACHE))
 				return (WT_NOTFOUND);
 
 			/*
@@ -45,10 +45,11 @@ __wt_page_in_func(
 			 */
 			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
-			oldgen = F_ISSET(session, WT_SESSION_NO_CACHE) ? 1 : 0;
+			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
+			    F_ISSET(session, WT_SESSION_NO_CACHE);
 			continue;
 		case WT_REF_READING:
-			if (LF_ISSET(WT_READ_CACHE_ONLY))
+			if (LF_ISSET(WT_READ_CACHE))
 				return (WT_NOTFOUND);
 			/* FALLTHROUGH */
 		case WT_REF_LOCKED:
@@ -82,7 +83,7 @@ __wt_page_in_func(
 			 * That is, if the updates on the page are visible to
 			 * the running transaction.
 			 */
-			if (!LF_ISSET(WT_READ_NO_BUMP) &&
+			if (!LF_ISSET(WT_READ_NO_GEN) &&
 			    force_attempts < 10 &&
 			    __wt_eviction_force_check(session, page) &&
 			    __wt_eviction_force_txn_check(session, page)) {
@@ -104,9 +105,9 @@ __wt_page_in_func(
 			 *
 			 * Otherwise, update the page's read generation.
 			 */
-			if (oldgen && page->read_gen == WT_READ_GEN_NOTSET)
-				page->read_gen = WT_READ_GEN_OLDEST;
-			else if (!LF_ISSET(WT_READ_NO_BUMP) &&
+			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
+				page->read_gen = WT_READGEN_OLDEST;
+			else if (!LF_ISSET(WT_READ_NO_GEN) &&
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
 				    __wt_cache_read_gen_set(session);
@@ -258,7 +259,7 @@ __wt_page_inmem(
 	/* Allocate and initialize a new WT_PAGE. */
 	WT_RET(__wt_page_alloc(session, dsk->type, alloc_entries, &page));
 	page->dsk = dsk;
-	page->read_gen = WT_READ_GEN_NOTSET;
+	page->read_gen = WT_READGEN_NOTSET;
 	F_SET_ATOMIC(page, flags);
 
 	/*

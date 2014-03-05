@@ -219,7 +219,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 		new_ins_head->head[i] = new_ins_head->tail[i] = ins;
 
 	/* Make it likely we evict the page we just split. */
-	orig->read_gen = WT_READ_GEN_OLDEST;
+	orig->read_gen = WT_READGEN_OLDEST;
 
 	/*
 	 * Swap the new top-level page into place.  This must come last: once

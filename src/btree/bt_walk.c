@@ -163,11 +163,19 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_DECL_RET;
 	WT_PAGE *couple, *page;
 	WT_REF *ref;
-	uint32_t read_flags, slot;
-	int cache, compact, discard, eviction, prev, set_read_gen;
-	int skip, skip_intl, skip_leaf;
+	uint32_t slot;
+	int prev, skip;
 
 	btree = S2BT(session);
+
+	/*
+	 * !!!
+	 * Fast-truncate currently only works on row-store trees.
+	 */
+	if (btree->type != BTREE_ROW)
+		LF_CLR(WT_READ_TRUNCATE);
+
+	prev = LF_ISSET(WT_READ_PREV) ? 1 : 0;
 
 	/*
 	 * There are multiple reasons and approaches to walking the in-memory
@@ -176,39 +184,16 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	 * (1) finding pages to evict (the eviction server);
 	 * (2) writing just dirty leaves or internal nodes (checkpoint);
 	 * (3) discarding pages (close);
-	 * (4) skipping pages based on outside information (compaction);
-	 * (5) cursor scans (applications).
+	 * (4) truncating pages in a range (fast truncate);
+	 * (5) skipping pages based on outside information (compaction);
+	 * (6) cursor scans (applications).
 	 *
 	 * Except for cursor scans and compaction, the walk is limited to the
 	 * cache, no pages are read.  In all cases, hazard pointers protect the
 	 * walked pages from eviction.
 	 *
-	 * !!!
-	 * Fast-discard currently only works on row-store trees.
-	 */
-	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
-	compact = LF_ISSET(WT_TREE_COMPACT) ? 1 : 0;
-	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;
-	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
-	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
-	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
-	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
-
-	/* Calculate flags for __wt_page_in. */
-	read_flags = 0;
-	if (cache || eviction) {
-		read_flags |= WT_READ_CACHE_ONLY;
-		if (!LF_ISSET(WT_TREE_WAIT))
-			read_flags |= WT_READ_NO_WAIT;
-		if (eviction)
-			read_flags |= WT_READ_NO_BUMP;
-	}
-	if (compact)
-		read_flags |= WT_READ_NO_BUMP;
-
-	/*
-	 * Cursor scans use hazard-pointer coupling through the tree and that's
-	 * OK (hazard pointers can't deadlock, so there's none of the usual
+	 * Walks use hazard-pointer coupling through the tree and that's OK
+	 * (hazard pointers can't deadlock, so there's none of the usual
 	 * problems found when logically locking up a btree).  If the eviction
 	 * thread tries to evict the active page, it fails because of our
 	 * hazard pointer.  If eviction tries to evict our parent, that fails
@@ -218,20 +203,15 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	 * saves a hazard-pointer swap for each cursor page movement.
 	 *
 	 * !!!
-	 * NOTE: we don't bother checking if we're hazard-pointer coupling when
-	 * setting the variable couple in this code.  We never actually use the
-	 * variable couple if the variable eviction is true.
-	 *
 	 * NOTE: we depend on the fact it's OK to release a page we don't hold,
 	 * that is, it's OK to release couple when couple is set to NULL.
 	 *
 	 * Take a copy of any held page and clear the return value.  Remember
 	 * the hazard pointer we're currently holding.
 	 *
-	 * We may be clearing btree->evict_page here.  We check when discarding
-	 * pages that we're not discarding that page, so for the eviction
-	 * thread, this must be cleared before the page's state is switched to
-	 * WT_REF_MEM.
+	 * We may be passed a pointer to btree->evict_page that we are clearing
+	 * here.  We check when discarding pages that we're not discarding that
+	 * page, so this clear must be done before the page is released.
 	 */
 	couple = page = *pagep;
 	*pagep = NULL;
@@ -268,7 +248,7 @@ ascend:	/*
 		if ((prev && slot == 0) ||
 		    (!prev && slot == page->entries - 1)) {
 			/* Optionally skip internal pages. */
-			if (skip_intl)
+			if (LF_ISSET(WT_READ_SKIP_INTL))
 				goto ascend;
 
 			/*
@@ -285,7 +265,7 @@ ascend:	/*
 				WT_RET(__wt_page_release(session, couple));
 			else
 				WT_RET(__wt_page_swap(session,
-				    couple, page, page->ref, read_flags));
+				    couple, page, page->ref, flags));
 
 			*pagep = page;
 			return (0);
@@ -299,23 +279,23 @@ descend:	for (;;) {
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT)
 				ref = &page->u.intl.t[slot];
-			else if (skip_leaf)
+			else if (LF_ISSET(WT_READ_SKIP_LEAF))
 				goto ascend;
 			else {
 				*pagep = page;
 				return (0);
 			}
 
-			if (cache || eviction) {
+			if (LF_ISSET(WT_READ_CACHE)) {
 				/* Only look at unlocked pages in memory. */
 				ret = __wt_page_swap(
-				    session, couple, page, ref, read_flags);
+				    session, couple, page, ref, flags);
 				if (ret == WT_NOTFOUND) {
 					ret = 0;
 					break;
 				}
 				WT_RET(ret);
-			} else if (discard) {
+			} else if (LF_ISSET(WT_READ_TRUNCATE)) {
 				/*
 				 * If deleting a range, try to delete the page
 				 * without instantiating it.
@@ -325,8 +305,8 @@ descend:	for (;;) {
 				if (skip)
 					break;
 				WT_RET(__wt_page_swap(
-				    session, couple, page, ref, read_flags));
-			} else if (compact) {
+				    session, couple, page, ref, flags));
+			} else if (LF_ISSET(WT_READ_COMPACT)) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
 				 * seem useful.
@@ -342,27 +322,15 @@ descend:	for (;;) {
 				 * location).  If the page isn't in-memory, test
 				 * if the page will help with compaction, don't
 				 * read it if we don't have to.
-				 *
-				 * Pages read for compaction aren't "useful";
-				 * reset the page generation to a low value so
-				 * the page is quickly chosen for eviction.
-				 * (This can race of course, but it's unlikely
-				 * and will only result in an incorrectly low
-				 * page read generation and possible eviction.)
 				 */
-				set_read_gen = 0;
 				if (ref->state == WT_REF_DISK) {
-					set_read_gen = 1;
 					WT_RET(__wt_compact_page_skip(
 					    session, page, ref, &skip));
 					if (skip)
 						break;
 				}
 				WT_RET(__wt_page_swap(
-				    session, couple, page, ref, read_flags));
-				if (set_read_gen)
-					ref->page->read_gen =
-					    WT_READ_GEN_OLDEST;
+				    session, couple, page, ref, flags));
 			} else {
 				/*
 				 * If iterating a cursor, skip deleted pages
@@ -373,7 +341,7 @@ descend:	for (;;) {
 					break;
 
 				WT_RET(__wt_page_swap(
-				    session, couple, page, ref, read_flags));
+				    session, couple, page, ref, flags));
 			}
 
 			couple = page = ref->page;

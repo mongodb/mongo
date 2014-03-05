@@ -353,9 +353,9 @@ struct __wt_page {
 	 * becomes active.  To avoid incrementing a page's read generation too
 	 * frequently, it is set to a future point.
 	 */
-#define	WT_READ_GEN_NOTSET	0
-#define	WT_READ_GEN_OLDEST	1
-#define	WT_READ_GEN_STEP	100
+#define	WT_READGEN_NOTSET	0
+#define	WT_READGEN_OLDEST	1
+#define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
 	uint64_t memory_footprint;	/* Memory attached to the page */

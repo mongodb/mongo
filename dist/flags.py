@@ -30,9 +30,15 @@ flags = {
 		'LOG_FSYNC'
 	],
 	'page_read' : [
-		'READ_CACHE_ONLY',
-		'READ_NO_BUMP',
+		'READ_CACHE',
+		'READ_COMPACT',
+		'READ_NO_GEN',
 		'READ_NO_WAIT',
+		'READ_PREV',
+		'READ_SKIP_INTL',
+		'READ_SKIP_LEAF',
+		'READ_TRUNCATE',
+		'READ_WONT_NEED',
 	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
@@ -41,16 +47,6 @@ flags = {
 	],
 	'shared_cache' : [
 		'CACHE_POOL_RUN'
-	],
-	'tree_walk' : [
-		'TREE_CACHE',
-		'TREE_COMPACT',
-		'TREE_DISCARD',
-		'TREE_EVICT',
-		'TREE_PREV',
-		'TREE_SKIP_INTL',
-		'TREE_SKIP_LEAF',
-		'TREE_WAIT',
 	],
 	'txn_log_checkpoint' : [
 		'TXN_LOG_CKPT_FAIL',

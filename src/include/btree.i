@@ -177,7 +177,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 	 * page.  In other words, the goal is to avoid some number of updates
 	 * immediately after each update we have to make.
 	 */
-	return (__wt_cache_read_gen(session) + WT_READ_GEN_STEP);
+	return (__wt_cache_read_gen(session) + WT_READGEN_STEP);
 }
 
 /*
@@ -639,7 +639,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Try to immediately evict pages if they have the special "oldest"
 	 * read generation and we have some chance of succeeding.
 	 */
-	if (page->read_gen == WT_READ_GEN_OLDEST &&
+	if (page->read_gen == WT_READGEN_OLDEST &&
 	    __wt_eviction_force_txn_check(session, page) &&
 	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if ((ret = __wt_hazard_clear(session, page)) != 0) {
@@ -693,7 +693,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session,
 #endif
 	    );
 	acquired = ret == 0;
-	if (!(LF_ISSET(WT_READ_CACHE_ONLY) && ret == WT_NOTFOUND))
+	if (!(LF_ISSET(WT_READ_CACHE) && ret == WT_NOTFOUND))
 		WT_TRET(__wt_page_release(session, out));
 
 	if (ret != 0 && acquired)
@@ -749,7 +749,7 @@ __wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_txn_update_oldest(session);
 	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
 	    __wt_txn_visible_all(session, page->modify->update_txn)) {
-		page->read_gen = WT_READ_GEN_OLDEST;
+		page->read_gen = WT_READGEN_OLDEST;
 		WT_RET(__wt_page_release(session, page));
 		/*
 		 * Forced eviction can create chains of internal pages before

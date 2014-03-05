@@ -469,9 +469,9 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 
 	/* Evict new child pages as soon as possible. */
 	if (lchild != NULL && !F_ISSET(lchild->modify, WT_PM_REC_SPLIT_MERGE))
-		lchild->read_gen = WT_READ_GEN_OLDEST;
+		lchild->read_gen = WT_READGEN_OLDEST;
 	if (rchild != NULL && !F_ISSET(rchild->modify, WT_PM_REC_SPLIT_MERGE))
-		rchild->read_gen = WT_READ_GEN_OLDEST;
+		rchild->read_gen = WT_READGEN_OLDEST;
 
 	/* Update statistics. */
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_merge);
