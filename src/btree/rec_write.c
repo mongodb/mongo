@@ -2106,7 +2106,8 @@ __rec_split_write(
 	 * the first time the page splits.
 	 */
 	bnd_slot = bnd - r->bnd;
-	if (mod->u.m.multi != NULL || bnd_slot > 1) {
+	if (bnd_slot > 1 ||
+	    (F_ISSET(mod, WT_PM_REC_SPLIT) && mod->u.m.multi != NULL)) {
 		/*
 		 * There are page header fields which need to be cleared to get
 		 * consistent checksums: specifically, the write generation and
@@ -2118,7 +2119,8 @@ __rec_split_write(
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (mod->u.m.multi_entries > bnd_slot) {
+		if (F_ISSET(mod, WT_PM_REC_SPLIT) &&
+		    mod->u.m.multi_entries > bnd_slot) {
 			multi = &mod->u.m.multi[bnd_slot];
 			if (multi->size == bnd->size &&
 			    multi->cksum == bnd->cksum) {
