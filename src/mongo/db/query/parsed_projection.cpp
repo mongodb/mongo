@@ -266,6 +266,10 @@ namespace mongo {
             BSONObjIterator srcIt(spec);
             while (srcIt.more()) {
                 BSONElement elt = srcIt.next();
+                // We've already handled the _id field before entering this loop.
+                if (includeID && mongoutils::str::equals(elt.fieldName(), "_id")) {
+                    continue;
+                }
                 if (elt.trueValue()) {
                     pp->_requiredFields.push_back(elt.fieldName());
                 }
