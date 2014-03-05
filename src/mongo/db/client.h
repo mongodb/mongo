@@ -95,7 +95,6 @@ namespace mongo {
         CurOp* curop() const { return _curOp; }
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
-        const char *ns() const { return _context->ns(); }
         const StringData desc() const { return _desc; }
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }

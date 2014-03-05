@@ -50,7 +50,7 @@ namespace {
 namespace mongo {
 
 namespace {
-    void _appendUserInfo(const Client& c,
+    void _appendUserInfo(const CurOp& c,
                          BSONObjBuilder& builder,
                          AuthorizationSession* authSession) {
         UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
@@ -59,7 +59,7 @@ namespace {
         if (nameIter.more())
             bestUser = *nameIter;
 
-        StringData opdb( nsToDatabaseSubstring( c.ns() ) );
+        StringData opdb( nsToDatabaseSubstring( c.getNS() ) );
 
         BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
         for ( ; nameIter.more(); nameIter.next()) {
@@ -93,7 +93,7 @@ namespace {
         b.append("client", c.clientAddress());
 
         AuthorizationSession * authSession = c.getAuthorizationSession();
-        _appendUserInfo(c, b, authSession);
+        _appendUserInfo(currentOp, b, authSession);
 
         BSONObj p = b.done();
 
@@ -106,7 +106,7 @@ namespace {
             BSONObjBuilder b(profileBufBuilder);
             b.appendDate("ts", jsTime());
             b.append("client", c.clientAddress() );
-            _appendUserInfo(c, b, authSession);
+            _appendUserInfo(currentOp, b, authSession);
 
             b.append("err", "profile line too large (max is 100KB)");
 
