@@ -301,8 +301,15 @@ worker(void *arg)
 			 * a random range as a "read".
 			 */
 			ret = cursor->search(cursor);
-			if (ret == 0 || ret == WT_NOTFOUND)
+			if (ret == 0 || ret == WT_NOTFOUND) {
+				if ((ret = cursor->get_value(
+				    cursor, &value)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "get_value in read.");
+					goto err;
+				}
 				break;
+			}
 			goto op_err;
 		case WORKER_INSERT_RMW:
 			if ((ret = cursor->search(cursor)) != WT_NOTFOUND)
