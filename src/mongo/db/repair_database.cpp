@@ -424,6 +424,8 @@ namespace mongo {
             getDur().syncDataAndTruncateJournal();
             MongoFile::flushAll(true); // need both in case journaling is disabled
 
+            killCurrentOp.checkForInterrupt(false);
+
             Client::Context tempContext( dbName, reservedPathString );
             Database::closeDatabase( dbName, reservedPathString );
         }
