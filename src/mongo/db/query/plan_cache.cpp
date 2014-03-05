@@ -195,6 +195,9 @@ namespace mongo {
     // static
     const double PlanCacheEntry::kStdDevThreshold = 2.0;
 
+    // static
+    const double PlanCacheEntry::kMinDeviation = 0.0001;
+
     //
     // PlanCacheIndexTree
     //
@@ -381,23 +384,29 @@ namespace mongo {
             }
             double stddev = sqrt(sum_of_squares / (entry->feedback.size() - 1));
 
-            // If the score has gotten more than a standard deviation lower than
-            // its initial value, we should uncache the entry.
-            double initialScore = entry->decision->scores[0];
-            if ((initialScore - mean) > (PlanCacheEntry::kStdDevThreshold * stddev)) {
-                return true;
-            }
-
             entry->averageScore.reset(mean);
             entry->stddevScore.reset(stddev);
         }
 
         // If the latest use of this plan cache entry is too far from the expected
-        // performance, then we should uncache the entry.
-        if ((*entry->averageScore - latestFeedback->score)
-             > (PlanCacheEntry::kStdDevThreshold * (*entry->stddevScore))) {
+        // performance, then we should uncache the entry. Only uncache if the deviation
+        // also exceeds a minimum value.
+        double deviation = *entry->averageScore - latestFeedback->score;
+
+        if (deviation < PlanCacheEntry::kMinDeviation) {
+            // The plan performed better then the average or is only worse by
+            // epsilon. Keep the cache entry, regardless of the std dev.
+            return false;
+        }
+
+        if (deviation > (PlanCacheEntry::kStdDevThreshold * (*entry->stddevScore))) {
+            // This run of the plan was much worse than average.
+            // Kick it out of the plan cache.
             return true;
         }
+
+        // If we're here, the performance deviated from the average, but
+        // not by enough to warrant uncaching.
 
         return false;
     }

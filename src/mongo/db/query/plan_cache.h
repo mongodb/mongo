@@ -272,6 +272,9 @@ namespace mongo {
         // Must be positive. TODO how do we tune this?
         static const double kStdDevThreshold;
 
+        // In order to justify eviction, the deviation from the mean must exceed a
+        // minimum threshold.
+        static const double kMinDeviation;
     };
 
     /**

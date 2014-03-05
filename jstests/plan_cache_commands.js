@@ -182,11 +182,12 @@ t.ensureIndex({a: 1, b: 1});
 // Implementation note: feedback stats is calculated after 20 executions.
 // See PlanCacheEntry::kMaxFeedback.
 var numExecutions = 100;
+var queryA3B3 = {a: 3, b: 3};
 for (var i = 0; i < numExecutions; i++) {
-    assert.eq(1, t.find(queryA1, projectionA1).sort(sortA1).itcount(), 'query failed');
+    assert.eq(0, t.find(queryA3B3, projectionA1).sort(sortA1).itcount(), 'query failed');
 }
 
-plans = getPlans(queryA1, sortA1, projectionA1);
+plans = getPlans(queryA3B3, sortA1, projectionA1);
 
 // This should be obvious but feedback is available only for the first (winning) plan.
 print('planCacheListPlans result (after adding indexes and completing 20 executions):');
@@ -203,6 +204,15 @@ for (var i = 0; i < plans.length; i++) {
 
 // feedback meaningful only for plan 0
 // feedback is capped at 20
+//
+// This assertion relies on the condition that the plan cache feedback mechanism
+// has not evicted the cache entry. In order for this to be reliable, we must be
+// sure that the plan scores the same each time it is run. We can be sure of this
+// because:
+//   1) The plan will produce zero results. This means that the productivity will
+//   always be zero, and in turn the score will always be the same.
+//   2) The plan hits EOF quickly. This means that it will be cached despite
+//   returning zero results.
 assert.eq(20, plans[0].feedback.nfeedback, 'incorrect nfeedback');
 assert.gt(plans[0].feedback.averageScore, 0, 'invalid average score');
 
@@ -415,7 +425,7 @@ assert.eq(0, t.find({c: 0}).itcount(), 'unexpected count');
 assert.eq(0, getShapes().length, 'unexpected number of query shapes in plan cache');
 
 // ...but a query with zero results that hits EOF will be cached.
-assert.eq(1, t.find({a: 2, b: 2}).itcount(), 'unexpected count');
+assert.eq(0, t.find({a: 3, b: 3}).itcount(), 'unexpected count');
 assert.eq(1, getShapes().length, 'unexpected number of query shapes in plan cache');
 
 // A query that returns results but does not hit EOF will also be cached.
