@@ -176,6 +176,7 @@ __wt_txn_read_skip(
     WT_SESSION_IMPL *session, WT_UPDATE *upd, uint64_t *max_txn, int *skipp)
 {
 	WT_UPDATE *first_upd;
+        uint64_t txnid;
 
 	/*
 	 * Track the largest transaction ID on this page.  We store this in the
@@ -191,11 +192,11 @@ __wt_txn_read_skip(
 	 */
 	*skipp = 0;
 	for (first_upd = NULL; upd != NULL; upd = upd->next)
-		if (upd->txnid != WT_TXN_ABORTED) {
-			if (TXNID_LT(*max_txn, upd->txnid))
-				*max_txn = upd->txnid;
+		if ((txnid = upd->txnid) != WT_TXN_ABORTED) {
+			if (TXNID_LT(*max_txn, txnid))
+				*max_txn = txnid;
 			if (first_upd == NULL) {
-				if (__wt_txn_visible(session, upd->txnid))
+				if (__wt_txn_visible(session, txnid))
 					first_upd = upd;
 				else
 					*skipp = 1;
