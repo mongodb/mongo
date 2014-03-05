@@ -100,22 +100,6 @@ namespace mongo {
         uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
     }
 
-    string getDbContext() {
-        stringstream ss;
-        Client * c = currentClient.get();
-        if ( c ) {
-            Client::Context * cx = c->getContext();
-            if ( cx ) {
-                Database *database = cx->db();
-                if ( database ) {
-                    ss << database->name() << ' ';
-                    ss << cx->ns() << ' ';
-                }
-            }
-        }
-        return ss.str();
-    }
-
     /*---------------------------------------------------------------------*/
 
     /** { ..., capped: true, size: ..., max: ... }

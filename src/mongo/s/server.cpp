@@ -103,10 +103,6 @@ namespace mongo {
         return dbexitCalled;
     }
 
-    string getDbContext() {
-        return "?";
-    }
-
     bool haveLocalShardingInfo( const string& ns ) {
         verify( 0 );
         return false;
