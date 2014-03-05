@@ -28,6 +28,7 @@
 
 #include "mongo/db/query/idhack_runner.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
@@ -233,6 +234,16 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    // static
+    bool IDHackRunner::supportsQuery(const CanonicalQuery& query) {
+        return !query.getParsed().showDiskLoc()
+            && query.getParsed().getHint().isEmpty()
+            && 0 == query.getParsed().getSkip()
+            && canUseProjection(query)
+            && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
+            && !query.getParsed().hasOption(QueryOption_CursorTailable);
     }
 
     // static

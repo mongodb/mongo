@@ -79,11 +79,16 @@ namespace mongo {
                                PlanInfo** planInfo) const;
 
         /**
+         * ID Hack has a very strict criteria for the queries it supports.
+         */
+        static bool supportsQuery(const CanonicalQuery& query);
+
+    private:
+        /**
          * ID Hack will work with only one projection: {_id: 1}.
          */
         static bool canUseProjection(const CanonicalQuery& query);
 
-    private:
         // Not owned here.
         const Collection* _collection;
 

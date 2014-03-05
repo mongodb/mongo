@@ -56,15 +56,6 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(enableIndexIntersection, bool, true);
 
-    static bool canUseIDHack(const CanonicalQuery& query) {
-        return !query.getParsed().showDiskLoc()
-            && query.getParsed().getHint().isEmpty()
-            && 0 == query.getParsed().getSkip()
-            && IDHackRunner::canUseProjection(query)
-            && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
-            && !query.getParsed().hasOption(QueryOption_CursorTailable);
-    }
-
     // static
     void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
                                    std::vector<IndexEntry>* indexEntries) {
@@ -225,7 +216,8 @@ namespace mongo {
         }
 
         // If we have an _id index we can use the idhack runner.
-        if (canUseIDHack(*canonicalQuery) && collection->getIndexCatalog()->findIdIndex()) {
+        if (IDHackRunner::supportsQuery(*canonicalQuery) &&
+            collection->getIndexCatalog()->findIdIndex()) {
             *out = new IDHackRunner(collection, canonicalQuery.release());
             return Status::OK();
         }
