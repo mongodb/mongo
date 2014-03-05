@@ -251,14 +251,18 @@ namespace mongo {
          * information due to flattening.
          *
          * Nodes that cannot be deeply traversed are returned via the output
-         * vector 'subnodesOut'.
+         * vectors 'subnodesOut' and 'mandatorySubnodes'. Subnodes are "mandatory"
+         * if they *must* use an index (TEXT and GEO).
          *
          * Does not take ownership of arguments.
+         *
+         * Returns false if the AND cannot be indexed. Otherwise returns true.
          */
-        void partitionPreds(MatchExpression* node,
+        bool partitionPreds(MatchExpression* node,
                             PrepMemoContext context,
                             vector<MatchExpression*>* indexOut,
-                            vector<MemoID>* subnodesOut);
+                            vector<MemoID>* subnodesOut,
+                            vector<MemoID>* mandatorySubnodes);
 
         /**
          * Finds a set of predicates that can be safely compounded with 'assigned',

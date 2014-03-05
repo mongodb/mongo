@@ -36,6 +36,8 @@
 
 namespace {
 
+    using namespace mongo;
+
     std::string getPathPrefix(std::string path) {
         if (mongoutils::str::contains(path, '.')) {
             return mongoutils::str::before(path, '.');
@@ -43,6 +45,15 @@ namespace {
         else {
             return path;
         }
+    }
+
+    /**
+     * Returns true if either 'node' or a descendent of 'node'
+     * is a predicate that is required to use an index.
+     */
+    bool isIndexMandatory(const MatchExpression* node) {
+        return CanonicalQuery::countNodes(node, MatchExpression::GEO_NEAR) > 0
+            || CanonicalQuery::countNodes(node, MatchExpression::TEXT) > 0;
     }
 
 } // namespace
@@ -256,16 +267,34 @@ namespace mongo {
             IndexToPredMap idxToFirst;
             IndexToPredMap idxToNotFirst;
 
-            // Children that aren't predicates.
+            // Children that aren't predicates, and which do not necessarily need
+            // to use an index.
             vector<MemoID> subnodes;
+
+            // Children that aren't predicates, but which *must* use an index.
+            // (e.g. an OR which contains a TEXT child).
+            vector<MemoID> mandatorySubnodes;
 
             // A list of predicates contained in the subtree rooted at 'node'
             // obtained by traversing deeply through $and and $elemMatch children.
             vector<MatchExpression*> indexedPreds;
 
-            // Partition the childen into the children that aren't predicates
-            // ('subnodes'), and children that are predicates ('indexedPreds').
-            partitionPreds(node, childContext, &indexedPreds, &subnodes);
+            // Partition the childen into the children that aren't predicates which may or may
+            // not be indexed ('subnodes'), children that aren't predicates which must use the
+            // index ('mandatorySubnodes'). and children that are predicates ('indexedPreds').
+            //
+            // We have to get the subnodes with mandatory assignments rather than adding the
+            // mandatory preds to 'indexedPreds'. Adding the mandatory preds directly to
+            // 'indexedPreds' would lead to problems such as pulling a predicate beneath an OR
+            // into a set joined by an AND.
+            if (!partitionPreds(node, childContext, &indexedPreds,
+                                &subnodes, &mandatorySubnodes)) {
+                return false;
+            }
+
+            if (mandatorySubnodes.size() > 1) {
+                return false;
+            }
 
             // Indices we *must* use.  TEXT or GEO.
             set<IndexID> mandatoryIndices;
@@ -277,8 +306,7 @@ namespace mongo {
 
                 invariant(Indexability::nodeCanUseIndexOnOwnField(child));
 
-                bool childRequiresIndex = (child->matchType() == MatchExpression::GEO_NEAR
-                                        || child->matchType() == MatchExpression::TEXT);
+                bool childRequiresIndex = isIndexMandatory(child);
 
                 RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
 
@@ -301,7 +329,11 @@ namespace mongo {
             }
 
             // If none of our children can use indices, bail out.
-            if (idxToFirst.empty() && (subnodes.size() == 0)) { return false; }
+            if (idxToFirst.empty()
+                && (subnodes.size() == 0)
+                && (mandatorySubnodes.size() == 0)) {
+                return false;
+            }
 
             // At least one child can use an index, so we can create a memo entry.
             AndAssignment* andAssignment = new AndAssignment();
@@ -311,6 +343,15 @@ namespace mongo {
             allocateAssignment(node, &nodeAssignment, &myMemoID);
             // Takes ownership.
             nodeAssignment->andAssignment.reset(andAssignment);
+
+            // Predicates which must use an index might be buried inside
+            // a subnode. Handle that case here.
+            if (1 == mandatorySubnodes.size()) {
+                AndEnumerableState aes;
+                aes.subnodesToIndex.push_back(mandatorySubnodes[0]);
+                andAssignment->choices.push_back(aes);
+                return true;
+            }
 
             // Only near queries and text queries have mandatory indices.
             // In this case there's no point to enumerating anything here; both geoNear
@@ -732,10 +773,11 @@ namespace mongo {
         }
     }
 
-    void PlanEnumerator::partitionPreds(MatchExpression* node,
+    bool PlanEnumerator::partitionPreds(MatchExpression* node,
                                         PrepMemoContext context,
                                         vector<MatchExpression*>* indexOut,
-                                        vector<MemoID>* subnodesOut) {
+                                        vector<MemoID>* subnodesOut,
+                                        vector<MemoID>* mandatorySubnodes) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
             MatchExpression* child = node->getChild(i);
             if (Indexability::nodeCanUseIndexOnOwnField(child)) {
@@ -757,17 +799,19 @@ namespace mongo {
                 indexOut->push_back(child);
             }
             else if (Indexability::isBoundsGeneratingNot(child)) {
-                partitionPreds(child, context, indexOut, subnodesOut);
+                partitionPreds(child, context, indexOut, subnodesOut, mandatorySubnodes);
             }
             else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
                 PrepMemoContext childContext;
                 childContext.elemMatchExpr = child;
-                partitionPreds(child, childContext, indexOut, subnodesOut);
+                partitionPreds(child, childContext, indexOut, subnodesOut, mandatorySubnodes);
             }
             else if (MatchExpression::AND == child->matchType()) {
-                partitionPreds(child, context, indexOut, subnodesOut);
+                partitionPreds(child, context, indexOut, subnodesOut, mandatorySubnodes);
             }
             else {
+                bool mandatory = isIndexMandatory(child);
+
                 // Recursively prepMemo for the subnode. We fall through
                 // to this case for logical nodes other than AND (e.g. OR)
                 // and for array nodes other than ELEM_MATCH_OBJECT or
@@ -777,10 +821,22 @@ namespace mongo {
                     size_t childID = _nodeToId[child];
 
                     // Output the subnode.
-                    subnodesOut->push_back(childID);
+                    if (mandatory) {
+                        mandatorySubnodes->push_back(childID);
+                    }
+                    else {
+                        subnodesOut->push_back(childID);
+                    }
+                }
+                else if (mandatory) {
+                    // The subnode is mandatory but cannot be indexed. This means
+                    // that the entire AND cannot be indexed either.
+                    return false;
                 }
             }
         }
+
+        return true;
     }
 
     void PlanEnumerator::getMultikeyCompoundablePreds(const MatchExpression* assigned,
