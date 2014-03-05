@@ -229,7 +229,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 
 		/* Check to see if the eviction server should run. */
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
-			flags = (loop > 10) ?
+			flags = (F_ISSET(cache, WT_EVICT_STUCK) || loop > 10) ?
 			    WT_EVICT_PASS_AGGRESSIVE : WT_EVICT_PASS_ALL;
 		else if (dirty_inuse >
 		    (cache->eviction_dirty_target * bytes_max) / 100)
