@@ -2165,7 +2165,11 @@ namespace mongo {
                 commandBuilder.setField("$queryOptions", Value(cmdObj["$queryOptions"]));
             }
 
-            commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
+            if (!pPipeline->isExplain()) {
+                // "cursor" is ignored by 2.6 shards when doing explain, but including it leads to a
+                // worse error message when talking to 2.4 shards.
+                commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
+            }
 
             if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
                 commandBuilder.setField(LiteParsedQuery::cmdOptionMaxTimeMS,
