@@ -249,6 +249,7 @@ typedef struct {
 	int tested_ref_state;		/* Debugging information */
 } WT_RECONCILE;
 
+static void __rec_bnd_init(WT_SESSION_IMPL *, WT_RECONCILE *, int);
 static void __rec_cell_build_addr(
 		WT_RECONCILE *, const void *, size_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
@@ -473,10 +474,8 @@ static int
 __rec_write_init(
     WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, void *reconcilep)
 {
-	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
 	WT_RECONCILE *r;
-	uint32_t i;
 
 	btree = S2BT(session);
 
@@ -494,31 +493,8 @@ __rec_write_init(
 		F_SET(&r->dsk, WT_ITEM_ALIGNED);
 	}
 
-	/*
-	 * Clean up any pre-existing boundary structures: almost none of this
-	 * should be necessary (already_compressed is the notable exception),
-	 * but it's cheap.
-	 */
-	if (r->bnd != NULL)
-		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
-			bnd->start = NULL;
-			bnd->recno = 0;
-			bnd->entries = 0;
-
-			WT_ASSERT(session, bnd->addr.addr == NULL);
-			bnd->addr.size = 0;
-			bnd->addr.type = 0;
-			bnd->size = bnd->cksum = 0;
-			__wt_free(session, bnd->dsk);
-
-			__wt_free(session, bnd->skip);
-			bnd->skip_next = 0;
-			bnd->skip_allocated = 0;
-
-			/* Leave the key alone, it's space we re-use. */
-
-			bnd->already_compressed = 0;
-		}
+	/* Initialize the boundary information. */
+	__rec_bnd_init(session, r, 0);
 
 	/*
 	 * Raw compression, the application builds disk images: applicable only
@@ -606,9 +582,7 @@ __rec_write_init(
 static void
 __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 {
-	WT_BOUNDARY *bnd;
 	WT_RECONCILE *r;
-	uint32_t i;
 
 	if ((r = *(WT_RECONCILE **)reconcilep) == NULL)
 		return;
@@ -620,13 +594,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 	__wt_free(session, r->raw_offsets);
 	__wt_free(session, r->raw_recnos);
 
-	if (r->bnd != NULL) {
-		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
-			__wt_free(session, bnd->addr.addr);
-			__wt_buf_free(session, &bnd->key);
-		}
-		__wt_free(session, r->bnd);
-	}
+	__rec_bnd_init(session, r, 1);
 
 	__wt_buf_free(session, &r->k.buf);
 	__wt_buf_free(session, &r->v.buf);
@@ -647,6 +615,54 @@ __rec_destroy_session(WT_SESSION_IMPL *session)
 {
 	__rec_destroy(session, &session->reconcile);
 	return (0);
+}
+
+/*
+ * __rec_bnd_init --
+ *	Initialize/cleanup the boundary structure information.
+ */
+static void
+__rec_bnd_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
+{
+	WT_BOUNDARY *bnd;
+	uint32_t i;
+
+	if (r->bnd == NULL)
+		return;
+
+	/*
+	 * Clean up any pre-existing boundary structures: almost none of this
+	 * should be necessary (already_compressed is the notable exception),
+	 * but it's cheap.
+	 */
+	for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
+		bnd->start = NULL;
+
+		bnd->recno = 0;
+		bnd->entries = 0;
+
+		WT_ASSERT(session, bnd->addr.addr == NULL);
+		bnd->addr.size = 0;
+		bnd->addr.type = 0;
+		bnd->size = bnd->cksum = 0;
+		__wt_free(session, bnd->dsk);
+
+		__wt_free(session, bnd->skip);
+		bnd->skip_next = 0;
+		bnd->skip_allocated = 0;
+
+		/*
+		 * Leave the key alone unless we're destroying the structures,
+		 * we reuse/grow that memory as necessary.
+		 */
+		if (destroy)
+			__wt_buf_free(session, &bnd->key);
+
+		bnd->already_compressed = 0;
+	}
+
+	if (destroy)
+		__wt_free(session, r->bnd);
 }
 
 /*
