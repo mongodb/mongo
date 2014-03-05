@@ -500,6 +500,15 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		WT_ERR(__wt_tree_walk(
 		    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 
+		/*
+		 * Before discarding the root page, clear the reference from
+		 * the btree handle.  This is necessary so future evictions
+		 * don't see the handle's root page reference pointing to freed
+		 * memory.
+		 */
+		if (WT_PAGE_IS_ROOT(page))
+			btree->root_page = NULL;
+
 		switch (syncop) {
 		case WT_SYNC_DISCARD:
 			/*
@@ -538,15 +547,15 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		case WT_SYNC_DISCARD_NOWRITE:
 			/*
 			 * Discard the page, whether clean or dirty.
-			 * Before we discard the root page, clear the reference
-			 * from the btree handle.  This is necessary so future
-			 * evictions don't see the handle's root page reference
-			 * pointing to freed memory.
+			 *
+			 * Clean the page, both to keep statistics correct, and
+			 * to let the page-discard function assert no dirty page
+			 * is ever discarded.
 			 */
-			if (WT_PAGE_IS_ROOT(page))
-				btree->root_page = NULL;
-			if (__wt_page_is_modified(page))
+			if (__wt_page_is_modified(page)) {
+				page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, page);
+			}
 			__wt_page_out(session, &page);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);

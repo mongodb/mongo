@@ -606,10 +606,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	WT_PAGE_LOCK(session, parent);
 	locked = 1;
 
-	/*
-	 * Append the underlying split page's WT_REF array into the parent
-	 * page's list.
-	 */
+	/* Append the allocated WT_REF array into the parent's list. */
 	WT_ERR(__rec_split_list_alloc(session, parent_mod, &i));
 	parent_mod->splits[i].refs = alloc_ref;
 	alloc_ref = NULL;
@@ -634,9 +631,9 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 			refp++;
 
 	/*
-	 * We can't free the previous page index, there may be threads using
-	 * it.  Add it to the session's discard list, to be freed once we know
-	 * no threads can still be using it.
+	 * We can't free the previous WT_REF index array, there may be threads
+	 * using it.  Add it to the session's discard list, to be freed once we
+	 * know no threads can still be using it.
 	 */
 	WT_ERR(__wt_session_fotxn_add(session, pindex,
 	    sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *)));
@@ -654,7 +651,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	/*
 	 * The key for the split WT_REF may be an onpage overflow key, and we're
 	 * about to lose track of it.  Add it to the tracking list so it will be
-	 * discarded the next time this page is reconciled.
+	 * discarded the next time the parent is reconciled.
 	 */
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
@@ -671,10 +668,19 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	}
 
 	/*
-	 * Reset the page's original WT_REF field to split, releasing any
-	 * blocked threads.
+	 * Reset the page's original WT_REF field to split, releasing blocked
+	 * threads.
 	 */
 	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
+
+	/*
+	 * The page may never have been marked clean, if it contained unresolved
+	 * changes.  In that case, mark it clean now.
+	 */
+	if (__wt_page_is_modified(page)) {
+		 mod->write_gen = 0;
+		 __wt_cache_dirty_decr(session, page);
+	}
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_VERBOSE_ERR(session, split,

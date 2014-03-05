@@ -27,18 +27,18 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 
 	/*
 	 * When a page is discarded, it's been disconnected from its parent and
-	 * its parent's WT_REF structure may now point to a different page.
-	 * Make sure we don't accidentally use the page itself or any other
-	 * information.
+	 * its parent's WT_REF structure may now point to a different page.  Do
+	 * our best to catch races.
 	 */
 	page = *pagep;
 	*pagep = NULL;
 	page->parent = NULL;
 
 	/*
-	 * We should never discard the file's current eviction point or a page
-	 * queued for LRU eviction.
+	 * We should never discard a dirty page, the file's current eviction
+	 * point or a page queued for LRU eviction.
 	 */
+	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, S2BT(session)->evict_page != page);
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
