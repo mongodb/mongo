@@ -1543,6 +1543,10 @@ namespace mongo {
                 client.curop()->ensureStarted();
                 retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
             }
+
+            if ( retval && c->logTheOp() && ! fromRepl ) {
+                logOp("c", cmdns, cmdObj);
+            }
         }
         else if( c->locktype() != Command::WRITE ) { 
             // read lock
