@@ -60,7 +60,7 @@ namespace mongo {
         return !query.getParsed().showDiskLoc()
             && query.getParsed().getHint().isEmpty()
             && 0 == query.getParsed().getSkip()
-            && !query.getProj()
+            && IDHackRunner::canUseProjection(query)
             && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
             && !query.getParsed().hasOption(QueryOption_CursorTailable);
     }

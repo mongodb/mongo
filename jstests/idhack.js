@@ -46,8 +46,14 @@ var skipExplain = t.find( query ).skip(1).explain();
 print( "explain for skip query = " + tojson( skipExplain ) );
 assert.neq( explain.cursor, skipExplain.cursor, "F1" );
 
-// ID hack cannot be used with projection.
-var projectionExplain = t.find( query, { _id : 1 } ).explain();
+// Only acceptable projection for ID hack is {_id: 1}.
+var projectionExplain = t.find( query, { _id : 0, z : 1 } ).explain();
 print( "explain for projection query = " + tojson( projectionExplain ) );
 assert.neq( explain.cursor, projectionExplain.cursor, "G1" );
 
+// Covered query returning _id field only can be handled by ID hack.
+var coveredExplain = t.find( query, { _id : 1 } ).explain();
+print( "explain for covered query = " + tojson( coveredExplain ) );
+assert.eq( explain.cursor, coveredExplain.cursor, "H1" );
+// Check doc from covered ID hack query.
+assert.eq( { _id : { x: 2 } }, t.findOne( query, { _id : 1 } ), "H2" );
