@@ -46,3 +46,8 @@ var skipExplain = t.find( query ).skip(1).explain();
 print( "explain for skip query = " + tojson( skipExplain ) );
 assert.neq( explain.cursor, skipExplain.cursor, "F1" );
 
+// ID hack cannot be used with projection.
+var projectionExplain = t.find( query, { _id : 1 } ).explain();
+print( "explain for projection query = " + tojson( projectionExplain ) );
+assert.neq( explain.cursor, projectionExplain.cursor, "G1" );
+

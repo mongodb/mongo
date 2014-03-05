@@ -31,7 +31,6 @@
 #include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/exec/projection_exec.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
@@ -128,14 +127,6 @@ namespace mongo {
                         return Runner::RUNNER_EOF;
                     }
                 }
-            }
-
-            // If there is a projection...
-            if (_query && _query->getProj()) {
-                // Create something to execute it.
-                auto_ptr<ProjectionExec> projExec(new ProjectionExec(_query->getParsed().getProj(),
-                                                                     _query->root()));
-                projExec->transform(*objOut, objOut);
             }
         }
 
