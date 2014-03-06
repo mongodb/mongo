@@ -18,8 +18,14 @@ function mkStr(length) {
 function canMakeCollectionWithName(name) {
     assert.eq(myDb.stats().fileSize, 0, "initial conditions");
 
-    var res = myDb[name].insert({});
-    var success = !res.hasWriteErrors();
+    var success = false;
+    try {
+        // may either throw or return an error
+        success = !(myDb[name].insert({}).hasWriteErrors());
+    } catch (e) {
+        success = false;
+    }
+
     if (!success) {
         assert.eq(myDb.stats().fileSize, 0, "no files should be created on error");
         return false;
