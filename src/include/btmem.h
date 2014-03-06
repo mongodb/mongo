@@ -506,6 +506,8 @@ struct __wt_page {
 	WT_PAGE	*parent;		/* Page's parent */
 	uint32_t ref_hint;		/* Page's WT_REF hint */
 
+#define	WT_PAGE_IS_INTERNAL(page)					\
+	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
 #define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */
