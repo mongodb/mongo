@@ -774,9 +774,17 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
 
 			/*
-			 * If called during checkpoint, the child can't be
-			 * evicted, it's an in-memory case.
+			 * If called during checkpoint, try to grab a hazard
+			 * pointer so the child can't be evicted: it's an
+			 * in-memory case.
 			 */
+			ret = __wt_page_in(session, page, ref,
+			    WT_READ_CACHE | WT_READ_NO_WAIT);
+			if (ret == WT_NOTFOUND) {
+				ret = 0;
+				break;
+			}
+			WT_RET(ret);
 			goto in_memory;
 
 		case WT_REF_READING:
@@ -806,8 +814,12 @@ in_memory:
 	mod = ref->page->modify;
 	if (mod != NULL && mod->flags != 0)
 		*statep = WT_CHILD_MODIFIED;
-	else if (ref->addr == NULL)
-		*statep = WT_CHILD_IGNORE;
+	else  {
+		if (!F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+			WT_TRET(__wt_page_release(session, ref->page));
+		if (ref->addr == NULL)
+			*statep = WT_CHILD_IGNORE;
+	}
 
 done:	WT_HAVE_DIAGNOSTIC_YIELD;
 	return (ret);
@@ -2318,12 +2330,13 @@ static int
 __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_ADDR *addr;
+	WT_DECL_RET;
 	WT_KV *val;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE *rp;
 	WT_REF *ref;
 	uint32_t i;
-	int state;
+	int done, state;
 
 	WT_STAT_FAST_DATA_INCR(session, rec_page_merge);
 
@@ -2344,6 +2357,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (state) {
 			WT_ASSERT(session, state == WT_CHILD_MODIFIED);
 			rp = ref->page;
+			done = 0;
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -2352,18 +2366,26 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * name space.  The exceptions are pages created
 				 * when the tree is created, and never filled.
 				 */
-				continue;
+				done = 1;
+				break;
 			case WT_PM_REC_REPLACE:
 				addr = &rp->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
-				WT_RET(__rec_col_merge(
+				WT_TRET(__rec_col_merge(
 				    session, r, rp->modify->u.split));
-				continue;
+				done = 1;
+				break;
 			case WT_PM_REC_SPLIT_MERGE:
-				WT_RET(__rec_col_merge(session, r, rp));
-				continue;
+				WT_TRET(__rec_col_merge(session, r, rp));
+				done = 1;
+				break;
 			}
+			if (!F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+				WT_TRET(__wt_page_release(session, rp));
+			WT_RET(ret);
+			if (done)
+				continue;
 		}
 
 		/*
@@ -2995,6 +3017,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
@@ -3002,7 +3025,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	size_t size;
 	uint32_t i;
 	u_int vtype;
-	int onpage_ovfl, ovfl_key, state;
+	int done, onpage_ovfl, ovfl_key, state;
 	const void *p;
 
 	btree = S2BT(session);
@@ -3055,9 +3078,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
 		}
 
-		vtype = 0;
-		addr = ref->addr;
-		rp = ref->page;
 		WT_RET(__rec_child_modify(session, r, page, ref, &state));
 
 		/* Deleted child we don't have to write. */
@@ -3075,16 +3095,23 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			continue;
 		}
 
+		addr = ref->addr;
+
 		/* Deleted child requiring a proxy cell. */
-		if (state == WT_CHILD_PROXY)
-			vtype = WT_CELL_ADDR_DEL;
+		vtype = (state == WT_CHILD_PROXY) ? WT_CELL_ADDR_DEL : 0;
 
 		/*
 		 * Modified child.
 		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
+		 *
+		 * We have a hazard pointer on the child in this case to
+		 * prevent eviction.  Release it when we're done.
 		 */
-		if (state == WT_CHILD_MODIFIED)
+		if (state == WT_CHILD_MODIFIED) {
+			rp = ref->page;
+			done = 0;
+
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -3096,10 +3123,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_ovfl_onpage_add(
+					WT_TRET(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
-				continue;
+				done = 1;
+				break;
 			case WT_PM_REC_REPLACE:
 				/*
 				 * If the page is replaced, the page's modify
@@ -3119,16 +3147,23 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_ovfl_onpage_add(
+					WT_TRET(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
 
-				WT_RET(__rec_row_merge(session, r,
+				WT_TRET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
-				continue;
+				done = 1;
+				break;
 			WT_ILLEGAL_VALUE(session);
 			}
+			if (!F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+				WT_TRET(__wt_page_release(session, rp));
+			WT_RET(ret);
+			if (done)
+				continue;
+		}
 
 		/*
 		 * Build the value cell, the child page's address.  Addr points
@@ -3222,13 +3257,14 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *vpack, _vpack;
+	WT_DECL_RET;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_REF *ref;
 	size_t size;
 	uint32_t i;
 	u_int vtype;
-	int ovfl_key, state;
+	int done, ovfl_key, state;
 	const void *p;
 
 	WT_STAT_FAST_DATA_INCR(session, rec_page_merge);
@@ -3240,9 +3276,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* For each entry in the in-memory page... */
 	WT_REF_FOREACH(page, ref, i) {
 		vtype = 0;
-		addr = ref->addr;
-		rp = ref->page;
 		WT_RET(__rec_child_modify(session, r, page, ref, &state));
+		addr = ref->addr;
 
 		/* Deleted child we don't have to write. */
 		if (state == WT_CHILD_IGNORE)
@@ -3257,10 +3292,13 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
-		if (state == WT_CHILD_MODIFIED)
+		if (state == WT_CHILD_MODIFIED) {
+			rp = ref->page;
+			done = 0;
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
-				continue;
+				done = 1;
+				break;
 			case WT_PM_REC_REPLACE:
 				/*
 				 * If the page is replaced, the page's modify
@@ -3270,12 +3308,19 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			case WT_PM_REC_SPLIT:
 			case WT_PM_REC_SPLIT_MERGE:
-				WT_RET(__rec_row_merge(session, r,
+				WT_TRET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
-				continue;
+				done = 1;
+				break;
 			WT_ILLEGAL_VALUE(session);
 			}
+			if (!F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+				WT_TRET(__wt_page_release(session, rp));
+			WT_RET(ret);
+			if (done)
+				continue;
+		}
 
 		/*
 		 * Build the value cell, the child page's address.  Addr points
