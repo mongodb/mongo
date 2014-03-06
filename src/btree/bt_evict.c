@@ -524,9 +524,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * target.
 			 *
 			 * We could limit this test to empty pages (only empty
-			 * pages can switch state this way, split pages always
-			 * merge into their parent, no matter what), but I see
-			 * no reason to do that now.
+			 * pages can switch state this way).
 			 */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(
