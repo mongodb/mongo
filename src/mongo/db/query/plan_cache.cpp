@@ -500,7 +500,7 @@ namespace mongo {
             return;
         }
         LOG(1) << _ns << ": clearing collection plan cache - " << kPlanCacheMaxWriteOperations
-               << " write operations on detected since last refresh.";
+               << " write operations detected since last refresh.";
         clear();
     }
 
