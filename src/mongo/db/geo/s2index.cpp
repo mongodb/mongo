@@ -366,7 +366,7 @@ namespace mongo {
             uassert(16689, "finestIndexedLevel must be >= coarsestIndexedLevel",
                     params.finestIndexedLevel >= params.coarsestIndexedLevel);
             massert(17289,
-                    str::stream() << "unsupported geo index version { 2dsphereIndexVersion : "
+                    str::stream() << "unsupported geo index version { "
                                   << spec->info["2dsphereIndexVersion"]
                                   << " }, only support versions: [1]",
                     configValueWithDefault(spec, "2dsphereIndexVersion", 1) == 1);
@@ -396,8 +396,8 @@ namespace mongo {
         virtual BSONObj adjustIndexSpec( const BSONObj& spec ) const {
             BSONElement indexVersionElt = spec["2dsphereIndexVersion"];
             uassert(17290,
-                    str::stream() << "unsupported geo index version { 2dsphereIndexVersion : "
-                                  << indexVersionElt << " }, only support versions: [1]",
+                    str::stream() << "unsupported geo index version { " << indexVersionElt
+                                  << " }, only support versions: [1]",
                     indexVersionElt.eoo() || indexVersionElt.numberInt() == 1);
             return spec;
         }

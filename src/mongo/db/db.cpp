@@ -361,12 +361,12 @@ namespace mongo {
                 }
             }
             else {
-                if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
-                    const string systemIndexes = cc().database()->name + ".system.indexes";
-                    shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
-                    for ( ; cursor && cursor->ok(); cursor->advance()) {
-                        const BSONObj index = cursor->current();
-                        const BSONObj key = index.getObjectField("key");
+                const string systemIndexes = cc().database()->name + ".system.indexes";
+                shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
+                for ( ; cursor && cursor->ok(); cursor->advance()) {
+                    const BSONObj index = cursor->current();
+                    const BSONObj key = index.getObjectField("key");
+                    if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
                         const string plugin = IndexPlugin::findPluginName(key);
                         if (IndexPlugin::existedBefore24(plugin))
                             continue;
@@ -376,6 +376,21 @@ namespace mongo {
                               << "See the upgrade section: "
                               << "http://dochub.mongodb.org/core/upgrade-2.4"
                               << startupWarningsLog;
+                    }
+                    else {
+                        verify(h->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER);
+                        try {
+                            IndexSpec(key, index, IndexSpec::RulesFor24);
+                        }
+                        catch (const DBException& e) {
+                            error() << "Encountered an unrecognized index spec: " << index << endl;
+                            error() << "Reason this index spec could not be loaded: \"" << e.what()
+                                    << "\"" << endl;
+                            error() << "The index cannot be used with this version of MongoDB; "
+                                    << "exiting..." << endl;
+                            cc().shutdown();
+                            dbexit(EXIT_UNCAUGHT);
+                        }
                     }
                 }
                 Database::closeDatabase( dbName.c_str(), dbpath );
