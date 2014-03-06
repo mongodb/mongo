@@ -636,41 +636,6 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 }
 
 /*
- * __wt_eviction_force_check --
- *	Check if a page matches the criteria for forced eviction.
- */
-static inline int
-__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
-	/* Pages are usually small enough, check that first. */
-	if (page->memory_footprint < btree->maxmempage)
-		return (0);
-
-	/* Leaf pages only. */
-	if (page->type != WT_PAGE_COL_FIX &&
-	    page->type != WT_PAGE_COL_VAR &&
-	    page->type != WT_PAGE_ROW_LEAF)
-		return (0);
-
-	/* Eviction may be turned off, although that's rare. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * It's hard to imagine a page with a huge memory footprint that has
-	 * never been modified, but check to be sure.
-	 */
-	if (page->modify == NULL)
-		return (0);
-
-	return (1);
-}
-
-/*
  * __wt_page_release --
  *	Release a reference to a page.
  */
@@ -765,6 +730,67 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_PAGE *held,
 }
 
 /*
+ * __wt_eviction_force_check --
+ *	Check if a page matches the criteria for forced eviction.
+ */
+static inline int
+__wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
+
+	/* Leaf pages only. */
+	if (page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_VAR &&
+	    page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
+	/* Eviction may be turned off, although that's rare. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that has
+	 * never been modified, but check to be sure.
+	 */
+	if (page->modify == NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
+ * __wt_eviction_force --
+ *	Forcefully evict a page, if possible.
+ */
+static inline int
+__wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	/*
+	 * Check if eviction has a chance of succeeding, otherwise stall to
+	 * give other transactions a chance to complete.
+	 */
+	__wt_txn_update_oldest(session);
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_FORCE) ||
+	    __wt_txn_visible_all(session, page->modify->update_txn)) {
+		F_SET_ATOMIC(page, WT_PAGE_EVICT_FORCE);
+		page->read_gen = WT_READGEN_OLDEST;
+		WT_RET(__wt_page_release(session, page));
+		WT_RET(__wt_evict_server_wake(session));
+	} else {
+		WT_RET(__wt_page_release(session, page));
+		__wt_sleep(0, 10000);
+	}
+
+	return (0);
+}
+
+/*
  * __wt_page_hazard_check --
  *	Return if there's a hazard pointer to the page in the system.
  */
@@ -796,32 +822,6 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 				return (hp);
 	}
 	return (NULL);
-}
-
-/*
- * __wt_eviction_force --
- *	Forcefully evict a page, if possible.
- */
-static inline int
-__wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	/*
-	 * Check if eviction has a chance of succeeding, otherwise stall to
-	 * give other transactions a chance to complete.
-	 */
-	__wt_txn_update_oldest(session);
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_FORCE) ||
-	    __wt_txn_visible_all(session, page->modify->update_txn)) {
-		F_SET_ATOMIC(page, WT_PAGE_EVICT_FORCE);
-		page->read_gen = WT_READGEN_OLDEST;
-		WT_RET(__wt_page_release(session, page));
-		WT_RET(__wt_evict_server_wake(session));
-	} else {
-		WT_RET(__wt_page_release(session, page));
-		__wt_sleep(0, 10000);
-	}
-
-	return (0);
 }
 
 /*
