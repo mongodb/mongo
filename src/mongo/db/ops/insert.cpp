@@ -40,7 +40,8 @@ namespace mongo {
             return StatusWith<BSONObj>( ErrorCodes::BadValue,
                                         str::stream()
                                         << "object to insert too large"
-                                        << doc.objsize() );
+                                        << ". size in bytes: " << doc.objsize()
+                                        << ", max size: " << BSONObjMaxUserSize );
 
         bool firstElementIsId = doc.firstElement().fieldNameStringData() == "_id";
         bool hasTimestampToFix = false;
