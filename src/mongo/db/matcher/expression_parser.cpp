@@ -399,8 +399,10 @@ namespace mongo {
                                                                               sub);
                     if (s.isOK()) {
                         root->add(s.getValue());
-                        return Status::OK();
                     }
+
+                    // Propagate geo parsing result to caller.
+                    return s.getStatus();
                 }
             }
         }

@@ -61,7 +61,7 @@ namespace mongo {
         BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
                                  "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
         NearQuery nq;
-        ASSERT(nq.parseFrom(query["loc"].Obj()));
+        ASSERT_OK(nq.parseFrom(query["loc"].Obj()));
 
         GeoNearMatchExpression gne;
         ASSERT(gne.init("a", nq, query).isOK());

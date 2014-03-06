@@ -71,21 +71,32 @@ namespace mongo {
         return hasGeometry;
     }
 
-    bool NearQuery::parseNewQuery(const BSONObj &obj) {
+    Status NearQuery::parseNewQuery(const BSONObj &obj) {
         bool hasGeometry = false;
 
         BSONObjIterator objIt(obj);
-        if (!objIt.more()) { return false; }
+        if (!objIt.more()) {
+            return Status(ErrorCodes::BadValue, "empty geo near query object");
+        }
         BSONElement e = objIt.next();
         // Just one arg. to $geoNear.
-        if (objIt.more()) { return false; }
+        if (objIt.more()) {
+            return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                          "geo near accepts just one argument when querying for a GeoJSON " <<
+                          "point. Extra field found: " << objIt.next());
+        }
 
         // Parse "new" near:
         // t.find({"geo" : {"$near" : {"$geometry": pointA, $minDistance: 1, $maxDistance: 3}}})
         // t.find({"geo" : {"$geoNear" : {"$geometry": pointA, $minDistance: 1, $maxDistance: 3}}})
-        if (!e.isABSONObj()) { return false; }
+        if (!e.isABSONObj()) {
+            return Status(ErrorCodes::BadValue, "geo near query argument is not an object");
+        }
         BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
-        if (BSONObj::opNEAR != matchType) { return false; }
+        if (BSONObj::opNEAR != matchType) {
+            return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                          "invalid geo near query operator: " << e.fieldName());
+        }
 
         // Iterate over the argument.
         BSONObjIterator it(e.embeddedObject());
@@ -96,7 +107,11 @@ namespace mongo {
                     BSONObj embeddedObj = e.embeddedObject();
                     uassert(16885, "$near requires a point, given " + embeddedObj.toString(),
                             GeoParser::isPoint(embeddedObj));
-                    if (!GeoParser::parsePoint(embeddedObj, &centroid)) { return false; }
+                    if (!GeoParser::parsePoint(embeddedObj, &centroid)) {
+                        return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                      "invalid point in geo near query $geometry argument: " <<
+                                      embeddedObj);
+                    }
                     uassert(16681, "$near requires geojson point, given " + embeddedObj.toString(),
                             (SPHERE == centroid.crs));
                     hasGeometry = true;
@@ -112,12 +127,18 @@ namespace mongo {
             }
         }
 
-        return hasGeometry;
+        if (!hasGeometry) {
+            return Status(ErrorCodes::BadValue, "$geometry is required for geo near query");
+        }
+
+        return Status::OK();
     }
 
 
-    bool NearQuery::parseFrom(const BSONObj &obj) {
-        if (parseLegacyQuery(obj)) { return true; }
+    Status NearQuery::parseFrom(const BSONObj &obj) {
+        if (parseLegacyQuery(obj)) {
+            return Status::OK();
+        }
         // Clear out any half-baked data.
         minDistance = 0;
         isNearSphere = false;
