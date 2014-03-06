@@ -759,7 +759,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * If evicting and updates were skipped, remember the list of WT_UPDATEs
 	 * so we can restore it on a newly instantiated page.  (The order of the
 	 * updates matters, we can't move only unresolved WT_UPDATEs, we have to
-	 * move the entire list.
+	 * move the entire list.)
 	 *
 	 * Additionally, in this case we don't write any WT_UPDATEs at all, we
 	 * don't want to move an insert into a different position on the page.
@@ -773,15 +773,36 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 }
 
 /*
+ * CHILD_RELEASE --
+ *	Macros to clean up during internal-page reconciliation, releasing the
+ * hazard pointer we're holding on child pages.
+ */
+#undef	CHILD_RELEASE
+#define	CHILD_RELEASE(session, hazard, child) do {			\
+	if (hazard) {							\
+		hazard = 0;						\
+		WT_TRET(__wt_page_release(session, child));		\
+	}								\
+} while (0)
+#undef	CHILD_RELEASE_ERR
+#define	CHILD_RELEASE_ERR(session, hazard, child) do {			\
+	CHILD_RELEASE(session, hazard, child);				\
+	WT_ERR(ret);							\
+} while (0)
+
+/*
  * __rec_child_modify --
  *	Return if the internal page's child references any modifications.
  */
 static int
 __rec_child_modify(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
+    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *hazardp, int *statep)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
+
+	/* We may acquire a hazard pointer our caller must release. */
+	*hazardp = 0;
 
 #define	WT_CHILD_IGNORE		1		/* Deleted child: ignore */
 #define	WT_CHILD_MODIFIED	2		/* Modified child */
@@ -857,9 +878,15 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
 
 			/*
-			 * If called during checkpoint, the child can't be
-			 * evicted, it's an in-memory case.
+			 * If called during checkpoint, acquire a hazard pointer
+			 * so the child isn't evicted, it's an in-memory case.
 			 */
+			if ((ret = __wt_page_in(session, page, ref,
+			    WT_READ_CACHE | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
+				ret = 0;
+				break;
+			}
+			*hazardp = 1;
 			goto in_memory;
 
 		case WT_REF_READING:
@@ -889,8 +916,10 @@ in_memory:
 	mod = ref->page->modify;
 	if (mod != NULL && mod->flags != 0)
 		*statep = WT_CHILD_MODIFIED;
-	else if (ref->addr == NULL)
+	else if (ref->addr == NULL) {
 		*statep = WT_CHILD_IGNORE;
+		CHILD_RELEASE(session, *hazardp, ref->page);
+	}
 
 done:	WT_HAVE_DIAGNOSTIC_YIELD;
 	return (ret);
@@ -2430,16 +2459,19 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_BTREE *btree;
-	WT_KV *val;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE *rp;
+	WT_DECL_RET;
+	WT_KV *val;
+	WT_PAGE *child;
 	WT_REF *ref;
-	int state;
+	int hazard, state;
 
 	btree = S2BT(session);
+	unpack = &_unpack;
+	child = NULL;
+	hazard = 0;
 
 	val = &r->v;
-	unpack = &_unpack;
 
 	WT_RET(__rec_split_init(
 	    session, r, page, page->pg_intl_recno, btree->maxintlpage));
@@ -2454,12 +2486,13 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
+		WT_ERR(
+		    __rec_child_modify(session, r, page, ref, &hazard, &state));
 		addr = NULL;
-		WT_RET(__rec_child_modify(session, r, page, ref, &state));
+		child = ref->page;
 		if (state) {
 			WT_ASSERT(session, state == WT_CHILD_MODIFIED);
-			rp = ref->page;
-			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
+			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
 				 * Column-store pages are almost never empty, as
@@ -2467,14 +2500,16 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * name space.  The exceptions are pages created
 				 * when the tree is created, and never filled.
 				 */
+				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
 			case WT_PM_REC_REPLACE:
-				addr = &rp->modify->u.replace;
+				addr = &child->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
-				WT_RET(__rec_col_merge(session, r, rp));
+				WT_ERR(__rec_col_merge(session, r, child));
+				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
-			WT_ILLEGAL_VALUE(session);
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
 		}
 
@@ -2498,13 +2533,14 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		} else
 			__rec_cell_build_addr(r, addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
+		CHILD_RELEASE_ERR(session, hazard, child);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
 			if (r->raw_compression)
-				WT_RET(__rec_split_raw(session, r));
+				WT_ERR(__rec_split_raw(session, r));
 			else
-				WT_RET(__rec_split(session, r));
+				WT_ERR(__rec_split(session, r));
 
 		/* Copy the value onto the page. */
 		__rec_copy_incr(session, r, val);
@@ -2512,6 +2548,9 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
+
+err:	CHILD_RELEASE(session, hazard, child);
+	return (ret);
 }
 
 /*
@@ -3148,16 +3187,19 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_KV *key, *val;
-	WT_PAGE *rp;
+	WT_PAGE *child;
 	WT_REF *ref;
 	size_t size;
 	u_int vtype;
-	int onpage_ovfl, ovfl_key, state;
+	int hazard, onpage_ovfl, ovfl_key, state;
 	const void *p;
 
 	btree = S2BT(session);
+	child = NULL;
+	hazard = 0;
 
 	key = &r->k;
 	kpack = &_kpack;
@@ -3207,10 +3249,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
 		}
 
-		vtype = 0;
+		WT_ERR(
+		    __rec_child_modify(session, r, page, ref, &hazard, &state));
 		addr = ref->addr;
-		rp = ref->page;
-		WT_RET(__rec_child_modify(session, r, page, ref, &state));
+		child = ref->page;
+		vtype = 0;
 
 		/* Deleted child we don't have to write. */
 		if (state == WT_CHILD_IGNORE) {
@@ -3222,8 +3265,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * reusing this key in this reconciliation is unlikely.
 			 */
 			if (onpage_ovfl)
-				WT_RET(__wt_ovfl_onpage_add(
+				WT_ERR(__wt_ovfl_onpage_add(
 				    session, page, kpack->data, kpack->size));
+			CHILD_RELEASE_ERR(session, hazard, child);
 			continue;
 		}
 
@@ -3237,7 +3281,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		if (state == WT_CHILD_MODIFIED)
-			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
+			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
 				 * Overflow keys referencing empty pages are no
@@ -3248,16 +3292,17 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_ovfl_onpage_add(
+					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
+				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
 			case WT_PM_REC_REPLACE:
 				/*
 				 * If the page is replaced, the page's modify
 				 * structure has the page's address.
 				 */
-				addr = &rp->modify->u.replace;
+				addr = &child->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
 				/*
@@ -3270,13 +3315,14 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_ovfl_onpage_add(
+					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
 
-				WT_RET(__rec_row_merge(session, r, rp));
+				WT_ERR(__rec_row_merge(session, r, child));
+				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
-			WT_ILLEGAL_VALUE(session);
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
 
 		/*
@@ -3299,6 +3345,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				vtype = vpack->raw;
 		}
 		__rec_cell_build_addr(r, p, size, vtype, 0);
+		CHILD_RELEASE_ERR(session, hazard, child);
 
 		/*
 		 * If the key is an overflow key, check to see if we've entered
@@ -3322,7 +3369,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			ovfl_key = 1;
 		} else {
 			__wt_ref_key(page, ref, &p, &size);
-			WT_RET(__rec_cell_build_int_key(
+			WT_ERR(__rec_cell_build_int_key(
 			    session, r, p, r->cell_zero ? 1 : size, &ovfl_key));
 		}
 		r->cell_zero = 0;
@@ -3330,7 +3377,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		/* Boundary: split or write the page. */
 		while (key->len + val->len > r->space_avail) {
 			if (r->raw_compression) {
-				WT_RET(__rec_split_raw(session, r));
+				WT_ERR(__rec_split_raw(session, r));
 				continue;
 			}
 
@@ -3341,11 +3388,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * about to promote it.
 			 */
 			if (onpage_ovfl) {
-				WT_RET(__wt_buf_set(session,
+				WT_ERR(__wt_buf_set(session,
 				    r->cur, WT_IKEY_DATA(ikey), ikey->size));
 				onpage_ovfl = 0;
 			}
-			WT_RET(__rec_split(session, r));
+			WT_ERR(__rec_split(session, r));
 		}
 
 		/* Copy the key and value onto the page. */
@@ -3358,6 +3405,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
+
+err:	CHILD_RELEASE(session, hazard, child);
+	return (ret);
 }
 
 /*
