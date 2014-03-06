@@ -638,6 +638,7 @@ msg
 msgv
 mtx
 multi
+multiblock
 multicore
 multiprocess
 multisocket
