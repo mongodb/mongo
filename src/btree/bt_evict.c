@@ -535,13 +535,11 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			/*
 			 * Evict the page.
 			 * Do not attempt to evict pages expected to be merged
-			 * into their parents, with the single exception that
-			 * the root page can't be merged into anything, it must
-			 * be written.
+			 * into their parents, with the exception that the root
+			 * page can't be merged, it must be written.
 			 */
 			if (WT_PAGE_IS_ROOT(page) || page->modify == NULL ||
-			    !F_ISSET(page->modify,
-			    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT))
+			    !F_ISSET(page->modify, WT_PM_REC_EMPTY))
 				WT_ERR(__wt_rec_evict(session, &page, 1));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:

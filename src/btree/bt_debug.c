@@ -557,14 +557,21 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 	__dmsg(ds, " (%s", __wt_page_is_modified(page) ? "dirty" : "clean");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
 		__dmsg(ds, ", keys-built");
-	if (page->modify != NULL) {
-		if (F_ISSET(page->modify, WT_PM_REC_EMPTY))
+	if (page->modify != NULL)
+		switch (F_ISSET(page->modify, WT_PM_REC_MASK)) {
+		case WT_PM_REC_EMPTY:
 			__dmsg(ds, ", empty");
-		if (F_ISSET(page->modify, WT_PM_REC_REPLACE))
+			break;
+		case WT_PM_REC_MULTIBLOCK:
+			__dmsg(ds, ", multiblock");
+			break;
+		case WT_PM_REC_REPLACE:
 			__dmsg(ds, ", replaced");
-		if (F_ISSET(page->modify, WT_PM_REC_SPLIT))
-			__dmsg(ds, ", split");
-	}
+			break;
+		case 0:
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 	__dmsg(ds, ")\n");
 
 	if (WT_PAGE_IS_ROOT(page))
@@ -593,24 +600,20 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 
 	__dmsg(ds, "\t" "write generation: %" PRIu32 "\n", mod->write_gen);
 
-	switch (page->modify == NULL ?
-	    0 : F_ISSET(page->modify, WT_PM_REC_MASK)) {
-	case 0:
-		break;
+	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:
-		__dmsg(ds, "\t" "empty page\n");
+		__dmsg(ds, "\t" "empty\n");
+		break;
+	case WT_PM_REC_MULTIBLOCK:
+		__dmsg(ds, "\t" "multiblock\n");
 		break;
 	case WT_PM_REC_REPLACE:
-		__dmsg(ds, "\t" "replacement %s\n",
-		    __wt_addr_string(session, ds->tmp,
-		    mod->u.replace.addr, mod->u.replace.size));
+		__dmsg(ds, "\t" "replacement\n");
 		break;
-	case WT_PM_REC_SPLIT:
-		__dmsg(ds, "\t" "split page\n");
+	case 0:
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-
 	return (0);
 }
 

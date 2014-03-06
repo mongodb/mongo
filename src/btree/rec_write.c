@@ -423,7 +423,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 	case WT_PM_REC_REPLACE:				/* 1-for-1 page swap */
 		return (0);
-	case WT_PM_REC_SPLIT:				/* Page split */
+	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -2129,7 +2129,7 @@ __rec_split_write(
 	 */
 	bnd_slot = bnd - r->bnd;
 	if (bnd_slot > 1 ||
-	    (F_ISSET(mod, WT_PM_REC_SPLIT) && mod->u.m.multi != NULL)) {
+	    (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) && mod->u.m.multi != NULL)) {
 		/*
 		 * There are page header fields which need to be cleared to get
 		 * consistent checksums: specifically, the write generation and
@@ -2141,7 +2141,7 @@ __rec_split_write(
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (F_ISSET(mod, WT_PM_REC_SPLIT) &&
+		if (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) &&
 		    mod->u.m.multi_entries > bnd_slot) {
 			multi = &mod->u.m.multi[bnd_slot];
 			if (multi->size == bnd->size &&
@@ -2502,13 +2502,13 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 */
 				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
-			case WT_PM_REC_REPLACE:
-				addr = &child->modify->u.replace;
-				break;
-			case WT_PM_REC_SPLIT:
+			case WT_PM_REC_MULTIBLOCK:
 				WT_ERR(__rec_col_merge(session, r, child));
 				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
+			case WT_PM_REC_REPLACE:
+				addr = &child->modify->u.replace;
+				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
 		}
@@ -3297,14 +3297,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					    kpack->data, kpack->size));
 				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
-			case WT_PM_REC_REPLACE:
-				/*
-				 * If the page is replaced, the page's modify
-				 * structure has the page's address.
-				 */
-				addr = &child->modify->u.replace;
-				break;
-			case WT_PM_REC_SPLIT:
+			case WT_PM_REC_MULTIBLOCK:
 				/*
 				 * Overflow keys referencing split pages are no
 				 * longer useful (the split page's key is the
@@ -3322,6 +3315,13 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				WT_ERR(__rec_row_merge(session, r, child));
 				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
+			case WT_PM_REC_REPLACE:
+				/*
+				 * If the page is replaced, the page's modify
+				 * structure has the page's address.
+				 */
+				addr = &child->modify->u.replace;
+				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
 
@@ -3993,6 +3993,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
+	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
+		/*
+		 * Discard the multiple replacement blocks.
+		 */
+		WT_RET(__rec_split_discard(session, page));
+		break;
 	case WT_PM_REC_REPLACE:				/* 1-for-1 page swap */
 		/*
 		 * Discard the replacement leaf page's blocks.
@@ -4007,12 +4013,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
 		mod->u.replace.size = 0;
-		break;
-	case WT_PM_REC_SPLIT:				/* Page split */
-		/*
-		 * Discard the split page's blocks.
-		 */
-		WT_RET(__rec_split_discard(session, page));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -4142,7 +4142,7 @@ err:			__wt_scr_free(&tkey);
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
-		F_SET(mod, WT_PM_REC_SPLIT);
+		F_SET(mod, WT_PM_REC_MULTIBLOCK);
 		break;
 	}
 

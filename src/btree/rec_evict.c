@@ -787,6 +787,9 @@ __rec_page_dirty_update(
 		parent_ref->txnid = WT_TXN_NONE;
 		WT_PUBLISH(parent_ref->state, WT_REF_DELETED);
 		break;
+	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
+		WT_RET(__rec_split_evict(session, parent_ref, page));
+		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		if (parent_ref->addr != NULL &&
 		    __wt_off_page(page->parent, parent_ref->addr)) {
@@ -808,9 +811,6 @@ __rec_page_dirty_update(
 		parent_ref->page = NULL;
 		parent_ref->addr = addr;
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
-		break;
-	case WT_PM_REC_SPLIT:				/* Page split */
-		WT_RET(__rec_split_evict(session, parent_ref, page));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -970,8 +970,7 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 			if (__wt_page_ref(session, t)->state != WT_REF_MEM)
 				goto ckpt;
 			if (t->modify == NULL ||		/* not merged */
-			    !F_ISSET(t->modify,
-			    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT))
+			    !F_ISSET(t->modify, WT_PM_REC_EMPTY))
 				break;
 		}
 
@@ -983,41 +982,26 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 * eviction until its children have been evicted.
 	 *
 	 * We have to write dirty pages to know their final state, a page marked
-	 * empty may have had records added since reconciliation, a page marked
-	 * split may have had records deleted and no longer need to split.
-	 * Split-merge pages are the exception: they can never be change into
-	 * anything other than a split-merge page and are merged regardless of
-	 * being clean or dirty.
-	 *
-	 * Writing the page is expensive, do a cheap test first: if it doesn't
-	 * appear a subtree page can be merged, quit.  It's possible the page
-	 * has been emptied since it was last reconciled, and writing it before
-	 * testing might be worthwhile, but it's more probable we're attempting
-	 * to evict an internal page with live children, and that's a waste of
-	 * time.
+	 * empty may have had records added since reconciliation.  Writing the
+	 * page is expensive, do a cheap test first: if it doesn't seem likely a
+	 * subtree page can be merged, quit.
 	 */
 	mod = page->modify;
-	if (!top &&
-	    (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY | WT_PM_REC_SPLIT)))
+	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
 		return (EBUSY);
 
 	/*
 	 * If the page is dirty and can possibly change state, write it so we
 	 * know the final state.
+	 *
+	 * XXXKEITH
+	 * I don't think we should be setting WT_SKIP_UPDATE_RESTORE on any
+	 * page other than the top page, but then again, I think most of this
+	 * code is wrong, at this point.
 	 */
-	if (__wt_page_is_modified(page)) {
+	if (__wt_page_is_modified(page))
 		WT_RET(__wt_rec_write(session, page,
 		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_RESTORE));
-
-		/*
-		 * Update the page's modification reference, reconciliation
-		 * might have changed it.
-		 *
-		 * XXXKEITH: I don't think this is true, I don't think the
-		 * page's modify reference ever moves (or can move).
-		 */
-		mod = page->modify;
-	}
 
 	/*
 	 * If the page was ever modified, make sure all of the updates on the
@@ -1031,8 +1015,7 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 * Repeat the test: fail if any page in the top-level page's subtree
 	 * won't be merged into its parent.
 	 */
-	if (!top &&
-	    (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY | WT_PM_REC_SPLIT)))
+	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
 		return (EBUSY);
 
 	return (0);
