@@ -594,6 +594,7 @@ namespace mongo {
                     mutablebson::Document cmdToLog(curop.query(), 
                             mutablebson::Document::kInPlaceDisabled);
                     curCommand->redactForLogging(&cmdToLog);
+                    s << curCommand->name << " ";
                     s << cmdToLog.toString();
                 } 
                 else { // Should not happen but we need to handle curCommand == NULL gracefully
