@@ -865,11 +865,11 @@ function getUserObjString(userObj) {
  */
 DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
     var c = this.getCollection( "system.users" );
-    var oldPwd;
+    userObj = Object.extend({}, userObj); // Prevent modifications to userObj from getting to caller
     if (userObj.pwd != null) {
-        oldPwd = userObj.pwd;
         userObj.pwd = _hashPassword(userObj.user, userObj.pwd);
     }
+
     try {
         c.save(userObj);
     } catch (e) {
@@ -882,9 +882,6 @@ DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
         } else {
             throw "Could not insert into system.users: " + tojson(e);
         }
-    } finally {
-        if (userObj.pwd != null)
-            userObj.pwd = oldPwd;
     }
     print("Successfully added user: " + getUserObjString(userObj));
 
