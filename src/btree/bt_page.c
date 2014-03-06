@@ -127,8 +127,8 @@ __wt_page_in_func(
  *	Create or read a page into the cache.
  */
 int
-__wt_page_alloc(WT_SESSION_IMPL *session,
-    uint8_t type, uint64_t recno, uint32_t alloc_entries, WT_PAGE **pagep)
+__wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
+    uint64_t recno, uint32_t alloc_entries, int alloc_ref, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
@@ -136,7 +136,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 	WT_REF **refp;
 	uint32_t i;
 	size_t size;
-	void *p;
+	void *p, *t;
 
 	*pagep = NULL;
 
@@ -158,7 +158,8 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		size += alloc_entries * sizeof(WT_REF);
+		if (alloc_ref)
+			size += alloc_entries * sizeof(WT_REF);
 		break;
 	case WT_PAGE_COL_VAR:
 		size += alloc_entries * sizeof(WT_COL);
@@ -184,32 +185,35 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		page->pg_intl_recno = recno;
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
-		page->pg_intl_orig_index = p;
-		page->pg_intl_orig_entries = alloc_entries;
-
 		/*
 		 * Internal pages have an array of references to WT_REF objects
-		 * so they can split.  Allocate and initialize that array to
-		 * point to the initial WT_REF object array, even though the
-		 * WT_REF object array isn't yet initialized (it's initialized
+		 * so they can split, and in most cases, pages being allocated
+		 * have an array of WT_REF objects (the exception is an internal
+		 * page being created to deepen the tree).  Allocate the array
+		 * of references in all cases, and optionally initialize that
+		 * array to point to the initial WT_REF object array (note the
+		 * WT_REF object array isn't yet initialized, that will be done
 		 * when our caller reads through the storage image).
 		 */
 		if ((ret = __wt_calloc(session, 1,
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *),
-		    &p)) != 0) {
+		    &t)) != 0) {
 			__wt_free(session, page);
 			return (ret);
 		}
 		size +=
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *);
-		page->pg_intl_index = p;
+		page->pg_intl_index = t;
 		page->pg_intl_index->entries = alloc_entries;
 		page->pg_intl_index->index =
-		    (WT_REF **)((WT_PAGE_INDEX *)p + 1);
-		for (i = 0,
-		    refp = page->pg_intl_index->index; i < alloc_entries; ++i)
-			*refp++ = &page->pg_intl_orig_index[i];
-
+		    (WT_REF **)((WT_PAGE_INDEX *)t + 1);
+		if (alloc_ref) {
+			page->pg_intl_orig_index = p;
+			page->pg_intl_orig_entries = alloc_entries;
+			for (i = 0, refp =
+			    page->pg_intl_index->index; i < alloc_entries; ++i)
+				*refp++ = &page->pg_intl_orig_index[i];
+		}
 		break;
 	case WT_PAGE_COL_VAR:
 		page->pg_var_recno = recno;
@@ -296,7 +300,7 @@ __wt_page_inmem(
 
 	/* Allocate and initialize a new WT_PAGE. */
 	WT_RET(__wt_page_alloc(
-	    session, dsk->type, dsk->recno, alloc_entries, &page));
+	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
 	page->dsk = dsk;
 	F_SET_ATOMIC(page, flags);
 

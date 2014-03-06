@@ -346,6 +346,7 @@ extern int __wt_page_alloc(WT_SESSION_IMPL *session,
     uint8_t type,
     uint64_t recno,
     uint32_t alloc_entries,
+    int alloc_ref,
     WT_PAGE **pagep);
 extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE *parent,

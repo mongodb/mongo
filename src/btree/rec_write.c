@@ -438,11 +438,11 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->u.m.multi_entries, &next));
+		    WT_PAGE_COL_INT, 1, mod->u.m.multi_entries, 1, &next));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->u.m.multi_entries, &next));
+		    WT_PAGE_ROW_INT, 0, mod->u.m.multi_entries, 1, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

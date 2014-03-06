@@ -391,7 +391,8 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, &root));
+		WT_ERR(
+		    __wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, 1, &root));
 		root->parent = NULL;
 
 		ref = root->pg_intl_index->index[0];
@@ -401,7 +402,8 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		ref->key.recno = 1;
 		break;
 	case BTREE_ROW:
-		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, &root));
+		WT_ERR(
+		    __wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, 1, &root));
 		root->parent = NULL;
 
 		ref = root->pg_intl_index->index[0];
@@ -476,13 +478,16 @@ __wt_btree_new_leaf_page(
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_FIX, 1, 0, &leaf));
+		WT_RET(
+		    __wt_page_alloc(session, WT_PAGE_COL_FIX, 1, 0, 1, &leaf));
 		break;
 	case BTREE_COL_VAR:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_VAR, 1, 0, &leaf));
+		WT_RET(
+		    __wt_page_alloc(session, WT_PAGE_COL_VAR, 1, 0, 1, &leaf));
 		break;
 	case BTREE_ROW:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, &leaf));
+		WT_RET(
+		    __wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 1, &leaf));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
