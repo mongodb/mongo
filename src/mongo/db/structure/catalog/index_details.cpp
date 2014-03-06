@@ -42,18 +42,6 @@
 
 namespace mongo {
 
-    int IndexDetails::keyPatternOffset( const string& key ) const {
-        BSONObjIterator i( keyPattern() );
-        int n = 0;
-        while ( i.more() ) {
-            BSONElement e = i.next();
-            if ( key == e.fieldName() )
-                return n;
-            n++;
-        }
-        return -1;
-    }
-
     /* delete this index.  does NOT clean up the system catalog
        (system.indexes or system.namespaces) -- only NamespaceIndex.
        TOOD: above comment is wrong, also, document durability assumptions

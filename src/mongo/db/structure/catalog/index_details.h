@@ -86,13 +86,6 @@ namespace mongo {
             return info.obj().getObjectField("key");
         }
 
-        /**
-         * @return offset into keyPattern for key
-                   -1 if doesn't exist
-         */
-        int keyPatternOffset( const string& key ) const;
-        bool inKeyPattern( const string& key ) const { return keyPatternOffset( key ) >= 0; }
-
         // returns name of this index's storage area (database.collection.$index)
         string indexNamespace() const {
             return indexNamespaceFromObj(info.obj());
