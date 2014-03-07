@@ -287,7 +287,7 @@ namespace mongo {
             }
 
             // If we just became last in cap extent, advance past capFirstNewRecord
-            // (We know capExtent.ext()->firstRecord != capFirstNewRecord, since would
+            // (We know ext(capExtent)->firstRecord != capFirstNewRecord, since would
             // have returned DiskLoc() earlier otherwise.)
             if (ret == em->getExtent( nsd->capExtent() )->lastRecord) {
                 ret = em->getPrevRecord( nsd->capFirstNewRecord() );
