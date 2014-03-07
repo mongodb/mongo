@@ -314,9 +314,13 @@ namespace mongo {
         // config
         string temp = ctx.ctx().db()->name() + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
-        if (config["options"].isABSONObj())
-            if (!userCreateNS(ns.c_str(), config["options"].Obj(), errmsg, logForRepl, 0))
+        if (config["options"].isABSONObj()) {
+            Status status = userCreateNS(ns.c_str(), config["options"].Obj(), logForRepl, 0);
+            if ( !status.isOK() ) {
+                errmsg = status.toString();
                 return false;
+            }
+        }
 
         // main data
         copy(ctx.ctx(),
@@ -464,10 +468,8 @@ namespace mongo {
             string to_name = todb + p;
 
             {
-                string err;
-                const char *toname = to_name.c_str();
                 /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(toname, options, err, opts.logForRepl, false);
+                userCreateNS(to_name, options, opts.logForRepl, false);
             }
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;

@@ -418,7 +418,6 @@ namespace mongo {
         }
 
         /* create an oplog collection, if it doesn't yet exist. */
-        BSONObjBuilder b;
         double sz;
         if (replSettings.oplogSize != 0)
             sz = (double)replSettings.oplogSize;
@@ -447,13 +446,12 @@ namespace mongo {
         log() << "******" << endl;
         log() << "creating replication oplog of size: " << (int)( sz / ( 1024 * 1024 ) ) << "MB..." << endl;
 
-        b.append("size", sz);
-        b.appendBool("capped", 1);
-        b.appendBool("autoIndexId", false);
+        CollectionOptions options;
+        options.capped = true;
+        options.cappedSize = sz;
+        options.autoIndexId = CollectionOptions::NO;
 
-        string err;
-        BSONObj o = b.done();
-        userCreateNS(ns, o, err, false);
+        invariant( ctx.db()->createCollection( ns, options ) );
         if( !rs )
             logOp( "n", "", BSONObj() );
 

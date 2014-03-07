@@ -591,12 +591,8 @@ namespace mongo {
                         options.hasField("$nExtents"));
 
             // Create collection.
-            string err;
-            bool ok = userCreateNS(ns.c_str(), options, err, !fromRepl);
-            if (!ok && !err.empty()) {
-                errmsg = err;
-            }
-            return ok;
+            return appendCommandStatus( result,
+                                        userCreateNS(ns.c_str(), options, !fromRepl) );
         }
     } cmdCreate;
 

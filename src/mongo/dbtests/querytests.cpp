@@ -1171,7 +1171,7 @@ namespace QueryTests {
             Client::WriteContext ctx( "unittests" );
 
             // note that extents are always at least 4KB now - so this will get rounded up a bit.
-            ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
+            ASSERT( userCreateNS( ns(), fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
             for ( int i=0; i<200; i++ ) {
                 insertNext();
 //                cout << count() << endl;

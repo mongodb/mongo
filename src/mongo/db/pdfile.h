@@ -39,14 +39,17 @@
 
 #include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
     void dropDatabase(const std::string& db);
 
-    bool userCreateNS(const char *ns, BSONObj j, std::string& err,
-                      bool logForReplication, bool createDefaultIndexes = true );
+    Status userCreateNS( const StringData& ns,
+                         BSONObj options,
+                         bool logForReplication,
+                         bool createDefaultIndexes = true );
 
 
 } // namespace mongo

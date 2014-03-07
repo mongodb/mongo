@@ -1648,10 +1648,11 @@ namespace mongo {
                     string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
                     if ( entry["options"].isABSONObj() ) {
-                        string errmsg;
-                        if ( ! userCreateNS( ns.c_str(), entry["options"].Obj(), errmsg, true, 0 ) )
-                            warning() << "failed to create collection with options: " << errmsg
-                                      << endl;
+                        Status status = userCreateNS( ns, entry["options"].Obj(), true, 0 );
+                        if ( !status.isOK() ) {
+                            warning() << "failed to create collection [" << ns << "] "
+                                      << " with options: " << status;
+                        }
                     }
                     else {
                         db->createCollection( ns );

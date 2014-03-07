@@ -316,8 +316,7 @@ namespace ReplSetTests {
 
         void create() {
             Client::Context c(_cappedNs);
-            string err;
-            ASSERT(userCreateNS( _cappedNs.c_str(), fromjson( spec() ), err, false ));
+            ASSERT( userCreateNS( _cappedNs, fromjson( spec() ), false ).isOK() );
         }
 
         void dropCapped() {

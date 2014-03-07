@@ -181,18 +181,13 @@ namespace {
 
         // system.profile namespace doesn't exist; create it
         log() << "creating profile collection: " << profileName << endl;
-        string myerrmsg;
-        if (!userCreateNS(profileName,
-                          BSON("capped" << true << "size" << 1024 * 1024), myerrmsg , false)) {
-            myerrmsg = str::stream() << "could not create ns " << profileName << ": " << myerrmsg;
-            log() << myerrmsg << endl;
-            if ( errmsg )
-                *errmsg = myerrmsg;
-            return NULL;
-        }
 
-        collection = db->getCollection( profileName );
-        verify( collection );
+        CollectionOptions collectionOptions;
+        collectionOptions.capped = true;
+        collectionOptions.cappedSize = 1024 * 1024;
+
+        collection = db->createCollection( profileName, collectionOptions );
+        invariant( collection );
         return collection;
     }
 

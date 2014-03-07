@@ -209,12 +209,12 @@ namespace mongo {
                 // Create the target collection.
                 Collection* targetColl = NULL;
                 if ( capped ) {
-                    BSONObjBuilder spec;
-                    spec.appendBool( "capped", true );
-                    spec.append( "size", double( size ) );
-                    spec.appendBool( "autoIndexId", false );
-                    userCreateNS( target.c_str(), spec.obj(), errmsg, false );
-                    targetColl = ctx.db()->getCollection( target );
+                    CollectionOptions options;
+                    options.capped = true;
+                    options.cappedSize = size;
+                    options.setNoIdIndex();
+
+                    targetColl = ctx.db()->createCollection( target, options );
                 }
                 else {
                     CollectionOptions options;

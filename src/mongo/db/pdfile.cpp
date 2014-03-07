@@ -107,30 +107,29 @@ namespace mongo {
      * @param createDefaultIndexes - if false, defers id (and other) index creation.
      * @return true if successful
     */
-    bool userCreateNS(const char *ns, BSONObj options, string& err,
-                      bool logForReplication, bool createDefaultIndexes ) {
+    Status userCreateNS( const StringData& ns,
+                         BSONObj options,
+                         bool logForReplication,
+                         bool createDefaultIndexes ) {
 
         LOG(1) << "create collection " << ns << ' ' << options;
 
-        massert(10356 ,
-                str::stream() << "invalid ns: " << ns,
-                NamespaceString::validCollectionComponent(ns));
+        if ( !NamespaceString::validCollectionComponent(ns) )
+            return Status( ErrorCodes::InvalidNamespace,
+                           str::stream() << "invalid ns: " << ns );
 
         Database* db = cc().database();
 
         Collection* collection = db->getCollection( ns );
 
-        if ( collection ) {
-            err = "collection already exists";
-            return false;
-        }
+        if ( collection )
+            return Status( ErrorCodes::NamespaceExists,
+                           "collection already exists" );
 
         CollectionOptions collectionOptions;
         Status status = collectionOptions.parse( options );
-        if ( !status.isOK() ) {
-            err = status.toString();
-            return false;
-        }
+        if ( !status.isOK() )
+            return status;
 
         invariant( db->createCollection( ns, collectionOptions, true, createDefaultIndexes ) );
 
@@ -144,7 +143,8 @@ namespace mongo {
             string logNs = nsToDatabase(ns) + ".$cmd";
             logOp("c", logNs.c_str(), options);
         }
-        return true;
+
+        return Status::OK();
     }
 
     void dropAllDatabasesExceptLocal() {

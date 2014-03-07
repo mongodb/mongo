@@ -1043,8 +1043,7 @@ namespace NamespaceTests {
         protected:
             void create() {
                 Lock::GlobalWrite lk;
-                string err;
-                ASSERT( userCreateNS( ns(), fromjson( spec() ), err, false ) );
+                ASSERT( userCreateNS( ns(), fromjson( spec() ), false ).isOK() );
             }
             virtual string spec() const {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":1}";

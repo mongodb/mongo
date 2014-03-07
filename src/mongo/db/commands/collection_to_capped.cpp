@@ -66,9 +66,9 @@ namespace mongo {
             if ( temp )
                 spec.appendBool( "temp", true );
 
-            string errmsg;
-            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, logForReplication ) )
-                return Status( ErrorCodes::InternalError, errmsg );
+            Status status = userCreateNS( toNs.c_str(), spec.done(), logForReplication );
+            if ( !status.isOK() )
+                return status;
         }
 
         Collection* toCollection = db->getCollection( toNs );
