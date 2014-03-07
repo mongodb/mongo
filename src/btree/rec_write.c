@@ -2376,8 +2376,10 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ERR(
 		    __rec_child_modify(session, r, page, ref, &hazard, &state));
 		child = ref->page;
-		if (state) {
-			WT_ASSERT(session, state == WT_CHILD_MODIFIED);
+		WT_ASSERT(session, state != WT_CHILD_PROXY);
+		if (state == WT_CHILD_IGNORE)
+			continue;
+		if (state == WT_CHILD_MODIFIED) {
 			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
