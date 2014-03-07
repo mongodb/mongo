@@ -220,6 +220,12 @@ namespace mongo {
     // ---------------------------
 
     Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName ) {
+
+        // first check if requested index requires pdfile minor version to be bumped
+        if ( IndexNames::existedBefore24(newPluginName) ) {
+            return Status::OK();
+        }
+
         Database* db = _collection->_database;
 
         DataFileHeader* dfh = db->getExtentManager().getFile(0)->getHeader();
