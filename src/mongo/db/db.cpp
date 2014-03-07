@@ -289,14 +289,6 @@ namespace mongo {
         boost::thread thr(testExhaust);
 #endif
         server->run();
-
-        // If system is in shutdown, any network errors are from the sockets closing, so just block
-        // and wait for _exit to be called.
-        if (inShutdown()) {
-            sleepsecs(std::numeric_limits<int>::max());
-        }
-
-        exitCleanly(EXIT_NET_ERROR);
     }
 
     void checkForIdIndexes( OperationContext* txn, Database* db ) {
@@ -680,35 +672,43 @@ namespace mongo {
         indexRebuilder.go(); 
 
         listen(listenPort);
+
+        // listen() will return when exit code closes its socket.
     }
 
-    static void initAndListen(int listenPort) {
+    ExitCode initAndListen(int listenPort) {
         try {
             _initAndListen(listenPort);
+
+            return EXIT_NET_ERROR;
         }
         catch ( DBException &e ) {
             log() << "exception in initAndListen: " << e.toString() << ", terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
+            return EXIT_UNCAUGHT;
         }
         catch ( std::exception &e ) {
-            log() << "exception in initAndListen std::exception: " << e.what() << ", terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
+            log() << "exception in initAndListen std::exception: " << e.what() << ", terminating";
+            return EXIT_UNCAUGHT;
         }
         catch ( int& n ) {
             log() << "exception in initAndListen int: " << n << ", terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
+            return EXIT_UNCAUGHT;
         }
         catch(...) {
             log() << "exception in initAndListen, terminating" << endl;
-            dbexit( EXIT_UNCAUGHT );
+            return EXIT_UNCAUGHT;
         }
     }
 
 #if defined(_WIN32)
-    void initService() {
+    ExitCode initService() {
         ntservice::reportStatus( SERVICE_RUNNING );
         log() << "Service running" << endl;
-        initAndListen(serverGlobalParams.port);
+        ExitCode exitCode = initAndListen(serverGlobalParams.port);
+
+        // ignore EXIT_NET_ERROR on clean shutdown since we return this when the listening socket
+        // is closed
+        return (exitCode == EXIT_NET_ERROR && inShutdown()) ? EXIT_CLEAN : exitCode;
     }
 #endif
 
@@ -940,6 +940,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 #endif
 
     StartupTest::runTests();
-    initAndListen(serverGlobalParams.port);
-    fassertFailed(18000);
+    ExitCode exitCode = initAndListen(serverGlobalParams.port);
+    exitCleanly(exitCode);
+    return 0;
 }
