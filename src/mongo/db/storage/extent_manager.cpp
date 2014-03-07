@@ -249,7 +249,7 @@ namespace mongo {
         while ( 1 ) {
             if ( e->xnext.isNull() )
                 return DiskLoc(); // end of collection
-            e = e->xnext.ext();
+            e = getExtent( e->xnext );
             if ( !e->firstRecord.isNull() )
                 break;
             // entire extent could be empty, keep looking
@@ -278,7 +278,7 @@ namespace mongo {
         while ( 1 ) {
             if ( e->xprev.isNull() )
                 return DiskLoc(); // end of collection
-            e = e->xprev.ext();
+            e = getExtent( e->xprev );
             if ( !e->firstRecord.isNull() )
                 break;
             // entire extent could be empty, keep looking
@@ -422,7 +422,7 @@ namespace mongo {
             Timer t;
             DiskLoc L = _getFreeListStart();
             while( !L.isNull() ) {
-                Extent * e = L.ext();
+                Extent* e = getExtent( L );
                 if ( e->length >= low && e->length <= high ) {
                     int diff = abs(e->length - approxSize);
                     if ( diff < bestDiff ) {
@@ -512,7 +512,7 @@ namespace mongo {
         else {
             verify( !details->firstExtent().isNull() );
             getDur().writingDiskLoc(e->xprev) = details->lastExtent();
-            getDur().writingDiskLoc(details->lastExtent().ext()->xnext) = eloc;
+            getDur().writingDiskLoc(getExtent(details->lastExtent())->xnext) = eloc;
             details->setLastExtent( eloc );
         }
 
