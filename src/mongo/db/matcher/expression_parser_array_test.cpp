@@ -94,6 +94,51 @@ namespace mongo {
 
     }
 
+    TEST( MatchExpressionParserArrayTest, ElemMatchAnd ) {
+        BSONObj query = BSON( "x" <<
+                          BSON( "$elemMatch" <<
+                            BSON( "$and" << BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSON( "x" << 1 ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
+                                                  BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+
+    }
+
+    TEST( MatchExpressionParserArrayTest, ElemMatchNor ) {
+        BSONObj query = BSON( "x" <<
+                          BSON( "$elemMatch" <<
+                            BSON( "$nor" << BSON_ARRAY( BSON( "x" << 1 ) ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSON( "x" << 1 ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
+                                                  BSON_ARRAY( BSON( "x" << 2 << "y" << 2 ) ) ) ) );
+
+    }
+
+    TEST( MatchExpressionParserArrayTest, ElemMatchOr ) {
+        BSONObj query = BSON( "x" <<
+                          BSON( "$elemMatch" <<
+                            BSON( "$or" << BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
+        ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
+        ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
+                                                  BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+
+    }
+
     TEST( MatchExpressionParserArrayTest, ElemMatchVal1 ) {
         BSONObj query = BSON( "x" << BSON( "$elemMatch" << BSON( "$gt" << 5 ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );

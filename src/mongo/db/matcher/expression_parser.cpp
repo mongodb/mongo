@@ -605,7 +605,25 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$elemMatch needs an Object" );
 
         BSONObj obj = e.Obj();
+
+        // $elemMatch value case applies when the children all
+        // work on the field 'name'.
+        // This is the case when:
+        //     1) the argument is an expression document; and
+        //     2) expression is not a AND/NOR/OR logical operator. Children of
+        //        these logical operators are initialized with field names.
+        bool isElemMatchValue = false;
         if ( _isExpressionDocument( e, true ) ) {
+            BSONObj o = e.Obj();
+            BSONElement elt = o.firstElement();
+            invariant( !elt.eoo() );
+
+            isElemMatchValue = !mongoutils::str::equals( "$and", elt.fieldName() ) &&
+                               !mongoutils::str::equals( "$nor", elt.fieldName() ) &&
+                               !mongoutils::str::equals( "$or", elt.fieldName() );
+        }
+
+        if ( isElemMatchValue ) {
             // value case
 
             AndMatchExpression theAnd;
