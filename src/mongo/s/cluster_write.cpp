@@ -325,6 +325,13 @@ namespace mongo {
             return;
         }
 
+        if ( !NamespaceString::validCollectionName( nss.coll() ) ) {
+            toBatchError( Status( ErrorCodes::BadValue,
+                                  str::stream() << "invalid collection name " << nss.coll() ),
+                          response );
+            return;
+        }
+
         string errMsg;
         if ( request.isInsertIndexRequest() && !request.isValidIndexRequest( &errMsg ) ) {
             toBatchError( Status( ErrorCodes::InvalidOptions, errMsg ), response );
