@@ -718,12 +718,12 @@ static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_UPDATE *upd, WT_INSERT *ins, WT_ROW *rip, WT_UPDATE **updp)
 {
-	uint64_t max_txn;
+	uint64_t txnid, max_txn;
 
 	*updp = NULL;
 
 	for (max_txn = WT_TXN_NONE; upd != NULL; upd = upd->next) {
-		if (upd->txnid == WT_TXN_ABORTED)
+		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
 		/*
@@ -732,8 +732,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * skipped, and used to avoid evicting clean pages from memory
 		 * with changes that are required to satisfy a snapshot read.
 		 */
-		if (TXNID_LT(max_txn, upd->txnid))
-			max_txn = upd->txnid;
+		if (TXNID_LT(max_txn, txnid))
+			max_txn = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -746,7 +746,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * reconciled until modified again.
 		 */
 		if (*updp == NULL) {
-			if (__wt_txn_visible(session, upd->txnid))
+			if (__wt_txn_visible(session, txnid))
 				*updp = upd;
 			else
 				r->upd_skipped = 1;
