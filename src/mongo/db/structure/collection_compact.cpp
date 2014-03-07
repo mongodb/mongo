@@ -86,7 +86,7 @@ namespace mongo {
         unsigned oldObjSize = 0; // we'll report what the old padding was
         unsigned oldObjSizeWithPadding = 0;
 
-        Extent *e = diskloc.ext();
+        Extent *e = getExtentManager()->getExtent( diskloc );
         e->assertOk();
         verify( e->validates(diskloc) );
 
@@ -182,7 +182,7 @@ namespace mongo {
             verify( details()->lastExtent() != diskloc );
             DiskLoc newFirst = e->xnext;
             details()->firstExtent().writing() = newFirst;
-            newFirst.ext()->xprev.writing().Null();
+            getExtentManager()->getExtent( newFirst )->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
             getExtentManager()->freeExtents( diskloc, diskloc );
 
@@ -236,9 +236,11 @@ namespace mongo {
         getDur().commitIfNeeded();
 
         list<DiskLoc> extents;
-        for( DiskLoc L = d->firstExtent(); !L.isNull(); L = L.ext()->xnext )
-            extents.push_back(L);
-        log() << "compact " << extents.size() << " extents" << endl;
+        for( DiskLoc extLocation = d->firstExtent();
+             !extLocation.isNull();
+             extLocation = getExtentManager()->getExtent( extLocation )->xnext )
+            extents.push_back( extLocation );
+        log() << "compact " << extents.size() << " extents";
 
         // same data, but might perform a little different after compact?
         _infoCache.reset();
@@ -306,9 +308,9 @@ namespace mongo {
             pm.hit();
         }
 
-        verify( d->firstExtent().ext()->xprev.isNull() );
+        invariant( getExtentManager()->getExtent( d->firstExtent() )->xprev.isNull() );
 
-        // indexes will do their own progress meter?
+        // indexes will do their own progress meter
         pm.finished();
 
         log() << "starting index commits";
