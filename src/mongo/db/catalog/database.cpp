@@ -50,6 +50,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {

@@ -60,6 +60,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/storage/data_file.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -599,7 +600,7 @@ namespace mongo {
                                          << "not allow document removal." );
         }
 
-        if ( !IndexDetails::isIdIndexPattern( key ) ) {
+        if ( !IndexDescriptor::isIdIndexPattern( key ) ) {
             // for non _id indexes, we check to see if replication has turned off all indexes
             // we _always_ created _id index
             if( theReplSet && !theReplSet->buildIndexes() ) {
@@ -1252,7 +1253,7 @@ namespace mongo {
     }
 
     BSONObj IndexCatalog::fixIndexKey( const BSONObj& key ) {
-        if ( IndexDetails::isIdIndexPattern( key ) ) {
+        if ( IndexDescriptor::isIdIndexPattern( key ) ) {
             return _idObj;
         }
         if ( key["_id"].type() == Bool && key.nFields() == 1 ) {
@@ -1285,7 +1286,7 @@ namespace mongo {
         b.append( "key", key );
 
         string name = o["name"].String();
-        if ( IndexDetails::isIdIndexPattern( key ) ) {
+        if ( IndexDescriptor::isIdIndexPattern( key ) ) {
             name = "_id_";
         }
         b.append( "name", name );

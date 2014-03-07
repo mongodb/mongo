@@ -43,6 +43,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/background.h"
 
 namespace mongo {

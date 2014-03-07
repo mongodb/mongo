@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo { 

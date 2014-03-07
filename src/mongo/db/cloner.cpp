@@ -37,6 +37,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
@@ -52,7 +53,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 

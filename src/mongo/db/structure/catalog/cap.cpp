@@ -38,8 +38,8 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/json.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/mmap.h"
 

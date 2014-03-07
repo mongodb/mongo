@@ -41,6 +41,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/structure/catalog/namespace.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
