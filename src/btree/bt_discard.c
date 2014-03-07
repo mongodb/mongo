@@ -27,18 +27,18 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 
 	/*
 	 * When a page is discarded, it's been disconnected from its parent and
-	 * its parent's WT_REF structure may now point to a different page.
-	 * Make sure we don't accidentally use the page itself or any other
-	 * information.
+	 * its parent's WT_REF structure may now point to a different page.  Do
+	 * our best to catch races.
 	 */
 	page = *pagep;
 	*pagep = NULL;
 	page->parent = NULL;
 
 	/*
-	 * We should never discard the file's current eviction point or a page
-	 * queued for LRU eviction.
+	 * We should never discard a dirty page, the file's current eviction
+	 * point or a page queued for LRU eviction.
 	 */
+	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, S2BT(session)->evict_page != page);
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
@@ -99,27 +99,10 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	mod = page->modify;
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
-	case WT_PM_REC_SPLIT:
-		/*
-		 * If a root page split, there may be one or more pages linked
-		 * from the page; walk the list, discarding pages.
-		 */
-		if (mod->root_split != NULL)
-			__wt_page_out(session, &mod->root_split);
-		break;
-	case WT_PM_REC_REPLACE:
-		/*
-		 * Discard any replacement address: this memory is usually moved
-		 * into the parent's WT_REF, but at the root that can't happen.
-		 */
-		__wt_free(session, mod->u.replace.addr);
-		break;
-	default:
-		break;
-	}
-
-	/* Free any reconciliation-created list of replacement blocks. */
-	if (mod->u.m.multi != NULL) {
+	case WT_PM_REC_MULTIBLOCK:
+		/* Free list of replacement blocks. */
+		if (mod->u.m.multi == NULL)
+			break;
 		for (i = 0; i < mod->u.m.multi_entries; ++i) {
 			switch (page->type) {
 			case WT_PAGE_ROW_INT:
@@ -134,6 +117,14 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, mod->u.m.multi[i].addr.addr);
 		}
 		__wt_free(session, mod->u.m.multi);
+		break;
+	case WT_PM_REC_REPLACE:
+		/*
+		 * Discard any replacement address: this memory is usually moved
+		 * into the parent's WT_REF, but at the root that can't happen.
+		 */
+		__wt_free(session, mod->u.replace.addr);
+		break;
 	}
 
 	/*
@@ -146,6 +137,13 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, mod->splits[i].refs);
 	}
 	__wt_free(session, mod->splits);
+
+	/*
+	 * If a root page split, there may be one or more pages linked from the
+	 * page; walk the list, discarding pages.
+	 */
+	if (mod->root_split != NULL)
+		__wt_page_out(session, &mod->root_split);
 
 	/* Free the append array. */
 	if ((append = WT_COL_APPEND(page)) != NULL) {

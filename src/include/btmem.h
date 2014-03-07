@@ -325,11 +325,11 @@ struct __wt_page_modify {
 	__wt_spin_unlock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
 	uint8_t page_lock;    /* Page's spinlock */
 
-#define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
-#define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
-#define	WT_PM_REC_SPLIT		0x04	/* Reconciliation: page split */
+#define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: no replacement */
+#define	WT_PM_REC_MULTIBLOCK	0x02	/* Reconciliation: multiple blocks */
+#define	WT_PM_REC_REPLACE	0x04	/* Reconciliation: single block */
 #define	WT_PM_REC_MASK							\
-	(WT_PM_REC_EMPTY | WT_PM_REC_REPLACE | WT_PM_REC_SPLIT)
+	(WT_PM_REC_EMPTY | WT_PM_REC_MULTIBLOCK | WT_PM_REC_REPLACE)
 	uint8_t flags;			/* Page flags */
 };
 
@@ -490,9 +490,9 @@ struct __wt_page {
 	 * becomes active.  To avoid incrementing a page's read generation too
 	 * frequently, it is set to a future point.
 	 */
-#define	WT_READ_GEN_NOTSET	0
-#define	WT_READ_GEN_OLDEST	1
-#define	WT_READ_GEN_STEP	100
+#define	WT_READGEN_NOTSET	0
+#define	WT_READGEN_OLDEST	1
+#define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
 	uint64_t memory_footprint;	/* Memory attached to the page */
@@ -506,6 +506,8 @@ struct __wt_page {
 	WT_PAGE	*parent;		/* Page's parent */
 	uint32_t ref_hint;		/* Page's WT_REF hint */
 
+#define	WT_PAGE_IS_INTERNAL(page)					\
+	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
 #define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */
@@ -550,10 +552,6 @@ struct __wt_page {
  *	row-store leaf pages without reading them if they don't reference
  *	overflow items.
  *
- * WT_REF_EVICT_WALK:
- *	The next page to be walked for LRU eviction.  This page is available
- *	for reads but not eviction.
- *
  * WT_REF_LOCKED:
  *	Locked for exclusive access.  In eviction, this page or a parent has
  *	been selected for eviction; once hazard pointers are checked, the page
@@ -596,7 +594,6 @@ struct __wt_page {
 enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
-	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
 	WT_REF_READING,			/* Page being read */

@@ -301,6 +301,14 @@ worker(void *arg)
 			 * a random range as a "read".
 			 */
 			ret = cursor->search(cursor);
+			if (ret == 0) {
+				if ((ret = cursor->get_value(
+				    cursor, &value)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "get_value in read.");
+					goto err;
+				}
+			}
 			if (ret == 0 || ret == WT_NOTFOUND)
 				break;
 			goto op_err;
@@ -1380,7 +1388,8 @@ start_run(CONFIG *cfg)
 		goto err;
 
 	/* Optional workload. */
-	if (cfg->run_time != 0 || cfg->run_ops != 0) {
+	if (cfg->workers_cnt != 0 &&
+	    (cfg->run_time != 0 || cfg->run_ops != 0)) {
 		/* Didn't create, set insert count. */
 		if (cfg->create == 0 && find_table_count(cfg) != 0)
 			goto err;

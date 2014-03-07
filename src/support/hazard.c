@@ -81,21 +81,16 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 
 		/*
 		 * Check if the page state is still valid, where valid means a
-		 * state of WT_REF_MEM or WT_REF_EVICT_WALK and the pointer is
-		 * unchanged.  (The pointer can change, it means the page was
-		 * evicted between the time we set our hazard pointer and the
-		 * publication.  It would theoretically be possible for the
-		 * page to be evicted and a different page read into the same
-		 * memory, so the pointer hasn't changed but the contents have.
-		 * That's OK, we found this page using the tree's key space,
-		 * whatever page we find here is the page for us to use.)
+		 * state of WT_REF_MEM and the pointer is unchanged.  (The
+		 * pointer can change, it means the page was evicted between
+		 * the time we set our hazard pointer and the publication.  It
+		 * would theoretically be possible for the page to be evicted
+		 * and a different page read into the same memory, so the
+		 * pointer hasn't changed but the contents have.  That's OK, we
+		 * found this page using the tree's key space, whatever page we
+		 * find here is the page for us to use.)
 		 */
-		if (ref->page == hp->page &&
-		    (ref->state == WT_REF_MEM ||
-		    ref->state == WT_REF_EVICT_WALK)) {
-			WT_VERBOSE_RET(session, hazard,
-			    "session %p hazard %p: set", session, ref->page);
-
+		if (ref->page == hp->page && ref->state == WT_REF_MEM) {
 			++session->nhazard;
 			return (0);
 		}
@@ -151,9 +146,9 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			/*
 			 * We don't publish the hazard pointer clear in the
 			 * general case.  It's not required for correctness;
-			 * it gives the page server thread faster access to the
+			 * it gives an eviction thread faster access to the
 			 * page were the page selected for eviction, but the
-			 * generation number was just set, so it's unlikely the
+			 * generation number was just set, it's unlikely the
 			 * page will be selected for eviction.
 			 */
 			hp->page = NULL;

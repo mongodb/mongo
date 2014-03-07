@@ -177,7 +177,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 	 * page.  In other words, the goal is to avoid some number of updates
 	 * immediately after each update we have to make.
 	 */
-	return (__wt_cache_read_gen(session) + WT_READ_GEN_STEP);
+	return (__wt_cache_read_gen(session) + WT_READGEN_STEP);
 }
 
 /*
@@ -351,7 +351,7 @@ static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/*
-	 * Mark the tree dirty (even if the page is already marked dirty, newly
+	 * Mark the tree dirty (even if the page is already marked dirty), newly
 	 * created pages to support "empty" files are dirty, but the file isn't
 	 * marked dirty until there's a real change needing to be written. Test
 	 * before setting the dirty flag, it's a hot cache line.
@@ -636,6 +636,100 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 }
 
 /*
+ * __wt_page_release --
+ *	Release a reference to a page.
+ */
+static inline int
+__wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_DECL_RET;
+	WT_REF *ref;
+
+	/*
+	 * Discard our hazard pointer.  Ignore pages we don't have and the root
+	 * page, which sticks in memory, regardless.
+	 */
+	if (page == NULL || WT_PAGE_IS_ROOT(page))
+		return (0);
+
+	/*
+	 * Try to immediately evict pages if they have the special "oldest"
+	 * read generation and we have some chance of succeeding.
+	 */
+	if (page->read_gen != WT_READGEN_OLDEST ||
+	    F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
+		goto skip;
+	ref = __wt_page_ref(session, page);
+	if (WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
+		if ((ret = __wt_hazard_clear(session, page)) != 0) {
+			ref->state = WT_REF_MEM;
+			return (ret);
+		}
+		if ((ret = __wt_evict_page(session, &page)) == 0)
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+		else {
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_force_fail);
+			if (ret == EBUSY)
+				ret = 0;
+		}
+		return (ret);
+	}
+
+skip:	return (__wt_hazard_clear(session, page));
+}
+
+/*
+ * __wt_page_swap_func --
+ *	Swap one page's hazard pointer for another one when hazard pointer
+ * coupling up/down the tree.
+ */
+static inline int
+__wt_page_swap_func(WT_SESSION_IMPL *session, WT_PAGE *held,
+    WT_PAGE *parent, WT_REF *ref, uint32_t flags
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    )
+{
+	WT_DECL_RET;
+	int acquired;
+
+	/*
+	 * This function is here to simplify the error handling during hazard
+	 * pointer coupling so we never leave a hazard pointer dangling.  The
+	 * assumption is we're holding a hazard pointer on "held", and want to
+	 * acquire a hazard pointer on the page referenced by a parent/ref
+	 * pair, releasing the hazard pointer on page "held" when we're done.
+	 */
+	ret = __wt_page_in_func(session, parent, ref, flags
+#ifdef HAVE_DIAGNOSTIC
+	    , file, line
+#endif
+	    );
+
+	/* An expected failure: WT_NOTFOUND when doing a cache-only read. */
+	if (LF_ISSET(WT_READ_CACHE) && ret == WT_NOTFOUND)
+		return (WT_NOTFOUND);
+
+	/* An expected failure: WT_RESTART */
+	if (ret == WT_RESTART)
+		return (WT_RESTART);
+
+	/* Discard the original held page. */
+	acquired = ret == 0;
+	WT_TRET(__wt_page_release(session, held));
+
+	/*
+	 * If there was an error discarding the original held page, discard
+	 * the acquired page too, keeping it is never useful.
+	 */
+	if (acquired && ret != 0)
+		WT_TRET(__wt_page_release(session, ref->page));
+	return (ret);
+}
+
+/*
  * __wt_eviction_force_check --
  *	Check if a page matches the criteria for forced eviction.
  */
@@ -671,95 +765,29 @@ __wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_page_release --
- *	Release a reference to a page.
+ * __wt_eviction_force --
+ *	Forcefully evict a page, if possible.
  */
 static inline int
-__wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_DECL_RET;
-	WT_REF *ref;
-
 	/*
-	 * Discard our hazard pointer.  Ignore pages we don't have and the root
-	 * page, which sticks in memory, regardless.
+	 * Check if eviction has a chance of succeeding, otherwise stall to
+	 * give other transactions a chance to complete.
 	 */
-	if (page == NULL || WT_PAGE_IS_ROOT(page))
-		return (0);
-
-	/*
-	 * Try to immediately evict pages if they have the special "oldest"
-	 * read generation and we have some chance of succeeding.
-	 */
-	if (page->read_gen != WT_READ_GEN_OLDEST)
-		goto skip;
-
-	ref = __wt_page_ref(session, page);
-	if (WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
-		if ((ret = __wt_hazard_clear(session, page)) != 0) {
-			ref->state = WT_REF_MEM;
-			return (ret);
-		}
-		if ((ret = __wt_evict_page(session, &page)) == 0)
-			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-		else {
-			WT_STAT_FAST_CONN_INCR(
-			    session, cache_eviction_force_fail);
-			if (ret == EBUSY)
-				ret = 0;
-		}
-		return (ret);
+	__wt_txn_update_oldest(session);
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_FORCE) ||
+	    __wt_txn_visible_all(session, page->modify->update_txn)) {
+		F_SET_ATOMIC(page, WT_PAGE_EVICT_FORCE);
+		page->read_gen = WT_READGEN_OLDEST;
+		WT_RET(__wt_page_release(session, page));
+		WT_RET(__wt_evict_server_wake(session));
+	} else {
+		WT_RET(__wt_page_release(session, page));
+		__wt_sleep(0, 10000);
 	}
 
-skip:	return (__wt_hazard_clear(session, page));
-}
-
-/*
- * __wt_page_swap_func --
- *	Swap one page's hazard pointer for another one when hazard pointer
- * coupling up/down the tree.
- */
-static inline int
-__wt_page_swap_func(WT_SESSION_IMPL *session,
-    WT_PAGE *held, WT_PAGE *parent, WT_REF *ref, int cleanup
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    )
-{
-	WT_DECL_RET;
-	int acquired;
-
-	/*
-	 * This function is here to simplify the error handling during hazard
-	 * pointer coupling so we never leave a hazard pointer dangling.  The
-	 * assumption is we're holding a hazard pointer on "held", and want to
-	 * acquire a hazard pointer on the page referenced by a parent/ref
-	 * pair, releasing the hazard pointer on page "held" when we're done.
-	 * If we can't get the page we want, optionally discard the original
-	 * hazard pointer.
-	 */
-	ret = __wt_page_in_func(session, parent, ref
-#ifdef HAVE_DIAGNOSTIC
-	    , file, line
-#endif
-	    );
-	acquired = ret == 0;
-
-	/*
-	 * If we got the page we wanted, or we're discarding all hazard pointers
-	 * on error, discard the original held pointer.
-	 */
-	if (acquired || cleanup)
-		WT_TRET(__wt_page_release(session, held));
-
-	/*
-	 * If there was an error discarding the original held pointer, discard
-	 * the acquired pointer too, keeping it is never useful.
-	 */
-	if (acquired && ret != 0)
-		WT_TRET(__wt_page_release(session, ref->page));
-	return (ret);
+	return (0);
 }
 
 /*
@@ -794,32 +822,6 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 				return (hp);
 	}
 	return (NULL);
-}
-
-/*
- * __wt_eviction_force --
- *	Forcefully evict a page, if possible.
- */
-static inline int
-__wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	/*
-	 * Check if eviction has a chance of succeeding, otherwise stall to
-	 * give other transactions a chance to complete.
-	 */
-	__wt_txn_update_oldest(session);
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_FORCE) ||
-	    __wt_txn_visible_all(session, page->modify->update_txn)) {
-		F_SET_ATOMIC(page, WT_PAGE_EVICT_FORCE);
-		page->read_gen = WT_READ_GEN_OLDEST;
-		WT_RET(__wt_page_release(session, page));
-		WT_RET(__wt_evict_server_wake(session));
-	} else {
-		WT_RET(__wt_page_release(session, page));
-		__wt_sleep(0, 10000);
-	}
-
-	return (0);
 }
 
 /*

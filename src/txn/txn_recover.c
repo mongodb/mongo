@@ -402,7 +402,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	/* We need a real session for recovery. */
 	WT_RET(__wt_open_session(conn, 0, NULL, NULL, &session));
-	F_SET(session, WT_SESSION_LOGGING_DISABLED);
+	F_SET(session, WT_SESSION_NO_LOGGING);
 	r.session = session;
 
 	WT_ERR(__wt_metadata_search(session, WT_METADATA_URI, &config));

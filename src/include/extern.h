@@ -240,9 +240,9 @@ extern int __wt_compact_page_skip( WT_SESSION_IMPL *session,
     WT_REF *ref,
     int *skipp);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
-extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard);
+extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard);
+extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp);
@@ -285,12 +285,11 @@ extern void __wt_free_ref_array( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_REF *ref,
     uint32_t entries);
-extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
-extern void __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
-extern void __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
+extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_evict_file(WT_SESSION_IMPL *session, int syncop);
 extern int __wt_sync_file(WT_SESSION_IMPL *session, int syncop);
@@ -338,7 +337,7 @@ extern int __wt_ovfl_cache(WT_SESSION_IMPL *session,
     WT_CELL_UNPACK *unpack);
 extern int
 __wt_page_in_func(
- WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref
+ WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
  , const char *file, int line
 #endif
@@ -347,6 +346,7 @@ extern int __wt_page_alloc(WT_SESSION_IMPL *session,
     uint8_t type,
     uint64_t recno,
     uint32_t alloc_entries,
+    int alloc_ref,
     WT_PAGE **pagep);
 extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE *parent,

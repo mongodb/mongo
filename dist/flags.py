@@ -29,6 +29,17 @@ flags = {
 		'LOG_DSYNC',
 		'LOG_FSYNC'
 	],
+	'page_read' : [
+		'READ_CACHE',
+		'READ_COMPACT',
+		'READ_NO_GEN',
+		'READ_NO_WAIT',
+		'READ_PREV',
+		'READ_SKIP_INTL',
+		'READ_SKIP_LEAF',
+		'READ_TRUNCATE',
+		'READ_WONT_NEED',
+	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',
@@ -36,16 +47,6 @@ flags = {
 	],
 	'shared_cache' : [
 		'CACHE_POOL_RUN'
-	],
-	'tree_walk' : [
-		'TREE_CACHE',
-		'TREE_COMPACT',
-		'TREE_DISCARD',
-		'TREE_EVICT',
-		'TREE_PREV',
-		'TREE_SKIP_INTL',
-		'TREE_SKIP_LEAF',
-		'TREE_WAIT',
 	],
 	'txn_log_checkpoint' : [
 		'TXN_LOG_CKPT_FAIL',
@@ -60,7 +61,6 @@ flags = {
 		'VERB_evict',
 		'VERB_evictserver',
 		'VERB_fileops',
-		'VERB_hazard',
 		'VERB_log',
 		'VERB_lsm',
 		'VERB_mutex',
@@ -89,10 +89,10 @@ flags = {
 	],
 	'session' : [
 		'SESSION_INTERNAL',
-		'SESSION_LOGGING_DISABLED',
 		'SESSION_LOGGING_INMEM',
 		'SESSION_NO_CACHE',
 		'SESSION_NO_CACHE_CHECK',
+		'SESSION_NO_LOGGING',
 		'SESSION_NO_SCHEMA_LOCK',
 		'SESSION_SALVAGE_CORRUPT_OK',
 		'SESSION_SCHEMA_LOCKED',

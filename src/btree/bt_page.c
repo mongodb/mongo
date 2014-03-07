@@ -22,7 +22,7 @@ static int  __inmem_row_leaf_entries(
  */
 int
 __wt_page_in_func(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -36,24 +36,29 @@ __wt_page_in_func(
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
+			if (LF_ISSET(WT_READ_CACHE))
+				return (WT_NOTFOUND);
+
 			/*
 			 * The page isn't in memory, attempt to read it.
 			 * Make sure there is space in the cache.
 			 */
 			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
-			oldgen = F_ISSET(session, WT_SESSION_NO_CACHE) ? 1 : 0;
+			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
+			    F_ISSET(session, WT_SESSION_NO_CACHE);
 			continue;
-		case WT_REF_LOCKED:
 		case WT_REF_READING:
-			/*
-			 * The page is being read or considered for eviction --
-			 * wait for that to be resolved.
-			 */
+			if (LF_ISSET(WT_READ_CACHE))
+				return (WT_NOTFOUND);
+			/* FALLTHROUGH */
+		case WT_REF_LOCKED:
+			if (LF_ISSET(WT_READ_NO_WAIT))
+				return (WT_NOTFOUND);
+			/* The page is busy -- wait. */
 			break;
 		case WT_REF_SPLIT:
 			return (WT_RESTART);
-		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 			/*
 			 * The page is in memory: get a hazard pointer, update
@@ -80,7 +85,8 @@ __wt_page_in_func(
 			 * That is, if the updates on the page are visible to
 			 * the running transaction.
 			 */
-			if (force_attempts < 10 &&
+			if (!LF_ISSET(WT_READ_NO_GEN) &&
+			    force_attempts < 10 &&
 			    __wt_eviction_force_check(session, page)) {
 				++force_attempts;
 				WT_RET(__wt_eviction_force(session, page));
@@ -100,9 +106,10 @@ __wt_page_in_func(
 			 *
 			 * Otherwise, update the page's read generation.
 			 */
-			if (oldgen && page->read_gen == WT_READ_GEN_NOTSET)
-				page->read_gen = WT_READ_GEN_OLDEST;
-			else if (page->read_gen < __wt_cache_read_gen(session))
+			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
+				page->read_gen = WT_READGEN_OLDEST;
+			else if (!LF_ISSET(WT_READ_NO_GEN) &&
+			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
 				    __wt_cache_read_gen_set(session);
 
@@ -120,8 +127,8 @@ __wt_page_in_func(
  *	Create or read a page into the cache.
  */
 int
-__wt_page_alloc(WT_SESSION_IMPL *session,
-    uint8_t type, uint64_t recno, uint32_t alloc_entries, WT_PAGE **pagep)
+__wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
+    uint64_t recno, uint32_t alloc_entries, int alloc_ref, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
@@ -129,7 +136,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 	WT_REF **refp;
 	uint32_t i;
 	size_t size;
-	void *p;
+	void *p, *t;
 
 	*pagep = NULL;
 
@@ -151,7 +158,8 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		size += alloc_entries * sizeof(WT_REF);
+		if (alloc_ref)
+			size += alloc_entries * sizeof(WT_REF);
 		break;
 	case WT_PAGE_COL_VAR:
 		size += alloc_entries * sizeof(WT_COL);
@@ -166,7 +174,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 	p = (uint8_t *)page + sizeof(WT_PAGE);
 
 	page->type = type;
-	page->read_gen = WT_READ_GEN_NOTSET;
+	page->read_gen = WT_READGEN_NOTSET;
 
 	switch (type) {
 	case WT_PAGE_COL_FIX:
@@ -177,32 +185,35 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		page->pg_intl_recno = recno;
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
-		page->pg_intl_orig_index = p;
-		page->pg_intl_orig_entries = alloc_entries;
-
 		/*
 		 * Internal pages have an array of references to WT_REF objects
-		 * so they can split.  Allocate and initialize that array to
-		 * point to the initial WT_REF object array, even though the
-		 * WT_REF object array isn't yet initialized (it's initialized
+		 * so they can split, and in most cases, pages being allocated
+		 * have an array of WT_REF objects (the exception is an internal
+		 * page being created to deepen the tree).  Allocate the array
+		 * of references in all cases, and optionally initialize that
+		 * array to point to the initial WT_REF object array (note the
+		 * WT_REF object array isn't yet initialized, that will be done
 		 * when our caller reads through the storage image).
 		 */
 		if ((ret = __wt_calloc(session, 1,
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *),
-		    &p)) != 0) {
+		    &t)) != 0) {
 			__wt_free(session, page);
 			return (ret);
 		}
 		size +=
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *);
-		page->pg_intl_index = p;
+		page->pg_intl_index = t;
 		page->pg_intl_index->entries = alloc_entries;
 		page->pg_intl_index->index =
-		    (WT_REF **)((WT_PAGE_INDEX *)p + 1);
-		for (i = 0,
-		    refp = page->pg_intl_index->index; i < alloc_entries; ++i)
-			*refp++ = &page->pg_intl_orig_index[i];
-
+		    (WT_REF **)((WT_PAGE_INDEX *)t + 1);
+		if (alloc_ref) {
+			page->pg_intl_orig_index = p;
+			page->pg_intl_orig_entries = alloc_entries;
+			for (i = 0, refp =
+			    page->pg_intl_index->index; i < alloc_entries; ++i)
+				*refp++ = &page->pg_intl_orig_index[i];
+		}
 		break;
 	case WT_PAGE_COL_VAR:
 		page->pg_var_recno = recno;
@@ -289,7 +300,7 @@ __wt_page_inmem(
 
 	/* Allocate and initialize a new WT_PAGE. */
 	WT_RET(__wt_page_alloc(
-	    session, dsk->type, dsk->recno, alloc_entries, &page));
+	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
 	page->dsk = dsk;
 	F_SET_ATOMIC(page, flags);
 
