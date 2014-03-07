@@ -1693,8 +1693,8 @@ namespace mongo {
         const int sizeWithEOO = b.len() + 1/*EOO*/ - 4/*BSONObj::Holder ref count*/;
         uassert(17260, str::stream() << "Converting from JavaScript to BSON failed: "
                                      << "Object size " << sizeWithEOO << " exceeds limit of "
-                                     << BSONObjMaxUserSize << " bytes.",
-                sizeWithEOO <= BSONObjMaxUserSize);
+                                     << BSONObjMaxInternalSize << " bytes.",
+                sizeWithEOO <= BSONObjMaxInternalSize);
 
         return b.obj(); // Would give an uglier error than above for oversized objects.
     }
