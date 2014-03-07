@@ -37,7 +37,8 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/delete_executor.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -775,11 +776,11 @@ namespace mongo {
                         }
                     }
                     catch ( const DBException& ex ) {
-                        Status stat(ex.toStatus());
-                        if (ErrorCodes::isInterruption(stat.code())) {
+                        Status status(ex.toStatus());
+                        if (ErrorCodes::isInterruption(status.code())) {
                             throw;
                         }
-                        currResult.error = toWriteError(stat);
+                        currResult.error = toWriteError(status);
                     }
 
                     //
@@ -925,9 +926,6 @@ namespace mongo {
 
         // Removes are similar to updates, but page faults are handled externally
 
-        const BatchedCommandRequest& request = *removeItem.getRequest();
-        const NamespaceString nss( removeItem.getRequest()->getNS() );
-
         // BEGIN CURRENT OP
         scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, removeItem ) );
         incOpStats( removeItem );
@@ -935,34 +933,11 @@ namespace mongo {
         WriteOpResult result;
 
         while ( true ) {
+            multiRemove( removeItem, &result );
 
-            {
-                // NOTE: Deletes will not fault outside the lock once any data has been written
-                PageFaultRetryableSection pFaultSection;
-
-                ///////////////////////////////////////////
-                Lock::DBWrite writeLock( nss.ns() );
-                ///////////////////////////////////////////
-
-                // Check version once we're locked
-
-                if ( !checkShardVersion( &shardingState, request, &result.error ) ) {
-                    // Version error
-                    break;
-                }
-
-                // Context once we're locked, to set more details in currentOp()
-                // TODO: better constructor?
-                Client::Context writeContext( nss.ns(),
-                                              storageGlobalParams.dbpath,
-                                              false /* don't check version */);
-
-                multiRemove( removeItem, &result );
-
-                if ( !result.fault ) {
-                    incWriteStats( removeItem, result.stats, result.error, currentOp.get() );
-                    break;
-                }
+            if ( !result.fault ) {
+                incWriteStats( removeItem, result.stats, result.error, currentOp.get() );
+                break;
             }
 
             //
@@ -1021,11 +996,11 @@ namespace mongo {
             result->fault = new PageFaultException( ex );
         }
         catch ( const DBException& ex ) {
-            Status stat(ex.toStatus());
-            if (ErrorCodes::isInterruption(stat.code())) {
+            Status status(ex.toStatus());
+            if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(stat);
+            result->error = toWriteError(status);
         }
 
     }
@@ -1065,18 +1040,18 @@ namespace mongo {
             result->fault = new PageFaultException( ex );
         }
         catch ( const DBException& ex ) {
-            Status stat(ex.toStatus());
-            if (ErrorCodes::isInterruption(stat.code())) {
+            Status status = ex.toStatus();
+            if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(stat);
+            result->error = toWriteError(status);
         }
     }
 
     static void multiUpdate( const BatchItemRef& updateItem,
                              WriteOpResult* result ) {
 
-        NamespaceString nsString(updateItem.getRequest()->getNS());
+        const NamespaceString nsString(updateItem.getRequest()->getNS());
         UpdateRequest request(nsString);
         request.setQuery(updateItem.getUpdate()->getQuery());
         request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
@@ -1119,11 +1094,11 @@ namespace mongo {
             result->stats.upsertedID = resUpsertedID;
         }
         catch (const DBException& ex) {
-            Status stat(ex.toStatus());
-            if (ErrorCodes::isInterruption(stat.code())) {
+            status = ex.toStatus();
+            if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(stat);
+            result->error = toWriteError(status);
         }
     }
 
@@ -1136,28 +1111,52 @@ namespace mongo {
     static void multiRemove( const BatchItemRef& removeItem,
                              WriteOpResult* result ) {
 
-        Lock::assertWriteLocked( removeItem.getRequest()->getNS() );
+        const NamespaceString nss( removeItem.getRequest()->getNS() );
+        DeleteRequest request( nss );
+        request.setQuery( removeItem.getDelete()->getQuery() );
+        request.setMulti( removeItem.getDelete()->getLimit() != 1 );
+        request.setUpdateOpLog(true);
+        request.setGod( false );
+        DeleteExecutor executor( &request );
+        Status status = executor.prepare();
+        if ( !status.isOK() ) {
+            result->error = toWriteError( status );
+            return;
+        }
+
+        // NOTE: Deletes will not fault outside the lock once any data has been written
+        PageFaultRetryableSection pFaultSection;
+
+        ///////////////////////////////////////////
+        Lock::DBWrite writeLock( nss.ns() );
+        ///////////////////////////////////////////
+
+        // Check version once we're locked
+
+        if ( !checkShardVersion( &shardingState, *removeItem.getRequest(), &result->error ) ) {
+            // Version error
+            return;
+        }
+
+        // Context once we're locked, to set more details in currentOp()
+        // TODO: better constructor?
+        Client::Context writeContext( nss.ns(),
+                                      storageGlobalParams.dbpath,
+                                      false /* don't check version */);
 
         try {
-            long long n = deleteObjects( removeItem.getRequest()->getNS(),
-                                         removeItem.getDelete()->getQuery(),
-                                         removeItem.getDelete()->getLimit() == 1, // justOne
-                                         true, // logOp
-                                         false // god
-                                         );
-
-            result->stats.n = n;
+            result->stats.n = executor.execute();
         }
         catch ( const PageFaultException& ex ) {
             // TODO: An actual data structure that's not an exception for this
             result->fault = new PageFaultException( ex );
         }
         catch ( const DBException& ex ) {
-            Status stat(ex.toStatus());
-            if (ErrorCodes::isInterruption(stat.code())) {
+            status = ex.toStatus();
+            if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(stat);
+            result->error = toWriteError(status);
         }
     }
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,27 +26,44 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/delete.h"
+#pragma once
 
-#include "mongo/db/ops/delete_executor.h"
-#include "mongo/db/ops/delete_request.h"
+#include <string>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
-    /* ns:      namespace, e.g. <database>.<collection>
-       pattern: the "where" clause / criteria
-       justOne: stop after 1 match
-       god:     allow access to system namespaces, and don't yield
-    */
-    long long deleteObjects(const StringData& ns, BSONObj pattern, bool justOne, bool logop, bool god) {
-        NamespaceString nsString(ns);
-        DeleteRequest request(nsString);
-        request.setQuery(pattern);
-        request.setMulti(!justOne);
-        request.setUpdateOpLog(logop);
-        request.setGod(god);
-        DeleteExecutor executor(&request);
-        return executor.execute();
-    }
+    class DeleteRequest {
+        MONGO_DISALLOW_COPYING(DeleteRequest);
+    public:
+        explicit DeleteRequest(const NamespaceString& nsString) :
+            _nsString(nsString),
+            _multi(false),
+            _logop(false),
+            _god(false) {}
+
+        void setQuery(const BSONObj& query) { _query = query; }
+        void setMulti(bool multi = true) { _multi = multi; }
+        void setUpdateOpLog(bool logop = true) { _logop = logop; }
+        void setGod(bool god = true) { _god = god; }
+
+        const NamespaceString& getNamespaceString() const { return _nsString; }
+        const BSONObj& getQuery() const { return _query; }
+        bool isMulti() const { return _multi; }
+        bool shouldCallLogOp() const { return _logop; }
+        bool isGod() const { return _god; }
+
+        std::string toString() const;
+
+    private:
+        const NamespaceString& _nsString;
+        BSONObj _query;
+        bool _multi;
+        bool _logop;
+        bool _god;
+    };
 
 }  // namespace mongo

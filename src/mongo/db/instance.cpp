@@ -65,7 +65,8 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/count.h"
-#include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/delete_executor.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
@@ -647,15 +648,21 @@ namespace mongo {
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
+                DeleteRequest request(ns);
+                request.setQuery(pattern);
+                request.setMulti(!justOne);
+                request.setUpdateOpLog(true);
+                DeleteExecutor executor(&request);
+                uassertStatusOK(executor.prepare());
                 Lock::DBWrite lk(ns.ns());
 
                 // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
                 if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
                     return;
-                
+
                 Client::Context ctx(ns);
-                
-                long long n = deleteObjects(ns.ns(), pattern, justOne, true);
+
+                long long n = executor.execute();
                 lastError.getSafe()->recordDelete( n );
                 op.debug().ndeleted = n;
                 break;
