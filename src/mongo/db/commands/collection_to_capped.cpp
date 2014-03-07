@@ -30,16 +30,12 @@
 
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h" // XXX-remove
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/instance.h" // XXX-remove
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/extent.h"
 
 namespace mongo {
 
@@ -75,36 +71,18 @@ namespace mongo {
                 return Status( ErrorCodes::InternalError, errmsg );
         }
 
-        auto_ptr<Runner> runner;
-
-        {
-            const NamespaceDetails* details = fromCollection->details();
-            DiskLoc extent = details->firstExtent();
-
-            // datasize and extentSize can't be compared exactly, so add some padding to 'size'
-            long long excessSize =
-                static_cast<long long>( fromCollection->dataSize() - size * 2 );
-
-            // skip ahead some extents since not all the data fits,
-            // so we have to chop a bunch off
-            for( ;
-                 excessSize > extent.ext()->length && extent != details->lastExtent();
-                 extent = extent.ext()->xnext ) {
-
-                excessSize -= extent.ext()->length;
-                LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size "
-                         << extent.ext()->length << endl;
-                LOG( 6 ) << "excessSize: " << excessSize << endl;
-            }
-            DiskLoc startLoc = extent.ext()->firstRecord;
-
-            runner.reset( InternalPlanner::collectionScan(fromNs,
-                                                          InternalPlanner::FORWARD,
-                                                          startLoc) );
-        }
-
         Collection* toCollection = db->getCollection( toNs );
-        verify( toCollection );
+        invariant( toCollection ); // we created above
+
+        // how much data to ignore because it won't fit anyway
+        // datasize and extentSize can't be compared exactly, so add some padding to 'size'
+        long long excessSize =
+            static_cast<long long>( fromCollection->dataSize() -
+                                    ( toCollection->storageSize() * 2 ) );
+
+        scoped_ptr<Runner> runner( InternalPlanner::collectionScan(fromNs,
+                                                                   InternalPlanner::FORWARD ) );
+
 
         while ( true ) {
             BSONObj obj;
@@ -119,6 +97,11 @@ namespace mongo {
             case Runner::RUNNER_ERROR:
                 return Status( ErrorCodes::InternalError, "runner error while iterating" );
             case Runner::RUNNER_ADVANCED:
+                if ( excessSize > 0 ) {
+                    excessSize -= ( 4 * obj.objsize() ); // 4x is for padding, power of 2, etc...
+                    continue;
+                }
+
                 toCollection->insertDocument( obj, true );
                 if ( logForReplication )
                     logOp( "i", toNs.c_str(), obj );
@@ -126,7 +109,7 @@ namespace mongo {
             }
         }
 
-        verify( false ); // unreachable
+        invariant( false ); // unreachable
     }
 
     /* convertToCapped seems to use this */
