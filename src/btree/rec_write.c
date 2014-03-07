@@ -882,6 +882,11 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * If called during checkpoint, acquire a hazard pointer
 			 * so the child isn't evicted, it's an in-memory case.
+			 *
+			 * XXXKEITH
+			 * Can this call see a WT_RESTART return because the
+			 * underlying page split?  If it can, we need to think
+			 * more about checkpoints in the context of page splits.
 			 */
 			if ((ret = __wt_page_in(session, page, ref,
 			    WT_READ_CACHE | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
