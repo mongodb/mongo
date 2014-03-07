@@ -1,6 +1,6 @@
 // Test that setting maxSyncSourceLagSecs causes the set to change sync target
 var replTest = new ReplSetTest({ nodes: 3, oplogSize: 5,
-                                 nodeOptions: {setParameter: "maxSyncSourceLagSecs=1"}});
+                                 nodeOptions: {setParameter: "maxSyncSourceLagSecs=5"}});
 replTest.startSet();
 replTest.initiate();
 
@@ -19,7 +19,7 @@ assert.soon(function() {
     }, "sync target not changed to other slave");
 printjson(replTest.status);
 
-jsTestLog("Lock slave 1 and add some docs.  Should force sync target for slave 2 to change to primary");
+jsTestLog("Lock slave 1 and add some docs.  Force sync target for slave 2 to change to primary");
 assert.commandWorked(slaves[0].getDB("admin").runCommand({fsync:1, lock: 1}));
 var docNum = 100;
 for (var i=0; i<docNum; i++) {
