@@ -185,7 +185,7 @@ __rec_ref_instantiate(
 	/*
 	 * Instantiate row-store keys, and column- and row-store addresses in
 	 * the WT_REF structures referenced by a page that's being split (and
-	 * deepening the tree.  The WT_REF structures aren't moving, but the
+	 * deepening the tree).  The WT_REF structures aren't moving, but the
 	 * index references are moving from the page we're splitting to a set
 	 * of child pages, and so we can no longer reference the block image
 	 * that remains with the page being split.
@@ -853,12 +853,6 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  * __rec_review --
  *	Get exclusive access to the page and review the page and its subtree
  *	for conditions that would block its eviction.
- *
- *	The ref and page arguments may appear to be redundant, because usually
- *	ref->page == page and page->ref == ref.  However, we need both because
- *	(a) there are cases where ref == NULL (e.g., for root page or during
- *	salvage), and (b) we can't safely look at page->ref until we have a
- *	hazard pointer.
  */
 static int
 __rec_review(WT_SESSION_IMPL *session,
@@ -866,7 +860,6 @@ __rec_review(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
-	WT_PAGE *t;
 
 	btree = S2BT(session);
 
@@ -892,7 +885,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * have to write pages in depth-first order, otherwise we'll dirty
 	 * pages after we've written them.
 	 */
-	if (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)
+	if (WT_PAGE_IS_INTERNAL(page))
 		WT_INTL_FOREACH_BEGIN(page, ref) {
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
@@ -917,64 +910,29 @@ __rec_review(WT_SESSION_IMPL *session,
 		} WT_INTL_FOREACH_END;
 
 	/*
-	 * If the file is being checkpointed, we cannot evict dirty pages,
-	 * because that may free a page that appears on an internal page in the
-	 * checkpoint.  Don't rely on new updates being skipped by the
-	 * transaction used for transaction reads: (1) there are paths that
-	 * dirty pages for artificial reasons; (2) internal pages aren't
-	 * transactional; and (3) if an update was skipped during the
-	 * checkpoint (leaving the page dirty), then rolled back, we could
-	 * still successfully overwrite a page and corrupt the checkpoint.
-	 *
-	 * Further, even for clean pages, the checkpoint's reconciliation of an
-	 * internal page might race with us as we evict a child in the page's
-	 * subtree.
-	 *
-	 * One half of that test is in the reconciliation code: the checkpoint
-	 * thread waits for eviction-locked pages to settle before determining
-	 * their status.  The other half of the test is here: after acquiring
-	 * the exclusive eviction lock on a page, confirm no page in the page's
-	 * stack of pages from the root is being reconciled in a checkpoint.
-	 * This ensures we either see the checkpoint-walk state here, or the
-	 * reconciliation of the internal page sees our exclusive lock on the
-	 * child page and waits until we're finished evicting the child page
-	 * (or give up if eviction isn't possible).
-	 *
-	 * We must check the full stack (we might be attempting to evict a leaf
-	 * page multiple levels beneath the internal page being reconciled as
-	 * part of the checkpoint, and  all of the intermediate nodes are being
-	 * merged into the internal page).
-	 *
-	 * There's no simple test for knowing if a page in our page stack is
-	 * involved in a checkpoint.  The internal page's checkpoint-walk flag
-	 * is the best test, but it's not set anywhere for the root page, it's
-	 * not a complete test.
-	 *
-	 * Quit for any page that's not a simple, in-memory page.  (Almost the
-	 * same as checking for the checkpoint-walk flag.  I don't think there
-	 * are code paths that change the page's status from checkpoint-walk,
-	 * but these races are hard enough I'm not going to proceed if there's
-	 * anything other than a vanilla, in-memory tree stack.)  Climb until
-	 * we find a page which can't be merged into its parent, and failing if
-	 * we never find such a page.
+	 * If the file is being checkpointed, we stop evicting dirty pages: the
+	 * problem is if we write a page, the previous version of the page will
+	 * be free'd, which previous version might be referenced by an internal
+	 * page already been written in service of the checkpoint, leaving the
+	 * checkpoint inconsistent.
+	 *     Don't rely on new updates being skipped by the transaction used
+	 * for transaction reads: (1) there are paths that dirty pages for
+	 * artificial reasons; (2) internal pages aren't transactional; and
+	 * (3) if an update was skipped during the checkpoint (leaving the page
+	 * dirty), then rolled back, we could still successfully overwrite a
+	 * page and corrupt the checkpoint.
+	 *	Further, we can't race with the checkpoint's reconciliation of
+	 * an internal page as we evict a clean child from the page's subtree.
+	 * This works in the usual way: eviction locks the page and then checks
+	 * for existing hazard pointers, the checkpoint thread reconciling an
+	 * internal page acquires hazard pointers on child pages it reads, and
+	 * is blocked by the exclusive lock.
 	 */
 	if (btree->checkpointing && __wt_page_is_modified(page)) {
-ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
 	}
-
-	if (btree->checkpointing && top)
-		for (t = page->parent;; t = t->parent) {
-			if (t == NULL || t->parent == NULL)	/* root */
-				goto ckpt;
-								/* scary */
-			if (__wt_page_ref(session, t)->state != WT_REF_MEM)
-				goto ckpt;
-			if (t->modify == NULL ||		/* not merged */
-			    !F_ISSET(t->modify, WT_PM_REC_EMPTY))
-				break;
-		}
 
 	/*
 	 * Fail if any page in the top-level page's subtree won't be merged into
@@ -996,14 +954,15 @@ ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 	 * If the page is dirty and can possibly change state, write it so we
 	 * know the final state.
 	 *
-	 * XXXKEITH
-	 * I don't think we should be setting WT_SKIP_UPDATE_RESTORE on any
-	 * page other than the top page, but then again, I think most of this
-	 * code is wrong, at this point.
+	 * Set the "skip updates" flag on the top-level page we're trying to
+	 * evict, we will save and restore any unresolved updates as part of
+	 * evicting that page.  Don't set it for any children of that page,
+	 * those pages either end up as clean, mergeable pages, or we fail.
 	 */
 	if (__wt_page_is_modified(page))
-		WT_RET(__wt_rec_write(session, page,
-		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_RESTORE));
+		WT_RET(__wt_rec_write(session, page, NULL,
+		    WT_EVICTION_LOCKED |
+		    (top ? WT_SKIP_UPDATE_RESTORE : 0)));
 
 	/*
 	 * If the page was ever modified, make sure all of the updates on the

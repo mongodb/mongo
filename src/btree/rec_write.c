@@ -324,7 +324,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	    session, reconcile, "%s", __wt_page_type_string(page->type));
 	WT_STAT_FAST_CONN_INCR(session, rec_pages);
 	WT_STAT_FAST_DATA_INCR(session, rec_pages);
-	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED)) {
+	if (LF_ISSET(WT_EVICTION_LOCKED)) {
 		WT_STAT_FAST_CONN_INCR(session, rec_pages_eviction);
 		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
 	}
@@ -355,13 +355,21 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 			ret = __rec_col_fix(session, r, page);
 		break;
 	case WT_PAGE_COL_INT:
+		if (LF_ISSET(WT_EVICTION_LOCKED))
+			WT_PAGE_LOCK(session, page);
 		ret = __rec_col_int(session, r, page);
+		if (LF_ISSET(WT_EVICTION_LOCKED))
+			WT_PAGE_UNLOCK(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
 		ret = __rec_col_var(session, r, page, salvage);
 		break;
 	case WT_PAGE_ROW_INT:
+		if (LF_ISSET(WT_EVICTION_LOCKED))
+			WT_PAGE_LOCK(session, page);
 		ret = __rec_row_int(session, r, page);
+		if (LF_ISSET(WT_EVICTION_LOCKED))
+			WT_PAGE_UNLOCK(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		ret = __rec_row_leaf(session, r, page, salvage);
@@ -854,7 +862,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * for eviction by us and the state is stable until we
 			 * reset it, it's an in-memory state.
 			 */
-			if (F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+			if (F_ISSET(r, WT_EVICTION_LOCKED))
 				goto in_memory;
 
 			/*
@@ -871,13 +879,14 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 		case WT_REF_MEM:
 			/*
-			 * In memory.  We should not be here if called by the
-			 * eviction server, a child page in this state within
-			 * an evicted page's subtree would have been set to
-			 * WT_REF_LOCKED.
+			 * In memory.
+			 *
+			 * We should never be here during eviction, a child page
+			 * in this state within an evicted page's subtree would
+			 * have either caused eviction to fail or have had its
+			 * state set to WT_REF_LOCKED.
 			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+			WT_ASSERT(session, !F_ISSET(r, WT_EVICTION_LOCKED));
 
 			/*
 			 * If called during checkpoint, acquire a hazard pointer
@@ -898,12 +907,28 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 		case WT_REF_READING:
 			/*
-			 * Being read, not modified by definition.  We should
-			 * never be here if called by the eviction server.
+			 * Being read, not modified by definition.
+			 *
+			 * We should never be here during eviction, a child page
+			 * in this state within an evicted page's subtree would
+			 * have caused eviction to fail.
 			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+			WT_ASSERT(session, !F_ISSET(r, WT_EVICTION_LOCKED));
 			goto done;
+
+		case WT_REF_SPLIT:
+			/*
+			 * The page was split out from under us.
+			 *
+			 * We should never be here during eviction, a child page
+			 * in this state within an evicted page's subtree would
+			 * have caused eviction to fail.
+			 *
+			 * We should never be here during checkpoint, internal
+			 * pages are locked during checkpoint reconciliation,
+			 * and that lock is acquired when splitting a page.
+			 */
+			WT_ASSERT(session, ref->state != WT_REF_SPLIT);
 
 		WT_ILLEGAL_VALUE(session);
 		}
