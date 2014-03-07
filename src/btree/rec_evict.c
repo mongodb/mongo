@@ -501,8 +501,8 @@ __wt_multi_inmem_build(
 			WT_RET(__wt_col_search(session, recno, new, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_col_modify(session, &cbt, recno,
-			    NULL, upd, WT_UPDATE_DELETED_ISSET(upd)));
+			WT_RET(__wt_col_modify(
+			    session, &cbt, recno, NULL, upd, 0));
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
@@ -518,8 +518,8 @@ __wt_multi_inmem_build(
 			WT_RET(__wt_row_search(session, &key, new, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_row_modify(session, &cbt, &key,
-			    NULL, upd, WT_UPDATE_DELETED_ISSET(upd)));
+			WT_RET(__wt_row_modify(
+			    session, &cbt, &key, NULL, upd, 0));
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
