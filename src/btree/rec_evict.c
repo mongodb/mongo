@@ -451,6 +451,8 @@ __wt_multi_inmem_build(
 	uint64_t recno;
 	uint32_t i;
 
+	WT_CLEAR(cbt);
+	cbt.btree = S2BT(session);
 	WT_CLEAR(key);
 
 	/*
