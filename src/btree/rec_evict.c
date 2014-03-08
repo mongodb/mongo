@@ -259,7 +259,7 @@ __rec_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (last->size != 0) {
 				(void)WT_LEX_CMP(
 				    session, btree->collator, last, next, cmp);
-				WT_ASSERT(session, cmp > 0);
+				WT_ASSERT(session, cmp < 0);
 			}
 			tmp = last;
 			last = next;
