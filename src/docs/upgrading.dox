@@ -1,5 +1,15 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_22 Upgrading to Version 2.2
+<dl>
+
+<dt>internal_key_truncate</dt>
+<dd>
+In the 2.2 release of WiredTiger the \c internal_key_truncate configuration
+string to the WT_SESSION::create method has been removed, it can no longer
+be set.  Applications may require modifications to resolve run-time errors.
+</dd>
+
 @section version_211 Upgrading to Version 2.1.1
 <dl>
 

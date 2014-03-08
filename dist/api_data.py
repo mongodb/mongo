@@ -192,11 +192,6 @@ file_config = format_meta + [
 	    configure Huffman encoding for values.  Permitted values
 	    are empty (off), \c "english", \c "utf8<file>" or \c
 	    "utf16<file>".  See @ref huffman for more information'''),
-	Config('internal_key_truncate', 'true', r'''
-	    configure internal key truncation, discarding unnecessary
-	    trailing bytes on internal keys (ignored for custom
-	    collators)''',
-	    type='boolean'),
 	Config('internal_page_max', '4KB', r'''
 	    the maximum page size for internal nodes, in bytes; the size
 	    must be a multiple of the allocation size and is significant
