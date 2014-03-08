@@ -161,7 +161,6 @@ typedef struct {
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
 	uint32_t c_insert_pct;
-	uint32_t c_internal_key_truncation;
 	uint32_t c_intl_page_max;
 	uint32_t c_key_gap;
 	uint32_t c_key_max;

@@ -155,10 +155,6 @@ static CONFIG c[] = {
 	  "percent operations that are inserts",
 	  0x0, C_OPS, 0, 45, 90, &g.c_insert_pct, NULL },
 
-	{ "internal_key_truncation",
-	 "if internal keys are truncated",			/* 95% */
-	 0x0, C_BOOL, 95, 0, 0, &g.c_internal_key_truncation, NULL },
-
 	{ "internal_page_max",
 	  "maximum size of Btree internal nodes",
 	  0x0, 0x0, 9, 17, 27, &g.c_intl_page_max, NULL },

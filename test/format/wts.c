@@ -263,11 +263,6 @@ wts_create(void)
 		break;
 	}
 
-	/* Configure Btree internal key truncation. */
-	p += snprintf(
-	    p, (size_t)(end - p), ",internal_key_truncate=%s",
-	    g.c_internal_key_truncation ? "true" : "false");
-
 	/* Configure Btree page key gap. */
 	p += snprintf(p, (size_t)(end - p), ",key_gap=%" PRIu32, g.c_key_gap);
 
