@@ -224,6 +224,52 @@ __rec_ref_instantiate(
 	return (0);
 }
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __rec_verify_intl_key_order --
+ *	Verify the key order on an internal page after a split, diagnostic only.
+ */
+static void
+__rec_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+	WT_ITEM *next, _next, *last, _last, *tmp;
+	uint64_t recno;
+	WT_REF *ref;
+	int cmp;
+
+	btree = S2BT(session);
+
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+		recno = 0;
+		WT_INTL_FOREACH_BEGIN(page, ref) {
+			WT_ASSERT(session, ref->key.recno > recno);
+			recno = ref->key.recno;
+		} WT_INTL_FOREACH_END;
+		break;
+	case WT_PAGE_ROW_INT:
+		next = &_next;
+		WT_CLEAR(_next);
+		last = &_last;
+		WT_CLEAR(_last);
+
+		WT_INTL_FOREACH_BEGIN(page, ref) {
+			__wt_ref_key(page, ref, &next->data, &next->size);
+			if (last->size != 0) {
+				(void)WT_LEX_CMP(
+				    session, btree->collator, last, next, cmp);
+				WT_ASSERT(session, cmp > 0);
+			}
+			tmp = last;
+			last = next;
+			next = tmp;
+		} WT_INTL_FOREACH_END;
+		break;
+	}
+}
+#endif
+
 /*
  * __rec_split_deepen --
  *	Split an internal page in-memory, deepening the tree.
@@ -396,6 +442,9 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		    child->type != WT_PAGE_COL_INT)
 			continue;
 		WT_ASSERT(session, child->parent == parent);
+#ifdef HAVE_DIAGNOSTIC
+		__rec_verify_intl_key_order(session, child);
+#endif
 
 		WT_INTL_FOREACH_BEGIN(child, ref) {
 			/*
@@ -701,8 +750,8 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
 
 	/*
-	 * The page may never have been marked clean, if it contained unresolved
-	 * changes.  In that case, mark it clean now.
+	 * Pages with unresolved changes are not marked clean by reconciliation;
+	 * mark the page clean now so it will be discarded.
 	 */
 	if (__wt_page_is_modified(page)) {
 		 mod->write_gen = 0;
@@ -716,19 +765,25 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	    page, __wt_page_type_string(page->type), parent, parent_entries,
 	    result_entries, result_entries - parent_entries);
 
+#ifdef HAVE_DIAGNOSTIC
+	__rec_verify_intl_key_order(session, parent);
+#endif
+
 	/*
-	 * We're already holding the parent page locked, see if the parent needs
-	 * to split, deepening the tree.
-	 *
-	 * Page splits trickle up the tree, that is, as leaf pages grow large
-	 * enough, they'll split into their parent, as that parent grows large
-	 * enough, it will split into its parent and so on.  If the page split
-	 * reaches the parent, then the tree will permanently deepen as some
-	 * number of root pages are written.  However, that only helps if the
-	 * tree is closed and re-opened from a disk image: to work in-memory,
-	 * we check internal pages, and if they're large enough, we deepen the
-	 * tree at that point.  This code is here because we've just split into
-	 * a parent page, so check if the parent needs to split.
+	 * Simple page splits trickle up the tree, that is, as leaf pages grow
+	 * large enough and are evicted, they'll split into their parent.  And,
+	 * as that parent grows large enough and is evicted, it will split into
+	 * its parent and so on.  When the page split wave reaches the root,
+	 * the tree will permanently deepen as multiple root pages are written.
+	 *	However, this only helps if first, the pages are evicted (and
+	 * we resist evicting internal pages for obvious reasons), and second,
+	 * if the tree is closed and re-opened from a disk image, which is a
+	 * rare event.
+	 *	To avoid the case of internal pages becoming too large when they
+	 * aren't being evicted, check internal pages each time a leaf page is
+	 * split into them.  If they're big enough, deepen the tree that point.
+	 *	Do the check here because we've just split into a parent page
+	 * and we're already holding the page locked.
 	 *
 	 * A rough metric: addresses in the standard block manager are 10B, more
 	 * or less, and let's pretend a standard key is 0B for column-store and
@@ -739,8 +794,12 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	if (parent->type == WT_PAGE_ROW_INT)
 		bytes += 20;
 	if ((bytes * result_entries) /
-	    btree->maxintlpage > (uint64_t)btree->split_deepen)
+	    btree->maxintlpage > (uint64_t)btree->split_deepen) {
 		ret = __rec_split_deepen(session, parent);
+#ifdef HAVE_DIAGNOSTIC
+		__rec_verify_intl_key_order(session, parent);
+	}
+#endif
 
 err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
