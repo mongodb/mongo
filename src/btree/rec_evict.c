@@ -798,8 +798,8 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 		ret = __rec_split_deepen(session, parent);
 #ifdef HAVE_DIAGNOSTIC
 		__rec_verify_intl_key_order(session, parent);
-	}
 #endif
+	}
 
 err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
