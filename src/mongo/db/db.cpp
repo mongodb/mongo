@@ -577,12 +577,12 @@ namespace mongo {
                     }
                 }
             }
-            catch (const std::exception& e) {
-                log() << "unable to validate readahead settings due to error: " << e.what()
-                    << startupWarningsLog;
-                log() << "for more information, see http://dochub.mongodb.org/core/readahead"
-                    << startupWarningsLog;
-            }
+        }
+        catch (const std::exception& e) {
+            log() << "unable to validate readahead settings due to error: " << e.what()
+                << startupWarningsLog;
+            log() << "for more information, see http://dochub.mongodb.org/core/readahead"
+                << startupWarningsLog;
         }
 #endif // __linux__
     }
