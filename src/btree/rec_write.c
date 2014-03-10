@@ -929,6 +929,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * and that lock is acquired when splitting a page.
 			 */
 			WT_ASSERT(session, ref->state != WT_REF_SPLIT);
+			/* FALLTHROUGH */
 
 		WT_ILLEGAL_VALUE(session);
 		}
