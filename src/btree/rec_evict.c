@@ -383,7 +383,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	 * we find a page which can't be merged into its parent, and failing if
 	 * we never find such a page.
 	 */
-	if (btree->checkpointing && !merge && __wt_page_is_modified(page)) {
+	if (btree->checkpointing && (merge || __wt_page_is_modified(page))) {
 ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
