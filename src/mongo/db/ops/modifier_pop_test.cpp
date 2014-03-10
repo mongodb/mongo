@@ -294,4 +294,23 @@ namespace {
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
         ASSERT_TRUE(execInfo.noOp);
     }
+
+    // from SERVER-12846
+    TEST(Prepare, MissingArrayElementPath) {
+        Document doc(fromjson("{_id : 1, a : [1, 2]}"));
+        Mod mod(fromjson("{ $pop : { 'a.3' : 1 } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_TRUE(execInfo.noOp);
+    }
+
+    TEST(Prepare, FromArrayElementPath) {
+        Document doc(fromjson("{ a : [1, 2] }"));
+        Mod mod(fromjson("{ $pop : { 'a.0' : 1 } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
+    }
+
 } // unnamed namespace

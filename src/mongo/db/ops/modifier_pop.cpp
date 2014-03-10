@@ -141,27 +141,32 @@ namespace mongo {
                                                        &_preparedState->pathFoundElement);
         // Check if we didn't find the full path
         if (status.isOK()) {
-            // If the path exists, we require the target field to be already an
-            // array.
-            if (_preparedState->pathFoundElement.getType() != Array) {
-                mb::Element idElem = mb::findFirstChildNamed(root, "_id");
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream() << "Can only $pop from arrays. {"
-                                  << idElem.toString()
-                                  << "} has the field '"
-                                  << _preparedState->pathFoundElement.getFieldName()
-                                  << "' of non-array type "
-                                  << typeName(_preparedState->pathFoundElement.getType()));
-            }
-
-            // No children, nothing to do -- not an error state
-            if (!_preparedState->pathFoundElement.hasChildren()) {
+            const bool destExists = (_preparedState->pathFoundIndex == (_fieldRef.numParts()-1));
+            if (!destExists) {
                 execInfo->noOp = true;
             } else {
-                _preparedState->elementToRemove = _fromTop ?
-                                _preparedState->pathFoundElement.leftChild() :
-                                _preparedState->pathFoundElement.rightChild();
+                // If the path exists, we require the target field to be already an
+                // array.
+                if (_preparedState->pathFoundElement.getType() != Array) {
+                    mb::Element idElem = mb::findFirstChildNamed(root, "_id");
+                    return Status(
+                        ErrorCodes::BadValue,
+                        str::stream() << "Can only $pop from arrays. {"
+                                      << idElem.toString()
+                                      << "} has the field '"
+                                      << _preparedState->pathFoundElement.getFieldName()
+                                      << "' of non-array type "
+                                      << typeName(_preparedState->pathFoundElement.getType()));
+                }
+
+                // No children, nothing to do -- not an error state
+                if (!_preparedState->pathFoundElement.hasChildren()) {
+                    execInfo->noOp = true;
+                } else {
+                    _preparedState->elementToRemove = _fromTop ?
+                                    _preparedState->pathFoundElement.leftChild() :
+                                    _preparedState->pathFoundElement.rightChild();
+                }
             }
         } else {
             // Let the caller know we can't do anything given the mod, _fieldRef, and doc.

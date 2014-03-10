@@ -159,40 +159,45 @@ namespace mongo {
                                                        &_preparedState->pathFoundElement);
         // Check if we didn't find the full path
         if (status.isOK()) {
-            // If the path exists, we require the target field to be already an
-            // array.
-            if (_preparedState->pathFoundElement.getType() != Array) {
-                mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream() << "Can only apply $pullAll to an array. "
-                                  << idElem.toString()
-                                  << " has the field "
-                                  <<  _preparedState->pathFoundElement.getFieldName()
-                                  << " of non-array type "
-                                  << typeName(_preparedState->pathFoundElement.getType()));
-            }
+            const bool destExists = (_preparedState->pathFoundIndex == (_fieldRef.numParts()-1));
 
-            // No children, nothing to do -- not an error state
-            if (!_preparedState->pathFoundElement.hasChildren()) {
+            if (!destExists) {
                 execInfo->noOp = true;
             } else {
-                mutablebson::Element elem = _preparedState->pathFoundElement.leftChild();
-                while (elem.ok()) {
-                    if (std::find_if(_elementsToFind.begin(),
-                                     _elementsToFind.end(),
-                                     mutableElementEqualsBSONElement(elem))
-                                        != _elementsToFind.end()) {
-                        _preparedState->elementsToRemove.push_back(elem);
-                    }
-                    elem = elem.rightSibling();
+                // If the path exists, we require the target field to be already an
+                // array.
+                if (_preparedState->pathFoundElement.getType() != Array) {
+                    mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+                    return Status(
+                        ErrorCodes::BadValue,
+                        str::stream() << "Can only apply $pullAll to an array. "
+                                      << idElem.toString()
+                                      << " has the field "
+                                      <<  _preparedState->pathFoundElement.getFieldName()
+                                      << " of non-array type "
+                                      << typeName(_preparedState->pathFoundElement.getType()));
                 }
 
-                // Nothing to remove so it is a noOp.
-                if (_preparedState->elementsToRemove.empty())
+                // No children, nothing to do -- not an error state
+                if (!_preparedState->pathFoundElement.hasChildren()) {
                     execInfo->noOp = true;
-            }
+                } else {
+                    mutablebson::Element elem = _preparedState->pathFoundElement.leftChild();
+                    while (elem.ok()) {
+                        if (std::find_if(_elementsToFind.begin(),
+                                         _elementsToFind.end(),
+                                         mutableElementEqualsBSONElement(elem))
+                                            != _elementsToFind.end()) {
+                            _preparedState->elementsToRemove.push_back(elem);
+                        }
+                        elem = elem.rightSibling();
+                    }
 
+                    // Nothing to remove so it is a noOp.
+                    if (_preparedState->elementsToRemove.empty())
+                        execInfo->noOp = true;
+                }
+            }
         } else {
             // Let the caller know we can't do anything given the mod, _fieldRef, and doc.
             execInfo->noOp = true;
