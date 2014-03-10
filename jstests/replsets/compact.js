@@ -1,3 +1,5 @@
+if (0) { // this test also commented out in master (renamed to auth_compact.js) b/c of SERVER-12697 
+
 // test that nodes still respond to heartbeats during compact() SERVER-12264
 var replTest = new ReplSetTest({ name: 'compact', nodes: 3 });
 
@@ -53,3 +55,5 @@ for (i=0; i<5; i++) {
 }
 
 replTest.stopSet();
+
+}
