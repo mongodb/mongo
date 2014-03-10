@@ -135,11 +135,6 @@ namespace mongo {
         // new defaults and because we never reset to an empty default.
         // TODO: fix this for sane behavior where we query repl set object
         if ( getLastErrorDefault ) defaultWriteConcern = *getLastErrorDefault;
-        if ( defaultWriteConcern.isEmpty() ) {
-            BSONObjBuilder b;
-            b.append( "w", 1 );
-            defaultWriteConcern = b.obj();
-        }
 
         WriteBatchExecutor writeBatchExecutor(defaultWriteConcern,
                                               &cc(),

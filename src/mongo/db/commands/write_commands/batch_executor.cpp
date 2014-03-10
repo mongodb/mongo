@@ -153,7 +153,17 @@ namespace mongo {
 
         Status wcStatus = Status::OK();
         if ( wcDoc.isEmpty() ) {
-            wcStatus = writeConcern.parse( _defaultWriteConcern );
+
+            // The default write concern if empty is w : 1
+            // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
+
+            wcStatus = writeConcern.parse(
+                _defaultWriteConcern.isEmpty() ?
+                    WriteConcernOptions::Acknowledged : _defaultWriteConcern );
+
+            if ( writeConcern.wNumNodes == 0 && writeConcern.wMode.empty() ) {
+                writeConcern.wNumNodes = 1;
+            }
         }
         else {
             wcStatus = writeConcern.parse( wcDoc );
