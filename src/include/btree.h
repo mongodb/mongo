@@ -92,6 +92,7 @@ struct __wt_btree {
 	} checksum;			/* Checksum configuration */
 
 	u_int dictionary;		/* Reconcile: dictionary slots */
+	int   internal_key_truncate;	/* Reconcile: internal key truncate */
 	int   maximum_depth;		/* Reconcile: maximum tree depth */
 	int   prefix_compression;	/* Reconcile: prefix compression */
 	u_int prefix_compression_min;	/* Reconcile: prefix compression min */

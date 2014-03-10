@@ -236,7 +236,7 @@ __rec_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ITEM *next, _next, *last, _last, *tmp;
 	uint64_t recno;
 	WT_REF *ref;
-	int cmp;
+	int skip_first, cmp;
 
 	btree = S2BT(session);
 
@@ -253,13 +253,18 @@ __rec_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_CLEAR(_next);
 		last = &_last;
 		WT_CLEAR(_last);
+		skip_first = WT_PAGE_IS_ROOT(page);
 
 		WT_INTL_FOREACH_BEGIN(page, ref) {
 			__wt_ref_key(page, ref, &next->data, &next->size);
-			if (last->size != 0) {
-				(void)WT_LEX_CMP(
-				    session, btree->collator, last, next, cmp);
-				WT_ASSERT(session, cmp < 0);
+			if (last->size == 0) {
+				if (skip_first)
+					skip_first = 0;
+				else {
+					(void)WT_LEX_CMP(session,
+					    btree->collator, last, next, cmp);
+					WT_ASSERT(session, cmp < 0);
+				}
 			}
 			tmp = last;
 			last = next;

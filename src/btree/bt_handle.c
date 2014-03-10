@@ -276,6 +276,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		break;
 	case BTREE_ROW:
 		WT_RET(__wt_config_gets(
+		    session, cfg, "internal_key_truncate", &cval));
+		btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
+
+		WT_RET(__wt_config_gets(
 		    session, cfg, "prefix_compression", &cval));
 		btree->prefix_compression = cval.val == 0 ? 0 : 1;
 		WT_RET(__wt_config_gets(

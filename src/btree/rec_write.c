@@ -241,6 +241,8 @@ typedef struct {
 
 	int key_pfx_compress;		/* If can prefix-compress next key */
 	int key_pfx_compress_conf;	/* If prefix compression configured */
+	int key_sfx_compress;		/* If can suffix-compress next key */
+	int key_sfx_compress_conf;	/* If suffix compression configured */
 
 	int bulk_load;			/* If it's a bulk load */
 
@@ -281,7 +283,8 @@ static int  __rec_split_col(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_split_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *, WT_RECONCILE *);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
-static int  __rec_split_row_promote(WT_SESSION_IMPL *, WT_RECONCILE *);
+static int  __rec_split_row_promote(
+		WT_SESSION_IMPL *, WT_RECONCILE *, uint8_t);
 static int  __rec_split_write(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *);
 static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, void *);
@@ -517,6 +520,25 @@ __rec_write_init(
 	    page->type != WT_PAGE_COL_FIX &&
 	    btree->dictionary == 0 &&
 	    btree->prefix_compression == 0;
+
+	/*
+	 * Suffix compression shortens internal page keys by discarding trailing
+	 * bytes that aren't necessary for tree navigation.  We don't do suffix
+	 * compression if there is a custom collator because we don't know what
+	 * bytes a custom collator might use.  Some custom collators (for
+	 * example, a collator implementing reverse ordering of strings), won't
+	 * have any problem with suffix compression: if there's ever a reason to
+	 * implement suffix compression for custom collators, we can add a
+	 * setting to the collator, configured when the collator is added, that
+	 * turns on suffix compression.
+	 *
+	 * The raw compression routines don't even consider suffix compression,
+	 * but it doesn't hurt to confirm that.
+	 */
+	r->key_sfx_compress_conf = 0;
+	if (btree->collator == NULL &&
+	    btree->internal_key_truncate && !r->raw_compression)
+		r->key_sfx_compress_conf = 1;
 
 	/*
 	 * Prefix compression discards repeated prefix bytes from row-store leaf
@@ -1124,9 +1146,6 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 	WT_ITEM *a;
 
 	/*
-	 * If we're not writing an overflow key on the page, update the last-key
-	 * value and turn on prefix compression.
-	 *
 	 * If writing an overflow key onto the page, don't update the "last key"
 	 * value, and leave the state of prefix compression alone.  (If we are
 	 * currently doing prefix compression, we have a key state which will
@@ -1134,13 +1153,32 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 	 * it's an overflow key and doesn't participate in prefix compression.
 	 * If we are not currently doing prefix compression, we can't start, an
 	 * overflow key doesn't give us any state.)
+	 *
+	 * Additionally, if we wrote an overflow key onto the page, turn off the
+	 * suffix compression of row-store internal node keys.  (When we split,
+	 * "last key" is the largest key on the previous page, and "cur key" is
+	 * the first key on the next page, which is being promoted.  In some
+	 * cases we can discard bytes from the "cur key" that are not needed to
+	 * distinguish between the "last key" and "cur key", compressing the
+	 * size of keys on internal nodes.  If we just built an overflow key,
+	 * we're not going to update the "last key", making suffix compression
+	 * impossible for the next key.   Alternatively, we could remember where
+	 * the last key was on the page, detect it's an overflow key, read it
+	 * from disk and do suffix compression, but that's too much work for an
+	 * unlikely event.)
+	 *
+	 * If we're not writing an overflow key on the page, update the last-key
+	 * value and turn on both prefix and suffix compression.
 	 */
-	if (!ovfl_key) {
+	if (ovfl_key)
+		r->key_sfx_compress = 0;
+	else {
 		a = r->cur;
 		r->cur = r->last;
 		r->last = a;
 
 		r->key_pfx_compress = r->key_pfx_compress_conf;
+		r->key_sfx_compress = r->key_sfx_compress_conf;
 	}
 }
 
@@ -1282,7 +1320,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
 	/* New page, compression off. */
-	r->key_pfx_compress = 0;
+	r->key_pfx_compress = r->key_sfx_compress = 0;
 
 	return (0);
 }
@@ -1350,21 +1388,61 @@ __rec_split_row_promote_cell(
  *	Key promotion for a row-store.
  */
 static int
-__rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 {
+	size_t cnt, len, size;
+	const uint8_t *pa, *pb;
+
 	/*
 	 * For a column-store, the promoted key is the recno and we already have
 	 * a copy.  For a row-store, it's the first key on the page, a variable-
-	 * length byte string.  Take a copy of the last key built, the "current"
-	 * key.
+	 * length byte string, get a copy.
 	 *
-	 * This function is called from the split code at each split boundary.
-	 * (Note, we're not called before the first boundary, and we will have
-	 * to retrieve the first key explicitly when creating the list of split
-	 * keys for eviction and/or subsequent merges.)
+	 * This function is called from the split code at each split boundary,
+	 * but that means we're not called before the first boundary, and we
+	 * will eventually have to get the first key explicitly when splitting
+	 * a page.
+	 *
+	 * For the current slot, take the last key we built, after doing suffix
+	 * compression.  The "last key we built" describes some process: before
+	 * calling the split code, we must place the last key on the page before
+	 * the boundary into the "last" key structure, and the first key on the
+	 * page after the boundary into the "current" key structure, we're going
+	 * to compare them for suffix compression.
+	 *
+	 * Suffix compression is a hack to shorten keys on internal pages.  We
+	 * only need enough bytes in the promoted key to ensure searches go to
+	 * the correct page: the promoted key has to be larger than the last key
+	 * on the leaf page preceding it, but we don't need any more bytes than
+	 * that.   In other words, we can discard any suffix bytes not required
+	 * to distinguish between the key being promoted and the last key on the
+	 * leaf page preceding it.  This can only be done for the first level of
+	 * internal pages, you cannot repeat suffix truncation as you split up
+	 * the tree, it loses too much information.
+	 *
+	 * One note: if the last key on the previous page was an overflow key,
+	 * we don't have the in-memory key against which to compare, and don't
+	 * try to do suffix compression.  The code for that case turns suffix
+	 * compression off for the next key.
+	 *
+	 * The r->last key sorts before the r->cur key, so we'll either find a
+	 * larger byte value in r->cur, or r->cur will be the longer key, and
+	 * the interesting byte is one past the length of the shorter key.
 	 */
+	if (type == WT_PAGE_ROW_LEAF && r->key_sfx_compress) {
+		pa = r->last->data;
+		pb = r->cur->data;
+		len = WT_MIN(r->last->size, r->cur->size);
+		size = len + 1;
+		for (cnt = 1; len > 0; ++cnt, --len, ++pa, ++pb)
+			if (*pa != *pb) {
+				size = cnt;
+				break;
+			}
+	} else
+		size = r->cur->size;
 	return (__wt_buf_set(
-	    session, &r->bnd[r->bnd_next].key, r->cur->data, r->cur->size));
+	    session, &r->bnd[r->bnd_next].key, r->cur->data, size));
 }
 
 /*
@@ -1437,7 +1515,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		bnd->start = r->first_free;
 		if (dsk->type == WT_PAGE_ROW_INT ||
 		    dsk->type == WT_PAGE_ROW_LEAF)
-			WT_RET(__rec_split_row_promote(session, r));
+			WT_RET(__rec_split_row_promote(session, r, dsk->type));
 		bnd->entries = 0;
 
 		/*
@@ -1493,7 +1571,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		bnd->recno = r->recno;
 		if (dsk->type == WT_PAGE_ROW_INT ||
 		    dsk->type == WT_PAGE_ROW_LEAF)
-			WT_RET(__rec_split_row_promote(session, r));
+			WT_RET(__rec_split_row_promote(session, r, dsk->type));
 		bnd->entries = 0;
 
 		/*
