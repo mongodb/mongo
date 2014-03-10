@@ -501,32 +501,32 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_RET(__wt_tree_walk(
 	    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 	while ((page = next_page) != NULL) {
+		/*
+		 * Eviction can fail when a page in the evicted page's
+		 * subtree switches state.  For example, if we don't
+		 * evict a page marked empty, because we expect it to
+		 * be merged into its parent, it might no longer be
+		 * empty after it's reconciled, in which case eviction
+		 * of its parent would fail.  We can either walk the
+		 * tree multiple times, until it's eventually empty,
+		 * or immediately reconcile the page to get it to its
+		 * final state before considering if it's an eviction
+		 * target.
+		 *
+		 * We could limit this test to empty pages (only empty
+		 * pages can switch state this way, split pages always
+		 * merge into their parent, no matter what), but I see
+		 * no reason to do that now.
+		 */
+		if (syncop == WT_SYNC_DISCARD && __wt_page_is_modified(page))
+			WT_ERR(__wt_rec_write(
+			    session, page, NULL, WT_SKIP_UPDATE_ERR));
+
 		WT_ERR(__wt_tree_walk(
 		    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 
 		switch (syncop) {
 		case WT_SYNC_DISCARD:
-			/*
-			 * Eviction can fail when a page in the evicted page's
-			 * subtree switches state.  For example, if we don't
-			 * evict a page marked empty, because we expect it to
-			 * be merged into its parent, it might no longer be
-			 * empty after it's reconciled, in which case eviction
-			 * of its parent would fail.  We can either walk the
-			 * tree multiple times, until it's eventually empty,
-			 * or immediately reconcile the page to get it to its
-			 * final state before considering if it's an eviction
-			 * target.
-			 *
-			 * We could limit this test to empty pages (only empty
-			 * pages can switch state this way, split pages always
-			 * merge into their parent, no matter what), but I see
-			 * no reason to do that now.
-			 */
-			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(
-				    session, page, NULL, WT_SKIP_UPDATE_ERR));
-
 			/*
 			 * Evict the page.
 			 * Do not attempt to evict pages expected to be merged
