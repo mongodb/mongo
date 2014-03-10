@@ -110,7 +110,12 @@ namespace mongo {
             return Status::OK();
         }
 
-        Status validateDBRef(const mb::ConstElement elem, const bool deep) {
+        /**
+         * Validates an element that has a field name which starts with a dollar sign ($).
+         * In the case of a DBRef field ($id, $ref, [$db]) these fields may be valid in
+         * the correct order/context only.
+         */
+        Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep) {
             mb::ConstElement curr = elem;
             StringData currName = elem.getFieldName();
 
@@ -160,8 +165,11 @@ namespace mongo {
             else {
                 // not an okay, $ prefixed field name.
                 return Status(ErrorCodes::DollarPrefixedFieldName,
-                              str::stream() << elem.getFieldName()
-                              << " is not valid for storage.");
+                              str::stream() << "The dollar ($) prefixed field '"
+                                            << elem.getFieldName() << "' in '"
+                                            << mb::getFullName(elem)
+                                            << "' is not valid for storage.");
+
             }
 
             return Status::OK();
@@ -182,18 +190,19 @@ namespace mongo {
 
             if (!childOfArray) {
                 StringData fieldName = elem.getFieldName();
-                // Cannot start with "$", unless dbref which must start with ($ref, $id)
+                // Cannot start with "$", unless dbref
                 if (fieldName[0] == '$') {
-                    // Check if it is a DBRef has this field {$ref, $id, [$db]}
-                    Status status = validateDBRef(elem, deep);
+                    Status status = validateDollarPrefixElement(elem, deep);
                     if (!status.isOK())
                         return status;
                 }
                 else if (fieldName.find(".") != string::npos) {
                     // Field name cannot have a "." in it.
                     return Status(ErrorCodes::DottedFieldName,
-                                  str::stream() << elem.getFieldName()
-                                                << " is not valid for storage.");
+                                  str::stream() << "The dotted field '"
+                                                << elem.getFieldName() << "' in '"
+                                                << mb::getFullName(elem)
+                                                << "' is not valid for storage.");
                 }
             }
 
