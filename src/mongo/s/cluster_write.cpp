@@ -42,6 +42,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/config_coordinator.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -352,13 +353,21 @@ namespace mongo {
 
             bool verboseWC = request.isVerboseWC();
 
-            // We only support batch sizes of one and {w:0} write concern for config writes
-            if ( request.sizeWriteOps() != 1 ||
-                    ( request.isWriteConcernSet() &&
-                            !validConfigWC( request.getWriteConcern() ))) {
-
+            // We only support batch sizes of one for config writes
+            if ( request.sizeWriteOps() != 1 ) {
                 toBatchError( Status( ErrorCodes::InvalidOptions,
-                                      "invalid batch request for config write" ),
+                                      mongoutils::str::stream() << "Writes to config servers must "
+                                              "have batch size of 1, found "
+                                              << request.sizeWriteOps() ),
+                              response );
+                return;
+            }
+
+            // We only support {w: 0}, {w: 1}, and {w: 'majority'} write concern for config writes
+            if ( request.isWriteConcernSet() && !validConfigWC( request.getWriteConcern() )) {
+                toBatchError( Status( ErrorCodes::InvalidOptions,
+                                      mongoutils::str::stream() << "Invalid write concern for write"
+				              " to config servers: " << request.getWriteConcern() ),
                               response );
                 return;
             }
