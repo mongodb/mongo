@@ -111,8 +111,12 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->rec_pages.desc = "page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "page reconciliation calls for eviction";
+	stats->rec_prefix_compression.desc =
+	    "leaf page key bytes discarded using prefix compression";
 	stats->rec_skipped_update.desc =
 	    "reconciliation failed because an update could not be included";
+	stats->rec_suffix_compression.desc =
+	    "internal page key bytes discarded using suffix compression";
 	stats->session_compact.desc = "object compaction";
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
@@ -204,7 +208,9 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->rec_page_match.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
+	stats->rec_prefix_compression.v = 0;
 	stats->rec_skipped_update.v = 0;
+	stats->rec_suffix_compression.v = 0;
 	stats->session_compact.v = 0;
 	stats->txn_update_conflict.v = 0;
 }
@@ -289,7 +295,9 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->rec_page_match.v += c->rec_page_match.v;
 	p->rec_pages.v += c->rec_pages.v;
 	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
+	p->rec_prefix_compression.v += c->rec_prefix_compression.v;
 	p->rec_skipped_update.v += c->rec_skipped_update.v;
+	p->rec_suffix_compression.v += c->rec_suffix_compression.v;
 	p->session_compact.v += c->session_compact.v;
 	p->session_cursor_open.v += c->session_cursor_open.v;
 	p->txn_update_conflict.v += c->txn_update_conflict.v;

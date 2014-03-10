@@ -287,7 +287,9 @@ struct __wt_dsrc_stats {
 	WT_STATS rec_page_match;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;
+	WT_STATS rec_prefix_compression;
 	WT_STATS rec_skipped_update;
+	WT_STATS rec_suffix_compression;
 	WT_STATS session_compact;
 	WT_STATS session_cursor_open;
 	WT_STATS txn_update_conflict;

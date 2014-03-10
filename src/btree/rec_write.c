@@ -1437,7 +1437,11 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 		size = len + 1;
 		for (cnt = 1; len > 0; ++cnt, --len, ++pa, ++pb)
 			if (*pa != *pb) {
-				size = cnt;
+				if (size != cnt) {
+					WT_STAT_FAST_DATA_INCRV(session,
+					    rec_suffix_compression, size - cnt);
+					size = cnt;
+				}
 				break;
 			}
 	} else
@@ -4455,6 +4459,9 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 			 */
 			if (pfx < btree->prefix_compression_min)
 				pfx = 0;
+			else
+				WT_STAT_FAST_DATA_INCRV(
+				    session, rec_prefix_compression, pfx);
 		}
 
 		/* Copy the non-prefix bytes into the key buffer. */
