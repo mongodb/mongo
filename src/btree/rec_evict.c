@@ -424,6 +424,10 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_PUBLISH(parent->pg_intl_index, alloc_index);
 	alloc_index = NULL;
 
+#ifdef HAVE_DIAGNOSTIC
+	__rec_verify_intl_key_order(session, parent);
+#endif
+
 	/*
 	 * The children of the newly created pages reference the wrong parent
 	 * page, and we have to fix that up.   As soon as a thread tries to get
@@ -799,12 +803,8 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	if (parent->type == WT_PAGE_ROW_INT)
 		bytes += 20;
 	if ((bytes * result_entries) /
-	    btree->maxintlpage > (uint64_t)btree->split_deepen) {
+	    btree->maxintlpage > (uint64_t)btree->split_deepen)
 		ret = __rec_split_deepen(session, parent);
-#ifdef HAVE_DIAGNOSTIC
-		__rec_verify_intl_key_order(session, parent);
-#endif
-	}
 
 err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
