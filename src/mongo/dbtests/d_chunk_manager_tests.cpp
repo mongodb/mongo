@@ -362,6 +362,20 @@ namespace {
             ASSERT( cloned->belongsToMe( split1 ) );
             ASSERT( cloned->belongsToMe( split2 ) );
             ASSERT( ! cloned->belongsToMe( max ) );
+
+            ASSERT_FALSE( cloned->getNextChunk( BSON( "a" << MinKey << "b" << 0 ), &min, &max ));
+            ASSERT_EQUALS( BSON( "a" << 10 << "b" << 0 ), min );
+            ASSERT_EQUALS( BSON( "a" << 15 << "b" << 0 ), max );
+
+            ASSERT_FALSE( cloned->getNextChunk( BSON( "a" << 10 << "b" << 0 ), &min, &max ));
+            ASSERT_EQUALS( BSON( "a" << 15 << "b" << 0 ), min );
+            ASSERT_EQUALS( BSON( "a" << 18 << "b" << 0 ), max );
+
+            ASSERT_FALSE( cloned->getNextChunk( BSON( "a" << 15 << "b" << 0 ), &min, &max ));
+            ASSERT_EQUALS( BSON( "a" << 18 << "b" << 0 ), min );
+            ASSERT_EQUALS( BSON( "a" << 20 << "b" << 0 ), max );
+
+            ASSERT( cloned->getNextChunk( BSON( "a" << 18 << "b" << 0 ), &min, &max ));
         }
     };
 
