@@ -234,12 +234,14 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
             obj.forEach(function(doc) {
                 batch.insert(doc);
             });
+            // Do not return a SingleWriteResult if inserting an array
+            result = batch.execute(wc);
         }
         else {
             batch.insert(obj);
+            result = batch.execute(wc).toSingleResult();
         }
 
-        result = batch.execute(wc).toSingleResult();
     }
     else {
         if ( ! _allow_dot ) {
