@@ -132,7 +132,7 @@ DB.prototype.upgradeCheck = function(obj) {
             throw Error("When providing an argument to upgradeCheck, it must be of the form " +
                         "{collection: <collectionNameString>}. Otherwise, it will check every " +
                         "collection in the database. If you would like to check all databases, " +
-                        "run db.upgradeCheckAllDbs() from the admin database.");
+                        "run db.upgradeCheckAllDBs() from the admin database.");
         }
     }
 
@@ -146,10 +146,10 @@ DB.prototype.upgradeCheck = function(obj) {
     return false;
 };
 
-DB.prototype.upgradeCheckAllDbs = function() {
+DB.prototype.upgradeCheckAllDBs = function() {
     var self = this;
     if (self.getName() !== "admin") {
-        throw Error("db.upgradeCheckAllDbs() can only be run from the admin database");
+        throw Error("db.upgradeCheckAllDBs() can only be run from the admin database");
     }
 
     var dbs = self.getMongo().getDBs();
