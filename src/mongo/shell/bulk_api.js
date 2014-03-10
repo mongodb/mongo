@@ -903,7 +903,7 @@ var _bulk_api_module = (function() {
     //
     // Execute the batch
     this.execute = function(_writeConcern) {
-      if(executed) throw Error("operations cannot be re-executed");
+      if(executed) throw Error("A bulk operation cannot be re-executed");
 
       // If writeConcern set, use it, else get from collection (which will inherit from db/mongo)
       writeConcern = _writeConcern ? _writeConcern : coll.getWriteConcern();
