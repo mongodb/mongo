@@ -970,8 +970,9 @@ namespace replset {
                     }
                 }
 
-                LOG(1) << "replSet last: " << slave->last.toString() << " to " 
-                       << last.toString() << rsLog;
+                LOG(5) << "replSet secondary " << slave->slave->fullName()
+                       << " syncing progress updated from " << slave->last.toStringPretty()
+                       << " to " << last.toStringPretty() << rsLog;
                 if (slave->last > last) {
                     // Nothing to do; already up to date.
                     return;
