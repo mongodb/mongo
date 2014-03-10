@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/query_solution.h"

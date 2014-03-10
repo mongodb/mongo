@@ -179,6 +179,19 @@ namespace mongo {
     }
 
     // static
+    bool LiteParsedQuery::isQueryIsolated(const BSONObj& query) {
+        BSONObjIterator iter(query);
+        while (iter.more()) {
+            BSONElement elt = iter.next();
+            if (str::equals(elt.fieldName(), "$isolated") && elt.trueValue())
+                return true;
+            if (str::equals(elt.fieldName(), "$atomic") && elt.trueValue())
+                return true;
+        }
+        return false;
+    }
+
+    // static
     BSONObj LiteParsedQuery::normalizeSortOrder(const BSONObj& sortObj) {
         BSONObjBuilder b;
         BSONObjIterator i(sortObj);

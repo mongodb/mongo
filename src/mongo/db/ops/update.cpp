@@ -47,6 +47,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/queryutil.h"
@@ -487,18 +488,6 @@ namespace mongo {
         return executor.execute();
     }
 
-    static bool isQueryIsolated(const BSONObj& query) {
-        BSONObjIterator iter(query);
-        while (iter.more()) {
-            BSONElement elt = iter.next();
-            if (str::equals(elt.fieldName(), "$isolated") && elt.trueValue())
-                return true;
-            if (str::equals(elt.fieldName(), "$atomic") && elt.trueValue())
-                return true;
-        }
-        return false;
-    }
-
     UpdateResult update(
             const UpdateRequest& request,
             OpDebug* opDebug,
@@ -545,7 +534,7 @@ namespace mongo {
         // yield while evaluating the update loop below.
         const bool isolated =
             (cq && QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC)) ||
-            isQueryIsolated(request.getQuery());
+            LiteParsedQuery::isQueryIsolated(request.getQuery());
 
         //
         // We'll start assuming we have one or more documents for this update. (Otherwise,
