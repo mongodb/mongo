@@ -489,14 +489,38 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	/* Make sure the oldest transaction ID is up-to-date. */
 	__wt_txn_update_oldest(session);
 
-	/*
-	 * We can't evict the page just returned to us, it marks our place in
-	 * the tree.  So, always walk one page ahead of the page being evicted.
-	 */
+	/* Walk the tree, discarding pages. */
 	next_page = NULL;
 	WT_RET(__wt_tree_walk(
 	    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 	while ((page = next_page) != NULL) {
+		/*
+		 * Eviction can fail when a page in the evicted page's subtree
+		 * switches state.  For example, if we don't evict a page marked
+		 * empty, because we expect it to be merged into its parent, it
+		 * might no longer be empty after it's reconciled, in which case
+		 * eviction of its parent would fail.  We can either walk the
+		 * tree multiple times (until it's finally empty), or reconcile
+		 * each page to get it to its final state before considering if
+		 * it's an eviction target or will be merged into its parent.
+		 *
+		 * Don't limit this test to any particular page type, that tends
+		 * to introduce bugs when the reconciliation of other page types
+		 * changes, and there's no advantage to doing so.
+		 */
+		if (syncop == WT_SYNC_DISCARD && __wt_page_is_modified(page))
+			WT_ERR(__wt_rec_write(
+			    session, page, NULL, WT_SKIP_UPDATE_ERR));
+
+		/*
+		 * We can't evict the page just returned to us (it marks our
+		 * place in the tree), so move the walk to one page ahead of
+		 * the page being evicted.  Note, we reconcile the returned
+		 * page first: if reconciliation of that page were to change
+		 * the shape of the tree, and we did the next walk call before
+		 * the reconciliation, the next walk call could miss a page in
+		 * the tree.
+		 */
 		WT_ERR(__wt_tree_walk(
 		    session, &next_page, WT_READ_CACHE | WT_READ_NO_GEN));
 
@@ -511,25 +535,6 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 
 		switch (syncop) {
 		case WT_SYNC_DISCARD:
-			/*
-			 * Eviction can fail when a page in the evicted page's
-			 * subtree switches state.  For example, if we don't
-			 * evict a page marked empty, because we expect it to
-			 * be merged into its parent, it might no longer be
-			 * empty after it's reconciled, in which case eviction
-			 * of its parent would fail.  We can either walk the
-			 * tree multiple times, until it's eventually empty,
-			 * or immediately reconcile the page to get it to its
-			 * final state before considering if it's an eviction
-			 * target.
-			 *
-			 * We could limit this test to empty pages (only empty
-			 * pages can switch state this way).
-			 */
-			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(
-				    session, page, NULL, WT_SKIP_UPDATE_ERR));
-
 			/*
 			 * Evict the page.
 			 * Do not attempt to evict pages expected to be merged
