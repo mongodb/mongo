@@ -200,7 +200,7 @@ Mongo.prototype.writeMode = function() {
         // good with whatever is already set
     }
     else if ( this._writeMode == "commands" ) {
-        print("Cannot use commands write mode, degrading to compatability mode");
+        print("Cannot use commands write mode, degrading to compatibility mode");
         this._writeMode = "compatibility";
     }
     
