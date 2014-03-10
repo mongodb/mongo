@@ -1,6 +1,6 @@
 o = "xxxxxxxxxxxxxxxxxxx";
 o = o + o;
-o + o;
+o = o + o;
 o = o + o;
 o = o + o;
 o = o + o;
