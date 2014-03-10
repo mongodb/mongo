@@ -509,9 +509,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * each page to get it to its final state before considering if
 		 * it's an eviction target or will be merged into its parent.
 		 *
-		 * Don't limit this test to any particular page type: that tends
-		 * to introduce bugs when reconciliation of other page types of
-		 * pages change, and there's no advantage to doing so.
+		 * Don't limit this test to any particular page type, that tends
+		 * to introduce bugs when the reconciliation of other page types
+		 * changes, and there's no advantage to doing so.
 		 */
 		if (syncop == WT_SYNC_DISCARD && __wt_page_is_modified(page))
 			WT_ERR(__wt_rec_write(
