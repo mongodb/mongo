@@ -674,13 +674,34 @@ namespace mongo {
         MatchExpression* textNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
             RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
-            // Error if the text node is tagged with zero indices, or if the text node is tagged
-            // with greater than one index.
-            if (1 != tag->first.size() + tag->notFirst.size()) {
+
+            // Exactly one text index required for TEXT.  We need to check this explicitly because
+            // the text stage can't be built if no text index exists or there is an ambiguity as to
+            // which one to use.
+            size_t textIndexCount = 0;
+            for (size_t i = 0; i < params.indices.size(); i++) {
+                if (INDEX_TEXT == params.indices[i].type) {
+                    textIndexCount++;
+                }
+            }
+            if (textIndexCount != 1) {
                 // Don't leave tags on query tree.
                 query.root()->resetTag();
                 return Status(ErrorCodes::BadValue, "need exactly one text index for $text query");
             }
+
+            // Error if the text node is tagged with zero indices.
+            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+                // Don't leave tags on query tree.
+                query.root()->resetTag();
+                return Status(ErrorCodes::BadValue,
+                              "failed to use text index to satisfy $text query (if text index is "
+                              "compound, are equality predicates given for all prefix fields?)");
+            }
+
+            // At this point, we know that there is only one text index and that the TEXT node is
+            // assigned to it.
+            invariant(1 == tag->first.size() + tag->notFirst.size());
         }
 
         // If we have any relevant indices, we try to create indexed plans.
