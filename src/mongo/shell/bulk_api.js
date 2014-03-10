@@ -422,6 +422,18 @@ var _bulk_api_module = (function() {
       return batches;
     }
 
+    var finalizeBatch = function(newDocType) {
+        // Save the batch to the execution stack
+        batches.push(currentBatch);
+
+        // Create a new batch
+        currentBatch = new Batch(newDocType, currentIndex);
+
+        // Reset the current size trackers
+        currentBatchSize = 0;
+        currentBatchSizeBytes = 0;
+    };
+
     // Add to internal list of documents
     var addToOperationsList = function(docType, document) {
       // Get the bsonSize
@@ -433,19 +445,9 @@ var _bulk_api_module = (function() {
       currentBatchSize = currentBatchSize + 1;
       currentBatchSizeBytes = currentBatchSizeBytes + bsonSize;
 
-      // Check if we need to create a new batch
-      if((currentBatchSize >= maxNumberOfDocsInBatch)
-        || (currentBatchSizeBytes >= maxBatchSizeBytes)
-        || (currentBatch.batchType != docType)) {
-        // Save the batch to the execution stack
-        batches.push(currentBatch);
-
-        // Create a new batch
-        currentBatch = new Batch(docType, currentIndex);
-
-        // Reset the current size trackers
-        currentBatchSize = 0;
-        currentBatchSizeBytes = 0;
+      // Finalize and create a new batch if we have a new operation type
+      if (currentBatch.batchType != docType) {
+          finalizeBatch(docType);
       }
 
       // We have an array of documents
@@ -455,6 +457,13 @@ var _bulk_api_module = (function() {
         currentBatch.operations.push(document)
         currentIndex = currentIndex + 1;
       }
+
+      // Check if the batch exceeds one of the size limits
+      if((currentBatchSize >= maxNumberOfDocsInBatch)
+        || (currentBatchSizeBytes >= maxBatchSizeBytes)) {
+          finalizeBatch(docType);
+      }
+
     };
 
     /**
