@@ -98,7 +98,8 @@ namespace mongo {
         const PlanCacheKey& getPlanCacheKey() const;
 
         // Debugging
-        string toString() const;
+        std::string toString() const;
+        std::string toStringShort() const;
 
         /**
          * Validates match expression, checking for certain

@@ -417,9 +417,7 @@ namespace mongo {
         verify(cq);
 
         QLOG() << "Running query:\n" << cq->toString();
-        LOG(2) << "Running query: query " << cq->getParsed().getFilter().toString()
-               << " sort " << cq->getParsed().getSort().toString()
-               << " projection " << cq->getParsed().getProj().toString();
+        LOG(2) << "Running query: " << cq->toStringShort();
 
         // Parse, canonicalize, plan, transcribe, and get a runner.
         Runner* rawRunner = NULL;
@@ -515,19 +513,11 @@ namespace mongo {
         // to fill in explain information
         const bool isExplain = pq.isExplain();
 
-        // Try to get information about the plan which the runner
-        // will use to execute the query.
+        // Have we retrieved info about which plan the runner will
+        // use to execute the query yet?
         bool gotPlanInfo = false;
         PlanInfo* rawInfo;
         boost::scoped_ptr<PlanInfo> planInfo;
-        Status infoStatus = runner->getInfo(NULL, &rawInfo);
-        if (infoStatus.isOK()) {
-            gotPlanInfo = true;
-            planInfo.reset(rawInfo);
-            // planSummary is really a ThreadSafeString which copies the data from
-            // the provided pointer.
-            curop.debug().planSummary = planInfo->planSummary.c_str();
-        }
 
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
             // Add result to output buffer. This is unnecessary if explain info is requested
@@ -546,7 +536,7 @@ namespace mongo {
             //
             // TODO: Do we ever want to output what the MPR is comparing?
             if (!gotPlanInfo) {
-                infoStatus = runner->getInfo(NULL, &rawInfo);
+                Status infoStatus = runner->getInfo(NULL, &rawInfo);
                 if (infoStatus.isOK()) {
                     gotPlanInfo = true;
                     planInfo.reset(rawInfo);
@@ -587,6 +577,19 @@ namespace mongo {
                     saveClientCursor = !runner->isEOF();
                 }
                 break;
+            }
+        }
+
+        // Try to get information about the plan which the runner
+        // will use to execute the query, it we don't have it already.
+        if (!gotPlanInfo) {
+            Status infoStatus = runner->getInfo(NULL, &rawInfo);
+            if (infoStatus.isOK()) {
+                gotPlanInfo = true;
+                planInfo.reset(rawInfo);
+                // planSummary is really a ThreadSafeString which copies the data from
+                // the provided pointer.
+                curop.debug().planSummary = planInfo->planSummary.c_str();
             }
         }
 

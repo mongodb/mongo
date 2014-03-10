@@ -401,6 +401,10 @@ namespace mongo {
             return "AND_SORTED";
         case STAGE_COLLSCAN:
             return "COLLSCAN";
+        case STAGE_COUNT:
+            return "COUNT";
+        case STAGE_DISTINCT:
+            return "DISTINCT";
         case STAGE_FETCH:
             return "FETCH";
         case STAGE_GEO_2D:
@@ -411,6 +415,8 @@ namespace mongo {
             return "GEO_NEAR_2DSPHERE";
         case STAGE_IXSCAN:
             return "IXSCAN";
+        case STAGE_KEEP_MUTATIONS:
+            return "KEEP_MUTATIONS";
         case STAGE_LIMIT:
             return "LIMIT";
         case STAGE_OR:
@@ -427,10 +433,6 @@ namespace mongo {
             return "SORT_MERGE";
         case STAGE_TEXT:
             return "TEXT";
-        case STAGE_KEEP_MUTATIONS:
-            return "KEEP_MUTATIONS";
-        case STAGE_DISTINCT:
-            return "STAGE_DISTINCT";
         default:
             invariant(0);
         }
@@ -572,9 +574,13 @@ namespace mongo {
                 leafInfo << stageTypeString(node->getType());
 
                 // If the leaf is an index scan, also add the key pattern.
-                if (STAGE_IXSCAN == node->getType()) {
-                    const IndexScanNode* ixn = static_cast<const IndexScanNode*>(node);
-                    leafInfo << " " << ixn->indexKeyPattern;
+                if (STAGE_COUNT == node->getType()) {
+                    const CountNode* countNode = static_cast<const CountNode*>(node);
+                    leafInfo << " " << countNode->indexKeyPattern;
+                }
+                else if (STAGE_DISTINCT == node->getType()) {
+                    const DistinctNode* dn = static_cast<const DistinctNode*>(node);
+                    leafInfo << " " << dn->indexKeyPattern;
                 }
                 else if (STAGE_GEO_2D == node->getType()) {
                     const Geo2DNode* g2d = static_cast<const Geo2DNode*>(node);
@@ -588,6 +594,10 @@ namespace mongo {
                     const GeoNear2DSphereNode* g2dsphere =
                         static_cast<const GeoNear2DSphereNode*>(node);
                     leafInfo << " " << g2dsphere->indexKeyPattern;
+                }
+                else if (STAGE_IXSCAN == node->getType()) {
+                    const IndexScanNode* ixn = static_cast<const IndexScanNode*>(node);
+                    leafInfo << " " << ixn->indexKeyPattern;
                 }
                 else if (STAGE_TEXT == node->getType()) {
                     const TextNode* textNode = static_cast<const TextNode*>(node);

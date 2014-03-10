@@ -644,7 +644,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    string CanonicalQuery::toString() const {
+    std::string CanonicalQuery::toString() const {
         mongoutils::str::stream ss;
         ss << "ns=" << _pq->ns() << " limit=" << _pq->getNumToReturn()
            << " skip=" << _pq->getSkip() << '\n';
@@ -652,6 +652,14 @@ namespace mongo {
         ss << "Tree: " << _root->toString();
         ss << "Sort: " << _pq->getSort().toString() << '\n';
         ss << "Proj: " << _pq->getProj().toString() << '\n';
+        return ss;
+    }
+
+    std::string CanonicalQuery::toStringShort() const {
+        mongoutils::str::stream ss;
+        ss << "query: " << _pq->getFilter().toString()
+           << " sort: " << _pq->getSort().toString()
+           << " projection: " << _pq->getProj().toString();
         return ss;
     }
 

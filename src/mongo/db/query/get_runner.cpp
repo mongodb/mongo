@@ -107,6 +107,8 @@ namespace mongo {
                      size_t plannerOptions) {
 
         if (!collection) {
+            LOG(2) << "Collection " << ns << " does not exist."
+                   << " Using EOF runner: " << unparsedQuery.toString();
             *outCanonicalQuery = NULL;
             *outRunner = new EOFRunner(NULL, ns);
             return Status::OK();
@@ -122,6 +124,8 @@ namespace mongo {
                 return status;
             return getRunner(collection, *outCanonicalQuery, outRunner, plannerOptions);
         }
+
+        LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
         *outCanonicalQuery = NULL;
         *outRunner = new IDHackRunner(collection, unparsedQuery["_id"].wrap());
@@ -212,6 +216,8 @@ namespace mongo {
         // This can happen as we're called by internal clients as well.
         if (NULL == collection) {
             const string& ns = canonicalQuery->ns();
+            LOG(2) << "Collection " << ns << " does not exist."
+                   << " Using EOF runner: " << canonicalQuery->toStringShort();
             *out = new EOFRunner(canonicalQuery.release(), ns);
             return Status::OK();
         }
@@ -219,6 +225,7 @@ namespace mongo {
         // If we have an _id index we can use the idhack runner.
         if (IDHackRunner::supportsQuery(*canonicalQuery) &&
             collection->getIndexCatalog()->findIdIndex()) {
+            LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
             *out = new IDHackRunner(collection, canonicalQuery.release());
             return Status::OK();
         }
@@ -285,6 +292,9 @@ namespace mongo {
             if (status.isOK()) {
                 if (plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) {
                     if (turnIxscanIntoCount(qs)) {
+                        LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
+                               << ", planSummary: " << getPlanSummary(*qs);
+
                         WorkingSet* ws;
                         PlanStage* root;
                         verify(StageBuilder::build(*qs, &root, &ws));
@@ -297,7 +307,8 @@ namespace mongo {
                     }
                 }
 
-                LOG(2) << "Using cached query plan: " << getPlanSummary(*qs);
+                LOG(2) << "Using cached query plan: " << canonicalQuery->toStringShort()
+                       << ", planSummary: " << getPlanSummary(*qs);
 
                 WorkingSet* ws;
                 PlanStage* root;
@@ -347,6 +358,9 @@ namespace mongo {
                         }
                     }
 
+                    LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
+                           << ", planSummary: " << getPlanSummary(*solutions[i]);
+
                     // We're not going to cache anything that's fast count.
                     WorkingSet* ws;
                     PlanStage* root;
@@ -362,6 +376,10 @@ namespace mongo {
         }
 
         if (1 == solutions.size()) {
+            LOG(2) << "Only one plan is available; it will be run but will not be cached. "
+                   << canonicalQuery->toStringShort()
+                   << ", planSummary: " << getPlanSummary(*solutions[0]);
+
             // Only one possible plan.  Run it.  Build the stages from the solution.
             WorkingSet* ws;
             PlanStage* root;
@@ -767,6 +785,9 @@ namespace mongo {
             QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, dn);
             verify(soln);
 
+            LOG(2) << "Using fast distinct: " << cq->toStringShort()
+                   << ", planSummary: " << getPlanSummary(*soln);
+
             WorkingSet* ws;
             PlanStage* root;
             verify(StageBuilder::build(*soln, &root, &ws));
@@ -790,6 +811,9 @@ namespace mongo {
                         delete solutions[j];
                     }
                 }
+
+                LOG(2) << "Using fast distinct: " << cq->toStringShort()
+                       << ", planSummary: " << getPlanSummary(*solutions[i]);
 
                 // Build and return the SSR over solutions[i].
                 WorkingSet* ws;
