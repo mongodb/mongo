@@ -339,12 +339,21 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	/*
 	 * The compaction process looks at the page's modification information;
 	 * if compaction is running, lock the page down.
+	 *
+	 * Evicting leaf pages could result in splits into their parent, which
+	 * could theoretically collide with the checkpoint write of an internal
+	 * page (we could see a child reference in a split state when walking
+	 * the internal page), and we're not prepared to deal with that.  When
+	 * reconciling internal pages that might have live children, lock down
+	 * the page to block splits of its children.
 	 */
 	locked = 0;
-	if (conn->compact_in_memory_pass) {
+	if (conn->compact_in_memory_pass)
 		locked = 1;
+	if (WT_PAGE_IS_INTERNAL(page) && !LF_ISSET(WT_EVICTION_LOCKED))
+		locked = 1;
+	if (locked)
 		WT_PAGE_LOCK(session, page);
-	}
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -355,21 +364,13 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 			ret = __rec_col_fix(session, r, page);
 		break;
 	case WT_PAGE_COL_INT:
-		if (LF_ISSET(WT_EVICTION_LOCKED))
-			WT_PAGE_LOCK(session, page);
 		ret = __rec_col_int(session, r, page);
-		if (LF_ISSET(WT_EVICTION_LOCKED))
-			WT_PAGE_UNLOCK(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
 		ret = __rec_col_var(session, r, page, salvage);
 		break;
 	case WT_PAGE_ROW_INT:
-		if (LF_ISSET(WT_EVICTION_LOCKED))
-			WT_PAGE_LOCK(session, page);
 		ret = __rec_row_int(session, r, page);
-		if (LF_ISSET(WT_EVICTION_LOCKED))
-			WT_PAGE_UNLOCK(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		ret = __rec_row_leaf(session, r, page, salvage);
@@ -501,6 +502,10 @@ __rec_write_init(
 		F_SET(&r->dsk, WT_ITEM_ALIGNED);
 	}
 
+	/* Remember the configuration. */
+	r->page = page;
+	r->flags = flags;
+
 	/* Initialize the boundary information. */
 	__rec_bnd_init(session, r, 0);
 
@@ -573,11 +578,7 @@ __rec_write_init(
 	r->all_empty_value = 1;
 	r->any_empty_value = 0;
 
-	/* Remember the flags. */
-	r->flags = flags;
-
 	/* Save the page's write generation before reading the page. */
-	r->page = page;
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	return (0);
@@ -674,28 +675,6 @@ __rec_bnd_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 }
 
 /*
- * __rec_txn_skip_chk --
- *	Found an update we can't write: if that's not OK, fail.
- */
-static inline int
-__rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
-{
-	r->upd_skipped = 1;
-
-	switch (F_ISSET(r, WT_SKIP_UPDATE_ERR | WT_SKIP_UPDATE_RESTORE)) {
-	case WT_SKIP_UPDATE_ERR:
-		WT_PANIC_RETX(
-		    session, "reconciliation illegally skipped an update");
-	case WT_SKIP_UPDATE_RESTORE:
-		return (EBUSY);
-	case 0:
-	default:
-		break;
-	}
-	return (0);
-}
-
-/*
  * __rec_upd_skip_save --
  *	Save a key/WT_UPDATE pair for later restoration.
  */
@@ -765,18 +744,23 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		r->max_txn = max_txn;
 
 	/*
-	 * If evicting and updates were skipped, remember the list of WT_UPDATEs
-	 * so we can restore it on a newly instantiated page.  (The order of the
-	 * updates matters, we can't move only unresolved WT_UPDATEs, we have to
-	 * move the entire list.)
+	 * If evicting and not all of the updates are visible, and we can save
+	 * and restore the list of updates on a newly instantiated page, do so.
+	 * (The order of the updates matters so we can't move only unresolved
+	 * updates, we have to move the entire list.)  Additionally, in this
+	 * case we don't write any updates at all, that might move an insert to
+	 * a different position on the page.
 	 *
-	 * Additionally, in this case we don't write any WT_UPDATEs at all, we
-	 * don't want to move an insert into a different position on the page.
+	 * If evicting and not all of the updates are visible, and we can't save
+	 * and restore the updates, quit, this page can't be evicted.
 	 */
-	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
+	if (F_ISSET(r, WT_EVICTION_LOCKED) &&
 	    !__wt_txn_visible_all(session, max_txn)) {
-		*updp = NULL;
-		WT_RET(__rec_upd_skip_save(session, r, ins, rip));
+		if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
+			*updp = NULL;
+			WT_RET(__rec_upd_skip_save(session, r, ins, rip));
+		} else
+			return (EBUSY);
 	}
 
 	return (0);
@@ -980,8 +964,19 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * during reconciliation by setting the skipped flag and ignoring the
 	 * change for the purposes of writing the internal page.
 	 */
-	if (!__wt_txn_visible(session, ref->txnid))
-		return (__rec_txn_skip_chk(session, r));
+	if (!__wt_txn_visible(session, ref->txnid)) {
+		/*
+		 * In some cases (for example, when closing a file), there had
+		 * better not be any updates we can't write.
+		 */
+		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
+			WT_PANIC_RETX(session,
+			    "reconciliation illegally skipped an update");
+
+		/* If this page cannot be evicted, quit now. */
+		if (F_ISSET(r, WT_EVICTION_LOCKED))
+			return (EBUSY);
+	}
 
 	/*
 	 * Deal with any underlying disk blocks.  First, check to see if there
