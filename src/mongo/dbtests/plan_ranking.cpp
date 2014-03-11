@@ -39,6 +39,7 @@
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
@@ -145,6 +146,12 @@ namespace PlanRankingTests {
             failPoint->setMode(FailPoint::off);
         }
 
+    protected:
+        // A large number, which must be larger than the number of times
+        // candidate plans are worked by the multi plan runner. Used for
+        // determining the number of documents in the tests below.
+        static const int N;
+
     private:
         static DBDirectClient _client;
         scoped_ptr<MultiPlanRunner> _mpr;
@@ -155,14 +162,15 @@ namespace PlanRankingTests {
 
     DBDirectClient PlanRankingTestBase::_client;
 
+    // static
+    const int PlanRankingTestBase::N = internalQueryPlanEvaluationWorks + 1000;
+
     /**
      * Test that the "prefer ixisect" parameter works.
      */
     class PlanRankingIntersectOverride : public PlanRankingTestBase {
     public:
         void run() {
-            static const int N = 10000;
-
             // 'a' is very selective, 'b' is not.
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << i << "b" << 1));
@@ -210,8 +218,6 @@ namespace PlanRankingTests {
     class PlanRankingIntersectWithBackup : public PlanRankingTestBase {
     public:
         void run() {
-            static const int N = 10000;
-
             // 'a' is very selective, 'b' is not.
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << i << "b" << 1));
@@ -253,8 +259,6 @@ namespace PlanRankingTests {
         void run() {
             // Insert data {a:i, b:i}.  Index {a:1} and {a:1, b:1}, query on 'a', projection on 'a'
             // and 'b'.  Should prefer the second index as we can pull the 'b' data out.
-
-            static const int N = 10000;
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << i << "b" << i));
             }
@@ -291,8 +295,6 @@ namespace PlanRankingTests {
             // We insert lots of copies of {a:1, b:1, c: 20}.  We have the indices {a:1} and {b:1},
             // and the query is {a:1, b:1, c: 999}.  No data that matches the query but we won't
             // know that during plan ranking.  We don't want to choose an intersection plan here.
-            static const int N = 10000;
-
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << 1 << "b" << 1 << "c" << 20));
             }
@@ -330,8 +332,6 @@ namespace PlanRankingTests {
             // We insert lots of copies of {a:1, b:1}.  We have the indices {a:1} and {a:1, b:1},
             // the query is for a doc that doesn't exist, but there is a projection over 'a' and
             // 'b'.  We should prefer the index that provides a covered query.
-            static const int N = 10000;
-
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << 1 << "b" << 1));
             }
@@ -367,8 +367,6 @@ namespace PlanRankingTests {
     class PlanRankingPreferImmediateEOF : public PlanRankingTestBase {
     public:
         void run() {
-            static const int N = 10000;
-
             // 'a' is very selective, 'b' is not.
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << i << "b" << 1));
@@ -399,8 +397,6 @@ namespace PlanRankingTests {
     class PlanRankingNoCollscan : public PlanRankingTestBase {
     public:
         void run() {
-            static const int N = 10000;
-
             for (int i = 0; i < N; ++i) {
                 insert(BSON("_id" << i));
             }
@@ -437,8 +433,6 @@ namespace PlanRankingTests {
     class PlanRankingCollscan : public PlanRankingTestBase {
     public:
         void run() {
-            static const int N = 10000;
-
             // Insert data for which we have no index.
             for (int i = 0; i < N; ++i) {
                 insert(BSON("foo" << i));
@@ -469,8 +463,6 @@ namespace PlanRankingTests {
         void run() {
             // Simulate needing lots of FETCH's.
             turnOnAlwaysFetch();
-
-            static const int N = 10000;
 
             // Neither 'a' nor 'b' is selective.
             for (int i = 0; i < N; ++i) {
@@ -515,8 +507,6 @@ namespace PlanRankingTests {
             // Simulate needing lots of FETCH's.
             turnOnAlwaysFetch();
 
-            static const int N = 10000;
-
             // Neither 'a' nor 'b' is selective.
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << 1 << "b" << 1));
@@ -559,8 +549,6 @@ namespace PlanRankingTests {
         void run() {
             // Simulate needing lots of FETCH's.
             turnOnAlwaysFetch();
-
-            static const int N = 10000;
 
             // Set up data so that the following conditions hold:
             //  1) Documents matching {a: 1} are of high cardinality.
@@ -612,8 +600,6 @@ namespace PlanRankingTests {
             // Simulate needing lots of FETCH's.
             turnOnAlwaysFetch();
 
-            static const int N = 10000;
-
             // Set up the data so that for the query {a: 1, b: 1}, the
             // intersection is empty. The single index plans have to do
             // more fetching from disk in order to determine that the result
@@ -661,8 +647,6 @@ namespace PlanRankingTests {
             // Simulate needing lots of FETCH's.
             turnOnAlwaysFetch();
 
-            static const int N = 10000;
-
             // Set up the data so that for the query {a: 1, b: 1, c: 1}, the intersection
             // between 'b' and 'c' is small, and the other intersections are larger.
             for (int i = 0; i < 10; ++i) {
@@ -707,8 +691,6 @@ namespace PlanRankingTests {
     class PlanRankingAvoidBlockingSort : public PlanRankingTestBase {
     public:
         void run() {
-            static const int N = 10000;
-
             for (int i = 0; i < N; ++i) {
                 insert(BSON("a" << 1 << "d" << i));
             }
@@ -739,6 +721,39 @@ namespace PlanRankingTests {
         }
     };
 
+    /**
+     * Make sure we run candidate plans for long enough when none of the
+     * plans are producing results.
+     */
+    class PlanRankingWorkPlansLongEnough : public PlanRankingTestBase {
+    public:
+        void run() {
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << 1));
+                insert(BSON("a" << 1 << "b" << 1 << "c" << i));
+            }
+
+            // Indices on 'a' and 'b'.
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("b" << 1));
+
+            // Solutions using either 'a' or 'b' will take a long time to start producing
+            // results. However, an index scan on 'b' will start producing results sooner
+            // than an index scan on 'a'.
+            CanonicalQuery* cq;
+            ASSERT(CanonicalQuery::canonicalize(ns,
+                                                fromjson("{a: 1, b: 1, c: {$gte: 5000}}"),
+                                                &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // Use index on 'b'.
+            QuerySolution* soln = pickBestPlan(cq);
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
+                        soln->root.get()));
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query_plan_ranking" ) {}
@@ -758,6 +773,7 @@ namespace PlanRankingTests {
             add<PlanRankingIxisectHitsEOFFirst>();
             add<PlanRankingChooseBetweenIxisectPlans>();
             add<PlanRankingAvoidBlockingSort>();
+            add<PlanRankingWorkPlansLongEnough>();
         }
     } planRankingAll;
 
