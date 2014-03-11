@@ -1241,7 +1241,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 * the page and some other thread may have evicted it by the time we
 	 * look at it.
 	 */
-	page->read_gen = __wt_cache_read_gen_set(session);
+	if (page->read_gen != WT_READGEN_OLDEST)
+		page->read_gen = __wt_cache_read_gen_set(session);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, page));
 
