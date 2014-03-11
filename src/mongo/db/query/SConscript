@@ -14,6 +14,7 @@ env.Library(
         "planner_access.cpp",
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
+        "query_knobs.cpp",
         "query_planner.cpp",
         "query_solution.cpp",
     ],
@@ -23,6 +24,7 @@ env.Library(
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions",
         "$BUILD_DIR/mongo/index_names",
+        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 

@@ -48,7 +48,7 @@
 namespace mongo {
 
     // How we access the external setParameter testing bool.
-    extern bool forceIntersectionPlans;
+    extern bool internalQueryForceIntersectionPlans;
 
 }  // namespace mongo
 
@@ -61,14 +61,14 @@ namespace PlanRankingTests {
 
     class PlanRankingTestBase {
     public:
-        PlanRankingTestBase() : _forceIntersectionPlans(forceIntersectionPlans) {
+        PlanRankingTestBase() : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans) {
             Client::WriteContext ctx(ns);
             _client.dropCollection(ns);
         }
 
         virtual ~PlanRankingTestBase() {
             // Restore external setParameter testing bool.
-            forceIntersectionPlans = _forceIntersectionPlans;
+            internalQueryForceIntersectionPlans = _internalQueryForceIntersectionPlans;
         }
 
         void insert(const BSONObj& obj) {
@@ -148,9 +148,9 @@ namespace PlanRankingTests {
     private:
         static DBDirectClient _client;
         scoped_ptr<MultiPlanRunner> _mpr;
-        // Holds the value of global "forceIntersectionPlans" setParameter flag.
+        // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
         // Restored at end of test invocation regardless of test result.
-        bool _forceIntersectionPlans;
+        bool _internalQueryForceIntersectionPlans;
     };
 
     DBDirectClient PlanRankingTestBase::_client;
@@ -186,7 +186,7 @@ namespace PlanRankingTests {
 
             // Turn on the "force intersect" option.
             // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-            forceIntersectionPlans = true;
+            internalQueryForceIntersectionPlans = true;
 
             // And run the same query again.
             ASSERT(CanonicalQuery::canonicalize(ns, BSON("a" << 100 << "b" << 1), &cq).isOK());
@@ -229,7 +229,7 @@ namespace PlanRankingTests {
 
             // Turn on the "force intersect" option.
             // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-            forceIntersectionPlans = true;
+            internalQueryForceIntersectionPlans = true;
 
             // Takes ownership of cq.
             QuerySolution* soln = pickBestPlan(cq);

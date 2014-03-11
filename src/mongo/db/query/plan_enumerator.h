@@ -35,16 +35,14 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/query_knobs.h"
 
 namespace mongo {
 
     struct PlanEnumeratorParams {
 
-        // How many choices do we want when computing ixisect solutions in an AND?
-        static const size_t kDefaultMaxIntersectPerAnd = 3;
-
         PlanEnumeratorParams() : intersect(false),
-                                 maxIntersectPerAnd(3) { }
+                                 maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd) { }
 
         // Do we provide solutions that use more indices than the minimum required to provide
         // an indexed solution?

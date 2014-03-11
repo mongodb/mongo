@@ -32,17 +32,15 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/query_knobs.h"
 
 namespace mongo {
 
     struct QueryPlannerParams {
 
-        // How many indexed solutions are we willing to output?
-        static const size_t kDefaultMaxIndexedSolutions = 6;
-
         QueryPlannerParams() : options(DEFAULT),
                                indexFiltersApplied(false),
-                               maxIndexedSolutions(kDefaultMaxIndexedSolutions) { }
+                               maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions) { }
 
         enum Options {
             // You probably want to set this.

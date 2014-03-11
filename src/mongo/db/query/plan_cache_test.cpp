@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_solution.h"
@@ -387,26 +388,25 @@ namespace {
         ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
         ASSERT_EQUALS(planCache.size(), 1U);
 
-        // First (PlanCache::kPlanCacheMaxWriteOperations - 1) notifications should have
-        // no effect on cache contents.
-        for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
+        // First (N - 1) write ops should have no effect on cache contents.
+        for (int i = 0; i < (internalQueryCacheWriteOpsBetweenFlush - 1); ++i) {
             planCache.notifyOfWriteOp();
         }
         ASSERT_EQUALS(planCache.size(), 1U);
 
-        // 1000th notification will cause cache to be cleared.
+        // N-th notification will cause cache to be cleared.
         planCache.notifyOfWriteOp();
         ASSERT_EQUALS(planCache.size(), 0U);
 
         // Clearing the cache should reset the internal write
         // operation counter.
-        // Repopulate cache. Write (PlanCache::kPlanCacheMaxWriteOperations - 1) times.
+        // Repopulate cache. Write (N - 1) times.
         // Clear cache.
         // Add cache entry again.
         // After clearing and adding a new entry, the next write operation should not
         // clear the cache.
         ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
-        for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
+        for (int i = 0; i < (internalQueryCacheWriteOpsBetweenFlush - 1); ++i) {
             planCache.notifyOfWriteOp();
         }
         ASSERT_EQUALS(planCache.size(), 1U);

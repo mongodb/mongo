@@ -36,13 +36,10 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-    const int PlanCache::kPlanCacheMaxWriteOperations = 1000;
-
-    const int PlanCache::kMaxCacheSize = 200;
 
     //
     // Cache-related functions for CanonicalQuery
@@ -189,11 +186,6 @@ namespace mongo {
         return ss;
     }
 
-    // static
-    const size_t PlanCacheEntry::kMaxFeedback = 20;
-
-    // static
-    const double PlanCacheEntry::kStdDevThreshold = 2.0;
 
     // static
     const double PlanCacheEntry::kMinDeviation = 0.0001;
@@ -285,9 +277,9 @@ namespace mongo {
     // PlanCache
     //
 
-    PlanCache::PlanCache() : _cache(kMaxCacheSize) { }
+    PlanCache::PlanCache() : _cache(internalQueryCacheSize) { }
 
-    PlanCache::PlanCache(const std::string& ns) : _cache(kMaxCacheSize), _ns(ns) { }
+    PlanCache::PlanCache(const std::string& ns) : _cache(internalQueryCacheSize), _ns(ns) { }
 
     PlanCache::~PlanCache() { }
 
@@ -399,7 +391,7 @@ namespace mongo {
             return false;
         }
 
-        if (deviation > (PlanCacheEntry::kStdDevThreshold * (*entry->stddevScore))) {
+        if (deviation > (internalQueryCacheStdDeviations * (*entry->stddevScore))) {
             // This run of the plan was much worse than average.
             // Kick it out of the plan cache.
             return true;
@@ -426,7 +418,7 @@ namespace mongo {
         }
         invariant(entry);
 
-        if (entry->feedback.size() >= PlanCacheEntry::kMaxFeedback) {
+        if (entry->feedback.size() >= size_t(internalQueryCacheFeedbacksStored)) {
             // If we have enough feedback, then use it to determine whether
             // we should get rid of the cached solution.
             if (hasCachedPlanPerformanceDegraded(entry, autoFeedback.get())) {
@@ -496,10 +488,12 @@ namespace mongo {
     void PlanCache::notifyOfWriteOp() {
         // It's fine to clear the cache multiple times if multiple threads
         // increment the counter to kPlanCacheMaxWriteOperations or greater.
-        if (_writeOperations.addAndFetch(1) < kPlanCacheMaxWriteOperations) {
+        if (_writeOperations.addAndFetch(1) < internalQueryCacheWriteOpsBetweenFlush) {
             return;
         }
-        LOG(1) << _ns << ": clearing collection plan cache - " << kPlanCacheMaxWriteOperations
+
+        LOG(1) << _ns << ": clearing collection plan cache - "
+               << internalQueryCacheWriteOpsBetweenFlush
                << " write operations detected since last refresh.";
         clear();
     }

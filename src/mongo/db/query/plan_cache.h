@@ -263,15 +263,6 @@ namespace mongo {
         // The standard deviation of the scores from stored as feedback.
         boost::optional<double> stddevScore;
 
-        // Determines the amount of feedback that we are willing to store. Must be >= 1.
-        // TODO: how do we tune this?
-        static const size_t kMaxFeedback;
-
-        // The number of standard deviations which must be exceeded
-        // in order to determine that the cache entry should be removed.
-        // Must be positive. TODO how do we tune this?
-        static const double kStdDevThreshold;
-
         // In order to justify eviction, the deviation from the mean must exceed a
         // minimum threshold.
         static const double kMinDeviation;
@@ -287,17 +278,6 @@ namespace mongo {
     private:
         MONGO_DISALLOW_COPYING(PlanCache);
     public:
-        /**
-         * Flush cache when the number of write operations since last
-         * clear() reaches this limit.
-         */
-        static const int kPlanCacheMaxWriteOperations;
-
-        /**
-         * The maximum number of plan cache entries allowed.
-         */
-        static const int kMaxCacheSize;
-
         /**
          * We don't want to cache every possible query. This function
          * encapsulates the criteria for what makes a canonical query

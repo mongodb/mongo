@@ -35,6 +35,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/server_options.h"
@@ -55,8 +56,6 @@ namespace {
 } // namespace
 
 namespace mongo {
-
-    MONGO_EXPORT_SERVER_PARAMETER(forceIntersectionPlans, bool, false);
 
     using std::vector;
 
@@ -248,12 +247,12 @@ namespace mongo {
         QLOG() << scoreStr << endl;
         LOG(2) << scoreStr;
 
-        if (forceIntersectionPlans) {
+        if (internalQueryForceIntersectionPlans) {
             if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
                 // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
                 // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.
                 score += 3;
-                QLOG() << "Score boosted to " << score << " due to forceIntersectionPlans." << endl;
+                QLOG() << "Score boosted to " << score << " due to intersection forcing." << endl;
             }
         }
 

@@ -44,6 +44,7 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/single_solution_runner.h"
@@ -54,8 +55,6 @@
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
-
-    MONGO_EXPORT_SERVER_PARAMETER(enableIndexIntersection, bool, true);
 
     // static
     void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
@@ -194,7 +193,7 @@ namespace mongo {
             }
         }
 
-        if (enableIndexIntersection) {
+        if (internalQueryPlannerEnableIndexIntersection) {
             plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
         }
 

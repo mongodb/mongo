@@ -41,6 +41,7 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/catalog/collection.h"
@@ -312,10 +313,8 @@ namespace mongo {
     }
 
     bool MultiPlanRunner::pickBestPlan(size_t* out, BSONObj* objOut) {
-        static const int timesEachPlanIsWorked = 100;
-
         // Run each plan some number of times.
-        for (int i = 0; i < timesEachPlanIsWorked; ++i) {
+        for (int i = 0; i < internalQueryPlanEvaluationWorks; ++i) {
             bool moreToDo = workAllPlans(objOut);
             if (!moreToDo) { break; }
         }
