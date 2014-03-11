@@ -95,14 +95,18 @@ namespace mongo {
             BSONObj projObj = projBob.obj();
 
             CanonicalQuery* cq;
-            if (!CanonicalQuery::canonicalize(ns, queryObj, sortSpec, projObj, 0, limit, BSONObj(), &cq).isOK()) {
-                errmsg = "Can't parse filter / create query";
+            Status canonicalizeStatus = CanonicalQuery::canonicalize(ns, queryObj, sortSpec,
+                                                                     projObj, 0, limit, BSONObj(),
+                                                                     &cq);
+            if (!canonicalizeStatus.isOK()) {
+                errmsg = canonicalizeStatus.reason();
                 return false;
             }
 
             Runner* rawRunner;
-            if (!getRunner(cq, &rawRunner, 0).isOK()) {
-                errmsg = "can't get query runner";
+            Status getRunnerStatus = getRunner(cq, &rawRunner, 0);
+            if (!getRunnerStatus.isOK()) {
+                errmsg = getRunnerStatus.reason();
                 return false;
             }
 
