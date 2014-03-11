@@ -40,7 +40,6 @@ var executeTests = function() {
     bulkOp.find({a:11}).removeOne();
     bulkOp.find({a:3}).remove({a:3});
     var result = bulkOp.execute();
-    printjson(result);
     assert.eq(2, result.nInserted);
     assert.eq(2, result.nUpserted);
     assert.eq(5, result.nMatched);
