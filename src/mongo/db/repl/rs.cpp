@@ -539,6 +539,20 @@ namespace {
             return;
         }
 
+        // initialize _me in SyncSourceFeedback
+        bool meEnsured = false;
+        while (!inShutdown() && !meEnsured) {
+            try {
+                theReplSet->syncSourceFeedback.ensureMe();
+                meEnsured = true;
+            }
+            catch (const DBException& e) {
+                warning() << "failed to write to local.me: " << e.what()
+                          << " trying again in one second";
+                sleepsecs(1);
+            }
+        }
+
         changeState(MemberState::RS_STARTUP2);
         startThreads();
         newReplUp(); // oplog.cpp

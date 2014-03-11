@@ -134,18 +134,6 @@ namespace replset {
 
     void BackgroundSync::notifierThread() {
         Client::initThread("rsSyncNotifier");
-        bool meEnsured = false;
-        while (!inShutdown() && !meEnsured) {
-            try {
-                theReplSet->syncSourceFeedback.ensureMe();
-                meEnsured = true;
-            }
-            catch (const DBException& e) {
-                warning() << "failed to initiate notifier thread: " << e.what()
-                          << " trying again in one second";
-                sleepsecs(1);
-            }
-        }
         replLocalAuth();
 
         // This makes the initial connection to our sync source for oplog position notification.
