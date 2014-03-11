@@ -421,7 +421,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		    "wtperf: read unexpected amount from config file\n");
 		return (EINVAL);
 	}
-	/* Make sure the buffer is termiated correctly. */
+	/* Make sure the buffer is terminated correctly. */
 	file_buf[buf_size] = '\n';
 
 	ret = 0;
