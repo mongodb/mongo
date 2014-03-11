@@ -853,7 +853,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		 * useful in the past.
 		 */
 		if (btree->evict_walk_period != 0 &&
-		    cache->evict_entries >= WT_EVICT_WALK_BASE &&
+		    cache->evict_entries >= WT_EVICT_WALK_INCR &&
 		    btree->evict_walk_skips++ < btree->evict_walk_period)
 			continue;
 		btree->evict_walk_skips = 0;
