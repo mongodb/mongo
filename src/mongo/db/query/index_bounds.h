@@ -181,13 +181,33 @@ namespace mongo {
         KeyState checkKey(const BSONObj& key, int* keyEltsToUse, bool* movePastKeyElts,
                           vector<const BSONElement*>* out, vector<bool>* incOut);
 
-    private:
+        /**
+         * Relative position of a key to an interval.
+         * Exposed for testing only.
+         */
         enum Location {
             BEHIND = -1,
             WITHIN = 0,
             AHEAD = 1,
         };
 
+        /**
+         * If 'elt' is in any interval, return WITHIN and set 'newIntervalIndex' to the index of the
+         * interval in the ordered interval list.
+         *
+         * If 'elt' is not in any interval but could be advanced to be in one, return BEHIND and set
+         * 'newIntervalIndex' to the index of the interval that 'elt' could be advanced to.
+         *
+         * If 'elt' cannot be advanced to any interval, return AHEAD.
+         *
+         * Exposed for testing only.
+         *
+         * TODO(efficiency): Start search from a given index.
+         */
+        static Location findIntervalForField(const BSONElement &elt, const OrderedIntervalList& oil,
+                                             const int expectedDirection, size_t* newIntervalIndex);
+
+    private:
         /**
          * Find the first field in the key that isn't within the interval we think it is.  Returns
          * false if every field is in the interval we think it is.  Returns true and populates out
@@ -207,31 +227,6 @@ namespace mongo {
          * keyValues are the elements of the index key in order.
          */
         bool spaceLeftToAdvance(size_t fieldsToCheck, const vector<BSONElement>& keyValues);
-
-        /**
-         * Returns BEHIND if the key is behind the interval.
-         * Returns WITHIN if the key is within the interval.
-         * Returns AHEAD if the key is ahead the interval.
-         *
-         * All directions are oriented along 'direction'.
-         */
-        static Location intervalCmp(const Interval& interval, const BSONElement& key,
-                                    const int expectedDirection);
-
-        /**
-         * If 'elt' is in any interval, return WITHIN and set 'newIntervalIndex' to the index of the
-         * interval in the ordered interval list.
-         *
-         * If 'elt' is not in any interval but could be advanced to be in one, return BEHIND and set
-         * 'newIntervalIndex' to the index of the interval that 'elt' could be advanced to.
-         *
-         * If 'elt' cannot be advanced to any interval, return AHEAD.
-         *
-         * TODO(efficiency): Start search from a given index.
-         * TODO(efficiency): Binary search for the answer.
-         */
-        static Location findIntervalForField(const BSONElement &elt, const OrderedIntervalList& oil,
-                                             const int expectedDirection, size_t* newIntervalIndex);
 
         // The actual bounds.  Must outlive this object.  Not owned by us.
         const IndexBounds* _bounds;

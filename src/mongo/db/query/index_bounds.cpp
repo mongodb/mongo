@@ -39,6 +39,26 @@ namespace mongo {
             return i > 0 ? 1 : -1;
         }
 
+        /**
+         * Returns BEHIND if the key is behind the interval.
+         * Returns WITHIN if the key is within the interval.
+         * Returns AHEAD if the key is ahead the interval.
+         *
+         * All directions are oriented along 'direction'.
+         */
+        IndexBoundsChecker::Location intervalCmp(const Interval& interval, const BSONElement& key,
+                                                 const int expectedDirection) {
+            int cmp = sgn(key.woCompare(interval.start, false));
+            bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
+            if (!startOK) { return IndexBoundsChecker::BEHIND; }
+
+            cmp = sgn(key.woCompare(interval.end, false));
+            bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
+            if (!endOK) { return IndexBoundsChecker::AHEAD; }
+
+            return IndexBoundsChecker::WITHIN;
+        }
+
     }  // namespace
 
     // For debugging.
@@ -491,21 +511,6 @@ namespace mongo {
 
         verify(firstNonContainedField == _curInterval.size());
         return VALID;
-    }
-
-    // static
-    IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& interval,
-                                                                   const BSONElement& key,
-                                                                   const int expectedDirection) {
-        int cmp = sgn(key.woCompare(interval.start, false));
-        bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
-        if (!startOK) { return BEHIND; }
-
-        cmp = sgn(key.woCompare(interval.end, false));
-        bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
-        if (!endOK) { return AHEAD; }
-
-        return WITHIN;
     }
 
     // static
