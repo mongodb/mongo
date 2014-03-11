@@ -225,6 +225,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * before checking if the cache is full.
 		 */
 		if (F_ISSET(cache, WT_EVICT_CLEAR_WALKS)) {
+			F_CLR(cache, WT_EVICT_CLEAR_WALKS);
 			WT_RET(__evict_clear_walks(session));
 			WT_RET(__wt_cond_signal(
 			    session, cache->evict_waiter_cond));
@@ -856,7 +857,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		 * useful in the past.
 		 */
 		if (btree->evict_walk_period != 0 &&
-		    cache->evict_entries >= WT_EVICT_WALK_BASE &&
+		    cache->evict_entries >= WT_EVICT_WALK_INCR &&
 		    btree->evict_walk_skips++ < btree->evict_walk_period)
 			continue;
 		btree->evict_walk_skips = 0;
@@ -953,7 +954,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	end = WT_MIN(start + WT_EVICT_WALK_PER_FILE,
 	    cache->evict + cache->evict_slots);
 
-	walk_flags = WT_READ_CACHE | WT_READ_NO_GEN;
+	walk_flags = WT_READ_CACHE | WT_READ_NO_GEN | WT_READ_NO_WAIT;
 
 	/*
 	 * Get some more eviction candidate pages.
@@ -1195,7 +1196,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 * the page and some other thread may have evicted it by the time we
 	 * look at it.
 	 */
-	page->read_gen = __wt_cache_read_gen_set(session);
+	if (page->read_gen != WT_READGEN_OLDEST)
+		page->read_gen = __wt_cache_read_gen_set(session);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, &page));
 

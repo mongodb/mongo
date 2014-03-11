@@ -282,9 +282,16 @@ ascend:	/*
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				WT_RET(__wt_page_release(session, couple));
-			else
-				WT_RET(__wt_page_swap(session, couple, page,
-				    __wt_page_ref(session, page), flags));
+			else {
+				ref = __wt_page_ref(session, page);
+				ret = __wt_page_swap(
+				    session, couple, page, ref, flags);
+				if (ret == WT_NOTFOUND) {
+					WT_TRET(__wt_page_release(
+					    session, couple));
+					page = NULL;
+				}
+			}
 
 			*pagep = page;
 			return (0);
@@ -316,7 +323,13 @@ restart:		/*
 			ref = pindex->index[slot];
 
 			if (LF_ISSET(WT_READ_CACHE)) {
-				/* Only look at unlocked pages in memory. */
+				/*
+				 * Only look at unlocked pages in memory, and
+				 * fast path some common cases.
+				 */
+				if (LF_ISSET(WT_READ_NO_WAIT) &&
+				    ref->state != WT_REF_MEM)
+					break;
 				PAGE_SWAP(
 				    session, couple, page, ref, flags, ret);
 				if (ret == WT_NOTFOUND) {
