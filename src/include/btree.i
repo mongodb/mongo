@@ -652,31 +652,25 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page == NULL || WT_PAGE_IS_ROOT(page))
 		return (0);
 
-	/*
-	 * Try to immediately evict pages if they have the special "oldest"
-	 * read generation and we have some chance of succeeding.
-	 */
+	/* Attempt to evict pages with the special "oldest" read generation. */
 	if (page->read_gen != WT_READGEN_OLDEST ||
 	    F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
-		goto skip;
-	ref = __wt_page_ref(session, page);
-	if (WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
-		if ((ret = __wt_hazard_clear(session, page)) != 0) {
-			ref->state = WT_REF_MEM;
-			return (ret);
-		}
-		if ((ret = __wt_evict_page(session, &page)) == 0)
-			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-		else {
-			WT_STAT_FAST_CONN_INCR(
-			    session, cache_eviction_force_fail);
-			if (ret == EBUSY)
-				ret = 0;
-		}
-		return (ret);
-	}
+		return (__wt_hazard_clear(session, page));
 
-skip:	return (__wt_hazard_clear(session, page));
+	ref = __wt_page_ref(session, page);
+	WT_RET(__wt_hazard_clear(session, page));
+
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+		return (0);
+
+	if ((ret = __wt_evict_page(session, &page)) == 0)
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+	else {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
+		if (ret == EBUSY)
+			ret = 0;
+	}
+	return (ret);
 }
 
 /*
