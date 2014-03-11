@@ -74,14 +74,13 @@ var strings = [
 ];
 
 var nItems = 200000;
+var bulk = db.ts1.initializeUnorderedBulkOp();
 for(i = 1; i <= nItems; ++i) {
-    db.ts1.save(
+    bulk.insert(
         {counter: ++count, number: strings[i % 20], random: Math.random(),
          filler: "0123456789012345678901234567890123456789"});
 }
-
-// wait for all writebacks to be applied
-assert.eq(db.getLastError(), null);
+assert.writeOK(bulk.execute());
 
 // Turn on exception tracing in mongod to figure out exactly where the SCEs are coming from
 // TEMPORARY - REMOVE ONCE SERVER-9622 IS RESOLVED
@@ -145,8 +144,8 @@ for(i = 0 ; i < strings.length; ++i) {
 // a match takes place in the shards; just returning the results from mongos
 var a4 = aggregateNoOrder(db.ts1, [
     { $match: {$or:[{counter:55}, {counter:1111},
-                    {counter: 2222}, {counter: 33333},
-                    {counter: 99999}, {counter: 55555}]}
+                    {counter: 2222}, {counter: 3333},
+                    {counter: 9999}, {counter: 5555}]}
     }
 ]);
 
