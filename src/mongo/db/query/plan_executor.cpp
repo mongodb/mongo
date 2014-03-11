@@ -179,7 +179,9 @@ namespace mongo {
             }
             else {
                 verify(PlanStage::FAILURE == code);
-                WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
+                if (NULL != objOut) {
+                    WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
+                }
                 return Runner::RUNNER_ERROR;
             }
         }

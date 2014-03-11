@@ -323,6 +323,44 @@ namespace QueryStageSortTests {
         }
     };
 
+    // Should error out if we sort with parallel arrays.
+    class QueryStageSortParallelArrays : public QueryStageSortTestBase {
+    public:
+        virtual int numObj() { return 100; }
+
+        void run() {
+            Client::WriteContext ctx(ns());
+            Database* db = ctx.ctx().db();
+            Collection* coll = db->getCollection(ns());
+            if (!coll) {
+                coll = db->createCollection(ns());
+            }
+
+            WorkingSet* ws = new WorkingSet();
+            MockStage* ms = new MockStage(ws);
+
+            for (int i = 0; i < numObj(); ++i) {
+                WorkingSetMember member;
+                member.state = WorkingSetMember::OWNED_OBJ;
+
+                member.obj = fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}");
+                ms->pushBack(member);
+
+                member.obj = fromjson("{a:1, b:1, c:1}");
+                ms->pushBack(member);
+            }
+
+            SortStageParams params;
+            params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
+            params.limit = 0;
+
+            // We don't get results back since we're sorting some parallel arrays.
+            PlanExecutor runner(ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL));
+            Runner::RunnerState runnerState = runner.getNext(NULL, NULL);
+            ASSERT_EQUALS(Runner::RUNNER_ERROR, runnerState);
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "query_stage_sort_test" ) { }
@@ -338,6 +376,7 @@ namespace QueryStageSortTests {
             add<QueryStageSortInvalidation>();
             add<QueryStageSortInvalidationWithLimit<10> >();
             add<QueryStageSortInvalidationWithLimit<1> >();
+            add<QueryStageSortParallelArrays>();
         }
     }  queryStageSortTest;
 

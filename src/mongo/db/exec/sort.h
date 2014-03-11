@@ -76,7 +76,7 @@ namespace mongo {
         /**
          * Returns the key used to sort 'member'.
          */
-        BSONObj getSortKey(const WorkingSetMember& member) const;
+        Status getSortKey(const WorkingSetMember& member, BSONObj* objOut) const;
 
         /**
          * Passed to std::sort and used to sort the keys that are returned from getSortKey.
@@ -86,7 +86,7 @@ namespace mongo {
         const BSONObj& getSortComparator() const { return _comparatorObj; }
 
     private:
-        BSONObj getBtreeKey(const BSONObj& memberObj) const;
+        Status getBtreeKey(const BSONObj& memberObj, BSONObj* objOut) const;
 
         /**
          * In order to emulate the existing sort behavior we must make unindexed sort behavior as

@@ -112,11 +112,18 @@ namespace mongo {
         }
     }
 
-    BSONObj SortStageKeyGenerator::getSortKey(const WorkingSetMember& member) const {
-        BSONObj btreeKeyToUse = getBtreeKey(member.obj);
+    Status SortStageKeyGenerator::getSortKey(const WorkingSetMember& member,
+                                             BSONObj* objOut) const {
+        BSONObj btreeKeyToUse;
+
+        Status btreeStatus = getBtreeKey(member.obj, &btreeKeyToUse);
+        if (!btreeStatus.isOK()) {
+            return btreeStatus;
+        }
 
         if (!_sortHasMeta) {
-            return btreeKeyToUse;
+            *objOut = btreeKeyToUse;
+            return Status::OK();
         }
 
         BSONObjBuilder mergedKeyBob;
@@ -143,12 +150,15 @@ namespace mongo {
             }
         }
 
-        return mergedKeyBob.obj();
+        *objOut = mergedKeyBob.obj();
+        return Status::OK();
     }
 
-    BSONObj SortStageKeyGenerator::getBtreeKey(const BSONObj& memberObj) const {
+    Status SortStageKeyGenerator::getBtreeKey(const BSONObj& memberObj, BSONObj* objOut) const {
+        // Not sorting by anything in the key, just bail out early.
         if (_btreeObj.isEmpty()) {
-            return BSONObj();
+            *objOut = BSONObj();
+            return Status::OK();
         }
 
         // We will sort '_data' in the same order an index over '_pattern' would have.  This is
@@ -157,24 +167,31 @@ namespace mongo {
         BSONObjCmp patternCmp(_btreeObj);
         BSONObjSet keys(patternCmp);
 
-        // keyGen can throw on a "parallel array."  Previously we'd error out of sort.
-        // For now we just accept the doc verbatim.  TODO: Do we want to error?
         try {
             _keyGen->getKeys(memberObj, &keys);
         }
+        catch (const UserException& e) {
+            // Probably a parallel array.
+            if (BtreeKeyGenerator::ParallelArraysCode == e.getCode()) {
+                return Status(ErrorCodes::BadValue,
+                              "cannot sort with keys that are parallel arrays");
+            }
+            else {
+                return e.toStatus();
+            }
+        }
         catch (...) {
-            return memberObj;
+            return Status(ErrorCodes::InternalError, "unknown error during sort key generation");
         }
 
-        if (keys.empty()) {
-            // TODO: will this ever happen?  don't think it should.
-            return memberObj;
-        }
+        // Key generator isn't sparse so we should at least get an all-null key.
+        invariant(!keys.empty());
 
         // No bounds?  No problem!  Use the first key.
         if (!_hasBounds) {
             // Note that we sort 'keys' according to the pattern '_btreeObj'.
-            return *keys.begin();
+            *objOut = *keys.begin();
+            return Status::OK();
         }
 
         // To decide which key to use in sorting, we must consider not only the sort pattern but
@@ -186,13 +203,15 @@ namespace mongo {
         verify(NULL != _boundsChecker.get());
         for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
             if (_boundsChecker->isValidKey(*it)) {
-                return *it;
+                *objOut = *it;
+                return Status::OK();
             }
         }
 
-        // No key in our bounds.
+        // No key is in our bounds.
         // TODO: will this ever happen?  don't think it should.
-        return *keys.begin();
+        *objOut = *keys.begin();
+        return Status::OK();
     }
 
     void SortStageKeyGenerator::getBoundsForSort(const BSONObj& queryObj, const BSONObj& sortObj) {
@@ -321,7 +340,11 @@ namespace mongo {
 
                 // The data remains in the WorkingSet and we wrap the WSID with the sort key.
                 SortableDataItem item;
-                item.sortKey = _sortKeyGen->getSortKey(*member);
+                Status sortKeyStatus = _sortKeyGen->getSortKey(*member, &item.sortKey);
+                if (!_sortKeyGen->getSortKey(*member, &item.sortKey).isOK()) {
+                    *out = WorkingSetCommon::allocateStatusMember(_ws, sortKeyStatus);
+                    return PlanStage::FAILURE;
+                }
                 item.wsid = id;
                 if (member->hasLoc()) {
                     // The DiskLoc breaks ties when sorting two WSMs with the same sort key.
