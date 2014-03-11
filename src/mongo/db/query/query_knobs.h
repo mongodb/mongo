@@ -34,8 +34,16 @@ namespace mongo {
     // multi-plan ranking
     //
 
-    // Max number of times we call work() on plans before comparing them.
+    // Max number of times we call work() on plans before comparing them,
+    // for small collections.
     extern int internalQueryPlanEvaluationWorks;
+
+    // For large collections, the number times we work() candidate plans is
+    // taken as this fraction of the collection size.
+    extern double internalQueryPlanEvaluationCollFraction;
+
+    // Stop working plans once a plan returns this many results.
+    extern int internalQueryPlanEvaluationMaxResults;
 
     // Do we give a big ranking bonus to intersection plans?
     extern bool internalQueryForceIntersectionPlans;

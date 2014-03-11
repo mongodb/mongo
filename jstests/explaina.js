@@ -12,34 +12,17 @@ for( i = 0; i < 1000; ++i ) {
 }
 
 // Query with an initial set of documents.
-explain1 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).explain( true );
+explain1 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).hint( { a:1 } ).explain();
+printjson(explain1);
+assert.eq( 333, explain1.n, 'wrong n for explain1' );
+assert.eq( 1000, explain1.nscanned, 'wrong nscanned for explain1' );
 
 for( i = 1000; i < 2000; ++i ) {
     t.save( { a:i, b:i%3 } );
 }
 
 // Query with some additional documents.
-explain2 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).explain( true );
-
-function plan( explain, cursor ) {
-    for( i in explain.allPlans ) {
-        e = explain.allPlans[ i ];
-        if ( e.cursor == cursor ) {
-            return e;
-        }
-    }
-    assert( false );
-}
-
-// Check query totals.
-assert.eq( 333, explain1.n );
-assert.eq( 666, explain2.n );
-
-printjson(explain1);
+explain2 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).hint ( { a:1 } ).explain();
 printjson(explain2);
-
-// Check totals for the selected in order a:1 plan.
-assert.eq( 333, plan( explain1, "BtreeCursor a_1" ).n );
-assert.eq( 1000, plan( explain1, "BtreeCursor a_1" ).nscanned );
-assert.eq( 666, plan( explain2, "BtreeCursor a_1" ).n );
-assert.eq( 2000, plan( explain2, "BtreeCursor a_1" ).nscanned );
+assert.eq( 666, explain2.n, 'wrong n for explain2' );
+assert.eq( 2000, explain2.nscanned, 'wrong nscanned for explain2' );

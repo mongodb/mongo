@@ -28,7 +28,9 @@
 
 #include "mongo/db/query/multi_plan_runner.h"
 
+#include <algorithm>
 #include <memory>
+
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/diskloc.h"
@@ -313,8 +315,21 @@ namespace mongo {
     }
 
     bool MultiPlanRunner::pickBestPlan(size_t* out, BSONObj* objOut) {
-        // Run each plan some number of times.
-        for (int i = 0; i < internalQueryPlanEvaluationWorks; ++i) {
+        // Run each plan some number of times. This number is at least as great as
+        // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
+        size_t numWorks = internalQueryPlanEvaluationWorks;
+        if (NULL != _collection) {
+            // For large collections, the number of works is set to be this
+            // fraction of the collection size.
+            double fraction = internalQueryPlanEvaluationCollFraction;
+
+            numWorks = std::max(size_t(internalQueryPlanEvaluationWorks),
+                                size_t(fraction * _collection->numRecords()));
+        }
+
+        // Work the plans, stopping when a plan hits EOF or returns some
+        // fixed number of results.
+        for (size_t i = 0; i < numWorks; ++i) {
             bool moreToDo = workAllPlans(objOut);
             if (!moreToDo) { break; }
         }
@@ -435,7 +450,7 @@ namespace mongo {
     }
 
     bool MultiPlanRunner::workAllPlans(BSONObj* objOut) {
-        bool planHitEOF = false;
+        bool doneWorking = false;
 
         for (size_t i = 0; i < _candidates.size(); ++i) {
             CandidatePlan& candidate = _candidates[i];
@@ -455,6 +470,12 @@ namespace mongo {
             if (PlanStage::ADVANCED == state) {
                 // Save result for later.
                 candidate.results.push_back(id);
+
+                // Once a plan returns enough results, stop working.
+                if (candidate.results.size()
+                    >= size_t(internalQueryPlanEvaluationMaxResults)) {
+                    doneWorking = true;
+                }
             }
             else if (PlanStage::NEED_TIME == state) {
                 // Fall through to yield check at end of large conditional.
@@ -496,7 +517,7 @@ namespace mongo {
             else if (PlanStage::IS_EOF == state) {
                 // First plan to hit EOF wins automatically.  Stop evaluating other plans.
                 // Assumes that the ranking will pick this plan.
-                planHitEOF = true;
+                doneWorking = true;
             }
             else {
                 // FAILURE or DEAD.  Do we want to just tank that plan and try the rest?  We
@@ -517,7 +538,7 @@ namespace mongo {
             }
         }
 
-        return !planHitEOF;
+        return !doneWorking;
     }
 
     void MultiPlanRunner::allPlansSaveState() {

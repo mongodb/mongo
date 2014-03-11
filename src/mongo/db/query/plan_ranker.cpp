@@ -192,7 +192,8 @@ namespace mongo {
                             / static_cast<double>(workUnits);
 
         // Just enough to break a tie.
-        static const double epsilon = 0.0001;
+        static const double epsilon = 1.0 /
+            static_cast<double>(internalQueryPlanEvaluationWorks);
 
         // We prefer covered projections.
         //
