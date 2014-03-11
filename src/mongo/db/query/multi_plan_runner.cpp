@@ -507,7 +507,7 @@ namespace mongo {
                 ++_failureCount;
 
                 // Propage most recent seen failure to parent.
-                if (PlanStage::FAILURE == state) {
+                if (PlanStage::FAILURE == state && (NULL != objOut)) {
                     WorkingSetCommon::getStatusMemberObject(*candidate.ws, id, objOut);
                 }
 
