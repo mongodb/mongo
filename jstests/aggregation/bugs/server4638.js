@@ -6,8 +6,6 @@ t.drop();
 
 t.insert( { _id : 0 , x : 0 , undef: undefined } );
 
-db.getLastError();
-
 // Make sure having an undefined doesn't break pipelines not using the field
 res = t.aggregate( { $project : { x : 1 } } ).toArray();
 assert.eq(res[0].x, 0);

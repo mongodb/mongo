@@ -15,7 +15,6 @@ N = 100;
 for( i = 0; i < N; ++i ) {
     d.data.insert( { _id:i } )
 }
-d.getLastError();
 
 // Split the data into 3 chunks.
 s.adminCommand( { split:"test.data", middle:{ _id:33 } } );
