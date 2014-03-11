@@ -430,7 +430,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 	 * WiredTiger configuration string compatible string, and using
 	 * the WiredTiger configuration parser to parse it at once.
 	 */
-#define WTPERF_CONFIG_DELIMS	"\n\\"
+#define	WTPERF_CONFIG_DELIMS	"\n\\"
 	for (line = strtok(file_buf, WTPERF_CONFIG_DELIMS);
 	    line != NULL;
 	    line = strtok(NULL, WTPERF_CONFIG_DELIMS)) {
