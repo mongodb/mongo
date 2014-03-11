@@ -393,21 +393,47 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 int
 config_opt_file(CONFIG *cfg, const char *filename)
 {
-	FILE *fp;
-	size_t linelen, optionpos;
-	int contline, linenum, ret;
-	char line[256], option[1024];
-	char *comment, *ltrim, *rtrim;
+	int contline, fd, linenum, ret;
+	char option[1024];
+	char *comment, *file_buf, *line, *ltrim, *rtrim;
+	size_t buf_size, linelen, optionpos;
+	ssize_t read_size;
+	struct stat sb;
 
-	if ((fp = fopen(filename, "r")) == NULL) {
+	if ((ret = stat(filename, &sb)) != 0) {
+		fprintf(stderr, "wtperf: stat of %s: %s\n",
+		    filename, strerror(ret));
+		return (ret);
+	}
+	buf_size = (size_t)sb.st_size;
+	file_buf = (char *)malloc(buf_size + 1);
+	if (file_buf == NULL)
+		return (ENOMEM);
+
+	if ((fd = open(filename, O_RDONLY)) == -1) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
 		return (errno);
+	}
+	read_size = read(fd, file_buf, buf_size);
+	(void)close(fd);
+	if (read_size == -1 || (size_t)read_size != buf_size) {
+		fprintf(stderr,
+		    "wtperf: read unexpected amount from config file\n");
+		return (EINVAL);
 	}
 
 	ret = 0;
 	optionpos = 0;
 	linenum = 0;
-	while (fgets(line, sizeof(line), fp) != NULL) {
+	/*
+	 * We should switch this from using strtok to generating a single
+	 * WiredTiger configuration string compatible string, and using
+	 * the WiredTiger configuration parser to parse it at once.
+	 */
+#define WTPERF_CONFIG_DELIMS	"\n\\"
+	for (line = strtok(file_buf, WTPERF_CONFIG_DELIMS);
+	    line != NULL;
+	    line = strtok(NULL, WTPERF_CONFIG_DELIMS)) {
 		linenum++;
 		/* trim the line */
 		for (ltrim = line; *ltrim && isspace(*ltrim); ltrim++)
@@ -456,7 +482,6 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		ret = EINVAL;
 	}
 
-	(void)fclose(fp);
 	return (ret);
 }
 
