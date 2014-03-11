@@ -61,20 +61,41 @@ namespace mongo {
         ++_commonStats.works;
 
         if (isEOF()) { return PlanStage::IS_EOF; }
+        invariant(_internalState != DONE);
+
+        PlanStage::StageState stageState = PlanStage::IS_EOF;
 
         switch (_internalState) {
         case INIT_SCANS:
-            return initScans(out);
+            stageState = initScans(out);
+            break;
         case READING_TERMS:
-            return readFromSubScanners(out);
+            stageState = readFromSubScanners(out);
+            break;
         case RETURNING_RESULTS:
-            return returnResults(out);
+            stageState = returnResults(out);
+            break;
         case DONE:
-            return PlanStage::IS_EOF;
+            // Handled above.
+            break;
         }
 
-        // Not reached.
-        return PlanStage::IS_EOF;
+        // Increment common stats counters that are specific to the return value of work().
+        switch (stageState) {
+        case PlanStage::ADVANCED:
+            ++_commonStats.advanced;
+            break;
+        case PlanStage::NEED_TIME:
+            ++_commonStats.needTime;
+            break;
+        case PlanStage::NEED_FETCH:
+            ++_commonStats.needFetch;
+            break;
+        default:
+            break;
+        }
+
+        return stageState;
     }
 
     void TextStage::prepareToYield() {
