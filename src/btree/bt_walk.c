@@ -287,7 +287,13 @@ descend:	for (;;) {
 			}
 
 			if (LF_ISSET(WT_READ_CACHE)) {
-				/* Only look at unlocked pages in memory. */
+				/*
+				 * Only look at unlocked pages in memory, and
+				 * fast path some common cases.
+				 */
+				if (LF_ISSET(WT_READ_NO_WAIT) &&
+				    ref->state != WT_REF_MEM)
+					break;
 				ret = __wt_page_swap(
 				    session, couple, page, ref, flags);
 				if (ret == WT_NOTFOUND) {
