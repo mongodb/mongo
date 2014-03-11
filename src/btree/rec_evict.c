@@ -1038,7 +1038,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	if (__wt_page_is_modified(page))
 		WT_RET(__wt_rec_write(session, page, NULL,
 		    WT_EVICTION_LOCKED | (top &&
-		    WT_PAGE_IS_INTERNAL(page) ? WT_SKIP_UPDATE_RESTORE : 0)));
+		    !WT_PAGE_IS_INTERNAL(page) ? WT_SKIP_UPDATE_RESTORE : 0)));
 
 	/*
 	 * If the page was ever modified, make sure all of the updates on the
