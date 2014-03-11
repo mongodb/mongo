@@ -142,7 +142,7 @@ assert.eq(coll.count(), 11);
 coll.remove({});
 printjson( result = coll.insert([{ foo : "bar" }, { foo : "baz" }]) );
 assert.eq(result.nInserted, 2);
-assert(!result.getWriteError());
+assert(!result.hasWriteErrors());
 assert(!result.getWriteConcernError());
 assert.eq(coll.count(), 2);
 
@@ -154,7 +154,7 @@ var id = new ObjectId();
 printjson( result = coll.insert([{ _id : id, foo : "bar" },
                                  { _id : id, foo : "baz" }]) );
 assert.eq(result.nInserted, 1);
-assert(result.getWriteError());
+assert(result.hasWriteErrors());
 assert(!result.getWriteConcernError());
 assert.eq(coll.count(), 1);
 
