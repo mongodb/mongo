@@ -224,6 +224,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * before checking if the cache is full.
 		 */
 		if (F_ISSET(cache, WT_EVICT_CLEAR_WALKS)) {
+			F_CLR(cache, WT_EVICT_CLEAR_WALKS);
 			WT_RET(__evict_clear_walks(session));
 			WT_RET(__wt_cond_signal(
 			    session, cache->evict_waiter_cond));
