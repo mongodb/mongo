@@ -138,7 +138,7 @@ DB.prototype.upgradeCheck = function(obj) {
 
     print("database '" + self.getName() + "' for 2.6 upgrade compatibility");
     if (dbUpgradeCheck(self, true)) {
-        print("Everything in '" + dbName + "' is ready for the upgrade!");
+        print("Everything in '" + self.getName() + "' is ready for the upgrade!");
         return true;
     }
     print("To fix the problems above please consult " +
