@@ -406,7 +406,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		return (ret);
 	}
 	buf_size = (size_t)sb.st_size;
-	file_buf = (char *)malloc(buf_size + 1);
+	file_buf = (char *)calloc(buf_size + 2, 1);
 	if (file_buf == NULL)
 		return (ENOMEM);
 
@@ -421,6 +421,8 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		    "wtperf: read unexpected amount from config file\n");
 		return (EINVAL);
 	}
+	/* Make sure the buffer is termiated correctly. */
+	file_buf[buf_size] = '\n';
 
 	ret = 0;
 	optionpos = 0;
