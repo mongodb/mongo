@@ -40,10 +40,11 @@ var collUpgradeCheck = function(collObj) {
 
     // check for _id index if and only if it should be present
     // no $, not oplog, not system
+    var indexColl = dbObj.getSiblingDB(dbName).system.indexes;
     if (collName.indexOf('$') === -1 && 
         collName.indexOf("system.") !== 0 &&
         (dbName !== "local" || collName.indexOf("oplog.") !== 0)) {
-        var idIdx = dbObj.getSiblingDB(dbName).system.indexes.find({ns: fullName, name: "_id_"});
+        var idIdx = indexColl.find({ns: fullName, name:"_id_"}).addOption(DBQuery.Option.noTimeout);
         if (!idIdx.hasNext()) {
             print("Collection Error: lack of _id index on collection: " + fullName);
             goodSoFar = false;
@@ -52,7 +53,7 @@ var collUpgradeCheck = function(collObj) {
 
     var indexes = [];
     // run index level checks on each index on the collection
-    dbObj.getSiblingDB(dbName).system.indexes.find({ns: fullName}).forEach( function(index) {
+    indexColl.find({ns: fullName}).addOption(DBQuery.Option.noTimeout).forEach( function(index) {
         if (!indexUpgradeCheck(index)) {
             goodSoFar = false;
         }
@@ -73,7 +74,8 @@ var collUpgradeCheck = function(collObj) {
     var alertInterval = 10 * 1000; // 10 seconds
     var numDocs = 0;
     // run document level checks on each document in the collection
-    dbObj.getSiblingDB(dbName).getCollection(collName).find().sort({$natural: 1}).forEach(
+    var theColl = dbObj.getSiblingDB(dbName).getCollection(collName);
+    theColl.find().addOption(DBQuery.Option.noTimeout).sort({$natural: 1}).forEach(
         function(doc) {
             numDocs++;
 
