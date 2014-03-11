@@ -30,5 +30,14 @@ doc = t.findOne();
 assert.eq(4, doc.a);
 assert.eq(null, doc._id, tojson(doc));
 
+t.drop();
+var toInsert = [];
+var count = 100 * 1000;
+for (i = 0; i < count; ++i) { toInsert.push({_id: i, a: 5}) }
+assert.writeOK(t.insert(toInsert));
+doc = t.findOne({_id:1});
+assert.eq(5, doc.a);
+assert.eq(count, t.count(), "bad count");
+
 var stats = db.runCommand({ collstats: "insert1" });
 assert(stats.paddingFactor == 1.0);
