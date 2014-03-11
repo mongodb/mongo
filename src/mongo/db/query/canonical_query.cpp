@@ -395,16 +395,10 @@ namespace mongo {
     bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
         bool hasID = false;
 
-        // Must have _id field, and optionally can have either
-        // $isolated or $atomic.
-        if (query.nFields() > 2) {
-            return false;
-        }
-
         BSONObjIterator it(query);
         while (it.more()) {
             BSONElement elt = it.next();
-            if (mongoutils::str::equals("_id", elt.fieldName())) {
+            if (mongoutils::str::equals("_id", elt.fieldName() ) ) {
                 // Verify that the query on _id is a simple equality.
                 hasID = true;
 
@@ -421,8 +415,12 @@ namespace mongo {
                     return false;
                 }
             }
-            else if (!(mongoutils::str::equals("$isolated", elt.fieldName()) ||
-                       mongoutils::str::equals("$atomic", elt.fieldName()))) {
+            else if (elt.fieldName()[0] == '$' &&
+                     (mongoutils::str::equals("$isolated", elt.fieldName())||
+                      mongoutils::str::equals("$atomic", elt.fieldName()))) {
+                // ok, passthrough
+            }
+            else {
                 // If the field is not _id, it must be $isolated/$atomic.
                 return false;
             }
