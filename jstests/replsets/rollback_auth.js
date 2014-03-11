@@ -93,7 +93,7 @@ reconnect(a);
 reconnect(b);
 
 // Wait for B to be master
-replTest.waitForState(b_conn, replTest.PRIMARY);
+replTest.waitForState(b_conn, replTest.PRIMARY, 60000);
 printjson(b.adminCommand('replSetGetStatus'));
 
 
@@ -172,8 +172,8 @@ B.runCommand({ replSetTest: 1, blind: false });
 reconnect(a);
 reconnect(b);
 replTest.awaitReplication();
-replTest.waitForState(a_conn, replTest.PRIMARY);
-replTest.waitForState(b_conn, replTest.SECONDARY);
+replTest.waitForState(a_conn, replTest.PRIMARY, 60000);
+replTest.waitForState(b_conn, replTest.SECONDARY, 60000);
 
 // Now both A and B should agree
 assert.commandWorked(a.runCommand({dbStats: 1}));
