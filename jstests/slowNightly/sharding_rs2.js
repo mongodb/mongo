@@ -1,7 +1,7 @@
 // mostly for testing mongos w/replica sets
 
-
-s = new ShardingTest( "rs2" , 2 , 2 , 1 , { rs : true , chunksize : 1 } )
+var s = new ShardingTest({ shards: { rs0: { nodes: 2 }, rs1: { nodes: 2 }},
+                           verbose: 1, chunkSize: 1 });
 
 db = s.getDB( "test" )
 t = db.foo
@@ -24,7 +24,7 @@ function countNodes(){
     return x.host.split( "," ).length
 }
 
-assert.eq( 3 , countNodes() , "A1" )
+assert.eq( 2 , countNodes() , "A1" )
 
 rs = s.getRSEntry( serverName );
 rs.test.add()
@@ -41,7 +41,7 @@ assert.soon(
         try {
             printjson( rs.test.getMaster().getDB("admin").runCommand( "isMaster" ) )
             s.config.shards.find().forEach( printjsononeline );
-            return countNodes() == 4;
+            return countNodes() == 3;
         }
         catch ( e ){
             print( e );
@@ -125,7 +125,11 @@ s.adminCommand( { split : "test.foo" , middle : { x : 50 } } )
 db.printShardingStatus()
 
 other = s.config.shards.findOne( { _id : { $ne : serverName } } );
-s.adminCommand( { moveChunk : "test.foo" , find : { x : 10 } , to : other._id, _waitForDelete : true } )
+assert.commandWorked(s.getDB('admin').runCommand({ moveChunk: "test.foo",
+                                                   find: { x: 10 },
+                                                   to: other._id,
+                                                   _secondaryThrottle: true,
+                                                   _waitForDelete: true }));
 assert.eq( 100 , t.count() , "C3" )
 
 assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )
