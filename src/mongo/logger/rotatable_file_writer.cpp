@@ -96,6 +96,8 @@ namespace {
         virtual std::streamsize xsputn(const char* s, std::streamsize count);
         virtual int_type overflow(int_type ch = traits_type::eof());
 
+        std::streamsize writeToFile(const char* s, std::streamsize count);
+
         HANDLE _fileHandle;
     };
 
@@ -165,8 +167,9 @@ namespace {
         return false;
     }
 
-    std::streamsize Win32FileStreambuf::xsputn(const char* s, std::streamsize count) {
+    std::streamsize Win32FileStreambuf::writeToFile(const char* s, std::streamsize count) {
         DWORD totalBytesWritten = 0;
+
         while (count > totalBytesWritten) {
             DWORD bytesWritten;
             if (!WriteFile(
@@ -179,9 +182,36 @@ namespace {
             }
             totalBytesWritten += bytesWritten;
         }
+
         return totalBytesWritten;
     }
 
+    // Called when strings are written to ostream
+    std::streamsize Win32FileStreambuf::xsputn(const char* s, std::streamsize count) {
+        DWORD totalBytesWritten = 0;
+
+        // Scan for embedded newlines before end
+        // this should be rare since the newline should only be at the end
+        const char* startPos = s;
+        for (int i = 0; i < count; i++) {
+            if (s[i] == '\n') {
+                totalBytesWritten += writeToFile(startPos, i - (startPos - s));
+                writeToFile("\r\n", 2);
+                totalBytesWritten += 1; // Caller expected we only wrote 1 char, so tell them so
+                startPos = &s[i + 1];
+            }
+        }
+
+        // Did the string not end on "\n"? Write the remaining, no need for CRLF
+        // as upper layers are responsible for it
+        if ((startPos - s) != count) {
+            totalBytesWritten += writeToFile(startPos, count - (startPos - s));
+        }
+
+        return totalBytesWritten;
+    }
+
+    // Overflow is called for single character writes to the ostream
     Win32FileStreambuf::int_type Win32FileStreambuf::overflow(int_type ch) {
         if (ch == traits_type::eof())
             return ~ch;  // Returning traits_type::eof() => failure, anything else => success.
