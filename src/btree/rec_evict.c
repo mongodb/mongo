@@ -99,7 +99,8 @@ err:		/*
 		 * If unable to evict this page, release exclusive reference(s)
 		 * we've acquired.
 		 */
-		__rec_excl_clear(session);
+		if (!exclusive)
+			__rec_excl_clear(session);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
