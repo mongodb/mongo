@@ -747,6 +747,10 @@ namespace mongo {
 
                 // The updates were not in place. Apply them through the file manager.
                 newObj = doc.getObject();
+                uassert(17419,
+                        str::stream() << "Resulting document after update is larger than "
+                                      << BSONObjMaxUserSize,
+                        newObj.objsize() <= BSONObjMaxUserSize);
                 StatusWith<DiskLoc> res = collection->updateDocument(loc,
                                                                      newObj,
                                                                      true,
@@ -878,6 +882,10 @@ namespace mongo {
 
         // Insert the doc
         BSONObj newObj = doc.getObject();
+        uassert(17420,
+                str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
+                newObj.objsize() <= BSONObjMaxUserSize);
+
         StatusWith<DiskLoc> newLoc = collection->insertDocument(newObj,
                                                                 !request.isGod() /*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
