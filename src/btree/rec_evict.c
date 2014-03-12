@@ -923,7 +923,7 @@ __rec_review(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
-	uint32_t write_flags;
+	uint32_t flags;
 
 	btree = S2BT(session);
 
@@ -1018,28 +1018,31 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * If the page is dirty and can possibly change state, write it so we
 	 * know the final state.
 	 *
-	 * If the top-level page we're trying to evict is a leaf page, set the
-	 * update-restore flag, so that reconciliation will write blocks it
-	 * can write and create a list of skipped updates for blocks it cannot
+	 * If we have an exclusive lock (we're discarding the tree), assert
+	 * there are no updates we cannot read.
+	 *
+	 * Otherwise, if the top-level page we're evicting is a leaf page, set
+	 * the update-restore flag, so reconciliation will write blocks it can
+	 * write and create a list of skipped updates for blocks it cannot
 	 * write.   This is how forced eviction of huge pages works: we take a
 	 * big page and reconcile it into blocks, some of which we write and
 	 * discard, the rest of which we re-create as smaller in-memory pages,
 	 * (restoring the updates that stopped us from writing the block), and
 	 * inserting the whole mess into the page's parent.
-	 *
-	 * We don't set the update-restore flag for internal pages, they don't
+	 *	Don't set the update-restore flag for internal pages, they don't
 	 * have updates that can be saved and restored.
-	 *
-	 * We don't set the update-restore flag for anything other than the top
-	 * page, the result of reconciliation won't go through the split path
-	 * (and it's a page we expect to merge into a parent page eventually,
-	 * if it splits, something pretty strange is going on).
+	 *	Don't set the update-restore flag for any page other than the
+	 * top one; only the reconciled top page goes through the split path
+	 * (and child pages are pages we expect to merge into the top page, they
+	 * they are not expected to split).
 	 */
 	if (__wt_page_is_modified(page)) {
-		write_flags = WT_EVICTION_LOCKED;
-		if (top && !WT_PAGE_IS_INTERNAL(page))
-			write_flags |= WT_SKIP_UPDATE_RESTORE;
-		WT_RET(__wt_rec_write(session, page, NULL, write_flags));
+		flags = WT_EVICTION_LOCKED;
+		if (exclusive)
+			LF_SET(WT_SKIP_UPDATE_ERR);
+		else if (top && !WT_PAGE_IS_INTERNAL(page))
+			LF_SET(WT_SKIP_UPDATE_RESTORE);
+		WT_RET(__wt_rec_write(session, page, NULL, flags));
 	}
 
 	/*
