@@ -111,8 +111,10 @@ var _bulk_api_module = (function() {
       if(singleBatch && singleBatch.batchType == UPDATE) {
         result.nMatched = this.nMatched;
         result.nUpserted = this.nUpserted;
-        result.nModified = this.nModified;
-
+        
+        if(this.nModified != undefined)
+            result.nModified = this.nModified;
+        
         if(Array.isArray(bulkResult.upserted)
             && bulkResult.upserted.length == 1) {
           result._id = bulkResult.upserted[0]._id;
@@ -640,10 +642,13 @@ var _bulk_api_module = (function() {
 
       // If we have an update Batch type
       if(batch.batchType == UPDATE) {
-        var nModified = ('nModified' in result)? result.nModified: 0;
         bulkResult.nUpserted = bulkResult.nUpserted + nUpserted;
         bulkResult.nMatched = bulkResult.nMatched + (result.n - nUpserted);
-        bulkResult.nModified = bulkResult.nModified + nModified;
+        if(result.nModified == undefined) {
+            bulkResult.nModified = undefined;
+        } else if(bulkResult.nModified != undefined) {
+            bulkResult.nModified = bulkResult.nModified + result.nModified;
+        }
       }
 
       if(Array.isArray(result.writeErrors)) {
@@ -832,7 +837,6 @@ var _bulk_api_module = (function() {
 
       var batchResult = {
           n: 0
-        , nModified: 0
         , writeErrors: []
         , upserted: []
       };

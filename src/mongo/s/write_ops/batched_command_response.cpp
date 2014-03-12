@@ -39,7 +39,7 @@ namespace mongo {
     const BSONField<int> BatchedCommandResponse::errCode("code", ErrorCodes::UnknownError);
     const BSONField<string> BatchedCommandResponse::errMessage("errmsg");
     const BSONField<long long> BatchedCommandResponse::n("n", 0);
-    const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);
+    const BSONField<long long> BatchedCommandResponse::nModified("nModified", -1);
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
     const BSONField<OpTime> BatchedCommandResponse::lastOp("lastOp");
@@ -81,7 +81,7 @@ namespace mongo {
 
         if (_isErrMessageSet) builder.append(errMessage(), _errMessage);
 
-        if (_isNModifiedSet) builder.appendNumber(nModified(), _nModified);
+        if (_isNModifiedSet && _nModified > -1) builder.appendNumber(nModified(), _nModified);
         if (_isNSet) builder.appendNumber(n(), _n);
 
         if (_upsertDetails.get()) {
@@ -203,7 +203,7 @@ namespace mongo {
         _errMessage.clear();
         _isErrMessageSet = false;
 
-        _nModified = 0;
+        _nModified = -1;
         _isNModifiedSet = false;
 
         _n = 0;
