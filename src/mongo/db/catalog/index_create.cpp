@@ -237,6 +237,7 @@ namespace mongo {
                  status.isOK() );
 
         IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk();
+        scoped_ptr<IndexAccessMethod> bulkHolder(bulk);
         IndexAccessMethod* iam = bulk ? bulk : btreeState->accessMethod();
 
         if ( bulk )
@@ -293,7 +294,14 @@ namespace mongo {
         : _collection( collection ) {
     }
 
-    Status MultiIndexBlock::init( std::vector<BSONObj>& indexSpecs ) {
+    MultiIndexBlock::~MultiIndexBlock() {
+        for ( size_t i = 0; i < _states.size(); i++ ) {
+            delete _states[i].bulk;
+            delete _states[i].block;
+        }
+    }
+
+    Status MultiIndexBlock::init(std::vector<BSONObj>& indexSpecs) {
 
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
             BSONObj info = indexSpecs[i];
@@ -318,7 +326,7 @@ namespace mongo {
             info = statusWithInfo.getValue();
 
             IndexState state;
-            state.block.reset( new IndexCatalog::IndexBuildBlock( _collection, info ) );
+            state.block = new IndexCatalog::IndexBuildBlock( _collection, info );
             status = state.block->init();
             if ( !status.isOK() )
                 return status;

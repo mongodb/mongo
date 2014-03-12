@@ -357,7 +357,7 @@ namespace mongo {
         }
 
         virtual IndexAccessMethod* initiateBulk() {
-            return this;
+            return NULL;
         }
 
         virtual Status commitBulk( IndexAccessMethod* bulk,
