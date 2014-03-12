@@ -810,7 +810,6 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 		 __wt_cache_dirty_decr(session, page);
 	}
 
-
 err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
 
