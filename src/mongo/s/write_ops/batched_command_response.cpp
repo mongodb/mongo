@@ -54,6 +54,7 @@ namespace mongo {
 
     BatchedCommandResponse::~BatchedCommandResponse() {
         unsetErrDetails();
+        unsetUpsertDetails();
     }
 
     bool BatchedCommandResponse::isValid(std::string* errMsg) const {
