@@ -715,6 +715,13 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 		else
 			refp++;
 
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
+	WT_VERBOSE_ERR(session, split,
+	    "%p: %s merged into %p %" PRIu32 " -> %" PRIu32
+	    " (%" PRIu32 ")",
+	    page, __wt_page_type_string(page->type), parent, parent_entries,
+	    result_entries, result_entries - parent_entries);
+
 	/*
 	 * We can't free the previous WT_REF index array, there may be threads
 	 * using it.  Add it to the session's discard list, to be freed once we
@@ -727,16 +734,30 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	__wt_cache_page_inmem_incr(session, parent, mod->u.m.multi_size);
 
 	/*
-	 * Update the parent page's index: this is the update that splits the
-	 * parent page, making the split visible to other threads.
+	 * Update the parent page's index: this update makes the split visible
+	 * to threads descending the tree.
 	 */
 	WT_PUBLISH(parent->pg_intl_index, alloc_index);
 	alloc_index = NULL;
 
+#ifdef HAVE_DIAGNOSTIC
+	__rec_verify_intl_key_order(session, parent);
+#endif
+
 	/*
-	 * The key for the split WT_REF may be an onpage overflow key, and we're
-	 * about to lose track of it.  Add it to the tracking list so it will be
-	 * discarded the next time the parent is reconciled.
+	 * Reset the page's original WT_REF field to split.  Threads cursoring
+	 * through the tree were blocked because that WT_REF state was set to
+	 * locked.  This update changes the locked state to split, unblocking
+	 * those threads and causing them to re-calculate their position based
+	 * on the updated parent page's index.
+	 */
+	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
+
+	/*
+	 * The key for the original page may be an onpage overflow key, and we
+	 * just lost track of it as the parent's index to no longer references
+	 * the WT_REF pointing to it.  Add it to the parent's tracking list and
+	 * it will be discarded the next time the parent is reconciled.
 	 */
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
@@ -751,32 +772,6 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 		}
 		break;
 	}
-
-	/*
-	 * Reset the page's original WT_REF field to split, releasing blocked
-	 * threads.
-	 */
-	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
-
-	/*
-	 * Pages with unresolved changes are not marked clean by reconciliation;
-	 * mark the page clean now so it will be discarded.
-	 */
-	if (__wt_page_is_modified(page)) {
-		 mod->write_gen = 0;
-		 __wt_cache_dirty_decr(session, page);
-	}
-
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
-	WT_VERBOSE_ERR(session, split,
-	    "%p: %s merged into %p %" PRIu32 " -> %" PRIu32
-	    " (%" PRIu32 ")",
-	    page, __wt_page_type_string(page->type), parent, parent_entries,
-	    result_entries, result_entries - parent_entries);
-
-#ifdef HAVE_DIAGNOSTIC
-	__rec_verify_intl_key_order(session, parent);
-#endif
 
 	/*
 	 * Simple page splits trickle up the tree, that is, as leaf pages grow
@@ -805,6 +800,16 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	if ((bytes * result_entries) /
 	    btree->maxintlpage > (uint64_t)btree->split_deepen)
 		ret = __rec_split_deepen(session, parent);
+
+	/*
+	 * Pages with unresolved changes are not marked clean by reconciliation;
+	 * mark the page clean now so it will be discarded.
+	 */
+	if (__wt_page_is_modified(page)) {
+		 mod->write_gen = 0;
+		 __wt_cache_dirty_decr(session, page);
+	}
+
 
 err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
