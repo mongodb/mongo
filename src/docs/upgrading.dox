@@ -1,5 +1,18 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_212 Upgrading to Version 2.1.2
+<dl>
+
+<dt>::wiredtiger_open shared_cache configuration changes</dt>
+<dd>
+In the 2.1.2 release of WiredTiger the ::wiredtiger_open \c shared_cache
+configuration option group have changed. The option that was named \c enable is
+now named \c enabled - this change was made to maintain consistency with
+the \c log configuration group.
+It is now also an error to specify a shared_cache configuration string
+without including an explicit setting for the \c enabled flag.
+</dd>
+
 @section version_211 Upgrading to Version 2.1.1
 <dl>
 
