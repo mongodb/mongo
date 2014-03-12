@@ -32,16 +32,15 @@
 
 #include "mongo/db/jsobj.h"
 
+/**
+ * Please, please, please do not rely on this existing.  If you write code that uses
+ * it please talk to hk first.
+ *
+ * This is visible only for for upgrade checking.
+ */
 namespace mongo {
 
-    /**
-     * Please, please, please do not rely on this existing.  If you write code that uses
-     * it please talk to hk first.
-     *
-     * This is visible only for for upgrade checking.
-     */
-    void getKeysForUpgradeChecking(const BSONObj& infoObj,
-                                   const BSONObj& doc,
-                                   BSONObjSet* keys);
+    // Returns whether or not the largest key the index will generate for the document is too large.
+    bool isAnyIndexKeyTooLarge(const BSONObj& index, const BSONObj& doc);
 
 }  // namespace mongo

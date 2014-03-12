@@ -138,18 +138,13 @@ namespace mongo {
             return BSON( "" << b.done() );
         }
 
-        BSONObj keyTooLong(const BSONObj& a, void* data) {
-            BSONObj index = a[0]["index"].Obj();
-            BSONObj doc = a[0]["doc"].Obj();
-            BSONObjSet keys;
-            getKeysForUpgradeChecking(index, doc, &keys);
-            for (BSONObjSet::const_iterator key = keys.begin(); key != keys.end(); ++key) { 
-                // recreation of the logic in KeyV1::dataSize() and BtreeBucket<V>::getKeyMax()
-                if (key->objsize() + 1 > 1024) {
-                    return BSON("" << true);
-                }
-            }                                                                           
-            return BSON("" << false);
+        BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
+            uassert(17417, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
+            BSONObjIterator i(a);
+            BSONObj index = i.next().Obj();
+            BSONObj doc = i.next().Obj();
+
+            return BSON("" << isAnyIndexKeyTooLarge(index, doc));
         }
 
         BSONObj validateIndexKey(const BSONObj& a, void* data) {
@@ -197,7 +192,7 @@ namespace mongo {
             scope.injectNative( "_isWindows" , isWindows );
             scope.injectNative( "interpreterVersion", interpreterVersion );
             scope.injectNative( "getBuildInfo", getBuildInfo );
-            scope.injectNative( "keyTooLong", keyTooLong );
+            scope.injectNative( "isKeyTooLarge", isKeyTooLarge );
             scope.injectNative( "validateIndexKey", validateIndexKey );
 
 #ifndef MONGO_SAFE_SHELL
