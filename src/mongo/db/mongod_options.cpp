@@ -323,7 +323,7 @@ namespace mongo {
 
         rs_options.addOptionChaining("replication.replSetName", "", moe::String, "arg is <setname>")
                                     .setSources(moe::SourceYAMLConfig)
-                                    .format("[^/]", "[replica set name with no \"/\"]")
+                                    .format("[^/]+", "[replica set name with no \"/\"]")
                                     .incompatibleWith("replication.replSet");
 
         rs_options.addOptionChaining("replication.secondaryIndexPrefetch", "replIndexPrefetch", moe::String,
