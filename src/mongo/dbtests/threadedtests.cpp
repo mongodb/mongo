@@ -863,16 +863,19 @@ namespace ThreadedTests {
         }
     };
 
-    class QLockTest : public ThreadedTest<3> {
+    const int ThreadTest_ThreadCount = 3;
+    class QLockTest : public ThreadedTest<ThreadTest_ThreadCount> {
     public:
         bool gotW;
-        QLockTest() : gotW(false), m() { }
+        QLockTest() : gotW(false), m(), _barrier(ThreadTest_ThreadCount) { }
         void setup() {}
         ~QLockTest() {}
     private:
         QLock m;
+        boost::barrier _barrier;
         virtual void validate() { }
         virtual void subthread(int x) {
+            _barrier.wait();
             int Z = 0;
             Client::initThread("qtest");
             if( x == 1 ) { 
