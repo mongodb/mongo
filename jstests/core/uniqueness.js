@@ -28,8 +28,8 @@ db.jstests_uniqueness2.insert({a:3});
 db.jstests_uniqueness2.insert({a:3});
 assert( db.jstests_uniqueness2.count() == 2 , 6) ;
 res = db.jstests_uniqueness2.ensureIndex({a:1}, true);
-assert.writeError( res );
-assert( res.getWriteError().errmsg.match( /E11000/ ) );
+assert.commandFailed( res );
+assert( res.errmsg.match( /E11000/ ) );
 
 // Check for an error message when we index in the background and there are dups
 db.jstests_uniqueness2.drop();
@@ -37,8 +37,8 @@ db.jstests_uniqueness2.insert({a:3});
 db.jstests_uniqueness2.insert({a:3});
 assert( db.jstests_uniqueness2.count() == 2 , 6) ;
 res = db.jstests_uniqueness2.ensureIndex({a:1}, {unique:true,background:true});
-assert.writeError( res );
-assert( res.getWriteError().errmsg.match( /E11000/ ) );
+assert.commandFailed( res );
+assert( res.errmsg.match( /E11000/ ) );
 
 /* Check that if we update and remove _id, it gets added back by the DB */
 

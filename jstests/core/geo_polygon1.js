@@ -40,7 +40,7 @@ pacman = [
          ];
 
 t.save({loc: [1,3] }); // Add a point that's in
-assert.writeOK(t.ensureIndex( { loc : "2d" } ));
+assert.commandWorked(t.ensureIndex( { loc : "2d" } ));
 
 assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).count() , "Pacman single point" );
 

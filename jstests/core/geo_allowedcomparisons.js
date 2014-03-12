@@ -83,7 +83,7 @@ t.dropIndex({geo: "2d"})
 runTests();
 
 // 2dsphere index now.
-assert.writeOK( t.ensureIndex({geo: "2dsphere"}) );
+assert.commandWorked( t.ensureIndex({geo: "2dsphere"}) );
 // 2dsphere does not support arrays of points.
 assert.writeError(t.insert({geo: [geojsonPoint2, geojsonPoint]}));
 runTests();

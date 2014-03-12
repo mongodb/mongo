@@ -23,7 +23,7 @@ function f() {
         x++;
     }
 
-    assert.writeError(lastErr, "should have got an error 'too many indexes'");
+    assert.commandFailed(lastErr, "should have got an error 'too many indexes'");
 
     // 40 is the limit currently
     lim = t.getIndexes().length;

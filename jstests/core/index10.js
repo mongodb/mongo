@@ -13,8 +13,8 @@ t.ensureIndex( {i:1} );
 assert.eq( 5, t.count() );
 t.dropIndexes();
 var err = t.ensureIndex( {i:1}, true );
-assert.writeError(err)
-assert.eq( 11000, err.getWriteError().code );
+assert.commandFailed(err)
+assert.eq( 11000, err.code );
 
 assert( 1 == db.system.indexes.count( {ns:"test.jstests_index10" } ), "only id index" );
 // t.dropIndexes();

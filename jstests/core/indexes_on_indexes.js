@@ -3,7 +3,7 @@ t = db.getSiblingDB("indexes_on_indexes");
 printjson(t.system.indexes.getIndexes());
 assert.eq(t.system.indexes.getIndexes().length, 0);
 print("trying via ensureIndex");
-assert.throws(t.system.indexes.ensureIndex({_id:1}));
+assert.commandFailed(t.system.indexes.ensureIndex({_id:1}));
 printjson(t.system.indexes.getIndexes());
 assert.eq(t.system.indexes.getIndexes().length, 0);
 print("trying via createIndex");

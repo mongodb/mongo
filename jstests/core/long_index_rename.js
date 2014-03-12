@@ -14,4 +14,4 @@ t.createIndex({a:1}, {name: "aaa"});
 var result = t.createIndex({a:1}, {name: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"});
 assert( !result.ok );
-assert( result.getWriteError().errmsg.indexOf( "too long" ) >= 0 );
+assert( result.errmsg.indexOf( "too long" ) >= 0 );

@@ -12,8 +12,8 @@ for( i = 0; i < 10; ++i ) {
 t.save( {loc:locArr,a:arr,b:arr,c:arr} );
 
 // Parallel arrays are allowed for geo indexes.
-assert.writeOK(t.ensureIndex( {loc:'2d',a:1,b:1,c:1} ));
+assert.commandWorked(t.ensureIndex( {loc:'2d',a:1,b:1,c:1} ));
 
 // Parallel arrays are not allowed for normal indexes.
-assert.writeError(t.ensureIndex( {loc:1,a:1,b:1,c:1} ));
+assert.commandFailed(t.ensureIndex( {loc:1,a:1,b:1,c:1} ));
 

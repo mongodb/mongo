@@ -21,7 +21,7 @@ function checkFailingOperations() {
     expectWriteError(function() { return idx.update({ x: 1 }, { x: 2 }); });
     expectWriteError(function() { return idx.remove({ x: 1 }); });
     assert.commandFailed( idx.runCommand( 'compact' ) );
-    assert.writeError(idx.ensureIndex({ x: 1 }));
+    assert.commandFailed( idx.ensureIndex({ x: 1 }));
 }
 
 // Check with base collection not present.

@@ -9,7 +9,7 @@ function test(index) {
     assert.writeOK( res );
 
     if (index) {
-        assert.writeOK(t.ensureIndex( { loc : "2d", zip : 1 } ));
+        assert.commandWorked(t.ensureIndex( { loc : "2d", zip : 1 } ));
         assert.eq( 2, t.getIndexKeys().length )
     }
 

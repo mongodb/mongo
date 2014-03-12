@@ -19,11 +19,12 @@ var geometry = {
 };
 
 t.insert({_id: 42, geometry: geometry});
-var err = assert.writeError(t.createIndex({geometry: '2dsphere'}));
+var err = t.createIndex({geometry: '2dsphere'});
+assert.commandFailed(err);
 
 // Document's _id should be in error message.
 assert(
-    -1 != err.getWriteError().errmsg.indexOf('42'),
+    -1 != err.errmsg.indexOf('42'),
     "Error message didn't contain document _id.\nMessage: \"" + err.errmsg
     + '"\n'
 );
