@@ -447,14 +447,17 @@ namespace mongo {
         // Kind of a mess.  We get a function for clipping the line to the
         // polygon.  We do this and make sure the line is the same as the
         // line we're clipping against.
-        vector<S2Polyline*> clipped;
+        OwnedPointerVector<S2Polyline> clippedOwned;
+        vector<S2Polyline*>& clipped = clippedOwned.mutableVector();
+
         poly.IntersectWithPolyline(&otherLine, &clipped);
         if (1 != clipped.size()) { return false; }
+
         // If the line is entirely contained within the polygon, we should be
         // getting it back verbatim, so really there should be no error.
         bool ret = clipped[0]->NearlyCoversPolyline(otherLine,
                 S1Angle::Degrees(1e-10));
-        for (size_t i = 0; i < clipped.size(); ++i) delete clipped[i];
+
         return ret;
     }
 

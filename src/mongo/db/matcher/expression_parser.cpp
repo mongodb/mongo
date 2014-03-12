@@ -46,6 +46,8 @@ namespace mongo {
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
                                                                        ComparisonMatchExpression* cmp,
                                                                        const BSONElement& e ) {
+        std::auto_ptr<ComparisonMatchExpression> temp(cmp);
+
         // Non-equality comparison match expressions cannot have
         // a regular expression as the argument (e.g. {a: {$gt: /b/}} is illegal).
         if (MatchExpression::EQ != cmp->matchType() && RegEx == e.type()) {
@@ -53,8 +55,6 @@ namespace mongo {
             ss << "Can't have RegEx as arg to predicate over field '" << name << "'.";
             return StatusWithMatchExpression(Status(ErrorCodes::BadValue, ss.str()));
         }
-
-        std::auto_ptr<ComparisonMatchExpression> temp( cmp );
 
         Status s = temp->init( name, e );
         if ( !s.isOK() )
