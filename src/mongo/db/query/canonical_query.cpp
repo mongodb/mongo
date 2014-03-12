@@ -139,11 +139,8 @@ namespace {
         case MatchExpression::ALWAYS_FALSE: return "af"; break;
         case MatchExpression::GEO_NEAR: return "gn"; break;
         case MatchExpression::TEXT: return "te"; break;
+        default: verify(0); return "";
         }
-        // Unreachable code.
-        // All MatchType values have been handled in switch().
-        verify(0);
-        return "";
     }
 
     /**

@@ -113,6 +113,10 @@ namespace mongo {
             double distance;
         };
 
+        // Our index scans aren't deduped so we might see the same doc twice in a given
+        // annulus.
+        unordered_set<DiskLoc, DiskLoc::Hasher> _seenInScan;
+
         // We compute an annulus of results and cache it here.
         priority_queue<Result> _results;
 
