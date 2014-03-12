@@ -426,7 +426,8 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * a 1-for-1 page swap), we've written root and checkpoint, we're done.
 	 * If the root page split, write the resulting WT_REF array.  We already
 	 * have an infrastructure for writing pages, create a fake root page and
-	 * write it instead of adding code to write WT_REF arrays.
+	 * write it instead of adding code to write blocks based on a the list
+	 * of blocks resulting from a multiblock reconciliation.
 	 */
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
@@ -461,9 +462,11 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	/*
 	 * We maintain a list of pages written for the root in order to free the
-	 * backing blocks the next time the root is written.  We could allocate
-	 * memory instead, but it's not a common thing and it's not much memory,
-	 * and requires less special-purpose code.
+	 * backing blocks the next time the root is written.
+	 *
+	 * XXXKEITH
+	 * This list takes up 8B in the page-modify structure, and needs to go
+	 * away.
 	 */
 	mod->root_split = next;
 
