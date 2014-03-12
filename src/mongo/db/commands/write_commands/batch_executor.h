@@ -150,12 +150,12 @@ namespace mongo {
     struct WriteOpStats {
 
         WriteOpStats() :
-            n( 0 ), nModified( 0 ) {
+            n( 0 ), nModified( -1 ) {
         }
 
         void reset() {
             n = 0;
-            nModified = 0;
+            nModified = -1;
             upsertedID = BSONObj();
         }
 

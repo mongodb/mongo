@@ -221,7 +221,7 @@ printjson( request = {update : coll.getName(),
 printjson( result = coll.runCommand(request) );
 assert(result.ok);
 assert.eq(2, result.n);
-assert.eq(0, result.nModified, "missing/wrong nModified")
+assert.eq(undefined, result.nModified, "wrong nModified")
 assert.eq(1, result.writeErrors.length);
 
 assert.eq(2, result.writeErrors[0].index);
@@ -248,7 +248,7 @@ printjson( request = {update : coll.getName(),
 printjson( result = coll.runCommand(request) );
 assert(result.ok);
 assert.eq(2, result.n);
-assert.eq(0, result.nModified, "missing/wrong nModified");
+assert.eq(undefined, result.nModified, "wrong nModified");
 assert.eq(2, result.writeErrors.length);
 
 assert.eq(1, result.writeErrors[0].index);
