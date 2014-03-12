@@ -611,8 +611,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 			addr->size = multi->addr.size;
 			addr->type = multi->addr.type;
 			WT_ERR(__wt_strndup(session,
-			    multi->addr.addr, addr->size = multi->addr.size,
-			    &addr->addr));
+			    multi->addr.addr, addr->size, &addr->addr));
 		} else
 			WT_ERR(
 			    __wt_multi_inmem_build(session, page, ref, multi));

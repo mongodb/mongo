@@ -3937,7 +3937,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	for (multi = mod->u.m.multi,
 	    i = 0; i < mod->u.m.multi_entries; ++multi, ++i) {
-		if (!multi->reuse)
+		if (multi->skip == NULL && !multi->reuse)
 			WT_RET(bm->free(
 			    bm, session, multi->addr.addr, multi->addr.size));
 		__wt_free(session, multi->addr.addr);
