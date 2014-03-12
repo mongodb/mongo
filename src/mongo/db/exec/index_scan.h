@@ -108,7 +108,7 @@ namespace mongo {
         // Index access.
         const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
         scoped_ptr<IndexCursor> _indexCursor;
-        const IndexDescriptor* _descriptor; // owned by Collection -> IndexCatalog
+        BSONObj _keyPattern;
 
         // Have we hit the end of the index scan?
         bool _hitEnd;
