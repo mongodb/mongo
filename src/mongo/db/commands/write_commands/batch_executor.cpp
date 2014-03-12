@@ -317,12 +317,10 @@ namespace mongo {
 
             if ( upserted.size() ) {
                 response->setUpsertDetails( upserted );
-                upserted.clear();
             }
 
             if ( writeErrors.size() ) {
                 response->setErrDetails( writeErrors );
-                writeErrors.clear();
             }
 
             if ( wcError.get() ) {
@@ -378,9 +376,57 @@ namespace mongo {
         error->setErrMessage( errMsg );
     }
 
+
+    namespace {
+
+        /**
+        * Data structure to safely hold and clean up results of single write operations.
+        */
+        class WriteOpResult : boost::noncopyable {
+        public:
+            WriteOpResult() {
+            }
+
+            ~WriteOpResult() {
+                dassert(!(fault.get() && error.get()));
+                reset();
+            }
+
+            WriteErrorDetail* releaseError() {
+                return error.release();
+            }
+
+            WriteErrorDetail* getError() const { return error.get(); }
+
+            void setError(WriteErrorDetail* errorParameter) {
+                error.reset(errorParameter);
+            }
+
+            PageFaultException* getFault() const { return fault.get(); }
+
+            void setFault(PageFaultException* faultParameter) {
+                fault.reset(faultParameter);
+            }
+
+            void reset() {
+                fault.reset();
+                error.reset();
+
+                stats.reset();
+            }
+
+            WriteOpStats stats;
+        private:
+            // Only one of these may be set at once
+            auto_ptr<PageFaultException> fault;
+            auto_ptr<WriteErrorDetail> error;
+        };
+
+    }
+
     static bool checkShardVersion( ShardingState* shardingState,
                                    const BatchedCommandRequest& request,
-                                   WriteErrorDetail** error ) {
+                                   WriteOpResult* result) {
 
         const NamespaceString nss( request.getTargetingNS() );
         Lock::assertWriteLocked( nss.ns() );
@@ -399,8 +445,10 @@ namespace mongo {
                     metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
                 if ( !requestShardVersion.isWriteCompatibleWith( shardVersion ) ) {
-                    *error = new WriteErrorDetail;
-                    buildStaleError( requestShardVersion, shardVersion, *error );
+                    WriteErrorDetail* errorDetail = new WriteErrorDetail;
+                    buildStaleError( requestShardVersion, shardVersion, errorDetail);
+                    result->setError(errorDetail);
+
                     return false;
                 }
             }
@@ -409,12 +457,13 @@ namespace mongo {
         return true;
     }
 
-    static bool checkIsMasterForCollection(const NamespaceString& ns, WriteErrorDetail** error) {
+    static bool checkIsMasterForCollection(const NamespaceString& ns, WriteOpResult* result) {
         if (!isMasterNs(ns.ns().c_str())) {
-            WriteErrorDetail* errorDetail = *error = new WriteErrorDetail;
+            WriteErrorDetail* errorDetail = new WriteErrorDetail;
             errorDetail->setErrCode(ErrorCodes::NotMaster);
             errorDetail->setErrMessage(std::string(mongoutils::str::stream() <<
                                                    "Not primary while writing to " << ns.ns()));
+            result->setError(errorDetail);
             return false;
         }
         return true;
@@ -431,7 +480,7 @@ namespace mongo {
 
     static bool checkIndexConstraints( ShardingState* shardingState,
                                        const BatchedCommandRequest& request,
-                                       WriteErrorDetail** error ) {
+                                       WriteOpResult* result) {
 
         const NamespaceString nss( request.getTargetingNS() );
         Lock::assertWriteLocked( nss.ns() );
@@ -447,10 +496,11 @@ namespace mongo {
                 if ( !isUniqueIndexCompatible( metadata->getKeyPattern(),
                                                request.getIndexKeyPattern() ) ) {
 
-                    *error = new WriteErrorDetail;
+                    WriteErrorDetail* errorDetail = new WriteErrorDetail;
                     buildUniqueIndexError( metadata->getKeyPattern(),
                                            request.getIndexKeyPattern(),
-                                           *error );
+                                           errorDetail );
+                    result->setError(errorDetail);
 
                     return false;
                 }
@@ -588,49 +638,6 @@ namespace mongo {
     // - error
     //
 
-    namespace {
-
-        /**
-         * Data structure to safely hold and clean up results of single write operations.
-         */
-        struct WriteOpResult {
-
-            WriteOpResult() :
-                fault( NULL ), error( NULL ) {
-            }
-
-            ~WriteOpResult() {
-                dassert( !( fault && error ) );
-                reset();
-            }
-
-            WriteErrorDetail* releaseError() {
-                WriteErrorDetail* released = error;
-                error = NULL;
-                return released;
-            }
-
-            void reset() {
-                if ( fault )
-                    delete fault;
-                if ( error )
-                    delete error;
-
-                fault = NULL;
-                error = NULL;
-
-                stats.reset();
-            }
-
-            WriteOpStats stats;
-
-            // Only one of these may be set at once
-            PageFaultException* fault;
-            WriteErrorDetail* error;
-        };
-
-    }
-
     static void singleInsert( const BatchItemRef& insertItem,
                               const BSONObj& normalInsert,
                               Collection* collection,
@@ -746,8 +753,8 @@ namespace mongo {
 
             // Don't (re-)acquire locks and create database until it's necessary
             if ( !normalInserts[currInsertItem->getItemIndex()].isOK() ) {
-                currResult.error =
-                    toWriteError( normalInserts[currInsertItem->getItemIndex()].getStatus() );
+                currResult.setError(
+                    toWriteError( normalInserts[currInsertItem->getItemIndex()].getStatus() ));
             }
             else {
 
@@ -759,9 +766,9 @@ namespace mongo {
 
                 // Check version inside of write lock
 
-                if ( checkIsMasterForCollection( nss, &currResult.error )
-                     && checkShardVersion( &shardingState, request, &currResult.error )
-                     && checkIndexConstraints( &shardingState, request, &currResult.error ) ) {
+                if ( checkIsMasterForCollection( nss, &currResult )
+                     && checkShardVersion( &shardingState, request, &currResult )
+                     && checkIndexConstraints(&shardingState, request, &currResult) ) {
 
                     //
                     // Get the collection for the insert
@@ -785,9 +792,9 @@ namespace mongo {
                             // Implicitly create if it doesn't exist
                             collection = database->createCollection( nss.ns() );
                             if ( !collection ) {
-                                currResult.error =
+                                currResult.setError(
                                     toWriteError( Status( ErrorCodes::InternalError,
-                                                          "could not create collection" ) );
+                                                          "could not create collection" ) ));
                             }
                         }
                     }
@@ -796,7 +803,7 @@ namespace mongo {
                         if (ErrorCodes::isInterruption(status.code())) {
                             throw;
                         }
-                        currResult.error = toWriteError(status);
+                        currResult.setError(toWriteError(status));
                     }
 
                     //
@@ -824,7 +831,7 @@ namespace mongo {
 
                         if ( !normalInsert.isOK() ) {
                             // This insert failed on preprocessing
-                            currResult.error = toWriteError( normalInsert.getStatus() );
+                            currResult.setError(toWriteError( normalInsert.getStatus() ));
                         }
                         else if ( !request.isInsertIndexRequest() ) {
                             // Try the insert
@@ -845,20 +852,20 @@ namespace mongo {
                         // END CURRENT OP
                         //
 
-                        finishCurrentOp( _client, currentOp.get(), currResult.error );
+                        finishCurrentOp( _client, currentOp.get(), currResult.getError() );
   
                         // Faults release the write lock
-                        if ( currResult.fault )
+                        if ( currResult.getFault() )
                             break;
 
                         // In general, we might have stats and errors
                         incWriteStats( *currInsertItem,
                                        currResult.stats,
-                                       currResult.error,
+                                       currResult.getError(),
                                        currentOp.get() );
 
                         // Errors release the write lock
-                        if ( currResult.error )
+                        if (currResult.getError())
                             break;
 
                         // Increment in the write lock and reset the stats for next time
@@ -885,7 +892,7 @@ namespace mongo {
             // Store the current error if it exists
             //
 
-            if ( currResult.error ) {
+            if ( currResult.getError() ) {
 
                 errors->push_back( currResult.releaseError() );
                 errors->back()->setIndex( currInsertItem->getItemIndex() );
@@ -899,9 +906,9 @@ namespace mongo {
             // Fault or increment
             //
 
-            if ( currResult.fault ) {
+            if ( currResult.getFault() ) {
                 // Check page fault out of lock
-                currResult.fault->touch();
+                currResult.getFault()->touch();
             }
             else {
                 // Increment if not a fault
@@ -922,17 +929,17 @@ namespace mongo {
 
         WriteOpResult result;
         multiUpdate( updateItem, &result );
-        incWriteStats( updateItem, result.stats, result.error, currentOp.get() );
+        incWriteStats( updateItem, result.stats, result.getError(), currentOp.get() );
 
         if ( !result.stats.upsertedID.isEmpty() ) {
             *upsertedId = result.stats.upsertedID;
         }
 
         // END CURRENT OP
-        finishCurrentOp( _client, currentOp.get(), result.error );
+        finishCurrentOp( _client, currentOp.get(), result.getError() );
 
-        if ( result.error ) {
-            result.error->setIndex( updateItem.getItemIndex() );
+        if ( result.getError() ) {
+            result.getError()->setIndex(updateItem.getItemIndex());
             *error = result.releaseError();
         }
     }
@@ -951,8 +958,8 @@ namespace mongo {
         while ( true ) {
             multiRemove( removeItem, &result );
 
-            if ( !result.fault ) {
-                incWriteStats( removeItem, result.stats, result.error, currentOp.get() );
+            if ( !result.getFault()) {
+                incWriteStats( removeItem, result.stats, result.getError(), currentOp.get() );
                 break;
             }
 
@@ -960,16 +967,16 @@ namespace mongo {
             // Check page fault out of lock
             //
 
-            dassert( result.fault );
-            result.fault->touch();
+            dassert( result.getFault() );
+            result.getFault()->touch();
             result.reset();
         }
 
         // END CURRENT OP
-        finishCurrentOp( _client, currentOp.get(), result.error );
+        finishCurrentOp( _client, currentOp.get(), result.getError() );
 
-        if ( result.error ) {
-            result.error->setIndex( removeItem.getItemIndex() );
+        if ( result.getError() ) {
+            result.getError()->setIndex(removeItem.getItemIndex());
             *error = result.releaseError();
         }
     }
@@ -999,7 +1006,7 @@ namespace mongo {
             StatusWith<DiskLoc> status = collection->insertDocument( normalInsert, true );
 
             if ( !status.isOK() ) {
-                result->error = toWriteError( status.getStatus() );
+                result->setError(toWriteError( status.getStatus() ));
             }
             else {
                 logOp( "i", insertNS.c_str(), normalInsert );
@@ -1009,14 +1016,14 @@ namespace mongo {
         }
         catch ( const PageFaultException& ex ) {
             // TODO: An actual data structure that's not an exception for this
-            result->fault = new PageFaultException( ex );
+            result->setFault(new PageFaultException( ex ));
         }
         catch ( const DBException& ex ) {
             Status status(ex.toStatus());
             if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(status);
+            result->setError(toWriteError(status));
         }
 
     }
@@ -1044,7 +1051,7 @@ namespace mongo {
                 result->stats.n = 0;
             }
             else if ( !status.isOK() ) {
-                result->error = toWriteError( status );
+                result->setError(toWriteError(status));
             }
             else {
                 logOp( "i", indexNS.c_str(), normalIndexDesc );
@@ -1053,14 +1060,14 @@ namespace mongo {
         }
         catch ( const PageFaultException& ex ) {
             // TODO: An actual data structure that's not an exception for this
-            result->fault = new PageFaultException( ex );
+            result->setFault(new PageFaultException( ex ));
         }
         catch ( const DBException& ex ) {
             Status status = ex.toStatus();
             if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(status);
+            result->setError(toWriteError(status));
         }
     }
 
@@ -1080,7 +1087,7 @@ namespace mongo {
         UpdateExecutor executor(&request, &cc().curop()->debug());
         Status status = executor.prepare();
         if (!status.isOK()) {
-            result->error = toWriteError(status);
+            result->setError(toWriteError(status));
             return;
         }
 
@@ -1088,7 +1095,7 @@ namespace mongo {
         Lock::DBWrite writeLock( nsString.ns() );
         ///////////////////////////////////////////
 
-        if ( !checkShardVersion( &shardingState, *updateItem.getRequest(), &result->error ) )
+        if ( !checkShardVersion( &shardingState, *updateItem.getRequest(), result) )
             return;
 
         Client::Context ctx( nsString.ns(),
@@ -1114,7 +1121,7 @@ namespace mongo {
             if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(status);
+            result->setError(toWriteError(status));
         }
     }
 
@@ -1136,7 +1143,7 @@ namespace mongo {
         DeleteExecutor executor( &request );
         Status status = executor.prepare();
         if ( !status.isOK() ) {
-            result->error = toWriteError( status );
+            result->setError(toWriteError( status ));
             return;
         }
 
@@ -1149,7 +1156,7 @@ namespace mongo {
 
         // Check version once we're locked
 
-        if ( !checkShardVersion( &shardingState, *removeItem.getRequest(), &result->error ) ) {
+        if ( !checkShardVersion( &shardingState, *removeItem.getRequest(), result ) ) {
             // Version error
             return;
         }
@@ -1165,14 +1172,14 @@ namespace mongo {
         }
         catch ( const PageFaultException& ex ) {
             // TODO: An actual data structure that's not an exception for this
-            result->fault = new PageFaultException( ex );
+            result->setFault( new PageFaultException( ex ));
         }
         catch ( const DBException& ex ) {
             status = ex.toStatus();
             if (ErrorCodes::isInterruption(status.code())) {
                 throw;
             }
-            result->error = toWriteError(status);
+            result->setError(toWriteError(status));
         }
     }
 
