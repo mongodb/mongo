@@ -300,7 +300,7 @@ connection_runtime_config = [
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',
 	    type='category', subconfig=[
-	    Config('enable', 'false', r'''
+	    Config('enabled', 'false', r'''
 	        whether the connection is using a shared cache''',
 	        type='boolean'),
 	    Config('chunk', '10MB', r'''
