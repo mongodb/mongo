@@ -924,6 +924,7 @@ __rec_review(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
+	uint32_t write_flags;
 
 	btree = S2BT(session);
 
@@ -1035,10 +1036,12 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * (and it's a page we expect to merge into a parent page eventually,
 	 * if it splits, something pretty strange is going on).
 	 */
-	if (__wt_page_is_modified(page))
-		WT_RET(__wt_rec_write(session, page, NULL,
-		    WT_EVICTION_LOCKED | (top &&
-		    !WT_PAGE_IS_INTERNAL(page) ? WT_SKIP_UPDATE_RESTORE : 0)));
+	if (__wt_page_is_modified(page)) {
+		write_flags = WT_EVICTION_LOCKED;
+		if (top && !WT_PAGE_IS_INTERNAL(page))
+			write_flags |= WT_SKIP_UPDATE_RESTORE;
+		WT_RET(__wt_rec_write(session, page, NULL, write_flags));
+	}
 
 	/*
 	 * If the page was ever modified, make sure all of the updates on the
