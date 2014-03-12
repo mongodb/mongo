@@ -402,9 +402,8 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	page = page->parent;
-	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_only_modify_set(session, page);
+	WT_RET(__wt_page_modify_init(session, page->parent));
+	__wt_page_only_modify_set(session, page->parent);
 	return (0);
 }
 
