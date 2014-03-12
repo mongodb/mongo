@@ -47,26 +47,28 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
 	else {
-		/* Only setup if a shared cache was explicitly configured. */
+		/*
+		 * Only setup if a shared cache was explicitly configured,
+		 * which is why we skip the first (default) configuration
+		 * string.
+		 */
 		ret = __wt_config_gets(
-		    session, cfg, "shared_cache.enabled", &cval);
-		if (ret != 0 || !cval.val) {
-			/*
-			 * If the user specified any shared_cache config but
-			 * didn't enable it or provide an cache_size setting
-			 * return an error - it was likely a mistake.
-			 */
-			if (__wt_config_gets(session, cfg,
-			    "shared_cache", &cval) != WT_NOTFOUND &&
-			    __wt_config_gets(session, &cfg[1],
-			    "cache_size", &cval) == WT_NOTFOUND)
+		    session, &cfg[1], "shared_cache.enabled", &cval);
+		/*
+		 * It was likely a mistake if the user specified any
+		 * shared cache config but didn't enable it.
+		 */
+		if (ret == WT_NOTFOUND) {
+			if (__wt_config_gets(session,
+			    &cfg[1], "shared_cache", &cval) != WT_NOTFOUND)
 				WT_RET_MSG(session, EINVAL,
 				    "Partial shared cache configuration "
 				    "provided. Configuring a shared cache "
-				    "requires that enabled is set to true");
-
+				    "requires that enabled is set");
 			return (0);
-		}
+		} else if (ret != 0 || !cval.val)
+			return (ret);
+
 		WT_RET_NOTFOUND_OK(
 		    __wt_config_gets(session, cfg, "shared_cache.name", &cval));
 		/*
