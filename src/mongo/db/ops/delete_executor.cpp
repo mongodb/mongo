@@ -83,7 +83,7 @@ namespace mongo {
 
     long long DeleteExecutor::execute() {
         uassertStatusOK(prepare());
-        uassert(0,
+        uassert(17417,
                 mongoutils::str::stream() <<
                 "DeleteExecutor::prepare() failed to parse query " << _request->getQuery(),
                 _isQueryParsed);
@@ -101,7 +101,7 @@ namespace mongo {
             }
         }
 
-        massert(0,
+        massert(17418,
                 mongoutils::str::stream() <<
                 "dbname = " << currentClient.get()->database()->name() <<
                 "; ns = " << ns.ns(),
