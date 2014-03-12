@@ -89,7 +89,7 @@ __wt_page_in_func(
 			    force_attempts < 10 &&
 			    __wt_eviction_force_check(session, page)) {
 				++force_attempts;
-				WT_RET(__wt_eviction_force(session, page));
+				WT_RET(__wt_page_release(session, page));
 				break;
 			}
 
