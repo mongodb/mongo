@@ -484,6 +484,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		ret = EINVAL;
 	}
 
+	free(file_buf);
 	return (ret);
 }
 
