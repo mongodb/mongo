@@ -10,9 +10,9 @@ var documentUpgradeCheck = function(indexes, doc) {
         goodSoFar = false;
     }
     indexes.forEach(function(idx) {
-        if (keyTooLong({index: idx, doc: doc})) {
-            print("Document Error: key for index '" + idx.name + "' (" + tojsononeline(idx.key) +
-                  ")" + " too long for document: " +tojsononeline(doc));
+        if (isKeyTooLarge(idx, doc)) {
+            print("Document Error: key for index " + tojsononeline(idx) +
+                  " too long for document: " + tojsononeline(doc));
             goodSoFar = false;
         }
     });
@@ -59,7 +59,13 @@ var collUpgradeCheck = function(collObj) {
         }
         else {
             // add its key to the list of index keys to check documents against
-            indexes.push(index);
+            if (index["v"] !== 1) {
+                print("Warning: upgradeCheck only supports V1 indexes. Skipping index: " +
+                      tojsononeline(index));
+            }
+            else {
+                indexes.push(index);
+            }
         }
     });
 
@@ -139,7 +145,7 @@ DB.prototype.upgradeCheck = function(obj) {
     }
 
     print("database '" + self.getName() + "' for 2.6 upgrade compatibility");
-    if (dbUpgradeCheck(self, true)) {
+    if (dbUpgradeCheck(self)) {
         print("Everything in '" + self.getName() + "' is ready for the upgrade!");
         return true;
     }
