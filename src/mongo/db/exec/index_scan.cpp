@@ -50,27 +50,34 @@ namespace mongo {
     IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
                          const MatchExpression* filter)
         : _workingSet(workingSet),
-          _descriptor(params.descriptor),
+          _keyPattern(params.descriptor->keyPattern().getOwned()),
           _hitEnd(false),
           _filter(filter), 
           _shouldDedup(params.descriptor->isMultikey()),
           _yieldMovedCursor(false),
           _params(params),
           _btreeCursor(NULL) {
+        // Do not access index descriptor after construction.
+        const IndexDescriptor* descriptor = params.descriptor;
+        _params.descriptor = NULL;
+        invariant(descriptor);
 
-        _iam = _descriptor->getIndexCatalog()->getIndex(_descriptor);
+        _iam = descriptor->getIndexCatalog()->getIndex(descriptor);
 
         if (_params.doNotDedup) {
             _shouldDedup = false;
         }
 
         _specificStats.indexType = "BtreeCursor"; // TODO amName;
-        _specificStats.indexName = _descriptor->infoObj()["name"].String();
         _specificStats.indexBounds = _params.bounds.toBSON();
         _specificStats.indexBoundsVerbose = _params.bounds.toString();
         _specificStats.direction = _params.direction;
-        _specificStats.isMultiKey = _descriptor->isMultikey();
-        _specificStats.keyPattern = _descriptor->keyPattern();
+
+        // Fetch what we need from index descriptor now because details in index
+        // catalog (such as multi-key) might change during/after execution.
+        _specificStats.indexName = descriptor->infoObj()["name"].String();
+        _specificStats.isMultiKey = descriptor->isMultikey();
+        _specificStats.keyPattern = _keyPattern;
     }
 
     void IndexScan::initIndexCursor() {
@@ -104,10 +111,10 @@ namespace mongo {
             // "Fast" Btree-specific navigation.
             _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
             _checker.reset(new IndexBoundsChecker(&_params.bounds,
-                                                  _descriptor->keyPattern(),
+                                                  _keyPattern,
                                                   _params.direction));
 
-            int nFields = _descriptor->keyPattern().nFields();
+            int nFields = _keyPattern.nFields();
             vector<const BSONElement*> key;
             vector<bool> inc;
             key.resize(nFields);
@@ -162,7 +169,7 @@ namespace mongo {
             }
         }
 
-        if (Filter::passes(keyObj, _descriptor->keyPattern(), _filter)) {
+        if (Filter::passes(keyObj, _keyPattern, _filter)) {
             if (NULL != _filter) {
                 ++_specificStats.matchTested;
             }
@@ -175,12 +182,12 @@ namespace mongo {
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
-            member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), ownedKeyObj));
+            member->keyData.push_back(IndexKeyDatum(_keyPattern, ownedKeyObj));
             member->state = WorkingSetMember::LOC_AND_IDX;
 
             if (_params.addKeyMetadata) {
                 BSONObjBuilder bob;
-                bob.appendKeys(_descriptor->keyPattern(), ownedKeyObj);
+                bob.appendKeys(_keyPattern, ownedKeyObj);
                 member->addComputed(new IndexKeyComputedData(bob.obj()));
             }
 
@@ -275,8 +282,7 @@ namespace mongo {
             // If there is an empty endKey we will scan until we run out of index to scan over.
             if (_params.bounds.endKey.isEmpty()) { return; }
 
-            int cmp = sgn(_params.bounds.endKey.woCompare(_indexCursor->getKey(),
-                _descriptor->keyPattern()));
+            int cmp = sgn(_params.bounds.endKey.woCompare(_indexCursor->getKey(), _keyPattern));
 
             if ((cmp != 0 && cmp != _params.direction)
                 || (cmp == 0 && !_params.bounds.endKeyInclusive)) {
