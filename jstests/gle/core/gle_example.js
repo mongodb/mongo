@@ -27,8 +27,3 @@ coll.update({ y: 1 }, { _id: 1 }, true);
 gle = db.getLastErrorObj();
 assert.neq(null, gle.err);
 
-// Error on index creation.
-coll.ensureIndex({ x: 'invalid' });
-gle = db.getLastErrorObj();
-assert.neq(null, gle.err);
-

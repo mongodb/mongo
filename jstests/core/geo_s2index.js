@@ -101,14 +101,14 @@ assert.writeOK(res);
 t.drop();
 t.save({loc: [0,0]})
 res = t.ensureIndex({ loc: "2dsphere" }, { finestIndexedLevel: 31, coarsestIndexedLevel: 5 });
-assert.writeError(res);
+assert.commandFailed(res);
 
 t.drop();
 t.save({loc: [0,0]})
 res = t.ensureIndex({ loc: "2dsphere" }, { finestIndexedLevel: 30, coarsestIndexedLevel: 0 });
-assert.writeOK(res);
+assert.commandWorked(res);
 
 t.drop();
 t.save({loc: [0,0]})
 res = t.ensureIndex({ loc: "2dsphere" }, { finestIndexedLevel: 30, coarsestIndexedLevel: -1 });
-assert.writeError(res);
+assert.commandFailed(res);

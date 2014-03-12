@@ -36,7 +36,7 @@ function canMakeCollectionWithName(name) {
 }
 
 function canMakeIndexWithName(collection, name) {
-    var success = !(collection.ensureIndex({x:1}, {name: name}).hasWriteErrors());
+    var success = collection.ensureIndex({x:1}, {name: name}).ok;
     if (success) {
         assert.commandWorked(collection.dropIndex(name));
     }

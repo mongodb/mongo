@@ -3,7 +3,7 @@
 coll = db.geo10
 coll.drop();
 
-assert.writeOK( db.geo10.ensureIndex( { c : '2d', t : 1 }, { min : 0, max : Math.pow( 2, 40 ) } ));
+assert.commandWorked( db.geo10.ensureIndex( { c : '2d', t : 1 }, { min : 0, max : Math.pow( 2, 40 ) } ));
 assert( db.system.indexes.count({ ns : "test.geo10" }) == 2, "A3" )
 
 printjson( db.system.indexes.find().toArray() )

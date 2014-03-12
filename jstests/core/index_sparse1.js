@@ -28,7 +28,7 @@ assert.eq( 1 , t.getIndexes().length , "C3" )
 t.remove( { _id : 2 } )
 
 // test that we can't create a unique index without sparse 
-assert.writeError( t.ensureIndex( { x : 1 } , { unique : 1 } ));
+assert.commandFailed( t.ensureIndex( { x : 1 } , { unique : 1 } ));
 assert.eq( 1 , t.getIndexes().length , "D2" )
 
 
