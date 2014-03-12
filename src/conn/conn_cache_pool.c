@@ -48,10 +48,25 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		reconfiguring = 1;
 	else {
 		/* Only setup if a shared cache was explicitly configured. */
-		WT_RET(__wt_config_gets(
-		    session, cfg, "shared_cache.enable", &cval));
-		if (!cval.val)
+		ret = __wt_config_gets(
+		    session, cfg, "shared_cache.enabled", &cval);
+		if (ret != 0 || !cval.val) {
+			/*
+			 * If the user specified any shared_cache config but
+			 * didn't enable it or provide an cache_size setting
+			 * return an error - it was likely a mistake.
+			 */
+			if (__wt_config_gets(session, cfg,
+			    "shared_cache", &cval) != WT_NOTFOUND &&
+			    __wt_config_gets(session, &cfg[1],
+			    "cache_size", &cval) == WT_NOTFOUND)
+				WT_RET_MSG(session, EINVAL,
+				    "Partial shared cache configuration "
+				    "provided. Configuring a shared cache "
+				    "requires that enabled is set to true");
+
 			return (0);
+		}
 		WT_RET_NOTFOUND_OK(
 		    __wt_config_gets(session, cfg, "shared_cache.name", &cval));
 		/*
