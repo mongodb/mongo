@@ -68,16 +68,10 @@ namespace mongo {
             _shouldDedup = false;
         }
 
-        _specificStats.indexType = "BtreeCursor"; // TODO amName;
-        _specificStats.indexBounds = _params.bounds.toBSON();
-        _specificStats.indexBoundsVerbose = _params.bounds.toString();
-        _specificStats.direction = _params.direction;
-
         // Fetch what we need from index descriptor now because details in index
         // catalog (such as multi-key) might change during/after execution.
         _specificStats.indexName = descriptor->infoObj()["name"].String();
         _specificStats.isMultiKey = descriptor->isMultikey();
-        _specificStats.keyPattern = _keyPattern;
     }
 
     void IndexScan::initIndexCursor() {
@@ -341,6 +335,16 @@ namespace mongo {
 
     PlanStageStats* IndexScan::getStats() {
         _commonStats.isEOF = isEOF();
+
+        // These specific stats fields never change.
+        if (_specificStats.indexType.empty()) {
+            _specificStats.indexType = "BtreeCursor"; // TODO amName;
+            _specificStats.indexBounds = _params.bounds.toBSON();
+            _specificStats.indexBoundsVerbose = _params.bounds.toString();
+            _specificStats.direction = _params.direction;
+            _specificStats.keyPattern = _keyPattern;
+        }
+
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
         ret->specific.reset(new IndexScanStats(_specificStats));
         return ret.release();
