@@ -6,13 +6,13 @@ var documentUpgradeCheck = function(indexes, doc) {
     var invalidForStorage = Object.invalidForStorage(doc);
     if (invalidForStorage) {
         print("Document Error: document is no longer valid in 2.6 because " + invalidForStorage +
-              ": "+ tojson(doc));
+              ": "+ tojsononeline(doc));
         goodSoFar = false;
     }
     indexes.forEach(function(idx) {
         if (keyTooLong({index: idx, doc: doc})) {
-            print("Document Error: key for index '" + idx.name + "' (" + tojson(idx.key) + ")" +
-                  " too long for document: " +tojson(doc));
+            print("Document Error: key for index '" + idx.name + "' (" + tojsononeline(idx.key) +
+                  ")" + " too long for document: " +tojsononeline(doc));
             goodSoFar = false;
         }
     });
@@ -24,7 +24,7 @@ var indexUpgradeCheck = function(index) {
     var indexValid = validateIndexKey(index.key);
     if (!indexValid.ok) {
         print("Index Error: invalid index spec for index '" + index.name + "': " +
-              tojson(index.key));
+              tojsononeline(index.key));
         goodSoFar = false;
     }
     return goodSoFar;
