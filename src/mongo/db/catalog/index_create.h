@@ -55,6 +55,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( MultiIndexBlock );
     public:
         MultiIndexBlock( Collection* collection );
+        ~MultiIndexBlock();
 
         Status init( std::vector<BSONObj>& specs );
 
@@ -69,12 +70,12 @@ namespace mongo {
 
         struct IndexState {
             IndexState()
-                : real( NULL ), bulk( NULL ) {
+                : real( NULL ), bulk( NULL ), block( NULL ) {
             }
 
             IndexAccessMethod* forInsert() { return bulk ? bulk : real; }
 
-            shared_ptr<IndexCatalog::IndexBuildBlock> block;
+            IndexCatalog::IndexBuildBlock* block;
             IndexAccessMethod* real;
             IndexAccessMethod* bulk;
         };
