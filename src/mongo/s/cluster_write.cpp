@@ -332,6 +332,14 @@ namespace mongo {
             return;
         }
 
+        if ( request.sizeWriteOps() > BatchedCommandRequest::kMaxWriteBatchSize ) {
+            toBatchError( Status( ErrorCodes::FailedToParse,
+                                  str::stream() << "exceeded maximum write batch size of "
+                                                << BatchedCommandRequest::kMaxWriteBatchSize ),
+                          response );
+            return;
+        }
+
         string errMsg;
         if ( request.isInsertIndexRequest() && !request.isValidIndexRequest( &errMsg ) ) {
             toBatchError( Status( ErrorCodes::InvalidOptions, errMsg ), response );

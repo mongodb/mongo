@@ -11,6 +11,9 @@ jsTest.log("Starting update tests...");
 
 var request;
 var result;
+var batch;
+
+var maxWriteBatchSize = 1000;
 
 function resultOK( result ) {
     return result.ok &&
@@ -184,6 +187,42 @@ assert.eq(2, result.n);
 assert.eq(1, result.nModified, "missing/wrong nModified")
 assert.eq(2, coll.find({a:1, c:2}).count());
 assert.eq(2, coll.count());
+
+//
+// Large batch under the size threshold should update successfully
+coll.remove({});
+coll.insert({a:0});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize; ++i) {
+    batch.push({q:{}, u: {$inc: {a:1}}});
+}
+printjson( request = {update : coll.getName(),
+                      updates: batch,
+                      writeConcern: {w:1},
+                      ordered:false} );
+printjson( result = coll.runCommand(request) );
+assert(resultOK(result));
+assert.eq(batch.length, result.n);
+assert.eq(batch.length, result.nModified, "missing/wrong nModified")
+assert.eq(1, coll.find({a:batch.length}).count());
+assert.eq(1, coll.count());
+
+//
+// Large batch above the size threshold should fail to update
+coll.remove({});
+coll.insert({a:0});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
+    batch.push({q:{}, u: {$inc: {a:1}}});
+}
+printjson( request = {update : coll.getName(),
+                      updates: batch,
+                      writeConcern: {w:1},
+                      ordered:false} );
+printjson( result = coll.runCommand(request) );
+assert(resultNOK(result));
+assert.eq(1, coll.find({a:0}).count());
+assert.eq(1, coll.count());
 
 
 //

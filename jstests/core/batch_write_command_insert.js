@@ -11,6 +11,9 @@ jsTest.log("Starting insert tests...");
 
 var request;
 var result;
+var batch;
+
+var maxWriteBatchSize = 1000;
 
 function resultOK( result ) {
     return result.ok &&
@@ -93,6 +96,31 @@ printjson( result = coll.runCommand(request) );
 assert(resultOK(result));
 assert.eq(1, result.n);
 assert.eq(coll.count(), 1);
+
+//
+// Large batch under the size threshold should insert successfully
+coll.remove({});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize; ++i) {
+    batch.push({});
+}
+printjson( request = {insert : coll.getName(), documents: batch, writeConcern:{w:1}, ordered:false} );
+printjson( result = coll.runCommand(request) );
+assert(resultOK(result));
+assert.eq(batch.length, result.n);
+assert.eq(coll.count(), batch.length);
+
+//
+// Large batch above the size threshold should fail to insert
+coll.remove({});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
+    batch.push({});
+}
+printjson( request = {insert : coll.getName(), documents: batch, writeConcern:{w:1}, ordered:false} );
+printjson( result = coll.runCommand(request) );
+assert(resultNOK(result));
+assert.eq(coll.count(), 0);
 
 //
 //
