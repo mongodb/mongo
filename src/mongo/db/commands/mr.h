@@ -252,10 +252,14 @@ namespace mongo {
             void emit( const BSONObj& a );
 
             /**
-             * if size is big, run a reduce
-             * if its still big, dump to temp collection
-             */
-            void checkSize();
+            * Checks the size of the transient in-memory results accumulated so far and potentially
+            * runs reduce in order to compact them. If the data is still too large, it will be 
+            * spilled to the output collection.
+            *
+            * NOTE: Make sure that no DB locks are held, when calling this function, because it may
+            * try to acquire write DB lock for the write to the output collection.
+            */
+            void reduceAndSpillInMemoryStateIfNeeded();
 
             /**
              * run reduce on _temp
@@ -326,7 +330,13 @@ namespace mongo {
 
         protected:
 
-            void _add( InMemory* im , const BSONObj& a , long& size );
+            /**
+             * Appends a new document to the in-memory list of tuples, which are under that
+             * document's key.
+             *
+             * @return estimated in-memory size occupied by the newly added document.
+             */
+            int _add(InMemory* im , const BSONObj& a);
 
             scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
