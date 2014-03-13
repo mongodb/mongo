@@ -193,7 +193,6 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 			    print_config(session, uri, value, NULL) != 0 ||
 			    dump_suffix() != 0)
 				ret = 1;
-			free(value);
 		} else if (ret == WT_NOTFOUND)
 			ret = util_err(0, "%s: No such object exists", uri);
 		else
