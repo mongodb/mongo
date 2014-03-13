@@ -180,6 +180,7 @@ namespace mongo {
             if ( e->descriptor() != desc )
                 continue;
             _entries.mutableVector().erase( i );
+            delete e;
             return true;
         }
         return false;
