@@ -122,6 +122,10 @@ namespace mongo {
 
     /**
      * Also called by db/ops/query.cpp.  This is the new getMore entry point.
+     *
+     * pass - when QueryOption_AwaitData is in use, the caller will make repeated calls 
+     *        when this method returns an empty result, incrementing pass on each call.  
+     *        Thus, pass == 0 indicates this is the first "attempt" before any 'awaiting'.
      */
     QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
                             int pass, bool& exhaust, bool* isCursorAuthorized) {
@@ -176,8 +180,9 @@ namespace mongo {
             curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
             killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
-            // TODO: What is pass?
-            if (0 == pass) { cc->updateSlaveLocation(curop); }
+            if (0 == pass) { 
+                cc->updateSlaveLocation(curop); 
+            }
 
             if (cc->isAggCursor) {
                 // Agg cursors handle their own locking internally.
