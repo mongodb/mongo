@@ -34,11 +34,15 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/shard.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
 #include "mongo/s/write_ops/dbclient_safe_writer.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
+
+    // Can force the write mode used for the shards to not uses commands, even if avail.
+    MONGO_EXPORT_SERVER_PARAMETER( _forceLegacyShardWriteMode, bool, false );
 
     DBClientMultiCommand::PendingCommand::PendingCommand( const ConnectionString& endpoint,
                                                           const StringData& dbName,
@@ -77,7 +81,8 @@ namespace mongo {
         }
 
         bool hasBatchWriteFeature( DBClientBase* conn ) {
-            return conn->getMinWireVersion() <= BATCH_COMMANDS
+            return !_forceLegacyShardWriteMode
+                   && conn->getMinWireVersion() <= BATCH_COMMANDS
                    && conn->getMaxWireVersion() >= BATCH_COMMANDS;
         }
 
