@@ -88,7 +88,8 @@ namespace mongo {
                     break;
                 }
             }
-            while ( dbMsg.moreJSObjs() );
+            while ( static_cast<int>( docs.size() ) < BatchedCommandRequest::kMaxWriteBatchSize
+                    && dbMsg.moreJSObjs() );
 
             dassert( !docs.empty() );
 
