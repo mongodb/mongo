@@ -235,8 +235,8 @@ __rec_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_ITEM *next, _next, *last, _last, *tmp;
-	uint64_t recno;
 	WT_REF *ref;
+	uint64_t recno;
 	int skip_first, cmp;
 
 	btree = S2BT(session);
@@ -684,9 +684,9 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * Get a page-level lock on the parent to single-thread splits into the
 	 * page.  It's OK to queue up multiple splits as the child pages split,
 	 * but the actual split into the parent has to be serialized.  We do
-	 * memory allocation inside of the lock, but I don't see a reason to
-	 * tighten this down yet, we're only blocking other leaf pages trying
-	 * to split into this parent, they can wait their turn.
+	 * memory allocation inside of the lock and we may want to invest effort
+	 * in making the locked period shorter, we're blocking checkpoints of
+	 * the internal pages.
 	 */
 	WT_PAGE_LOCK(session, parent);
 	locked = 1;
