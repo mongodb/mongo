@@ -55,6 +55,9 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(WriteBatchExecutor);
     public:
 
+        // State object used by private execInserts.  TODO: Do not expose this type.
+        class ExecInsertsState;
+
         WriteBatchExecutor( const BSONObj& defaultWriteConcern,
                             Client* client,
                             OpCounters* opCounters,
@@ -69,7 +72,6 @@ namespace mongo {
         const WriteBatchStats& getStats() const;
 
     private:
-
         /**
          * Executes the writes in the batch and returns upserted _ids and write errors.
          * Dispatches to one of the three functions below for DBLock, CurOp, and stats management.
@@ -87,6 +89,11 @@ namespace mongo {
          */
         void execInserts( const BatchedCommandRequest& request,
                           std::vector<WriteErrorDetail*>* errors );
+
+        /**
+         * Executes a single insert from a batch, described in the opaque "state" object.
+         */
+        void execOneInsert( ExecInsertsState* state, WriteErrorDetail** error );
 
         /**
          * Executes an update item (which may update many documents or upsert), and returns the
