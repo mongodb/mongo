@@ -130,10 +130,6 @@ namespace mongo {
     QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
                             int pass, bool& exhaust, bool* isCursorAuthorized) {
         exhaust = false;
-        int bufSize = 512 + sizeof(QueryResult) + MaxBytesToReturnToClientAtOnce;
-
-        BufBuilder bb(bufSize);
-        bb.skip(sizeof(QueryResult));
 
         // This is a read lock.
         scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
@@ -159,6 +155,10 @@ namespace mongo {
 
         int numResults = 0;
         int startingResult = 0;
+
+        const int InitialBufSize = 512 + sizeof(QueryResult) + MaxBytesToReturnToClientAtOnce;
+        BufBuilder bb(InitialBufSize);
+        bb.skip(sizeof(QueryResult));
 
         if (NULL == cc) {
             cursorid = 0;
