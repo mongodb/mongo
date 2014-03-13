@@ -1959,7 +1959,7 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * it's possible.
 	 */
 	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
-	    r->bnd_next == 0 && r->upd_skipped) {
+	    r->bnd_next == 0 && r->bnd[0].skip != NULL) {
 		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
 		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
 		return (EBUSY);
@@ -3317,9 +3317,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			vtype = WT_CELL_ADDR_DEL;
 
 		/*
-		 * Modified child.
-		 * The page may be emptied or internally created during a split.
-		 * Deleted/split pages are merged into the parent and discarded.
+		 * Modified child.  Empty pages are merged into the parent and
+		 * discarded.
 		 */
 		if (state == WT_CHILD_MODIFIED)
 			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
@@ -4094,11 +4093,18 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * replacing a single page with another single page most of
 		 * the time.
 		 *
+		 * We should not be saving/restoring changes for this page in
+		 * this case, we should have returned failure before writing
+		 * any blocks.
+		 */
+		bnd = &r->bnd[0];
+		WT_ASSERT(session, bnd->skip == NULL);
+
+		/*
 		 * If this is a root page, then we don't have an address and we
 		 * have to create a sync point.  The address was cleared when
 		 * we were about to write the buffer so we know what to do here.
 		 */
-		bnd = &r->bnd[0];
 		if (bnd->addr.addr == NULL)
 			WT_RET(__wt_bt_write(session,
 			    &r->dsk, NULL, NULL, 1, bnd->already_compressed));
