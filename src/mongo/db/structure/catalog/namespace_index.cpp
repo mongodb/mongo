@@ -43,7 +43,7 @@ namespace mongo {
     }
 
     NamespaceDetails* NamespaceIndex::details(const Namespace& ns) {
-        if ( !_ht )
+        if ( !_ht.get() )
             return 0;
         NamespaceDetails *d = _ht->get(ns);
         if ( d && d->isCapped() )
@@ -71,7 +71,7 @@ namespace mongo {
 
     void NamespaceIndex::kill_ns(const StringData& ns) {
         Lock::assertWriteLocked(ns);
-        if ( !_ht )
+        if ( !_ht.get() )
             return;
         Namespace n(ns);
         _ht->kill(n);
@@ -117,7 +117,7 @@ namespace mongo {
         verify( onlyCollections ); // TODO: need to implement this
         //                                  need boost::bind or something to make this less ugly
 
-        if ( _ht )
+        if ( _ht.get() )
             _ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
     }
 
@@ -131,7 +131,7 @@ namespace mongo {
     }
 
     NOINLINE_DECL void NamespaceIndex::_init() {
-        verify( !_ht );
+        verify( !_ht.get() );
 
         Lock::assertWriteLocked(_database);
 
@@ -189,7 +189,7 @@ namespace mongo {
 
 
         verify( len <= 0x7fffffff );
-        _ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
+        _ht.reset(new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index"));
     }
 
 
