@@ -347,7 +347,7 @@ def check_db_hashes(master, slave):
     replicated_collections += master.dict.keys()
 
     for coll in replicated_collections:
-        if coll not in slave.dict:
+        if coll not in slave.dict and coll not in lost_in_slave:
             lost_in_slave.append(coll)
         mhash = master.dict[coll]
         shash = slave.dict[coll]
@@ -383,7 +383,7 @@ def check_db_hashes(master, slave):
 
 
     for db in slave.dict.keys():
-        if db not in master.dict:
+        if db not in master.dict and db not in lost_in_master:
             lost_in_master.append(db)
 
 
