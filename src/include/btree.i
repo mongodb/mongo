@@ -755,22 +755,10 @@ __wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page->modify == NULL)
 		return (0);
 
-	return (1);
-}
-
-/*
- * __wt_eviction_force --
- *	Forcefully evict a page, if possible.
- */
-static inline int
-__wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_FORCE)) {
-		F_SET_ATOMIC(page, WT_PAGE_EVICT_FORCE);
-		WT_RET(__wt_evict_server_wake(session));
-	}
+	/* Trigger eviction on the next page release. */
 	page->read_gen = WT_READGEN_OLDEST;
-	return (__wt_page_release(session, page));
+
+	return (1);
 }
 
 /*
