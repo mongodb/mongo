@@ -217,8 +217,7 @@ printjson(request = {insert : "system.indexes",
 printjson( result = coll.runCommand(request) );
 assert(result.ok);
 assert.eq(1, result.n);
-// Background index may or may not be created
-assert.lte(coll.getIndexes().length, 2);
+assert.eq(coll.getIndexes().length, 2);
 
 //
 // Duplicate index insertion gives n = 0
@@ -241,8 +240,7 @@ printjson(request = {insert : "system.indexes",
                                    key : {x : 1}, name : "x_1", unique : true}]});
 printjson(result = coll.runCommand(request));
 assert(!result.ok);
-//This is LTE since we may or may not actually create the database
-assert.lte(coll.getIndexes().length, 1);
+assert.eq(coll.getIndexes().length, 0);
 
 //
 // Empty index insertion
@@ -250,8 +248,7 @@ coll.drop();
 printjson(request = {insert : "system.indexes", documents : [{}]});
 printjson(result = coll.runCommand(request));
 assert(!result.ok);
-// This is LTE since we may or may not actually create the database
-assert.lte(coll.getIndexes().length, 1);
+assert.eq(coll.getIndexes().length, 0);
 
 //
 // Invalid index desc
@@ -293,6 +290,5 @@ printjson(request = {insert : "system.indexes",
                                   {ns : coll.toString(), key : {y : 1}, name : "y_1"}]});
 printjson(result = coll.runCommand(request));
 assert(!result.ok);
-// This is LTE since we may or may not actually create the database
-assert.lte(coll.getIndexes().length, 1);
+assert.eq(coll.getIndexes().length, 0);
 
