@@ -51,6 +51,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".findOne([query])");
     print("\tdb." + shortName + ".findAndModify( { update : ... , remove : bool [, query: {}, sort: {}, 'new': false] } )");
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
+    print("\tdb." + shortName + ".getPlanCache() get query plan cache associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
     print("\tdb." + shortName + ".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
     // print("\tdb." + shortName + ".indexStats({expandNodes: [<expanded child numbers>}, <detailed: t/f>) - output aggregate/per-depth btree bucket stats");
