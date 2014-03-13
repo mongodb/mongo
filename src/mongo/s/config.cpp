@@ -34,6 +34,8 @@
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_database.h"
+#include "mongo/s/type_locks.h"
+#include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/net/message.h"
@@ -984,6 +986,16 @@ namespace mongo {
                                           ChunkType::DEPRECATED_lastmod() << 1 ), true );
 
             conn->get()->ensureIndex(ShardType::ConfigNS, BSON(ShardType::host() << 1), true);
+
+            conn->get()->ensureIndex(LocksType::ConfigNS, 
+                                     BSON( LocksType::lockID() << 1 ), true);
+
+            conn->get()->ensureIndex(LockpingsType::ConfigNS, 
+                                     BSON( LockpingsType::ping() << 1 ), false);
+
+            conn->get()->ensureIndex(LocksType::ConfigNS, 
+                                     BSON( LocksType::state() << 1 << 
+                                           LocksType::process() << 1 ), false);
 
             conn->done();
         }
