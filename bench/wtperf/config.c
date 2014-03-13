@@ -62,6 +62,8 @@ config_assign(CONFIG *dest, const CONFIG *src)
 
 	if (src->uris != NULL) {
 		dest->uris = (char **)calloc(src->table_count, sizeof(char *));
+		if (dest->uris == NULL)
+			return (enomem(dest));
 		for (i = 0; i < src->table_count; i++)
 			dest->uris[i] = strdup(src->uris[i]);
 	}
@@ -73,6 +75,8 @@ config_assign(CONFIG *dest, const CONFIG *src)
 		dest->base_uri = strdup(src->base_uri);
 	if (src->workload != NULL) {
 		dest->workload = calloc(WORKLOAD_MAX, sizeof(WORKLOAD));
+		if (dest->workload == NULL)
+			return (enomem(dest));
 		memcpy(dest->workload,
 		    src->workload, WORKLOAD_MAX * sizeof(WORKLOAD));
 	}
@@ -393,36 +397,40 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 int
 config_opt_file(CONFIG *cfg, const char *filename)
 {
+	struct stat sb;
+	ssize_t read_size;
+	size_t buf_size, linelen, optionpos;
 	int contline, fd, linenum, ret;
 	char option[1024];
 	char *comment, *file_buf, *line, *ltrim, *rtrim;
-	size_t buf_size, linelen, optionpos;
-	ssize_t read_size;
-	struct stat sb;
 
-	if ((ret = stat(filename, &sb)) != 0) {
-		fprintf(stderr, "wtperf: stat of %s: %s\n",
-		    filename, strerror(ret));
-		return (ret);
-	}
-	buf_size = (size_t)sb.st_size;
-	file_buf = (char *)calloc(buf_size + 2, 1);
-	if (file_buf == NULL)
-		return (ENOMEM);
-
+	file_buf = NULL;
 	if ((fd = open(filename, O_RDONLY)) == -1) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
 		return (errno);
+	}
+	if ((ret = fstat(fd, &sb)) != 0) {
+		fprintf(stderr, "wtperf: stat of %s: %s\n",
+		    filename, strerror(errno));
+		(void)close(fd);
+		return (errno);
+	}
+	buf_size = (size_t)sb.st_size;
+	file_buf = (char *)calloc(buf_size + 2, 1);
+	if (file_buf == NULL) {
+		ret = ENOMEM;
+		goto err;
 	}
 	read_size = read(fd, file_buf, buf_size);
 	(void)close(fd);
 	if (read_size == -1 || (size_t)read_size != buf_size) {
 		fprintf(stderr,
 		    "wtperf: read unexpected amount from config file\n");
-		return (EINVAL);
+		ret = EINVAL;
+		goto err;
 	}
 	/* Make sure the buffer is terminated correctly. */
-	file_buf[buf_size] = '\n';
+	file_buf[buf_size] = '\0';
 
 	ret = 0;
 	optionpos = 0;
@@ -482,9 +490,12 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		fprintf(stderr, "wtperf: %s: %d: last line continues\n",
 		    filename, linenum);
 		ret = EINVAL;
+		goto err;
 	}
 
-	free(file_buf);
+err:
+	if (file_buf != NULL)
+		free(file_buf);
 	return (ret);
 }
 

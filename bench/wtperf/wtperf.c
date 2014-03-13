@@ -1270,6 +1270,10 @@ start_all_runs(CONFIG *cfg)
 	}
 	for (i = 0; i < cfg->database_count; i++) {
 		next_cfg = calloc(1, sizeof(CONFIG));
+		if (next_cfg == NULL) {
+			ret = ENOMEM;
+			goto err;
+		}
 		if ((ret = config_assign(next_cfg, cfg)) != 0)
 			goto err;
 
