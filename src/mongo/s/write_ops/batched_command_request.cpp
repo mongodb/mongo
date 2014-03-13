@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    const size_t BatchedCommandRequest::kMaxWriteBatchSize = 1000;
+
     BatchedCommandRequest::BatchedCommandRequest( BatchType batchType ) :
             _batchType( batchType ) {
         switch ( getBatchType() ) {

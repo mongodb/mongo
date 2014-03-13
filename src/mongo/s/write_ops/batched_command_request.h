@@ -48,7 +48,7 @@ namespace mongo {
     public:
 
         // Maximum number of write ops supported per batch
-        static const int kMaxWriteBatchSize = 1000;
+        static const size_t kMaxWriteBatchSize;
 
         enum BatchType {
             BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown

@@ -11,6 +11,9 @@ jsTest.log("Starting delete tests...");
 
 var request;
 var result;
+var batch;
+
+var maxWriteBatchSize = 1000;
 
 function resultOK( result ) {
     return result.ok &&
@@ -101,6 +104,39 @@ printjson( result = coll.runCommand(request) );
 assert(resultOK(result));
 assert.eq(2, result.n);
 assert.eq(0, coll.count());
+
+//
+// Large batch under the size threshold should delete successfully
+coll.remove({});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize; ++i) {
+    coll.insert({a:i});
+    batch.push({q:{a:i}, limit: 0});
+}
+printjson( request = {'delete' : coll.getName(),
+                      deletes: batch,
+                      writeConcern:{w:1},
+                      ordered: false} );
+printjson( result = coll.runCommand(request) );
+assert(resultOK(result));
+assert.eq(batch.length, result.n);
+assert.eq(0, coll.count());
+
+//
+// Large batch above the size threshold should fail to delete
+coll.remove({});
+batch = [];
+for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
+    coll.insert({a:i});
+    batch.push({q:{a:i}, limit: 0});
+}
+printjson( request = {'delete' : coll.getName(),
+                      deletes: batch,
+                      writeConcern:{w:1},
+                      ordered: false} );
+printjson( result = coll.runCommand(request) );
+assert(resultNOK(result));
+assert.eq(batch.length, coll.count());
 
 //
 // Cause remove error using ordered:true
