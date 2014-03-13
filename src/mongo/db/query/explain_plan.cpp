@@ -125,213 +125,226 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status explainPlan(const PlanStageStats& stats, TypeExplain** explainOut, bool fullDetails) {
-        //
-        // Temporary explain for index intersection
-        //
+    namespace {
 
-        if (isIntersectPlan(stats)) {
-            return explainIntersectPlan(stats, explainOut, fullDetails);
-        }
+        Status explainPlan(const PlanStageStats& stats, TypeExplain** explainOut,
+                           bool fullDetails, bool covered) {
+            //
+            // Temporary explain for index intersection
+            //
 
-        //
-        // Legacy explain implementation
-        //
-
-        // Descend the plan looking for structural properties:
-        // + Are there any OR clauses?  If so, explain each branch.
-        // + What type(s) are the leaf nodes and what are their properties?
-        // + Did we need a sort?
-
-        bool covered = true;
-        bool sortPresent = false;
-        size_t chunkSkips = 0;
-
-        const PlanStageStats* orStage = NULL;
-        const PlanStageStats* root = &stats;
-        const PlanStageStats* leaf = root;
-
-        while (leaf->children.size() > 0) {
-            // We shouldn't be here if there are any ANDs
-            if (leaf->children.size() > 1) {
-                verify(isOrStage(leaf->stageType));
+            if (isIntersectPlan(stats)) {
+                return explainIntersectPlan(stats, explainOut, fullDetails);
             }
 
-            if (isOrStage(leaf->stageType)) {
-                orStage = leaf;
-                break;
-            }
+            //
+            // Legacy explain implementation
+            //
 
-            if (leaf->stageType == STAGE_FETCH) {
-                covered = false;
-            }
+            // Descend the plan looking for structural properties:
+            // + Are there any OR clauses?  If so, explain each branch.
+            // + What type(s) are the leaf nodes and what are their properties?
+            // + Did we need a sort?
 
-            if (leaf->stageType == STAGE_SORT) {
-                sortPresent = true;
-            }
+            bool sortPresent = false;
+            size_t chunkSkips = 0;
 
-            if (STAGE_SHARDING_FILTER == leaf->stageType) {
-                const ShardingFilterStats* sfs
-                    = static_cast<const ShardingFilterStats*>(leaf->specific.get());
-                chunkSkips = sfs->chunkSkips;
-            }
+            const PlanStageStats* orStage = NULL;
+            const PlanStageStats* root = &stats;
+            const PlanStageStats* leaf = root;
 
-            leaf = leaf->children[0];
-        }
-
-        auto_ptr<TypeExplain> res(new TypeExplain);
-
-        // Accounting for 'nscanned' and 'nscannedObjects' is specific to the kind of leaf:
-        //
-        // + on collection scan, both are the same; all the documents retrieved were
-        //   fetched in practice. To get how many documents were retrieved, one simply
-        //   looks at the number of 'advanced' in the stats.
-        //
-        // + on an index scan, we'd neeed to look into the index scan cursor to extract the
-        //   number of keys that cursor retrieved, and into the stage's stats 'advanced' for
-        //   nscannedObjects', which would be the number of keys that survived the IXSCAN
-        //   filter. Those keys would have been FETCH-ed, if a fetch is present.
-
-        if (orStage != NULL) {
-            size_t nScanned = 0;
-            size_t nScannedObjects = 0;
-            const std::vector<PlanStageStats*>& children = orStage->children;
-            for (std::vector<PlanStageStats*>::const_iterator it = children.begin();
-                 it != children.end();
-                 ++it) {
-                TypeExplain* childExplain = NULL;
-                explainPlan(**it, &childExplain, false /* no full details */);
-                if (childExplain) {
-                    // Override child's indexOnly value if we have a non-covered
-                    // query (implied by a FETCH stage).
-                    //
-                    // As we run explain on each child, explainPlan() sets indexOnly
-                    // based only on the information in each child. This does not
-                    // consider the possibility of a FETCH stage above the OR/MERGE_SORT
-                    // stage, in which case the child's indexOnly may be erroneously set
-                    // to true.
-                    if (!covered && childExplain->isIndexOnlySet()) {
-                        childExplain->setIndexOnly(false);
-                    }
-
-                    // 'res' takes ownership of 'childExplain'.
-                    res->addToClauses(childExplain);
-                    nScanned += childExplain->getNScanned();
-                    nScannedObjects += childExplain->getNScannedObjects();
+            while (leaf->children.size() > 0) {
+                // We shouldn't be here if there are any ANDs
+                if (leaf->children.size() > 1) {
+                    verify(isOrStage(leaf->stageType));
                 }
+
+                if (isOrStage(leaf->stageType)) {
+                    orStage = leaf;
+                    break;
+                }
+
+                if (leaf->stageType == STAGE_FETCH) {
+                    covered = false;
+                }
+
+                if (leaf->stageType == STAGE_SORT) {
+                    sortPresent = true;
+                }
+
+                if (STAGE_SHARDING_FILTER == leaf->stageType) {
+                    const ShardingFilterStats* sfs
+                        = static_cast<const ShardingFilterStats*>(leaf->specific.get());
+                    chunkSkips = sfs->chunkSkips;
+                }
+
+                leaf = leaf->children[0];
             }
-            // We set the cursor name for backwards compatibility with 2.4.
-            res->setCursor("QueryOptimizerCursor");
-            res->setNScanned(nScanned);
-            res->setNScannedObjects(nScannedObjects);
-        }
-        else if (leaf->stageType == STAGE_COLLSCAN) {
-            CollectionScanStats* csStats = static_cast<CollectionScanStats*>(leaf->specific.get());
-            res->setCursor("BasicCursor");
-            res->setNScanned(csStats->docsTested);
-            res->setNScannedObjects(csStats->docsTested);
-            res->setIndexOnly(false);
-            res->setIsMultiKey(false);
-        }
-        else if (leaf->stageType == STAGE_GEO_2D) {
-            // Cursor name depends on type of GeoBrowse.
-            // TODO: We could omit the shape from the cursor name.
-            TwoDStats* nStats = static_cast<TwoDStats*>(leaf->specific.get());
-            res->setCursor("GeoBrowse-" + nStats->type);
-            res->setNScanned(leaf->common.works);
-            res->setNScannedObjects(leaf->common.works);
 
-            // Generate index bounds from prefixes.
-            GeoHashConverter converter(nStats->converterParams);
-            BSONObjBuilder bob;
-            BSONArrayBuilder arrayBob(bob.subarrayStart(nStats->field));
-            for (size_t i = 0; i < nStats->expPrefixes.size(); ++i) {
-                const GeoHash& prefix = nStats->expPrefixes[i];
-                Box box = converter.unhashToBox(prefix);
-                arrayBob.append(box.toBSON());
+            auto_ptr<TypeExplain> res(new TypeExplain);
+
+            // Accounting for 'nscanned' and 'nscannedObjects' is specific to the kind of leaf:
+            //
+            // + on collection scan, both are the same; all the documents retrieved were
+            //   fetched in practice. To get how many documents were retrieved, one simply
+            //   looks at the number of 'advanced' in the stats.
+            //
+            // + on an index scan, we'd neeed to look into the index scan cursor to extract the
+            //   number of keys that cursor retrieved, and into the stage's stats 'advanced' for
+            //   nscannedObjects', which would be the number of keys that survived the IXSCAN
+            //   filter. Those keys would have been FETCH-ed, if a fetch is present.
+
+            if (orStage != NULL) {
+                size_t nScanned = 0;
+                size_t nScannedObjects = 0;
+                const std::vector<PlanStageStats*>& children = orStage->children;
+                for (std::vector<PlanStageStats*>::const_iterator it = children.begin();
+                     it != children.end();
+                     ++it) {
+                    TypeExplain* childExplain = NULL;
+                    explainPlan(**it, &childExplain, false /* no full details */, covered);
+                    if (childExplain) {
+                        // Override child's indexOnly value if we have a non-covered
+                        // query (implied by a FETCH stage).
+                        //
+                        // As we run explain on each child, explainPlan() sets indexOnly
+                        // based only on the information in each child. This does not
+                        // consider the possibility of a FETCH stage above the OR/MERGE_SORT
+                        // stage, in which case the child's indexOnly may be erroneously set
+                        // to true.
+                        if (!covered && childExplain->isIndexOnlySet()) {
+                            childExplain->setIndexOnly(false);
+                        }
+
+                        // 'res' takes ownership of 'childExplain'.
+                        res->addToClauses(childExplain);
+                        nScanned += childExplain->getNScanned();
+                        nScannedObjects += childExplain->getNScannedObjects();
+                    }
+                }
+                // We set the cursor name for backwards compatibility with 2.4.
+                res->setCursor("QueryOptimizerCursor");
+                res->setNScanned(nScanned);
+                res->setNScannedObjects(nScannedObjects);
             }
-            arrayBob.doneFast();
-            res->setIndexBounds(bob.obj());
+            else if (leaf->stageType == STAGE_COLLSCAN) {
+                CollectionScanStats* csStats = static_cast<CollectionScanStats*>(leaf->specific.get());
+                res->setCursor("BasicCursor");
+                res->setNScanned(csStats->docsTested);
+                res->setNScannedObjects(csStats->docsTested);
+                res->setIndexOnly(false);
+                res->setIsMultiKey(false);
+            }
+            else if (leaf->stageType == STAGE_GEO_2D) {
+                // Cursor name depends on type of GeoBrowse.
+                // TODO: We could omit the shape from the cursor name.
+                TwoDStats* nStats = static_cast<TwoDStats*>(leaf->specific.get());
+                res->setCursor("GeoBrowse-" + nStats->type);
+                res->setNScanned(leaf->common.works);
+                res->setNScannedObjects(leaf->common.works);
 
-            // TODO: Could be multikey.
-            res->setIsMultiKey(false);
-            res->setIndexOnly(false);
-        }
-        else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
-            // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
-            res->setCursor("S2NearCursor");
-            // The first work() is an init.  Every subsequent work examines a document.
-            res->setNScanned(leaf->common.works);
-            res->setNScannedObjects(leaf->common.works);
-            // TODO: only adding empty index bounds for backwards compatibility.
-            res->setIndexBounds(BSONObj());
-            // TODO: Could be multikey.
-            res->setIsMultiKey(false);
-            res->setIndexOnly(false);
-        }
-        else if (leaf->stageType == STAGE_GEO_NEAR_2D) {
-            TwoDNearStats* nStats = static_cast<TwoDNearStats*>(leaf->specific.get());
-            res->setCursor("GeoSearchCursor");
-            // The first work() is an init.  Every subsequent work examines a document.
-            res->setNScanned(nStats->nscanned);
-            res->setNScannedObjects(nStats->objectsLoaded);
-            // TODO: only adding empty index bounds for backwards compatibility.
-            res->setIndexBounds(BSONObj());
-            // TODO: Could be multikey.
-            res->setIsMultiKey(false);
-            res->setIndexOnly(false);
-        }
-        else if (leaf->stageType == STAGE_TEXT) {
-            TextStats* tStats = static_cast<TextStats*>(leaf->specific.get());
-            res->setCursor("TextCursor");
-            res->setNScanned(tStats->keysExamined);
-            res->setNScannedObjects(tStats->fetches);
-        }
-        else if (leaf->stageType == STAGE_IXSCAN) {
-            IndexScanStats* indexStats = static_cast<IndexScanStats*>(leaf->specific.get());
-            verify(indexStats);
-            string direction = indexStats->direction > 0 ? "" : " reverse";
-            res->setCursor(indexStats->indexType + " " + indexStats->indexName + direction);
-            res->setNScanned(indexStats->keysExamined);
+                // Generate index bounds from prefixes.
+                GeoHashConverter converter(nStats->converterParams);
+                BSONObjBuilder bob;
+                BSONArrayBuilder arrayBob(bob.subarrayStart(nStats->field));
+                for (size_t i = 0; i < nStats->expPrefixes.size(); ++i) {
+                    const GeoHash& prefix = nStats->expPrefixes[i];
+                    Box box = converter.unhashToBox(prefix);
+                    arrayBob.append(box.toBSON());
+                }
+                arrayBob.doneFast();
+                res->setIndexBounds(bob.obj());
 
-            // If we're covered, that is, no FETCH is present, then, by definition,
-            // nScannedObject would be zero because no full document would have been fetched
-            // from disk.
-            res->setNScannedObjects(covered ? 0 : leaf->common.advanced);
+                // TODO: Could be multikey.
+                res->setIsMultiKey(false);
+                res->setIndexOnly(false);
+            }
+            else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
+                // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
+                res->setCursor("S2NearCursor");
+                // The first work() is an init.  Every subsequent work examines a document.
+                res->setNScanned(leaf->common.works);
+                res->setNScannedObjects(leaf->common.works);
+                // TODO: only adding empty index bounds for backwards compatibility.
+                res->setIndexBounds(BSONObj());
+                // TODO: Could be multikey.
+                res->setIsMultiKey(false);
+                res->setIndexOnly(false);
+            }
+            else if (leaf->stageType == STAGE_GEO_NEAR_2D) {
+                TwoDNearStats* nStats = static_cast<TwoDNearStats*>(leaf->specific.get());
+                res->setCursor("GeoSearchCursor");
+                // The first work() is an init.  Every subsequent work examines a document.
+                res->setNScanned(nStats->nscanned);
+                res->setNScannedObjects(nStats->objectsLoaded);
+                // TODO: only adding empty index bounds for backwards compatibility.
+                res->setIndexBounds(BSONObj());
+                // TODO: Could be multikey.
+                res->setIsMultiKey(false);
+                res->setIndexOnly(false);
+            }
+            else if (leaf->stageType == STAGE_TEXT) {
+                TextStats* tStats = static_cast<TextStats*>(leaf->specific.get());
+                res->setCursor("TextCursor");
+                res->setNScanned(tStats->keysExamined);
+                res->setNScannedObjects(tStats->fetches);
+            }
+            else if (leaf->stageType == STAGE_IXSCAN) {
+                IndexScanStats* indexStats = static_cast<IndexScanStats*>(leaf->specific.get());
+                verify(indexStats);
+                string direction = indexStats->direction > 0 ? "" : " reverse";
+                res->setCursor(indexStats->indexType + " " + indexStats->indexName + direction);
+                res->setNScanned(indexStats->keysExamined);
 
-            res->setIndexBounds(indexStats->indexBounds);
-            res->setIsMultiKey(indexStats->isMultiKey);
-            res->setIndexOnly(covered);
-        }
-        else if (leaf->stageType == STAGE_DISTINCT) {
-            DistinctScanStats* dss = static_cast<DistinctScanStats*>(leaf->specific.get());
-            verify(dss);
-            res->setCursor("DistinctCursor");
-            res->setN(dss->keysExamined);
-            res->setNScanned(dss->keysExamined);
-            // Distinct hack stage is fully covered.
-            res->setNScannedObjects(0);
-        }
-        else {
-            return Status(ErrorCodes::InternalError, "cannot interpret execution plan");
+                // If we're covered, that is, no FETCH is present, then, by definition,
+                // nScannedObject would be zero because no full document would have been fetched
+                // from disk.
+                res->setNScannedObjects(covered ? 0 : leaf->common.advanced);
+
+                res->setIndexBounds(indexStats->indexBounds);
+                res->setIsMultiKey(indexStats->isMultiKey);
+                res->setIndexOnly(covered);
+            }
+            else if (leaf->stageType == STAGE_DISTINCT) {
+                DistinctScanStats* dss = static_cast<DistinctScanStats*>(leaf->specific.get());
+                verify(dss);
+                res->setCursor("DistinctCursor");
+                res->setN(dss->keysExamined);
+                res->setNScanned(dss->keysExamined);
+                // Distinct hack stage is fully covered.
+                res->setNScannedObjects(0);
+            }
+            else {
+                return Status(ErrorCodes::InternalError, "cannot interpret execution plan");
+            }
+
+            // How many documents did the query return?
+            res->setN(root->common.advanced);
+            res->setScanAndOrder(sortPresent);
+            res->setNChunkSkips(chunkSkips);
+
+            // Statistics for the plan (appear only in a detailed mode)
+            // TODO: if we can get this from the runner, we can kill "detailed mode"
+            if (fullDetails) {
+                res->setNYields(root->common.yields);
+                BSONObjBuilder bob;
+                statsToBSON(*root, &bob);
+                res->stats = bob.obj();
+            }
+
+            *explainOut = res.release();
+            return Status::OK();
         }
 
-        // How many documents did the query return?
-        res->setN(root->common.advanced);
-        res->setScanAndOrder(sortPresent);
-        res->setNChunkSkips(chunkSkips);
+    }  // namespace
 
-        // Statistics for the plan (appear only in a detailed mode)
-        // TODO: if we can get this from the runner, we can kill "detailed mode"
-        if (fullDetails) {
-            res->setNYields(root->common.yields);
-            BSONObjBuilder bob;
-            statsToBSON(*root, &bob);
-            res->stats = bob.obj();
-        }
-
-        *explainOut = res.release();
-        return Status::OK();
+    Status explainPlan(const PlanStageStats& stats, TypeExplain** explainOut, bool fullDetails) {
+        // This function merely calls a recursive helper of the same name.  The boolean "covered" is
+        // used to determine the value of nscannedObjects for subtrees along the way.  Recursive
+        // calls will pass false for "covered" if a fetch stage has been seen at that point in the
+        // traversal.
+        const bool covered = true;
+        return explainPlan(stats, explainOut, fullDetails, covered);
     }
 
     Status explainMultiPlan(const PlanStageStats& stats,
