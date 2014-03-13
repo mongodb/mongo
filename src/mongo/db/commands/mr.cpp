@@ -1034,7 +1034,6 @@ namespace mongo {
             _dupCount = 0;
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); ++i ) {
-                BSONObj key = i->first;
                 BSONList& all = i->second;
 
                 if ( all.size() == 1 ) {
@@ -1045,13 +1044,13 @@ namespace mongo {
                     }
                     else {
                         // add to new map
-                        _add( n.get() , all[0] , nSize );
+                        nSize += _add(n.get(), all[0]);
                     }
                 }
                 else if ( all.size() > 1 ) {
                     // several values, reduce and add to map
                     BSONObj res = _config.reducer->reduce( all );
-                    _add( n.get() , res , nSize );
+                    nSize += _add(n.get(), res);
                 }
             }
 
@@ -1087,21 +1086,25 @@ namespace mongo {
          */
         void State::emit( const BSONObj& a ) {
             _numEmits++;
-            _add( _temp.get() , a , _size );
+            _size += _add(_temp.get(), a);
         }
 
-        void State::_add( InMemory* im, const BSONObj& a , long& size ) {
+        int State::_add(InMemory* im, const BSONObj& a) {
             BSONList& all = (*im)[a];
             all.push_back( a );
-            size += a.objsize() + 16;
-            if (all.size() > 1)
+            if (all.size() > 1) {
                 ++_dupCount;
+            }
+
+            return a.objsize() + 16;
         }
 
-        /**
-         * this method checks the size of in memory map and potentially flushes to disk
-         */
-        void State::checkSize() {
+        void State::reduceAndSpillInMemoryStateIfNeeded() {
+            // Make sure no DB read locks are held, because we might try to acquire write lock and
+            // upgrade is not supported.
+            //
+            dassert(!cc().lockState().hasAnyReadLock());
+
             if (_jsMode) {
                 // try to reduce if it is beneficial
                 int dupCt = _scope->getNumberInt("_dupCt");
@@ -1233,9 +1236,6 @@ namespace mongo {
 
                 bool shouldHaveData = false;
 
-                long long num = 0;
-                long long inReduce = 0;
-
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
                 State state( config );
@@ -1276,12 +1276,16 @@ namespace mongo {
                     ProgressMeterHolder pm(progress);
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
+
                     long long mapTime = 0;
+                    long long reduceTime = 0;
+                    long long numInputs = 0;
                     {
                         // We've got a cursor preventing migrations off, now re-establish our useful cursor
 
                         // Need lock and context to use it
                         Lock::DBRead lock( config.ns );
+
                         // This context does no version check, safe b/c we checked earlier and have an
                         // open cursor
                         Client::Context ctx(config.ns, storageGlobalParams.dbpath, false);
@@ -1303,10 +1307,10 @@ namespace mongo {
                         runner->setYieldPolicy(Runner::YIELD_AUTO);
 
                         Timer mt;
+
                         // go through each doc
                         BSONObj o;
-                        Runner::RunnerState state;
-                        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&o, NULL))) {
+                        while (Runner::RUNNER_ADVANCED == runner->getNext(&o, NULL)) {
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
                             if ( collMetadata ) {
@@ -1321,21 +1325,42 @@ namespace mongo {
                             config.mapper->map( o );
                             if ( config.verbose ) mapTime += mt.micros();
 
-                            num++;
-                            if ( num % 100 == 0 ) {
+                            // Check if the state accumulated so far needs to be written to a
+                            // collection. This may yield the DB lock temporarily and then 
+                            // acquire it again.
+                            //
+                            numInputs++;
+                            if (numInputs % 100 == 0) {
+                                Timer t;
+
+                                // TODO: As an optimization, we might want to do the save/restore 
+                                // state and yield inside the reduceAndSpillInMemoryState method,
+                                // so it only happens if necessary.
+                                //
+                                runner->saveState();
+                                {
+                                    dbtemprelease unlock;
+                                    state.reduceAndSpillInMemoryStateIfNeeded();
+                                }
+                                runner->restoreState();
+
+                                reduceTime += t.micros();
+
                                 killCurrentOp.checkForInterrupt();
                             }
+
                             pm.hit();
 
-                            if ( config.limit && num >= config.limit )
+                            if (config.limit && numInputs >= config.limit)
                                 break;
                         }
                     }
                     pm.finished();
 
                     killCurrentOp.checkForInterrupt();
+
                     // update counters
-                    countsBuilder.appendNumber( "input" , num );
+                    countsBuilder.appendNumber("input", numInputs);
                     countsBuilder.appendNumber( "emit" , state.numEmits() );
                     if ( state.numEmits() )
                         shouldHaveData = true;
@@ -1353,9 +1378,9 @@ namespace mongo {
                     state.dumpToInc();
                     // final reduce
                     state.finalReduce( op , pm );
-                    inReduce += rt.micros();
+                    reduceTime += rt.micros();
                     countsBuilder.appendNumber( "reduce" , state.numReduces() );
-                    timingBuilder.appendNumber( "reduceTime" , inReduce / 1000 );
+                    timingBuilder.appendNumber("reduceTime", reduceTime / 1000);
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
 
                     long long finalCount = state.postProcessCollection(op, pm);
