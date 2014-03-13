@@ -122,6 +122,29 @@ namespace mongo {
     }
 #endif
 
+    void NamespaceDetails::onLoad(const Namespace& k) {
+
+        if( k.isExtra() ) {
+            /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
+            return;
+        }
+
+        if( indexBuildsInProgress ) {
+            verify( Lock::isW() ); // TODO(erh) should this be per db?
+            if( indexBuildsInProgress ) {
+                log() << "indexBuildsInProgress was " << indexBuildsInProgress << " for " << k
+                      << ", indicating an abnormal db shutdown" << endl;
+                getDur().writingInt( indexBuildsInProgress ) = 0;
+            }
+        }
+    }
+
+    static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) {
+        v.onLoad(k);
+    }
+
+    bool checkNsFilesOnLoad = true;
+
     NOINLINE_DECL void NamespaceIndex::_init() {
         verify( !ht );
 
@@ -174,6 +197,9 @@ namespace mongo {
 
         verify( len <= 0x7fffffff );
         ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
+        if( checkNsFilesOnLoad )
+            ht->iterAll(namespaceOnLoadCallback);
+
     }
 
     static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {

@@ -77,6 +77,7 @@ namespace mongo {
     extern int diagLogging;
     extern unsigned lenForNewNsFiles;
     extern int lockFile;
+    extern bool checkNsFilesOnLoad;
     extern string repairpath;
 
     static void setupSignalHandlers();
@@ -321,6 +322,8 @@ namespace mongo {
         Client::GodScope gs;
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
+        checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
+
         Lock::GlobalWrite lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
@@ -404,6 +407,8 @@ namespace mongo {
             cc().shutdown();
             dbexit( EXIT_CLEAN );
         }
+
+        checkNsFilesOnLoad = true;
     }
 
     void clearTmpFiles() {

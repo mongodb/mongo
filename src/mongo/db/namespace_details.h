@@ -405,6 +405,7 @@ namespace mongo {
         /** Make all linked Extra objects writeable as well */
         NamespaceDetails *writingWithExtra();
 
+        void onLoad( const Namespace& k );
     private:
         DiskLoc _alloc(const char *ns, int len);
         void maybeComplain( const char *ns, int len ) const;
