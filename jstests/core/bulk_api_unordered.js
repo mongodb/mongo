@@ -83,7 +83,8 @@ var executeTests = function() {
     bulkOp.insert({b:1, a:1});
     bulkOp.find({b:2}).upsert().updateOne({$set: {a:1}});
     bulkOp.insert({b:3, a:2});
-    var result = bulkOp.execute();
+    var result = assert.throws( function() { bulkOp.execute(); } );
+
     // Basic properties check
     assert.eq(2, result.nInserted);
     assert.eq(true, result.hasWriteErrors());
@@ -116,7 +117,8 @@ var executeTests = function() {
     bulkOp.find({b:2}).upsert().updateOne({$set: {a:1}});
     bulkOp.insert({b:4, a:3});
     bulkOp.insert({b:5, a:1});
-    var result = bulkOp.execute();
+    var result = assert.throws( function() { bulkOp.execute(); } );
+
     // Basic properties check
     assert.eq(2, result.nInserted);
     assert.eq(1, result.nUpserted);

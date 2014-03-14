@@ -18,7 +18,7 @@ for( i = 0; i < doccount; ++i ) {
 }
 assert.writeOK(bulk.execute());
 
-assert.writeOK(mdc.ensureIndex( { x : 1 }, { unique: true } ));
+assert.commandWorked(mdc.ensureIndex( { x : 1 }, { unique: true } ));
 
 // add a secondary
 var slave = rt.add();

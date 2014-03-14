@@ -10,7 +10,7 @@ var coll = db.bulk_legacy_enforce_gle;
 coll.drop();
 var bulk = coll.initializeUnorderedBulkOp();
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
-assert.writeOK(bulk.execute());
+assert( bulk.execute() instanceof BulkWriteResult );
 
 var gle = db.runCommand({ getLastError: 1 });
 assert(gle.ok, tojson(gle));
@@ -21,7 +21,7 @@ coll.drop();
 coll.insert({ _id: 1 });
 bulk = coll.initializeUnorderedBulkOp();
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
-assert.writeError(bulk.execute());
+assert.throws( function() { bulk.execute(); } );
 
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.ok, tojson(gle));
@@ -34,7 +34,7 @@ bulk = coll.initializeUnorderedBulkOp();
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 0 });
-var res = assert.writeError(bulk.execute());
+var res = assert.throws( function() { bulk.execute(); } );
 assert.eq(2, res.getWriteErrors().length);
 
 gle = db.runCommand({ getLastError: 1 });
@@ -48,7 +48,7 @@ bulk = coll.initializeUnorderedBulkOp();
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 0 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 2 });
-res = assert.writeError(bulk.execute());
+var res = assert.throws( function() { bulk.execute(); } );
 assert.eq(1, res.getWriteErrors().length);
 
 gle = db.runCommand({ getLastError: 1 });
@@ -63,7 +63,7 @@ bulk = coll.initializeUnorderedBulkOp();
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 0 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 2 });
-res = assert.writeError(bulk.execute());
+res = assert.throws( function() { bulk.execute(); } );
 assert.eq(1, res.getWriteErrors().length);
 
 gle = db.runCommand({ getLastError: 1 });
@@ -77,7 +77,7 @@ bulk = coll.initializeUnorderedBulkOp();
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 0 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 2 });
-res = assert.writeError(bulk.execute());
+res = assert.throws( function() { bulk.execute(); } );
 assert.eq(1, res.getWriteErrors().length);
 
 gle = db.runCommand({ getLastError: 1, w: 1 });
@@ -91,7 +91,7 @@ bulk = coll.initializeUnorderedBulkOp();
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 0 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 1 });
 bulk.find({ none: 1 }).upsert().updateOne({ _id: 2 });
-res = assert.writeError(bulk.execute());
+res = assert.throws( function() { bulk.execute(); } );
 assert.eq(1, res.getWriteErrors().length);
 
 gle = db.runCommand({ getLastError: 1, w: 0 });

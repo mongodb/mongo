@@ -36,10 +36,10 @@ dotest( true );
 t.drop();
 
 res = t.update( {_id: 1} , { $setOnInsert: { "_id.a": new Date() } } , true );
-assert(res.hasWriteErrors(), "$setOnInsert _id.a - " + res.toString() + tojson(t.findOne()));
+assert(res.hasWriteError(), "$setOnInsert _id.a - " + res.toString() + tojson(t.findOne()));
 
 res = t.update( {"_id.a": 4} , { $setOnInsert: { "_id.b": 1 } } , true );
-assert(res.hasWriteErrors(), "$setOnInsert _id.b - " + res.toString() + tojson(t.findOne()));
+assert(res.hasWriteError(), "$setOnInsert _id.b - " + res.toString() + tojson(t.findOne()));
 
 res = t.update( {"_id.a": 4} , { $setOnInsert: { "_id": {a:4, b:1} } } , true );
-assert(res.hasWriteErrors(), "$setOnInsert _id 3 - " + res.toString() + tojson(t.findOne()));
+assert(res.hasWriteError(), "$setOnInsert _id 3 - " + res.toString() + tojson(t.findOne()));

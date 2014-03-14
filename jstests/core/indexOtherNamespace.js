@@ -7,18 +7,8 @@ otherDB.foo.insert({a:1})
 assert.eq(1, otherDB.system.indexes.count());
 assert.eq("BasicCursor", otherDB.foo.find({a:1}).explain().cursor);
 
-if (db.getMongo().writeMode() == 'commands') {
-    assert.throws(function() {
-        otherDB.randomNS.system.indexes.insert({ ns: "indexOtherNS.foo",
-                                                 key: { a: 1}, name: "a_1" });
-    });
-}
-else {
-    assert.writeError(otherDB.randomNS.system.indexes.insert({ ns: "indexOtherNS.foo",
-                                                               key: { a: 1 }, name: "a_1"}));
-}
-
-
+assert.writeError(otherDB.randomNS.system.indexes.insert({ ns: "indexOtherNS.foo",
+                                                           key: { a: 1 }, name: "a_1"}));
 
 // Assert that index didn't actually get built
 assert.eq(1, otherDB.system.indexes.count());

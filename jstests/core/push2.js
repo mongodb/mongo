@@ -11,7 +11,7 @@ gotError = null;
 for ( x=0; x<100; x++ ){
     print (x + " pushes");
     var res = t.update( {} , { $push : { a : s } } );
-    gotError = res.hasWriteErrors();
+    gotError = res.hasWriteError();
     if ( gotError )
         break;
 }

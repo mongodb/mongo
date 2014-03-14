@@ -21,7 +21,7 @@ function canMakeCollectionWithName(name) {
     var success = false;
     try {
         // may either throw or return an error
-        success = !(myDb[name].insert({}).hasWriteErrors());
+        success = !(myDb[name].insert({}).hasWriteError());
     } catch (e) {
         success = false;
     }

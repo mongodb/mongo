@@ -21,7 +21,7 @@ function test( n , idx ){
     if ( idx )
         t.ensureIndex( idx );
     var res = del();
-    assert( !res.hasWriteErrors() , "error deleting: " + res.toString() );
+    assert( !res.hasWriteError() , "error deleting: " + res.toString() );
     assert.eq( 0 , t.count() , n + " B " + idx );
 }
 

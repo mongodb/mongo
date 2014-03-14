@@ -44,7 +44,7 @@ db.no_id.drop();
 db.createCollection("no_id", {autoIndexId:false})
 l = db.no_id.update({foo:1}, {$set:{a:1}}, true)
 assert( l.getUpsertedId() , "H1 - " + tojson(l) );
-assert( !l.hasWriteErrors(), "H1.5 No error expected - " + tojson(l) )
+assert( !l.hasWriteError(), "H1.5 No error expected - " + tojson(l) )
 assert.eq( 0, db.no_id.getIndexes().length, "H2" );
 assert.eq( 1, db.no_id.count(), "H3" );
 var newDoc =  db.no_id.findOne();

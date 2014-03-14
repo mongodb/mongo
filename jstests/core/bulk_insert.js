@@ -3,7 +3,9 @@
 var coll = db.bulkInsertTest
 coll.drop()
 
-Random.srand( new Date().getTime() )
+var seed = new Date().getTime();
+Random.srand( seed );
+print("Seed for randomized test is " + seed);
 
 var bulkSize = Math.floor( Random.rand() * 200 ) + 1
 var numInserts = Math.floor( Random.rand() * 300 ) + 1
