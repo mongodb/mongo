@@ -2017,6 +2017,15 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		return (EBUSY);
 	}
 
+	/*
+	 * We only arrive here with no entries to write if the page was entirely
+	 * empty (if the page wasn't empty, the only reason to split, resetting
+	 * entries to 0, is because there's another entry to write, which then
+	 * sets entries to 1).  If the page was empty, we eventually delete it.
+	 */
+	if (r->entries == 0)
+		return (0);
+
 	/* Set the boundary reference and increment the count. */
 	bnd = &r->bnd[r->bnd_next++];
 	bnd->entries = r->entries;
@@ -2054,15 +2063,7 @@ __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	/*
 	 * We're done reconciling a page.
-	 *
-	 * We only arrive here with no entries to write if the page was entirely
-	 * empty (if the page wasn't empty, the only reason to split, resetting
-	 * entries to 0, is because there's another entry to write, which then
-	 * sets entries to 1).  If the page was empty, we eventually delete it.
 	 */
-	if (r->entries == 0)
-		return (0);
-
 	return (r->raw_compression ?
 	    __rec_split_finish_raw(session, r) :
 	    __rec_split_finish_std(session, r));
