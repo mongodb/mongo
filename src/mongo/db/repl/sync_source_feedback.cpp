@@ -208,7 +208,6 @@ namespace mongo {
 
     void SyncSourceFeedback::updateMap(const mongo::OID& rid, const OpTime& ot) {
         boost::unique_lock<boost::mutex> lock(_mtx);
-        LOG(1) << "replSet last: " << _slaveMap[rid].toString() << " to " << ot.toString() << endl;
         // only update if ot is newer than what we have already
         if (ot > _slaveMap[rid]) {
             _slaveMap[rid] = ot;
