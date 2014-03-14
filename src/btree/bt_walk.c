@@ -324,19 +324,12 @@ restart:		/*
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*
-				 * Only look at unlocked pages in memory, and
-				 * fast path some common cases.
+				 * Only look at unlocked pages in memory:
+				 * fast-path some common cases.
 				 */
 				if (LF_ISSET(WT_READ_NO_WAIT) &&
 				    ref->state != WT_REF_MEM)
 					break;
-				PAGE_SWAP(
-				    session, couple, page, ref, flags, ret);
-				if (ret == WT_NOTFOUND) {
-					ret = 0;
-					break;
-				}
-				WT_RET(ret);
 			} else if (LF_ISSET(WT_READ_TRUNCATE)) {
 				/*
 				 * If deleting a range, try to delete the page
@@ -346,9 +339,6 @@ restart:		/*
 				    session, page, ref, &skip));
 				if (skip)
 					break;
-				PAGE_SWAP(
-				    session, couple, page, ref, flags, ret);
-				WT_RET(ret);
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
@@ -372,9 +362,6 @@ restart:		/*
 					if (skip)
 						break;
 				}
-				PAGE_SWAP(
-				    session, couple, page, ref, flags, ret);
-				WT_RET(ret);
 			} else {
 				/*
 				 * If iterating a cursor, skip deleted pages
@@ -383,10 +370,14 @@ restart:		/*
 				WT_RET(__tree_walk_read(session, ref, &skip));
 				if (skip)
 					break;
-				PAGE_SWAP(
-				    session, couple, page, ref, flags, ret);
-				WT_RET(ret);
 			}
+
+			PAGE_SWAP(session, couple, page, ref, flags, ret);
+			if (ret == WT_NOTFOUND) {
+				ret = 0;
+				break;
+			}
+			WT_RET(ret);
 
 			/*
 			 * Entering a new page: configure for traversal of any

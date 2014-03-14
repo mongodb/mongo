@@ -1,5 +1,18 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_212 Upgrading to Version 2.1.2
+<dl>
+
+<dt>::wiredtiger_open shared_cache configuration changes</dt>
+<dd>
+In the 2.1.2 release of WiredTiger the ::wiredtiger_open \c shared_cache
+configuration option group have changed. The option that was named \c enable is
+no longer available. To enable a \c shared_cache it is compulsory to name
+the pool being shared.
+We are now also enforcing that only one of \c cache_size and \c shared_cache
+are specified in the ::wiredtiger_open configuration string.
+</dd>
+
 @section version_211 Upgrading to Version 2.1.1
 <dl>
 
