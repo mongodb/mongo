@@ -102,7 +102,17 @@ namespace mongo {
         else if ( !err.empty() ) {
             // Write error
             errors->writeError.reset( new WriteErrorDetail );
-            errors->writeError->setErrCode( code == 0 ? ErrorCodes::UnknownError : code );
+            int writeErrorCode = code == 0 ? ErrorCodes::UnknownError : code;
+
+            // COMPATIBILITY
+            // Certain clients expect write commands to always report 11000 for duplicate key
+            // errors, while legacy GLE can return additional codes.
+            if ( writeErrorCode == 11001 /* dup key in update */
+                 || writeErrorCode == 12582 /* dup key capped */) {
+                writeErrorCode = ErrorCodes::DuplicateKey;
+            }
+
+            errors->writeError->setErrCode( writeErrorCode );
             errors->writeError->setErrMessage( err );
         }
         else if ( !jNote.empty() ) {
