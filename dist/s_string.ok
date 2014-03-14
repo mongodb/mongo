@@ -387,6 +387,7 @@ curconfig
 curdump
 curfile
 curindex
+curmetadata
 cursorp
 curstat
 curtable

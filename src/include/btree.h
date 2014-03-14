@@ -144,3 +144,34 @@ struct __wt_salvage_cookie {
 
 	int	 done;				/* Ignore the rest */
 };
+
+/*
+ * WT_BTREE_CURSOR_SAVE_AND_RESTORE
+ *	Save the cursor's key/value data/size fields, call an underlying btree
+ * function, and then consistently handle failure and success.
+ */
+#define	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, f, ret) do {		\
+	const void *__key_data = (cursor)->key.data;			\
+	const void *__value_data = (cursor)->value.data;		\
+	uint64_t __recno = (cursor)->recno;				\
+	size_t __key_size = (cursor)->key.size;				\
+	size_t __value_size = (cursor)->value.size;			\
+	if (((ret) = (f)) == 0) {					\
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);	\
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
+	} else if ((ret) == WT_NOTFOUND)				\
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
+	else {								\
+		if (F_ISSET(cursor, WT_CURSTD_KEY_EXT)) {		\
+			(cursor)->recno = __recno;			\
+			(cursor)->key.data = __key_data;		\
+			(cursor)->key.size = __key_size;		\
+		}							\
+		if (F_ISSET(cursor, WT_CURSTD_VALUE_EXT)) {		\
+			(cursor)->value.data = __value_data;		\
+			(cursor)->value.size = __value_size;		\
+		}							\
+		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
+	}								\
+} while (0)
+

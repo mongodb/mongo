@@ -8,36 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * WT_BTREE_CURSOR_SAVE_AND_RESTORE
- *	Save the cursor's key/value data/size fields, call an underlying btree
- * function, and then consistently handle failure and success.
- */
-#define	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, f, ret) do {		\
-	const void *__key_data = (cursor)->key.data;			\
-	const void *__value_data = (cursor)->value.data;		\
-	uint64_t __recno = (cursor)->recno;				\
-	size_t __key_size = (cursor)->key.size;				\
-	size_t __value_size = (cursor)->value.size;			\
-	if (((ret) = (f)) == 0) {					\
-		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);	\
-		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
-	} else if ((ret) == WT_NOTFOUND)				\
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
-	else {								\
-		if (F_ISSET(cursor, WT_CURSTD_KEY_EXT)) {		\
-			(cursor)->recno = __recno;			\
-			(cursor)->key.data = __key_data;		\
-			(cursor)->key.size = __key_size;		\
-		}							\
-		if (F_ISSET(cursor, WT_CURSTD_VALUE_EXT)) {		\
-			(cursor)->value.data = __value_data;		\
-			(cursor)->value.size = __value_size;		\
-		}							\
-		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
-	}								\
-} while (0)
-
-/*
  * __curfile_compare --
  *	WT_CURSOR->compare method for the btree cursor type.
  */
@@ -432,16 +402,6 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	if (bulk)
 		LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
-	/* 
-	 * The metadata cursor is a read-only handle on the metadata file; we
-	 * don't make the metadata URI itself read-only, that would prevent
-	 * WiredTiger itself from opening the metadata file for writing.
-	 */
-	if (WT_STRING_MATCH(uri, "metadata:", strlen("metadata:"))) {
-		meta = 1;
-		uri = WT_METADATA_URI;
-	}
-
 	/* Get the handle and lock it while the cursor is using it. */
 	if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, flags));
@@ -450,12 +410,6 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 
 	WT_ERR(__wt_curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
 
-	/* Metadata cursors are read-only. */
-	if (meta) {
-		(*cursorp)->insert = __wt_cursor_notsup;
-		(*cursorp)->update = __wt_cursor_notsup;
-		(*cursorp)->remove = __wt_cursor_notsup;
-	}
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */
