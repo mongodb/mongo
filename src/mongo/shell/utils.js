@@ -886,7 +886,7 @@ shellHelper.show = function (what) {
             });
         });
 
-        dbinfo.sort(function (a,b) { a.name - b.name });
+        dbinfo.sort(compareOn('name'))
         dbinfo.forEach(function (db) {
             var namePadding = maxNameLength - db.name_size;
             var sizePadding = maxGbDigits   - db.gb_digits;
