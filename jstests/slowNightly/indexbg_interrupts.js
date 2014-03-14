@@ -1,3 +1,5 @@
+// TODO: SERVER-13215 move test back to replSets suite.
+
 /**
  * TODO: SERVER-13204
  * This  tests inserts a huge number of documents, initiates a background index build
@@ -53,7 +55,7 @@ var dropAction = [
     {dropIndexes: collection, index: "i_1"},
     {drop: collection},
     {dropDatabase: 1 },
-    {convertToCapped: collection, size: 20}
+    {convertToCapped: collection, size: 20000}
 ];
 
 
@@ -64,11 +66,9 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     // set up collections
     masterDB.dropDatabase();
     jsTest.log("creating test data " + size + " documents");
-    var bulk = masterDB.getCollection(collection).initializeUnorderedBulkOp();
     for(var i = 0; i < size; ++i ) {
-        bulk.insert({ i: i });
+        masterDB.getCollection(collection).save( {i:i} );
     }
-    assert.writeOK(bulk.execute());
 
     jsTest.log("Starting background indexing for test of: " + JSON.stringify(dc));
     masterDB.getCollection(collection).ensureIndex( {i:1}, {background:true} );
