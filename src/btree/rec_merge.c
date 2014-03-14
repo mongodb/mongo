@@ -143,10 +143,10 @@ __merge_unlock(WT_PAGE *page)
  *	__wt_cache_page_inmem_incr.
  */
 static void
-__merge_transfer_footprint(WT_SESSION_IMPL *session,
-    WT_PAGE *newpage, WT_PAGE *oldpage, size_t size)
+__merge_transfer_footprint(WT_PAGE *newpage, WT_PAGE *oldpage, size_t size)
 {
-	WT_ASSERT(session, size < oldpage->memory_footprint);
+	if (oldpage->memory_footprint < size)
+		size = oldpage->memory_footprint;
 	oldpage->memory_footprint -= size;
 	newpage->memory_footprint += size;
 }
@@ -171,13 +171,13 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 	newref = state->ref++;
 
 	if (ref->addr != NULL)
-		__merge_transfer_footprint(state->session, state->page,
-		    parent, sizeof(WT_ADDR) + ((WT_ADDR *)ref->addr)->size);
+		__merge_transfer_footprint(state->page, parent,
+		    sizeof(WT_ADDR) + ((WT_ADDR *)ref->addr)->size);
 
 	if (parent->type == WT_PAGE_ROW_INT &&
 	    (ikey = __wt_ref_key_instantiated(ref)) != NULL)
-		__merge_transfer_footprint(state->session,
-		    state->page, parent, sizeof(WT_IKEY) + ikey->size);
+		__merge_transfer_footprint(state->page, parent,
+		    sizeof(WT_IKEY) + ikey->size);
 
 	if (ref->state == WT_REF_LOCKED) {
 		child = ref->page;
