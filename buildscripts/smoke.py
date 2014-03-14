@@ -754,7 +754,10 @@ at the end of testing:""" % (src, dst)
 at the end of testing:"""
         for coll in screwy_in_slave.keys():
             stats = screwy_in_slave[coll]
-            print "collection: %s\t (master/slave) hashes: %s/%s counts: %i/%i" % (coll, stats['hashes']['master'], stats['hashes']['slave'], stats['counts']['master'], stats['counts']['slave'])
+            # Counts are "approx" because they are collected after the dbhash runs and may not
+            # reflect the states of the collections that were hashed. If the hashes differ, one
+            # possibility is that a test exited with writes still in-flight.
+            print "collection: %s\t (master/slave) hashes: %s/%s counts (approx): %i/%i" % (coll, stats['hashes']['master'], stats['hashes']['slave'], stats['counts']['master'], stats['counts']['slave'])
             if "docs" in stats:
                 if (("master" in stats["docs"] and len(stats["docs"]["master"]) != 0) or
                     ("slave" in stats["docs"] and len(stats["docs"]["slave"]) != 0)):
