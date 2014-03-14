@@ -5,6 +5,10 @@
 
 function runTest(conn) {
     var authzErrorCode = 13;
+    var hasAuthzError = function(result) {
+        assert(result.hasWriteError());
+        assert.eq(authzErrorCode, result.getWriteError().code);
+    };
 
     conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
     conn.getDB('admin').auth('admin', 'pwd');
@@ -37,15 +41,13 @@ function runTest(conn) {
 
 
     // test CRUD
-    testDB.foo.insert({a:1});
-    assert.gleErrorCode(testDB, authzErrorCode);
+    hasAuthzError(testDB.foo.insert({ a: 1 }));
     assert.throws(function() { testDB.foo.findOne()});
 
     testUserAdmin.grantPrivilegesToRole('testRole1', [{resource: {db: 'test', collection: ''},
                                                        actions:['find']}]);
 
-    testDB.foo.insert({a:1});
-    assert.gleErrorCode(testDB, authzErrorCode);
+    hasAuthzError(testDB.foo.insert({ a: 1 }));
     assert.doesNotThrow(function() { testDB.foo.findOne()});
     assert.eq(0, testDB.foo.count());
     assert.eq(0, testDB.foo.find().itcount());
@@ -53,50 +55,40 @@ function runTest(conn) {
     testUserAdmin.grantPrivilegesToRole('testRole1', [{resource: {db: 'test', collection: 'foo'},
                                                        actions:['insert']}]);
 
-    testDB.foo.insert({a:1});
-    assert.gleSuccess(testDB);
+    assert.writeOK(testDB.foo.insert({ a: 1 }));
     assert.eq(1, testDB.foo.findOne().a)
     assert.eq(1, testDB.foo.count());
     assert.eq(1, testDB.foo.find().itcount());
-    testDB.foo.update({a:1}, {$inc: {a:1}});
-    assert.gleErrorCode(testDB, authzErrorCode);
+    hasAuthzError(testDB.foo.update({ a: 1 }, { $inc: { a: 1 }}));
     assert.eq(1, testDB.foo.findOne().a)
 
-    testDB.bar.insert({a:1});
-    assert.gleErrorCode(testDB, authzErrorCode);
+    hasAuthzError(testDB.bar.insert({ a: 1 }));
     assert.eq(0, testDB.bar.count());
 
     adminUserAdmin.grantPrivilegesToRole('adminRole', [{resource: {db: '', collection: 'foo'},
                                                         actions:['update']}]);
-    testDB.foo.update({a:1}, {$inc: {a:1}});
-    assert.gleSuccess(testDB);
+    assert.writeOK(testDB.foo.update({ a: 1 }, { $inc: { a: 1 }}));
     assert.eq(2, testDB.foo.findOne().a)
-    testDB.foo.update({b:1}, {$inc: {b:1}}, true); // upsert
-    assert.gleSuccess(testDB);
+    assert.writeOK(testDB.foo.update({ b: 1 }, { $inc: { b: 1 }}, true)); // upsert
     assert.eq(2, testDB.foo.count());
     assert.eq(2, testDB.foo.findOne({b: {$exists: true}}).b);
-    testDB.foo.remove({b:2});
-    assert.gleErrorCode(testDB, authzErrorCode);
+    hasAuthzError(testDB.foo.remove({ b: 2 }));
     assert.eq(2, testDB.foo.count());
 
     adminUserAdmin.grantPrivilegesToRole('adminRole', [{resource: {db: '', collection: ''},
                                                         actions:['remove']}]);
-    testDB.foo.remove({b:2});
-    assert.gleSuccess(testDB);
+    assert.writeOK(testDB.foo.remove({ b: 2 }));
     assert.eq(1, testDB.foo.count());
 
 
     // Test revoking privileges
     testUserAdmin.revokePrivilegesFromRole('testRole1', [{resource: {db: 'test', collection: 'foo'},
                                                           actions:['insert']}]);
-    testDB.foo.insert({a:1});
-    assert.gleErrorCode(testDB, authzErrorCode);
+    hasAuthzError(testDB.foo.insert({ a: 1 }));
     assert.eq(1, testDB.foo.count());
-    testDB.foo.update({a:2}, {$inc: {a:1}});
-    assert.gleSuccess(testDB);
+    assert.writeOK(testDB.foo.update({ a: 2 }, { $inc: { a: 1 }}));
     assert.eq(3, testDB.foo.findOne({a: {$exists: true}}).a);
-    testDB.foo.update({c:1}, {$inc: {c:1}}, true); // upsert should fail
-    assert.gleErrorCode(testDB, authzErrorCode);
+    hasAuthzError(testDB.foo.update({ c: 1 }, { $inc: { c: 1 }}, true)); // upsert should fail
     assert.eq(1, testDB.foo.count());
 
 

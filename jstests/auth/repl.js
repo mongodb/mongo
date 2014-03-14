@@ -236,8 +236,7 @@ slave = rt.start(false, mongoOptions, true);
 var masterDB = master.getDB("admin");
 
 // ensure that master/slave replication is up and running
-masterDB.foo.save({});
-masterDB.runCommand({getLastError: 1, w: 2, wtimeout: 5000});
+masterDB.foo.save({}, { writeConcern: { w: 2, wtimeout: 5000 }});
 masterDB.foo.drop();
 
 authReplTest = AuthReplTest({
