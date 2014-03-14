@@ -380,10 +380,9 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int bitmap, bulk, meta;
+	int bitmap, bulk;
 	uint32_t flags;
 
-	meta = 0;
 	flags = 0;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
