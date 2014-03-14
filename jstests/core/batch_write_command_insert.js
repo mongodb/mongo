@@ -123,6 +123,14 @@ assert(resultNOK(result));
 assert.eq(coll.count(), 0);
 
 //
+// Batch of size zero should fail to insert
+coll.remove({});
+printjson( request = {insert : coll.getName(),
+                      documents: [] } );
+printjson( result = coll.runCommand(request) );
+assert(resultNOK(result));
+
+//
 //
 // Unique index tests
 coll.remove({});
