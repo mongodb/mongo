@@ -179,9 +179,16 @@ namespace mongo {
             return;
         }
 
+        if ( request.sizeWriteOps() == 0u ) {
+            toBatchError( Status( ErrorCodes::InvalidLength,
+                                  "no write ops were included in the batch" ),
+                          response );
+            return;
+        }
+
         // Validate batch size
         if ( request.sizeWriteOps() > BatchedCommandRequest::kMaxWriteBatchSize ) {
-            toBatchError( Status( ErrorCodes::FailedToParse,
+            toBatchError( Status( ErrorCodes::InvalidLength,
                                   stream() << "exceeded maximum write batch size of "
                                            << BatchedCommandRequest::kMaxWriteBatchSize ),
                           response );

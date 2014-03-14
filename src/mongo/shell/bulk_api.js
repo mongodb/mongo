@@ -431,34 +431,30 @@ var _bulk_api_module = (function() {
 
     // Add to internal list of documents
     var addToOperationsList = function(docType, document) {
+      
+      if (Array.isArray(document))
+        throw Error("operation passed in cannot be an Array");
+
       // Get the bsonSize
       var bsonSize = Object.bsonsize(document);
+      
       // Create a new batch object if we don't have a current one
       if(currentBatch == null) currentBatch = new Batch(docType, currentIndex);
 
+      // Finalize and create a new batch if this op would take us over the
+      // limits *or* if this op is of a different type
+      if(currentBatchSize + 1 > maxNumberOfDocsInBatch
+         || (currentBatchSize > 0 && 
+             currentBatchSizeBytes + bsonSize >= maxBatchSizeBytes)
+         || currentBatch.batchType != docType) {
+        finalizeBatch(docType);
+      }
+
+      currentBatch.operations.push(document);
+      currentIndex = currentIndex + 1;
       // Update current batch size
       currentBatchSize = currentBatchSize + 1;
       currentBatchSizeBytes = currentBatchSizeBytes + bsonSize;
-
-      // Finalize and create a new batch if we have a new operation type
-      if (currentBatch.batchType != docType) {
-          finalizeBatch(docType);
-      }
-
-      // We have an array of documents
-      if(Array.isArray(document)) {
-        throw Error("operation passed in cannot be an Array");
-      } else {
-        currentBatch.operations.push(document)
-        currentIndex = currentIndex + 1;
-      }
-
-      // Check if the batch exceeds one of the size limits
-      if((currentBatchSize >= maxNumberOfDocsInBatch)
-        || (currentBatchSizeBytes >= maxBatchSizeBytes)) {
-          finalizeBatch(docType);
-      }
-
     };
 
     /**
