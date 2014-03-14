@@ -62,10 +62,12 @@ namespace mongo {
         void run() {
             try {
                 ScopedConn c(d.toHost);
+                LOG(1) << "multiCommand running on host " << d.toHost;
                 d.ok = c.runCommand("admin", cmd, d.result);
+                LOG(1) << "multiCommand response: " << d.result;
             }
-            catch(DBException&) {
-                DEV log() << "dev caught dbexception on multiCommand " << d.toHost << rsLog;
+            catch (const DBException& e) {
+                LOG(1) << "dev caught " << e.what() << " on multiCommand to " << d.toHost;
             }
         }
     };
