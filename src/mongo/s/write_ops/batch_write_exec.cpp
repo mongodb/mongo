@@ -121,7 +121,8 @@ namespace mongo {
             //    exactly when the metadata changed.
             //
 
-            vector<TargetedWriteBatch*> childBatches;
+            OwnedPointerVector<TargetedWriteBatch> childBatchesOwned;
+            vector<TargetedWriteBatch*>& childBatches = childBatchesOwned.mutableVector();
 
             // If we've already had a targeting error, we've refreshed the metadata once and can
             // record target errors definitively.
@@ -232,8 +233,7 @@ namespace mongo {
 
                     // Get the TargetedWriteBatch to find where to put the response
                     dassert( pendingBatches.find( shardHost ) != pendingBatches.end() );
-                    TargetedWriteBatch* batchRaw = pendingBatches.find( shardHost )->second;
-                    scoped_ptr<TargetedWriteBatch> batch( batchRaw );
+                    TargetedWriteBatch* batch = pendingBatches.find( shardHost )->second;
 
                     if ( dispatchStatus.isOK() ) {
 
@@ -269,8 +269,14 @@ namespace mongo {
                     else {
 
                         // Error occurred dispatching, note it
+
+                        stringstream msg;
+                        msg << "write results unavailable from " << shardHost.toString()
+                            << causedBy( dispatchStatus.toString() );
+
                         WriteErrorDetail error;
-                        buildErrorFrom( dispatchStatus, &error );
+                        buildErrorFrom( Status( ErrorCodes::RemoteResultsUnavailable, msg.str() ),
+                                        &error );
                         batchOp.noteBatchError( *batch, error );
                     }
                 }
@@ -323,7 +329,7 @@ namespace mongo {
 
                 WriteErrorDetail error;
                 buildErrorFrom( Status( ErrorCodes::NoProgressMade, msg.str() ), &error );
-                batchOp.setBatchError( error );
+                batchOp.abortBatch( error );
                 break;
             }
         }

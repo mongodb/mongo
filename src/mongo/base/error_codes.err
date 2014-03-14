@@ -82,6 +82,7 @@ error_code("UnknownReplWriteConcern", 79)
 error_code("RoleDataInconsistent", 80)
 error_code("NoClientContext", 81)
 error_code("NoProgressMade", 82)
+error_code("RemoteResultsUnavailable", 83)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

@@ -414,16 +414,10 @@ namespace mongo {
         };
     }
 
-    static void cloneBatchErrorTo( const BatchedCommandResponse& batchResp,
-                                   WriteErrorDetail* details ) {
+    static void cloneCommandErrorTo( const BatchedCommandResponse& batchResp,
+                                     WriteErrorDetail* details ) {
         details->setErrCode( batchResp.getErrCode() );
         details->setErrMessage( batchResp.getErrMessage() );
-    }
-
-    static void cloneBatchErrorFrom( const WriteErrorDetail& details,
-                                     BatchedCommandResponse* response ) {
-        response->setErrCode( details.getErrCode() );
-        response->setErrMessage( details.getErrMessage() );
     }
 
     // Given *either* a batch error or an array of per-item errors, copies errors we're interested
@@ -468,26 +462,29 @@ namespace mongo {
                                           const BatchedCommandResponse& response,
                                           TrackedErrors* trackedErrors ) {
 
-        // Increment stats for this batch
-        incBatchStats( _clientRequest->getBatchType(), response, _stats.get() );
+        if ( !response.getOk() ) {
+
+            WriteErrorDetail error;
+            cloneCommandErrorTo( response, &error );
+
+            // Treat command errors exactly like other failures of the batch
+            // Note that no errors will be tracked from these failures - as-designed
+            noteBatchError( targetedBatch, error );
+            return;
+        }
+
+        dassert( response.getOk() );
 
         // Stop tracking targeted batch
         _targeted.erase( &targetedBatch );
 
-        //
-        // Organize errors based on error code.
-        // We may have *either* a batch error or errors per-item.
-        // (Write Concern errors are stored and handled later.)
-        //
+        // Increment stats for this batch
+        incBatchStats( _clientRequest->getBatchType(), response, _stats.get() );
 
-        if ( !response.getOk() ) {
-            WriteErrorDetail batchError;
-            cloneBatchErrorTo( response, &batchError );
-            _batchError.reset( new ShardError( targetedBatch.getEndpoint(),
-                                                      batchError ));
-            cancelBatch( targetedBatch, _writeOps, batchError );
-            return;
-        }
+        //
+        // Assign errors to particular items.
+        // Write Concern errors are stored and handled later.
+        //
 
         // Special handling for write concern errors, save for later
         if ( response.isWriteConcernErrorSet() ) {
@@ -584,22 +581,64 @@ namespace mongo {
         }
     }
 
-    void BatchWriteOp::noteBatchError( const TargetedWriteBatch& targetedBatch,
-                                       const WriteErrorDetail& error ) {
-        BatchedCommandResponse response;
-        response.setOk( false );
-        response.setN( 0 );
-        cloneBatchErrorFrom( error, &response );
-        dassert( response.isValid( NULL ) );
-        noteBatchResponse( targetedBatch, response, NULL );
+    static void toWriteErrorResponse( const WriteErrorDetail& error,
+                                      bool ordered,
+                                      int numWrites,
+                                      BatchedCommandResponse* writeErrResponse ) {
+
+        writeErrResponse->setOk( true );
+        writeErrResponse->setN( 0 );
+
+        int numErrors = ordered ? 1 : numWrites;
+        for ( int i = 0; i < numErrors; i++ ) {
+            auto_ptr<WriteErrorDetail> errorClone( new WriteErrorDetail );
+            error.cloneTo( errorClone.get() );
+            errorClone->setIndex( i );
+            writeErrResponse->addToErrDetails( errorClone.release() );
+        }
+
+        dassert( writeErrResponse->isValid( NULL ) );
     }
 
-    void BatchWriteOp::setBatchError( const WriteErrorDetail& error ) {
-        _batchError.reset( new ShardError( ShardEndpoint(), error ) );
+    void BatchWriteOp::noteBatchError( const TargetedWriteBatch& targetedBatch,
+                                       const WriteErrorDetail& error ) {
+
+        // Treat errors to get a batch response as failures of the contained writes
+        BatchedCommandResponse emulatedResponse;
+        toWriteErrorResponse( error,
+                              _clientRequest->getOrdered(),
+                              targetedBatch.getWrites().size(),
+                              &emulatedResponse );
+
+        noteBatchResponse( targetedBatch, emulatedResponse, NULL );
+    }
+
+    void BatchWriteOp::abortBatch( const WriteErrorDetail& error ) {
+
+        dassert( !isFinished() );
+        dassert( numWriteOpsIn( WriteOpState_Pending ) == 0 );
+
+        size_t numWriteOps = _clientRequest->sizeWriteOps();
+        bool orderedOps = _clientRequest->getOrdered();
+        for ( size_t i = 0; i < numWriteOps; ++i ) {
+
+            WriteOp& writeOp = _writeOps[i];
+            // Can only be called with no outstanding batches
+            dassert( writeOp.getWriteState() != WriteOpState_Pending );
+
+            if ( writeOp.getWriteState() < WriteOpState_Completed ) {
+
+                writeOp.setOpError( error );
+
+                // Only one error if we're ordered
+                if ( orderedOps ) break;
+            }
+        }
+
+        dassert( isFinished() );
     }
 
     bool BatchWriteOp::isFinished() {
-        if ( _batchError.get() ) return true;
 
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         bool orderedOps = _clientRequest->getOrdered();
@@ -619,22 +658,6 @@ namespace mongo {
     void BatchWriteOp::buildClientResponse( BatchedCommandResponse* batchResp ) {
 
         dassert( isFinished() );
-
-        if ( _batchError.get() ) {
-
-            batchResp->setOk( false );
-            batchResp->setErrCode( _batchError->error.getErrCode() );
-
-            stringstream msg;
-            msg << _batchError->error.getErrMessage();
-            if ( !_batchError->endpoint.shardName.empty() ) {
-                msg << " at " << _batchError->endpoint.shardName;
-            }
-
-            batchResp->setErrMessage( msg.str() );
-            dassert( batchResp->isValid( NULL ) );
-            return;
-        }
 
         // Result is OK
         batchResp->setOk( true );
