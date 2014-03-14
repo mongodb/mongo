@@ -1,3 +1,5 @@
+// TODO: SERVER-13215 move test back to replSets suite.
+
 /**
  * TODO: SERVER-13204
  * This  tests inserts a huge number of documents, initiates a background index build
@@ -36,11 +38,9 @@ var secondDB = second.getDB('bgIndexSec');
 var size = 500000;
 
 jsTest.log("creating test data " + size + " documents");
-var bulk = masterDB.jstests_bgsec.initializeUnorderedBulkOp();
 for(var i = 0; i < size; ++i) {
-    bulk.insert({ i: i });
+    masterDB.jstests_bgsec.save( {i:i} );
 }
-assert.writeOK(bulk.execute());
 
 jsTest.log("Starting background indexing");
 masterDB.jstests_bgsec.ensureIndex( {i:1}, {background:true} );
