@@ -862,9 +862,9 @@ struct __wt_insert {
  * Skiplist helper macros.
  */
 #define	WT_SKIP_FIRST(ins_head)						\
-	(((ins_head) == NULL) ? NULL : (ins_head)->head[0])
+	(((ins_head) == NULL) ? NULL : ((WT_INSERT_HEAD *)ins_head)->head[0])
 #define	WT_SKIP_LAST(ins_head)						\
-	(((ins_head) == NULL) ? NULL : (ins_head)->tail[0])
+	(((ins_head) == NULL) ? NULL : ((WT_INSERT_HEAD *)ins_head)->tail[0])
 #define	WT_SKIP_NEXT(ins)  ((ins)->next[0])
 #define	WT_SKIP_FOREACH(ins, ins_head)					\
 	for ((ins) = WT_SKIP_FIRST(ins_head);				\
