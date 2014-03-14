@@ -684,11 +684,11 @@ __rec_bnd_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 }
 
 /*
- * __rec_upd_skip_save --
- *	Save a key/WT_UPDATE pair for later restoration.
+ * __rec_update_save_worker --
+ *	Save a WT_UPDATE list for later restoration.
  */
 static int
-__rec_upd_skip_save(
+__rec_update_save_worker(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip)
 {
 	WT_BOUNDARY *bnd;
@@ -699,6 +699,36 @@ __rec_upd_skip_save(
 	bnd->skip[bnd->skip_next].ins = ins;
 	bnd->skip[bnd->skip_next].rip = rip;
 	++bnd->skip_next;
+	return (0);
+}
+
+/*
+ * __rec_ins_update_save --
+ *	If we have an WT_UPDATE list to be saved, save it, WT_INSERT version.
+ */
+static inline int
+__rec_ins_update_save(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, int *skipp)
+{
+	if (*skipp) {
+		WT_RET(__rec_update_save_worker(session, r, ins, NULL));
+		*skipp = 0;
+	}
+	return (0);
+}
+
+/*
+ * __rec_rip_update_save --
+ *	If we have an WT_UPDATE list to be saved, save it, WT_ROW version.
+ */
+static inline int
+__rec_rip_update_save(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ROW *rip, int *skipp)
+{
+	if (*skipp) {
+		WT_RET(__rec_update_save_worker(session, r, NULL, rip));
+		*skipp = 0;
+	}
 	return (0);
 }
 
@@ -2712,10 +2742,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (upd != NULL)
 			__bit_setv_recno(page, WT_INSERT_RECNO(ins),
 			    btree->bitcnt, ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
-
-		/* Save any skipped key/value pair update. */
-		if (upd_skip)
-			WT_RET(__rec_upd_skip_save(session, r, ins, NULL));
+		WT_RET(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	/* Copy the updated, disk-image bytes into place. */
@@ -2731,10 +2758,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
 		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
 		if (upd == NULL) {
-			/* Save any skipped key/value pair update. */
-			if (upd_skip)
-				WT_RET(
-				    __rec_upd_skip_save(session, r, ins, NULL));
+			WT_RET(
+			    __rec_ins_update_save(session, r, ins, &upd_skip));
 			continue;
 		}
 		for (;;) {
@@ -2772,9 +2797,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 		}
 
-		/* Save any skipped key/value pair update. */
-		if (upd_skip)
-			WT_RET(__rec_upd_skip_save(session, r, ins, NULL));
+		WT_RET(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	/* Update the counters. */
@@ -3169,6 +3192,8 @@ compare:		/*
 				WT_ERR(__rec_col_var_helper(session, r,
 				    salvage, last, last_deleted, 0, rle));
 			}
+			WT_ERR(
+			    __rec_ins_update_save(session, r, ins, &upd_skip));
 
 			/*
 			 * Swap the current/last state.
@@ -3217,8 +3242,11 @@ compare:		/*
 	/* Walk any append list. */
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
 		WT_ERR(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
-		if (upd == NULL)
+		if (upd == NULL) {
+			WT_ERR(
+			    __rec_ins_update_save(session, r, ins, &upd_skip));
 			continue;
+		}
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left
@@ -3264,6 +3292,7 @@ compare:		/*
 			last_deleted = deleted;
 			rle = 1;
 		}
+		WT_ERR(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	/* If we were tracking a record, write it. */
@@ -3902,9 +3931,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
 
-		/* Save any skipped key/value pair update. */
-		if (upd_skip)
-			WT_ERR(__rec_upd_skip_save(session, r, NULL, rip));
+		WT_ERR(__rec_rip_update_save(session, r, rip, &upd_skip));
 
 leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 		if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT(page, rip))) != NULL)
@@ -3940,10 +3967,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		/* Look for an update. */
 		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
 		if (upd == NULL) {
-			/* Save any skipped key/value pair update. */
-			if (upd_skip)
-				WT_RET(
-				    __rec_upd_skip_save(session, r, ins, NULL));
+			WT_RET(
+			    __rec_ins_update_save(session, r, ins, &upd_skip));
 			continue;
 		}
 		if (WT_UPDATE_DELETED_ISSET(upd))
@@ -3995,9 +4020,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
 
-		/* Save any skipped key/value pair update. */
-		if (upd_skip)
-			WT_RET(__rec_upd_skip_save(session, r, ins, NULL));
+		WT_RET(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	return (0);
