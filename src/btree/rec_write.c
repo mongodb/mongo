@@ -33,7 +33,7 @@ typedef struct {
 	 * If page updates are skipped because they are as yet unresolved, or
 	 * the page has updates we cannot discard, the page is left "dirty":
 	 * the page cannot be discarded and a subsequent reconciliation will
-	 * be necessary to dsicard the page.
+	 * be necessary to discard the page.
 	 */
 	int	 leave_dirty;
 
