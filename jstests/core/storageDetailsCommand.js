@@ -96,3 +96,4 @@ function test() {
     checkErrorConditions(t.diskStorageStats);
     checkErrorConditions(t.pagesInRAM);
 }
+test();
