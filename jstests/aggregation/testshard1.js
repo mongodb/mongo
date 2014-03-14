@@ -144,8 +144,8 @@ for(i = 0 ; i < strings.length; ++i) {
 // a match takes place in the shards; just returning the results from mongos
 var a4 = aggregateNoOrder(db.ts1, [
     { $match: {$or:[{counter:55}, {counter:1111},
-                    {counter: 2222}, {counter: 3333},
-                    {counter: 9999}, {counter: 5555}]}
+                    {counter: 2222}, {counter: 33333},
+                    {counter: 99999}, {counter: 55555}]}
     }
 ]);
 
@@ -153,7 +153,7 @@ for(i = 0; i < 6; ++i) {
     c = a4[i].counter;
     printjson({c:c})
     assert((c == 55) || (c == 1111) || (c == 2222) ||
-           (c == 33333) || (c = 99999) || (c == 55555),
+           (c == 33333) || (c == 99999) || (c == 55555),
            'agg sharded test simple match failed');
 }
 
