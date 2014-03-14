@@ -294,19 +294,12 @@ descend:	for (;;) {
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*
-				 * Only look at unlocked pages in memory, and
-				 * fast path some common cases.
+				 * Only look at unlocked pages in memory:
+				 * fast-path some common cases.
 				 */
 				if (LF_ISSET(WT_READ_NO_WAIT) &&
 				    ref->state != WT_REF_MEM)
 					break;
-				ret = __wt_page_swap(
-				    session, couple, page, ref, flags);
-				if (ret == WT_NOTFOUND) {
-					ret = 0;
-					break;
-				}
-				WT_RET(ret);
 			} else if (LF_ISSET(WT_READ_TRUNCATE)) {
 				/*
 				 * If deleting a range, try to delete the page
@@ -316,8 +309,6 @@ descend:	for (;;) {
 				    session, page, ref, &skip));
 				if (skip)
 					break;
-				WT_RET(__wt_page_swap(
-				    session, couple, page, ref, flags));
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
 				/*
 				 * Skip deleted pages, rewriting them doesn't
@@ -341,8 +332,6 @@ descend:	for (;;) {
 					if (skip)
 						break;
 				}
-				WT_RET(__wt_page_swap(
-				    session, couple, page, ref, flags));
 			} else {
 				/*
 				 * If iterating a cursor, skip deleted pages
@@ -351,10 +340,14 @@ descend:	for (;;) {
 				WT_RET(__tree_walk_read(session, ref, &skip));
 				if (skip)
 					break;
-
-				WT_RET(__wt_page_swap(
-				    session, couple, page, ref, flags));
 			}
+
+			if ((ret = __wt_page_swap(session,
+			    couple, page, ref, flags)) == WT_NOTFOUND) {
+				ret = 0;
+				break;
+			}
+			WT_RET(ret);
 
 			couple = page = ref->page;
 			slot = prev ? page->entries - 1 : 0;
