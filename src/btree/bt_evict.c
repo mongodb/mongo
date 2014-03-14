@@ -991,7 +991,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		if (__wt_btree_mergeable(page))
 			for (levels = 1;
 			    levels < WT_MERGE_STACK_MIN &&
-			    __wt_btree_mergeable(page->parent);
+			    __wt_btree_mergeable(page->parent) &&
+			    page->parent->ref->state == WT_REF_MEM;
 			    page = page->parent, levels++)
 				;
 		else if (page->modify != NULL &&

@@ -264,17 +264,20 @@ ascend:	/*
 			if (WT_PAGE_IS_ROOT(page))
 				WT_RET(__wt_page_release(session, couple));
 			else {
+				ref = page->ref;
 				ret = __wt_page_swap(session,
-				    couple, page, page->ref, flags);
-				if (ret == WT_NOTFOUND) {
-					WT_TRET(__wt_page_release(
-					    session, couple));
+				    couple, page, ref, flags);
+				WT_ASSERT(session, ret != 0 ||
+				    ref->page == page);
+				if (ret != 0)
 					page = NULL;
-				}
+				if (ret == WT_NOTFOUND)
+					ret = __wt_page_release(
+					    session, couple);
 			}
 
 			*pagep = page;
-			return (0);
+			return (ret);
 		}
 		if (prev)
 			--slot;
