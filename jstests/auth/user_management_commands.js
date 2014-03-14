@@ -5,6 +5,10 @@
 
 function runTest(conn) {
     var authzErrorCode = 13;
+    var hasAuthzError = function(result) {
+        assert(result.hasWriteError());
+        assert.eq(authzErrorCode, result.getWriteError().code);
+    };
 
     conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
     conn.getDB('admin').auth('admin', 'pwd');
@@ -49,16 +53,14 @@ function runTest(conn) {
          var user = testUserAdmin.getUser('spencer');
          assert.eq(10028, user.customData.zipCode);
          assert(db.auth('spencer', 'pwd'));
-         db.foo.insert({a:1});
-         assert.gleSuccess(db);
+         assert.writeOK(db.foo.insert({ a: 1 }));
          assert.eq(1, db.foo.findOne().a);
          assert.doesNotThrow(function() {db.getRole('testRole')});
          assert.commandWorked(db.adminCommand('connPoolSync'));
 
          db.logout();
          assert(db.auth('andy', 'pwd'));
-         db.foo.insert({a:1});
-         assert.gleErrorCode(db, authzErrorCode);
+         hasAuthzError(db.foo.insert({ a: 1 }));
          assert.throws(function() { db.foo.findOne();});
          assert.throws(function() {db.getRole('testRole')});
      })();
@@ -76,8 +78,7 @@ function runTest(conn) {
                                               roles: ["read", "testRole"]});
          var user = testUserAdmin.getUser('spencer');
          assert.eq(10036, user.customData.zipCode);
-         db.foo.insert({a:1});
-         assert.gleErrorCode(db, authzErrorCode);
+         hasAuthzError(db.foo.insert({ a: 1 }));
          assert.eq(1, db.foo.findOne().a);
          assert.eq(1, db.foo.count());
          assert.doesNotThrow(function() {db.getRole('testRole')});
@@ -85,8 +86,7 @@ function runTest(conn) {
 
          testUserAdmin.updateUser('spencer', {roles: ["readWrite",
                                                       {role: 'adminRole', db:'admin'}]});
-         db.foo.update({}, {$inc: {a:1}});
-         assert.gleSuccess(db);
+         assert.writeOK(db.foo.update({}, { $inc: { a: 1 }}));
          assert.eq(2, db.foo.findOne().a);
          assert.eq(1, db.foo.count());
          assert.throws(function() {db.getRole('testRole')});
@@ -107,8 +107,7 @@ function runTest(conn) {
                                          'readWrite']);
 
          assert.commandWorked(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}));
-         db.foo.update({}, {$inc: {a:1}});
-         assert.gleSuccess(db);
+         assert.writeOK(db.foo.update({}, { $inc: { a: 1 }}));
          assert.eq(3, db.foo.findOne().a);
          assert.eq(1, db.foo.count());
          assert.doesNotThrow(function() {db.getRole('testRole')});
@@ -124,8 +123,7 @@ function runTest(conn) {
                                             "testRole"]);
 
          assert.commandWorked(db.runCommand({collMod: 'foo', usePowerOf2Sizes: true}));
-         db.foo.update({}, {$inc: {a:1}});
-         assert.gleErrorCode(db, authzErrorCode);
+         hasAuthzError(db.foo.update({}, { $inc: { a: 1 }}));
          assert.throws(function() { db.foo.findOne();});
          assert.throws(function() {db.getRole('testRole')});
          assert.commandWorked(db.adminCommand('connPoolSync'));
@@ -133,8 +131,7 @@ function runTest(conn) {
 
          testUserAdmin.revokeRolesFromUser('spencer', [{role: 'adminRole', db: 'admin'}]);
 
-         db.foo.update({}, {$inc: {a:1}});
-         assert.gleErrorCode(db, authzErrorCode);
+         hasAuthzError(db.foo.update({}, { $inc: { a: 1 }}));
          assert.throws(function() { db.foo.findOne();});
          assert.throws(function() {db.getRole('testRole')});
          assert.commandFailedWithCode(db.adminCommand('connPoolSync'), authzErrorCode);

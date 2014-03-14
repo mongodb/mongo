@@ -54,8 +54,7 @@ with_mongod( ['--noauth'], function setupTest( mongod ) {
     somedb.createUser({user: 'frim', pwd: 'fram', roles: jsTest.basicUserRoles});
     somedb.data.drop();
     for (var i = 0; i < 10; ++i) {
-        somedb.data.insert( { val: i } );
-        assert ( ! somedb.getLastError() );
+        assert.writeOK(somedb.data.insert( { val: i } ));
     }
     admin.logout();
 } );

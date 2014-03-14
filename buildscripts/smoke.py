@@ -443,7 +443,7 @@ def skipTest(path):
     return False
 
 def setShellWriteModeForTest(path, argv):
-    forceCommandsForSuite = ["aggregation", "replsets", "parallel", "core"]
+    forceCommandsForSuite = ["aggregation", "replsets", "parallel", "core", "auth"]
     swm = shell_write_mode;
     if swm == "legacy": # change when the default changes to "commands"
         if use_write_commands or any("jstests/" + s in path for s in forceCommandsForSuite):
