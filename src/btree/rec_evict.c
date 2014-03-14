@@ -1048,15 +1048,15 @@ __rec_review(WT_SESSION_IMPL *session,
 		else if (top && !WT_PAGE_IS_INTERNAL(page))
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, page, NULL, flags));
+	} else {
+		/*
+		 * If the page was ever modified, make sure all of the updates
+		 * on the page are old enough they can be discarded from cache.
+		 */
+		if (!exclusive && mod != NULL &&
+		    !__wt_txn_visible_all(session, mod->rec_max_txn))
+			return (EBUSY);
 	}
-
-	/*
-	 * If the page was ever modified, make sure all of the updates on the
-	 * page are old enough that they can be discarded from cache.
-	 */
-	if (!exclusive && mod != NULL &&
-	    !__wt_txn_visible_all(session, mod->rec_max_txn))
-		return (EBUSY);
 
 	/*
 	 * Repeat the test: fail if any page in the top-level page's subtree
