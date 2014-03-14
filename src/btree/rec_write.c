@@ -28,7 +28,14 @@ typedef struct {
 	/* Track whether all changes to the page are written. */
 	uint64_t max_txn;
 	uint32_t orig_write_gen;
-	int	 upd_skipped;		/* Skipped a page's update */
+
+	/*
+	 * If page updates are skipped because they are as yet unresolved, or
+	 * the page has updates we cannot discard, the page is left "dirty":
+	 * the page cannot be discarded and a subseuqent reconciliation will
+	 * be necessary to dsicard the page.
+	 */
+	int	 leave_dirty;
 
 	/*
 	 * Raw compression (don't get me started, as if normal reconciliation
@@ -570,8 +577,8 @@ __rec_write_init(
 		    r, btree->dictionary < 100 ? 100 : btree->dictionary));
 	__rec_dictionary_reset(r);
 
-	/* Per-page reconciliation: track skipped updates. */
-	r->upd_skipped = 0;
+	/* Per-page reconciliation: track if the page can be marked clean. */
+	r->leave_dirty = 0;
 
 	/* Per-page reconciliation: track overflow items. */
 	r->ovfl_items = 0;
@@ -697,19 +704,19 @@ __rec_upd_skip_save(
 
 /*
  * __rec_txn_read --
- *	Return the first visible update in a list (or NULL if none are visible).
- *
- *	Track the maximum transaction ID in the list and whether updates were
- *	skipped to find the visible update.  Optionally save any updates that
- *	cannot be discarded.
+ *	Return the first visible update in a list (or NULL if none are visible),
+ * and a flag if the update chain should be saved/restored.
+ *	Track the maximum transaction ID in the list and whether the page can
+ * be discarded.
  */
 static inline int
-__rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-    WT_UPDATE *upd, WT_INSERT *ins, WT_ROW *rip, WT_UPDATE **updp)
+__rec_txn_read(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp, int *skipp)
 {
 	uint64_t txnid, max_txn;
 
 	*updp = NULL;
+	*skipp = 0;
 
 	for (max_txn = WT_TXN_NONE; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
@@ -738,7 +745,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			if (__wt_txn_visible(session, txnid))
 				*updp = upd;
 			else
-				r->upd_skipped = 1;
+				r->leave_dirty = 1;
 		}
 	}
 
@@ -760,7 +767,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	    !__wt_txn_visible_all(session, max_txn)) {
 		if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
 			*updp = NULL;
-			WT_RET(__rec_upd_skip_save(session, r, ins, rip));
+			*skipp = 1;
+			r->leave_dirty = 1;
 		} else
 			return (EBUSY);
 	}
@@ -1388,8 +1396,16 @@ __rec_split_row_promote_cell(
 static int
 __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 {
+	WT_BOUNDARY *bnd;
+	WT_DECL_ITEM(max_update);
+	WT_DECL_RET;
+	WT_ITEM *max, key;
+	WT_PAGE *page;
+	WT_UPD_SKIPPED *skip;
 	size_t cnt, len, size;
+	uint32_t i;
 	const uint8_t *pa, *pb;
+	int cmp;
 
 	/*
 	 * For a column-store, the promoted key is the recno and we already have
@@ -1418,33 +1434,68 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 	 * internal pages, you cannot repeat suffix truncation as you split up
 	 * the tree, it loses too much information.
 	 *
-	 * One note: if the last key on the previous page was an overflow key,
+	 * Note #1: if the last key on the previous page was an overflow key,
 	 * we don't have the in-memory key against which to compare, and don't
 	 * try to do suffix compression.  The code for that case turns suffix
-	 * compression off for the next key.
-	 *
-	 * The r->last key sorts before the r->cur key, so we'll either find a
-	 * larger byte value in r->cur, or r->cur will be the longer key, and
-	 * the interesting byte is one past the length of the shorter key.
+	 * compression off for the next key, we don't have to deal with it here.
 	 */
-	if (type == WT_PAGE_ROW_LEAF && r->key_sfx_compress) {
-		pa = r->last->data;
-		pb = r->cur->data;
-		len = WT_MIN(r->last->size, r->cur->size);
-		size = len + 1;
-		for (cnt = 1; len > 0; ++cnt, --len, ++pa, ++pb)
-			if (*pa != *pb) {
-				if (size != cnt) {
-					WT_STAT_FAST_DATA_INCRV(session,
-					    rec_suffix_compression, size - cnt);
-					size = cnt;
-				}
-				break;
+	if (type != WT_PAGE_ROW_LEAF || !r->key_sfx_compress)
+		return (__wt_buf_set(session,
+		    &r->bnd[r->bnd_next].key, r->cur->data, r->cur->size));
+
+	/*
+	 * Note #2: if we skipped updates, an update key may be larger than the
+	 * last key stored on the page (probable for append-centric workloads).
+	 * If there are skipped updates, check to see if they're larger than the
+	 * last key stored on the page.
+	 */
+	max = r->last;
+	page = r->page;
+	bnd = &r->bnd[r->bnd_next-1];
+	for (skip = bnd->skip, i = 0; i < bnd->skip_next; ++i, ++skip) {
+		if (skip->ins == NULL)
+			WT_ERR(__wt_row_leaf_key(
+			    session, page, skip->rip, &key, 0));
+		else {
+			key.data = WT_INSERT_KEY(skip->ins);
+			key.size = WT_INSERT_KEY_SIZE(skip->ins);
+		}
+		WT_ERR(WT_LEX_CMP(
+		    session, S2BT(session)->collator, max, &key, cmp));
+		if (cmp < 0) {
+			if (max_update == NULL)
+				WT_ERR(__wt_scr_alloc(
+				    session, key.size, &max_update));
+			WT_ERR(__wt_buf_set(
+			    session, max_update, key.data, key.size));
+			max = max_update;
+		}
+	}
+
+	/*
+	 * The last key (r->last, or copied update "last") sorts before the
+	 * r->cur key, so we'll either find a larger byte value in r->cur, or
+	 * r->cur will be the longer key, and the interesting byte is one past
+	 * the length of the shorter key.
+	 */
+	pa = max->data;
+	pb = r->cur->data;
+	len = WT_MIN(max->size, r->cur->size);
+	size = len + 1;
+	for (cnt = 1; len > 0; ++cnt, --len, ++pa, ++pb)
+		if (*pa != *pb) {
+			if (size != cnt) {
+				WT_STAT_FAST_DATA_INCRV(session,
+				    rec_suffix_compression, size - cnt);
+				size = cnt;
 			}
-	} else
-		size = r->cur->size;
-	return (__wt_buf_set(
-	    session, &r->bnd[r->bnd_next].key, r->cur->data, size));
+			break;
+		}
+	ret =
+	    __wt_buf_set(session, &r->bnd[r->bnd_next].key, r->cur->data, size);
+
+err:	__wt_scr_free(&max_update);
+	return (ret);
 }
 
 /*
@@ -1954,12 +2005,13 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 	/*
 	 * If we're doing an eviction, and we skipped an update, it only pays
-	 * off to continue if writing multiple blocks.  This should be unlikely
-	 * (why did eviction pick a small block that was recently written), but
-	 * it's possible.
+	 * off to continue if we're writing multiple blocks, that is, if we
+	 * will be able to evict something.  This should be unlikely (why did
+	 * eviction pick a relatively small block that was recently written),
+	 * but it's possible.
 	 */
 	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
-	    r->bnd_next == 0 && r->bnd[0].skip != NULL) {
+	    r->bnd_next == 0 && r->leave_dirty) {
 		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
 		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
 		return (EBUSY);
@@ -2647,12 +2699,13 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t entry, nrecs;
+	int upd_skip;
 
 	btree = S2BT(session);
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		WT_RET(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
+		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
 		if (upd == NULL)
 			continue;
 		__bit_setv_recno(page, WT_INSERT_RECNO(ins),
@@ -2675,7 +2728,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		WT_RET(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
+		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
 		if (upd == NULL)
 			continue;
 		for (;;) {
@@ -2889,7 +2942,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
-	int deleted, last_deleted, orig_deleted, update_no_copy;
+	int deleted, last_deleted, orig_deleted, update_no_copy, upd_skip;
 	const void *data;
 
 	btree = S2BT(session);
@@ -2997,7 +3050,7 @@ record_loop:	/*
 			upd = NULL;
 			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
 				WT_ERR(__rec_txn_read(
-				    session, r, ins->upd, ins, NULL, &upd));
+				    session, r, ins->upd, &upd, &upd_skip));
 				ins = WT_SKIP_NEXT(ins);
 			}
 			if (upd != NULL) {
@@ -3155,7 +3208,7 @@ compare:		/*
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		WT_ERR(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
+		WT_ERR(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
 		if (upd == NULL)
 			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
@@ -3519,7 +3572,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	size_t size;
 	uint64_t slvg_skip;
 	uint32_t i;
-	int dictionary, onpage_ovfl, ovfl_key;
+	int dictionary, onpage_ovfl, ovfl_key, upd_skip;
 	const void *p;
 
 	btree = S2BT(session);
@@ -3579,7 +3632,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		if ((val_cell = __wt_row_leaf_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
 		WT_ERR(__rec_txn_read(session, r,
-		    WT_ROW_UPDATE(page, rip), NULL, rip, &upd));
+		    WT_ROW_UPDATE(page, rip), &upd, &upd_skip));
 		if (upd == NULL) {
 			/*
 			 * When the page was read into memory, there may not
@@ -3665,10 +3718,10 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					 * locks on the overflow lock when
 					 * checking for key instantiation.
 					 */
-					WT_ERR(__wt_writelock(session,
-					    S2BT(session)->ovfl_lock));
-					WT_ERR(__wt_rwunlock(session,
-					    S2BT(session)->ovfl_lock));
+					WT_ERR(__wt_writelock(
+					    session, btree->ovfl_lock));
+					WT_ERR(__wt_rwunlock(
+					    session, btree->ovfl_lock));
 
 					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
@@ -3836,6 +3889,12 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			__rec_copy_incr(session, r, val);
 		}
 
+		/* Save any skipped key/value pair update. */
+		if (upd_skip) {
+			WT_ERR(__rec_upd_skip_save(session, r, NULL, rip));
+			upd_skip = 0;
+		}
+
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
 
@@ -3862,17 +3921,23 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_UPDATE *upd;
-	int ovfl_key;
+	int ovfl_key, upd_skip;
 
 	btree = S2BT(session);
+
 	key = &r->k;
 	val = &r->v;
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		/* Build value cell. */
-		WT_RET(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
-		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
+		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
+		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd)) {
+			/* Save any skipped key/value pair update. */
+			if (upd_skip)
+				WT_RET(
+				    __rec_upd_skip_save(session, r, ins, NULL));
 			continue;
+		}
 		if (upd->size == 0)
 			val->len = 0;
 		else
@@ -3915,6 +3980,10 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 				WT_RET(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);
 		}
+
+		/* Save any skipped key/value pair update. */
+		if (upd_skip)
+			WT_RET(__rec_upd_skip_save(session, r, ins, NULL));
 
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
@@ -4203,7 +4272,7 @@ err:			__wt_scr_free(&tkey);
 	 * current checkpoint is waiting on this reconciliation to complete,
 	 * there's no risk of that happening).
 	 */
-	if (r->upd_skipped) {
+	if (r->leave_dirty) {
 		/*
 		 * In some cases (for example, when closing a file), there had
 		 * better not be any updates we can't write.
@@ -4217,13 +4286,14 @@ err:			__wt_scr_free(&tkey);
 	}
 
 	/*
-	 * If no updates were skipped, we have a new maximum transaction
-	 * written for the page (used to decide if a clean page can be
-	 * evicted).  The page might be clean; if the write generation is
-	 * unchanged since reconciliation started, clear it and update the
-	 * cache's dirty statistics.
+	 * If no updates were skipped, we have a new maximum transaction written
+	 * for the page (used to decide if a clean page can be evicted).  The
+	 * page only might be clean; if the write generation is unchanged since
+	 * reconciliation started, clear it and update cache dirty statistics,
+	 * if the write generation changed, then the page has been written since
+	 * we started reconciliation, it cannot be discarded.
 	 */
-	if (!r->upd_skipped) {
+	if (!r->leave_dirty) {
 		mod->rec_max_txn = r->max_txn;
 
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
