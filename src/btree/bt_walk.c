@@ -286,15 +286,15 @@ ascend:	/*
 				ref = __wt_page_ref(session, page);
 				ret = __wt_page_swap(
 				    session, couple, page, ref, flags);
-				if (ret == WT_NOTFOUND) {
-					WT_TRET(__wt_page_release(
-					    session, couple));
+				if (ret != 0)
 					page = NULL;
-				}
+				if (ret == WT_NOTFOUND)
+					ret = __wt_page_release(
+					    session, couple);
 			}
 
 			*pagep = page;
-			return (0);
+			return (ret);
 		}
 
 		if (0) {
