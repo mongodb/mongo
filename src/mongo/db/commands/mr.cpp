@@ -183,7 +183,6 @@ namespace mongo {
             // need to build the reduce args: ( key, [values] )
             BSONObjBuilder reduceArgs( sizeEstimate );
             boost::scoped_ptr<BSONArrayBuilder>  valueBuilder;
-            int sizeSoFar = 0;
             unsigned n = 0;
             for ( ; n<tuples.size(); n++ ) {
                 BSONObjIterator j(tuples[n]);
@@ -191,7 +190,6 @@ namespace mongo {
                 if ( n == 0 ) {
                     reduceArgs.append( keyE );
                     key = keyE.wrap();
-                    sizeSoFar = 5 + keyE.size();
                     valueBuilder.reset(new BSONArrayBuilder( reduceArgs.subarrayStart( "tuples" ) ));
                 }
 
@@ -199,13 +197,15 @@ namespace mongo {
 
                 uassert( 13070 , "value too large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
 
-                if ( sizeSoFar + ee.size() > BSONObjMaxUserSize ) {
+                // If adding this element to the array would cause it to be too large, break. The
+                // remainder of the tuples will be processed recursively at the end of this
+                // function.
+                if ( valueBuilder->len() + ee.size() > BSONObjMaxUserSize ) {
                     verify( n > 1 ); // if not, inf. loop
                     break;
                 }
 
                 valueBuilder->append( ee );
-                sizeSoFar += ee.size();
             }
             verify(valueBuilder);
             valueBuilder->done();
