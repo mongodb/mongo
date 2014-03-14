@@ -148,7 +148,17 @@ typedef struct {
 		uint32_t cksum;		/* Split's checksum */
 		void    *dsk;		/* Split's disk image */
 
-		WT_UPD_SKIPPED *skip;	/* Skipped updates */
+		/*
+		 * When busy pages get large, we need to be able to evict them
+		 * even when they contain unresolved updates, or updates which
+		 * cannot be evicted because of running transactions.  In such
+		 * cases, break the page into multiple blocks, write the blocks
+		 * that can be evicted, saving lists of updates for blocks that
+		 * cannot be evicted, then re-instantiate the blocks that cannot
+		 * be evicted as new, in-memory pages, restoring the updates on
+		 * those pages.
+		 */
+		WT_UPD_SKIPPED *skip;		/* Skipped updates */
 		uint32_t	skip_next;
 		size_t		skip_allocated;
 
@@ -204,6 +214,14 @@ typedef struct {
 	uint32_t entries;		/* Current number of entries */
 	uint8_t *first_free;		/* Current first free byte */
 	size_t	 space_avail;		/* Remaining space in this chunk */
+
+	/*
+	 * While reviewing updates for each page, we store skipped updates here,
+	 * and then move them to per-block areas as the blocks are defined.
+	 */
+	WT_UPD_SKIPPED *skip;		/* Skipped updates */
+	uint32_t	skip_next;
+	size_t		skip_allocated;
 
 	/*
 	 * We don't need to keep the 0th key around on internal pages, the
@@ -291,9 +309,9 @@ static int  __rec_split_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *, WT_RECONCILE *);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_split_row_promote(
-		WT_SESSION_IMPL *, WT_RECONCILE *, uint8_t);
-static int  __rec_split_write(
-		WT_SESSION_IMPL *, WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *);
+		WT_SESSION_IMPL *, WT_RECONCILE *, WT_ITEM *, uint8_t);
+static int  __rec_split_write(WT_SESSION_IMPL *,
+		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, int);
 static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, void *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_write_wrapup_err(
@@ -515,8 +533,8 @@ __rec_write_init(
 	r->page = page;
 	r->flags = flags;
 
-	/* Initialize the boundary information. */
-	__rec_bnd_init(session, r, 0);
+	/* Track if the page can be marked clean. */
+	r->leave_dirty = 0;
 
 	/*
 	 * Raw compression, the application builds disk images: applicable only
@@ -534,6 +552,33 @@ __rec_write_init(
 	    page->type != WT_PAGE_COL_FIX &&
 	    btree->dictionary == 0 &&
 	    btree->prefix_compression == 0;
+
+	/* Track overflow items. */
+	r->ovfl_items = 0;
+
+	/* Track empty values. */
+	r->all_empty_value = 1;
+	r->any_empty_value = 0;
+
+	/* Initialize the boundary information. */
+	__rec_bnd_init(session, r, 0);
+
+	/* The list of cached, skipped updates. */
+	r->skip_next = 0;
+
+	/*
+	 * Dictionary compression only writes repeated values once.  We grow
+	 * the dictionary as necessary, always using the largest size we've
+	 * seen.
+	 *
+	 * Reset the dictionary.
+	 *
+	 * Sanity check the size: 100 slots is the smallest dictionary we use.
+	 */
+	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots)
+		WT_RET(__rec_dictionary_init(session,
+		    r, btree->dictionary < 100 ? 100 : btree->dictionary));
+	__rec_dictionary_reset(r);
 
 	/*
 	 * Suffix compression shortens internal page keys by discarding trailing
@@ -562,31 +607,6 @@ __rec_write_init(
 	if (btree->prefix_compression && page->type == WT_PAGE_ROW_LEAF)
 		r->key_pfx_compress_conf = 1;
 
-	/*
-	 * Dictionary compression only writes repeated values once.  We grow
-	 * the dictionary as necessary, always using the largest size we've
-	 * seen.
-	 *
-	 * Per-page reconciliation: reset the dictionary.
-	 *
-	 * Sanity check the size: 100 slots is the smallest dictionary
-	 * we use.
-	 */
-	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots)
-		WT_RET(__rec_dictionary_init(session,
-		    r, btree->dictionary < 100 ? 100 : btree->dictionary));
-	__rec_dictionary_reset(r);
-
-	/* Per-page reconciliation: track if the page can be marked clean. */
-	r->leave_dirty = 0;
-
-	/* Per-page reconciliation: track overflow items. */
-	r->ovfl_items = 0;
-
-	/* Per-page reconciliation: track empty values. */
-	r->all_empty_value = 1;
-	r->any_empty_value = 0;
-
 	/* Save the page's write generation before reading the page. */
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
@@ -613,6 +633,8 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 	__wt_free(session, r->raw_recnos);
 
 	__rec_bnd_init(session, r, 1);
+
+	__wt_free(session, r->skip);
 
 	__wt_buf_free(session, &r->k.buf);
 	__wt_buf_free(session, &r->v.buf);
@@ -684,51 +706,37 @@ __rec_bnd_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 }
 
 /*
- * __rec_update_save_worker --
- *	Save a WT_UPDATE list for later restoration.
+ * __rec_skip_update_save --
+ *	Save a skipped WT_UPDATE list for later restoration.
  */
 static int
-__rec_update_save_worker(
+__rec_skip_update_save(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip)
 {
-	WT_BOUNDARY *bnd;
+	WT_RET(__wt_realloc_def(
+	    session, &r->skip_allocated, r->skip_next + 1, &r->skip));
+	r->skip[r->skip_next].ins = ins;
+	r->skip[r->skip_next].rip = rip;
+	++r->skip_next;
+	return (0);
+}
 
-	bnd = &r->bnd[r->bnd_next];
+/*
+ * __rec_skip_update_move --
+ *	Move a skipped WT_UPDATE list from the per-page cache to a specific
+ * block's list.
+ */
+static int
+__rec_skip_update_move(
+    WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_UPD_SKIPPED *skip)
+{
 	WT_RET(__wt_realloc_def(
 	    session, &bnd->skip_allocated, bnd->skip_next + 1, &bnd->skip));
-	bnd->skip[bnd->skip_next].ins = ins;
-	bnd->skip[bnd->skip_next].rip = rip;
+	bnd->skip[bnd->skip_next] = *skip;
 	++bnd->skip_next;
-	return (0);
-}
 
-/*
- * __rec_ins_update_save --
- *	If we have an WT_UPDATE list to be saved, save it, WT_INSERT version.
- */
-static inline int
-__rec_ins_update_save(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, int *skipp)
-{
-	if (*skipp) {
-		WT_RET(__rec_update_save_worker(session, r, ins, NULL));
-		*skipp = 0;
-	}
-	return (0);
-}
-
-/*
- * __rec_rip_update_save --
- *	If we have an WT_UPDATE list to be saved, save it, WT_ROW version.
- */
-static inline int
-__rec_rip_update_save(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ROW *rip, int *skipp)
-{
-	if (*skipp) {
-		WT_RET(__rec_update_save_worker(session, r, NULL, rip));
-		*skipp = 0;
-	}
+	skip->ins = NULL;
+	skip->rip = NULL;
 	return (0);
 }
 
@@ -740,13 +748,12 @@ __rec_rip_update_save(
  * be discarded.
  */
 static inline int
-__rec_txn_read(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp, int *skipp)
+__rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
+    WT_UPDATE *upd, WT_INSERT *ins, WT_ROW *rip, WT_UPDATE **updp)
 {
 	uint64_t max_txn, txnid;
 
 	*updp = NULL;
-	*skipp = 0;
 
 	for (max_txn = WT_TXN_NONE; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
@@ -797,7 +804,7 @@ __rec_txn_read(WT_SESSION_IMPL *session,
 	    !__wt_txn_visible_all(session, max_txn)) {
 		if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
 			*updp = NULL;
-			*skipp = 1;
+			WT_RET(__rec_skip_update_save(session, r, ins, rip));
 			r->leave_dirty = 1;
 		} else
 			return (EBUSY);
@@ -1397,7 +1404,7 @@ __rec_is_checkpoint(WT_RECONCILE *r, WT_BOUNDARY *bnd)
  */
 static int
 __rec_split_row_promote_cell(
-    WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, WT_ITEM *copy)
+    WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, WT_ITEM *key)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -1415,7 +1422,7 @@ __rec_split_row_promote_cell(
 	WT_ASSERT(session,
 	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
 
-	WT_RET(__wt_cell_data_copy(session, dsk->type, unpack, copy));
+	WT_RET(__wt_cell_data_copy(session, dsk->type, unpack, key));
 	return (0);
 }
 
@@ -1424,18 +1431,18 @@ __rec_split_row_promote_cell(
  *	Key promotion for a row-store.
  */
 static int
-__rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
+__rec_split_row_promote(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key, uint8_t type)
 {
-	WT_BOUNDARY *bnd;
-	WT_DECL_ITEM(max_update);
-	WT_DECL_RET;
-	WT_ITEM *max, key;
-	WT_PAGE *page;
+	WT_BTREE *btree;
+	WT_ITEM update, *max;
 	WT_UPD_SKIPPED *skip;
 	size_t cnt, len, size;
 	uint32_t i;
 	const uint8_t *pa, *pb;
 	int cmp;
+
+	btree = S2BT(session);
 
 	/*
 	 * For a column-store, the promoted key is the recno and we already have
@@ -1470,43 +1477,51 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 	 * compression off for the next key, we don't have to deal with it here.
 	 */
 	if (type != WT_PAGE_ROW_LEAF || !r->key_sfx_compress)
-		return (__wt_buf_set(session,
-		    &r->bnd[r->bnd_next].key, r->cur->data, r->cur->size));
+		return (__wt_buf_set(session, key, r->cur->data, r->cur->size));
 
 	/*
 	 * Note #2: if we skipped updates, an update key may be larger than the
-	 * last key stored on the page (probable for append-centric workloads).
-	 * If there are skipped updates, check to see if they're larger than the
-	 * last key stored on the page.
+	 * last key stored in the previous block (probable for append-centric
+	 * workloads).  If there are skipped updates, check for one larger than
+	 * the last key and smaller than the current key.
 	 */
 	max = r->last;
-	page = r->page;
-	bnd = &r->bnd[r->bnd_next-1];
-	for (skip = bnd->skip, i = 0; i < bnd->skip_next; ++i, ++skip) {
+	for (i = r->skip_next; i > 0; --i) {
+		skip = &r->skip[i - 1];
 		if (skip->ins == NULL)
-			WT_ERR(__wt_row_leaf_key(
-			    session, page, skip->rip, &key, 0));
+			WT_RET(__wt_row_leaf_key(
+			    session, r->page, skip->rip, &update, 0));
 		else {
-			key.data = WT_INSERT_KEY(skip->ins);
-			key.size = WT_INSERT_KEY_SIZE(skip->ins);
+			update.data = WT_INSERT_KEY(skip->ins);
+			update.size = WT_INSERT_KEY_SIZE(skip->ins);
 		}
-		WT_ERR(WT_LEX_CMP(
-		    session, S2BT(session)->collator, max, &key, cmp));
-		if (cmp < 0) {
-			if (max_update == NULL)
-				WT_ERR(__wt_scr_alloc(
-				    session, key.size, &max_update));
-			WT_ERR(__wt_buf_set(
-			    session, max_update, key.data, key.size));
-			max = max_update;
-		}
+
+		/* Compare against the current key, it must be less. */
+		WT_RET(WT_LEX_CMP(
+		    session, btree->collator, &update, r->cur, cmp));
+		if (cmp >= 0)
+			continue;
+
+		/* Compare against the last key, it must be greater. */
+		WT_RET(WT_LEX_CMP(
+		    session, btree->collator, &update, r->last, cmp));
+		if (cmp >= 0)
+			max = &update;
+
+		/*
+		 * The skipped updates are in key-sort order so the entry we're
+		 * looking for is either the last one or the next-to-last one
+		 * in the list.  Once we've compared an entry against the last
+		 * key on the page, we're done.
+		 */
+		break;
 	}
 
 	/*
-	 * The last key (r->last, or copied update "last") sorts before the
-	 * r->cur key, so we'll either find a larger byte value in r->cur, or
-	 * r->cur will be the longer key, and the interesting byte is one past
-	 * the length of the shorter key.
+	 * The largest key on the last block must sort before the current key,
+	 * so we'll either find a larger byte value in the current key, or the
+	 * current key will be a longer key, and the interesting byte is one
+	 * past the length of the shorter key.
 	 */
 	pa = max->data;
 	pb = r->cur->data;
@@ -1521,11 +1536,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 			}
 			break;
 		}
-	ret =
-	    __wt_buf_set(session, &r->bnd[r->bnd_next].key, r->cur->data, size);
-
-err:	__wt_scr_free(&max_update);
-	return (ret);
+	return (__wt_buf_set(session, key, r->cur->data, size));
 }
 
 /*
@@ -1537,7 +1548,7 @@ static int
 __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_BTREE *btree;
-	WT_BOUNDARY *bnd;
+	WT_BOUNDARY *last, *next;
 	WT_PAGE_HEADER *dsk;
 	uint32_t len;
 
@@ -1582,24 +1593,26 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		 * have happened.
 		 */
 		WT_RET(__rec_split_bnd_grow(session, r));
-		bnd = &r->bnd[r->bnd_next++];
+		last = &r->bnd[r->bnd_next++];
+		next = last + 1;
 
 		/* Set the number of entries for the just finished chunk. */
-		bnd->entries = r->entries - r->total_entries;
+		last->entries = r->entries - r->total_entries;
 		r->total_entries = r->entries;
 
-		/*
-		 * Set the starting record number, buffer address and promotion
-		 * key for the next chunk, clear the entries (not required, but
-		 * cleaner).
-		 */
-		++bnd;
-		bnd->recno = r->recno;
-		bnd->start = r->first_free;
+		/* Set the key for the next chunk. */
+		next->recno = r->recno;
 		if (dsk->type == WT_PAGE_ROW_INT ||
 		    dsk->type == WT_PAGE_ROW_LEAF)
-			WT_RET(__rec_split_row_promote(session, r, dsk->type));
-		bnd->entries = 0;
+			WT_RET(__rec_split_row_promote(
+			    session, r, &next->key, dsk->type));
+
+		/*
+		 * Set the starting buffer address and clear the entries (the
+		 * latter not required, but cleaner).
+		 */
+		next->start = r->first_free;
+		next->entries = 0;
 
 		/*
 		 * Set the space available to another split-size chunk, if we
@@ -1630,32 +1643,34 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		r->bnd_state = SPLIT_TRACKING_OFF;
 		break;
 	case SPLIT_TRACKING_OFF:			/* Case #3 */
-		WT_RET(__rec_split_bnd_grow(session, r));
-		bnd = &r->bnd[r->bnd_next++];
-
 		/*
 		 * It didn't all fit, but either we've already noticed it and
 		 * are now processing the rest of the page at the split-size
 		 * boundaries, or the split size was the same as the page size,
 		 * so we never bothered with saving split-point information.
-		 *
-		 * Finalize the header information and write the page.
 		 */
-		dsk->recno = bnd->recno;
-		dsk->u.entries = r->entries;
-		dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
-		WT_RET(__rec_split_write(session, r, bnd, &r->dsk));
+		WT_RET(__rec_split_bnd_grow(session, r));
+		last = &r->bnd[r->bnd_next++];
+		next = last + 1;
 
 		/*
-		 * Set the starting record number and promotion key for the next
-		 * chunk, clear the entries (not required, but cleaner).
+		 * Set the key for the next chunk (before writing the block, a
+		 * key range is needed in that code).
 		 */
-		++bnd;
-		bnd->recno = r->recno;
+		next->recno = r->recno;
 		if (dsk->type == WT_PAGE_ROW_INT ||
 		    dsk->type == WT_PAGE_ROW_LEAF)
-			WT_RET(__rec_split_row_promote(session, r, dsk->type));
-		bnd->entries = 0;
+			WT_RET(__rec_split_row_promote(
+			    session, r, &next->key, dsk->type));
+
+		/* Clear the entries (not required, but cleaner). */
+		next->entries = 0;
+
+		/* Finalize the header information and write the page. */
+		dsk->recno = last->recno;
+		dsk->u.entries = r->entries;
+		dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
+		WT_RET(__rec_split_write(session, r, last, &r->dsk, 0));
 
 		/*
 		 * Set the caller's entry count and buffer information for the
@@ -1694,6 +1709,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	size_t corrected_page_size, len, result_len;
 	uint64_t recno;
 	uint32_t entry, i, result_slots, slots;
+	int single;
 	uint8_t *dsk_start;
 
 	wt_session = (WT_SESSION *)session;
@@ -1915,7 +1931,6 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 			recno = 0;
 			break;
 		}
-
 		bnd->already_compressed = 1;
 	} else if (final) {
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
@@ -1963,21 +1978,35 @@ more_rows:	/*
 	}
 
 	/*
-	 * If we are writing the whole page in our first/only attempt, it might
-	 * be a checkpoint.  In the case of a checkpoint, copy any compressed
-	 * version of the page into the original buffer, the wrapup functions
-	 * will perform the actual write from that buffer.  If not a checkpoint,
-	 * write the newly created compressed page.
+	 * Check for writing the whole page in our first/only attempt.
 	 */
-	if (final &&
-	    r->entries == 0 && r->bnd_next == 0 &&
-	    __rec_is_checkpoint(r, bnd)) {
+	single = final && r->entries == 0 && r->bnd_next == 0;
+
+	/*
+	 * If we're doing an eviction, and we skipped an update, it only pays
+	 * off to continue if we're writing multiple blocks, that is, we'll be
+	 * able to evict something.  This should be unlikely (why did eviction
+	 * choose a recently written, small block), but it's possible.
+	 */
+	if (single && F_ISSET(r, WT_SKIP_UPDATE_RESTORE) && r->leave_dirty) {
+		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
+		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
+		WT_ERR(EBUSY);
+	}
+
+	/*
+	 * If it's a checkpoint, copy any compressed version of the page into
+	 * the original buffer, the wrapup functions will perform the actual
+	 * write from that buffer.  If not a checkpoint, write the newly created
+	 * compressed page.
+	 */
+	if (single && __rec_is_checkpoint(r, bnd)) {
 		if (bnd->already_compressed)
 			WT_ERR(__wt_buf_set(
 			    session, &r->dsk, dst->mem, dst->size));
 	} else
-		WT_ERR(__rec_split_write(
-		    session, r, bnd, bnd->already_compressed ? dst : &r->dsk));
+		WT_ERR(__rec_split_write(session,
+		    r, bnd, bnd->already_compressed ? dst : &r->dsk, final));
 
 	/* We wrote something, move to the next boundary. */
 	WT_ERR(__rec_split_bnd_grow(session, r));
@@ -1986,6 +2015,46 @@ more_rows:	/*
 
 done:
 err:	__wt_scr_free(&dst);
+	return (ret);
+}
+
+/*
+ * __rec_raw_decompress --
+ *	Decompress a raw-compressed image.
+ */
+static int
+__rec_raw_decompress(
+    WT_SESSION_IMPL *session, void *image, size_t size, void *retp)
+{
+	WT_BTREE *btree;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+	WT_PAGE_HEADER *dsk;
+	size_t result_len;
+
+	btree = S2BT(session);
+	dsk = image;
+
+	/*
+	 * We skipped an update and we can't write a block, but unfortunately,
+	 * the block has already been compressed.   Decompress the block so we
+	 * can subsequently re-instantiate it in memory.
+	 */
+	WT_RET(__wt_scr_alloc(session, dsk->mem_size, &tmp));
+	memcpy(tmp->mem, image, WT_BLOCK_COMPRESS_SKIP);
+	WT_ERR(btree->compressor->decompress(btree->compressor,
+	    &session->iface,
+	    (uint8_t *)image + WT_BLOCK_COMPRESS_SKIP,
+	    size - WT_BLOCK_COMPRESS_SKIP,
+	    (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP,
+	    dsk->mem_size - WT_BLOCK_COMPRESS_SKIP,
+	    &result_len));
+	if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
+		WT_ERR(__wt_illegal_value(session, btree->dhandle->name));
+
+	ret = __wt_strndup(session, tmp->data, result_len, retp);
+
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -2009,16 +2078,15 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	WT_BOUNDARY *bnd;
 	WT_PAGE_HEADER *dsk;
 
-	/* Check our split status. */
+	/* Adjust the boundary information based on our split status. */
 	switch (r->bnd_state) {
 	case SPLIT_BOUNDARY:
 	case SPLIT_MAX:
 		/*
-		 * If we have could have split, but never did, the reconciled
-		 * page fit into a maximum page size, our boundary checking
-		 * was wasted.   Change the first boundary slot to represent
-		 * the full page (the first boundary slot is largely correct,
-		 * just update the number of entries).
+		 * We never split, the reconciled page fit into a maximum page
+		 * size.  Change the first boundary slot to represent the full
+		 * page (the first boundary slot is largely correct, just update
+		 * the number of entries).
 		 */
 		r->bnd_next = 0;
 		break;
@@ -2035,10 +2103,9 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 	/*
 	 * If we're doing an eviction, and we skipped an update, it only pays
-	 * off to continue if we're writing multiple blocks, that is, if we
-	 * will be able to evict something.  This should be unlikely (why did
-	 * eviction pick a relatively small block that was recently written),
-	 * but it's possible.
+	 * off to continue if we're writing multiple blocks, that is, we'll be
+	 * able to evict something.  This should be unlikely (why did eviction
+	 * choose a recently written, small block), but it's possible.
 	 */
 	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
 	    r->bnd_next == 0 && r->leave_dirty) {
@@ -2049,9 +2116,10 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 	/*
 	 * We only arrive here with no entries to write if the page was entirely
-	 * empty (if the page wasn't empty, the only reason to split, resetting
-	 * entries to 0, is because there's another entry to write, which then
-	 * sets entries to 1).  If the page was empty, we eventually delete it.
+	 * empty; if the page was empty, we merge it into its parent during the
+	 * parent's reconciliation.  This check is done after checking skipped
+	 * updates, we could have a page that's empty only because we skipped
+	 * all of the updates.
 	 */
 	if (r->entries == 0)
 		return (0);
@@ -2069,7 +2137,7 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	/* If this is a checkpoint, we're done, otherwise write the page. */
 	return (
 	    __rec_is_checkpoint(r, bnd) ? 0 :
-	    __rec_split_write(session, r, bnd, &r->dsk));
+	    __rec_split_write(session, r, bnd, &r->dsk, 1));
 }
 
 /*
@@ -2148,7 +2216,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		dsk->u.entries = bnd->entries;
 		dsk->mem_size =
 		    tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
-		WT_ERR(__rec_split_write(session, r, bnd, tmp));
+		WT_ERR(__rec_split_write(session, r, bnd, tmp, 0));
 	}
 
 	/*
@@ -2183,20 +2251,26 @@ err:	__wt_scr_free(&tmp);
  *	Write a disk block out for the split helper functions.
  */
 static int
-__rec_split_write(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf)
+__rec_split_write(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int final)
 {
 	WT_BTREE *btree;
+	WT_ITEM key;
 	WT_MULTI *multi;
+	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
 	WT_PAGE_MODIFY *mod;
+	WT_UPD_SKIPPED *skip;
 	ptrdiff_t bnd_slot;
 	size_t addr_size;
+	uint32_t i, j;
+	int cmp;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = S2BT(session);
 	dsk = buf->mem;
-	mod = r->page->modify;
+	page = r->page;
+	mod = page->modify;
 
 	/* Set the zero-length value flag in the page header. */
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
@@ -2227,12 +2301,76 @@ __rec_split_write(
 	bnd->cksum = 0;
 
 	/*
+	 * Check if we've skipped updates that belong to this block, and move
+	 * any to the per-block structure.  Quit as soon as we find a skipped
+	 * update that doesn't belong to the block, they're in sorted order.
+	 *
+	 * This code requires a key be filled in for the next block (or final
+	 * be set, if there's no next block).
+	 */
+	for (i = 0, skip = r->skip; i < r->skip_next; ++i, ++skip) {
+		/* The final block gets all remaining skipped updates. */
+		if (final) {
+			WT_RET(__rec_skip_update_move(session, bnd, skip));
+			continue;
+		}
+
+		/*
+		 * Get the skipped update's key and compare it with this block's
+		 * key range.  If the skipped update list belongs with the block
+		 * we're about to write, move it to the per-block memory.  Check
+		 * only to the first update that doesn't go with the block, they
+		 * must be in sorted order.
+		 */
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			if (WT_INSERT_RECNO(skip->ins) >= (bnd + 1)->recno)
+				goto skip_check_complete;
+			break;
+		case WT_PAGE_ROW_LEAF:
+			if (skip->ins == NULL)
+				WT_RET(__wt_row_leaf_key(
+				    session, page, skip->rip, &key, 0));
+			else {
+				key.data = WT_INSERT_KEY(skip->ins);
+				key.size = WT_INSERT_KEY_SIZE(skip->ins);
+			}
+			WT_RET(WT_LEX_CMP(session,
+			    btree->collator, &key, &(bnd + 1)->key, cmp));
+			if (cmp >= 0)
+				goto skip_check_complete;
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
+		WT_RET(__rec_skip_update_move(session, bnd, skip));
+	}
+skip_check_complete:
+	/*
+	 * If there are updates that weren't moved to the block, shuffle them to
+	 * the beginning of the cached list (we maintain the skipped updates in
+	 * sorted order, new skipped updates must be appended to the list).
+	 */
+	for (j = 0; i < r->skip_next; ++j, ++i)
+		r->skip[j] = r->skip[i];
+	r->skip_next = j;
+
+	/*
 	 * If we had to skip updates in order to build this disk image, we can't
 	 * actually write it. Instead, we will re-instantiate the page using the
 	 * disk image and the list of updates we skipped.
+	 *
+	 * If the buffer is compressed (raw compression was configured), we have
+	 * to decompress it so we can instantiate it later.
 	 */
-	if (bnd->skip != NULL)
-		return (__wt_strndup(session, buf->data, buf->size, &bnd->dsk));
+	if (bnd->skip != NULL) {
+		if (bnd->already_compressed)
+			return (__rec_raw_decompress(
+			    session, buf->mem, buf->size, &bnd->dsk));
+		else
+			return (__wt_strndup(
+			    session, buf->data, buf->size, &bnd->dsk));
+	}
 
 	/*
 	 * If we wrote this block before, re-use it.  Pages get written in the
@@ -2729,7 +2867,6 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t entry, nrecs;
-	int upd_skip;
 
 	btree = S2BT(session);
 
@@ -2738,11 +2875,10 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
+		WT_RET(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
 		if (upd != NULL)
 			__bit_setv_recno(page, WT_INSERT_RECNO(ins),
 			    btree->bitcnt, ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
-		WT_RET(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	/* Copy the updated, disk-image bytes into place. */
@@ -2756,12 +2892,9 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Walk any append list. */
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
-		if (upd == NULL) {
-			WT_RET(
-			    __rec_ins_update_save(session, r, ins, &upd_skip));
+		WT_RET(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
+		if (upd == NULL)
 			continue;
-		}
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
@@ -2796,8 +2929,6 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			entry = 0;
 			nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 		}
-
-		WT_RET(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	/* Update the counters. */
@@ -2974,7 +3105,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
-	int deleted, last_deleted, orig_deleted, update_no_copy, upd_skip;
+	int deleted, last_deleted, orig_deleted, update_no_copy;
 	const void *data;
 
 	btree = S2BT(session);
@@ -3082,7 +3213,7 @@ record_loop:	/*
 			upd = NULL;
 			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
 				WT_ERR(__rec_txn_read(
-				    session, r, ins->upd, &upd, &upd_skip));
+				    session, r, ins->upd, ins, NULL, &upd));
 				ins = WT_SKIP_NEXT(ins);
 			}
 			if (upd != NULL) {
@@ -3192,8 +3323,6 @@ compare:		/*
 				WT_ERR(__rec_col_var_helper(session, r,
 				    salvage, last, last_deleted, 0, rle));
 			}
-			WT_ERR(
-			    __rec_ins_update_save(session, r, ins, &upd_skip));
 
 			/*
 			 * Swap the current/last state.
@@ -3241,12 +3370,9 @@ compare:		/*
 
 	/* Walk any append list. */
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_ERR(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
-		if (upd == NULL) {
-			WT_ERR(
-			    __rec_ins_update_save(session, r, ins, &upd_skip));
+		WT_ERR(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
+		if (upd == NULL)
 			continue;
-		}
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left
@@ -3292,7 +3418,6 @@ compare:		/*
 			last_deleted = deleted;
 			rle = 1;
 		}
-		WT_ERR(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	/* If we were tracking a record, write it. */
@@ -3609,7 +3734,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	size_t size;
 	uint64_t slvg_skip;
 	uint32_t i;
-	int dictionary, onpage_ovfl, ovfl_key, upd_skip;
+	int dictionary, onpage_ovfl, ovfl_key;
 	const void *p;
 
 	btree = S2BT(session);
@@ -3666,7 +3791,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 		/* Look for an update. */
 		WT_ERR(__rec_txn_read(session, r,
-		    WT_ROW_UPDATE(page, rip), &upd, &upd_skip));
+		    WT_ROW_UPDATE(page, rip), NULL, rip, &upd));
 
 		/* Build value cell. */
 		dictionary = 0;
@@ -3931,8 +4056,6 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
 
-		WT_ERR(__rec_rip_update_save(session, r, rip, &upd_skip));
-
 leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 		if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT(page, rip))) != NULL)
 		    WT_ERR(__rec_row_leaf_insert(session, r, ins));
@@ -3956,7 +4079,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_UPDATE *upd;
-	int ovfl_key, upd_skip;
+	int ovfl_key;
 
 	btree = S2BT(session);
 
@@ -3965,13 +4088,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		/* Look for an update. */
-		WT_RET(__rec_txn_read(session, r, ins->upd, &upd, &upd_skip));
-		if (upd == NULL) {
-			WT_RET(
-			    __rec_ins_update_save(session, r, ins, &upd_skip));
-			continue;
-		}
-		if (WT_UPDATE_DELETED_ISSET(upd))
+		WT_RET(__rec_txn_read(session, r, ins->upd, ins, NULL, &upd));
+		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
 		if (upd->size == 0)			/* Build value cell. */
@@ -4019,8 +4137,6 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
-
-		WT_RET(__rec_ins_update_save(session, r, ins, &upd_skip));
 	}
 
 	return (0);
