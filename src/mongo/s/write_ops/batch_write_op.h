@@ -120,7 +120,7 @@ namespace mongo {
          * The response may be in any form, error or not.
          *
          * There is an additional optional 'trackedErrors' parameter, which can be used to return
-         * copies of any errors in the response that the caller is interested in (specified by
+         * copies of any write errors in the response that the caller is interested in (specified by
          * errCode).  (This avoids external callers needing to know much about the response format.)
          */
         void noteBatchResponse( const TargetedWriteBatch& targetedBatch,
@@ -128,18 +128,19 @@ namespace mongo {
                                 TrackedErrors* trackedErrors );
 
         /**
-         * Stores an error that occurred while trying to send/recv a TargetedWriteBatch for this
-         * BatchWriteOp, and so a response is not available.
+         * Stores an error that occurred trying to send/recv a TargetedWriteBatch for this
+         * BatchWriteOp.
          */
         void noteBatchError( const TargetedWriteBatch& targetedBatch,
                              const WriteErrorDetail& error );
 
         /**
-         * Sets a command error for this batch op directly.
+         * Aborts any further writes in the batch with the provided error.  There must be no pending
+         * ops awaiting results when a batch is aborted.
          *
-         * Should only be used when there are no outstanding batches to return.
+         * Batch is finished immediately after aborting.
          */
-        void setBatchError( const WriteErrorDetail& error );
+        void abortBatch( const WriteErrorDetail& error );
 
         /**
          * Returns false if the batch write op needs more processing.
@@ -176,11 +177,6 @@ namespace mongo {
 
         // Upserted ids for the whole write batch
         OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
-
-        // Use to store a top-level error indicating that the batch aborted unexpectedly and we
-        // can't report on any of the writes sent.  May also include a ShardEndpoint indicating
-        // where the root problem was.
-        scoped_ptr<ShardError> _batchError;
 
         // Stats for the entire batch op
         scoped_ptr<BatchWriteStats> _stats;

@@ -311,8 +311,9 @@ namespace {
 
         ASSERT( response.isOkSet() );
         ASSERT( !response.getOk() );
-        ASSERT_EQUALS( response.getErrCode(), 1234 );
-        ASSERT_EQUALS( response.getErrMessage(), "message" );
+        // Error code indicates partial results
+        ASSERT_EQUALS( response.getErrCode(), ErrorCodes::RemoteResultsUnavailable );
+        ASSERT( response.getErrMessage().find( "message" ) != string::npos );
         ASSERT( !mockWriter.isClearCalled() );
     }
 

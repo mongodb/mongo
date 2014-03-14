@@ -69,17 +69,22 @@ assert.eq(null, config.getLastError());
 printjson( request = {insert : brokenColl.getName(),
                       documents: [{_id:-1}]} );
 printjson( result = brokenColl.runCommand(request) );
-assert(!result.ok);
-assert.eq(result.code, 82); // No Progress Made
+assert(result.ok);
+assert.eq(0, result.n);
+assert.eq(1, result.writeErrors.length);
+assert.eq(0, result.writeErrors[0].index);
+assert.eq(result.writeErrors[0].code, 82); // No Progress Made
 
 //
 // Config server insert to other shard, repeatedly stale
 printjson( request = {insert : brokenColl.getName(),
                    documents: [{_id:1}]} );
 printjson( result = brokenColl.runCommand(request) );
-assert(!result.ok);
-assert.eq(result.code, 82); // No Progress Made
-
+assert(result.ok);
+assert.eq(0, result.n);
+assert.eq(1, result.writeErrors.length);
+assert.eq(0, result.writeErrors[0].index);
+assert.eq(result.writeErrors[0].code, 82); // No Progress Made
 
 //
 //
