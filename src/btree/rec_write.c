@@ -2024,12 +2024,12 @@ err:	__wt_scr_free(&dst);
  */
 static int
 __rec_raw_decompress(
-    WT_SESSION_IMPL *session, void *image, size_t size, void *retp)
+    WT_SESSION_IMPL *session, const void *image, size_t size, void *retp)
 {
 	WT_BTREE *btree;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
+	WT_PAGE_HEADER const *dsk;
 	size_t result_len;
 
 	btree = S2BT(session);
@@ -2366,7 +2366,7 @@ skip_check_complete:
 	if (bnd->skip != NULL) {
 		if (bnd->already_compressed)
 			return (__rec_raw_decompress(
-			    session, buf->mem, buf->size, &bnd->dsk));
+			    session, buf->data, buf->size, &bnd->dsk));
 		else
 			return (__wt_strndup(
 			    session, buf->data, buf->size, &bnd->dsk));
