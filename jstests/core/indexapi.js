@@ -37,12 +37,6 @@ assert( idx[1].unique , "M3" );
 //printjson( idx );
 
 // Test that attempting to create index in an invalid namespace fails.
-if (db.getMongo().writeMode() == 'commands') {
-    assert.throws(function() {
-        db.system.indexes.insert( { ns : "test" , key : { x : 1 } , name : "x" } );
-    });
-}
-else {
-    assert.writeError(db.system.indexes.insert( { ns : "test" , key : { x : 1 } , name : "x" } ));
-}
+assert.writeError(db.system.indexes.insert( { ns : "test" , key : { x : 1 } , name : "x" } ));
+
 

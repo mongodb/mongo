@@ -20,18 +20,10 @@ var assertCannotRunCommands = function(mongo) {
     var test = mongo.getDB("test");
     assert.throws( function() { test.system.users.findOne(); });
     assert.throws( function() { test.foo.findOne({ _id: 0 }); });
-
-    assert.throws(function() {
-        test.foo.save({ _id: 0 })
-    });
-
-    assert.throws(function() {
-        test.foo.update({ _id: 0 }, { $set: { x: 20 }})
-    });
-
-    assert.throws(function() {
-        test.foo.remove({ _id: 0 })
-    });
+        
+    assert.writeError(test.foo.save({ _id: 0 }));
+    assert.writeError(test.foo.update({ _id: 0 }, { $set: { x: 20 }}));
+    assert.writeError(test.foo.remove({ _id: 0 }));
 
     assert.throws(function() { 
         test.foo.mapReduce(

@@ -30,7 +30,7 @@ p = startParallelShell(
 
 // Remove using the a:1 index in ascending direction.
 var res = t.remove( { a:{ $gte:0 } } );
-assert( !res.hasWriteErrors(), 'The remove operation failed.' );
+assert( !res.hasWriteError(), 'The remove operation failed.' );
 
 p();
 

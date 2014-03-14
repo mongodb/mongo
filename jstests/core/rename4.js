@@ -6,7 +6,7 @@ function bad( f ) {
     var res = eval( f );
 
     //Ensure error
-    if (!res.hasWriteErrors()) {
+    if (!res.hasWriteError()) {
         print("Error:" + res.toString());
         print("Existing docs (before)")
         printjson(docsBeforeUpdate);

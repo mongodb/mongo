@@ -14,7 +14,7 @@ for ( i=0; i<N; i++ ) {
     bulk.insert( { a : i + .5 , x : s } );
     s += "x";
 }
-assert.writeError(bulk.execute());
+assert.throws( function() { bulk.execute(); } );
 
 assert.eq( 2 , t.getIndexes().length );
 

@@ -35,7 +35,7 @@ t.insert( {geo : somepoly, nonGeo: "somepoly" })
 
 var res = t.ensureIndex( { geo : "2dsphere", nonGeo: 1 } );
 // We have a point without any geo data.  Don't error.
-assert.writeOK(res);
+assert.commandWorked(res);
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointA} } });
 assert.eq(res.itcount(), 3);
@@ -96,7 +96,7 @@ assert.writeOK(res);
 t.drop();
 t.save({loc: [0,0]})
 res = t.ensureIndex({ loc: "2dsphere" }, { finestIndexedLevel: 17, coarsestIndexedLevel: 5 });
-assert.writeOK(res);
+assert.commandWorked(res);
 
 t.drop();
 t.save({loc: [0,0]})

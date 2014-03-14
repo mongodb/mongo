@@ -5,15 +5,15 @@ t = db.jstests_update_dbref;
 t.drop();
 
 res = t.save({_id:1, a: new DBRef("a", "b")});
-assert(!res.hasWriteErrors(), "failed to save dbref");
+assert(!res.hasWriteError(), "failed to save dbref");
 assert.docEq({_id:1, a: new DBRef("a", "b")}, t.findOne());
 
 res = t.update({}, {$set: {"a.$id": 2}});
-assert(!res.hasWriteErrors(), "a.$id update");
+assert(!res.hasWriteError(), "a.$id update");
 assert.docEq({_id:1, a: new DBRef("a", 2)}, t.findOne());
 
 res = t.update({}, {$set: {"a.$ref": "b"}});
-assert(!res.hasWriteErrors(), "a.$ref update");
+assert(!res.hasWriteError(), "a.$ref update");
 
 assert.docEq({_id:1, a: new DBRef("b", 2)}, t.findOne());
 
@@ -34,7 +34,7 @@ assert(/\$db/.test(res.getWriteError()), "expected bad update because of $db");
 assert.docEq({_id:1, a: new DBRef("b", 2)}, t.findOne());
 
 res = t.update({}, {$set: {"b.$id": 2}});
-assert(res.hasWriteErrors(), "b.$id update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());
+assert(res.hasWriteError(), "b.$id update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());
 
 res = t.update({}, {$set: {"b.$ref": 2}});
-assert(res.hasWriteErrors(), "b.$ref update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());
+assert(res.hasWriteError(), "b.$ref update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());

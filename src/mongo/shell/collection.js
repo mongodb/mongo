@@ -229,20 +229,35 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
 
     if ( this.getMongo().writeMode() != "legacy" ) {
         // Bit 1 of option flag is continueOnError. Bit 0 (stop on error) is the default.
-        var batch = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
+        var bulk = ordered ? this.initializeOrderedBulkOp() : this.initializeUnorderedBulkOp();
+        var isMultiInsert = Array.isArray(obj);
 
-        if (Array.isArray(obj)) {
+        if (isMultiInsert) {
             obj.forEach(function(doc) {
-                batch.insert(doc);
+                bulk.insert(doc);
             });
-            // Do not return a SingleWriteResult if inserting an array
-            result = batch.execute(wc);
         }
         else {
-            batch.insert(obj);
-            result = batch.execute(wc).toSingleResult();
+            bulk.insert(obj);
         }
 
+        try {
+            result = bulk.execute(wc);
+            if (!isMultiInsert)
+                result = result.toSingleResult();
+        }
+        catch( ex ) {
+            if ( ex instanceof BulkWriteError ) {
+                result = isMultiInsert ? ex.toResult() : ex.toSingleResult();
+            }
+            else if ( ex instanceof WriteCommandError ) {
+                result = isMultiInsert ? ex : ex.toSingleResult();
+            }
+            else {
+                // Other exceptions thrown
+                throw ex;
+            }
+        }
     }
     else {
         if ( ! _allow_dot ) {
@@ -292,14 +307,14 @@ DBCollection.prototype.remove = function( t , justOne ){
         wc = opts.writeConcern;
         justOne = opts.justOne;
     }
-    
+
     if (!wc)
         wc = this.getWriteConcern();
 
     if ( this.getMongo().writeMode() != "legacy" ) {
         var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
-        var batch = this.initializeOrderedBulkOp();
-        var removeOp = batch.find(query);
+        var bulk = this.initializeOrderedBulkOp();
+        var removeOp = bulk.find(query);
 
         if (justOne) {
             removeOp.removeOne();
@@ -308,7 +323,18 @@ DBCollection.prototype.remove = function( t , justOne ){
             removeOp.remove();
         }
 
-        result = batch.execute(wc).toSingleResult();
+        try {
+            result = bulk.execute(wc).toSingleResult();
+        }
+        catch( ex ) {
+            if ( ex instanceof BulkWriteError || ex instanceof WriteCommandError ) {
+                result = ex.toSingleResult();
+            }
+            else {
+                // Other exceptions thrown
+                throw ex;
+            }
+        }
     }
     else {
         this._validateRemoveDoc(t);
@@ -364,8 +390,8 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         wc = this.getWriteConcern();
     
     if ( this.getMongo().writeMode() != "legacy" ) {
-        var batch = this.initializeOrderedBulkOp();
-        var updateOp = batch.find(query);
+        var bulk = this.initializeOrderedBulkOp();
+        var updateOp = bulk.find(query);
 
         if (upsert) {
             updateOp = updateOp.upsert();
@@ -378,7 +404,18 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
             updateOp.updateOne(obj);
         }
 
-        result = batch.execute(wc).toSingleResult();
+        try {
+            result = bulk.execute(wc).toSingleResult();
+        }
+        catch( ex ) {
+            if ( ex instanceof BulkWriteError || ex instanceof WriteCommandError ) {
+                result = ex.toSingleResult();
+            }
+            else {
+                // Other exceptions thrown
+                throw ex;
+            }
+        }
     }
     else {
         this._validateUpdateDoc(obj);

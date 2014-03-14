@@ -27,7 +27,7 @@ assert.neq(null, res);
 
 // Create a point index only slightly bigger than the points we have
 res = t.ensureIndex( { loc : "2d" }, { max : overallMax + epsilon, min : overallMin - epsilon } );
-assert.writeOK(res);
+assert.commandWorked(res);
 
 // ************
 // Box Tests

@@ -7,7 +7,7 @@ s.remove({});
 assert.eq( 0 , s.count() , "setup - A" );
 
 res = s.save( { _id : "x" , value : "3" } );
-assert( !res.hasWriteErrors() , "setup - B" );
+assert( !res.hasWriteError() , "setup - B" );
 assert.eq( 1 , s.count() , "setup - C" );
 
 s.remove( { _id : "x" } );

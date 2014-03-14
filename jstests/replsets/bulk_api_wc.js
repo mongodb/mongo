@@ -37,7 +37,7 @@ var executeTests = function() {
     bulk.insert({a:1});
     bulk.insert({a:2});
     bulk.insert({a:2});
-    var result = bulk.execute({ w : 'invalid' });
+    var result = assert.throws( function() { bulk.execute({ w : 'invalid' }); } );
     assert.eq(result.nInserted, 2);
     assert.eq(result.getWriteErrors()[0].index, 2);
     assert(!result.getWriteConcernError());
@@ -54,7 +54,7 @@ var executeTests = function() {
     bulk.insert({a:1});
     bulk.insert({a:2});
     bulk.insert({a:2});
-    var result = bulk.execute({ w : 'invalid' });
+    var result = assert.throws( function(){ bulk.execute({ w : 'invalid' }); } );
     assert.eq(result.nInserted, 2);
     assert.eq(result.getWriteErrors()[0].index, 2);
     assert(result.getWriteConcernError());
@@ -69,7 +69,7 @@ var executeTests = function() {
     bulk.insert({a:1});
     bulk.insert({a:2});
     bulk.insert({a:2});
-    var result = bulk.execute({ w : 3, wtimeout : 1 });
+    var result = assert.throws( function() { bulk.execute({ w : 3, wtimeout : 1 }); } );
     assert.eq(result.nInserted, 2);
     assert.eq(result.getWriteErrors()[0].index, 2);
     assert(result.getWriteConcernError().errInfo.wtimeout);
@@ -83,7 +83,7 @@ var executeTests = function() {
     bulk.insert({a:2});
     bulk.find({a:3}).upsert().updateOne({a:3});
     bulk.insert({a:3});
-    var result = bulk.execute({ w : 'invalid' });
+    var result = assert.throws( function(){ bulk.execute({ w : 'invalid' }); } );
     assert.eq(result.nInserted, 2);
     assert.eq(result.nUpserted, 1);
     assert.eq(result.getUpsertedIds()[0].index, 2);
