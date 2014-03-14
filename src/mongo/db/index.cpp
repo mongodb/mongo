@@ -444,7 +444,7 @@ namespace mongo {
                 b.append("key", id_obj);
             }
             else {
-                b.append( "name", o["name"] );
+                b.append( o["name"] );
                 b.append(o["key"]);
             }
             if( o["unique"].trueValue() )
