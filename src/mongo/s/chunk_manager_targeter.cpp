@@ -496,10 +496,24 @@ namespace mongo {
             remoteShardVersion = ChunkVersion::fromBSON( staleInfo, "vWanted" );
         }
 
-        // We assume here that we can't have more than one stale config per-shard
-        dassert( _remoteShardVersions.find( endpoint.shardName ) == _remoteShardVersions.end() );
-
-        _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
+        ShardVersionMap::iterator it = _remoteShardVersions.find( endpoint.shardName );
+        if ( it == _remoteShardVersions.end() ) {
+            _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
+        }
+        else {
+            ChunkVersion& previouslyNotedVersion = it->second;
+            if ( previouslyNotedVersion.hasCompatibleEpoch( remoteShardVersion )) {
+                if ( previouslyNotedVersion.isOlderThan( remoteShardVersion )) {
+                    remoteShardVersion.cloneTo( &previouslyNotedVersion );
+                }
+            }
+            else {
+                // Epoch changed midway while applying the batch so set the version to
+                // something unique and non-existent to force a reload when
+                // refreshIsNeeded is called.
+                ChunkVersion::IGNORED().cloneTo( &previouslyNotedVersion );
+            }
+        }
     }
 
     void ChunkManagerTargeter::noteCouldNotTarget() {
