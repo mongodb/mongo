@@ -2516,8 +2516,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = S2BT(session);
-
 	cursor = &cbulk->cbt.iface;
+
 	key = &r->k;
 	val = &r->v;
 	WT_RET(__rec_cell_build_leaf_key(session, r,	/* Build key cell */
@@ -2719,11 +2719,11 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	int hazard, state;
 
 	btree = S2BT(session);
-	unpack = &_unpack;
 	child = NULL;
 	hazard = 0;
 
 	val = &r->v;
+	unpack = &_unpack;
 
 	WT_RET(__rec_split_init(
 	    session, r, page, page->pg_intl_recno, btree->maxintlpage));
@@ -2825,8 +2825,9 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_PAGE_MODIFY *mod;
 	uint32_t i;
 
-	val = &r->v;
 	mod = page->modify;
+
+	val = &r->v;
 
 	/* For each entry in the split array... */
 	for (multi = mod->u.m.multi,
@@ -3016,6 +3017,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_KV *val;
 
 	btree = S2BT(session);
+
 	val = &r->v;
 
 	/*
@@ -3676,9 +3678,10 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	uint32_t i;
 	int ovfl_key;
 
+	mod = page->modify;
+
 	key = &r->k;
 	val = &r->v;
-	mod = page->modify;
 
 	/* For each entry in the split array... */
 	for (multi = mod->u.m.multi,
@@ -4603,6 +4606,7 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session,
 	*is_ovflp = 0;
 
 	btree = S2BT(session);
+
 	key = &r->k;
 
 	/* Copy the bytes into the "current" and key buffers. */
@@ -4639,9 +4643,11 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 	uint8_t pfx;
 	const uint8_t *a, *b;
 
-	btree = S2BT(session);
-	key = &r->k;
 	*is_ovflp = 0;
+
+	btree = S2BT(session);
+
+	key = &r->k;
 
 	pfx = 0;
 	if (data == NULL)
@@ -4771,6 +4777,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session,
 	WT_KV *val;
 
 	btree = S2BT(session);
+
 	val = &r->v;
 
 	/*
