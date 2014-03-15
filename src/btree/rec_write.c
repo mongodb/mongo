@@ -793,9 +793,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * If evicting and not all of the updates are visible, and we can save
 	 * and restore the list of updates on a newly instantiated page, do so.
 	 * The order of the updates matters so we can't move only unresolved
-	 * updates, we have to move the entire update list.  For simplicity in
-	 * that case, we don't write any updates at all, our caller will either
-	 * write nothing, or the original value from the disk image of the page.
+	 * updates, we have to move the entire update list.
 	 *
 	 * If evicting and not all of the updates are visible, and we can't save
 	 * and restore the list of updates, quit -- this page can't be evicted.
@@ -803,7 +801,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (F_ISSET(r, WT_EVICTION_LOCKED) &&
 	    !__wt_txn_visible_all(session, max_txn)) {
 		if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
-			*updp = NULL;
 			WT_RET(__rec_skip_update_save(session, r, ins, rip));
 			r->leave_dirty = 1;
 		} else
