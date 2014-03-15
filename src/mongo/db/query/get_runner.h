@@ -119,6 +119,14 @@ namespace mongo {
                           Runner** out);
 
     /**
+     * Get a runner for a query.  Ignores the cache and always plans the full query.
+     */
+    Status getRunnerAlwaysPlan(Collection* collection,
+                               CanonicalQuery* rawCanonicalQuery,
+                               const QueryPlannerParams& plannerParams,
+                               Runner** out);
+
+    /**
      * RAII approach to ensuring that runners are deregistered in newRunQuery.
      *
      * While retrieving the first batch of results, newRunQuery manually registers the runner with

@@ -33,6 +33,7 @@
 #include <memory>
 #include "boost/thread/locks.hpp"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/client/dbclientinterface.h"   // For QueryOption_foobar
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/qlog.h"
@@ -79,6 +80,16 @@ namespace mongo {
         // stale information from the cache for the losing plans, allPlans would
         // simply be wrong.
         if (lpq.isExplain()) {
+            return false;
+        }
+
+        // Tailable cursors won't get cached, just turn into collscans.
+        if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
+            return false;
+        }
+
+        // Snapshot is really a hint.
+        if (query.getParsed().isSnapshot()) {
             return false;
         }
 
@@ -283,7 +294,8 @@ namespace mongo {
 
     PlanCache::~PlanCache() { }
 
-    Status PlanCache::add(const CanonicalQuery& query, const std::vector<QuerySolution*>& solns,
+    Status PlanCache::add(const CanonicalQuery& query,
+                          const std::vector<QuerySolution*>& solns,
                           PlanRankingDecision* why) {
         invariant(why);
 

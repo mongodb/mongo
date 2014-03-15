@@ -56,4 +56,6 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableIndexIntersection, bool, true);
 
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanOrChildrenIndependently, bool, true);
+
 }  // namespace mongo

@@ -305,19 +305,9 @@ namespace {
 
 namespace mongo {
 
-    // static
-    Status CanonicalQuery::canonicalize(const QueryMessage& qm, CanonicalQuery** out) {
-        LiteParsedQuery* lpq;
-        Status parseStatus = LiteParsedQuery::make(qm, &lpq);
-        if (!parseStatus.isOK()) { return parseStatus; }
-
-        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq);
-        if (!initStatus.isOK()) { return initStatus; }
-
-        *out = cq.release();
-        return Status::OK();
-    }
+    //
+    // These all punt to the many-argumented canonicalize below.
+    //
 
     // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
@@ -364,6 +354,65 @@ namespace mongo {
                                             out);
     }
 
+    //
+    // These actually call init() on the CQ.
+    //
+
+    // static
+    Status CanonicalQuery::canonicalize(const QueryMessage& qm, CanonicalQuery** out) {
+        // Make LiteParsedQuery.
+        LiteParsedQuery* lpq;
+        Status parseStatus = LiteParsedQuery::make(qm, &lpq);
+        if (!parseStatus.isOK()) { return parseStatus; }
+
+        // Make MatchExpression.
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter());
+        if (!swme.isOK()) {
+            delete lpq;
+            return swme.getStatus();
+        }
+
+        // Make the CQ we'll hopefully return.
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        // Takes ownership of lpq and the MatchExpression* in swme.
+        Status initStatus = cq->init(lpq, swme.getValue());
+
+        if (!initStatus.isOK()) { return initStatus; }
+        *out = cq.release();
+        return Status::OK();
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(const CanonicalQuery& baseQuery,
+                                        MatchExpression* root,
+                                        CanonicalQuery** out) {
+
+        LiteParsedQuery* lpq;
+
+        // Pass empty sort and projection.
+        BSONObj emptyObj;
+        // 0, 0, 0 is 'ntoskip', 'ntoreturn', and 'queryoptions'
+        // false, false is 'snapshot' and 'explain'
+        Status parseStatus = LiteParsedQuery::make(baseQuery.ns(),
+                                                   0, 0, 0,
+                                                   baseQuery.getParsed().getFilter(),
+                                                   baseQuery.getParsed().getProj(),
+                                                   baseQuery.getParsed().getSort(),
+                                                   emptyObj, emptyObj, emptyObj,
+                                                   false, false, &lpq);
+        if (!parseStatus.isOK()) {
+            return parseStatus;
+        }
+
+        // Make the CQ we'll hopefully return.
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        Status initStatus = cq->init(lpq, root->shallowClone());
+
+        if (!initStatus.isOK()) { return initStatus; }
+        *out = cq.release();
+        return Status::OK();
+    }
+
     // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
                                         const BSONObj& sort, const BSONObj& proj,
@@ -378,15 +427,55 @@ namespace mongo {
         BSONObj emptyObj;
         Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort,
                                                    hint, minObj, maxObj, snapshot, explain, &lpq);
-        if (!parseStatus.isOK()) { return parseStatus; }
+        if (!parseStatus.isOK()) {
+            return parseStatus;
+        }
 
+        // Build a parse tree from the BSONObj in the parsed query.
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter());
+        if (!swme.isOK()) {
+            delete lpq;
+            return swme.getStatus();
+        }
+
+        // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq);
-        if (!initStatus.isOK()) { return initStatus; }
+        // Takes ownership of lpq and the MatchExpression* in swme.
+        Status initStatus = cq->init(lpq, swme.getValue());
 
+        if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
         return Status::OK();
     }
+
+    Status CanonicalQuery::init(LiteParsedQuery* lpq, MatchExpression* root) {
+        _pq.reset(lpq);
+
+        // Normalize, sort and validate tree.
+        root = normalizeTree(root);
+
+        sortTree(root);
+        _root.reset(root);
+        Status validStatus = isValid(root, *_pq);
+        if (!validStatus.isOK()) {
+            return validStatus;
+        }
+
+        this->generateCacheKey();
+
+        // Validate the projection if there is one.
+        if (!_pq->getProj().isEmpty()) {
+            ParsedProjection* pp;
+            Status projStatus = ParsedProjection::make(_pq->getProj(), _root.get(), &pp);
+            if (!projStatus.isOK()) {
+                return projStatus;
+            }
+            _proj.reset(pp);
+        }
+
+        return Status::OK();
+    }
+
 
     // static
     bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
@@ -610,6 +699,7 @@ namespace mongo {
     }
 
     // static
+    // XXX TODO: This does not belong here at all.
     MatchExpression* CanonicalQuery::logicalRewrite(MatchExpression* tree) {
         // Only thing we do is pull an OR up at the root.
         if (MatchExpression::AND != tree->matchType()) {
@@ -655,43 +745,6 @@ namespace mongo {
 
         // Clean up any consequences from this tomfoolery.
         return normalizeTree(orChild);
-    }
-
-    Status CanonicalQuery::init(LiteParsedQuery* lpq) {
-        _pq.reset(lpq);
-
-        // Build a parse tree from the BSONObj in the parsed query.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(_pq->getFilter());
-        if (!swme.isOK()) { return swme.getStatus(); }
-
-        // Normalize, sort and validate tree.
-        MatchExpression* root = swme.getValue();
-        root = normalizeTree(root);
-
-        // TODO: We don't want to do this all the time.  See AndWithOrWithOneIndex in
-        // query_planner_test.cpp.
-        //
-        // root = logicalRewrite(root);
-        sortTree(root);
-        Status validStatus = isValid(root, *_pq);
-        if (!validStatus.isOK()) {
-            return validStatus;
-        }
-        _root.reset(root);
-
-        this->generateCacheKey();
-
-        // Validate the projection if there is one.
-        if (!_pq->getProj().isEmpty()) {
-            ParsedProjection* pp;
-            Status projStatus = ParsedProjection::make(_pq->getProj(), _root.get(), &pp);
-            if (!projStatus.isOK()) {
-                return projStatus;
-            }
-            _proj.reset(pp);
-        }
-
-        return Status::OK();
     }
 
     std::string CanonicalQuery::toString() const {

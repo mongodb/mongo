@@ -43,12 +43,14 @@
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/query/subplan_runner.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -200,6 +202,98 @@ namespace mongo {
         plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
     }
 
+    Status getRunnerFromCache(CanonicalQuery* canonicalQuery,
+                              Collection* collection,
+                              const QueryPlannerParams& plannerParams,
+                              Runner** out) {
+        // Skip cache look up for non-cacheable queries.
+        if (!PlanCache::shouldCacheQuery(*canonicalQuery)) {
+            return Status(ErrorCodes::BadValue, "query is not cacheable");
+        }
+
+        CachedSolution* rawCS;
+        Status cacheLookupStatus = collection->infoCache()->getPlanCache()->get(*canonicalQuery,
+                                                                                &rawCS);
+        if (!cacheLookupStatus.isOK()) {
+            return cacheLookupStatus;
+        }
+
+        // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+        boost::scoped_ptr<CachedSolution> cs(rawCS);
+        QuerySolution *qs, *backupQs;
+        Status status = QueryPlanner::planFromCache(*canonicalQuery,
+                                                    plannerParams,
+                                                    *cs,
+                                                    &qs,
+                                                    &backupQs);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // See SERVER-12438. Unfortunately we have to defer to the backup solution
+        // if both a batch size is set and a sort is requested.
+        //
+        // TODO: it would be really nice to delete this block in the future.
+        if (NULL != backupQs &&
+            0 < canonicalQuery->getParsed().getNumToReturn() &&
+            !canonicalQuery->getParsed().getSort().isEmpty()) {
+            delete qs;
+
+            WorkingSet* ws;
+            PlanStage* root;
+            verify(StageBuilder::build(*backupQs, &root, &ws));
+
+            // And, run the plan.
+            *out = new SingleSolutionRunner(collection,
+                                            canonicalQuery,
+                                            backupQs, root, ws);
+            return Status::OK();
+        }
+
+        // If our cached solution is a hit for a count query, try to turn it into a fast count
+        // thing.
+        if (plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) {
+            if (turnIxscanIntoCount(qs)) {
+                LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
+                       << ", planSummary: " << getPlanSummary(*qs);
+
+                WorkingSet* ws;
+                PlanStage* root;
+                verify(StageBuilder::build(*qs, &root, &ws));
+                *out = new SingleSolutionRunner(collection,
+                                                canonicalQuery, qs, root, ws);
+                if (NULL != backupQs) {
+                    delete backupQs;
+                }
+                return Status::OK();
+            }
+        }
+
+        // If we're here, we're going to used the cached plan and things are normal.
+        LOG(2) << "Using cached query plan: " << canonicalQuery->toStringShort()
+               << ", planSummary: " << getPlanSummary(*qs);
+
+        WorkingSet* ws;
+        PlanStage* root;
+        verify(StageBuilder::build(*qs, &root, &ws));
+        CachedPlanRunner* cpr = new CachedPlanRunner(collection,
+                                                     canonicalQuery,
+                                                     qs,
+                                                     root,
+                                                     ws);
+
+        // If there's a backup solution, let the CachedPlanRunner know about it.
+        if (NULL != backupQs) {
+            WorkingSet* backupWs;
+            PlanStage* backupRoot;
+            verify(StageBuilder::build(*backupQs, &backupRoot, &backupWs));
+            cpr->setBackupPlan(backupQs, backupRoot, backupWs);
+        }
+
+        *out = cpr;
+        return Status::OK();
+    }
+
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
@@ -253,80 +347,38 @@ namespace mongo {
         plannerParams.options = plannerOptions;
         fillOutPlannerParams(collection, rawCanonicalQuery, &plannerParams);
 
-        // Try to look up a cached solution for the query.
-        //
-        // Skip cache look up for non-cacheable queries.
-        // See PlanCache::shouldCacheQuery()
-        //
-        // TODO: Can the cache have negative data about a solution?
-        CachedSolution* rawCS;
-        if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
-            collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
-            // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-            boost::scoped_ptr<CachedSolution> cs(rawCS);
-            QuerySolution *qs, *backupQs;
-            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
-                                                        &qs, &backupQs);
+        // See if the cache has what we're looking for.
+        Status cacheStatus = getRunnerFromCache(canonicalQuery.get(),
+                                                collection,
+                                                plannerParams,
+                                                out);
 
-            // See SERVER-12438. Unfortunately we have to defer to the backup solution
-            // if both a batch size is set and a sort is requested.
-            //
-            // TODO: it would be really nice to delete this block in the future.
-            if (status.isOK() && NULL != backupQs &&
-                0 < canonicalQuery->getParsed().getNumToReturn() &&
-                !canonicalQuery->getParsed().getSort().isEmpty()) {
-                delete qs;
-
-                WorkingSet* ws;
-                PlanStage* root;
-                verify(StageBuilder::build(*backupQs, &root, &ws));
-
-                // And, run the plan.
-                *out = new SingleSolutionRunner(collection,
-                                                canonicalQuery.release(),
-                                                backupQs, root, ws);
-                return Status::OK();
-            }
-
-            if (status.isOK()) {
-                if (plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) {
-                    if (turnIxscanIntoCount(qs)) {
-                        LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                               << ", planSummary: " << getPlanSummary(*qs);
-
-                        WorkingSet* ws;
-                        PlanStage* root;
-                        verify(StageBuilder::build(*qs, &root, &ws));
-                        *out = new SingleSolutionRunner(collection,
-                                                        canonicalQuery.release(), qs, root, ws);
-                        if (NULL != backupQs) {
-                            delete backupQs;
-                        }
-                        return Status::OK();
-                    }
-                }
-
-                LOG(2) << "Using cached query plan: " << canonicalQuery->toStringShort()
-                       << ", planSummary: " << getPlanSummary(*qs);
-
-                WorkingSet* ws;
-                PlanStage* root;
-                verify(StageBuilder::build(*qs, &root, &ws));
-                CachedPlanRunner* cpr = new CachedPlanRunner(collection,
-                                                             canonicalQuery.release(), qs,
-                                                             root, ws);
-
-                if (NULL != backupQs) {
-                    WorkingSet* backupWs;
-                    PlanStage* backupRoot;
-                    verify(StageBuilder::build(*backupQs, &backupRoot, &backupWs));
-                    cpr->setBackupPlan(backupQs, backupRoot, backupWs);
-                }
-
-                *out = cpr;
-                return Status::OK();
-            }
+        // This can be not-OK and we can carry on.  It just means the query wasn't cached.
+        if (cacheStatus.isOK()) {
+            // We got a cached runner.
+            canonicalQuery.release();
+            return cacheStatus;
         }
+
+        if (internalQueryPlanOrChildrenIndependently
+            && SubplanRunner::canUseSubplanRunner(*canonicalQuery)) {
+
+            LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
+            *out = new SubplanRunner(collection, plannerParams, canonicalQuery.release());
+            return Status::OK();
+        }
+
+        return getRunnerAlwaysPlan(collection, canonicalQuery.release(), plannerParams, out);
+    }
+
+    Status getRunnerAlwaysPlan(Collection* collection,
+                               CanonicalQuery* rawCanonicalQuery,
+                               const QueryPlannerParams& plannerParams,
+                               Runner** out) {
+
+        invariant(collection);
+        invariant(rawCanonicalQuery);
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
         vector<QuerySolution*> solutions;
         Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
@@ -386,7 +438,10 @@ namespace mongo {
 
             // And, run the plan.
             *out = new SingleSolutionRunner(collection,
-                                            canonicalQuery.release(),solutions[0], root, ws);
+                                            canonicalQuery.release(),
+                                            solutions[0],
+                                            root,
+                                            ws);
             return Status::OK();
         }
         else {
