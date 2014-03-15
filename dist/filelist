@@ -146,7 +146,6 @@ src/support/mutex.c
 src/support/pow.c
 src/support/rand.c
 src/support/scratch.c
-src/support/sess_dump.c
 src/support/stat.c
 src/txn/txn.c
 src/txn/txn_ckpt.c

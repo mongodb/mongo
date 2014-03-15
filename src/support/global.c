@@ -103,8 +103,6 @@ void
 __wt_attach(WT_SESSION_IMPL *session)
 {
 #ifdef HAVE_ATTACH
-	__wt_session_dump_all(session);
-
 	__wt_errx(session, "process ID %" PRIdMAX
 	    ": waiting for debugger...", (intmax_t)getpid());
 

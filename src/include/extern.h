@@ -1504,8 +1504,6 @@ extern void *__wt_ext_scr_alloc( WT_EXTENSION_API *wt_api,
 extern void __wt_ext_scr_free(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     void *p);
-extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
-extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern void __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats);
 extern void __wt_stat_refresh_dsrc_stats(void *stats_arg);
 extern void __wt_stat_aggregate_dsrc_stats(const void *child,
