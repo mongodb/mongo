@@ -967,7 +967,7 @@ in_memory:
 	 * In-memory states: the child is potentially modified if the page's
 	 * modify structure has been instantiated.   If the modify structure
 	 * exists and the page has actually been modified, set that state.
-	 * If that's not the case, we would normally using the original cell's
+	 * If that's not the case, we would normally use the original cell's
 	 * disk address as our reference, but, if we're forced to instantiate
 	 * a deleted child page and it's never modified, we end up here with
 	 * a page that has a modify structure, no modifications, and no disk
