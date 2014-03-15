@@ -440,7 +440,8 @@ namespace {
 
         // Should look like this.
         string rewriteStr = "{$or:[{a:1, e:1}, {b:1, e:1}]}";
-        auto_ptr<MatchExpression> base(parseMatchExpression(fromjson(rewriteStr)));
+        BSONObj rewriteObj = fromjson(rewriteStr);
+        auto_ptr<MatchExpression> base(parseMatchExpression(rewriteObj));
         assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
     }
 
