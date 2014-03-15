@@ -609,6 +609,54 @@ namespace mongo {
         return Status::OK();
     }
 
+    // static
+    MatchExpression* CanonicalQuery::logicalRewrite(MatchExpression* tree) {
+        // Only thing we do is pull an OR up at the root.
+        if (MatchExpression::AND != tree->matchType()) {
+            return tree;
+        }
+
+        // We want to bail out ASAP if we have nothing to do here.
+        size_t numOrs = 0;
+        for (size_t i = 0; i < tree->numChildren(); ++i) {
+            if (MatchExpression::OR == tree->getChild(i)->matchType()) {
+                ++numOrs;
+            }
+        }
+
+        // Only do this for one OR right now.
+        if (1 != numOrs) {
+            return tree;
+        }
+
+        // Detach the OR from the root.
+        invariant(NULL != tree->getChildVector());
+        vector<MatchExpression*>& rootChildren = *tree->getChildVector();
+        MatchExpression* orChild = NULL;
+        for (size_t i = 0; i < rootChildren.size(); ++i) {
+            if (MatchExpression::OR == rootChildren[i]->matchType()) {
+                orChild = rootChildren[i];
+                rootChildren.erase(rootChildren.begin() + i);
+                break;
+            }
+        }
+
+        // AND the existing root with each or child.
+        invariant(NULL != orChild);
+        invariant(NULL != orChild->getChildVector());
+        vector<MatchExpression*>& orChildren = *orChild->getChildVector();
+        for (size_t i = 0; i < orChildren.size(); ++i) {
+            AndMatchExpression* ama = new AndMatchExpression();
+            ama->add(orChildren[i]);
+            ama->add(tree->shallowClone());
+            orChildren[i] = ama;
+        }
+        delete tree;
+
+        // Clean up any consequences from this tomfoolery.
+        return normalizeTree(orChild);
+    }
+
     Status CanonicalQuery::init(LiteParsedQuery* lpq) {
         _pq.reset(lpq);
 
@@ -619,6 +667,11 @@ namespace mongo {
         // Normalize, sort and validate tree.
         MatchExpression* root = swme.getValue();
         root = normalizeTree(root);
+
+        // TODO: We don't want to do this all the time.  See AndWithOrWithOneIndex in
+        // query_planner_test.cpp.
+        //
+        // root = logicalRewrite(root);
         sortTree(root);
         Status validStatus = isValid(root, *_pq);
         if (!validStatus.isOK()) {

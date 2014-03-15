@@ -418,6 +418,32 @@ namespace {
         FAIL(ss);
     }
 
+    //
+    // Tests for CanonicalQuery::logicalRewrite
+    //
+
+    // Don't do anything with a double OR.
+    TEST(CanonicalQueryTest, RewriteNoDoubleOr) {
+        string queryStr = "{$or:[{a:1}, {b:1}], $or:[{c:1}, {d:1}], e:1}";
+        BSONObj queryObj = fromjson(queryStr);
+        auto_ptr<MatchExpression> base(parseMatchExpression(queryObj));
+        auto_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(base->shallowClone()));
+        assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
+    }
+
+    // Do something with a single or.
+    TEST(CanonicalQueryTest, RewriteSingleOr) {
+        // Rewrite of this...
+        string queryStr = "{$or:[{a:1}, {b:1}], e:1}";
+        BSONObj queryObj = fromjson(queryStr);
+        auto_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(parseMatchExpression(queryObj)));
+
+        // Should look like this.
+        string rewriteStr = "{$or:[{a:1, e:1}, {b:1, e:1}]}";
+        auto_ptr<MatchExpression> base(parseMatchExpression(fromjson(rewriteStr)));
+        assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
+    }
+
     /**
      * Test function for CanonicalQuery::normalize.
      */
