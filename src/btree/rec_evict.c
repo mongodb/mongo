@@ -1102,9 +1102,6 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	    session->excl_next + 1, &session->excl));
 
 	/*
-	 * Hazard pointers are acquired down the tree, which means we can't
-	 * deadlock.
-	 *
 	 * Request exclusive access to the page.  The top-level page should
 	 * already be in the locked state, lock child pages in memory.
 	 * If another thread already has this page, give up.
