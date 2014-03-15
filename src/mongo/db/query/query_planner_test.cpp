@@ -37,6 +37,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -2974,7 +2975,7 @@ namespace {
                                  "{ 'a' : null, 'b' : 9, 'c' : null, 'd' : null },"
                                  "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
 
-        assertNumSolutions(internalQueryPlannerMaxIndexedSolutions);
+        assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
     }
 
     //
@@ -3180,6 +3181,41 @@ namespace {
         assertNumSolutions(1);
         assertSolutionExists("{fetch: {node: {mergeSort: {nodes: "
                                 "[{ixscan: {pattern: {a: 1, b: 1}}}, {ixscan: {pattern: {a: 1, b: 1}}}]}}}}");
+    }
+
+    // Make sure a top-level $or hits the limiting number
+    // of solutions that we are willing to consider.
+    TEST_F(QueryPlannerTest, OrEnumerationLimit) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+
+        // 6 $or clauses, each with 2 indexed predicates
+        // means 2^6 = 64 possibilities. We should hit the limit.
+        runQuery(fromjson("{$or: [{a: 1, b: 1},"
+                                 "{a: 2, b: 2},"
+                                 "{a: 3, b: 3},"
+                                 "{a: 4, b: 4},"
+                                 "{a: 5, b: 5},"
+                                 "{a: 6, b: 6}]}"));
+
+        assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
+    }
+
+    TEST_F(QueryPlannerTest, OrEnumerationLimit2) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+        addIndex(BSON("d" << 1));
+
+        // 3 $or clauses, and a few other preds. Each $or clause can
+        // generate up to the max number of allowed $or enumerations.
+        runQuery(fromjson("{$or: [{a: 1, b: 1, c: 1, d: 1},"
+                                 "{a: 2, b: 2, c: 2, d: 2},"
+                                 "{a: 3, b: 3, c: 3, d: 3}]}"));
+
+        assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
     }
 
     //

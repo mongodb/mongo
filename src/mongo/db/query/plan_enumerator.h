@@ -42,6 +42,7 @@ namespace mongo {
     struct PlanEnumeratorParams {
 
         PlanEnumeratorParams() : intersect(false),
+                                 maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions),
                                  maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd) { }
 
         // Do we provide solutions that use more indices than the minimum required to provide
@@ -53,6 +54,11 @@ namespace mongo {
 
         // Not owned here.
         const vector<IndexEntry>* indices;
+
+        // How many plans are we willing to ouput from an OR? We currently consider
+        // all possibly OR plans, which means the product of the number of possibilities
+        // for each clause of the OR. This could grow disastrously large.
+        size_t maxSolutionsPerOr;
 
         // How many intersect plans are we willing to output from an AND?  Given that we pursue an
         // all-pairs approach, we could wind up creating a lot of enumeration possibilities for
@@ -181,12 +187,16 @@ namespace mongo {
         };
 
         struct OrAssignment {
+            OrAssignment() : counter(0) { }
+
+            // Each child of an OR must be indexed for the OR to be indexed. When an OR moves to a
+            // subsequent state it just asks all its children to move their states forward.
+
             // Must use all of subnodes.
             vector<MemoID> subnodes;
 
-            // No enumeration state.  Each child of an OR must be indexed for the OR to be indexed.
-            // When an OR moves to a subsequent state it just asks all its children to move their
-            // states forward.
+            // The number of OR states that we've enumerated so far.
+            size_t counter;
         };
 
         // This is used by AndAssignment and is not an actual assignment.
@@ -386,6 +396,9 @@ namespace mongo {
 
         // Do we output >1 index per AND (index intersection)?
         bool _ixisect;
+
+        // How many enumerations are we willing to produce from each OR?
+        size_t _orLimit;
 
         // How many things do we want from each AND?
         size_t _intersectLimit;

@@ -76,6 +76,9 @@ namespace mongo {
     // How many indexed solutions will QueryPlanner::plan output?
     extern int internalQueryPlannerMaxIndexedSolutions;
 
+    // How many solutions will the enumerator consider at each OR?
+    extern int internalQueryEnumerationMaxOrSolutions;
+
     // How many intersections will the enumerator consider at each AND?
     extern int internalQueryEnumerationMaxIntersectPerAnd;
 

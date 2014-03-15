@@ -65,6 +65,7 @@ namespace mongo {
         : _root(params.root),
           _indices(params.indices),
           _ixisect(params.intersect),
+          _orLimit(params.maxSolutionsPerOr),
           _intersectLimit(params.maxIntersectPerAnd) { }
 
     PlanEnumerator::~PlanEnumerator() {
@@ -1060,9 +1061,16 @@ namespace mongo {
             return false;
         }
         else if (NULL != assign->orAssignment) {
-            // OR doesn't have any enumeration state.  It just walks through telling its children to
-            // move forward.
             OrAssignment* oa = assign->orAssignment.get();
+
+            // Limit the number of OR enumerations
+            oa->counter++;
+            if (oa->counter >= _orLimit) {
+                return true;
+            }
+
+            // OR just walks through telling its children to
+            // move forward.
             for (size_t i = 0; i < oa->subnodes.size(); ++i) {
                 // If there's no carry, we just stop.  If there's a carry, we move the next child
                 // forward.
