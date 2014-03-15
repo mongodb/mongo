@@ -46,7 +46,7 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 6);
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxIntersectPerAnd, int, 3);
 
