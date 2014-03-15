@@ -82,4 +82,7 @@ namespace mongo {
     // How many intersections will the enumerator consider at each AND?
     extern int internalQueryEnumerationMaxIntersectPerAnd;
 
+    // Do we want to plan each child of the OR independently?
+    extern bool internalQueryPlanOrChildrenIndependently;
+
 }  // namespace mongo

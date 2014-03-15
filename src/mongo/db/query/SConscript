@@ -43,6 +43,7 @@ env.Library(
         "plan_ranker.cpp",
         "single_solution_runner.cpp",
         "stage_builder.cpp",
+        "subplan_runner.cpp",
         "type_explain.cpp",
     ],
     LIBDEPS=[

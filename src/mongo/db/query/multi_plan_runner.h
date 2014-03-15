@@ -92,6 +92,13 @@ namespace mongo {
          */
         bool hasBackupPlan() const;
 
+        /**
+         * Caching the best plan is (currently implemented as) a destructive act so we separate it
+         * from ranking so that inspection of the winning solution is possible.  Also sets a backup
+         * plan if a backup plan is needed.  Exposed for testing.
+         */
+        void cacheBestPlan();
+
         virtual void saveState();
         virtual bool restoreState();
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
@@ -163,6 +170,12 @@ namespace mongo {
 
         // The query that we're trying to figure out the best solution to.
         boost::scoped_ptr<CanonicalQuery> _query;
+
+        // What's the ranking?  Produced by pickBestPlan, consumed by cacheBestPlan.
+        auto_ptr<PlanRankingDecision> _ranking;
+
+        // What's the best child?  Filled out by pickBestPlan, consumed by cacheBestPlan.
+        size_t _bestChild;
 
         //
         // Backup plan for sort

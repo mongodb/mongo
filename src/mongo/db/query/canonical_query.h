@@ -42,11 +42,26 @@ namespace mongo {
 
     class CanonicalQuery {
     public:
+        /**
+         * Caller owns the pointer in 'out' if any call to canonicalize returns Status::OK().
+         */
         static Status canonicalize(const QueryMessage& qm, CanonicalQuery** out);
 
         /**
          * For testing or for internal clients to use.
          */
+
+        /**
+         * Used for creating sub-queries from an existing CanonicalQuery.
+         *
+         * 'root' must be an expression in baseQuery.root().
+         *
+         * Does not take ownership of 'root'.
+         */
+        static Status canonicalize(const CanonicalQuery& baseQuery,
+                                   MatchExpression* root,
+                                   CanonicalQuery** out);
+
         static Status canonicalize(const string& ns, const BSONObj& query, CanonicalQuery** out);
 
         static Status canonicalize(const string& ns, const BSONObj& query, long long skip,
@@ -150,8 +165,10 @@ namespace mongo {
          */
         void generateCacheKey(void);
 
-        // Takes ownership of lpq
-        Status init(LiteParsedQuery* lpq);
+        /**
+         * Takes ownership of 'root' and 'lpq'.
+         */
+        Status init(LiteParsedQuery* lpq, MatchExpression* root);
 
         scoped_ptr<LiteParsedQuery> _pq;
 

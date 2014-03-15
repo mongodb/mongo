@@ -121,6 +121,8 @@ namespace PlanRankingTests {
             BSONObj unused;
             ASSERT(_mpr->pickBestPlan(&bestPlan, &unused));
             ASSERT_LESS_THAN(bestPlan, solutions.size());
+            // This is what sets a backup plan, should we test for it.
+            _mpr->cacheBestPlan();
             return solutions[bestPlan];
         }
 
