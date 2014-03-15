@@ -2974,7 +2974,7 @@ namespace {
                                  "{ 'a' : null, 'b' : 9, 'c' : null, 'd' : null },"
                                  "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
 
-        ASSERT_LESS_THAN(getNumSolutions(), 10U);
+        assertNumSolutions(internalQueryPlannerMaxIndexedSolutions);
     }
 
     //
