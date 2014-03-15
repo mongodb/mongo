@@ -1047,7 +1047,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 *
 		 * That said, if eviction is stuck, or the file is
 		 * being checkpointed, try anyway: maybe a transaction
-		 * that were running last time we wrote the page has
+		 * that was running last time we wrote the page has
 		 * since rolled back, or we can help get the checkpoint
 		 * completed sooner.
 		 */
