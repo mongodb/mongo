@@ -39,7 +39,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 	/*
 	 * If the page is clean, test the original addresses.
 	 * If the page is a 1-to-1 replacement, test the replacement addresses.
-	 * Ignore split and empty pages, they get merged into the parent.
+	 * Ignore empty pages, they get merged into the parent.
 	 */
 	if (mod == NULL || F_ISSET(mod, WT_PM_REC_MASK) == 0) {
 		WT_RET(__wt_ref_info(session, page->parent,
