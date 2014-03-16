@@ -792,8 +792,12 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	/*
 	 * If evicting and not all of the updates are visible, and we can save
 	 * and restore the list of updates on a newly instantiated page, do so.
-	 * The order of the updates matters so we can't move only unresolved
-	 * updates, we have to move the entire update list.
+	 *	The order of the updates on the list matters so we can't move
+	 * only the unresolved updates, we have to move the entire update list.
+	 *	In this case we also clear the returned update so our caller
+	 * ignores the key/value pair in the case of an insert/append entry
+	 * (everything we need is in the update list), and otherwise writes the
+	 * original on-page key/value pair to which the update list applies.
 	 *
 	 * If evicting and not all of the updates are visible, and we can't save
 	 * and restore the list of updates, quit -- this page can't be evicted.
@@ -802,6 +806,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	    !__wt_txn_visible_all(session, max_txn)) {
 		if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE)) {
 			WT_RET(__rec_skip_update_save(session, r, ins, rip));
+
+			*updp = NULL;
 			r->leave_dirty = 1;
 		} else
 			return (EBUSY);
@@ -3173,9 +3179,11 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * Overflow items are tricky: we don't know until we're
 			 * finished processing the set of values if we need the
 			 * overflow value or not.  If we don't use the overflow
-			 * item at all, we'll have to discard it (that's safe
-			 * because once the original value is unused during any
-			 * page reconciliation, it will never be needed again).
+			 * item at all, we have to discard it from the backing
+			 * file, otherwise we'll leak blocks on the checkpoint.
+			 * That's safe because if the backing overflow value is
+			 * still needed by any running transaction, we'll cache
+			 * a copy in the reconciliation tracking structures.
 			 *
 			 * Regardless, we avoid copying in overflow records: if
 			 * there's a WT_INSERT entry that modifies a reference
@@ -3185,7 +3193,23 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * see if they match records on either side.
 			 */
 			if (unpack->ovfl) {
-				ovfl_state = OVFL_UNUSED;
+				/*
+				 * If the backing overflow item has already been
+				 * deleted, we'll need to write brand-new copies
+				 * based on the cached value.  This should be a
+				 * rare thing: in summary, an overflow value was
+				 * discarded because it wasn't needed, but still
+				 * cached because there's a running transaction
+				 * that might read it.  Eviction then chose this
+				 * page, and we're going to try and split it to
+				 * push part of it out of memory.  In that case,
+				 * we have to write the original overflow item,
+				 * and we see a "removed overflow" cell type.
+				 */
+				if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
+					ovfl_state = OVFL_USED;
+				else
+					ovfl_state = OVFL_UNUSED;
 				goto record_loop;
 			}
 
@@ -3285,8 +3309,8 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_dsk_cell_data_ref(session,
-					    WT_PAGE_COL_VAR, unpack, orig));
+					WT_ERR(__wt_page_cell_data_ref(
+					    session, page, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;
 					/* FALLTHROUGH */
@@ -3826,6 +3850,26 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ERR(__rec_cell_build_val(
 				    session, r, p, size, (uint64_t)0));
 				dictionary = 1;
+			} else if (unpack->raw == WT_CELL_VALUE_OVFL_RM) {
+				/*
+				 * If the backing overflow item has already been
+				 * deleted, we'll need to write brand-new copies
+				 * based on the cached value.  This should be a
+				 * rare thing: in summary, an overflow value was
+				 * discarded because it wasn't needed, but still
+				 * cached because there's a running transaction
+				 * that might read it.  Eviction then chose this
+				 * page, and we're going to try and split it to
+				 * push part of it out of memory.  In that case,
+				 * we have to write the original overflow item,
+				 * and we see a "removed overflow" cell type.
+				 */
+				WT_ERR(__wt_page_cell_data_ref(
+				    session, page, unpack, tmpval));
+				p = tmpval->data;
+				size = tmpval->size;
+				WT_ERR(__rec_cell_build_val(
+				    session, r, p, size, (uint64_t)0));
 			} else {
 				val->buf.data = val_cell;
 				val->buf.size = __wt_cell_total_len(unpack);
