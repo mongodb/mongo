@@ -32,6 +32,8 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
 	 * structures.  We don't need a hazard pointer or anything on the
 	 * page because there are unresolved transactions, the page can't go
 	 * anywhere.
+	 *
+	 * XXXKEITH: we probably need to acquire a hazard pointer now.
 	 */
 	while (ref->state != WT_REF_MEM)
 		__wt_yield();
