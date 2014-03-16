@@ -291,8 +291,8 @@ ascend:	/*
 				if (ret != 0)
 					page = NULL;
 				if (ret == WT_NOTFOUND)
-					ret = __wt_page_release(
-					    session, couple);
+					ret =
+					    __wt_page_release(session, couple);
 			}
 
 			*pagep = page;
