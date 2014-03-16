@@ -628,12 +628,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * Pages cannot disappear from underneath internal pages when
 		 * internal pages are being reconciled by checkpoint; also,
 		 * pages in a checkpoint cannot be freed until the block lists
-		 * for the checkpoint are stable.  Eviction is disabled in the
-		 * subtree of any internal page being reconciled, including,
-		 * eventually, the whole tree when the root page is written.
-		 *
-		 * Set the checkpointing flag, it is checked in __rec_review
-		 * before any page is evicted.
+		 * for the checkpoint are stable.  Set the checkpointing flag
+		 * to block eviction of dirty pages until checkpoint's internal
+		 * page pass is complete.
 		 *
 		 * If any thread is already in the progress of evicting a page,
 		 * it will have set the ref state to WT_REF_LOCKED, and the
