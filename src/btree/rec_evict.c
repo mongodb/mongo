@@ -584,7 +584,6 @@ __wt_multi_inmem_build(
 		}
 
 	}
-	__wt_free(session, multi->skip);
 
 	WT_LINK_PAGE(page->parent, ref, new);
 
@@ -631,7 +630,13 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		}
 
 		ref->txnid = 0;
-		ref->state = ref->page == NULL ? WT_REF_DISK : WT_REF_MEM;
+
+		if (multi->skip == NULL)
+			ref->state = WT_REF_DISK;
+		else {
+			ref->state = WT_REF_MEM;
+			__wt_free(session, multi->skip);
+		}
 	}
 	return (0);
 
