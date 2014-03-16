@@ -118,7 +118,7 @@ struct __wt_btree {
 	u_int    evict_walk_skips;	/* Number of walks skipped */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
 
-	volatile int checkpointing;	/* Checkpoint in progress */
+	int checkpointing;		/* Checkpoint in progress */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
