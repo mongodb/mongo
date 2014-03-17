@@ -16,13 +16,23 @@ BuildRequires: js-devel, readline-devel, boost-devel, pcre-devel
 BuildRequires: gcc-c++, scons
 
 %description
-Mongo (from "huMONGOus") is a schema-free document-oriented database.
-It features dynamic profileable queries, full indexing, replication
-and fail-over support, efficient storage of large binary data objects,
-and auto-sharding.
+MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
-This package provides the mongo shell, import/export tools, and other
-client utilities.
+MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+
+MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+
+MongoDB features:
+* JSON Data Model with Dynamic Schemas
+* Auto-Sharding for Horizontal Scalability
+* Built-In Replication for High Availability
+* Rich Secondary Indexes, including geospatial
+* TTL indexes
+* Text Search
+* Aggregation Framework & Native MapReduce
+
+This package contains the mongo shell, import/export tools, and other client utilities.
+
 
 %package server
 Summary: MongoDB server, sharding server, and support scripts
@@ -30,20 +40,45 @@ Group: Databases
 Requires: mongodb
 
 %description server
-Mongo (from "huMONGOus") is a schema-free document-oriented database.
+MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
-This package provides the mongo server software, mongo sharding server
-softwware, default configuration files, and init.d scripts.
+MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+
+MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+
+MongoDB features:
+* JSON Data Model with Dynamic Schemas
+* Auto-Sharding for Horizontal Scalability
+* Built-In Replication for High Availability
+* Rich Secondary Indexes, including geospatial
+* TTL indexes
+* Text Search
+* Aggregation Framework & Native MapReduce
+
+This package contains the MongoDB server software, MongoDB sharded cluster query router, default configuration files, and init.d scripts.
+
 
 %package devel
-Summary: Headers and libraries for mongo development. 
+Summary: Headers and libraries for MongoDB development
 Group: Databases
 
 %description devel
-Mongo (from "huMONGOus") is a schema-free document-oriented database.
+MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
-This package provides the mongo static library and header files needed
-to develop mongo client software.
+MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+
+MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+
+MongoDB features:
+* JSON Data Model with Dynamic Schemas
+* Auto-Sharding for Horizontal Scalability
+* Built-In Replication for High Availability
+* Rich Secondary Indexes, including geospatial
+* TTL indexes
+* Text Search
+* Aggregation Framework & Native MapReduce
+
+This package provides the MongoDB static library and header files needed to develop MongoDB client software.
 
 %prep
 %setup -n %{name}-src-r%{version}
