@@ -623,7 +623,8 @@ namespace mongo {
                 if ( !desc->areIndexOptionsEquivalent( &temp ) )
                     return Status( ErrorCodes::CannotCreateIndex,
                                    str::stream() << "Index with name: " << name
-                                   << " already exists with different options" );
+                                   << " already exists with different options",
+                                   IndexOptionsDiffer);
 
                 // Index already exists with the same options, so no need to build a new
                 // one (not an error). Most likely requested by a client using ensureIndex.
@@ -644,7 +645,8 @@ namespace mongo {
                 if ( !desc->areIndexOptionsEquivalent( &temp ) )
                     return Status( ErrorCodes::CannotCreateIndex,
                                    str::stream() << "Index with pattern: " << key
-                                   << " already exists with different options" );
+                                   << " already exists with different options",
+                                   IndexOptionsDiffer );
 
                 return Status( ErrorCodes::IndexAlreadyExists, name );
             }
