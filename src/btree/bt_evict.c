@@ -595,16 +595,14 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	txn = &session->txn;
 
 	switch (syncop) {
-	case WT_SYNC_CHECKPOINT:
 	case WT_SYNC_WRITE_LEAVES:
 		/*
 		 * The first pass walks all cache leaf pages, waiting for
 		 * concurrent activity in a page to be resolved, acquiring
 		 * hazard pointers to prevent eviction.
 		 */
-		flags = WT_READ_CACHE | WT_READ_SKIP_INTL;
-		if (syncop == WT_SYNC_WRITE_LEAVES)
-			flags |= WT_READ_NO_WAIT;
+		flags = WT_READ_CACHE | WT_READ_SKIP_INTL |
+		    WT_READ_NO_GEN | WT_READ_NO_WAIT;
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
 			/* Write dirty pages if nobody beat us to it. */
@@ -620,10 +618,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
+		break;
 
-		if (syncop == WT_SYNC_WRITE_LEAVES)
-			break;
-
+	case WT_SYNC_CHECKPOINT:
 		/*
 		 * Pages cannot disappear from underneath internal pages when
 		 * internal pages are being reconciled by checkpoint; also,
@@ -645,7 +642,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * The second pass walks all cache internal pages, waiting for
 		 * concurrent activity to be resolved.
 		 */
-		flags = WT_READ_CACHE | WT_READ_NO_GEN | WT_READ_SKIP_LEAF;
+		flags = WT_READ_CACHE | WT_READ_NO_GEN;
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
 			/* Write dirty pages. */
