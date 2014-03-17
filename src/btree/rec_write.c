@@ -296,7 +296,7 @@ static int  __rec_col_merge(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *, WT_RECONCILE *,
-		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
+		WT_SALVAGE_COOKIE *, WT_ITEM *, int, uint8_t, uint64_t);
 static int  __rec_destroy_session(WT_SESSION_IMPL *);
 static int  __rec_root_write(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -3020,7 +3020,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 static int
 __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_SALVAGE_COOKIE *salvage,
-    WT_ITEM *value, int deleted, int ovfl, uint64_t rle)
+    WT_ITEM *value, int deleted, uint8_t overflow_type, uint64_t rle)
 {
 	WT_BTREE *btree;
 	WT_KV *val;
@@ -3065,9 +3065,9 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		val->buf.data = NULL;
 		val->buf.size = 0;
 		val->len = val->cell_len;
-	} else if (ovfl) {
+	} else if (overflow_type) {
 		val->cell_len = __wt_cell_pack_ovfl(
-		    &val->cell, WT_CELL_VALUE_OVFL, rle, value->size);
+		    &val->cell, overflow_type, rle, value->size);
 		val->buf.data = value->data;
 		val->buf.size = value->size;
 		val->len = val->cell_len + value->size;
@@ -3083,7 +3083,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			WT_RET(__rec_split(session, r));
 
 	/* Copy the value onto the page. */
-	if (!deleted && !ovfl && btree->dictionary)
+	if (!deleted && !overflow_type && btree->dictionary)
 		WT_RET(__rec_dict_replace(session, r, rle, val));
 	__rec_copy_incr(session, r, val);
 
@@ -3101,7 +3101,7 @@ static int
 __rec_col_var(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
-	enum { OVFL_IGNORE, OVFL_UNUSED, OVFL_USED } ovfl_state;
+	enum { OVFL_IGNORE, OVFL_REMOVE, OVFL_UNUSED, OVFL_USED } ovfl_state;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -3197,20 +3197,11 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 */
 			if (unpack->ovfl) {
 				/*
-				 * If the backing overflow item has already been
-				 * deleted, we'll need to write brand-new copies
-				 * based on the cached value.  This should be a
-				 * rare thing: in summary, an overflow value was
-				 * discarded because it wasn't needed, but still
-				 * cached because there's a running transaction
-				 * that might read it.  Eviction then chose this
-				 * page, and we're going to try and split it to
-				 * push part of it out of memory.  In that case,
-				 * we have to write the original overflow item,
-				 * and we see a "removed overflow" cell type.
+				 * WT_CELL_VALUE_OVFL_RM: see the discussion
+				 * in __wt_multi_inmem_ovfl_rm.
 				 */
 				if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
-					ovfl_state = OVFL_USED;
+					ovfl_state = OVFL_REMOVE;
 				else
 					ovfl_state = OVFL_UNUSED;
 				goto record_loop;
@@ -3280,12 +3271,11 @@ record_loop:	/*
 				 * time.
 				 */
 				switch (ovfl_state) {
+				case OVFL_REMOVE:
 				case OVFL_UNUSED:
 					/*
-					 * Original is an overflow item, as yet
-					 * unused -- use it now.
-					 *
-					 * Write out any record we're tracking.
+					 * We're going to copy the on-page cell,
+					 * write out any record we're tracking.
 					 */
 					if (rle != 0) {
 						WT_ERR(__rec_col_var_helper(
@@ -3293,18 +3283,33 @@ record_loop:	/*
 						    last_deleted, 0, rle));
 						rle = 0;
 					}
+					/*
+					 * Original is a removed overflow item,
+					 * or an as-yet-unused overflow item.
+					 *
+					 * Removed overflow items are written
+					 * only in the service of eviction.
+					 */
+					WT_ASSERT(session,
+					    unpack->raw == WT_CELL_VALUE_OVFL ||
+					    unpack->raw ==
+					    WT_CELL_VALUE_OVFL_RM);
+					WT_ASSERT(session,
+					    unpack->raw !=
+					    WT_CELL_VALUE_OVFL_RM ||
+					    F_ISSET(r, WT_SKIP_UPDATE_RESTORE));
 
-					/* Write the overflow item. */
 					last->data = unpack->data;
 					last->size = unpack->size;
 					WT_ERR(__rec_col_var_helper(
-					    session, r, salvage,
-					    last, 0, 1, repeat_count));
+					    session, r, salvage, last,
+					    0, unpack->raw, repeat_count));
 
 					/* Track if page has overflow items. */
 					r->ovfl_items = 1;
 
-					ovfl_state = OVFL_USED;
+					if (ovfl_state == OVFL_UNUSED)
+						ovfl_state = OVFL_USED;
 					continue;
 				case OVFL_USED:
 					/*
@@ -3312,8 +3317,8 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_page_cell_data_ref(
-					    session, page, unpack, orig));
+					WT_ERR(__wt_dsk_cell_data_ref(session,
+					    WT_PAGE_COL_VAR, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;
 					/* FALLTHROUGH */
@@ -3853,27 +3858,14 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ERR(__rec_cell_build_val(
 				    session, r, p, size, (uint64_t)0));
 				dictionary = 1;
-			} else if (unpack->raw == WT_CELL_VALUE_OVFL_RM) {
-				/*
-				 * If the backing overflow item has already been
-				 * deleted, we'll need to write brand-new copies
-				 * based on the cached value.  This should be a
-				 * rare thing: in summary, an overflow value was
-				 * discarded because it wasn't needed, but still
-				 * cached because there's a running transaction
-				 * that might read it.  Eviction then chose this
-				 * page, and we're going to try and split it to
-				 * push part of it out of memory.  In that case,
-				 * we have to write the original overflow item,
-				 * and we see a "removed overflow" cell type.
-				 */
-				WT_ERR(__wt_page_cell_data_ref(
-				    session, page, unpack, tmpval));
-				p = tmpval->data;
-				size = tmpval->size;
-				WT_ERR(__rec_cell_build_val(
-				    session, r, p, size, (uint64_t)0));
 			} else {
+				/*
+				 * WT_CELL_VALUE_OVFL_RM: see the discussion
+				 * in __wt_multi_inmem_ovfl_rm.
+				 */
+				WT_ASSERT(session,
+				    unpack->raw != WT_CELL_VALUE_OVFL_RM ||
+				    F_ISSET(r, WT_SKIP_UPDATE_RESTORE));
 				val->buf.data = val_cell;
 				val->buf.size = __wt_cell_total_len(unpack);
 				val->cell_len = 0;
