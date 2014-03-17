@@ -156,17 +156,6 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 }
 
 /*
- * PAGE_SWAP --
- *	Macro to swap pages, handling the split restart.
- */
-#undef	PAGE_SWAP
-#define	PAGE_SWAP(session, couple, page, ref, flags, ret) do {		\
-	if (((ret) = __wt_page_swap(					\
-	    session, couple, page, ref, flags)) == WT_RESTART)		\
-		goto restart;						\
-} while (0)
-
-/*
  * __wt_tree_walk --
  *	Move to the next/previous page in the tree.
  */
@@ -179,9 +168,10 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 	uint32_t page_entries, slot;
-	int prev, skip;
+	int descending, prev, skip;
 
 	btree = S2BT(session);
+	descending = 0;
 
 	/*
 	 * !!!
@@ -254,11 +244,35 @@ ascend:	/*
 	ref = pindex->index[slot];
 	page = page->parent;
 
+	if (0) {
+restart:	/*
+		 * The page we're moving to might have split, in which case use
+		 * the last page we held to locate the cursor in the newly split
+		 * tree.
+		 *
+		 * If we were in the process of descending, repeat the descent.
+		 * If we were moving within a single level of the tree, repeat
+		 * the last move.
+		 *
+		 * If we don't have a place to stand, we must have been starting
+		 * a tree walk, begin again.
+		 */
+		if (couple == NULL) {
+			if ((page = btree->root_page) == NULL)
+				return (0);
+			goto descend;
+		}
+		WT_RET(__wt_page_refp(session, couple, &pindex, &slot));
+		page_entries = pindex->entries;
+		if (descending)
+			goto descend;
+	}
+
 	for (;;) {
 		/*
-		 * If we're at the last/first slot on the page, return this
-		 * page in post-order traversal.  Otherwise we move to the
-		 * next/prev slot and left/right-most element in its subtree.
+		 * If we're at the last/first slot on the page, return this page
+		 * in post-order traversal.  Otherwise we move to the next/prev
+		 * slot and left/right-most element in its subtree.
 		 */
 		if ((prev && slot == 0) ||
 		    (!prev && slot == page_entries - 1)) {
@@ -299,29 +313,12 @@ ascend:	/*
 			return (ret);
 		}
 
-		if (0) {
-restart:		/*
-			 * The page we're moving to might have split, in which
-			 * case use the last page we had to locate the cursor
-			 * in the newly split tree and repeat the last move.
-			 * If we don't have a place to stand, we must have been
-			 * starting a tree walk, begin again.
-			 */
-			if (couple == NULL) {
-				if ((page = btree->root_page) == NULL)
-					return (0);
-				goto descend;
-			}
-			WT_RET(__wt_page_refp(session, couple, &pindex, &slot));
-			page_entries = pindex->entries;
-		}
-
 		if (prev)
 			--slot;
 		else
 			++slot;
 
-		for (;;) {
+		for (descending = 0;;) {
 			ref = pindex->index[slot];
 
 			if (LF_ISSET(WT_READ_CACHE)) {
@@ -374,11 +371,13 @@ restart:		/*
 					break;
 			}
 
-			PAGE_SWAP(session, couple, page, ref, flags, ret);
+			ret = __wt_page_swap(session, couple, page, ref, flags);
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
 				break;
 			}
+			if (ret == WT_RESTART)
+				goto restart;
 			WT_RET(ret);
 
 			/*
@@ -392,6 +391,7 @@ restart:		/*
 descend:			pindex = page->pg_intl_index;
 				page_entries = pindex->entries;
 				slot = prev ? page_entries - 1 : 0;
+				descending = 1;
 			} else if (LF_ISSET(WT_READ_SKIP_LEAF))
 				goto ascend;
 			else {
