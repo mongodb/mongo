@@ -522,6 +522,7 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
+#define	WT_PAGE_OVERFLOW_RM	0x10	/* Page has removed overflow items */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
