@@ -633,21 +633,6 @@ namespace IndexUpdateTests {
         }
     };
 
-    class SameSpecDifferentDropDups: public ComplexIndex {
-    public:
-        void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "super2"
-                         << "ns" << _ns
-                         << "unique" << 1
-                         << "dropDups" << false
-                         << "sparse" << true
-                         << "expireAfterSeconds" << 3600
-                         << "key" << BSON("superIdx" << "2d")));
-            ASSERT_NOT_EQUALS(_client.getLastError(), "");
-        }
-    };
-
     class SameSpecDifferentSparse: public ComplexIndex {
     public:
         void run() {
@@ -719,7 +704,6 @@ namespace IndexUpdateTests {
             add<DifferentSpecSameName>();
             add<SameSpecSameOptionDifferentOrder>();
             add<SameSpecDifferentUnique>();
-            add<SameSpecDifferentDropDups>();
             add<SameSpecDifferentSparse>();
             add<SameSpecDifferentTTL>();
 
