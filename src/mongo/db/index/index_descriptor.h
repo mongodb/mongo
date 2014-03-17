@@ -1,3 +1,5 @@
+// index_descriptor.cpp
+
 /**
 *    Copyright (C) 2013 10gen Inc.
 *
@@ -155,6 +157,8 @@ namespace mongo {
 
         // this is the owner of this IndexDescriptor
         IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
+
+        bool areIndexOptionsEquivalent( const IndexDescriptor* other ) const;
 
     private:
 

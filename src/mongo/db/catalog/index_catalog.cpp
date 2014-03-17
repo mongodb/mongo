@@ -606,20 +606,21 @@ namespace mongo {
 
         {
             // Check both existing and in-progress indexes (2nd param = true)
-            const int idx = _details->_catalogFindIndexByName(name, true);
-            if (idx >= 0) {
-                // index already exists.
-                const IndexDetails& indexSpec( _details->idx(idx) );
-                BSONObj existingKeyPattern(indexSpec.keyPattern());
+            const IndexDescriptor* desc = findIndexByName( name, true );
+            if ( desc ) {
+                // index already exists with same name
 
-                if ( !existingKeyPattern.equal( key ) )
+                if ( !desc->keyPattern().equal( key ) )
                     return Status( ErrorCodes::CannotCreateIndex,
                                    str::stream() << "Trying to create an index "
                                    << "with same name " << name
                                    << " with different key spec " << key
-                                   << " vs existing spec " << existingKeyPattern );
+                                   << " vs existing spec " << desc->keyPattern() );
 
-                if ( !indexSpec.areIndexOptionsEquivalent( spec ) )
+                IndexDescriptor temp( _collection,
+                                      _getAccessMethodName( key ),
+                                      spec );
+                if ( !desc->areIndexOptionsEquivalent( &temp ) )
                     return Status( ErrorCodes::CannotCreateIndex,
                                    str::stream() << "Index with name: " << name
                                    << " already exists with different options" );
@@ -637,7 +638,10 @@ namespace mongo {
                 LOG(2) << "index already exists with diff name " << name
                         << ' ' << key << endl;
 
-                if ( !_getIndexDetails(desc)->areIndexOptionsEquivalent( spec ) )
+                IndexDescriptor temp( _collection,
+                                      _getAccessMethodName( key ),
+                                      spec );
+                if ( !desc->areIndexOptionsEquivalent( &temp ) )
                     return Status( ErrorCodes::CannotCreateIndex,
                                    str::stream() << "Index with pattern: " << key
                                    << " already exists with different options" );
