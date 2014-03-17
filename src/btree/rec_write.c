@@ -58,17 +58,17 @@ typedef struct {
 	 * set to the leaf-no-overflow type.  This means we can delete the leaf
 	 * page without reading it because we don't have to discard any overflow
 	 * items it might reference.
-	 *	The test test is per-page reconciliation, that is, once we see
-	 * an overflow item on the page, all subsequent leaf pages written for
-	 * the page will not be leaf-no-overflow type, regardless of whether or
-	 * not they contain overflow items.  In other words, leaf-no-overflow
-	 * is not guaranteed to be set on every page that doesn't contain an
-	 * overflow item, only that if it is set, the page contains no overflow
-	 * items.
-	 *	The reason is because of raw compression: there's no easy/fast
-	 * way to figure out if the rows selected by raw compression included
-	 * overflow items, and the optimization isn't worth another pass over
-	 * the data.
+	 *
+	 * The test test is per-page reconciliation, that is, once we see an
+	 * overflow item on the page, all subsequent leaf pages written for the
+	 * page will not be leaf-no-overflow type, regardless of whether or not
+	 * they contain overflow items.  In other words, leaf-no-overflow is not
+	 * guaranteed to be set on every page that doesn't contain an overflow
+	 * item, only that if it is set, the page contains no overflow items.
+	 *
+	 * The reason is because of raw compression: there's no easy/fast way to
+	 * figure out if the rows selected by raw compression included overflow
+	 * items, and the optimization isn't worth another pass over the data.
 	 */
 	int	ovfl_items;
 
@@ -81,7 +81,8 @@ typedef struct {
 	 * a page with only empty values is another common data set, and keys on
 	 * that page will be equal to the number of entries.  In both cases, set
 	 * a flag in the page's on-disk header.
-	 *	The test is per-page reconciliation as described above for the
+	 *
+	 * The test is per-page reconciliation as described above for the
 	 * overflow-item test.
 	 */
 	int	all_empty_value, any_empty_value;
@@ -792,12 +793,14 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	/*
 	 * If evicting and not all of the updates are visible, and we can save
 	 * and restore the list of updates on a newly instantiated page, do so.
-	 *	The order of the updates on the list matters so we can't move
-	 * only the unresolved updates, we have to move the entire update list.
-	 *	In this case we also clear the returned update so our caller
-	 * ignores the key/value pair in the case of an insert/append entry
-	 * (everything we need is in the update list), and otherwise writes the
-	 * original on-page key/value pair to which the update list applies.
+	 *
+	 * The order of the updates on the list matters so we can't move only
+	 * the unresolved updates, we have to move the entire update list.
+	 *
+	 * In this case we also clear the returned update so our caller ignores
+	 * the key/value pair in the case of an insert/append entry (everything
+	 * we need is in the update list), and otherwise writes the original
+	 * on-page key/value pair to which the update list applies.
 	 *
 	 * If evicting and not all of the updates are visible, and we can't save
 	 * and restore the list of updates, quit -- this page can't be evicted.
