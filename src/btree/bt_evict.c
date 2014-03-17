@@ -597,14 +597,15 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
 		/*
-		 * The first pass walks all cache leaf pages, waiting for
-		 * concurrent activity in a page to be resolved, acquiring
-		 * hazard pointers to prevent eviction.
+		 * Write all immediately available, dirty in-cache leaf pages.
 		 */
-		flags = WT_READ_CACHE | WT_READ_SKIP_INTL |
-		    WT_READ_NO_GEN | WT_READ_NO_WAIT;
-		WT_ERR(__wt_tree_walk(session, &page, flags));
-		while (page != NULL) {
+		flags = WT_READ_CACHE |
+		    WT_READ_NO_GEN | WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
+		for (;;) {
+			WT_ERR(__wt_tree_walk(session, &page, flags));
+			if (page == NULL)
+				break;
+
 			/* Write dirty pages if nobody beat us to it. */
 			if (__wt_page_is_modified(page)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
@@ -615,22 +616,20 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 					__wt_txn_release_snapshot(session);
 				WT_ERR(ret);
 			}
-
-			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
 		break;
 
 	case WT_SYNC_CHECKPOINT:
 		/*
-		 * Pages cannot disappear from underneath internal pages when
-		 * internal pages are being reconciled by checkpoint; also,
-		 * pages in a checkpoint cannot be freed until the block lists
-		 * for the checkpoint are stable.  Set the checkpointing flag
-		 * to block eviction of dirty pages until checkpoint's internal
-		 * page pass is complete.
+		 * When internal pages are being reconciled by checkpoint their
+		 * child pages cannot disappear from underneath them or be split
+		 * into them, nor can underlying blocks be freed until the block
+		 * lists for the checkpoint are stable.  Set the checkpointing
+		 * flag to block eviction of dirty pages until the checkpoint's
+		 * internal page pass is complete.
 		 *
 		 * If any thread is already in the progress of evicting a page,
-		 * it will have set the ref state to WT_REF_LOCKED, and the
+		 * it will have set the page state to WT_REF_LOCKED, and the
 		 * checkpoint will notice and wait for eviction to complete
 		 * before proceeding.
 		 */
@@ -639,16 +638,17 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
-		 * The second pass walks all cache internal pages, waiting for
-		 * concurrent activity to be resolved.
+		 * Write all dirty in-cache pages.
 		 */
 		flags = WT_READ_CACHE | WT_READ_NO_GEN;
-		WT_ERR(__wt_tree_walk(session, &page, flags));
-		while (page != NULL) {
+		for (;;) {
+			WT_ERR(__wt_tree_walk(session, &page, flags));
+			if (page == NULL)
+				break;
+
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(session, page, NULL, 0));
-			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
