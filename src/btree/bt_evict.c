@@ -601,22 +601,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * The first pass walks all cache leaf pages, waiting for
 		 * concurrent activity in a page to be resolved, acquiring
 		 * hazard pointers to prevent eviction.
-		 *
-		 * Leaf pages cannot split under internal pages when leaf pages
-		 * are being reconciled by checkpoint, the process of splitting
-		 * means there's no leaf page address for the internal page to
-		 * use when it's written.  Set the checkpointing flag to block
-		 * page splits (but not eviction) during the checkpoint's leaf
-		 * page pass.
-		 *
-		 * If any thread is already in the progress of evicting a page,
-		 * it will set the page state to WT_REF_LOCKED, and checkpoint
-		 * will block until the eviction completes.
 		 */
-		__wt_spin_lock(session, &cache->evict_lock);
-		btree->checkpointing = WT_SYNC_WRITE_LEAVES;
-		__wt_spin_unlock(session, &cache->evict_lock);
-
 		flags = WT_READ_CACHE | WT_READ_SKIP_INTL;
 		if (syncop == WT_SYNC_WRITE_LEAVES)
 			flags |= WT_READ_NO_WAIT;
@@ -648,11 +633,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * page pass is complete.
 		 *
 		 * If any thread is already in the progress of evicting a page,
-		 * it will set the page state to WT_REF_LOCKED, and checkpoint
-		 * will block until the eviction completes.
+		 * it will have set the ref state to WT_REF_LOCKED, and the
+		 * checkpoint will notice and wait for eviction to complete
+		 * before proceeding.
 		 */
 		__wt_spin_lock(session, &cache->evict_lock);
-		btree->checkpointing = WT_SYNC_CHECKPOINT;
+		btree->checkpointing = 1;
 		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
@@ -1018,18 +1004,21 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		}
 
 		/*
-		 * If the file is being checkpointed, there's a period of time
-		 * where we can't evict dirty pages as that might race with the
-		 * checkpointing thread.
+		 * If the file is being checkpointed, there's a period
+		 * of time where we can't discard any page with a
+		 * modification structure because it might race with
+		 * the checkpointing thread.
 		 *
-		 * During this phase, there is no point trying to evict dirty
-		 * pages: we might be lucky and find an internal page that has
-		 * not yet been checkpointed, but much more likely is we will
-		 * waste effort considering dirty leaf pages that cannot be
-		 * evicted.
+		 * During this phase, there is little point trying to
+		 * evict dirty pages: we might be lucky and find an
+		 * internal page that has not yet been checkpointed,
+		 * but much more likely is that we will waste effort
+		 * considering dirty leaf pages that cannot be evicted
+		 * because they have modifications more recent than the
+		 * checkpoint.
 		 */
 		modified = __wt_page_is_modified(page);
-		if (modified && btree->checkpointing == WT_SYNC_CHECKPOINT)
+		if (modified && btree->checkpointing)
 			continue;
 
 		/* Optionally ignore clean pages. */

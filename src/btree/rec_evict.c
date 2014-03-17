@@ -984,14 +984,11 @@ __rec_review(WT_SESSION_IMPL *session,
 		} WT_INTL_FOREACH_END;
 
 	/*
-	 * Checkpoint has two parts, leaf page writes and internal page writes.
-	 * During the former, we stop splitting pages into the parent page as
-	 * the act of splitting means the page has no address for the internal
-	 * page to include.  During the latter, we stop evicting dirty pages
-	 * altogether: the problem is if we write a page, the previous version
-	 * of the page will be free'd, and that version may be referenced by an
-	 * internal page already been written in service of the checkpoint,
-	 * leaving the checkpoint inconsistent.
+	 * If the file is being checkpointed, we stop evicting dirty pages: the
+	 * problem is if we write a page, the previous version of the page will
+	 * be free'd, which previous version might be referenced by an internal
+	 * page already been written in service of the checkpoint, leaving the
+	 * checkpoint inconsistent.
 	 *     Don't rely on new updates being skipped by the transaction used
 	 * for transaction reads: (1) there are paths that dirty pages for
 	 * artificial reasons; (2) internal pages aren't transactional; and
@@ -1005,8 +1002,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	if (btree->checkpointing == WT_SYNC_CHECKPOINT &&
-	    __wt_page_is_modified(page)) {
+	if (btree->checkpointing && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
@@ -1049,16 +1045,12 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * top one; only the reconciled top page goes through the split path
 	 * (and child pages are pages we expect to merge into the top page, they
 	 * they are not expected to split).
-	 *	Don't set the update-restore flag if checkpoint is active, the
-	 * act of splitting pages into the parent discards any address for leaf
-	 * pages with unresolved changes.
 	 */
 	if (__wt_page_is_modified(page)) {
 		flags = WT_EVICTION_LOCKED;
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
-		else if (top &&
-		    !WT_PAGE_IS_INTERNAL(page) && btree->checkpointing == 0)
+		else if (top && !WT_PAGE_IS_INTERNAL(page))
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, page, NULL, flags));
 	} else {
