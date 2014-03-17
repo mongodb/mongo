@@ -944,8 +944,20 @@ execute_populate(CONFIG *cfg)
 		}
 		/*
 		 * We measure how long it takes to compact all tables for this
-		 * workload.
+		 * workload.  We first set the minimum timeout so that we can
+		 * kick off all the compacts.  Then we call compact a second
+		 * time with no timeout to wait for it to finish.  If there
+		 * are multiple tables they can compact in parallel and
+		 * the second call should be a fast no-op.
 		 */
+		for (i = 0; i < cfg->table_count; i++)
+			if ((ret = session->compact(
+			    session, cfg->uris[i], "timeout=1")) != 0 &&
+			    ret != ETIMEDOUT) {
+				lprintf(cfg, ret, 0,
+				     "execute_populate: WT_SESSION.compact");
+				goto err;
+			}
 		for (i = 0; i < cfg->table_count; i++)
 			if ((ret = session->compact(
 			    session, cfg->uris[i], "timeout=0")) != 0) {
