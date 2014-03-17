@@ -111,7 +111,7 @@ printjson( result = coll.update({ foo : "bar" }, { $invalid : "expr" }) );
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
 if (coll.getMongo().writeMode() == "commands")
-    assert.eq(undefined, result.nModified, result);
+    assert.eq(0, result.nModified, result);
 assert(result.getWriteError());
 assert(result.getWriteError().errmsg);
 assert(!result.getUpsertedId());
@@ -131,7 +131,7 @@ printjson( result = coll.update({},
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
 if (coll.getMongo().writeMode() == "commands")
-    assert.eq(undefined, result.nModified, result);
+    assert.eq(0, result.nModified, result);
 assert(result.getWriteError());
 assert(result.getWriteError().errmsg);
 assert(!result.getUpsertedId());
