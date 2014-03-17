@@ -92,7 +92,7 @@ namespace mongo {
 
         NamespaceDetails::IndexIterator ii = _details->ii(true);
         while ( ii.more() ) {
-            IndexDetails& id = ii.next();
+            const IndexDetails& id = ii.next();
             int idxNo = ii.pos() - 1;
 
             if ( idxNo >= _details->getCompletedIndexCount() ) {
@@ -579,7 +579,7 @@ namespace mongo {
         if ( !name[0] )
             return Status( ErrorCodes::CannotCreateIndex, "no index name specified" );
 
-        string indexNamespace = IndexDetails::indexNamespaceFromObj(spec);
+        string indexNamespace = IndexDescriptor::makeIndexNamespace( specNamespace, name );
         if ( indexNamespace.length() > Namespace::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
                            str::stream() << "namespace name generated from index name \"" <<

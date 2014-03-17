@@ -31,12 +31,11 @@
 #include "mongo/db/catalog/collection_info_cache.h"
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/util/debug_util.h"
 
-#include "mongo/db/structure/catalog/index_details.h" // XXX
 
 namespace mongo {
 
@@ -60,9 +59,9 @@ namespace mongo {
 
         _indexedPaths.clear();
 
-        NamespaceDetails::IndexIterator i = _collection->details()->ii( true );
+        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator( true );
         while( i.more() ) {
-            BSONObj key = i.next().keyPattern();
+            BSONObj key = i.next()->keyPattern();
             BSONObjIterator j( key );
             while ( j.more() ) {
                 BSONElement e = j.next();

@@ -141,7 +141,7 @@ namespace mongo {
                 return ((char *) this) - ((char *) d);
             }
             void init() { memset(this, 0, sizeof(Extra)); }
-            Extra* next(NamespaceDetails *d) {
+            Extra* next(const NamespaceDetails *d) const {
                 if( _next == 0 ) return 0;
                 return (Extra*) (((char *) d) + _next);
             }
@@ -151,7 +151,7 @@ namespace mongo {
                 _next = 0;
             }
         };
-        Extra* extra() {
+        Extra* extra() const {
             if( _extraOffset == 0 ) return 0;
             return (Extra *) (((char *) this) + _extraOffset);
         }
@@ -258,20 +258,21 @@ namespace mongo {
         };
 
         IndexDetails& idx(int idxNo, bool missingExpected = false );
+        const IndexDetails& idx(int idxNo, bool missingExpected = false ) const;
 
         class IndexIterator {
         public:
             int pos() { return i; } // note this is the next one to come
             bool more() { return i < n; }
-            IndexDetails& next() { return d->idx(i++); }
+            const IndexDetails& next() { return d->idx(i++); }
         private:
             friend class NamespaceDetails;
             int i, n;
-            NamespaceDetails *d;
-            IndexIterator(NamespaceDetails *_d, bool includeBackgroundInProgress);
+            const NamespaceDetails *d;
+            IndexIterator(const NamespaceDetails *_d, bool includeBackgroundInProgress);
         };
 
-        IndexIterator ii( bool includeBackgroundInProgress = false ) {
+        IndexIterator ii( bool includeBackgroundInProgress = false ) const {
             return IndexIterator(this, includeBackgroundInProgress);
         }
 
@@ -399,10 +400,11 @@ namespace mongo {
         /** Make all linked Extra objects writeable as well */
         NamespaceDetails *writingWithExtra();
 
-    private:
         // @return offset in indexes[]
         int _catalogFindIndexByName( const StringData& name,
-                                     bool includeBackgroundInProgress = false);
+                                     bool includeBackgroundInProgress = false) const;
+
+    private:
 
         void _removeIndexFromMe( int idx );
 

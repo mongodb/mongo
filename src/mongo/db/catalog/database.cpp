@@ -525,20 +525,31 @@ namespace mongo {
                 newIndexSpec = b.obj();
             }
 
+            Collection* systemIndexCollection = getCollection( _indexesName );
+
             StatusWith<DiskLoc> newIndexSpecLoc =
-                getCollection( _indexesName )->insertDocument( newIndexSpec, false );
+                systemIndexCollection->insertDocument( newIndexSpec, false );
             if ( !newIndexSpecLoc.isOK() )
                 return newIndexSpecLoc.getStatus();
 
-            int indexI = details->_catalogFindIndexByName( oldIndexSpec.getStringField( "name" ) );
-            IndexDetails &indexDetails = details->idx(indexI);
-            string oldIndexNs = indexDetails.indexNamespace();
-            indexDetails.info = newIndexSpecLoc.getValue();
-            string newIndexNs = indexDetails.indexNamespace();
+            const string& indexName = oldIndexSpec.getStringField( "name" );
 
-            Status s = _renameSingleNamespace( oldIndexNs, newIndexNs, false );
-            if ( !s.isOK() )
-                return s;
+            {
+                // fix IndexDetails pointer
+                int indexI = details->_catalogFindIndexByName( indexName );
+                IndexDetails& indexDetails = details->idx(indexI);
+                getDur().writingDiskLoc(indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
+            }
+
+            {
+                // move underlying namespac
+                string oldIndexNs = IndexDescriptor::makeIndexNamespace( fromNS, indexName );
+                string newIndexNs = IndexDescriptor::makeIndexNamespace( toNS, indexName );
+
+                Status s = _renameSingleNamespace( oldIndexNs, newIndexNs, false );
+                if ( !s.isOK() )
+                    return s;
+            }
 
             deleteObjects( _indexesName, oldIndexSpec, true, false, true );
         }

@@ -71,7 +71,7 @@ namespace mongo {
               _unique( _isIdIndex || infoObj["unique"].trueValue() ),
               _cachedEntry( NULL )
         {
-            _indexNamespace = _parentNS + ".$" + _indexName;
+            _indexNamespace = makeIndexNamespace( _parentNS, _indexName );
 
             _version = 0;
             BSONElement e = _infoObj["v"];
@@ -168,6 +168,11 @@ namespace mongo {
                    && (e.numberInt() == 1 || e.numberInt() == -1)))
                 return false;
              return i.next().eoo();
+        }
+
+        static string makeIndexNamespace( const StringData& ns,
+                                          const StringData& name ) {
+            return ns.toString() + ".$" + name.toString();
         }
 
     private:

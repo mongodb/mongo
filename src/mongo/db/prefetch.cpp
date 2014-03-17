@@ -33,10 +33,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/commands/server_status.h"
@@ -115,7 +113,7 @@ namespace mongo {
         if ((*opType == 'u') &&
             // do not prefetch the data for capped collections because
             // they typically do not have an _id index for findById() to use.
-            !collection->details()->isCapped()) {
+            !collection->isCapped()) {
             prefetchRecordPages(ns, obj);
         }
     }

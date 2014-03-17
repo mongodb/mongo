@@ -45,16 +45,14 @@ namespace mongo {
        system.namespaces (although this also includes the head pointer, which is not in that
        collection).
 
+       This is an internal part of the catalog.  Nothing outside of the catalog should use this.
+
        ** MemoryMapped Record ** (i.e., this is on disk data)
      */
     class IndexDetails {
     public:
         /**
          * btree head disk location
-         * TODO We should make this variable private, since btree operations
-         * may change its value and we don't want clients to rely on an old
-         * value.  If we create a btree class, we can provide a btree object
-         * to clients instead of 'head'.
          */
         DiskLoc head;
 
@@ -69,112 +67,11 @@ namespace mongo {
         */
         DiskLoc info;
 
-        /* extract key value from the query object
-           e.g., if key() == { x : 1 },
-                 { x : 70, y : 3 } -> { x : 70 }
-        */
-        BSONObj getKeyFromQuery(const BSONObj& query) const {
-            BSONObj k = keyPattern();
-            BSONObj res = query.extractFieldsUnDotted(k);
-            return res;
-        }
-
-        /* get the key pattern for this object.
-           e.g., { lastname:1, firstname:1 }
-        */
-        BSONObj keyPattern() const {
-            return info.obj().getObjectField("key");
-        }
-
-        // returns name of this index's storage area (database.collection.$index)
-        string indexNamespace() const {
-            return indexNamespaceFromObj(info.obj());
-        }
-
-        // returns the name of an index's storage area (database.collection.$index) from a BSONObj
-        static string indexNamespaceFromObj(const BSONObj& io) {
-            string s;
-            s.reserve(Namespace::MaxNsLen);
-            s = io.getStringField("ns");
-            verify( !s.empty() );
-            s += ".$";
-            s += io.getStringField("name");
-            return s;
-        }
-
-
-        string indexName() const { // e.g. "ts_1"
-            BSONObj io = info.obj();
-            return io.getStringField("name");
-        }
-
-        // TODO: Move elsewhere.  Currently also lives in db/query/query_planner.cpp.
-        static bool isIdIndexPattern( const BSONObj &pattern ) {
-            BSONObjIterator i(pattern);
-            BSONElement e = i.next();
-            //_id index must have form exactly {_id : 1} or {_id : -1}.
-            //Allows an index of form {_id : "hashed"} to exist but
-            //do not consider it to be the primary _id index
-            if(! ( strcmp(e.fieldName(), "_id") == 0
-                    && (e.numberInt() == 1 || e.numberInt() == -1)))
-                return false;
-            return i.next().eoo();
-        }
-
-        /* returns true if this is the _id index. */
-        bool isIdIndex() const {
-            return isIdIndexPattern( keyPattern() );
-        }
-
-        /* gets not our namespace name (indexNamespace for that),
-           but the collection we index, its name.
-           */
-        string parentNS() const {
-            BSONObj io = info.obj();
-            return io.getStringField("ns");
-        }
-
-        static int versionForIndexObj( const BSONObj &obj ) {
-            BSONElement e = obj["v"];
-            if( e.type() == NumberInt ) 
-                return e._numberInt();
-            // should normally be an int.  this is for backward compatibility
-            int v = e.numberInt();
-            uassert(14802, "index v field should be Integer type", v == 0);
-            return v;            
-        }
-        
-        int version() const {
-            return versionForIndexObj( info.obj() );
-        }
-
-        /** @return true if index has unique constraint */
-        bool unique() const {
-            BSONObj io = info.obj();
-            return io["unique"].trueValue() ||
-                   /* temp: can we juse make unique:true always be there for _id and get rid of this? */
-                   isIdIndex();
-        }
-
-        /** return true if dropDups was set when building index (if any duplicates, dropdups drops the duplicating objects) */
-        bool dropDups() const {
-            return info.obj().getBoolField( "dropDups" );
-        }
-
-        /** delete this index.  does NOT clean up the system catalog
-            (system.indexes or system.namespaces) -- only NamespaceIndex.
+        /**
+         * makes head and info invalid
         */
         void _reset();
 
-        string toString() const {
-            return info.obj().toString();
-        }
-
-        /** @return true if supported.  supported means we can use the index, including adding new keys.
-                    it may not mean we can build the index version in question: we may not maintain building 
-                    of indexes in old formats in the future.
-        */
-        static bool isASupportedIndexVersionNumber(int v) { return (v&1)==v; } // v == 0 || v == 1
     };
 
 } // namespace mongo

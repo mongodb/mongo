@@ -474,7 +474,33 @@ namespace mongo {
         return e->details[i];
     }
 
-    NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d,
+
+    const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const {
+        if( idxNo < NIndexesBase ) {
+            const IndexDetails& id = _indexes[idxNo];
+            return id;
+        }
+        const Extra *e = extra();
+        if ( ! e ) {
+            if ( missingExpected )
+                throw MsgAssertionException( 17421 , "Missing Extra" );
+            massert(17422, "missing Extra", e);
+        }
+        int i = idxNo - NIndexesBase;
+        if( i >= NIndexesExtra ) {
+            e = e->next(this);
+            if ( ! e ) {
+                if ( missingExpected )
+                    throw MsgAssertionException( 17423 , "missing extra" );
+                massert(17424, "missing Extra", e);
+            }
+            i -= NIndexesExtra;
+        }
+        return e->details[i];
+    }
+
+
+    NamespaceDetails::IndexIterator::IndexIterator(const NamespaceDetails *_d,
                                                    bool includeBackgroundInProgress) {
         d = _d;
         i = 0;
@@ -724,7 +750,7 @@ namespace mongo {
     }
 
     int NamespaceDetails::_catalogFindIndexByName(const StringData& name,
-                                                  bool includeBackgroundInProgress) {
+                                                  bool includeBackgroundInProgress) const {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
             if ( name == i.next().info.obj().getStringField("name") )

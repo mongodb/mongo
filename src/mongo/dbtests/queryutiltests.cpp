@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
@@ -1600,29 +1601,23 @@ namespace QueryUtilTests {
             Collection* collection() { return db()->getCollection( ns() ); }
             NamespaceDetails *nsd() { return collection()->details(); }
 
-            IndexDetails *index( const BSONObj &key, int* indexNoOut = NULL ) {
+            int indexno( const BSONObj &key ) {
                 stringstream ss;
                 ss << indexNum_++;
                 string name = ss.str();
                 client_.resetIndexCache();
                 client_.ensureIndex( ns(), key, false, name.c_str() );
-                NamespaceDetails *d = nsd();
-                for( int i = 0; i < d->getCompletedIndexCount(); ++i ) {
-                    if ( d->idx(i).keyPattern() == key /*indexName() == name*/ ||
-                         ( d->idx(i).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) ) {
-                        if ( indexNoOut )
-                            *indexNoOut = i;
-                        return &d->idx(i);
-                    }
-                }
-                verify( false );
-                return 0;
+
+                IndexCatalog* catalog = collection()->getIndexCatalog();
+                IndexDescriptor* desc = catalog->findIndexByKeyPattern( key );
+                invariant( desc );
+
+                int x = nsd()->_catalogFindIndexByName( desc->indexName() );
+                invariant( x >= 0 );
+
+                return x;
             }
-            int indexno( const BSONObj &key ) {
-                int idxNo;
-                ASSERT( index(key, &idxNo) );
-                return idxNo;
-            }
+
             static DBDirectClient client_;
         private:
             int indexNum_;

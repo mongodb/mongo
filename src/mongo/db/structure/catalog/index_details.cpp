@@ -42,10 +42,6 @@
 
 namespace mongo {
 
-    /* delete this index.  does NOT clean up the system catalog
-       (system.indexes or system.namespaces) -- only NamespaceIndex.
-       TOOD: above comment is wrong, also, document durability assumptions
-    */
     void IndexDetails::_reset() {
         head.setInvalid();
         info.setInvalid();
