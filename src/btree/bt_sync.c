@@ -39,13 +39,19 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 
 	btree = S2BT(session);
 
-	/*
-	 * XXX
-	 * Set the checkpoint reference for reconciliation -- this is ugly, but
-	 * there's no data structure path from here to the reconciliation of the
-	 * tree's root page.
-	 */
-	btree->ckpt = ckptbase;
+	switch (op) {
+	case WT_SYNC_CHECKPOINT:
+	case WT_SYNC_DISCARD:
+		/*
+		 * XXX
+		 * Set the checkpoint reference for reconciliation -- this is
+		 * ugly, but there's no data structure path from here to the
+		 * reconciliation of the tree's root page.
+		 */
+		WT_ASSERT(session, btree->ckpt == NULL);
+		btree->ckpt = ckptbase;
+		break;
+	}
 
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
@@ -59,6 +65,12 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	btree->ckpt = NULL;
+err:	switch (op) {
+	case WT_SYNC_CHECKPOINT:
+	case WT_SYNC_DISCARD:
+		btree->ckpt = NULL;
+		break;
+	}
+
 	return (ret);
 }
