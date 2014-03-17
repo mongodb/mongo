@@ -227,6 +227,17 @@ struct __wt_cursor_index {
 	WT_CURSOR **cg_cursors;
 };
 
+struct __wt_cursor_metadata {
+	WT_CURSOR iface;
+
+	WT_CURSOR *file_cursor;		/* Queries of regular metadata */
+	WT_ITEM tmp_val;		/* Result of metadata metadata query */
+#define	WT_MDC_POSITIONED	0x01
+#define	WT_MDC_ONMETADATA	0x02
+#define	WT_MDC_TMP_USED		0x04
+	uint32_t flags;
+};
+
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 

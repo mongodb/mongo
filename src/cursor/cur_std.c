@@ -58,6 +58,28 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_config_readonly --
+ *	Parse read only configuration and setup cursor appropriately.
+ */
+int
+__wt_cursor_config_readonly(WT_CURSOR *cursor, const char *cfg[], int def)
+{
+	WT_CONFIG_ITEM cval;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_RET(__wt_config_gets_def(session, cfg, "readonly", 0, &cval));
+	if (cval.val != 0) {
+		/* Reset all cursor methods that could modify data. */
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
+	}
+	return (0);
+}
+
+/*
  * __wt_cursor_kv_not_set --
  *	Standard error message for key/values not set.
  */
@@ -597,6 +619,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_RET(__wt_config_gets_def(session, cfg, "raw", 0, &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
+
+	/* readonly */
+	WT_RET(__wt_cursor_config_readonly(cursor, cfg, 0));
 
 	/*
 	 * Cursors that are internal to some other cursor (such as file cursors
