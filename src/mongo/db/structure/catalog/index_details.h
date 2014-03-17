@@ -180,14 +180,6 @@ namespace mongo {
             return info.obj().toString();
         }
 
-        /**
-         * @param newSpec the new index specification to check.
-         *
-         * @return true if the given newSpec has the same options as the
-         *     existing index assuming the key spec matches.
-         */
-        bool areIndexOptionsEquivalent( const BSONObj& newSpec ) const;
-
         /** @return true if supported.  supported means we can use the index, including adding new keys.
                     it may not mean we can build the index version in question: we may not maintain building 
                     of indexes in old formats in the future.
