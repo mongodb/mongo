@@ -70,7 +70,7 @@ namespace mongo {
 
         struct IndexState {
             IndexState()
-                : real( NULL ), bulk( NULL ), block( NULL ) {
+                : block( NULL ), real( NULL ), bulk( NULL ) {
             }
 
             IndexAccessMethod* forInsert() { return bulk ? bulk : real; }
