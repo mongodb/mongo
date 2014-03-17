@@ -516,7 +516,22 @@ namespace mongo {
                     Client::Context* ctx = cc().getContext();
                     verify( ctx );
                     IndexBuilder builder(o);
-                    uassertStatusOK( builder.build( *ctx ) );
+                    Status status = builder.build( *ctx );
+                    if ( status.isOK() ) {
+                        // yay
+                    }
+                    else if ( status.code() == ErrorCodes::CannotCreateIndex &&
+                              status.location() == IndexOptionsDiffer ) {
+                        // SERVER-13206
+                        // 2.4 (and earlier) will add an ensureIndex to an oplog if its ok or not
+                        // so in 2.6+ where we do stricter validation, it will fail
+                        // but we shouldn't care as the primary is responsible
+                        warning() << "index creation attempted on secondary that conflicts, "
+                                  << "skipping: " << status;
+                    }
+                    else {
+                        uassertStatusOK( status );
+                    }
                 }
             }
             else {
