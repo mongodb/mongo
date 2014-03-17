@@ -116,6 +116,7 @@ files.forEach(function(x) {
         'mr_auth|' +
         'queryoptimizera|' +
         'indexStatsCommand|' +
+        'storageDetailsCommand|' +
         'reversecursor|' +
         'block_check_supported|' +
         'batch_write_protocol|' +
