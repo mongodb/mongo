@@ -38,7 +38,7 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationMaxResults, int, 101);
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheSize, int, 200);
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheSize, int, 5000);
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
 
