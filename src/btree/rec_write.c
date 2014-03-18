@@ -750,18 +750,19 @@ __rec_skip_update_move(
  */
 static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-    WT_UPDATE *upd, WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack,
+    WT_UPDATE *upd_arg, WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack,
     WT_UPDATE **updp)
 {
 	WT_DECL_RET;
 	WT_ITEM ovfl;
-	WT_UPDATE *ovfl_upd;
+	WT_UPDATE *upd, *ovfl_upd;
 	size_t size;
 	uint64_t max_txn, txnid;
 
 	*updp = NULL;
 
-	for (max_txn = WT_TXN_NONE; upd != NULL; upd = upd->next) {
+	for (max_txn = WT_TXN_NONE,
+	    upd = upd_arg; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
@@ -837,10 +838,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * WT_CELL_OVFL_REMOVE.  Then, eviction chose the page, we're splitting
 	 * it up in order to push parts of it out of memory.
 	 *
-	 * An update was not globally visible in our check, so the value should
-	 * still be in the cache.  Regardless, ignore overflow values we can't
-	 * find -- assuming they were correctly removed, there's no possibility
-	 * of them being found by another thread.
+	 * If there was any globally visible update in the list, the value may
+	 * be gone from the cache.  Ignore overflow values we can't find, it
+	 * onlyl means there's a globally visible update in the list and the
+	 * underlying overflow value is of no interest.
 	 */
 	if (vpack != NULL && vpack->raw == WT_CELL_OVFL_REMOVE &&
 	    (ret = __wt_ovfl_txnc_search(
@@ -855,9 +856,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 */
 		WT_RET(__wt_update_alloc(session, &ovfl, &ovfl_upd, &size));
 		ovfl_upd->txnid = WT_TXN_NONE;
-		for (upd = ins == NULL ?
-		    r->page->pg_row_upd[WT_ROW_SLOT(r->page, rip)] : ins->upd;
-		    upd->next != NULL; upd = upd->next)
+		for (upd = upd_arg; upd->next != NULL; upd = upd->next)
 			;
 		upd->next = ovfl_upd;
 	}
