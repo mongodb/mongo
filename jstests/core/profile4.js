@@ -96,6 +96,12 @@ try {
     t.find().sort( {a:1} ).itcount();
     checkLastOp( [ [ "scanAndOrder", true ] ] );
     
+    t.ensureIndex( {a:1} );
+    t.find( {a:1} ).itcount();
+    o = lastOp();
+    assert.eq( "FETCH", o.execStats.type, tojson( o.execStats ) );
+    assert.eq( "IXSCAN", o.execStats.children[0].type, tojson( o.execStats ) );
+
     db.setProfilingLevel(0);
     db.system.profile.drop();    
 }
