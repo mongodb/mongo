@@ -180,6 +180,9 @@ namespace mongo {
         // N starts at zero, and we add to it for each item
         response->setN( 0 );
 
+        // GLE path always sets nModified to -1 (sentinel) to indicate we should omit it later.
+        response->setNModified(-1);
+
         for ( size_t i = 0; i < request.sizeWriteOps(); ++i ) {
 
             // Break on first error if we're ordered

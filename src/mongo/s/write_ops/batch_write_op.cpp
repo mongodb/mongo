@@ -449,7 +449,13 @@ namespace mongo {
                 numUpserted = response.sizeUpsertDetails();
             }
             stats->numMatched += ( response.getN() - numUpserted );
-            stats->numModified += response.getNModified();
+            long long numModified = response.getNModified();
+
+            if (numModified >= 0)
+                stats->numModified += numModified;
+            else
+                stats->numModified = -1; // sentinel used to indicate we omit the field downstream
+
             stats->numUpserted += numUpserted;
         }
         else {
@@ -740,8 +746,10 @@ namespace mongo {
         int nValue = _stats->numInserted + _stats->numUpserted + _stats->numMatched
                      + _stats->numDeleted;
         batchResp->setN( nValue );
-        if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update )
-            batchResp->setNModified( _stats->numModified );
+        if ( _clientRequest->getBatchType() == BatchedCommandRequest::BatchType_Update &&
+             _stats->numModified >= 0) {
+                batchResp->setNModified( _stats->numModified );
+        }
 
         dassert( batchResp->isValid( NULL ) );
     }

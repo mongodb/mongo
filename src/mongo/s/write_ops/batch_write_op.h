@@ -192,6 +192,16 @@ namespace mongo {
         int numModified;
         int numDeleted;
 
+        std::string toString() const {
+            StringBuilder str;
+            str << "numInserted: " << numInserted
+                << " numUpserted: " << numUpserted
+                << " numMatched: " << numMatched
+                << " numModified: " << numModified
+                << " numDeleted: " << numDeleted;
+            return str.str();
+        }
+
     };
 
     /**
