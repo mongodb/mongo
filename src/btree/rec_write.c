@@ -765,12 +765,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
-		/*
-		 * Track the largest transaction ID on this page.  We store this
-		 * in the page at the end of reconciliation if no updates are
-		 * skipped, and used to avoid evicting clean pages from memory
-		 * with changes that are required to satisfy a snapshot read.
-		 */
+		/* Track the largest/smallest transaction IDs on the list. */
 		if (TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
 		if (!TXNID_LT(min_txn, txnid))
@@ -794,7 +789,12 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		}
 	}
 
-	/* Track the maximum transaction ID in the page. */
+	/*
+	 * Track the maximum transaction ID in the page.  We store this in the
+	 * page at the end of reconciliation if no updates are skipped, and used
+	 * to avoid evicting clean pages from memory with changes required to
+	 * satisfy a snapshot read.
+	 */
 	if (TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
