@@ -34,8 +34,6 @@
 #include <cctype>
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/base/init.h"
-#include "mongo/base/initializer.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/platform/unordered_set.h"
@@ -46,7 +44,6 @@
 namespace mongo {
     long long Scope::_lastVersion = 1;
     static const unsigned kMaxJsFileLength = std::numeric_limits<unsigned>::max() - 1;
-    static DBClientBase* directDBclient;
 
     ScriptEngine::ScriptEngine() : _scopeInitCallback() {
     }
@@ -181,14 +178,6 @@ namespace mongo {
             uassert(10430,  "invalid object id: not hex", std::isxdigit(str.at(i)));
     }
 
-    MONGO_INITIALIZER(CreateJSDirectClient)
-        (InitializerContext* context) {
-
-        directDBclient = createDirectClient();
-
-        return Status::OK();
-    }
-
     void Scope::loadStored(bool ignoreNotConnected) {
         if (_localDBName.size() == 0) {
             if (ignoreNotConnected)
@@ -202,8 +191,8 @@ namespace mongo {
         _loadedVersion = _lastVersion;
         string coll = _localDBName + ".system.js";
 
-        auto_ptr<DBClientCursor> c = directDBclient->query(coll, Query(), 0, 0, NULL, 
-            QueryOption_SlaveOk, 0);
+        static DBClientBase* db = createDirectClient();
+        auto_ptr<DBClientCursor> c = db->query(coll, Query(), 0, 0, NULL, QueryOption_SlaveOk, 0);
         massert(16669, "unable to get db client cursor from query", c.get());
 
         set<string> thisTime;
