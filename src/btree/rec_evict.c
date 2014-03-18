@@ -582,7 +582,6 @@ __wt_multi_inmem_build(
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
-
 	}
 
 	WT_LINK_PAGE(page->parent, ref, new);
