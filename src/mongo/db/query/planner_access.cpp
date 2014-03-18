@@ -980,6 +980,9 @@ namespace mongo {
             }
             else {
                 // Can't do anything with negated logical nodes index-wise.
+                if (!inArrayOperator) {
+                    delete root;
+                }
                 return NULL;
             }
         }
@@ -1069,7 +1072,9 @@ namespace mongo {
                     // The child is an AND.
                     verify(1 == root->numChildren());
                     solution = buildIndexedDataAccess(query, root->getChild(0), true, indices);
-                    if (NULL == solution) { return NULL; }
+                    if (NULL == solution) {
+                        return NULL;
+                    }
                 }
 
                 // There may be an array operator above us.
@@ -1082,6 +1087,10 @@ namespace mongo {
                 fetch->children.push_back(solution);
                 return fetch;
             }
+        }
+
+        if (!inArrayOperator) {
+            delete root;
         }
 
         return NULL;
