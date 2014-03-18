@@ -127,10 +127,14 @@ namespace mongo {
         if (_failure || _killed) { return false; }
 
         if (NULL != _bestPlan) {
-            return _bestPlan->restoreState();
+            bool best = _bestPlan->restoreState();
+            // backup plan is OK by default.  Only can be set to not-OK if it exists and fails.
+            bool backup = true;
             if (NULL != _backupPlan) {
-                _backupPlan->restoreState();
+                backup = _backupPlan->restoreState();
             }
+            // We're OK to continue if the best plan and the backup plan are OK.
+            return best && backup;
         }
         else {
             allPlansRestoreState();
@@ -215,6 +219,7 @@ namespace mongo {
         _killed = true;
         _collection = NULL;
         if (NULL != _bestPlan) { _bestPlan->kill(); }
+        if (NULL != _backupPlan) { _backupPlan->kill(); }
     }
 
     Runner::RunnerState MultiPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
@@ -295,11 +300,14 @@ namespace mongo {
             PlanCache* cache = collection->infoCache()->getPlanCache();
             cache->remove(*_query);
 
+            // Move the backup info into the bestPlan info and clear the backup
+            // info.
             _bestPlan.reset(_backupPlan);
             _backupPlan = NULL;
             _bestSolution.reset(_backupSolution);
             _backupSolution = NULL;
             _alreadyProduced = _backupAlreadyProduced;
+            _backupAlreadyProduced.clear();
             return getNext(objOut, dlOut);
         }
 
