@@ -164,6 +164,8 @@ namespace mongo {
         // The last point is duplicated.  We drop it, since S2Loop expects no
         // duplicate points
         exteriorVertices.resize(exteriorVertices.size() - 1);
+        // S2 Polygon loops must have 3 vertices
+        if (exteriorVertices.size() < 3) { return false; }
 
         S2PolygonBuilderOptions polyOptions;
         polyOptions.set_validate(true);
@@ -185,6 +187,8 @@ namespace mongo {
             eraseDuplicatePoints(&holePoints);
             // Drop the duplicated last point.
             holePoints.resize(holePoints.size() - 1);
+            // S2 Polygon loops must have 3 vertices
+            if (holePoints.size() < 3) { return false; }
             // Interior rings are clockwise.
             S2Loop holeLoop(holePoints);
             holeLoop.Normalize();
