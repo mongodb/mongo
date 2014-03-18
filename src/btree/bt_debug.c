@@ -914,7 +914,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		case WT_CELL_DEL:
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
-		case WT_CELL_VALUE_OVFL_RM:
+		case WT_CELL_OVFL_REMOVE:
 			__dmsg(ds, ", rle: %" PRIu64, __wt_cell_rle(unpack));
 			break;
 		}
@@ -945,7 +945,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		goto addr;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
-	case WT_CELL_VALUE_OVFL_RM:
+	case WT_CELL_OVFL_REMOVE:
 		type = "ovfl";
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 		__dmsg(ds, ", %s %s", type,
@@ -996,7 +996,7 @@ __debug_cell_data(WT_DBG *ds,
 	case WT_CELL_DEL:
 deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 		break;
-	case WT_CELL_VALUE_OVFL_RM:
+	case WT_CELL_OVFL_REMOVE:
 		__debug_item(ds, tag, "overflow/rm", strlen("overflow/rm"));
 		break;
 	case WT_CELL_KEY:

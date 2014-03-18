@@ -653,7 +653,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
-	WT_CELL_UNPACK kpack;
+	WT_CELL_UNPACK *kpack, _kpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_PAGE *parent;
@@ -665,6 +665,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	int locked;
 
 	btree = S2BT(session);
+	kpack = &_kpack;
 	alloc_index = NULL;
 	alloc_ref = NULL;
 	locked = 0;
@@ -760,9 +761,9 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 
 	/*
 	 * The key for the original page may be an onpage overflow key, and we
-	 * just lost track of it as the parent's index to no longer references
-	 * the WT_REF pointing to it.  Add it to the parent's tracking list and
-	 * it will be discarded the next time the parent is reconciled.
+	 * just lost track of it as the parent's index no longer references the
+	 * WT_REF pointing to it.  Add it to the parent's tracking list and it
+	 * will be discarded the next time the parent is reconciled.
 	 */
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
@@ -770,10 +771,10 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 		ikey = __wt_ref_key_instantiated(parent_ref);
 		if (ikey != NULL && ikey->cell_offset != 0) {
 			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
-			__wt_cell_unpack(cell, &kpack);
-			if (kpack.ovfl)
+			__wt_cell_unpack(cell, kpack);
+			if (kpack->ovfl && kpack->raw != WT_CELL_OVFL_REMOVE)
 				WT_ERR(__wt_ovfl_onpage_add(
-				    session, parent, kpack.data, kpack.size));
+				    session, parent, kpack->data, kpack->size));
 		}
 		break;
 	}

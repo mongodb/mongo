@@ -100,7 +100,7 @@
 #define	WT_CELL_VALUE		 (8 << 4)	/* Value */
 #define	WT_CELL_VALUE_COPY	 (9 << 4)	/* Value copy */
 #define	WT_CELL_VALUE_OVFL	(10 << 4)	/* Overflow value */
-#define	WT_CELL_VALUE_OVFL_RM	(11 << 4)	/* Removed overflow value */
+#define	WT_CELL_OVFL_REMOVE	(11 << 4)	/* Removed overflow item */
 
 #define	WT_CELL_TYPE_MASK	(0x0fU << 4)	/* Maximum 16 cell types */
 #define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
@@ -478,7 +478,7 @@ __wt_cell_type(WT_CELL *cell)
 	switch (type = WT_CELL_TYPE(cell->__chunk[0])) {
 	case WT_CELL_KEY_PFX:
 		return (WT_CELL_KEY);
-	case WT_CELL_VALUE_OVFL_RM:
+	case WT_CELL_OVFL_REMOVE:
 		return (WT_CELL_VALUE_OVFL);
 	}
 	return (type);
@@ -637,7 +637,7 @@ restart:
 
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
-	case WT_CELL_VALUE_OVFL_RM:
+	case WT_CELL_OVFL_REMOVE:
 		/*
 		 * Set overflow flag.
 		 */
@@ -780,21 +780,21 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 /*
  * __wt_dsk_cell_data_ref, __wt_page_cell_data_ref --
  *	Set a buffer to reference the data from an unpacked cell, two flavors.
- * There are two version because of WT_CELL_VALUE_OVFL_RM type cells.  When an
+ * There are two version because of WT_CELL_OVFL_REMOVE type cells.  When an
  * overflow item is deleted, its backing blocks are removed; if there are still
  * running transactions that might need to see the overflow item, we cache a
- * copy of the item and reset the item's cell to WT_CELL_VALUE_OVFL_RM.  If we
- * find a WT_CELL_VALUE_OVFL_RM cell when reading an overflow item, we use the
+ * copy of the item and reset the item's cell to WT_CELL_OVFL_REMOVE.  If we
+ * find a WT_CELL_OVFL_REMOVE cell when reading an overflow item, we use the
  * page reference to look aside into the cache.  So, calling the "dsk" version
- * of the function declares the cell cannot be of type WT_CELL_VALUE_OVFL_RM,
- * and calling the "page" version means it might be.
+ * of the function declares the cell cannot be of type WT_CELL_OVFL_REMOVE, and
+ * calling the "page" version means it might be.
  */
 static inline int
 __wt_dsk_cell_data_ref(WT_SESSION_IMPL *session,
     int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	WT_ASSERT(session,
-	    __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
+	    __wt_cell_type_raw(unpack->cell) != WT_CELL_OVFL_REMOVE);
 	return (__cell_data_ref(session, NULL, page_type, unpack, store));
 }
 static inline int
@@ -822,7 +822,7 @@ __wt_cell_data_copy(WT_SESSION_IMPL *session,
 	 * a copy.
 	 *
 	 * We don't require two versions of this function, no callers need to
-	 * handle WT_CELL_VALUE_OVFL_RM cells.
+	 * handle WT_CELL_OVFL_REMOVE cells.
 	 */
 	WT_RET(__wt_dsk_cell_data_ref(session, page_type, unpack, store));
 	if (!WT_DATA_IN_ITEM(store))

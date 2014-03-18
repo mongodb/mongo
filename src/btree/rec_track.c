@@ -201,48 +201,31 @@ __ovfl_onpage_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __ovfl_onpage_wrapup_err --
  *	Resolve the page's overflow onpage list after an error occurs.
  */
-static int
+static void
 __ovfl_onpage_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_OVFL_ONPAGE **e, **head, *onpage;
-	int i;
-
-	head = page->modify->ovfl_track->ovfl_onpage;
+	WT_UNUSED(session);
+	WT_UNUSED(page);
 
 	/*
-	 * Discard any overflow records that were just added.
-	 *
-	 * First, walk the overflow onpage lists (except for the lowest one),
-	 * fixing up skiplist links.
+	 * This function exists as a placeholder for this comment: we don't do
+	 * anything to the on-page overflow record list, on error, because the
+	 * overflow objects stored in it are cached, removed overflow keys, and
+	 * we have set flags in the on-page key cell to tell reconciliation to
+	 * look here for those keys.  If reconciliation fails, we aren't going
+	 * to back out the key cell changes, which means we have to leave this
+	 * list alone.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
-		for (e = &head[i]; *e != NULL;) {
-			if (!F_ISSET(*e, WT_OVFL_ONPAGE_JUST_ADDED)) {
-				e = &(*e)->next[i];
-				continue;
-			}
-			*e = (*e)->next[i];
-		}
-
-	/* Second, discard any overflow record with a just-added flag. */
-	for (e = &head[0]; (onpage = *e) != NULL;) {
-		if (!F_ISSET(onpage, WT_OVFL_ONPAGE_JUST_ADDED)) {
-			e = &(*e)->next[0];
-			continue;
-		}
-		*e = (*e)->next[0];
-		__wt_free(session, onpage);
-	}
-	return (0);
+	return;
 }
 
 /*
- * __wt_ovfl_onpage_search --
+ * __ovfl_onpage_search --
  *	Return true/false if an address appears in the page's list of tracked
  * on-page overflow records.
  */
-int
-__wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, size_t addr_size)
+static int
+__ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, size_t addr_size)
 {
 	WT_OVFL_ONPAGE **head;
 
@@ -274,9 +257,10 @@ __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
 
 	head = page->modify->ovfl_track->ovfl_onpage;
 
-	/* Check if the record already appears in the list. */
-	if (__wt_ovfl_onpage_search(page, addr, addr_size))
-		return (0);
+	/*
+	 * The record should not already appear in the list.
+	 */
+	WT_ASSERT(session, __ovfl_onpage_search(page, addr, addr_size) == 0);
 
 	/* Choose a skiplist depth for this insert. */
 	skipdepth = __wt_skip_choose_depth();
@@ -1072,7 +1056,7 @@ __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 
 	if (mod->ovfl_track->ovfl_onpage[0] != NULL)
-		WT_RET(__ovfl_onpage_wrapup_err(session, page));
+		__ovfl_onpage_wrapup_err(session, page);
 	if (mod->ovfl_track->ovfl_reuse[0] != NULL)
 		WT_RET(__ovfl_reuse_wrapup_err(session, page));
 

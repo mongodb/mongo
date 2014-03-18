@@ -400,9 +400,6 @@ extern int __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
     WT_PAGE **pagep);
 extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
 extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_ovfl_onpage_search(WT_PAGE *page,
-    const uint8_t *addr,
-    size_t addr_size);
 extern int __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,

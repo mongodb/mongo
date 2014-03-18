@@ -448,10 +448,6 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * Walk the page, building references: the page contains unsorted value
 	 * items.  The value items are on-page (WT_CELL_VALUE), overflow items
 	 * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
-	 *
-	 * Removed overflow items (WT_CELL_VALUE_OVFL_RM) are possible when
-	 * reading a disk image in service of eviction, we should not see them
-	 * any other time.
 	 */
 	indx = 0;
 	cip = page->pg_var_d;

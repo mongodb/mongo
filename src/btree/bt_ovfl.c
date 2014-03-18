@@ -47,23 +47,23 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 
 	/*
 	 * If no page specified, there's no need to lock and there's no cache
-	 * to search, we don't care about WT_CELL_VALUE_OVFL_RM cells.
+	 * to search, we don't care about WT_CELL_OVFL_REMOVE cells.
 	 */
 	if (page == NULL)
 		return (
 		    __ovfl_read(session, unpack->data, unpack->size, store));
 
 	/*
-	 * WT_CELL_VALUE_OVFL_RM cells: If reconciliation deleted an overflow
+	 * WT_CELL_OVFL_REMOVE cells: If reconciliation deleted an overflow
 	 * item, but there was still a reader in the system that might need it,
-	 * the cell type will have been reset to WT_CELL_VALUE_OVFL_RM and we
+	 * the cell type will have been reset to WT_CELL_OVFL_REMOVE and we
 	 * will be passed a page so we can look-aside into the cache of such
 	 * items.
 	 *
 	 * Re-test the cell's value inside the lock.
 	 */
 	WT_RET(__wt_readlock(session, S2BT(session)->ovfl_lock));
-	ret = __wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM ?
+	ret = __wt_cell_type_raw(unpack->cell) == WT_CELL_OVFL_REMOVE ?
 	    __wt_ovfl_txnc_search(page, unpack->data, unpack->size, store) :
 	    __ovfl_read(session, unpack->data, unpack->size, store);
 	WT_TRET(__wt_rwunlock(session, S2BT(session)->ovfl_lock));
@@ -177,24 +177,13 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	 *
 	 * Use a read/write lock and the on-page cell to fix the problem: hold
 	 * a write lock when creating the cached copy and resetting the on-page
-	 * cell type from WT_CELL_VALUE_OVFL to WT_CELL_VALUE_OVFL_RM and hold
+	 * cell type from WT_CELL_VALUE_OVFL to WT_CELL_OVFL_REMOVE and hold
 	 * a read lock when reading an overflow item.
 	 *
 	 * The read/write lock is per btree, but it could be per page or even
 	 * per overflow item.  We don't do any of that because overflow values
 	 * are supposed to be rare and we shouldn't see contention for the lock.
 	 *
-	 * Pages are repeatedly reconciled and we don't want to lock out readers
-	 * every time we reconcile an overflow item on a page.  Check if we've
-	 * already cached this overflow value, and if work appears required we
-	 * lock and check again.  (Locking is required, it's possible we have
-	 * cached information about what's in the on-page cell and it's changed.
-	 * Vanishingly unlikely, but I think it's possible.)
-	 */
-	if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
-		return (0);
-
-	/*
 	 * Check for a globally visible update.  If there is a globally visible
 	 * update, we don't need to cache the item because it's not possible for
 	 * a running thread to have moved past it.
@@ -210,7 +199,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	}
 
 	WT_RET(__wt_writelock(session, S2BT(session)->ovfl_lock));
-	if (__wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM) {
+	if (__wt_cell_type_raw(unpack->cell) != WT_CELL_OVFL_REMOVE) {
 		/*
 		 * If there's no globally visible update, there's a reader in
 		 * the system that might try and read the old value, cache it.
@@ -221,11 +210,21 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 		}
 
 		/*
+		 * Queue the underlying overflow value's blocks to be freed when
+		 * reconciliation completes.  We're using the on-page structure,
+		 * not the reuse structure because we don't always have the
+		 * value itself, only the block address, and it's unclear reuse
+		 * is probable.
+		 */
+		WT_ERR(__wt_ovfl_onpage_add(
+		    session, page, unpack->data, unpack->size));
+
+		/*
 		 * Reset the page's cell type regardless of whether or not we
 		 * cached a copy and a thread might read it: we don't want to
-		 * redo this process during a subsequent reconciliation.
+		 * redo this process during every reconciliation of this page.
 		 */
-		__wt_cell_type_reset(unpack->cell, WT_CELL_VALUE_OVFL_RM);
+		__wt_cell_type_reset(unpack->cell, WT_CELL_OVFL_REMOVE);
 	}
 err:	WT_TRET(__wt_rwunlock(session, S2BT(session)->ovfl_lock));
 

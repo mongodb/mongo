@@ -698,6 +698,12 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		if (dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
+	case WT_CELL_OVFL_REMOVE:
+		/*
+		 * The overflow removed cell is in-memory only, it's an error
+		 * to ever see it on a disk page.
+		 */
+		break;
 	case WT_CELL_VALUE:
 	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
@@ -705,12 +711,6 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		if (dsk_type == WT_PAGE_COL_VAR ||
 		    dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
-		break;
-	case WT_CELL_VALUE_OVFL_RM:
-		/*
-		 * The overflow-value deleted cell is in-memory only, it's an
-		 * error to ever see it on a disk page.
-		 */
 		break;
 	default:
 		break;
