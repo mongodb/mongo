@@ -753,15 +753,14 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_UPDATE *upd_arg, WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack,
     WT_UPDATE **updp)
 {
-	WT_DECL_RET;
 	WT_ITEM ovfl;
 	WT_UPDATE *upd, *ovfl_upd;
 	size_t size;
-	uint64_t max_txn, txnid;
+	uint64_t max_txn, min_txn, txnid;
 
 	*updp = NULL;
 
-	for (max_txn = WT_TXN_NONE,
+	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
 	    upd = upd_arg; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
@@ -774,6 +773,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 */
 		if (TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
+		if (!TXNID_LT(min_txn, txnid))
+			min_txn = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -839,20 +840,20 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * it up in order to push parts of it out of memory.
 	 *
 	 * If there was any globally visible update in the list, the value may
-	 * be gone from the cache.  Ignore overflow values we can't find, it
-	 * onlyl means there's a globally visible update in the list and the
-	 * underlying overflow value is of no interest.
+	 * be gone from the cache, we don't need it.  If there's no globally
+	 * visible update in the list, we better find something in the cache.
 	 */
 	if (vpack != NULL && vpack->raw == WT_CELL_OVFL_REMOVE &&
-	    (ret = __wt_ovfl_txnc_search(
-	    r->page, vpack->data, vpack->size, &ovfl)) == 0) {
+	    !__wt_txn_visible_all(session, min_txn)) {
+		WT_RET(__wt_ovfl_txnc_search(
+		    r->page, vpack->data, vpack->size, &ovfl));
 		/*
-		 * If we find the value in the cache, create an update structure
-		 * with an impossibly low transaction ID and append it to the
-		 * update list we're about to save.  Restoring that update list
-		 * when this page is re-instantiated creates an update for the
-		 * key/value pair visible to every running transaction in the
-		 * system, ensuring the on-page value will be ignored.
+		 * Create an update structure with an impossibly low transaction
+		 * ID and append it to the update list we're about to save.
+		 * Restoring that update list when this page is re-instantiated
+		 * creates an update for the key/value pair visible to every
+		 * running transaction in the system, ensuring the on-page value
+		 * will be ignored.
 		 */
 		WT_RET(__wt_update_alloc(session, &ovfl, &ovfl_upd, &size));
 		ovfl_upd->txnid = WT_TXN_NONE;
@@ -860,7 +861,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			;
 		upd->next = ovfl_upd;
 	}
-	WT_RET_NOTFOUND_OK(ret);
 
 	WT_RET(__rec_skip_update_save(session, r, ins, rip));
 
