@@ -47,6 +47,10 @@ function op( childLoop ) {
 * ops currently mask parent ops in currentOp.
 */
 function testOne( map, reduce, finalize, scope, childLoop, wait ) {
+    debug( "testOne - map = " + tojson( map ) + "; reduce = " + tojson( reduce ) +
+           "; finalize = " + tojson( finalize ) + "; scope = " + tojson( scope ) +
+           "; childLoop = " + childLoop + "; wait = " + wait );
+     
     t.drop();
     t2.drop();
     // Ensure we have 2 documents for the reduce to run
@@ -94,29 +98,58 @@ function testOne( map, reduce, finalize, scope, childLoop, wait ) {
 
 /** Test using wait and non wait modes */
 function test( map, reduce, finalize, scope, childLoop ) {
+    debug( " Non wait mode" );
     testOne( map, reduce, finalize, scope, childLoop, false );
+
+    debug( " Wait mode" );
     testOne( map, reduce, finalize, scope, childLoop, true );
 }
 
 /** Test looping in map and reduce functions */
 function runMRTests( loop, childLoop ) {
-    test( loop, function( k, v ) { return v[ 0 ]; }, null, null, childLoop );
-    test( function() { emit( this.a, 1 ); }, loop, null, null, childLoop );
-    test( function() { loop(); }, function( k, v ) { return v[ 0 ] },
-         null, { loop: loop }, childLoop );
+    debug( " Running MR test - loop map function. no scope " );
+    test( loop, // map
+          function( k, v ) { return v[ 0 ]; }, // reduce
+          null, // finalize
+          null, // scope
+          childLoop );
+
+    debug( " Running MR test - loop reduce function " );
+    test( function() { emit( this.a, 1 ); }, // map
+          loop, // reduce
+          null, // finalize
+          null, // scope
+          childLoop );
+
+    debug( " Running finalization test - loop map function. with scope " );
+    test( function() { loop(); }, // map
+          function( k, v ) { return v[ 0 ] }, // reduce
+          null, // finalize
+          { loop: loop }, // scope
+          childLoop );
 }
 
 /** Test looping in finalize function */
 function runFinalizeTests( loop, childLoop ) {
-    test( function() { emit( this.a, 1 ); }, function( k, v ) { return v[ 0 ] },
-         loop, null, childLoop );
-    test( function() { emit( this.a, 1 ); }, function( k, v ) { return v[ 0 ] },
-         function( a, b ) { loop() }, { loop: loop }, childLoop );
+    debug( " Running finalization test - no scope " );
+    test( function() { emit( this.a, 1 ); }, // map
+          function( k, v ) { return v[ 0 ] }, // reduce
+          loop, // finalize
+          null, // scope
+          childLoop );
+
+    debug( " Running finalization test - with scope " );
+    test( function() { emit( this.a, 1 ); }, // map
+          function( k, v ) { return v[ 0 ] }, // reduce
+          function( a, b ) { loop() }, // finalize
+          { loop: loop }, // scope
+          childLoop );
 }
 
+// Run inside server. No access to debug().
 var loop = function() {
     while( 1 ) {
-        ;
+        sleep( 1000 );
     }
 }
 runMRTests( loop, false );
