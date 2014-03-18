@@ -494,9 +494,23 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
 DBCollection.prototype.createIndex = function( keys , options ){
     var o = this._indexSpec( keys, options );
 
-    if ( this.getMongo().writeMode() != "legacy" ) {
+    if ( this.getMongo().writeMode() == "commands" ) {
         delete o.ns; // ns is passed to the first element in the command.
         return this._db.runCommand({ createIndexes: this.getName(), indexes: [o] });
+    }
+    else if( this.getMongo().writeMode() == "compatibility" ) {
+        // Use the downconversion machinery of the bulk api to do a safe write, report response as a
+        // command response
+        var result = this._db.getCollection( "system.indexes" ).insert( o , 0, true );
+
+        if (result.hasWriteError() || result.hasWriteConcernError()) {
+            var error = result.hasWriteError() ? result.getWriteError() :
+                                                 result.getWriteConcernError();
+            return { ok : 0.0, code : error.code, errmsg : error.errmsg };
+        }
+        else {
+            return { ok : 1.0 };
+        }
     }
     else {
         this._db.getCollection( "system.indexes" ).insert( o , 0, true );
