@@ -568,8 +568,6 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", disk-mapped");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 		__dmsg(ds, ", evict-lru");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_RM))
-		__dmsg(ds, ", overflow-remove");
 
 	if (mod != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {

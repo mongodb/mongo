@@ -434,7 +434,6 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	uint64_t recno, rle;
 	size_t bytes_allocated;
 	uint32_t i, indx, n, repeat_off;
-	int overflow_rm;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
@@ -444,7 +443,6 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	repeat_off = 0;
 	unpack = &_unpack;
 	bytes_allocated = 0;
-	overflow_rm = 0;
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
@@ -460,10 +458,6 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
-
-		/* Track removed overflow objects. */
-		if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
-			overflow_rm = 1;
 
 		/*
 		 * Add records with repeat counts greater than 1 to an array we
@@ -490,16 +484,6 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 		indx++;
 		recno += rle;
 	}
-
-	/*
-	 * Verify we only saw removed overflow objects when we were expecting
-	 * them, and update the flags based on what we saw.
-	 */
-	if (overflow_rm) {
-		if (!F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_RM))
-			return (__wt_illegal_value(session, NULL));
-	} else
-		F_CLR_ATOMIC(page, WT_PAGE_OVERFLOW_RM);
 
 	return (0);
 }
@@ -655,12 +639,10 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_HEADER *dsk;
 	WT_ROW *rip;
 	uint32_t i;
-	int overflow_rm;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
-	overflow_rm = 0;
 
 	/* Walk the page, building indices. */
 	rip = page->pg_row_d;
@@ -677,25 +659,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
-
-		/*
-		 * Removed overflow items (WT_CELL_VALUE_OVFL_RM) are possible
-		 * when reading a disk image in service of eviction, we should
-		 * not see them any other time.
-		 */
-		if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
-			overflow_rm = 1;
 	}
-
-	/*
-	 * Verify we only saw removed overflow objects when we were expecting
-	 * them, and update the flags based on what we saw.
-	 */
-	if (overflow_rm) {
-		if (!F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_RM))
-			return (__wt_illegal_value(session, NULL));
-	} else
-		F_CLR_ATOMIC(page, WT_PAGE_OVERFLOW_RM);
 
 	/*
 	 * We do not currently instantiate keys on leaf pages when the page is

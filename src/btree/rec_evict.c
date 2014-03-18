@@ -494,95 +494,6 @@ err:		__wt_free(session, alloc_index);
 }
 
 /*
- * __wt_multi_inmem_ovfl_rm --
- *	Fix up removed overflow objects.
- */
-static int
-__wt_multi_inmem_ovfl_rm(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
-	uint32_t i;
-
-	btree = S2BT(session);
-	dsk = page->dsk;
-	unpack = &_unpack;
-
-	WT_RET(__wt_scr_alloc(session, 4096, &tmp));
-
-	/*
-	 * When re-instantiating a page in service of eviction, we might write
-	 * removed overflow cells (WT_CELL_VALUE_OVFL_RM) into the disk image.
-	 *
-	 * Here's the deal: an overflow item was updated or removed and its
-	 * backing blocks freed.  There was a transaction in the system that
-	 * might still read the item, so a copy was cached in the page's
-	 * reconciliation tracking memory, and the on-page cell was set to
-	 * WT_CELL_VALUE_OVFL_RM.  Then, eviction chose the page, and we split
-	 * it up in order to push parts of it out of memory.
-	 *
-	 * When reconciling pages for eviction, in the case of changes not yet
-	 * globally visible, we write the original key/value pair from the page
-	 * into a disk image, and re-instantiate the page with the unresolved
-	 * updates.  For removed overflow objects, the original key/value pair
-	 * is long gone from the backing file, and further, it may even be gone
-	 * from the page reconciliation tracking memory (we prune objects from
-	 * that cache once they are no longer required by running transactions).
-	 *
-	 * What we're doing here is fixing it all up: the page we instantiated
-	 * in memory has some removed overflow objects.  Find those objects, and
-	 * if they still exist in the original page's tracking memory, enter a
-	 * copy in the new page's tracking memory.  If they don't appear in the
-	 * original page's tracking memory, ignore them, they can't possibly be
-	 * accessible to any running transaction.
-	 */
-	switch (page->type) {
-	case WT_PAGE_COL_VAR:
-		WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-			__wt_cell_unpack(cell, unpack);
-			if (unpack->raw != WT_CELL_VALUE_OVFL_RM)
-				continue;
-
-			if ((ret = __wt_ovfl_txnc_search(orig,
-			    unpack->data, unpack->size, tmp)) == WT_NOTFOUND) {
-				ret = 0;
-				continue;
-			}
-
-			WT_ERR(ret);
-			WT_ERR(__wt_ovfl_txnc_add(session, page,
-			    unpack->data, unpack->size, tmp->data, tmp->size));
-		}
-		break;
-	case WT_PAGE_ROW_LEAF:
-		WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
-			__wt_cell_unpack(cell, unpack);
-			if (unpack->raw != WT_CELL_VALUE_OVFL_RM)
-				continue;
-
-			if ((ret = __wt_ovfl_txnc_search(orig,
-			    unpack->data, unpack->size, tmp)) == WT_NOTFOUND) {
-				ret = 0;
-				continue;
-			}
-
-			WT_ERR(ret);
-			WT_ERR(__wt_ovfl_txnc_add(session, page,
-			    unpack->data, unpack->size, tmp->data, tmp->size));
-		}
-		break;
-	WT_ILLEGAL_VALUE_ERR(session);
-	}
-
-err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-
-/*
  * __wt_multi_inmem_build --
  *	Instantiate a page in a multi-block set, when an update couldn't be
  * written.
@@ -615,8 +526,8 @@ __wt_multi_inmem_build(
 	 *
 	 * Create an in-memory version of the page, and link it to its parent.
 	 */
-	WT_RET(__wt_page_inmem(session, NULL, NULL, multi->skip_dsk,
-	    WT_PAGE_DISK_ALLOC | WT_PAGE_OVERFLOW_RM, &ref->page));
+	WT_RET(__wt_page_inmem(session,
+	    NULL, NULL, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &ref->page));
 	multi->skip_dsk = NULL;
 	new = ref->page;
 
@@ -673,10 +584,6 @@ __wt_multi_inmem_build(
 		}
 
 	}
-
-	/* Fix up removed overflow objects. */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_RM))
-		WT_RET(__wt_multi_inmem_ovfl_rm(session, page, new));
 
 	WT_LINK_PAGE(page->parent, ref, new);
 
