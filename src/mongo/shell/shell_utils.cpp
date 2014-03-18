@@ -139,7 +139,7 @@ namespace mongo {
         }
 
         BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
-            uassert(17417, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
+            uassert(17428, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
             BSONObjIterator i(a);
             BSONObj index = i.next().Obj();
             BSONObj doc = i.next().Obj();
