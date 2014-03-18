@@ -1248,11 +1248,14 @@ DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
     }
 }
 
-DB.prototype.getUser = function(username) {
+DB.prototype.getUser = function(username, args) {
     if (typeof username != "string") {
         throw Error("User name for getUser shell helper must be a string");
     }
-    var res = this.runCommand({usersInfo: username});
+    var cmdObj = {usersInfo: username};
+    Object.extend(cmdObj, args);
+
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
