@@ -84,6 +84,7 @@ namespace mongo {
 
         int size() const { return *_size; }
         bool have() const { return size() > 0; }
+        bool tooBig() const { return size() == TOO_BIG_SENTINEL; }
 
         BSONObj get() const {
             scoped_spinlock lk(_lock);
@@ -176,7 +177,7 @@ namespace mongo {
 
         // New Query Framework debugging/profiling info
         // TODO: should this really be an opaque BSONObj?  Not sure.
-        CachedBSONObj<2048> execStats;
+        CachedBSONObj<4096> execStats;
 
         // error handling
         ExceptionInfo exceptionInfo;
