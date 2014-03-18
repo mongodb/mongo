@@ -132,7 +132,7 @@ namespace mongo {
 
         /* remove ourself from extent pointers */
         {
-            Extent *e = getDur().writing( todelete->myExtent(dl) );
+            Extent *e = getDur().writing( _extentManager->extentFor( dl ) );
             if ( e->firstRecord == dl ) {
                 if ( todelete->nextOfs() == DiskLoc::NullOfs )
                     e->firstRecord.Null();
@@ -173,7 +173,7 @@ namespace mongo {
 
     void RecordStoreV1Base::_addRecordToRecListInExtent(Record *r, DiskLoc loc) {
         dassert( loc.rec() == r );
-        Extent *e = r->myExtent(loc);
+        Extent *e = _extentManager->extentFor( loc );
         if ( e->lastRecord.isNull() ) {
             Extent::FL *fl = getDur().writing(e->fl());
             fl->firstRecord = fl->lastRecord = loc;

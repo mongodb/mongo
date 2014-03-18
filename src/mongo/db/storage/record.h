@@ -78,10 +78,6 @@ namespace mongo {
         // TODO(ERH): remove
         Extent* myExtent(const DiskLoc& myLoc) { return DiskLoc(myLoc.a(), extentOfs() ).ext(); }
 
-        /* get the next record in the namespace, traversing extents as necessary */
-        DiskLoc getNext(const DiskLoc& myLoc); // TODO(ERH): remove
-        DiskLoc getPrev(const DiskLoc& myLoc); // TODO(ERH): remove
-
         struct NP {
             int nextOfs;
             int prevOfs;
@@ -157,14 +153,6 @@ namespace mongo {
         // TODO: we need to not const_cast here but problem is DiskLoc::writing
         DiskLoc& nextDeleted() const { _accessing(); return const_cast<DiskLoc&>(_nextDeleted); }
 
-        DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
-            _accessing();
-            return DiskLoc(myLoc.a(), _extentOfs);
-        }
-        Extent* myExtent(const DiskLoc& myLoc) {
-            _accessing();
-            return DiskLoc(myLoc.a(), _extentOfs).ext();
-        }
     private:
 
         void _accessing() const;
@@ -182,59 +170,5 @@ namespace mongo {
         AtomicInt64 accessesNotInMemory;
         AtomicInt64 pageFaultExceptionsThrown;
     };
-
-    // ------------------
-
-    inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
-        _accessing();
-        if ( _nextOfs != DiskLoc::NullOfs ) {
-            /* defensive */
-            if ( _nextOfs >= 0 && _nextOfs < 10 ) {
-                logContext("Assertion failure - Record::getNext() referencing a deleted record?");
-                return DiskLoc();
-            }
-
-            return DiskLoc(myLoc.a(), _nextOfs);
-        }
-        Extent *e = myExtent(myLoc);
-        while ( 1 ) {
-            if ( e->xnext.isNull() )
-                return DiskLoc(); // end of table.
-            e = e->xnext.ext();
-            if ( !e->firstRecord.isNull() )
-                break;
-            // entire extent could be empty, keep looking
-        }
-        return e->firstRecord;
-    }
-
-    inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
-        _accessing();
-
-        // Check if we still have records on our current extent
-        if ( _prevOfs != DiskLoc::NullOfs ) {
-            return DiskLoc(myLoc.a(), _prevOfs);
-        }
-
-        // Get the current extent
-        Extent *e = myExtent(myLoc);
-        while ( 1 ) {
-            if ( e->xprev.isNull() ) {
-                // There are no more extents before this one
-                return DiskLoc();
-            }
-
-            // Move to the extent before this one
-            e = e->xprev.ext();
-
-            if ( !e->lastRecord.isNull() ) {
-                // We have found a non empty extent
-                break;
-            }
-        }
-
-        // Return the last record in our new extent
-        return e->lastRecord;
-    }
 
 }

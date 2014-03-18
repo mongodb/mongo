@@ -148,14 +148,17 @@ namespace mongo {
     }
 
     bool NamespaceDetails::inCapExtent( const DiskLoc &dl ) const {
-        verify( !dl.isNull() );
-        // We could have a rec or drec, doesn't matter.
-        bool res = dl.drec()->myExtentLoc(dl) == _capExtent;
-        DEV {
-            // old implementation. this check is temp to test works the same.  new impl should be a little faster.
-            verify( res == (dl.drec()->myExtent( dl ) == _capExtent.ext()) );
-        }
-        return res;
+        invariant( !dl.isNull() );
+
+        if ( dl.a() != _capExtent.a() )
+            return false;
+
+        if ( dl.getOfs() < _capExtent.getOfs() )
+            return false;
+
+        const Extent* e = theCapExtent();
+        int end = _capExtent.getOfs() + e->length;
+        return dl.getOfs() <= end;
     }
 
     bool NamespaceDetails::nextIsInCapExtent( const DiskLoc &dl ) const {
