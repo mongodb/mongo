@@ -43,7 +43,7 @@ var collUpgradeCheck = function(collObj) {
     var indexColl = dbObj.getSiblingDB(dbName).system.indexes;
     if (collName.indexOf('$') === -1 && 
         collName.indexOf("system.") !== 0 &&
-        (dbName !== "local" || collName.indexOf("oplog.") !== 0)) {
+        (dbName !== "local" || (collName.indexOf("oplog.") !== 0 && collName !== "startup_log"))) {
         var idIdx = indexColl.find({ns: fullName, name:"_id_"}).addOption(DBQuery.Option.noTimeout);
         if (!idIdx.hasNext()) {
             print("Collection Error: lack of _id index on collection: " + fullName);
