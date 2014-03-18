@@ -774,6 +774,14 @@ namespace mongo {
                 // execStats is a CachedBSONObj because it lives in the race-prone
                 // curop.
                 curop.debug().execStats.set(explain->stats);
+
+                // Replace exec stats with plan summary if stats cannot fit into CachedBSONObj.
+                if (curop.debug().execStats.tooBig() && !curop.debug().planSummary.empty()) {
+                    BSONObjBuilder bob;
+                    bob.append("summary", curop.debug().planSummary.toString());
+                    curop.debug().execStats.set(bob.done());
+                }
+
             }
         }
 
