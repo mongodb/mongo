@@ -171,7 +171,10 @@ __wt_cache_evict_server(void *arg)
 	cache = conn->cache;
 	workers = NULL;
 
-	WT_ERR(__wt_calloc_def(session, cache->eviction_workers, &workers));
+	if (cache->eviction_workers > 0)
+		WT_ERR(__wt_calloc_def(
+		    session, cache->eviction_workers, &workers));
+
 	for (i = 0; i < cache->eviction_workers; i++) {
 		workers[i].conn = conn;
 		workers[i].id = i;
