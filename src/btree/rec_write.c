@@ -744,9 +744,8 @@ __rec_skip_update_move(
 /*
  * __rec_txn_read --
  *	Return the first visible update in a list (or NULL if none are visible),
- * and a flag if any updates were skipped.
- *	Track the maximum transaction ID in the list and whether the page can
- * be discarded.
+ * set a flag if any updates were skipped, track the maximum transaction ID on
+ * the page.
  */
 static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
@@ -755,7 +754,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 {
 	WT_ITEM ovfl;
 	WT_UPDATE *upd, *ovfl_upd;
-	size_t size;
+	size_t notused;
 	uint64_t max_txn, min_txn, txnid;
 
 	*updp = NULL;
@@ -791,9 +790,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	/*
 	 * Track the maximum transaction ID in the page.  We store this in the
-	 * page at the end of reconciliation if no updates are skipped, and used
-	 * to avoid evicting clean pages from memory with changes required to
-	 * satisfy a snapshot read.
+	 * page at the end of reconciliation if no updates are skipped, it's
+	 * used to avoid evicting clean pages from memory with changes required
+	 * to satisfy a snapshot read.
 	 */
 	if (TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
@@ -836,12 +835,13 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * backing blocks freed.  There was a transaction in the system that
 	 * might still read the value, so a copy was cached in the page's
 	 * reconciliation tracking memory, and the on-page cell was set to
-	 * WT_CELL_OVFL_REMOVE.  Then, eviction chose the page, we're splitting
-	 * it up in order to push parts of it out of memory.
+	 * WT_CELL_OVFL_REMOVE.  Eviction then chose the page and we're
+	 * splitting it up in order to push parts of it out of memory.
 	 *
 	 * If there was any globally visible update in the list, the value may
-	 * be gone from the cache, we don't need it.  If there's no globally
-	 * visible update in the list, we better find something in the cache.
+	 * be gone from the cache (and regardless, we don't need the value).
+	 * If there's no globally visible update in the list, we better find
+	 * the value in the cache.
 	 */
 	if (vpack != NULL && vpack->raw == WT_CELL_OVFL_REMOVE &&
 	    !__wt_txn_visible_all(session, min_txn)) {
@@ -855,7 +855,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * running transaction in the system, ensuring the on-page value
 		 * will be ignored.
 		 */
-		WT_RET(__wt_update_alloc(session, &ovfl, &ovfl_upd, &size));
+		WT_RET(__wt_update_alloc(session, &ovfl, &ovfl_upd, &notused));
 		ovfl_upd->txnid = WT_TXN_NONE;
 		for (upd = upd_arg; upd->next != NULL; upd = upd->next)
 			;
