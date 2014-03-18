@@ -51,6 +51,7 @@ static const CONFIG default_cfg = {
 	0,				/* checkpoint in progress */
 	0,				/* thread error */
 	0,				/* notify threads to stop */
+	0,				/* in warmup phase */
 	0,				/* total seconds running */
 
 #define	OPT_DEFINE_DEFAULT
@@ -375,19 +376,24 @@ op_err:			lprintf(cfg, ret, 0,
 		}
 
 		/* Gather statistics */
-		if (measure_latency) {
-			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-				lprintf(cfg, ret, 0, "Get time call failed");
-				goto err;
+		if (!cfg->in_warmup) {
+			if (measure_latency) {
+				if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "Get time call failed");
+					goto err;
+				}
+				++trk->latency_ops;
+				usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+				track_operation(trk, usecs);
 			}
-			++trk->latency_ops;
-			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
-			track_operation(trk, usecs);
-		}
-		++trk->ops;		/* increment operation counts */
+			/* Increment operation count */
+			++trk->ops;
 
-		if (++op == op_end)	/* schedule the next operation */
-			op = thread->workload->ops;
+			/* Schedule the next operation */
+			if (++op == op_end)
+				op = thread->workload->ops;
+		}
 	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -712,6 +718,8 @@ monitor(void *arg)
 		/* If the workers are done, don't bother with a final call. */
 		if (cfg->stop)
 			break;
+		if (cfg->in_warmup)
+			continue;
 
 		if ((ret = __wt_epoch(NULL, &t)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
@@ -1015,6 +1023,9 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 	
+	if (cfg->warmup != 0)
+		cfg->in_warmup = 1;
+
 	/* Allocate memory for the worker threads. */
 	if ((cfg->workers =
 	    calloc((size_t)cfg->workers_cnt, sizeof(CONFIG_THREAD))) == NULL) {
@@ -1040,6 +1051,13 @@ execute_workload(CONFIG *cfg)
 		    cfg, workp, threads, (u_int)workp->threads, worker)) != 0)
 			goto err;
 		threads += workp->threads;
+	}
+
+	if (cfg->warmup != 0) {
+		lprintf(cfg, 0, 1,
+		    "Waiting for warmup duration of %" PRIu32, cfg->warmup);
+		sleep(cfg->warmup);
+		cfg->in_warmup = 0;
 	}
 
 	for (interval = cfg->report_interval, run_time = cfg->run_time,
