@@ -173,7 +173,7 @@ static CONFIG c[] = {
 
 	{ "key_max",
 	  "maximum size of keys",
-	  C_ROW, 0x0, 64, 128, MEGABYTE(10), &g.c_key_max, NULL },
+	  C_ROW, 0x0, 20, 128, MEGABYTE(10), &g.c_key_max, NULL },
 
 	{ "key_min",
 	  "minimum size of keys",
