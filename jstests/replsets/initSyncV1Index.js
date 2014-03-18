@@ -13,7 +13,7 @@ db1.foo.createIndex( {x:1}, {v: 0} );
 
 var r2 = rs.add();
 rs.reInitiate();
-rs.awaitSecondaryNodes();
+rs.awaitSecondaryNodes(60000);
 var db2 = r2.getDB('test');
 r2.setSlaveOk();
 
