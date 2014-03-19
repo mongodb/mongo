@@ -171,17 +171,24 @@ config_setup(void)
 	}
 
 	/*
-	 * Key/value min & max are related, correct the minimum unless the
-	 * configuration file specified it.
+	 * Key/value minimum/maximum are related, correct unless specified by
+	 * the configuration.
 	 */
 	cp = config_find("key_min", strlen("key_min"));
 	if (!(cp->flags & C_PERM) && g.c_key_min > g.c_key_max)
 		g.c_key_min = g.c_key_max;
+	cp = config_find("key_max", strlen("key_max"));
+	if (!(cp->flags & C_PERM) && g.c_key_max < g.c_key_min)
+		g.c_key_max = g.c_key_min;
 	if (g.c_key_min > g.c_key_max)
 		die(EINVAL, "key_min may not be larger than key_max");
+
 	cp = config_find("value_min", strlen("value_min"));
 	if (!(cp->flags & C_PERM) && g.c_value_min > g.c_value_max)
 		g.c_value_min = g.c_value_max;
+	cp = config_find("value_max", strlen("value_max"));
+	if (!(cp->flags & C_PERM) && g.c_value_max < g.c_value_min)
+		g.c_value_max = g.c_value_min;
 	if (g.c_value_min > g.c_value_max)
 		die(EINVAL, "value_min may not be larger than value_max");
 
