@@ -3557,7 +3557,7 @@ __row_key_ovfl_rm(
 	 * the overflow lock to ensure they don't race with a thread trying to
 	 * instantiate the key itself.
 	 */
-	WT_RET(__wt_ovfl_onpage_add(session, page, kpack->data, kpack->size));
+	WT_RET(__wt_ovfl_discard_add(session, page, kpack->data, kpack->size));
 	__wt_cell_type_reset(
 	    session, kpack->cell, WT_CELL_KEY_OVFL, WT_CELL_KEY_OVFL_RM);
 

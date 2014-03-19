@@ -404,11 +404,11 @@ extern int __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
     WT_PAGE **pagep);
 extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
 extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
+extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    const uint8_t *addr,
+    const uint8_t *addr_arg,
     size_t addr_size);
-extern void __wt_ovfl_onpage_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_reuse_search(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint8_t **addrp,
@@ -421,7 +421,7 @@ extern int __wt_ovfl_reuse_add(WT_SESSION_IMPL *session,
     size_t addr_size,
     const void *value,
     size_t value_size);
-extern void __wt_ovfl_reuse_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_ovfl_reuse_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_txnc_search( WT_PAGE *page,
     const uint8_t *addr,
     size_t addr_size,
@@ -432,7 +432,7 @@ extern int __wt_ovfl_txnc_add(WT_SESSION_IMPL *session,
     size_t addr_size,
     const void *value,
     size_t value_size);
-extern void __wt_ovfl_txnc_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_ovfl_txnc_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write(WT_SESSION_IMPL *session,
@@ -476,10 +476,14 @@ extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     u_int skipdepth,
     WT_INSERT **insp,
     size_t *ins_sizep);
-extern int __wt_update_alloc(WT_SESSION_IMPL *session,
+extern int __wt_update_alloc( WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
     size_t *sizep);
+extern int __wt_update_alloc_simple( WT_SESSION_IMPL *session,
+    const void *data,
+    size_t size,
+    WT_UPDATE **updp);
 extern WT_UPDATE *__wt_update_obsolete_check(WT_SESSION_IMPL *session,
     WT_UPDATE *upd);
 extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,

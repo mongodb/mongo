@@ -88,34 +88,6 @@ struct __wt_addr {
 };
 
 /*
- * Overflow tracking of on-page key/value items: As pages are reconciled,
- * overflow key/value records referenced from the original page are discarded
- * as they are updated or removed.  We track such overflow items to ensure we
- * never discard the underlying blocks more than once.
- */
-struct __wt_ovfl_onpage {
-	uint8_t addr_offset;		/* Overflow addr offset */
-	uint8_t addr_size;		/* Overflow addr size */
-
-	/*
-	 * On each page reconciliation, set the just-added flag for each newly
-	 * added skiplist entry.  If reconciliation succeeds, the underlying
-	 * blocks are then discarded, if reconciliation fails for any reason,
-	 * the added records are discarded.
-	 */
-#define	WT_OVFL_ONPAGE_JUST_ADDED	0x01
-	uint8_t flags;
-
-	/*
-	 * The untyped address immediately follows the WT_OVFL_ONPAGE structure.
-	 */
-#define	WT_OVFL_ONPAGE_ADDR(p)						\
-	((void *)((uint8_t *)(p) + (p)->addr_offset))
-
-	WT_OVFL_ONPAGE *next[0];	/* Forward-linked skip list */
-};
-
-/*
  * Overflow tracking for reuse: When a page is reconciled, we write new K/V
  * overflow items.  If pages are reconciled multiple times, we need to know
  * if we've already written a particular overflow record (so we don't write
@@ -300,9 +272,26 @@ struct __wt_page_modify {
 
 	/* Overflow record tracking. */
 	struct __wt_ovfl_track {
-		WT_OVFL_ONPAGE	*ovfl_onpage[WT_SKIP_MAXDEPTH];
+		/*
+		 * Overflow key/value address/byte-string pairs we potentially
+		 * reuse each time we reconcile the page.
+		 */
 		WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
+
+		/*
+		 * Overflow value address/byte-string pairs cached until no
+		 * running transaction will possibly read them.
+		 */
 		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
+
+		/*
+		 * Overflow key/value addresses to be discarded from the block
+		 * manager after reconciliation completes successfully.
+		 * Note: this really isn't a WT_UPDATE entry, but a WT_UPDATE
+		 * structure has pretty much exactly what we need, so use it
+		 * instead of inventing something new.
+		 */
+		WT_UPDATE *discard;
 	} *ovfl_track;
 
 	uint64_t bytes_dirty;		/* Dirty bytes added to cache. */

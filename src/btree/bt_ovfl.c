@@ -216,7 +216,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 		 * value itself, only the block address, and it's unclear reuse
 		 * is probable.
 		 */
-		WT_ERR(__wt_ovfl_onpage_add(
+		WT_ERR(__wt_ovfl_discard_add(
 		    session, page, vpack->data, vpack->size));
 
 		/*

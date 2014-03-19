@@ -203,8 +203,8 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
  *	Allocate a WT_UPDATE structure and associated value and fill it in.
  */
 int
-__wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
+__wt_update_alloc(
+    WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
 	WT_UPDATE *upd;
 	size_t size;
@@ -224,6 +224,29 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 
 	*updp = upd;
 	*sizep = sizeof(WT_UPDATE) + size;
+	return (0);
+}
+
+/*
+ * __wt_update_alloc_simple --
+ *	Allocate a WT_UPDATE structure and associated value and fill it in (used
+ * by a couple of places that need a simple linked lists with associated data).
+ */
+int
+__wt_update_alloc_simple(
+    WT_SESSION_IMPL *session, const void *data, size_t size, WT_UPDATE **updp)
+{
+	WT_UPDATE *upd;
+
+	/*
+	 * Allocate the WT_UPDATE structure and room for the data, then copy
+	 * the data into place.
+	 */
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, &upd));
+	upd->size = WT_STORE_SIZE(size);
+	memcpy(WT_UPDATE_DATA(upd), data, size);
+
+	*updp = upd;
 	return (0);
 }
 
