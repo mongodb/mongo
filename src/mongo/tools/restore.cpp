@@ -36,6 +36,7 @@
 #include <fstream>
 #include <set>
 
+#include "mongo/base/init.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientcursor.h"
@@ -56,6 +57,17 @@ using namespace mongo;
 
 namespace {
     const char* OPLOG_SENTINEL = "$oplog";  // compare by ptr not strcmp
+}
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(RestoreAuthExternalState, ("ToolAuthExternalState"))(
+        InitializerContext* context) {
+    // Give restore the mongod implementation of AuthorizationManager so that it can run
+    // the _mergeAuthzCollections command directly against the data files
+    clearGlobalAuthorizationManager();
+    setGlobalAuthorizationManager(new AuthorizationManager(
+            new AuthzManagerExternalStateMongod()));
+
+    return Status::OK();
 }
 
 class Restore : public BSONTool {
@@ -100,12 +112,6 @@ public:
     }
 
     virtual int doRun() {
-
-        // Give restore the mongod implementation of AuthorizationManager so that it can run
-        // the _mergeAuthzCollections command directly against the data files
-        clearGlobalAuthorizationManager();
-        setGlobalAuthorizationManager(new AuthorizationManager(
-                new AuthzManagerExternalStateMongod()));
 
         boost::filesystem::path root = mongoRestoreGlobalParams.restoreDirectory;
 
