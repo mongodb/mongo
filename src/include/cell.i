@@ -797,7 +797,7 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 /*
  * __wt_dsk_cell_data_ref, __wt_page_cell_data_ref --
  *	Set a buffer to reference the data from an unpacked cell, two flavors.
- * There are two version because of WT_CELL_VALUE_OVFL_RM type cells.  When an
+ * There are two versions because of WT_CELL_VALUE_OVFL_RM type cells.  When an
  * overflow item is deleted, its backing blocks are removed; if there are still
  * running transactions that might need to see the overflow item, we cache a
  * copy of the item and reset the item's cell to WT_CELL_VALUE_OVFL_RM.  If we
