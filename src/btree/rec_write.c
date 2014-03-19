@@ -3915,8 +3915,12 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		__wt_cell_unpack(cell, kpack);
 
 		/* Unpack the on-page value cell, and look for an update. */
-		if ((val_cell = __wt_row_leaf_value(page, rip)) != NULL)
+		if ((val_cell = __wt_row_leaf_value(page, rip)) == NULL)
+			vpack = NULL;
+		else {
+			vpack = &_vpack;
 			__wt_cell_unpack(val_cell, vpack);
+		}
 		WT_ERR(__rec_txn_read(session, r,
 		    WT_ROW_UPDATE(page, rip), NULL, rip, vpack, &upd));
 
@@ -3932,7 +3936,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * copy, we have to create a new value item as the old
 			 * item might have been discarded from the page.
 			 */
-			if (val_cell == NULL) {
+			if (vpack == NULL) {
 				val->buf.data = NULL;
 				val->cell_len = val->len = val->buf.size = 0;
 			} else if (vpack->raw == WT_CELL_VALUE_COPY) {
@@ -3996,7 +4000,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * version if there's a transaction in the system that
 			 * might read the original value.
 			 */
-			if (val_cell != NULL &&
+			if (vpack != NULL &&
 			    vpack->ovfl && vpack->raw != WT_CELL_OVFL_REMOVE)
 				WT_ERR(
 				    __wt_ovfl_cache(session, page, rip, vpack));
