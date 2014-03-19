@@ -40,7 +40,7 @@ static int __verify_dsk_row(
  * __wt_verify_dsk_image --
  *	Verify a single block as read from disk.
  */
-static int
+int
 __wt_verify_dsk_image(WT_SESSION_IMPL *session,
     const char *addr, const WT_PAGE_HEADER *dsk, size_t size)
 {
@@ -698,6 +698,13 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		if (dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
+	case WT_CELL_KEY_OVFL_RM:
+	case WT_CELL_VALUE_OVFL_RM:
+		/*
+		 * Removed overflow cells are in-memory only, it's an error to
+		 * ever see one on a disk page.
+		 */
+		break;
 	case WT_CELL_VALUE:
 	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
@@ -705,12 +712,6 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		if (dsk_type == WT_PAGE_COL_VAR ||
 		    dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
-		break;
-	case WT_CELL_VALUE_OVFL_RM:
-		/*
-		 * The overflow-value deleted cell is in-memory only, it's an
-		 * error to ever see it on a disk page.
-		 */
 		break;
 	default:
 		break;

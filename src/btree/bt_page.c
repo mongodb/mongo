@@ -437,11 +437,12 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
 	btree = S2BT(session);
 	dsk = page->dsk;
-	unpack = &_unpack;
+	recno = page->pg_var_recno;
+
 	repeats = NULL;
 	repeat_off = 0;
+	unpack = &_unpack;
 	bytes_allocated = 0;
-	recno = page->pg_var_recno;
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value

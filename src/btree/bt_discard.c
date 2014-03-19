@@ -158,9 +158,9 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    page->type == WT_PAGE_COL_FIX ? 1 : page->pg_var_entries);
 
 	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
-	__wt_ovfl_onpage_discard(session, page);
-	__wt_ovfl_reuse_discard(session, page);
-	__wt_ovfl_txnc_discard(session, page);
+	__wt_ovfl_reuse_free(session, page);
+	__wt_ovfl_txnc_free(session, page);
+	__wt_ovfl_discard_free(session, page);
 
 	__wt_free(session, page->modify->ovfl_track);
 

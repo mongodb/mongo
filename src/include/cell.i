@@ -45,7 +45,7 @@
  *
  * Bits 1 and 2 are reserved for "short" key and value cells (that is, a cell
  * carrying data less than 64B, where we can store the data length in the cell
- * descriptor byte:
+ * descriptor byte):
  *	0x00	Not a short key/data cell
  *	0x01	Short key cell
  *	0x10	Short key cell, with a following prefix-compression byte
@@ -96,11 +96,12 @@
 #define	WT_CELL_DEL		 (4 << 4)	/* Deleted value */
 #define	WT_CELL_KEY		 (5 << 4)	/* Key */
 #define	WT_CELL_KEY_OVFL	 (6 << 4)	/* Overflow key */
+#define	WT_CELL_KEY_OVFL_RM	(12 << 4)	/* Overflow key (removed) */
 #define	WT_CELL_KEY_PFX		 (7 << 4)	/* Key with prefix byte */
 #define	WT_CELL_VALUE		 (8 << 4)	/* Value */
 #define	WT_CELL_VALUE_COPY	 (9 << 4)	/* Value copy */
 #define	WT_CELL_VALUE_OVFL	(10 << 4)	/* Overflow value */
-#define	WT_CELL_VALUE_OVFL_RM	(11 << 4)	/* Removed overflow value */
+#define	WT_CELL_VALUE_OVFL_RM	(11 << 4)	/* Overflow value (removed) */
 
 #define	WT_CELL_TYPE_MASK	(0x0fU << 4)	/* Maximum 16 cell types */
 #define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
@@ -448,17 +449,6 @@ __wt_cell_total_len(WT_CELL_UNPACK *unpack)
 }
 
 /*
- * __wt_cell_type_reset --
- *	Reset the cell's type.
- */
-static inline void
-__wt_cell_type_reset(WT_CELL *cell, u_int type)
-{
-	cell->__chunk[0] =
-	    (cell->__chunk[0] & ~WT_CELL_TYPE_MASK) | WT_CELL_TYPE(type);
-}
-
-/*
  * __wt_cell_type --
  *	Return the cell's type (collapsing special types).
  */
@@ -478,6 +468,8 @@ __wt_cell_type(WT_CELL *cell)
 	switch (type = WT_CELL_TYPE(cell->__chunk[0])) {
 	case WT_CELL_KEY_PFX:
 		return (WT_CELL_KEY);
+	case WT_CELL_KEY_OVFL_RM:
+		return (WT_CELL_KEY_OVFL);
 	case WT_CELL_VALUE_OVFL_RM:
 		return (WT_CELL_VALUE_OVFL);
 	}
@@ -497,6 +489,24 @@ __wt_cell_type_raw(WT_CELL *cell)
 }
 
 /*
+ * __wt_cell_type_reset --
+ *	Reset the cell's type.
+ */
+static inline void
+__wt_cell_type_reset(
+    WT_SESSION_IMPL *session, WT_CELL *cell, u_int old_type, u_int new_type)
+{
+	/*
+	 * For all current callers of this function, this should happen once
+	 * and only once, assert we're setting what we think we're setting.
+	 */
+	WT_ASSERT(session, old_type == 0 || old_type == __wt_cell_type(cell));
+
+	cell->__chunk[0] =
+	    (cell->__chunk[0] & ~WT_CELL_TYPE_MASK) | WT_CELL_TYPE(new_type);
+}
+
+/*
  * __wt_cell_leaf_value_parse --
  *	Return the cell if it's a row-store leaf page value, otherwise return
  * NULL.
@@ -504,8 +514,6 @@ __wt_cell_type_raw(WT_CELL *cell)
 static inline WT_CELL *
 __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
 {
-	uint8_t type;
-
 	/*
 	 * This function exists so there's a place for this comment.
 	 *
@@ -528,8 +536,17 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
 	if (cell >= (WT_CELL *)((uint8_t *)page->dsk + page->dsk->mem_size))
 		return (NULL);
 
-	type = __wt_cell_type(cell);
-	return (type == WT_CELL_KEY || type == WT_CELL_KEY_OVFL ? NULL : cell);
+	switch (__wt_cell_type_raw(cell)) {
+	case WT_CELL_KEY:
+	case WT_CELL_KEY_OVFL:
+	case WT_CELL_KEY_OVFL_RM:
+	case WT_CELL_KEY_PFX:
+	case WT_CELL_KEY_SHORT:
+	case WT_CELL_KEY_SHORT_PFX:
+		return (NULL);
+	default:
+		return (cell);
+	}
 }
 
 /*
@@ -636,6 +653,7 @@ restart:
 		goto restart;
 
 	case WT_CELL_KEY_OVFL:
+	case WT_CELL_KEY_OVFL_RM:
 	case WT_CELL_VALUE_OVFL:
 	case WT_CELL_VALUE_OVFL_RM:
 		/*
@@ -780,7 +798,7 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 /*
  * __wt_dsk_cell_data_ref, __wt_page_cell_data_ref --
  *	Set a buffer to reference the data from an unpacked cell, two flavors.
- * There are two version because of WT_CELL_VALUE_OVFL_RM type cells.  When an
+ * There are two versions because of WT_CELL_VALUE_OVFL_RM type cells.  When an
  * overflow item is deleted, its backing blocks are removed; if there are still
  * running transactions that might need to see the overflow item, we cache a
  * copy of the item and reset the item's cell to WT_CELL_VALUE_OVFL_RM.  If we
