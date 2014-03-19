@@ -59,7 +59,7 @@ printjson(x);
 // 171 is the # of results we happen to scan when we don't use a distinct
 // hack.  When we use the distinct hack we scan 16, currently.
 assert.lte(x.stats.n, 171);
-assert.eq( 0 , x.stats.nscannedObjects , "BB3" )
+assert.eq(171, x.stats.nscannedObjects , "BD3" )
 
 
 
