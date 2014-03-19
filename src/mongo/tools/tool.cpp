@@ -35,6 +35,7 @@
 #include <iostream>
 
 #include "mongo/base/initializer.h"
+#include "mongo/base/init.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -65,11 +66,14 @@ namespace mongo {
             delete _conn;
     }
 
-    int Tool::main( int argc , char ** argv, char ** envp ) {
-        static StaticObserver staticObserver;
-
+    MONGO_INITIALIZER(ToolAuthExternalState)(InitializerContext*) {
         setGlobalAuthorizationManager(new AuthorizationManager(
                 new AuthzManagerExternalStateMock()));
+        return Status::OK();
+    }
+
+    int Tool::main( int argc , char ** argv, char ** envp ) {
+        static StaticObserver staticObserver;
 
         mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
