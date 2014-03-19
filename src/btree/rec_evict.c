@@ -771,7 +771,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 		if (ikey != NULL && ikey->cell_offset != 0) {
 			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
-			if (kpack->ovfl && kpack->raw != WT_CELL_OVFL_REMOVE)
+			if (kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
 				WT_ERR(__wt_ovfl_onpage_add(
 				    session, parent, kpack->data, kpack->size));
 		}

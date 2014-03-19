@@ -65,14 +65,16 @@ __wt_cell_type_string(uint8_t type)
 		return ("key/short");
 	case WT_CELL_KEY_SHORT_PFX:
 		return ("key/short,pfx");
-	case WT_CELL_OVFL_REMOVE:
-		return ("ovfl,rm");
+	case WT_CELL_KEY_OVFL_RM:
+		return ("key/ovfl,rm");
 	case WT_CELL_VALUE:
 		return ("value");
 	case WT_CELL_VALUE_COPY:
 		return ("value/copy");
 	case WT_CELL_VALUE_OVFL:
 		return ("value/ovfl");
+	case WT_CELL_VALUE_OVFL_RM:
+		return ("value/ovfl,rm");
 	case WT_CELL_VALUE_SHORT:
 		return ("value/short");
 	default:

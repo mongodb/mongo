@@ -47,23 +47,23 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 
 	/*
 	 * If no page specified, there's no need to lock and there's no cache
-	 * to search, we don't care about WT_CELL_OVFL_REMOVE cells.
+	 * to search, we don't care about WT_CELL_VALUE_OVFL_RM cells.
 	 */
 	if (page == NULL)
 		return (
 		    __ovfl_read(session, unpack->data, unpack->size, store));
 
 	/*
-	 * WT_CELL_OVFL_REMOVE cells: If reconciliation deleted an overflow
-	 * item, but there was still a reader in the system that might need it,
-	 * the cell type will have been reset to WT_CELL_OVFL_REMOVE and we
-	 * will be passed a page so we can look-aside into the cache of such
-	 * items.
+	 * WT_CELL_VALUE_OVFL_RM cells: If reconciliation deleted an overflow
+	 * value, but there was still a reader in the system that might need it,
+	 * the on-page cell type will have been reset to WT_CELL_VALUE_OVFL_RM
+	 * and we will be passed a page so we can look-aside into the cache of
+	 * such values.
 	 *
 	 * Re-test the cell's value inside the lock.
 	 */
 	WT_RET(__wt_readlock(session, S2BT(session)->ovfl_lock));
-	ret = __wt_cell_type_raw(unpack->cell) == WT_CELL_OVFL_REMOVE ?
+	ret = __wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM ?
 	    __wt_ovfl_txnc_search(page, unpack->data, unpack->size, store) :
 	    __ovfl_read(session, unpack->data, unpack->size, store);
 	WT_TRET(__wt_rwunlock(session, S2BT(session)->ovfl_lock));
@@ -177,7 +177,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	 *
 	 * Use a read/write lock and the on-page cell to fix the problem: hold
 	 * a write lock when creating the cached copy and resetting the on-page
-	 * cell type from WT_CELL_VALUE_OVFL to WT_CELL_OVFL_REMOVE and hold
+	 * cell type from WT_CELL_VALUE_OVFL to WT_CELL_VALUE_OVFL_RM and hold
 	 * a read lock when reading an overflow item.
 	 *
 	 * The read/write lock is per btree, but it could be per page or even
@@ -199,7 +199,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	}
 
 	WT_RET(__wt_writelock(session, S2BT(session)->ovfl_lock));
-	if (__wt_cell_type_raw(vpack->cell) != WT_CELL_OVFL_REMOVE) {
+	if (__wt_cell_type_raw(vpack->cell) != WT_CELL_VALUE_OVFL_RM) {
 		/*
 		 * If there's no globally visible update, there's a reader in
 		 * the system that might try and read the old value, cache it.
@@ -225,7 +225,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 		 * redo this process during every reconciliation of this page.
 		 */
 		__wt_cell_type_reset(session,
-		    vpack->cell, WT_CELL_VALUE_OVFL, WT_CELL_OVFL_REMOVE);
+		    vpack->cell, WT_CELL_VALUE_OVFL, WT_CELL_VALUE_OVFL_RM);
 	}
 err:	WT_TRET(__wt_rwunlock(session, S2BT(session)->ovfl_lock));
 

@@ -912,9 +912,10 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	case WT_PAGE_COL_VAR:
 		switch (unpack->type) {
 		case WT_CELL_DEL:
+		case WT_CELL_KEY_OVFL_RM:
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
-		case WT_CELL_OVFL_REMOVE:
+		case WT_CELL_VALUE_OVFL_RM:
 			__dmsg(ds, ", rle: %" PRIu64, __wt_cell_rle(unpack));
 			break;
 		}
@@ -944,8 +945,9 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		type = "addr/leaf-no";
 		goto addr;
 	case WT_CELL_KEY_OVFL:
+	case WT_CELL_KEY_OVFL_RM:
 	case WT_CELL_VALUE_OVFL:
-	case WT_CELL_OVFL_REMOVE:
+	case WT_CELL_VALUE_OVFL_RM:
 		type = "ovfl";
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 		__dmsg(ds, ", %s %s", type,
@@ -970,6 +972,7 @@ __debug_cell_data(WT_DBG *ds,
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	const char *p;
 
 	session = ds->session;
 
@@ -982,22 +985,14 @@ __debug_cell_data(WT_DBG *ds,
 
 	switch (unpack->raw) {
 	case WT_CELL_ADDR_DEL:
-		__debug_item(ds, tag, "addr/del", strlen("addr/del"));
-		break;
 	case WT_CELL_ADDR_INT:
-		__debug_item(ds, tag, "addr/int", strlen("addr/int"));
-		break;
 	case WT_CELL_ADDR_LEAF:
-		__debug_item(ds, tag, "addr/leaf", strlen("addr/leaf"));
-		break;
 	case WT_CELL_ADDR_LEAF_NO:
-		__debug_item(ds, tag, "addr/leaf-no", strlen("addr/leaf-no"));
-		break;
 	case WT_CELL_DEL:
-deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
-		break;
-	case WT_CELL_OVFL_REMOVE:
-		__debug_item(ds, tag, "overflow/rm", strlen("overflow/rm"));
+	case WT_CELL_KEY_OVFL_RM:
+	case WT_CELL_VALUE_OVFL_RM:
+deleted:	p = __wt_cell_type_string(unpack->raw);
+		__debug_item(ds, tag, p, strlen(p));
 		break;
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:

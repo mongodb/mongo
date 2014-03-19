@@ -698,10 +698,11 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		if (dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
-	case WT_CELL_OVFL_REMOVE:
+	case WT_CELL_KEY_OVFL_RM:
+	case WT_CELL_VALUE_OVFL_RM:
 		/*
-		 * The overflow removed cell is in-memory only, it's an error
-		 * to ever see it on a disk page.
+		 * Removed overflow cells are in-memory only, it's an error to
+		 * ever see one on a disk page.
 		 */
 		break;
 	case WT_CELL_VALUE:

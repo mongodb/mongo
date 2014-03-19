@@ -843,7 +843,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * backing blocks freed.  There was a transaction in the system that
 	 * might still read the value, so a copy was cached in the page's
 	 * reconciliation tracking memory, and the on-page cell was set to
-	 * WT_CELL_OVFL_REMOVE.  Eviction then chose the page and we're
+	 * WT_CELL_VALUE_OVFL_RM.  Eviction then chose the page and we're
 	 * splitting it up in order to push parts of it out of memory.
 	 *
 	 * If there was any globally visible update in the list, the value may
@@ -851,7 +851,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * If there's no globally visible update in the list, we better find
 	 * the value in the cache.
 	 */
-	if (vpack != NULL && vpack->raw == WT_CELL_OVFL_REMOVE &&
+	if (vpack != NULL && vpack->raw == WT_CELL_VALUE_OVFL_RM &&
 	    !__wt_txn_visible_all(session, min_txn)) {
 		WT_RET(__wt_ovfl_txnc_search(
 		    page, vpack->data, vpack->size, &ovfl));
@@ -3295,7 +3295,7 @@ record_loop:	/*
 					data = WT_UPDATE_DATA(upd);
 					size = upd->size;
 				}
-			} else if (vpack->raw == WT_CELL_OVFL_REMOVE) {
+			} else if (vpack->raw == WT_CELL_VALUE_OVFL_RM) {
 				update_no_copy = 1;	/* No data copy */
 				repeat_count = 1;	/* Single record */
 
@@ -3463,7 +3463,7 @@ compare:		/*
 		 * might read the original value.
 		 */
 		if (ovfl_state == OVFL_UNUSED &&
-		    vpack->raw != WT_CELL_OVFL_REMOVE)
+		    vpack->raw != WT_CELL_VALUE_OVFL_RM)
 			WT_ERR(__wt_ovfl_cache(session, page, upd, vpack));
 	}
 
@@ -3540,7 +3540,7 @@ __row_key_ovfl_rm(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *kpack)
 {
 	/* If the overflow key has already been removed, we're done. */
-	if (kpack->raw == WT_CELL_OVFL_REMOVE)
+	if (kpack->raw == WT_CELL_KEY_OVFL_RM)
 		return (0);
 
 	/*
@@ -3559,7 +3559,7 @@ __row_key_ovfl_rm(
 	 */
 	WT_RET(__wt_ovfl_onpage_add(session, page, kpack->data, kpack->size));
 	__wt_cell_type_reset(
-	    session, kpack->cell, WT_CELL_KEY_OVFL, WT_CELL_OVFL_REMOVE);
+	    session, kpack->cell, WT_CELL_KEY_OVFL, WT_CELL_KEY_OVFL_RM);
 
 	return (0);
 }
@@ -3736,7 +3736,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * blocks have been freed; in that case, we have to build a new
 		 * key.
 		 */
-		if (onpage_ovfl && kpack->raw == WT_CELL_OVFL_REMOVE)
+		if (onpage_ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM)
 			onpage_ovfl = 0;
 
 		/*
@@ -3959,7 +3959,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ERR(__rec_cell_build_val(
 				    session, r, p, size, (uint64_t)0));
 				dictionary = 1;
-			} else if (vpack->raw == WT_CELL_OVFL_REMOVE) {
+			} else if (vpack->raw == WT_CELL_VALUE_OVFL_RM) {
 				/*
 				 * If doing update save and restore, there's an
 				 * update that's not globally visible, and the
@@ -4005,7 +4005,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * might read the original value.
 			 */
 			if (vpack != NULL &&
-			    vpack->ovfl && vpack->raw != WT_CELL_OVFL_REMOVE)
+			    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)
 				WT_ERR(
 				    __wt_ovfl_cache(session, page, rip, vpack));
 
@@ -4019,7 +4019,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 * seems unlikely enough to ignore.
 				 */
 				if (kpack->ovfl &&
-				    kpack->raw != WT_CELL_OVFL_REMOVE) {
+				    kpack->raw != WT_CELL_KEY_OVFL_RM) {
 					/*
 					 * Keys are part of the name-space, we
 					 * can't remove them from the in-memory
@@ -4082,7 +4082,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 * key.
 		 */
 		onpage_ovfl = kpack->ovfl;
-		if (onpage_ovfl && kpack->raw == WT_CELL_OVFL_REMOVE) {
+		if (onpage_ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM) {
 			onpage_ovfl = 0;
 			WT_ASSERT(session, ikey != NULL);
 		}
