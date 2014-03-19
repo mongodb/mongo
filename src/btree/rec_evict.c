@@ -761,8 +761,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	/*
 	 * The key for the original page may be an onpage overflow key, and we
 	 * just lost track of it as the parent's index no longer references the
-	 * WT_REF pointing to it.  Add it to the parent's tracking list and it
-	 * will be discarded the next time the parent is reconciled.
+	 * WT_REF pointing to it.  Discard it now, including the backing blocks.
 	 */
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
@@ -772,8 +771,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
 			if (kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
-				WT_ERR(__wt_ovfl_discard_add(
-				    session, parent, kpack->data, kpack->size));
+				WT_ERR(__wt_ovfl_discard(session, cell));
 		}
 		break;
 	}

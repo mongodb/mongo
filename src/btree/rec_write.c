@@ -3532,39 +3532,6 @@ err:	__wt_scr_free(&orig);
 }
 
 /*
- * __row_key_ovfl_rm --
- *	Remove an overflow key.
- */
-static inline int
-__row_key_ovfl_rm(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *kpack)
-{
-	/* If the overflow key has already been removed, we're done. */
-	if (kpack->raw == WT_CELL_KEY_OVFL_RM)
-		return (0);
-
-	/*
-	 * Queue the page to have its blocks discarded when reconciliation
-	 * completes, then set the underlying on-page cell to reflect that
-	 * the overflow item is gone.
-	 *
-	 * This is a simpler operation than the corresponding overflow value
-	 * operation.  If it's a row-store internal page, keys are always
-	 * instantiated so there's no question of racing with readers because
-	 * reconciliation is the only consumer of the on-page cell information.
-	 * On row-store leaf pages, keys are not necessarily instantiated, so
-	 * callers of this function must instantiate the key, then lock/unlock
-	 * the overflow lock to ensure they don't race with a thread trying to
-	 * instantiate the key itself.
-	 */
-	WT_RET(__wt_ovfl_discard_add(session, page, kpack->data, kpack->size));
-	__wt_cell_type_reset(
-	    session, kpack->cell, WT_CELL_KEY_OVFL, WT_CELL_KEY_OVFL_RM);
-
-	return (0);
-}
-
-/*
  * __rec_row_int --
  *	Reconcile a row-store internal page.
  */
@@ -3652,8 +3619,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * always instantiated.  Don't worry about reuse,
 			 * reusing this key in this reconciliation is unlikely.
 			 */
-			if (onpage_ovfl)
-				WT_ERR(__row_key_ovfl_rm(session, page, kpack));
+			if (onpage_ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
+				WT_ERR(__wt_ovfl_discard_add(
+				    session, page, kpack->cell));
 			CHILD_RELEASE_ERR(session, hazard, child);
 			continue;
 		}
@@ -3677,9 +3645,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * worry about reuse, reusing this key in this
 				 * reconciliation is unlikely.
 				 */
-				if (onpage_ovfl)
-					WT_ERR(__row_key_ovfl_rm(
-					    session, page, kpack));
+				if (onpage_ovfl &&
+				    kpack->raw != WT_CELL_KEY_OVFL_RM)
+					WT_ERR(__wt_ovfl_discard_add(
+					    session, page, kpack->cell));
 				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
 			case WT_PM_REC_MULTIBLOCK:
@@ -3692,9 +3661,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * worry about reuse, reusing this key in this
 				 * reconciliation is unlikely.
 				 */
-				if (onpage_ovfl)
-					WT_ERR(__row_key_ovfl_rm(
-					    session, page, kpack));
+				if (onpage_ovfl &&
+				    kpack->raw != WT_CELL_KEY_OVFL_RM)
+					WT_ERR(__wt_ovfl_discard_add(
+					    session, page, kpack->cell));
 
 				WT_ERR(__rec_row_merge(session, r, child));
 				CHILD_RELEASE_ERR(session, hazard, child);
@@ -4033,20 +4003,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 						    session,
 						    page, rip, NULL, 1));
 
-					/*
-					 * Acquire the overflow lock to avoid
-					 * racing with a thread instantiating
-					 * the key.  Reader threads hold read
-					 * locks on the overflow lock when
-					 * checking for key instantiation.
-					 */
-					WT_ERR(__wt_writelock(
-					    session, btree->ovfl_lock));
-					WT_ERR(__wt_rwunlock(
-					    session, btree->ovfl_lock));
-
-					WT_ERR(__row_key_ovfl_rm(
-					    session, page, kpack));
+					WT_ERR(__wt_ovfl_discard_add(
+					    session, page, kpack->cell));
 				}
 
 				/*
