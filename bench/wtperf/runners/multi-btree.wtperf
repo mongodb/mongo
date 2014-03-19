@@ -11,7 +11,7 @@ random_range=100000000
 checkpoint_interval=20
 checkpoint_threads=1
 report_interval=5
-run_time=200
+run_time=20
 threads=((count=2,reads=1),(count=2,inserts=1))
 value_sz=100
-warmup=150
+warmup=10

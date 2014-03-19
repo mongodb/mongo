@@ -389,11 +389,11 @@ op_err:			lprintf(cfg, ret, 0,
 			}
 			/* Increment operation count */
 			++trk->ops;
-
-			/* Schedule the next operation */
-			if (++op == op_end)
-				op = thread->workload->ops;
 		}
+
+		/* Schedule the next operation */
+		if (++op == op_end)
+			op = thread->workload->ops;
 	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
