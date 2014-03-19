@@ -12,8 +12,8 @@ for (var i = 0; i < 10000; i++) db1.foo.insert( {_id:i, x:i%1000, t:t} );
 db1.foo.createIndex( {x:1}, {v: 0} );
 
 var r2 = rs.add();
-rs.reInitiate();
-rs.awaitSecondaryNodes(60000);
+rs.reInitiate(60000);
+
 var db2 = r2.getDB('test');
 r2.setSlaveOk();
 
