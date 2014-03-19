@@ -1056,7 +1056,7 @@ namespace mongo {
                                    Collection* collection,
                                    WriteOpResult* result ) {
 
-        const string& indexNS = collection->ns().ns();
+        const string indexNS = collection->ns().getSystemIndexesCollection();
 
         Lock::assertWriteLocked( indexNS );
 
