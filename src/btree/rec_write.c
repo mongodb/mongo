@@ -749,18 +749,26 @@ __rec_skip_update_move(
  */
 static inline int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-    WT_UPDATE *upd_arg, WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack,
-    WT_UPDATE **updp)
+    WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
 	WT_ITEM ovfl;
-	WT_UPDATE *upd, *ovfl_upd;
+	WT_PAGE *page;
+	WT_UPDATE *upd, *upd_list, *upd_ovfl;
 	size_t notused;
 	uint64_t max_txn, min_txn, txnid;
 
 	*updp = NULL;
 
+	page = r->page;
+
+	/*
+	 * If we're called with an WT_INSERT reference, use its WT_UPDATE
+	 * list, else is an on-page row-store WT_UPDATE list.
+	 */
+	upd_list = ins == NULL ? WT_ROW_UPDATE(page, rip) : ins->upd;
+
 	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
-	    upd = upd_arg; upd != NULL; upd = upd->next) {
+	    upd = upd_list; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
@@ -846,7 +854,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (vpack != NULL && vpack->raw == WT_CELL_OVFL_REMOVE &&
 	    !__wt_txn_visible_all(session, min_txn)) {
 		WT_RET(__wt_ovfl_txnc_search(
-		    r->page, vpack->data, vpack->size, &ovfl));
+		    page, vpack->data, vpack->size, &ovfl));
 		/*
 		 * Create an update structure with an impossibly low transaction
 		 * ID and append it to the update list we're about to save.
@@ -855,11 +863,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * running transaction in the system, ensuring the on-page value
 		 * will be ignored.
 		 */
-		WT_RET(__wt_update_alloc(session, &ovfl, &ovfl_upd, &notused));
-		ovfl_upd->txnid = WT_TXN_NONE;
-		for (upd = upd_arg; upd->next != NULL; upd = upd->next)
+		WT_RET(__wt_update_alloc(session, &ovfl, &upd_ovfl, &notused));
+		upd_ovfl->txnid = WT_TXN_NONE;
+		for (upd = upd_list; upd->next != NULL; upd = upd->next)
 			;
-		upd->next = ovfl_upd;
+		upd->next = upd_ovfl;
 	}
 
 	WT_RET(__rec_skip_update_save(session, r, ins, rip));
@@ -2934,8 +2942,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		WT_RET(__rec_txn_read(
-		    session, r, ins->upd, ins, NULL, NULL, &upd));
+		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd != NULL)
 			__bit_setv_recno(page, WT_INSERT_RECNO(ins),
 			    btree->bitcnt, ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
@@ -2952,8 +2959,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Walk any append list. */
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_RET(__rec_txn_read(
-		    session, r, ins->upd, ins, NULL, NULL, &upd));
+		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd == NULL)
 			continue;
 		for (;;) {
@@ -3276,8 +3282,8 @@ record_loop:	/*
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
 			upd = NULL;
 			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
-				WT_ERR(__rec_txn_read(session,
-				    r, ins->upd, ins, NULL, vpack, &upd));
+				WT_ERR(__rec_txn_read(
+				    session, r, ins, NULL, vpack, &upd));
 				ins = WT_SKIP_NEXT(ins);
 			}
 			if (upd != NULL) {
@@ -3463,8 +3469,7 @@ compare:		/*
 
 	/* Walk any append list. */
 	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
-		WT_ERR(__rec_txn_read(
-		    session, r, ins->upd, ins, NULL, NULL, &upd));
+		WT_ERR(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd == NULL)
 			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
@@ -3921,8 +3926,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			vpack = &_vpack;
 			__wt_cell_unpack(val_cell, vpack);
 		}
-		WT_ERR(__rec_txn_read(session, r,
-		    WT_ROW_UPDATE(page, rip), NULL, rip, vpack, &upd));
+		WT_ERR(__rec_txn_read(session, r, NULL, rip, vpack, &upd));
 
 		/* Build value cell. */
 		dictionary = 0;
@@ -4237,8 +4241,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		/* Look for an update. */
-		WT_RET(__rec_txn_read(
-		    session, r, ins->upd, ins, NULL, NULL, &upd));
+		WT_RET(__rec_txn_read(session, r, ins, NULL, NULL, &upd));
 		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
