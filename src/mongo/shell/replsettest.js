@@ -462,7 +462,7 @@ ReplSetTest.prototype.reInitiate = function(timeout) {
     var master  = this.nodes[0];
     var c = master.getDB("local")['system.replset'].findOne();
     var config  = this.getReplSetConfig();
-    var timeout = timeout || 30000;
+    var timeout = timeout || 60000;
     config.version = c.version + 1;
     this.initiate( config , 'replSetReconfig', timeout );
 }
