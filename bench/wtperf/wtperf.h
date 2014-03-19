@@ -117,6 +117,7 @@ struct __config {			/* Configuration struction */
 	volatile int ckpt;		/* checkpoint in progress */
 	volatile int error;		/* thread error */
 	volatile int stop;		/* notify threads to stop */
+	volatile int in_warmup;		/* Running warmup phase */
 
 	volatile uint32_t totalsec;	/* total seconds running */
 
