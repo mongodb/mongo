@@ -1023,6 +1023,14 @@ __rec_review(WT_SESSION_IMPL *session,
 		return (EBUSY);
 
 	/*
+	 * If we are checkpointing, we can't merge multiblock pages into their
+	 * parent.
+	 */
+	if (btree->checkpointing &&
+	    mod != NULL && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
+		return (EBUSY);
+
+	/*
 	 * If the page is dirty and can possibly change state, write it so we
 	 * know the final state.
 	 *

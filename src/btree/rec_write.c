@@ -992,7 +992,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * more about checkpoints in the context of page splits.
 			 */
 			if ((ret = __wt_page_in(session, page, ref,
-			    WT_READ_CACHE | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
+			    WT_READ_CACHE |
+			    WT_READ_NO_GEN | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
 				ret = 0;
 				break;
 			}

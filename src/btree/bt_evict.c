@@ -636,6 +636,13 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		__wt_spin_lock(session, &cache->evict_lock);
 		btree->checkpointing = 1;
 		__wt_spin_unlock(session, &cache->evict_lock);
+ 
+		/*
+		 * Wait for existing LRU eviction activity to drain, so that
+		 * all subsequent eviction sees the checkpointing flag.
+		 */
+		while (btree->lru_count > 0)
+			__wt_yield();
 
 		/*
 		 * Write all dirty in-cache pages.
