@@ -29,6 +29,7 @@
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/owned_pointer_map.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h" // ConnectionString (header-only)
@@ -54,7 +55,9 @@ namespace mongo {
         //
 
         // TODO: Unordered map?
-        typedef map<ConnectionString, TargetedWriteBatch*, ConnectionStringComp> HostBatchMap;
+        typedef OwnedPointerMap<ConnectionString,
+                                TargetedWriteBatch,
+                                ConnectionStringComp> OwnedHostBatchMap;
     }
 
     static void buildErrorFrom( const Status& status, WriteErrorDetail* error ) {
@@ -148,7 +151,8 @@ namespace mongo {
             while ( numSent != numToSend ) {
 
                 // Collect batches out on the network, mapped by endpoint
-                HostBatchMap pendingBatches;
+                OwnedHostBatchMap ownedPendingBatches;
+                OwnedHostBatchMap::MapType& pendingBatches = ownedPendingBatches.mutableMap();
 
                 //
                 // Send side
@@ -183,13 +187,15 @@ namespace mongo {
                         batchOp.noteBatchError( *nextBatch, error );
 
                         // We're done with this batch
+                        // Clean up when we can't resolve a host
+                        delete *it;
                         *it = NULL;
                         --numToSend;
                         continue;
                     }
 
                     // If we already have a batch for this host, wait until the next time
-                    HostBatchMap::iterator pendingIt = pendingBatches.find( shardHost );
+                    OwnedHostBatchMap::MapType::iterator pendingIt = pendingBatches.find( shardHost );
                     if ( pendingIt != pendingBatches.end() ) continue;
 
                     //

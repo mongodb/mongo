@@ -24,38 +24,40 @@ namespace mongo {
     /**
      * An std::map wrapper that deletes pointers within a vector on destruction.  The objects
      * referenced by the vector's pointers are 'owned' by an object of this class.
-     * NOTE that an OwnedPointerMap<K,T> wraps an std::map<K,T*>.
+     * NOTE that an OwnedPointerMap<K,T,Compare> wraps an std::map<K,T*,Compare>.
      */
-    template<class K, class T>
+    template<class K, class T, class Compare = std::less<K> >
     class OwnedPointerMap {
         MONGO_DISALLOW_COPYING(OwnedPointerMap);
 
     public:
+        typedef typename std::map<K, T*, Compare> MapType;
+
         OwnedPointerMap();
         ~OwnedPointerMap();
 
         /** Access the map. */
-        const std::map<K, T*>& map() { return _map; }
-        std::map<K, T*>& mutableMap() { return _map; }
+        const MapType& map() { return _map; }
+        MapType& mutableMap() { return _map; }
 
         void clear();
 
     private:
-        std::map<K, T*> _map;
+        MapType _map;
     };
 
-    template<class K, class T>
-    OwnedPointerMap<K, T>::OwnedPointerMap() {
+    template<class K, class T, class Compare>
+    OwnedPointerMap<K, T, Compare>::OwnedPointerMap() {
     }
 
-    template<class K, class T>
-    OwnedPointerMap<K, T>::~OwnedPointerMap() {
+    template<class K, class T, class Compare>
+    OwnedPointerMap<K, T, Compare>::~OwnedPointerMap() {
         clear();
     }
 
-    template<class K, class T>
-    void OwnedPointerMap<K, T>::clear() {
-        for( typename std::map<K, T*>::iterator i = _map.begin(); i != _map.end(); ++i ) {
+    template<class K, class T, class Compare>
+    void OwnedPointerMap<K, T, Compare>::clear() {
+        for( typename MapType::iterator i = _map.begin(); i != _map.end(); ++i ) {
             delete i->second;
         }
         _map.clear();
