@@ -95,7 +95,7 @@ namespace mongo {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
             if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
-                warning() << ns << " had ilegal indexes, removing";
+                warning() << ns << " had illegal indexes, removing";
                 indexCatalog->dropAllIndexes( true );
                 continue;
             }
