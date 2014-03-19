@@ -526,7 +526,9 @@ namespace mongo {
             IndexScanNode* isn = static_cast<IndexScanNode*>(root->children[0]);
 
             // No filters allowed and side-stepping isSimpleRange for now.  TODO: do we ever see
-            // isSimpleRange here?  because we could well use it.  I just don't think we ever do see it.
+            // isSimpleRange here?  because we could well use it.  I just don't think we ever do see
+            // it.
+
             if (NULL != isn->filter.get() || isn->bounds.isSimpleRange) {
                 return false;
             }
@@ -783,43 +785,42 @@ namespace mongo {
             }
         }
 
-        // If there are no suitable indices for the distinct hack and the _id index is the only
-        // index in the catalog, a collection scan is the only possible solution. Bail out now
-        // into regular planning with no projection. Projection is unnecessary because there
-        // is no possibility of a covered index scan.
-        if (plannerParams.indices.empty() &&
-            collection->getIndexCatalog()->numIndexesTotal() == 1 &&
-            collection->getIndexCatalog()->haveIdIndex()) {
+        // If there are no suitable indices for the distinct hack bail out now into regular planning
+        // with no projection.
+        if (plannerParams.indices.empty()) {
             CanonicalQuery* cq;
-            Status status = CanonicalQuery::canonicalize(collection->ns().ns(), query, BSONObj(),
-                                                         BSONObj(), &cq);
+            Status status = CanonicalQuery::canonicalize(collection->ns().ns(),
+                                                         query,
+                                                         BSONObj(),
+                                                         BSONObj(),
+                                                         &cq);
             if (!status.isOK()) {
                 return status;
             }
+
             // Takes ownership of cq.
             return getRunner(cq, out);
         }
 
-        // We only care about the field that we're projecting over.  Have to drop the _id field
-        // explicitly because those are .find() semantics.
         //
-        // Applying a projection allows the planner to try to give us covered plans.
+        // If we're here, we have an index prefixed by the field we're distinct-ing over.
+        //
+
+        // Applying a projection allows the planner to try to give us covered plans that we can turn
+        // into the projection hack.  getDistinctProjection deals with .find() projection semantics
+        // (ie _id:1 being implied by default).
         BSONObj projection = getDistinctProjection(field);
 
         // Apply a projection of the key.  Empty BSONObj() is for the sort.
         CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(collection->ns().ns(), query, BSONObj(), projection, &cq);
+        Status status = CanonicalQuery::canonicalize(collection->ns().ns(),
+                                                     query,
+                                                     BSONObj(),
+                                                     projection,
+                                                     &cq);
         if (!status.isOK()) {
             return status;
         }
-
-        // No index has the field we're looking for.  Punt to normal planning.
-        if (plannerParams.indices.empty()) {
-            // Takes ownership of cq.
-            return getRunner(cq, out);
-        }
-
-        // If we're here, we have an index prefixed by the field we're distinct-ing over.
 
         // If there's no query, we can just distinct-scan one of the indices.
         // Not every index in plannerParams.indices may be suitable. Refer to
@@ -885,6 +886,18 @@ namespace mongo {
             delete solutions[i];
         }
 
+        // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
+        delete cq;
+        status = CanonicalQuery::canonicalize(collection->ns().ns(),
+                                              query,
+                                              BSONObj(),
+                                              BSONObj(),
+                                              &cq);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Takes ownership of cq.
         return getRunner(cq, out);
     }
 
