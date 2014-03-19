@@ -542,6 +542,8 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_KEY_OVFL_RM:
 	case WT_CELL_KEY_PFX:
+	case WT_CELL_KEY_SHORT:
+	case WT_CELL_KEY_SHORT_PFX:
 		return (NULL);
 	default:
 		return (cell);
