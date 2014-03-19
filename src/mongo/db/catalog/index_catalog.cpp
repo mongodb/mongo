@@ -1121,7 +1121,7 @@ namespace mongo {
         if (IndexNames::GEO_2D == type)
             return new TwoDAccessMethod( entry );
 
-        log() << "Can't find index for keypattern " << desc->keyPattern();
+        log() << "Can't find index for keyPattern " << desc->keyPattern();
         invariant(0);
         return NULL;
     }
