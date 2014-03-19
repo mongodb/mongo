@@ -871,7 +871,7 @@ namespace mongo {
                 invariant(!result.getError());
                 continue;
             }
-            fassertFailed(0);
+            fassertFailed(17429);
         }
 
         // END CURRENT OP
@@ -983,7 +983,7 @@ namespace mongo {
                 pfe.touch();
                 continue;  // Try the operation again.
             }
-            fassertFailed(0);
+            fassertFailed(17430);
         }
 
         // Errors release the write lock, as a matter of policy.
