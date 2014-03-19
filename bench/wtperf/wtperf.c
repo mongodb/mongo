@@ -51,6 +51,7 @@ static const CONFIG default_cfg = {
 	0,				/* checkpoint in progress */
 	0,				/* thread error */
 	0,				/* notify threads to stop */
+	0,				/* in warmup phase */
 	0,				/* total seconds running */
 
 #define	OPT_DEFINE_DEFAULT
@@ -375,18 +376,23 @@ op_err:			lprintf(cfg, ret, 0,
 		}
 
 		/* Gather statistics */
-		if (measure_latency) {
-			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-				lprintf(cfg, ret, 0, "Get time call failed");
-				goto err;
+		if (!cfg->in_warmup) {
+			if (measure_latency) {
+				if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "Get time call failed");
+					goto err;
+				}
+				++trk->latency_ops;
+				usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+				track_operation(trk, usecs);
 			}
-			++trk->latency_ops;
-			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
-			track_operation(trk, usecs);
+			/* Increment operation count */
+			++trk->ops;
 		}
-		++trk->ops;		/* increment operation counts */
 
-		if (++op == op_end)	/* schedule the next operation */
+		/* Schedule the next operation */
+		if (++op == op_end)
 			op = thread->workload->ops;
 	}
 
@@ -712,6 +718,8 @@ monitor(void *arg)
 		/* If the workers are done, don't bother with a final call. */
 		if (cfg->stop)
 			break;
+		if (cfg->in_warmup)
+			continue;
 
 		if ((ret = __wt_epoch(NULL, &t)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
@@ -944,8 +952,20 @@ execute_populate(CONFIG *cfg)
 		}
 		/*
 		 * We measure how long it takes to compact all tables for this
-		 * workload.
+		 * workload.  We first set the minimum timeout so that we can
+		 * kick off all the compacts.  Then we call compact a second
+		 * time with no timeout to wait for it to finish.  If there
+		 * are multiple tables they can compact in parallel and
+		 * the second call should be a fast no-op.
 		 */
+		for (i = 0; i < cfg->table_count; i++)
+			if ((ret = session->compact(
+			    session, cfg->uris[i], "timeout=1")) != 0 &&
+			    ret != ETIMEDOUT) {
+				lprintf(cfg, ret, 0,
+				     "execute_populate: WT_SESSION.compact");
+				goto err;
+			}
 		for (i = 0; i < cfg->table_count; i++)
 			if ((ret = session->compact(
 			    session, cfg->uris[i], "timeout=0")) != 0) {
@@ -1003,6 +1023,9 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 	
+	if (cfg->warmup != 0)
+		cfg->in_warmup = 1;
+
 	/* Allocate memory for the worker threads. */
 	if ((cfg->workers =
 	    calloc((size_t)cfg->workers_cnt, sizeof(CONFIG_THREAD))) == NULL) {
@@ -1028,6 +1051,13 @@ execute_workload(CONFIG *cfg)
 		    cfg, workp, threads, (u_int)workp->threads, worker)) != 0)
 			goto err;
 		threads += workp->threads;
+	}
+
+	if (cfg->warmup != 0) {
+		lprintf(cfg, 0, 1,
+		    "Waiting for warmup duration of %" PRIu32, cfg->warmup);
+		sleep(cfg->warmup);
+		cfg->in_warmup = 0;
 	}
 
 	for (interval = cfg->report_interval, run_time = cfg->run_time,
