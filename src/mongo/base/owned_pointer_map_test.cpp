@@ -37,6 +37,8 @@ namespace {
 
         static std::vector<string>& destroyedNames() { return _destroyedNames; }
 
+        string getName() { return _name; }
+
     private:
         string _name;
         static std::vector<string> _destroyedNames;
@@ -79,5 +81,32 @@ namespace {
         ASSERT_EQUALS( "second", DestructionLogger::destroyedNames()[ 1 ] );
     }
     
+    TEST(OwnedPointerMapTest, OwnedPointersWithCompare) {
+        DestructionLogger::destroyedNames().clear();
+        {
+            OwnedPointerMap<int,DestructionLogger,std::greater<int> > owned;
+            owned.mutableMap().insert( make_pair( 0, new DestructionLogger( "0" ) ) );
+            owned.mutableMap().insert( make_pair( 1, new DestructionLogger( "1" ) ) );
+
+            // use std::greater<int> rather than the default std::less<int>
+            std::map<int,DestructionLogger*,std::greater<int> >::iterator it = owned.mutableMap().begin();
+
+            ASSERT( owned.mutableMap().end() != it);
+            // "1" should be sorted to be the first item.
+            ASSERT_EQUALS( "1", it->second->getName() );
+
+            it++;
+            ASSERT( owned.mutableMap().end() != it);
+            ASSERT_EQUALS( "0", it->second->getName() );
+
+            // owned destroyed
+        }
+        // destroyed in descending order
+        ASSERT_EQUALS( 2U, DestructionLogger::destroyedNames().size() );
+        ASSERT_EQUALS( "1", DestructionLogger::destroyedNames()[ 0 ] );
+        ASSERT_EQUALS( "0", DestructionLogger::destroyedNames()[ 1 ] );
+    }
+
+
 } // namespace
 } // namespace mongo
