@@ -287,9 +287,6 @@ struct __wt_page_modify {
 		/*
 		 * Overflow key/value addresses to be discarded from the block
 		 * manager after reconciliation completes successfully.
-		 * Note: this really isn't a WT_UPDATE entry, but a WT_UPDATE
-		 * structure has pretty much exactly what we need, so use it
-		 * instead of inventing something new.
 		 */
 		WT_CELL **discard;
 		size_t	  discard_entries;

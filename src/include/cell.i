@@ -501,7 +501,6 @@ __wt_cell_type_reset(
 	 * and only once, assert we're setting what we think we're setting.
 	 */
 	WT_ASSERT(session, old_type == 0 || old_type == __wt_cell_type(cell));
-	WT_UNUSED(session);
 
 	cell->__chunk[0] =
 	    (cell->__chunk[0] & ~WT_CELL_TYPE_MASK) | WT_CELL_TYPE(new_type);
