@@ -405,6 +405,8 @@ config_opt_file(CONFIG *cfg, const char *filename)
 	char *comment, *file_buf, *line, *ltrim, *rtrim;
 
 	file_buf = NULL;
+	fd = -1;
+
 	if ((fd = open(filename, O_RDONLY)) == -1) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
 		return (errno);
@@ -412,8 +414,8 @@ config_opt_file(CONFIG *cfg, const char *filename)
 	if ((ret = fstat(fd, &sb)) != 0) {
 		fprintf(stderr, "wtperf: stat of %s: %s\n",
 		    filename, strerror(errno));
-		(void)close(fd);
-		return (errno);
+		ret = errno;
+		goto err;
 	}
 	buf_size = (size_t)sb.st_size;
 	file_buf = (char *)calloc(buf_size + 2, 1);
@@ -422,7 +424,6 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		goto err;
 	}
 	read_size = read(fd, file_buf, buf_size);
-	(void)close(fd);
 	if (read_size == -1 || (size_t)read_size != buf_size) {
 		fprintf(stderr,
 		    "wtperf: read unexpected amount from config file\n");
@@ -493,7 +494,8 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		goto err;
 	}
 
-err:
+err:	if (fd != -1)
+		(void)close(fd);
 	if (file_buf != NULL)
 		free(file_buf);
 	return (ret);
