@@ -107,10 +107,9 @@ namespace mongo {
         // Look up the key by going directly to the Btree.
         DiskLoc loc = accessMethod->findSingle( _key );
 
-        _done = true;
-
         // Key not found.
         if (loc.isNull()) {
+            _done = true;
             return Runner::RUNNER_EOF;
         }
 
@@ -150,6 +149,7 @@ namespace mongo {
                     ClientCursor::staticYield(micros, "", record);
                     // This can happen when we're yielded for various reasons (e.g. db/idx dropped).
                     if (_killed) {
+                        _done = true;
                         return Runner::RUNNER_DEAD;
                     }
                 }
@@ -165,6 +165,7 @@ namespace mongo {
                     KeyPattern kp(m->getKeyPattern());
                     if (!m->keyBelongsToMe( kp.extractSingleKey(*objOut))) {
                         // We have something with a matching _id but it doesn't belong to me.
+                        _done = true;
                         return Runner::RUNNER_EOF;
                     }
                 }
@@ -176,6 +177,7 @@ namespace mongo {
             *dlOut = loc;
         }
 
+        _done = true;
         return Runner::RUNNER_ADVANCED;
     }
 
