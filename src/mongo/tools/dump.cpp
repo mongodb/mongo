@@ -320,8 +320,9 @@ public:
                 break;
             }
         }
-        toolInfoLog() << "wrote " << seen.size() <<
-            ((seen.size() == 1) ? " document" : " documents") << std::endl;
+        toolInfoLog() << "wrote " << seen.size()
+                      << ((seen.size() == 1) ? " document" : " documents")
+                      << std::endl;
         return forward ? e->xnext : e->xprev;
     }
 
