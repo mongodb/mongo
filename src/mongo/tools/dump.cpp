@@ -127,7 +127,9 @@ public:
 
         doCollection(coll, q, f, &m);
 
-        toolInfoLog() << "\t\t " << m.done() << " documents" << std::endl;
+        toolInfoLog() << "\t\t " << m.done()
+                      << ((m.done() == 1) ? " document" : " documents")
+                      << std::endl;
     }
 
     void writeMetadataFile( const string coll, boost::filesystem::path outputFile, 
@@ -322,7 +324,9 @@ public:
             toolError() << "Repair scan failed: " << e.toString() << std::endl;
         }
 
-        toolInfoLog() << "\t\t " << m.done() << " documents" << std::endl;
+        toolInfoLog() << "\t\t " << m.done()
+                      << ((m.done() == 1) ? " document" : " documents")
+                      << std::endl;
     }
     
     int _repair( string dbname ) {

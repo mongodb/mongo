@@ -78,7 +78,7 @@ namespace mongo {
                 "first line in input file is a header (CSV and TSV only)");
 
         options->addOptionChaining("upsert", "upsert", moe::Switch,
-                "insert or update objects that already exist");
+                "insert or update documents that already exist");
 
         options->addOptionChaining("upsertFields", "upsertFields", moe::String,
                 "comma-separated fields for the query part of the upsert. "

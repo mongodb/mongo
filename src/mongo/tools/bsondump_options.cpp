@@ -59,7 +59,7 @@ namespace mongo {
     }
 
     void printBSONDumpHelp(std::ostream* out) {
-        *out << "Display BSON objects in a data file.\n" << std::endl;
+        *out << "Display BSON documents in a data file.\n" << std::endl;
         *out << "usage: bsondump [options] <bson filename>" << std::endl;
         *out << moe::startupOptions.helpString();
         *out << std::flush;
