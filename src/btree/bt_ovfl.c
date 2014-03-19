@@ -147,7 +147,7 @@ err:	__wt_scr_free(&tmp);
  */
 int
 __wt_ovfl_cache(WT_SESSION_IMPL *session,
-    WT_PAGE *page, void *cookie, WT_CELL_UNPACK *unpack)
+    WT_PAGE *page, void *cookie, WT_CELL_UNPACK *vpack)
 {
 	WT_DECL_RET;
 	int visible;
@@ -190,7 +190,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
-		visible = __ovfl_cache_col_visible(session, cookie, unpack);
+		visible = __ovfl_cache_col_visible(session, cookie, vpack);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		visible = __ovfl_cache_row_visible(session, page, cookie);
@@ -199,13 +199,13 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	}
 
 	WT_RET(__wt_writelock(session, S2BT(session)->ovfl_lock));
-	if (__wt_cell_type_raw(unpack->cell) != WT_CELL_OVFL_REMOVE) {
+	if (__wt_cell_type_raw(vpack->cell) != WT_CELL_OVFL_REMOVE) {
 		/*
 		 * If there's no globally visible update, there's a reader in
 		 * the system that might try and read the old value, cache it.
 		 */
 		if (!visible) {
-			WT_ERR(__ovfl_cache(session, page, unpack));
+			WT_ERR(__ovfl_cache(session, page, vpack));
 			WT_STAT_FAST_DATA_INCR(session, cache_overflow_value);
 		}
 
@@ -217,14 +217,15 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 		 * is probable.
 		 */
 		WT_ERR(__wt_ovfl_onpage_add(
-		    session, page, unpack->data, unpack->size));
+		    session, page, vpack->data, vpack->size));
 
 		/*
 		 * Reset the page's cell type regardless of whether or not we
 		 * cached a copy and a thread might read it: we don't want to
 		 * redo this process during every reconciliation of this page.
 		 */
-		__wt_cell_type_reset(unpack->cell, WT_CELL_OVFL_REMOVE);
+		__wt_cell_type_reset(session,
+		    vpack->cell, WT_CELL_VALUE_OVFL, WT_CELL_OVFL_REMOVE);
 	}
 err:	WT_TRET(__wt_rwunlock(session, S2BT(session)->ovfl_lock));
 

@@ -334,7 +334,7 @@ extern int __wt_ovfl_read(WT_SESSION_IMPL *session,
 extern int __wt_ovfl_cache(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     void *cookie,
-    WT_CELL_UNPACK *unpack);
+    WT_CELL_UNPACK *vpack);
 extern int
 __wt_page_in_func(
  WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, uint32_t flags
@@ -368,6 +368,10 @@ extern int __wt_bt_cache_op(WT_SESSION_IMPL *session,
     int op);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_verify_dsk_image(WT_SESSION_IMPL *session,
+    const char *addr,
+    const WT_PAGE_HEADER *dsk,
+    size_t size);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     const char *addr,
     WT_ITEM *buf);

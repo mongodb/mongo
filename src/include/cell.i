@@ -45,7 +45,7 @@
  *
  * Bits 1 and 2 are reserved for "short" key and value cells (that is, a cell
  * carrying data less than 64B, where we can store the data length in the cell
- * descriptor byte:
+ * descriptor byte):
  *	0x00	Not a short key/data cell
  *	0x01	Short key cell
  *	0x10	Short key cell, with a following prefix-compression byte
@@ -448,17 +448,6 @@ __wt_cell_total_len(WT_CELL_UNPACK *unpack)
 }
 
 /*
- * __wt_cell_type_reset --
- *	Reset the cell's type.
- */
-static inline void
-__wt_cell_type_reset(WT_CELL *cell, u_int type)
-{
-	cell->__chunk[0] =
-	    (cell->__chunk[0] & ~WT_CELL_TYPE_MASK) | WT_CELL_TYPE(type);
-}
-
-/*
  * __wt_cell_type --
  *	Return the cell's type (collapsing special types).
  */
@@ -494,6 +483,25 @@ __wt_cell_type_raw(WT_CELL *cell)
 	return (WT_CELL_SHORT_TYPE(cell->__chunk[0]) == 0 ?
 	    WT_CELL_TYPE(cell->__chunk[0]) :
 	    WT_CELL_SHORT_TYPE(cell->__chunk[0]));
+}
+
+/*
+ * __wt_cell_type_reset --
+ *	Reset the cell's type.
+ */
+static inline void
+__wt_cell_type_reset(
+    WT_SESSION_IMPL *session, WT_CELL *cell, u_int old_type, u_int new_type)
+{
+	/*
+	 * For all current callers of this function, this should happen once
+	 * and only once, assert we're setting what we think we're setting.
+	 */
+	WT_ASSERT(session, old_type == 0 || old_type == __wt_cell_type(cell));
+	WT_UNUSED(session);
+
+	cell->__chunk[0] =
+	    (cell->__chunk[0] & ~WT_CELL_TYPE_MASK) | WT_CELL_TYPE(new_type);
 }
 
 /*

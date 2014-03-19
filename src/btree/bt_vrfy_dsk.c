@@ -40,7 +40,7 @@ static int __verify_dsk_row(
  * __wt_verify_dsk_image --
  *	Verify a single block as read from disk.
  */
-static int
+int
 __wt_verify_dsk_image(WT_SESSION_IMPL *session,
     const char *addr, const WT_PAGE_HEADER *dsk, size_t size)
 {

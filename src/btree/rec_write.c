@@ -2420,11 +2420,14 @@ skip_check_complete:
 	 */
 	if (bnd->skip != NULL) {
 		if (bnd->already_compressed)
-			return (__rec_raw_decompress(
+			WT_RET(__rec_raw_decompress(
 			    session, buf->data, buf->size, &bnd->dsk));
 		else
-			return (__wt_strndup(
+			WT_RET(__wt_strndup(
 			    session, buf->data, buf->size, &bnd->dsk));
+		WT_ASSERT(session, __wt_verify_dsk_image(
+		    session, "[evict split]", buf->data, buf->size) == 0);
+		return (0);
 	}
 
 	/*
@@ -3550,7 +3553,8 @@ __row_key_ovfl_rm(
 	 * instantiate the key itself.
 	 */
 	WT_RET(__wt_ovfl_onpage_add(session, page, kpack->data, kpack->size));
-	__wt_cell_type_reset(kpack->cell, WT_CELL_OVFL_REMOVE);
+	__wt_cell_type_reset(
+	    session, kpack->cell, WT_CELL_KEY_OVFL, WT_CELL_OVFL_REMOVE);
 
 	return (0);
 }
