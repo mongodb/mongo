@@ -25,6 +25,7 @@ namespace mongo {
     typedef map<string, ScriptingFunction> FunctionCacheMap;
 
     class DBClientWithCommands;
+    class DBClientBase;
 
     struct JSFile {
         const char* name;
@@ -245,4 +246,5 @@ namespace mongo {
     const char* jsSkipWhiteSpace(const char* raw);
 
     extern ScriptEngine* globalScriptEngine;
+    extern DBClientBase* directDBClient;
 }

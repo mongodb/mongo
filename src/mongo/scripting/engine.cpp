@@ -44,6 +44,7 @@
 namespace mongo {
     long long Scope::_lastVersion = 1;
     static const unsigned kMaxJsFileLength = std::numeric_limits<unsigned>::max() - 1;
+    DBClientBase* directDBClient;
 
     ScriptEngine::ScriptEngine() : _scopeInitCallback() {
     }
@@ -191,8 +192,8 @@ namespace mongo {
         _loadedVersion = _lastVersion;
         string coll = _localDBName + ".system.js";
 
-        static DBClientBase* db = createDirectClient();
-        auto_ptr<DBClientCursor> c = db->query(coll, Query(), 0, 0, NULL, QueryOption_SlaveOk, 0);
+        auto_ptr<DBClientCursor> c = directDBClient->query(coll, Query(), 0, 0, NULL,
+            QueryOption_SlaveOk, 0);
         massert(16669, "unable to get db client cursor from query", c.get());
 
         set<string> thisTime;
