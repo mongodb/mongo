@@ -335,6 +335,7 @@ extern int __wt_ovfl_cache(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     void *cookie,
     WT_CELL_UNPACK *vpack);
+extern int __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell);
 extern int
 __wt_page_in_func(
  WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, uint32_t flags
@@ -406,8 +407,7 @@ extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
 extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    const uint8_t *addr_arg,
-    size_t addr_size);
+    WT_CELL *cell);
 extern void __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_reuse_search(WT_SESSION_IMPL *session,
     WT_PAGE *page,
@@ -480,10 +480,6 @@ extern int __wt_update_alloc( WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
     size_t *sizep);
-extern int __wt_update_alloc_simple( WT_SESSION_IMPL *session,
-    const void *data,
-    size_t size,
-    WT_UPDATE **updp);
 extern WT_UPDATE *__wt_update_obsolete_check(WT_SESSION_IMPL *session,
     WT_UPDATE *upd);
 extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,

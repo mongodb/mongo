@@ -291,7 +291,9 @@ struct __wt_page_modify {
 		 * structure has pretty much exactly what we need, so use it
 		 * instead of inventing something new.
 		 */
-		WT_UPDATE *discard;
+		WT_CELL **discard;
+		size_t	  discard_entries;
+		size_t	  discard_allocated;
 	} *ovfl_track;
 
 	uint64_t bytes_dirty;		/* Dirty bytes added to cache. */

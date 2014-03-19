@@ -30,19 +30,23 @@ __ovfl_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static int
 __ovfl_discard_verbose(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *addr, const char *tag)
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, const char *tag)
 {
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 512, &tmp));
+
+	unpack = &_unpack;
+	__wt_cell_unpack(cell, unpack);
 
 	WT_VERBOSE_ERR(session, overflow,
 	    "discard: %s%s%p %s",
 	    tag == NULL ? "" : tag,
 	    tag == NULL ? "" : ": ",
 	    page,
-	    __wt_addr_string(session, tmp, WT_UPDATE_DATA(addr), addr->size));
+	    __wt_addr_string(session, tmp, unpack->data, unpack->size));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -56,15 +60,17 @@ err:	__wt_scr_free(&tmp);
 static void
 __ovfl_discard_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_CELL **cellp;
 	WT_OVFL_TRACK *track;
-	WT_UPDATE *addr;
+	size_t i;
 
 	if (page->modify == NULL || page->modify->ovfl_track == NULL)
 		return;
 
 	track = page->modify->ovfl_track;
-	for (addr = track->discard; addr != NULL; addr = addr->next)
-		(void)__ovfl_discard_verbose(session, page, addr, "dump");
+	for (i = 0, cellp = track->discard;
+	    i < track->discard_entries; ++i, ++cellp)
+		(void)__ovfl_discard_verbose(session, page, *cellp, "dump");
 }
 #endif
 
@@ -75,28 +81,43 @@ __ovfl_discard_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __ovfl_discard_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BM *bm;
+	WT_CELL **cellp;
 	WT_DECL_RET;
 	WT_OVFL_TRACK *track;
-	WT_UPDATE *addr, *next;
+	uint32_t i;
 
-	bm = S2BT(session)->bm;
-
-	/* Free the underlying blocks for any address in the list. */
 	track = page->modify->ovfl_track;
-	for (addr = track->discard; addr != NULL; addr = next) {
+	for (i = 0, cellp = track->discard;
+	    i < track->discard_entries; ++i, ++cellp) {
 		if (WT_VERBOSE_ISSET(session, overflow))
 			WT_TRET(__ovfl_discard_verbose(
-			    session, page, addr, "free"));
+			    session, page, *cellp, "free"));
 
-		WT_TRET(
-		    bm->free(bm, session, WT_UPDATE_DATA(addr), addr->size));
-
-		next = addr->next;
-		__wt_free(session, addr);
+		/* Discard each cell's overflow item. */
+		WT_TRET(__wt_ovfl_discard(session, *cellp));
 	}
-	track->discard = NULL;
+
+	__wt_free(session, track->discard);
+	track->discard_entries = track->discard_allocated = 0;
+
 	return (ret);
+}
+
+/*
+ * __ovfl_discard_wrapup_err --
+ *	Resolve the page's overflow discard list after an error occurs.
+ */
+static int
+__ovfl_discard_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_TRACK *track;
+
+	track = page->modify->ovfl_track;
+
+	__wt_free(session, track->discard);
+	track->discard_entries = track->discard_allocated = 0;
+
+	return (0);
 }
 
 /*
@@ -105,22 +126,20 @@ __ovfl_discard_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
  * been discarded.
  */
 int
-__wt_ovfl_discard_add(WT_SESSION_IMPL *session,
-    WT_PAGE *page, const uint8_t *addr_arg, size_t addr_size)
+__wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
 {
 	WT_OVFL_TRACK *track;
-	WT_UPDATE *addr;
 
 	if (page->modify->ovfl_track == NULL)
 		WT_RET(__ovfl_track_init(session, page));
 
 	track = page->modify->ovfl_track;
-	WT_RET(__wt_update_alloc_simple(session, addr_arg, addr_size, &addr));
-	addr->next = track->discard;
-	track->discard = addr;
+	WT_RET(__wt_realloc_def(session, &track->discard_allocated,
+	    track->discard_entries + 1, &track->discard));
+	track->discard[track->discard_entries++] = cell;
 
 	if (WT_VERBOSE_ISSET(session, overflow))
-		WT_RET(__ovfl_discard_verbose(session, page, addr, "add"));
+		WT_RET(__ovfl_discard_verbose(session, page, cell, "add"));
 
 	return (0);
 }
@@ -132,18 +151,15 @@ __wt_ovfl_discard_add(WT_SESSION_IMPL *session,
 void
 __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_UPDATE *addr, *next;
 	WT_OVFL_TRACK *track;
 
 	if (page->modify == NULL || page->modify->ovfl_track == NULL)
 		return;
 
 	track = page->modify->ovfl_track;
-	for (addr = track->discard; addr != NULL; addr = next) {
-		next = addr->next;
-		__wt_free(session, addr);
-	}
-	track->discard = NULL;
+
+	__wt_free(session, track->discard);
+	track->discard_entries = track->discard_allocated = 0;
 }
 
 /*
@@ -882,7 +898,7 @@ __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	track = page->modify->ovfl_track;
 	if (track->discard != NULL)
-		__wt_ovfl_discard_free(session, page);
+		WT_RET(__ovfl_discard_wrapup_err(session, page));
 
 	if (track->ovfl_reuse[0] != NULL)
 		WT_RET(__ovfl_reuse_wrapup_err(session, page));
