@@ -398,13 +398,9 @@ extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_MULTI *multi,
     WT_REF *refarg,
     uint32_t entries);
-extern int __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
-    uint8_t type,
-    uint32_t entries,
-    int merge,
-    WT_PAGE **pagep);
-extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
-extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_split_evict(WT_SESSION_IMPL *session,
+    WT_REF *parent_ref,
+    WT_PAGE *page);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_CELL *cell);
