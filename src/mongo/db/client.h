@@ -126,6 +126,12 @@ namespace mongo {
             _hasWrittenSinceCheckpoint = false;
         }
 
+        /**
+         * Call this to allow PageFaultExceptions even if writes happened before this was called.
+         * Writes after this is called still prevent PFEs from being thrown.
+         */
+        void clearHasWrittenThisOperation() { _hasWrittenThisOperation = false; }
+
         bool allowedToThrowPageFaultException() const;
 
         LockState& lockState() { return _ls; }
