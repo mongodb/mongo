@@ -956,6 +956,7 @@ namespace mongo {
             state->request->getInsertRequest()->getDocumentsAt( state->currIndex ) :
             normalizedInsert.getValue();
 
+        cc().clearHasWrittenThisOperation();
         PageFaultRetryableSection pageFaultSection;
         while (true) {
             try {
