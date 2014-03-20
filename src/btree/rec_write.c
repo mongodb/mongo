@@ -3591,7 +3591,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * have to special case transforming the page from its disk image to
 	 * its in-memory version, for example).
 	 */
-	r->cell_zero = 0;		/* XXXKEITH */
+	r->cell_zero = 1;
 
 	/* For each entry in the in-memory page... */
 	WT_INTL_FOREACH_BEGIN(page, ref) {
@@ -3796,8 +3796,9 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    i = 0; i < mod->u.m.multi_entries; ++multi, ++i) {
 		/* Build the key and value cells. */
 		WT_RET(__rec_cell_build_int_key(session, r,
-		    WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size,
-		    &ovfl_key));
+		    WT_IKEY_DATA(multi->key.ikey),
+		    r->cell_zero ? 1 : multi->key.ikey->size, &ovfl_key));
+		r->cell_zero = 0;
 
 		addr = &multi->addr;
 		__rec_cell_build_addr(
