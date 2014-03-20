@@ -497,10 +497,6 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/*
 	 * We maintain a list of pages written for the root in order to free the
 	 * backing blocks the next time the root is written.
-	 *
-	 * XXXKEITH
-	 * This list takes up 8B in the page-modify structure, and needs to go
-	 * away.
 	 */
 	mod->root_split = next;
 

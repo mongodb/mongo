@@ -174,6 +174,9 @@ struct __wt_page_modify {
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
+	/* Dirty bytes added to the cache. */
+	uint64_t bytes_dirty;
+
 	/*
 	 * When pages are reconciled, the result is one or more replacement
 	 * blocks.  A replacement block can be in one of two states: it was
@@ -270,7 +273,11 @@ struct __wt_page_modify {
 	 */
 	WT_INSERT_HEAD **update;	/* Updated items */
 
-	/* Overflow record tracking. */
+	/*
+	 * Overflow record tracking.
+	 * We assume overflow records are relatively rare, so we don't allocate
+	 * the structures to track them until we actually see them in the data.
+	 */
 	struct __wt_ovfl_track {
 		/*
 		 * Overflow key/value address/byte-string pairs we potentially
@@ -292,8 +299,6 @@ struct __wt_page_modify {
 		size_t	  discard_entries;
 		size_t	  discard_allocated;
 	} *ovfl_track;
-
-	uint64_t bytes_dirty;		/* Dirty bytes added to cache. */
 
 	/*
 	 * The write generation is incremented when a page is modified, a page
