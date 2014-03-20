@@ -200,6 +200,7 @@ namespace mongo {
         }
 
         plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
+        plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
     }
 
     Status getRunnerFromCache(CanonicalQuery* canonicalQuery,
@@ -228,26 +229,6 @@ namespace mongo {
                                                     &backupQs);
         if (!status.isOK()) {
             return status;
-        }
-
-        // See SERVER-12438. Unfortunately we have to defer to the backup solution
-        // if both a batch size is set and a sort is requested.
-        //
-        // TODO: it would be really nice to delete this block in the future.
-        if (NULL != backupQs &&
-            0 < canonicalQuery->getParsed().getNumToReturn() &&
-            !canonicalQuery->getParsed().getSort().isEmpty()) {
-            delete qs;
-
-            WorkingSet* ws;
-            PlanStage* root;
-            verify(StageBuilder::build(*backupQs, &root, &ws));
-
-            // And, run the plan.
-            *out = new SingleSolutionRunner(collection,
-                                            canonicalQuery,
-                                            backupQs, root, ws);
-            return Status::OK();
         }
 
         // If our cached solution is a hit for a count query, try to turn it into a fast count
@@ -445,37 +426,6 @@ namespace mongo {
             return Status::OK();
         }
         else {
-            // See SERVER-12438. In an ideal world we should not arbitrarily prefer certain
-            // solutions over others. But unfortunately for historical reasons we are forced
-            // to prefer a solution where the index provides the sort, if the batch size
-            // is set and a sort is requested. Read SERVER-12438 for details, if you dare.
-            //
-            // TODO: it would be really nice to delete this entire block in the future.
-            if (0 < canonicalQuery->getParsed().getNumToReturn()
-                && !canonicalQuery->getParsed().getSort().isEmpty()) {
-                // Look for a solution without a blocking sort stage.
-                for (size_t i = 0; i < solutions.size(); ++i) {
-                    if (!solutions[i]->hasBlockingStage) {
-                        WorkingSet* ws;
-                        PlanStage* root;
-                        verify(StageBuilder::build(*solutions[i], &root, &ws));
-
-                        // Free unused solutions.
-                        for (size_t j = 0; j < solutions.size(); ++j) {
-                            if (j != i) {
-                                delete solutions[j];
-                            }
-                        }
-
-                        // And, run the plan.
-                        *out = new SingleSolutionRunner(collection,
-                                                       canonicalQuery.release(),
-                                                       solutions[i], root, ws);
-                        return Status::OK();
-                    }
-                }
-            }
-
             // Many solutions.  Let the MultiPlanRunner pick the best, update the cache, and so on.
             auto_ptr<MultiPlanRunner> mpr(new MultiPlanRunner(collection,canonicalQuery.release()));
 
