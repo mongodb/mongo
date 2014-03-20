@@ -100,6 +100,49 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 8 ) ) );
     }
 
+    TEST( MatchExpressionParserTreeTest, MaximumTreeDepth ) {
+        // This match tree is about 60 levels deep, which exceeds
+        // the maximum allowed depth.
+        BSONObj query = fromjson(
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2},"
+            "{$and: [{a: 3}, {$or: [{b: 2}, {b: 4}]}]}"
+            "]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]"
+            "}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}"
+            "]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]});"
+        );
+
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+    }
+
     TEST( MatchExpressionParserLeafTest, NotRegex1 ) {
         BSONObjBuilder b;
         b.appendRegex( "$not", "abc", "i" );
