@@ -1304,11 +1304,11 @@ start_all_runs(CONFIG *cfg)
 			ret = ENOMEM;
 			goto err;
 		}
+		configs[i] = next_cfg;
 		if ((ret = config_assign(next_cfg, cfg)) != 0)
 			goto err;
 
 		/* Setup a unique home directory for each database. */
-		configs[i] = next_cfg;
 		new_home = malloc(home_len + 5);
 		if (new_home == NULL) {
 			ret = ENOMEM;

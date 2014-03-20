@@ -275,7 +275,7 @@ typedef struct {
 	int tested_ref_state;		/* Debugging information */
 } WT_RECONCILE;
 
-static void __rec_bnd_init(WT_SESSION_IMPL *, WT_RECONCILE *, int);
+static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, int);
 static void __rec_cell_build_addr(
 		WT_RECONCILE *, const void *, size_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
@@ -413,6 +413,15 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	/* Release the page lock if we're holding one. */
 	if (locked)
 		WT_PAGE_UNLOCK(session, page);
+
+	/*
+	 * Clean up the boundary structures: some workloads result in millions
+	 * of these structures, and if associated with some random session that
+	 * got roped into doing forced eviction, it won't be discarded for the
+	 * life of the session.
+	 */
+	__rec_bnd_cleanup(session, r, 0);
+
 	WT_RET(ret);
 
 	/*
@@ -561,9 +570,6 @@ __rec_write_init(
 	r->all_empty_value = 1;
 	r->any_empty_value = 0;
 
-	/* Initialize the boundary information. */
-	__rec_bnd_init(session, r, 0);
-
 	/* The list of cached, skipped updates. */
 	r->skip_next = 0;
 
@@ -633,7 +639,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 	__wt_free(session, r->raw_offsets);
 	__wt_free(session, r->raw_recnos);
 
-	__rec_bnd_init(session, r, 1);
+	__rec_bnd_cleanup(session, r, 1);
 
 	__wt_free(session, r->skip);
 
@@ -659,11 +665,11 @@ __rec_destroy_session(WT_SESSION_IMPL *session)
 }
 
 /*
- * __rec_bnd_init --
- *	Initialize/cleanup the boundary structure information.
+ * __rec_bnd_cleanup --
+ *	Cleanup the boundary structure information.
  */
 static void
-__rec_bnd_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
+__rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 {
 	WT_BOUNDARY *bnd;
 	uint32_t i;
@@ -672,38 +678,45 @@ __rec_bnd_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 		return;
 
 	/*
-	 * Clean up any pre-existing boundary structures: almost none of this
-	 * should be necessary (already_compressed is the notable exception),
-	 * but it's cheap.
+	 * Destroy/re-initialize the boundary structures.  In the case of normal
+	 * cleanup, discard any memory we won't reuse after each reconciliation
+	 * completes.  In the case of destruction, discard everything.
+	 *
+	 * During some big-page evictions we have seen boundary arrays that have
+	 * millions of elements.  That should not be a normal event, but if the
+	 * memory is associated with a random session, it won't be discarded
+	 * until the session is closed.   If there are more than 1000 boundary
+	 * structure elements, destroy the boundary array and we'll start over.
 	 */
-	for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
-		bnd->start = NULL;
-
-		bnd->recno = 0;
-		bnd->entries = 0;
-
-		WT_ASSERT(session, bnd->addr.addr == NULL);
-		bnd->addr.size = 0;
-		bnd->addr.type = 0;
-		bnd->size = bnd->cksum = 0;
-		__wt_free(session, bnd->dsk);
-
-		__wt_free(session, bnd->skip);
-		bnd->skip_next = 0;
-		bnd->skip_allocated = 0;
-
-		/*
-		 * Leave the key alone unless we're destroying the structures,
-		 * we reuse/grow that memory as necessary.
-		 */
-		if (destroy)
+	if (destroy || r->bnd_entries > 1000) {
+		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
+			__wt_free(session, bnd->addr.addr);
+			__wt_free(session, bnd->dsk);
+			__wt_free(session, bnd->skip);
 			__wt_buf_free(session, &bnd->key);
-
-		bnd->already_compressed = 0;
-	}
-
-	if (destroy)
+		}
 		__wt_free(session, r->bnd);
+		r->bnd_next = 0;
+		r->bnd_entries = r->bnd_allocated = 0;
+	} else
+		for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i) {
+			bnd->start = NULL;
+			bnd->recno = 0;
+			bnd->entries = 0;
+			__wt_free(session, bnd->addr.addr);
+			bnd->addr.size = 0;
+			bnd->addr.type = 0;
+			bnd->cksum = 0;
+			__wt_free(session, bnd->dsk);
+			__wt_free(session, bnd->skip);
+			bnd->skip_next = 0;
+			bnd->skip_allocated = 0;
+			/*
+			 * Ignore the key, we re-use that memory during each
+			 * reconciliation.
+			 */
+			bnd->already_compressed = 0;
+		}
 }
 
 /*
