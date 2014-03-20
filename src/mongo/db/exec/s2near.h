@@ -91,6 +91,9 @@ namespace mongo {
         // bounds for the various annuluses/annuli.
         int _nearFieldIndex;
 
+        // Geo filter in index scan (which is owned by fetch stage in _child).
+        scoped_ptr<MatchExpression> _keyGeoFilter;
+
         scoped_ptr<PlanStage> _child;
 
         // The S2 machinery that represents the search annulus.  We keep this around after bounds

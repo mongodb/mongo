@@ -274,9 +274,11 @@ namespace mongo {
         //
         // This does force us to do our own deduping of results, though.
         params.doNotDedup = true;
-        GeoS2KeyMatchExpression* me = new GeoS2KeyMatchExpression(
-            &_annulus, _params.baseBounds.fields[_nearFieldIndex].name);
-        IndexScan* scan = new IndexScan(params, _ws, me);
+
+        // Owns geo filter.
+        _keyGeoFilter.reset(new GeoS2KeyMatchExpression(
+            &_annulus, _params.baseBounds.fields[_nearFieldIndex].name));
+        IndexScan* scan = new IndexScan(params, _ws, _keyGeoFilter.get());
 
         // Owns 'scan'.
         _child.reset(new FetchStage(_ws, scan, _params.filter));
@@ -289,6 +291,7 @@ namespace mongo {
         // All done reading from _child.
         if (PlanStage::IS_EOF == state) {
             _child.reset();
+            _keyGeoFilter.reset();
 
             // Adjust the annulus size depending on how many results we got.
             if (_results.empty()) {
