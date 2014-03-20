@@ -187,11 +187,15 @@ struct __wt_page_modify {
 	 * evicting a page, and we only expect to see unresolved modifications
 	 * on a page being evicted in the case of a hot page that's too large
 	 * to keep in memory as it is.  In other words, checkpoints will skip
-	 * unresolved modifications, but will still write the blocks rather
-	 * than build lists of unresolved modifications.
+	 * unresolved modifications, and will write the blocks rather than
+	 * build lists of unresolved modifications.
+	 *
+	 * Ugly union/struct layout to conserve memory, we never have both
+	 * a replace address and multiple replacement blocks.
 	 */
 	union {
 	WT_ADDR	 replace;		/* Single, written replacement block */
+#define	mod_replace	u1.replace
 
 	struct {			/* Multiple replacement blocks */
 	struct __wt_multi {
@@ -233,50 +237,74 @@ struct __wt_page_modify {
 	uint32_t multi_entries;		/* Multiple blocks element count */
 	size_t   multi_size;		/* Multiple blocks memory footprint */
 	} m;
-	} u;
+#define	mod_multi		u1.m.multi
+#define	mod_multi_entries	u1.m.multi_entries
+#define	mod_multi_size		u1.m.multi_size
+	} u1;
 
 	/*
-	 * When pages which have split into multiple blocks are evicted, the
-	 * multiple blocks are converted into a WT_REF array and inserted in
-	 * the parent's child index.  Those arrays live here, appearing only
-	 * in internal pages with children that have split and subsequently
-	 * been evicted.
+	 * Internal pages need to be able to split (have new arrays of WT_REF
+	 * structures inserted into the page).  Column-store leaf pages need
+	 * update and append lists.
+	 *
+	 * Ugly union/struct layout to conserve memory, a page is either a leaf
+	 * page or an internal page.
 	 */
-	struct __wt_split_list {
-		WT_REF	*refs;		/* Split child WT_REF arrays */
-		uint32_t entries;	/* Array element count */
-	} *splits;
-	uint32_t splits_entries;	/* Split child WT_REFs element count */
+	union {
+	struct {
+		/*
+		 * When pages which have split into multiple blocks are evicted,
+		 * the multiple blocks are converted into a WT_REF array and
+		 * inserted in the parent's index.  Those arrays only appear in
+		 * internal pages with children that split and were subsequently
+		 * evicted.
+		 */
+		struct __wt_split_list {
+			WT_REF	*refs;	/* Split child WT_REF arrays, count */
+			uint32_t entries;
+		} *splits;		/* Split child WT_REFs element count */
+		uint32_t splits_entries;
+
+		/*
+		 * When a root page splits, we create a fake page and write it;
+		 * that fake page can also split and so on, and we continue this
+		 * process until we write a single replacement root block.  We
+		 * use the root split field of this structure to track that list
+		 * of fake pages, so they are discarded when they're no longer
+		 * needed.
+		 */
+		WT_PAGE *root_split;	/* Linked list of root split pages */
+	} intl;
+#define	mod_root_split		u2.intl.root_split
+#define	mod_splits		u2.intl.splits
+#define	mod_splits_entries	u2.intl.splits_entries
+	struct {
+
+		/*
+		 * Appended items to column-stores: there is only a single one
+		 * of these per column-store tree.
+		 */
+		WT_INSERT_HEAD **append;
+
+		/*
+		 * Updated items in column-stores: variable-length RLE entries
+		 * can expand to multiple entries which requires some kind of
+		 * list we can expand on demand.  Updated items in fixed-length
+		 * files could be done based on an WT_UPDATE array as in
+		 * row-stores, but there can be a very large number of bits on
+		 * a single page, and the cost of the WT_UPDATE array would be
+		 * huge.
+		 */
+		WT_INSERT_HEAD **update;
+	} leaf;
+#define	mod_append		u2.leaf.append
+#define	mod_update		u2.leaf.update
+	} u2;
 
 	/*
-	 * When a root page splits, we create a fake page and write it; that
-	 * fake page can also split and so on, and we continue this process
-	 * until we write a single replacement root block.  We use the root
-	 * split field of this structure to track that list of fake pages, so
-	 * they are discarded when they're no longer needed.
-	 */
-	WT_PAGE *root_split;		/* Linked list of root split pages */
-
-	/*
-	 * Appended items to column-stores: there is only a single one of these
-	 * per column-store tree.
-	 */
-	WT_INSERT_HEAD **append;	/* Appended items */
-
-	/*
-	 * Updated items in column-stores: variable-length RLE entries can
-	 * expand to multiple entries which requires some kind of list we can
-	 * expand on demand.  Updated items in fixed-length files could be done
-	 * based on an WT_UPDATE array as in row-stores, but there can be a
-	 * very large number of bits on a single page, and the cost of the
-	 * WT_UPDATE array would be huge.
-	 */
-	WT_INSERT_HEAD **update;	/* Updated items */
-
-	/*
-	 * Overflow record tracking.
-	 * We assume overflow records are relatively rare, so we don't allocate
-	 * the structures to track them until we actually see them in the data.
+	 * Overflow record tracking for reconciliation.  We assume overflow
+	 * records are relatively rare, so we don't allocate the structures
+	 * to track them until we actually see them in the data.
 	 */
 	struct __wt_ovfl_track {
 		/*
@@ -915,8 +943,8 @@ struct __wt_insert_head {
  * of pointers and the specific structure exist, else NULL.
  */
 #define	WT_COL_UPDATE_SLOT(page, slot)					\
-	((page)->modify == NULL || (page)->modify->update == NULL ?	\
-	    NULL : (page)->modify->update[slot])
+	((page)->modify == NULL || (page)->modify->mod_update == NULL ?	\
+	    NULL : (page)->modify->mod_update[slot])
 #define	WT_COL_UPDATE(page, ip)						\
 	WT_COL_UPDATE_SLOT(page, WT_COL_SLOT(page, ip))
 
@@ -932,8 +960,8 @@ struct __wt_insert_head {
  * appends.
  */
 #define	WT_COL_APPEND(page)						\
-	((page)->modify != NULL &&					\
-	    (page)->modify->append != NULL ? (page)->modify->append[0] : NULL)
+	((page)->modify != NULL && (page)->modify->mod_append != NULL ?	\
+	    (page)->modify->mod_append[0] : NULL)
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\

@@ -101,29 +101,29 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_MULTIBLOCK:
 		/* Free list of replacement blocks. */
-		if (mod->u.m.multi == NULL)
+		if (mod->mod_multi == NULL)
 			break;
-		for (i = 0; i < mod->u.m.multi_entries; ++i) {
+		for (i = 0; i < mod->mod_multi_entries; ++i) {
 			switch (page->type) {
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
-				__wt_free(session, mod->u.m.multi[i].key.ikey);
+				__wt_free(session, mod->mod_multi[i].key.ikey);
 				break;
 			}
 
-			__wt_free(session, mod->u.m.multi[i].skip);
-			__wt_free(session, mod->u.m.multi[i].skip_dsk);
+			__wt_free(session, mod->mod_multi[i].skip);
+			__wt_free(session, mod->mod_multi[i].skip_dsk);
 
-			__wt_free(session, mod->u.m.multi[i].addr.addr);
+			__wt_free(session, mod->mod_multi[i].addr.addr);
 		}
-		__wt_free(session, mod->u.m.multi);
+		__wt_free(session, mod->mod_multi);
 		break;
 	case WT_PM_REC_REPLACE:
 		/*
 		 * Discard any replacement address: this memory is usually moved
 		 * into the parent's WT_REF, but at the root that can't happen.
 		 */
-		__wt_free(session, mod->u.replace.addr);
+		__wt_free(session, mod->mod_replace.addr);
 		break;
 	}
 
@@ -131,31 +131,40 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Free any split chunks created when underlying pages split into this
 	 * page.
 	 */
-	for (i = 0; i < mod->splits_entries; ++i) {
-		__wt_free_ref_array(
-		    session, page, mod->splits[i].refs, mod->splits[i].entries);
-		__wt_free(session, mod->splits[i].refs);
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		for (i = 0; i < mod->mod_splits_entries; ++i) {
+			__wt_free_ref_array(session, page,
+			    mod->mod_splits[i].refs,
+			    mod->mod_splits[i].entries);
+			__wt_free(session, mod->mod_splits[i].refs);
+		}
+		__wt_free(session, mod->mod_splits);
+
+		/*
+		 * If a root page split, there may be one or more pages linked
+		 * from the page; walk the list, discarding pages.
+		 */
+		if (mod->mod_root_split != NULL)
+			__wt_page_out(session, &mod->mod_root_split);
+		break;
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		/* Free the append array. */
+		if ((append = WT_COL_APPEND(page)) != NULL) {
+			__free_skip_list(session, WT_SKIP_FIRST(append));
+			__wt_free(session, append);
+			__wt_free(session, mod->mod_append);
+		}
+
+		/* Free the insert/update array. */
+		if (mod->mod_update != NULL)
+			__free_skip_array(session, mod->mod_update,
+			    page->type ==
+			    WT_PAGE_COL_FIX ? 1 : page->pg_var_entries);
+		break;
 	}
-	__wt_free(session, mod->splits);
-
-	/*
-	 * If a root page split, there may be one or more pages linked from the
-	 * page; walk the list, discarding pages.
-	 */
-	if (mod->root_split != NULL)
-		__wt_page_out(session, &mod->root_split);
-
-	/* Free the append array. */
-	if ((append = WT_COL_APPEND(page)) != NULL) {
-		__free_skip_list(session, WT_SKIP_FIRST(append));
-		__wt_free(session, append);
-		__wt_free(session, mod->append);
-	}
-
-	/* Free the insert/update array. */
-	if (mod->update != NULL)
-		__free_skip_array(session, mod->update,
-		    page->type == WT_PAGE_COL_FIX ? 1 : page->pg_var_entries);
 
 	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
 	__wt_ovfl_reuse_free(session, page);

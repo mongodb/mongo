@@ -473,7 +473,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	WT_VERBOSE_RET(session, split,
-	    "root page split -> %" PRIu32 " pages", mod->u.m.multi_entries);
+	    "root page split -> %" PRIu32 " pages", mod->mod_multi_entries);
 
 	/*
 	 * Create a new root page, initialize the array of child references,
@@ -482,23 +482,23 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->u.m.multi_entries, 1, &next));
+		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, 1, &next));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->u.m.multi_entries, 1, &next));
+		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, 1, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 
 	WT_ERR(__wt_multi_to_ref(session, next,
-	    mod->u.m.multi, next->pg_intl_orig_index, mod->u.m.multi_entries));
+	    mod->mod_multi, next->pg_intl_orig_index, mod->mod_multi_entries));
 
 	/*
 	 * We maintain a list of pages written for the root in order to free the
 	 * backing blocks the next time the root is written.
 	 */
-	mod->root_split = next;
+	mod->mod_root_split = next;
 
 	WT_ERR(__wt_page_modify_init(session, next));
 	__wt_page_only_modify_set(session, next);
@@ -2460,7 +2460,7 @@ skip_check_complete:
 	 */
 	bnd_slot = bnd - r->bnd;
 	if (bnd_slot > 1 ||
-	    (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) && mod->u.m.multi != NULL)) {
+	    (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) && mod->mod_multi != NULL)) {
 		/*
 		 * There are page header fields which need to be cleared to get
 		 * consistent checksums: specifically, the write generation and
@@ -2473,8 +2473,8 @@ skip_check_complete:
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
 		if (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) &&
-		    mod->u.m.multi_entries > bnd_slot) {
-			multi = &mod->u.m.multi[bnd_slot];
+		    mod->mod_multi_entries > bnd_slot) {
+			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
 			    multi->cksum == bnd->cksum) {
 				WT_RET(__wt_strndup(session,
@@ -2845,7 +2845,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				CHILD_RELEASE_ERR(session, hazard, child);
 				continue;
 			case WT_PM_REC_REPLACE:
-				addr = &child->modify->u.replace;
+				addr = &child->modify->mod_replace;
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -2909,8 +2909,8 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	val = &r->v;
 
 	/* For each entry in the split array... */
-	for (multi = mod->u.m.multi,
-	    i = 0; i < mod->u.m.multi_entries; ++multi, ++i) {
+	for (multi = mod->mod_multi,
+	    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
 		/* Update the starting record number in case we split. */
 		r->recno = multi->key.recno;
 
@@ -3684,7 +3684,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * If the page is replaced, the page's modify
 				 * structure has the page's address.
 				 */
-				addr = &child->modify->u.replace;
+				addr = &child->modify->mod_replace;
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -3792,8 +3792,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	val = &r->v;
 
 	/* For each entry in the split array... */
-	for (multi = mod->u.m.multi,
-	    i = 0; i < mod->u.m.multi_entries; ++multi, ++i) {
+	for (multi = mod->mod_multi,
+	    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
 		/* Build the key and value cells. */
 		WT_RET(__rec_cell_build_int_key(session, r,
 		    WT_IKEY_DATA(multi->key.ikey),
@@ -4284,8 +4284,8 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * A page that split is being reconciled for the second, or subsequent
 	 * time; discard underlying block space used in the last reconciliation.
 	 */
-	for (multi = mod->u.m.multi,
-	    i = 0; i < mod->u.m.multi_entries; ++multi, ++i) {
+	for (multi = mod->mod_multi,
+	    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
 		if (multi->skip == NULL && !multi->reuse) {
 			WT_RET(bm->free(
 			    bm, session, multi->addr.addr, multi->addr.size));
@@ -4294,14 +4294,14 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			__wt_free(session, mod->u.m.multi[i].key.ikey);
+			__wt_free(session, mod->mod_multi[i].key.ikey);
 			break;
 		}
 	}
-	__wt_free(session, mod->u.m.multi);
-	mod->u.m.multi_entries = 0;
-	__wt_cache_page_inmem_decr(session, page, mod->u.m.multi_size);
-	mod->u.m.multi_size = 0;
+	__wt_free(session, mod->mod_multi);
+	mod->mod_multi_entries = 0;
+	__wt_cache_page_inmem_decr(session, page, mod->mod_multi_size);
+	mod->mod_multi_size = 0;
 
 	/*
 	 * This routine would be trivial, and only walk a single page freeing
@@ -4310,10 +4310,10 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * a linked list, and we also have to discard overflow items written
 	 * for the page.
 	 */
-	if (mod->root_split != NULL) {
-		WT_RET(__rec_split_discard(session, mod->root_split));
-		WT_RET(__wt_ovfl_track_wrapup(session, mod->root_split));
-		__wt_page_out(session, &mod->root_split);
+	if (mod->mod_root_split != NULL) {
+		WT_RET(__rec_split_discard(session, mod->mod_root_split));
+		WT_RET(__wt_ovfl_track_wrapup(session, mod->mod_root_split));
+		__wt_page_out(session, &mod->mod_root_split);
 	}
 	return (ret);
 }
@@ -4390,11 +4390,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
 			WT_RET(bm->free(bm, session,
-			    mod->u.replace.addr, mod->u.replace.size));
+			    mod->mod_replace.addr, mod->mod_replace.size));
 
 		/* Discard the replacement page's address. */
-		__wt_free(session, mod->u.replace.addr);
-		mod->u.replace.size = 0;
+		__wt_free(session, mod->mod_replace.addr);
+		mod->mod_replace.size = 0;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -4450,7 +4450,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_bt_write(session,
 			    &r->dsk, NULL, NULL, 1, bnd->already_compressed));
 		else {
-			mod->u.replace = bnd->addr;
+			mod->mod_replace = bnd->addr;
 			bnd->addr.addr = NULL;
 		}
 
@@ -4632,10 +4632,10 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Allocate, then initialize the array of replacement blocks. */
 	WT_RET(__wt_calloc(
-	    session, r->bnd_next, sizeof(WT_MULTI), &mod->u.m.multi));
+	    session, r->bnd_next, sizeof(WT_MULTI), &mod->mod_multi));
 	incr = r->bnd_next * sizeof(WT_MULTI);
 
-	for (multi = mod->u.m.multi,
+	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		WT_RET(__wt_row_ikey(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
@@ -4659,8 +4659,8 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 
 	__wt_cache_page_inmem_incr(session, page, incr);
-	mod->u.m.multi_entries = r->bnd_next;
-	mod->u.m.multi_size = incr;
+	mod->mod_multi_entries = r->bnd_next;
+	mod->mod_multi_size = incr;
 
 	return (0);
 }
@@ -4682,10 +4682,10 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Allocate, then initialize the array of replacement blocks. */
 	WT_RET(__wt_calloc(
-	    session, r->bnd_next, sizeof(WT_MULTI), &mod->u.m.multi));
+	    session, r->bnd_next, sizeof(WT_MULTI), &mod->mod_multi));
 	incr = r->bnd_next * sizeof(WT_MULTI);
 
-	for (multi = mod->u.m.multi,
+	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
@@ -4707,8 +4707,8 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 
 	__wt_cache_page_inmem_incr(session, page, incr);
-	mod->u.m.multi_entries = r->bnd_next;
-	mod->u.m.multi_size = incr;
+	mod->mod_multi_entries = r->bnd_next;
+	mod->mod_multi_size = incr;
 
 	return (0);
 }

@@ -151,19 +151,20 @@ __rec_split_list_alloc(
 	size_t bytes_allocated;
 	uint32_t i;
 
-	for (i = 0; i < mod->splits_entries; ++i)
-		if (mod->splits[i].refs == NULL)
+	for (i = 0; i < mod->mod_splits_entries; ++i)
+		if (mod->mod_splits[i].refs == NULL)
 			break;
-	if (i == mod->splits_entries) {
+	if (i == mod->mod_splits_entries) {
 		/*
 		 * Calculate the bytes-allocated explicitly, this information
 		 * lives in the page-modify structure, and it's worth keeping
 		 * that as small as possible.
 		 */
-		bytes_allocated = mod->splits_entries * sizeof(mod->splits[0]);
+		bytes_allocated =
+		    mod->mod_splits_entries * sizeof(mod->mod_splits[0]);
 		WT_RET(__wt_realloc(session, &bytes_allocated,
-		    (i + 5) * sizeof(mod->splits[0]), &mod->splits));
-		mod->splits_entries = i + 5;
+		    (i + 5) * sizeof(mod->mod_splits[0]), &mod->mod_splits));
+		mod->mod_splits_entries = i + 5;
 	}
 	*ip = i;
 	return (0);
@@ -400,8 +401,8 @@ __rec_split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 	/* Add the WT_REF array into the parent's list. */
 	WT_ERR(__rec_split_list_alloc(session, parent->modify, &i));
-	parent->modify->splits[i].refs = alloc_ref;
-	parent->modify->splits[i].entries = entries;
+	parent->modify->mod_splits[i].refs = alloc_ref;
+	parent->modify->mod_splits[i].entries = entries;
 	alloc_ref = NULL;
 
 	/*
@@ -681,9 +682,9 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * Allocate an array of WT_REF structures, and move the page's multiple
 	 * block reconciliation information into it.
 	 */
-	WT_RET(__wt_calloc_def(session, mod->u.m.multi_entries, &alloc_ref));
+	WT_RET(__wt_calloc_def(session, mod->mod_multi_entries, &alloc_ref));
 	WT_ERR(__wt_multi_to_ref(
-	    session, page, mod->u.m.multi, alloc_ref, mod->u.m.multi_entries));
+	    session, page, mod->mod_multi, alloc_ref, mod->mod_multi_entries));
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -698,15 +699,15 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 
 	/* Append the allocated WT_REF array into the parent's list. */
 	WT_ERR(__rec_split_list_alloc(session, parent_mod, &i));
-	parent_mod->splits[i].refs = alloc_ref;
+	parent_mod->mod_splits[i].refs = alloc_ref;
 	alloc_ref = NULL;
-	parent_mod->splits[i].entries = mod->u.m.multi_entries;
+	parent_mod->mod_splits[i].entries = mod->mod_multi_entries;
 
 	/* Allocate a new WT_REF index array and initialize it. */
 	pindex = parent->pg_intl_index;
 	parent_entries = pindex->entries;
-	split = parent_mod->splits[i].refs;
-	split_entries = parent_mod->splits[i].entries;
+	split = parent_mod->mod_splits[i].refs;
+	split_entries = parent_mod->mod_splits[i].entries;
 	result_entries = (parent_entries - 1) + split_entries;
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_PAGE_INDEX) +
 	    result_entries * sizeof(WT_REF *), &alloc_index));
@@ -736,7 +737,7 @@ __rec_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	    sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *)));
 
 	/* Update the parent page's footprint. */
-	__wt_cache_page_inmem_incr(session, parent, mod->u.m.multi_size);
+	__wt_cache_page_inmem_incr(session, parent, mod->mod_multi_size);
 
 	/*
 	 * Update the parent page's index: this update makes the split visible
@@ -817,7 +818,7 @@ err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
 
 	__wt_free(session, alloc_index);
-	__wt_free_ref_array(session, page, alloc_ref, mod->u.m.multi_entries);
+	__wt_free_ref_array(session, page, alloc_ref, mod->mod_multi_entries);
 	__wt_free(session, alloc_ref);
 
 	return (ret);
@@ -877,9 +878,9 @@ __rec_page_dirty_update(
 		 * before the state change makes the page available to readers.
 		 */
 		WT_RET(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
-		*addr = mod->u.replace;
-		mod->u.replace.addr = NULL;
-		mod->u.replace.size = 0;
+		*addr = mod->mod_replace;
+		mod->mod_replace.addr = NULL;
+		mod->mod_replace.size = 0;
 
 		parent_ref->page = NULL;
 		parent_ref->addr = addr;
@@ -981,6 +982,8 @@ __rec_review(WT_SESSION_IMPL *session,
 			}
 		} WT_INTL_FOREACH_END;
 
+	mod = page->modify;
+
 	/*
 	 * If the file is being checkpointed, we stop evicting dirty pages: the
 	 * problem is if we write a page, the previous version of the page will
@@ -1026,7 +1029,6 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * page is expensive, do a cheap test first: if it doesn't seem likely a
 	 * subtree page can be merged, quit.
 	 */
-	mod = page->modify;
 	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
 		return (EBUSY);
 

@@ -54,8 +54,8 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 		 * the page is being reconciled, lock the page down.
 		 */
 		WT_PAGE_LOCK(session, page);
-		ret = bm->compact_page_skip(bm,
-		    session, mod->u.replace.addr, mod->u.replace.size, skipp);
+		ret = bm->compact_page_skip(bm, session,
+		    mod->mod_replace.addr, mod->mod_replace.size, skipp);
 		WT_PAGE_UNLOCK(session, page);
 		WT_RET(ret);
 	}
