@@ -561,6 +561,17 @@ namespace mongo {
         *ss << "PROJ\n";
         addIndent(ss, indent + 1);
         *ss << "proj = " << projection.toString() << '\n';
+        addIndent(ss, indent + 1);
+        if (DEFAULT == projType) {
+            *ss << "type = DEFAULT\n";
+        }
+        else if (COVERED_ONE_INDEX == projType) {
+            *ss << "type = COVERED_ONE_INDEX\n";
+        }
+        else {
+            invariant(SIMPLE_DOC == projType);
+            *ss << "type = SIMPLE_DOC\n";
+        }
         addCommon(ss, indent);
         addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';

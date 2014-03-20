@@ -36,13 +36,41 @@
 
 namespace mongo {
 
+    struct ProjectionStageParams {
+        enum ProjectionImplementation {
+            // The default case.  Will handle every projection.
+            NO_FAST_PATH,
+
+            // The projection is simple inclusion and is totally covered by one index.
+            COVERED_ONE_INDEX,
+
+            // The projection is simple inclusion and we expect an object.
+            SIMPLE_DOC
+        };
+
+        ProjectionStageParams() : projImpl(NO_FAST_PATH), fullExpression(NULL) { }
+
+        ProjectionImplementation projImpl;
+
+        // The projection object.  We lack a ProjectionExpression or similar so we use a BSONObj.
+        BSONObj projObj;
+
+        // If we have a positional or elemMatch projection we need a MatchExpression to pull out the
+        // right data.
+        // Not owned here, we do not take ownership.
+        const MatchExpression* fullExpression;
+
+        // If (COVERED_ONE_INDEX == projObj) this is the key pattern we're extracting covered data
+        // from.  Otherwise, this field is ignored.
+        BSONObj coveredKeyObj;
+    };
+
     /**
      * This stage computes a projection.
      */
     class ProjectionStage : public PlanStage {
     public:
-        ProjectionStage(BSONObj projObj,
-                        const MatchExpression* fullExpression,
+        ProjectionStage(const ProjectionStageParams& params,
                         WorkingSet* ws,
                         PlanStage* child);
 
@@ -58,6 +86,8 @@ namespace mongo {
         PlanStageStats* getStats();
 
     private:
+        Status transform(WorkingSetMember* member);
+
         scoped_ptr<ProjectionExec> _exec;
 
         // _ws is not owned by us.
@@ -66,6 +96,28 @@ namespace mongo {
 
         // Stats
         CommonStats _commonStats;
+
+        // Fast paths:
+        ProjectionStageParams::ProjectionImplementation _projImpl;
+
+        // Used by all projection implementations.
+        BSONObj _projObj;
+
+        // Data used for both SIMPLE_DOC and COVERED_ONE_INDEX paths.
+        // Has the field names present in the simple projection.
+        unordered_set<StringData, StringData::Hasher> _includedFields;
+
+        //
+        // Used for the COVERED_ONE_INDEX path.
+        //
+        BSONObj _coveredKeyObj;
+
+        // Field names can be empty in 2.4 and before so we can't use them as a sentinel value.
+        // If the i-th entry is true we include the i-th field in the key.
+        vector<bool> _includeKey;
+
+        // If the i-th entry of _includeKey is true this is the field name for the i-th key field.
+        vector<StringData> _keyFieldNames;
     };
 
 }  // namespace mongo
