@@ -562,6 +562,7 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "proj = " << projection.toString() << '\n';
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
@@ -594,6 +595,7 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "limit = " << limit << '\n';
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
@@ -622,6 +624,7 @@ namespace mongo {
         *ss << "limit = " << limit << '\n';
         addIndent(ss, indent + 1);
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
@@ -645,6 +648,7 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "skip= " << skip << '\n';
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
     }
