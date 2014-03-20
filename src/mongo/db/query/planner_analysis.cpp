@@ -400,18 +400,51 @@ namespace mongo {
         SortNode* sort = new SortNode();
         sort->pattern = sortObj;
         sort->query = query.getParsed().getFilter();
+        sort->children.push_back(solnRoot);
+        solnRoot = sort;
         // When setting the limit on the sort, we need to consider both
         // the limit N and skip count M. The sort should return an ordered list
         // N + M items so that the skip stage can discard the first M results.
         if (0 != query.getParsed().getNumToReturn()) {
             sort->limit = query.getParsed().getNumToReturn() +
                           query.getParsed().getSkip();
+
+            // This is a SORT with a limit. The wire protocol has a single quantity
+            // called "numToReturn" which could mean either limit or batchSize.
+            // We have no idea what the client intended. One way to handle the ambiguity
+            // of a limited OR stage is to use the SPLIT_LIMITED_SORT hack.
+            //
+            // If numToReturn is really a limit, then we want to add a limit to this
+            // SORT stage, and hence perform a topK.
+            //
+            // If numToReturn is really a batchSize, then we want to perform a regular
+            // blocking sort.
+            //
+            // Since we don't know which to use, just join the two options with an OR,
+            // with the topK first. If the client wants a limit, they'll get the efficiency
+            // of topK. If they want a batchSize, the other OR branch will deliver the missing
+            // results. The OR stage handles deduping.
+            if (params.options & QueryPlannerParams::SPLIT_LIMITED_SORT
+                && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
+                && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO)
+                && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+                // If we're here then the SPLIT_LIMITED_SORT hack is turned on,
+                // and the query is of a type that allows the hack.
+                //
+                // Not allowed for geo or text, because we assume elsewhere that those
+                // stages appear just once.
+                OrNode* orn = new OrNode();
+                orn->children.push_back(sort);
+                SortNode* sortClone = static_cast<SortNode*>(sort->clone());
+                sortClone->limit = 0;
+                orn->children.push_back(sortClone);
+                solnRoot = orn;
+            }
         }
         else {
             sort->limit = 0;
         }
-        sort->children.push_back(solnRoot);
-        solnRoot = sort;
+
         *blockingSortOut = true;
 
         return solnRoot;

@@ -125,6 +125,23 @@ namespace mongo {
          */
         virtual const BSONObjSet& getSort() const = 0;
 
+        /**
+         * Make a deep copy.
+         */
+        virtual QuerySolutionNode* clone() const = 0;
+
+        /**
+         * Copy base query solution data from 'this' to 'other'.
+         */
+        void cloneBaseData(QuerySolutionNode* other) const {
+            for (size_t i = 0; i < this->children.size(); i++) {
+                other->children.push_back(this->children[i]->clone());
+            }
+            if (NULL != this->filter) {
+                other->filter.reset(this->filter->shallowClone());
+            }
+        }
+
         // These are owned here.
         vector<QuerySolutionNode*> children;
 
@@ -213,6 +230,8 @@ namespace mongo {
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sort; }
 
+        QuerySolutionNode* clone() const;
+
         BSONObjSet _sort;
 
         BSONObj  indexKeyPattern;
@@ -237,6 +256,8 @@ namespace mongo {
         bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sort; }
+
+        QuerySolutionNode* clone() const;
 
         BSONObjSet _sort;
 
@@ -265,6 +286,8 @@ namespace mongo {
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return children.back()->getSort(); }
 
+        QuerySolutionNode* clone() const;
+
         BSONObjSet _sort;
     };
 
@@ -280,6 +303,8 @@ namespace mongo {
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const { return true; }
         const BSONObjSet& getSort() const { return _sort; }
+
+        QuerySolutionNode* clone() const;
 
         BSONObjSet _sort;
     };
@@ -301,6 +326,8 @@ namespace mongo {
         }
         const BSONObjSet& getSort() const { return _sort; }
 
+        QuerySolutionNode* clone() const;
+
         BSONObjSet _sort;
 
         bool dedup;
@@ -319,6 +346,8 @@ namespace mongo {
         bool sortedByDiskLoc() const { return false; }
 
         const BSONObjSet& getSort() const { return _sorts; }
+
+        QuerySolutionNode* clone() const;
 
         virtual void computeProperties() {
             for (size_t i = 0; i < children.size(); ++i) {
@@ -347,6 +376,8 @@ namespace mongo {
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
+        QuerySolutionNode* clone() const;
+
         BSONObjSet _sorts;
     };
 
@@ -364,6 +395,8 @@ namespace mongo {
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const;
         const BSONObjSet& getSort() const { return _sorts; }
+
+        QuerySolutionNode* clone() const;
 
         BSONObjSet _sorts;
 
@@ -422,6 +455,8 @@ namespace mongo {
             return _sorts;
         }
 
+        QuerySolutionNode* clone() const;
+
         BSONObjSet _sorts;
 
         // The full query tree.  Needed when we have positional operators.
@@ -446,6 +481,8 @@ namespace mongo {
         bool sortedByDiskLoc() const { return false; }
 
         const BSONObjSet& getSort() const { return _sorts; }
+
+        QuerySolutionNode* clone() const;
 
         virtual void computeProperties() {
             for (size_t i = 0; i < children.size(); ++i) {
@@ -478,6 +515,8 @@ namespace mongo {
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
+        QuerySolutionNode* clone() const;
+
         int limit;
     };
 
@@ -492,6 +531,8 @@ namespace mongo {
         bool hasField(const string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
+
+        QuerySolutionNode* clone() const;
 
         int skip;
     };
@@ -515,6 +556,8 @@ namespace mongo {
         const BSONObjSet& getSort() const { return _sorts; }
         BSONObjSet _sorts;
 
+        QuerySolutionNode* clone() const;
+
         BSONObj indexKeyPattern;
         GeoQuery gq;
     };
@@ -531,6 +574,9 @@ namespace mongo {
         bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sorts; }
+
+        QuerySolutionNode* clone() const;
+
         BSONObjSet _sorts;
 
         NearQuery nq;
@@ -552,6 +598,8 @@ namespace mongo {
         bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sorts; }
+
+        QuerySolutionNode* clone() const;
 
         BSONObjSet _sorts;
 
@@ -584,6 +632,8 @@ namespace mongo {
         bool hasField(const string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
+
+        QuerySolutionNode* clone() const;
     };
 
     /**
@@ -607,6 +657,8 @@ namespace mongo {
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }
 
+        QuerySolutionNode* clone() const;
+
         // Since we merge in flagged results we have no sort order.
         BSONObjSet sorts;
     };
@@ -628,6 +680,9 @@ namespace mongo {
         bool hasField(const string& field) const { return !indexKeyPattern[field].eoo(); }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }
+
+        QuerySolutionNode* clone() const;
+
         BSONObjSet sorts;
 
         BSONObj indexKeyPattern;
@@ -652,6 +707,9 @@ namespace mongo {
         bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }
+
+        QuerySolutionNode* clone() const;
+
         BSONObjSet sorts;
 
         BSONObj indexKeyPattern;

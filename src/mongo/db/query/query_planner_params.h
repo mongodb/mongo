@@ -77,6 +77,11 @@ namespace mongo {
             // Nobody should set this above the getRunner interface.  Internal flag set as a hint to
             // the planner that the caller is actually the count command.
             PRIVATE_IS_COUNT = 1 << 6,
+
+            // Set this if you want to handle batchSize properly with sort(). If limits on SORT
+            // stages are always actually limits, then this should be left off. If they are
+            // sometimes to be interpreted as batchSize, then this should be turned on.
+            SPLIT_LIMITED_SORT = 1 << 7
         };
 
         // See Options enum above.
