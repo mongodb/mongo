@@ -167,7 +167,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_PAGE *couple, *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
-	uint32_t page_entries, slot;
+	uint32_t slot;
 	int descending, prev, skip;
 
 	btree = S2BT(session);
@@ -240,8 +240,6 @@ ascend:	/*
 	 * switch to the parent.
 	 */
 	WT_RET(__wt_page_refp(session, page, &pindex, &slot));
-	page_entries = pindex->entries;
-	ref = pindex->index[slot];
 	page = page->parent;
 
 	if (0) {
@@ -263,7 +261,6 @@ restart:	/*
 			goto descend;
 		}
 		WT_RET(__wt_page_refp(session, couple, &pindex, &slot));
-		page_entries = pindex->entries;
 		if (descending)
 			goto descend;
 	}
@@ -275,30 +272,31 @@ restart:	/*
 		 * slot and left/right-most element in its subtree.
 		 */
 		if ((prev && slot == 0) ||
-		    (!prev && slot == page_entries - 1)) {
+		    (!prev && slot == pindex->entries - 1)) {
 			/* Optionally skip internal pages. */
 			if (LF_ISSET(WT_READ_SKIP_INTL))
 				goto ascend;
 
 			/*
 			 * We've ascended the tree and are returning an internal
-			 * page.  If it's the root, discard any hazard pointer
-			 * we have, otherwise, swap any hazard pointer we have
-			 * for the page we'll return.  We could keep the hazard
-			 * pointer we have as it's sufficient to pin any page in
-			 * our page stack, but we have no place to store it and
-			 * it's simpler if callers just know they hold a hazard
-			 * pointer on any page they're using.
-			 *
-			 * XXXKEITH:
-			 * Can this page-swap function return restart because of
-			 * a page split?  I don't think so (this is an internal
-			 * page that's pinned in memory), but I'm not 100% sure.
-			 * Note we're not handling a return of WT_RESTART.
+			 * page.  If it's the root, discard our hazard pointer,
+			 * otherwise, swap our hazard pointer for the page we'll
+			 * return.
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				WT_RET(__wt_page_release(session, couple));
 			else {
+				/*
+				 * Find the parent page's slot in its parent
+				 * page's WT_REF array, hazard pointer couple
+				 * to the parent.
+				 *
+				 * It's hard if this page-swap call can return
+				 * restart: we'd need to add code to the restart
+				 * handler to deal with ascent.  It can't happen
+				 * because we're holding a hazard pointer on the
+				 * child page, so it can't split.
+				 */
 				ref = __wt_page_ref(session, page);
 				ret = __wt_page_swap(
 				    session, couple, page, ref, flags);
@@ -389,8 +387,7 @@ restart:	/*
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT) {
 descend:			pindex = page->pg_intl_index;
-				page_entries = pindex->entries;
-				slot = prev ? page_entries - 1 : 0;
+				slot = prev ? pindex->entries - 1 : 0;
 				descending = 1;
 			} else if (LF_ISSET(WT_READ_SKIP_LEAF))
 				goto ascend;
