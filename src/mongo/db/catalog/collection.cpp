@@ -430,11 +430,8 @@ namespace mongo {
         return &_database->getExtentManager();
     }
 
-    Extent* Collection::increaseStorageSize( int size, bool enforceQuota ) {
-        return getExtentManager()->increaseStorageSize( _ns,
-                                                        _details,
-                                                        size,
-                                                        enforceQuota ? largestFileNumberInQuota() : 0 );
+    void Collection::increaseStorageSize( int size, bool enforceQuota ) {
+        _recordStore->increaseStorageSize( size, enforceQuota ? largestFileNumberInQuota() : 0 );
     }
 
     int Collection::largestFileNumberInQuota() const {

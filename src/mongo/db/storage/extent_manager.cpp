@@ -40,9 +40,6 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
@@ -168,7 +165,7 @@ namespace mongo {
         return preallocateOnly ? 0 : p;
     }
 
-    DataFile* ExtentManager::addAFile( int sizeNeeded, bool preallocateNextFile ) {
+    DataFile* ExtentManager::_addAFile( int sizeNeeded, bool preallocateNextFile ) {
         DEV Lock::assertWriteLocked( _dbname );
         int n = (int) _files.size();
         DataFile *ret = getFile( n, sizeNeeded );
@@ -353,7 +350,7 @@ namespace mongo {
     }
 
 
-    DiskLoc ExtentManager::createExtent( int size, int maxFileNoForQuota ) {
+    DiskLoc ExtentManager::_createExtent( int size, int maxFileNoForQuota ) {
         size = quantizeExtentSize( size );
 
         if ( size > Extent::maxSize() )
@@ -378,7 +375,7 @@ namespace mongo {
         // no space in an existing file
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
-            DataFile* f = addAFile( size, false );
+            DataFile* f = _addAFile( size, false );
 
             if ( f->getHeader()->unusedLength >= size ) {
                 return _createExtentInFile( numFiles() - 1, f, size, maxFileNoForQuota );
@@ -390,7 +387,7 @@ namespace mongo {
         msgasserted(14810, "couldn't allocate space for a new extent" );
     }
 
-    DiskLoc ExtentManager::allocFromFreeList( int approxSize, bool capped ) {
+    DiskLoc ExtentManager::_allocFromFreeList( int approxSize, bool capped ) {
         // setup extent constraints
 
         int low, high;
@@ -473,54 +470,28 @@ namespace mongo {
         return best->myLoc;
     }
 
-
-    Extent* ExtentManager::increaseStorageSize( const string& ns,
-                                                NamespaceDetails* details,
-                                                int size,
-                                                int quotaMax ) {
+    DiskLoc ExtentManager::allocateExtent( const string& ns,
+                                           bool capped,
+                                           int size,
+                                           int quotaMax ) {
 
         bool fromFreeList = true;
-        DiskLoc eloc = allocFromFreeList( size, details->isCapped() );
+        DiskLoc eloc = _allocFromFreeList( size, capped );
         if ( eloc.isNull() ) {
             fromFreeList = false;
-            eloc = createExtent( size, quotaMax );
+            eloc = _createExtent( size, quotaMax );
         }
 
-        verify( !eloc.isNull() );
-        verify( eloc.isValid() );
+        invariant( !eloc.isNull() );
+        invariant( eloc.isValid() );
 
-        LOG(1) << "ExtentManager::increaseStorageSize"
+        LOG(1) << "ExtentManager::allocateExtent"
                << " ns:" << ns
                << " desiredSize:" << size
                << " fromFreeList: " << fromFreeList
                << " eloc: " << eloc;
 
-        Extent *e = getExtent( eloc, false );
-        verify( e );
-
-        DiskLoc emptyLoc = getDur().writing(e)->reuse( ns,
-                                                       details->isCapped() );
-
-        if ( details->lastExtent().isNull() ) {
-            verify( details->firstExtent().isNull() );
-            details->setFirstExtent( eloc );
-            details->setLastExtent( eloc );
-            getDur().writingDiskLoc( details->capExtent() ) = eloc;
-            verify( e->xprev.isNull() );
-            verify( e->xnext.isNull() );
-        }
-        else {
-            verify( !details->firstExtent().isNull() );
-            getDur().writingDiskLoc(e->xprev) = details->lastExtent();
-            getDur().writingDiskLoc(getExtent(details->lastExtent())->xnext) = eloc;
-            details->setLastExtent( eloc );
-        }
-
-        details->setLastExtentSize( e->length );
-
-        details->addDeletedRec(emptyLoc.drec(), emptyLoc);
-
-        return e;
+        return eloc;
     }
 
     void ExtentManager::freeExtents(DiskLoc firstExt, DiskLoc lastExt) {

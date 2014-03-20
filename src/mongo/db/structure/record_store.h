@@ -56,6 +56,9 @@ namespace mongo {
 
         virtual StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax ) = 0;
 
+        // TODO: this makes me sad, it shouldn't be in the interface
+        // do not use this anymore
+        virtual void increaseStorageSize( int size, int quotaMax ) = 0;
     protected:
         std::string _ns;
     };
@@ -76,6 +79,8 @@ namespace mongo {
         StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax );
 
         StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax );
+
+        void increaseStorageSize( int size, int quotaMax );
 
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax ) = 0;

@@ -188,6 +188,38 @@ namespace mongo {
         }
     }
 
+    void RecordStoreV1Base::increaseStorageSize( int size, int quotaMax ) {
+        DiskLoc eloc = _extentManager->allocateExtent( _ns,
+                                                       _details->isCapped(),
+                                                       size,
+                                                       quotaMax );
+
+        Extent *e = _extentManager->getExtent( eloc, false );
+
+        invariant( e );
+
+        DiskLoc emptyLoc = getDur().writing(e)->reuse( _ns, _details->isCapped() );
+
+        if ( _details->lastExtent().isNull() ) {
+            verify( _details->firstExtent().isNull() );
+            _details->setFirstExtent( eloc );
+            _details->setLastExtent( eloc );
+            getDur().writingDiskLoc( _details->capExtent() ) = eloc;
+            verify( e->xprev.isNull() );
+            verify( e->xnext.isNull() );
+        }
+        else {
+            verify( !_details->firstExtent().isNull() );
+            getDur().writingDiskLoc(e->xprev) = _details->lastExtent();
+            getDur().writingDiskLoc(_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
+            _details->setLastExtent( eloc );
+        }
+
+        _details->setLastExtentSize( e->length );
+
+        _details->addDeletedRec(emptyLoc.drec(), emptyLoc);
+    }
+
     // -------------------------------
 
     SimpleRecordStoreV1::SimpleRecordStoreV1( const StringData& ns,
@@ -207,10 +239,9 @@ namespace mongo {
 
         LOG(1) << "allocating new extent";
 
-        _extentManager->increaseStorageSize( _ns, _details,
-                                             Extent::followupSize( lengthWithHeaders,
-                                                                   _details->lastExtentSize()),
-                                             quotaMax );
+        increaseStorageSize( Extent::followupSize( lengthWithHeaders,
+                                                   _details->lastExtentSize()),
+                             quotaMax );
 
         loc = _details->alloc( NULL, _ns, lengthWithHeaders );
         if ( !loc.isNull() ) {
@@ -225,10 +256,9 @@ namespace mongo {
         for ( int z = 0; z < 10 && lengthWithHeaders > _details->lastExtentSize(); z++ ) {
             log() << "try #" << z << endl;
 
-            _extentManager->increaseStorageSize( _ns, _details,
-                                                 Extent::followupSize( lengthWithHeaders,
-                                                                       _details->lastExtentSize()),
-                                                 quotaMax );
+            increaseStorageSize( Extent::followupSize( lengthWithHeaders,
+                                                       _details->lastExtentSize()),
+                                 quotaMax );
 
             loc = _details->alloc( NULL, _ns, lengthWithHeaders);
             if ( ! loc.isNull() )

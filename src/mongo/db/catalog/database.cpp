@@ -722,12 +722,10 @@ namespace mongo {
             }
             else if ( options.capped ) {
                 // normal
-                long long size = options.cappedSize;
-                while ( size > 0 ) {
-                    int mySize = _massageExtentSize( size );
-                    mySize &= 0xffffff00;
-                    Extent* e = collection->increaseStorageSize( mySize, true );
-                    size -= e->length;
+                while ( collection->storageSize() < options.cappedSize ) {
+                    int sz = _massageExtentSize( options.cappedSize - collection->storageSize() );
+                    sz &= 0xffffff00;
+                    collection->increaseStorageSize( sz, true );
                 }
             }
             else {

@@ -42,7 +42,6 @@
 namespace mongo {
 
     class DataFile;
-    class NamespaceDetails;
 
     /**
      * ExtentManager basics
@@ -85,34 +84,19 @@ namespace mongo {
         size_t numFiles() const;
         long long fileSize() const;
 
+        // TODO: make private
         DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false );
 
-        DataFile* addAFile( int sizeNeeded, bool preallocateNextFile );
-
-        void preallocateAFile() { getFile( numFiles() , 0, true ); }// XXX-ERH
+        // TODO: remove?
+        void preallocateAFile() { getFile( numFiles() , 0, true ); }
 
         void flushFiles( bool sync );
 
-        /* allocate a new Extent, does not check free list
-         * @param maxFileNoForQuota - 0 for unlimited
-        */
-        DiskLoc createExtent( int approxSize, int maxFileNoForQuota );
-
-        /**
-         * will return NULL if nothing suitable in free list
-         */
-        DiskLoc allocFromFreeList( int approxSize, bool capped );
-
-        /**
-         * @param details - this is for the collection we're adding space to
-         * @param quotaMax 0 == no limit
-         * TODO: this isn't quite in the right spot
-         *  really need the concept of a NamespaceStructure in the current paradigm
-         */
-        Extent* increaseStorageSize( const string& ns,
-                                     NamespaceDetails* details,
-                                     int size,
-                                     int quotaMax );
+        // must call Extent::reuse on the returned extent
+        DiskLoc allocateExtent( const string& ns,
+                                bool capped,
+                                int size,
+                                int quotaMax );
 
         /**
          * firstExt has to be == lastExt or a chain
@@ -166,6 +150,18 @@ namespace mongo {
         static int quantizeExtentSize( int size );
 
     private:
+
+        /**
+         * will return NULL if nothing suitable in free list
+         */
+        DiskLoc _allocFromFreeList( int approxSize, bool capped );
+
+        /* allocate a new Extent, does not check free list
+         * @param maxFileNoForQuota - 0 for unlimited
+        */
+        DiskLoc _createExtent( int approxSize, int maxFileNoForQuota );
+
+        DataFile* _addAFile( int sizeNeeded, bool preallocateNextFile );
 
         DiskLoc _getFreeListStart() const;
         DiskLoc _getFreeListEnd() const;

@@ -187,7 +187,7 @@ namespace mongo {
         // this will add a new extent the collection
         // the new extent will be returned
         // it will have been added to the linked list already
-        Extent* increaseStorageSize( int size, bool enforceQuota );
+        void increaseStorageSize( int size, bool enforceQuota );
 
         //
         // Stats
