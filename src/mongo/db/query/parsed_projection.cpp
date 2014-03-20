@@ -237,13 +237,7 @@ namespace mongo {
         // Save the raw spec.  It should be owned by the LiteParsedQuery.
         verify(spec.isOwned());
         pp->_source = spec;
-
-        // returnKey clobbers everything.
-        if (hasIndexKeyProjection) {
-            pp->_requiresDocument = false;
-            *out = pp.release();
-            return Status::OK();
-        }
+        pp->_returnKey = hasIndexKeyProjection;
 
         // Dotted fields aren't covered, non-simple require match details, and as for include, "if
         // we default to including then we can't use an index because we don't know what we're
@@ -274,6 +268,11 @@ namespace mongo {
                     pp->_requiredFields.push_back(elt.fieldName());
                 }
             }
+        }
+
+        // returnKey clobbers everything.
+        if (hasIndexKeyProjection) {
+            pp->_requiresDocument = false;
         }
 
         *out = pp.release();

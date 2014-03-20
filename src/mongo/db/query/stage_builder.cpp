@@ -109,7 +109,25 @@ namespace mongo {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
             PlanStage* childStage = buildStages(qsol, pn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            return new ProjectionStage(pn->projection, pn->fullExpression, ws, childStage);
+            ProjectionStageParams params;
+            params.projObj = pn->projection;
+
+            // Stuff the right data into the params depending on what proj impl we use.
+            if (ProjectionNode::DEFAULT == pn->projType) {
+                params.fullExpression = pn->fullExpression;
+                params.projImpl = ProjectionStageParams::NO_FAST_PATH;
+            }
+            else if (ProjectionNode::COVERED_ONE_INDEX == pn->projType) {
+                params.projImpl = ProjectionStageParams::COVERED_ONE_INDEX;
+                params.coveredKeyObj = pn->coveredKeyObj;
+                invariant(!pn->coveredKeyObj.isEmpty());
+            }
+            else {
+                invariant(ProjectionNode::SIMPLE_DOC == pn->projType);
+                params.projImpl = ProjectionStageParams::SIMPLE_DOC;
+            }
+
+            return new ProjectionStage(params, ws, childStage);
         }
         else if (STAGE_LIMIT == root->getType()) {
             const LimitNode* ln = static_cast<const LimitNode*>(root);

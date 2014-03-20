@@ -542,6 +542,10 @@ namespace mongo {
         if (NULL != query.getProj()) {
             QLOG() << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
             QLOG() << "PROJECTION: Current plan is:\n" << solnRoot->toString() << endl;
+
+            ProjectionNode::ProjectionType projType = ProjectionNode::DEFAULT;
+            BSONObj coveredKeyObj;
+
             if (query.getProj()->requiresDocument()) {
                 QLOG() << "PROJECTION: claims to require doc adding fetch.\n";
                 // If the projection requires the entire document, somebody must fetch.
@@ -551,7 +555,10 @@ namespace mongo {
                     solnRoot = fetch;
                 }
             }
-            else {
+            else if (!query.getProj()->wantIndexKey()) {
+                // The only way we're here is if it's a simple projection.  That is, we can pick out
+                // the fields we want to include and they're not dotted.  So we want to execute the
+                // projection in the fast-path simple fashion.  Just don't know which fast path yet.
                 QLOG() << "PROJECTION: requires fields\n";
                 const vector<string>& fields = query.getProj()->getRequiredFields();
                 bool covered = true;
@@ -563,13 +570,51 @@ namespace mongo {
                         break;
                     }
                 }
+
                 QLOG() << "PROJECTION: is covered?: = " << covered << endl;
+
                 // If any field is missing from the list of fields the projection wants,
                 // a fetch is required.
                 if (!covered) {
                     FetchNode* fetch = new FetchNode();
                     fetch->children.push_back(solnRoot);
                     solnRoot = fetch;
+
+                    // It's simple but we'll have the full document and we should just iterate
+                    // over that.
+                    projType = ProjectionNode::SIMPLE_DOC;
+                    QLOG() << "PROJECTION: not covered, fetching.";
+                }
+                else {
+                    if (solnRoot->fetched()) {
+                        // Fetched implies hasObj() so let's run with that.
+                        projType = ProjectionNode::SIMPLE_DOC;
+                        QLOG() << "PROJECTION: covered via FETCH, using SIMPLE_DOC fast path";
+                    }
+                    else {
+                        // If we're here we're not fetched so we're covered.  Let's see if we can
+                        // get out of using the default projType.  If there's only one leaf
+                        // underneath and it's giving us index data we can use the faster covered
+                        // impl.
+                        vector<QuerySolutionNode*> leafNodes;
+                        getLeafNodes(solnRoot, &leafNodes);
+
+                        if (1 == leafNodes.size()) {
+                            // Both the IXSCAN and DISTINCT stages provide covered key data.
+                            if (STAGE_IXSCAN == leafNodes[0]->getType()) {
+                                projType = ProjectionNode::COVERED_ONE_INDEX;
+                                IndexScanNode* ixn = static_cast<IndexScanNode*>(leafNodes[0]);
+                                coveredKeyObj = ixn->indexKeyPattern;
+                                QLOG() << "PROJECTION: covered via IXSCAN, using COVERED fast path";
+                            }
+                            else if (STAGE_DISTINCT == leafNodes[0]->getType()) {
+                                projType = ProjectionNode::COVERED_ONE_INDEX;
+                                DistinctNode* dn = static_cast<DistinctNode*>(leafNodes[0]);
+                                coveredKeyObj = dn->indexKeyPattern;
+                                QLOG() << "PROJECTION: covered via DISTINCT, using COVERED fast path";
+                            }
+                        }
+                    }
                 }
             }
 
@@ -578,6 +623,8 @@ namespace mongo {
             projNode->children.push_back(solnRoot);
             projNode->fullExpression = query.root();
             projNode->projection = query.getParsed().getProj();
+            projNode->projType = projType;
+            projNode->coveredKeyObj = coveredKeyObj;
             solnRoot = projNode;
         }
         else {

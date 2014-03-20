@@ -83,6 +83,10 @@ namespace mongo {
             return _wantGeoNearPoint;
         }
 
+        bool wantIndexKey() const {
+            return _returnKey;
+        }
+
     private:
         /**
          * Must go through ::make
@@ -116,6 +120,8 @@ namespace mongo {
         bool _wantGeoNearDistance;
 
         bool _wantGeoNearPoint;
+
+        bool _returnKey;
     };
 
 }  // namespace mongo
