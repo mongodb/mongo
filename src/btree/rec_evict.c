@@ -1007,6 +1007,14 @@ __rec_review(WT_SESSION_IMPL *session,
 	}
 
 	/*
+	 * If we are checkpointing, we can't merge multiblock pages into their
+	 * parent.
+	 */
+	if (btree->checkpointing &&
+	    mod != NULL && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
+		return (EBUSY);
+
+	/*
 	 * Fail if any page in the top-level page's subtree won't be merged into
 	 * its parent, the page that cannot be merged must be evicted first.
 	 * The test is necessary but should not fire much: the eviction code is
@@ -1020,14 +1028,6 @@ __rec_review(WT_SESSION_IMPL *session,
 	 */
 	mod = page->modify;
 	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
-		return (EBUSY);
-
-	/*
-	 * If we are checkpointing, we can't merge multiblock pages into their
-	 * parent.
-	 */
-	if (btree->checkpointing &&
-	    mod != NULL && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
 		return (EBUSY);
 
 	/*
