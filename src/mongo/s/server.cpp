@@ -369,6 +369,11 @@ static bool runMongosServer( bool doUpgrade ) {
         return false;
     }
 
+    if ( doUpgrade ) {
+        log() << "Config database is at version v" << CURRENT_CONFIG_VERSION;
+        return true;
+    }
+
     configServer.reloadSettings();
 
     init();
