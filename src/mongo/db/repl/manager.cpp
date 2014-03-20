@@ -110,6 +110,7 @@ namespace mongo {
                 // else, stick around
                 log() << "another PRIMARY detected but it should step down"
                     " since it was elected earlier than me";
+                return;
             }
         }
 
