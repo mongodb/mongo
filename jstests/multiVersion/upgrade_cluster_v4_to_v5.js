@@ -102,8 +102,7 @@ mongos = MongoRunner.runMongos({ binVersion : "2.6", configdb : configConnStr })
 assert.eq(null, mongos);
 
 mongos = MongoRunner.runMongos({ binVersion : "2.6", configdb : configConnStr, upgrade : "" });
-assert.neq(null, mongos);
-MongoRunner.stopMongos(mongos);
+assert.eq(null, mongos);
 
 jsTest.log("2.6 mongoses started in 2.4 cluster.");
 
