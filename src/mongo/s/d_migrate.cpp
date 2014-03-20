@@ -1676,7 +1676,6 @@ namespace mongo {
                         errmsg = str::stream() << "failed to create index before migrating data. "
                                                << " idx: " << idx
                                                << " error: " << status.toString();
-                        errmsg = str::stream() << "collection dropped during migration: " << ns;
                         warning() << errmsg;
                         state = FAIL;
                         return;
