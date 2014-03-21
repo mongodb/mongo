@@ -753,7 +753,7 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opt
         wait = signal
         signal = undefined
     }
-        
+    
     wait = wait || false
     if( ! wait.toFixed ){
         if( wait ) wait = 0
@@ -764,11 +764,15 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opt
     print('ReplSetTest stop *** Shutting down mongod in port ' + port + ' ***');
     var ret = MongoRunner.stopMongod( port , signal, opts );
     
-    if( ! ret || wait < 0 ) return ret
+    if( ! ret || wait < 0 ) {
+        print('ReplSetTest stop *** Mongod in port ' + port + ' shutdown with code (' 
+                    + ret + '), wait (' + wait + ') ***');
+        return ret;
+    }
     
     // Wait for shutdown
     this.waitForHealth( n, this.DOWN, wait )
-    
+
     return true
 }
 
