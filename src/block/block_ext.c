@@ -510,7 +510,7 @@ __wt_block_alloc(
 append:			WT_RET(__block_extend(session, block, offp, size));
 			WT_RET(__block_append(
 			    session, &block->live.alloc, *offp, (off_t)size));
-			return(0);
+			return (0);
 		}
 
 		/* Take the first record. */
