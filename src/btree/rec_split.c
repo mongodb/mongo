@@ -516,7 +516,8 @@ err:	__wt_free_ref_array(session, page, refarg, entries);
  *	Resolve a page split, inserting new information into the parent.
  */
 int
-__wt_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
+__wt_split_evict(
+    WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page, int exclusive)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -665,12 +666,14 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 	 * 20B for row-store.  If writing the parent page requires more than N
 	 * pages, deepen the tree to add those pages.
 	 */
-	bytes = 10;
-	if (parent->type == WT_PAGE_ROW_INT)
-		bytes += 20;
-	if ((bytes * result_entries) /
-	    btree->maxintlpage > (uint64_t)btree->split_deepen)
-		ret = __split_deepen(session, parent);
+	if (!exclusive) {
+		bytes = 10;
+		if (parent->type == WT_PAGE_ROW_INT)
+			bytes += 20;
+		if ((bytes * result_entries) /
+		    btree->maxintlpage > (uint64_t)btree->split_deepen)
+			ret = __split_deepen(session, parent);
+	}
 
 	/*
 	 * Pages with unresolved changes are not marked clean by reconciliation;

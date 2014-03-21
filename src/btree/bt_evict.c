@@ -478,14 +478,17 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
+	int eviction_enabled;
 
 	btree = S2BT(session);
+	eviction_enabled = !F_ISSET(btree, WT_BTREE_NO_EVICTION);
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
 	 * and drain any blocks already queued.
 	 */
-	WT_RET(__wt_evict_file_exclusive_on(session));
+	if (eviction_enabled)
+		WT_RET(__wt_evict_file_exclusive_on(session));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
 	__wt_txn_update_oldest(session);
@@ -570,7 +573,8 @@ err:		/* On error, clear any left-over tree walk. */
 			WT_TRET(__wt_page_release(session, next_page));
 	}
 
-	__wt_evict_file_exclusive_off(session);
+	if (eviction_enabled)
+		__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }
@@ -583,14 +587,12 @@ int
 __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 {
 	WT_BTREE *btree;
-	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_TXN *txn;
 	uint32_t flags;
 
 	btree = S2BT(session);
-	cache = S2C(session)->cache;
 	page = NULL;
 	txn = &session->txn;
 
@@ -626,23 +628,15 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * into them, nor can underlying blocks be freed until the block
 		 * lists for the checkpoint are stable.  Set the checkpointing
 		 * flag to block eviction of dirty pages until the checkpoint's
-		 * internal page pass is complete.
-		 *
-		 * If any thread is already in the progress of evicting a page,
-		 * it will have set the page state to WT_REF_LOCKED, and the
-		 * checkpoint will notice and wait for eviction to complete
-		 * before proceeding.
+		 * internal page pass is complete, then wait for any existing
+		 * eviction to complete.
 		 */
-		__wt_spin_lock(session, &cache->evict_lock);
 		btree->checkpointing = 1;
-		__wt_spin_unlock(session, &cache->evict_lock);
 
-		/*
-		 * Wait for existing LRU eviction activity to drain, so that
-		 * all subsequent eviction sees the checkpointing flag.
-		 */
-		while (btree->lru_count > 0)
-			__wt_yield();
+		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+			WT_ERR(__wt_evict_file_exclusive_on(session));
+			__wt_evict_file_exclusive_off(session);
+		}
 
 		/*
 		 * Write all dirty in-cache pages.

@@ -365,18 +365,9 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	/*
 	 * The compaction process looks at the page's modification information;
 	 * if compaction is running, lock the page down.
-	 *
-	 * Evicting leaf pages could result in splits into their parent, which
-	 * could theoretically collide with the checkpoint write of an internal
-	 * page (we could see a child reference in a split state when walking
-	 * the internal page), and we're not prepared to deal with that.  When
-	 * reconciling internal pages that might have live children, lock down
-	 * the page to block splits of its children.
 	 */
 	locked = 0;
 	if (conn->compact_in_memory_pass)
-		locked = 1;
-	if (WT_PAGE_IS_INTERNAL(page) && !LF_ISSET(WT_EVICTION_LOCKED))
 		locked = 1;
 	if (locked)
 		WT_PAGE_LOCK(session, page);

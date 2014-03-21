@@ -398,9 +398,10 @@ extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_MULTI *multi,
     WT_REF *refarg,
     uint32_t entries);
-extern int __wt_split_evict(WT_SESSION_IMPL *session,
+extern int __wt_split_evict( WT_SESSION_IMPL *session,
     WT_REF *parent_ref,
-    WT_PAGE *page);
+    WT_PAGE *page,
+    int exclusive);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_CELL *cell);
