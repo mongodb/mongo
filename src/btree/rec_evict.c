@@ -11,7 +11,8 @@ static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_REF *);
-static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *);
+static int  __rec_page_dirty_update(
+    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int);
 static int  __rec_review(
     WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int *);
 static void __rec_root_update(WT_SESSION_IMPL *);
@@ -82,7 +83,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE **pagep, int exclusive)
 			__rec_root_update(session);
 		else
 			WT_ERR(__rec_page_dirty_update(
-			    session, parent_ref, page));
+			    session, parent_ref, page, exclusive));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
@@ -146,7 +147,7 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *parent_ref)
  */
 static int
 __rec_page_dirty_update(
-    WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
+    WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page, int exclusive)
 {
 	WT_ADDR *addr;
 	WT_PAGE_MODIFY *mod;
@@ -178,7 +179,7 @@ __rec_page_dirty_update(
 		WT_PUBLISH(parent_ref->state, WT_REF_DELETED);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
-		WT_RET(__wt_split_evict(session, parent_ref, page));
+		WT_RET(__wt_split_evict(session, parent_ref, page, exclusive));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		if (parent_ref->addr != NULL &&
