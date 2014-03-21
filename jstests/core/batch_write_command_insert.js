@@ -214,20 +214,6 @@ assert.eq(1, result.n);
 assert.eq(coll.getIndexes().length, 2);
 
 //
-// Background index creation
-coll.drop();
-coll.insert({ x : 1 });
-printjson(request = {insert : "system.indexes",
-                     documents : [{ns : coll.toString(),
-                                   key : {x : 1},
-                                   name : "x_1",
-                                   background : true}]});
-printjson( result = coll.runCommand(request) );
-assert(result.ok);
-assert.eq(1, result.n);
-assert.eq(coll.getIndexes().length, 2);
-
-//
 // Duplicate index insertion gives n = 0
 coll.drop();
 coll.ensureIndex({x : 1}, {unique : true});
@@ -299,4 +285,20 @@ printjson(request = {insert : "system.indexes",
 printjson(result = coll.runCommand(request));
 assert(!result.ok);
 assert.eq(coll.getIndexes().length, 0);
+
+//
+// Background index creation
+// Note: due to SERVER-13304 this test is at the end of this file, and we don't drop
+// the collection afterwards.
+coll.drop();
+coll.insert({ x : 1 });
+printjson(request = {insert : "system.indexes",
+                     documents : [{ns : coll.toString(),
+                                   key : {x : 1},
+                                   name : "x_1",
+                                   background : true}]});
+printjson( result = coll.runCommand(request) );
+assert(result.ok);
+assert.eq(1, result.n);
+assert.eq(coll.getIndexes().length, 2);
 
