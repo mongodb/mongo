@@ -819,6 +819,7 @@ namespace mongo {
             // operation might not support interrupts.
             bool mayInterrupt = cc().curop()->parent() == NULL;
 
+            cc().curop()->setQuery(js);
             Status status = collection->getIndexCatalog()->createIndex( js, mayInterrupt );
 
             if ( status.code() == ErrorCodes::IndexAlreadyExists )

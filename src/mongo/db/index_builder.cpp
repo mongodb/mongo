@@ -75,6 +75,10 @@ namespace mongo {
             c = db->getOrCreateCollection( ns );
             verify(c);
         }
+
+        // Show which index we're building in the curop display.
+        context.getClient()->curop()->setQuery(_index);
+
         Status status = c->getIndexCatalog()->createIndex( _index, 
                                                            true, 
                                                            IndexCatalog::SHUTDOWN_LEAVE_DIRTY );
