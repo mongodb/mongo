@@ -31,7 +31,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -84,20 +83,11 @@ namespace mongo {
         return status;
     }
 
-    std::vector<BSONObj> IndexBuilder::killMatchingIndexBuilds(const BSONObj& criteria) {
-        verify(Lock::somethingWriteLocked());
-        std::vector<BSONObj> indexes;
-        CurOp* op = NULL;
-        while ((op = CurOp::getOp(criteria)) != NULL) {
-            BSONObj index = op->query();
-            killCurrentOp.kill(op->opNum());
-            indexes.push_back(index);
-            log() << "halting index build: " << index;
-        }
-        if (indexes.size() > 0) {
-            log() << "halted " << indexes.size() << " index build(s)" << endl;
-        }
-        return indexes;
+    std::vector<BSONObj> 
+    IndexBuilder::killMatchingIndexBuilds(Collection* collection,
+                                          const IndexCatalog::IndexKillCriteria& criteria) {
+        invariant(collection);
+        return collection->getIndexCatalog()->killMatchingIndexBuilds(criteria);
     }
 
     void IndexBuilder::restoreIndexes(const std::vector<BSONObj>& indexes) {

@@ -35,9 +35,11 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
+    class Client;
     class Collection;
     class NamespaceDetails;
 
@@ -157,6 +159,20 @@ namespace mongo {
          */
         vector<BSONObj> getAndClearUnfinishedIndexes();
 
+
+        struct IndexKillCriteria {
+            std::string ns;
+            std::string name;
+            BSONObj key;
+        };
+
+        /**
+         * Given some criteria, will search through all in-progress index builds
+         * and will kill ones that match. (namespace, index name, and/or index key spec)
+         * Returns the list of index specs that were killed, for use in restarting them later.
+         */
+        std::vector<BSONObj> killMatchingIndexBuilds(const IndexKillCriteria& criteria);
+
         // ---- modify single index
 
         /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
@@ -243,6 +259,7 @@ namespace mongo {
         static BSONObj fixIndexKey( const BSONObj& key );
 
     private:
+        typedef unordered_map<IndexDescriptor*, Client*> InProgressIndexesMap;
 
         // creates a new thing, no caching
         IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
@@ -306,6 +323,8 @@ namespace mongo {
 
         static const BSONObj _idObj; // { _id : 1 }
 
+        // Track in-progress index builds, in order to find and stop them when necessary.
+        InProgressIndexesMap _inProgressIndexes;
     };
 
 }

@@ -61,14 +61,11 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
-            std::string toDeleteNs = dbname+"."+cmdObj.firstElement().valuestr();
-            BSONObjBuilder builder;
-            builder.append("ns", systemIndexes);
-            builder.append("op", "insert");
-            builder.append("insert.ns", toDeleteNs);
+            std::string toDeleteNs = db->name() + "." + cmdObj.firstElement().valuestr();
+            Collection* collection = db->getCollection(toDeleteNs);
+            IndexCatalog::IndexKillCriteria criteria;
 
             // Get index name to drop
             BSONElement toDrop = cmdObj.getField("index");
@@ -76,21 +73,19 @@ namespace mongo {
             if (toDrop.type() == String) {
                 // Kill all in-progress indexes
                 if (strcmp("*", toDrop.valuestr()) == 0) {
-                    BSONObj criteria = builder.done();
-                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                    criteria.ns = toDeleteNs;
+                    return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
                 }
                 // Kill an in-progress index by name
                 else {
-                    builder.append("insert.name", toDrop.valuestr());
-                    BSONObj criteria = builder.done();
-                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                    criteria.name = toDrop.valuestr();
+                    return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
                 }
             }
             // Kill an in-progress index build by index key
             else if (toDrop.type() == Object) {
-                builder.append("insert.key", toDrop.Obj());
-                BSONObj criteria = builder.done();
-                return IndexBuilder::killMatchingIndexBuilds(criteria);
+                criteria.key = toDrop.Obj();
+                return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
             }
 
             return std::vector<BSONObj>();
@@ -110,7 +105,7 @@ namespace mongo {
                 return false;
             }
 
-            stopIndexBuilds(dbname, jsobj);
+            stopIndexBuilds(cc().database(), jsobj);
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             anObjBuilder.appendNumber("nIndexesWas", indexCatalog->numIndexesTotal() );
@@ -196,13 +191,12 @@ namespace mongo {
         }
         CmdReIndex() : Command("reIndex") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname + ".system.indexes";
-            std::string ns = dbname + '.' + cmdObj["reIndex"].valuestrsafe();
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
-
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            std::string ns = db->name() + '.' + cmdObj["reIndex"].valuestrsafe();
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
@@ -222,7 +216,7 @@ namespace mongo {
 
             BackgroundOperation::assertNoBgOpInProgForNs( toDeleteNs );
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(dbname, jsobj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(cc().database(), jsobj);
 
             list<BSONObj> all;
             auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );

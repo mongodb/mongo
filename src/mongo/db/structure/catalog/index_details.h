@@ -93,9 +93,6 @@ namespace mongo {
         int keyPatternOffset( const string& key ) const;
         bool inKeyPattern( const string& key ) const { return keyPatternOffset( key ) >= 0; }
 
-        /* true if the specified key is in the index */
-        bool hasKey(const BSONObj& key);
-
         // returns name of this index's storage area (database.collection.$index)
         string indexNamespace() const {
             return indexNamespaceFromObj(info.obj());

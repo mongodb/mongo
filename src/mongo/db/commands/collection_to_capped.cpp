@@ -199,19 +199,20 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname,
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
             std::string coll = cmdObj.firstElement().valuestr();
-            std::string ns = dbname + "." + coll;
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+            std::string ns = db->name() + "." + coll;
 
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            Database* db = cc().database();
 
-            stopIndexBuilds(dbname, jsobj);
+            stopIndexBuilds(db, jsobj);
             BackgroundOperation::assertNoBgOpInProgForDb(dbname.c_str());
 
             string shortSource = jsobj.getStringField( "convertToCapped" );
@@ -225,8 +226,6 @@ namespace mongo {
 
             string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
             string longTmpName = str::stream() << dbname << "." << shortTmpName;
-
-            Database* db = cc().database();
 
             if ( db->getCollection( longTmpName ) ) {
                 Status status = db->dropCollection( longTmpName );

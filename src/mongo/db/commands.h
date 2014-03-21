@@ -31,6 +31,7 @@ namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
     class Client;
+    class Database;
     class Timer;
 
 namespace mutablebson {
@@ -191,8 +192,8 @@ namespace mutablebson {
         static map<string,Command*> * _webCommands;
 
     public:
-        // Stop all index builds required to run this command and return index builds killed.
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        // Stops all index builds required to run this command and returns index builds killed.
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj);
 
         static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }

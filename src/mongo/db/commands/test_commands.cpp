@@ -169,14 +169,14 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname + ".system.indexes";
             std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
-            std::string ns = dbname + '.' + coll;
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+            std::string ns = db->name() + '.' + coll;
 
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -186,7 +186,7 @@ namespace mongo {
             NamespaceDetails *nsd = nsdetails( ns );
             massert( 13429, "emptycapped no such collection", nsd );
 
-            std::vector<BSONObj> indexes = stopIndexBuilds(dbname, cmdObj);
+            std::vector<BSONObj> indexes = stopIndexBuilds(cc().database(), cmdObj);
 
             nsd->emptyCappedCollection( ns.c_str() );
 

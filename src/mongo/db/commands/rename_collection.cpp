@@ -66,15 +66,16 @@ namespace mongo {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname,
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
 
-            BSONObj criteria = BSON("op" << "insert" << "ns" << dbname+".system.indexes" <<
-                                    "insert.ns" << source);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = source;
+            std::vector<BSONObj> prelim = 
+                IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
 
-            std::vector<BSONObj> prelim = IndexBuilder::killMatchingIndexBuilds(criteria);
             std::vector<BSONObj> indexes;
 
             for (int i = 0; i < static_cast<int>(prelim.size()); i++) {
@@ -162,7 +163,7 @@ namespace mongo {
 
                 {
                     const NamespaceDetails *nsd = nsdetails( source );
-                    indexesInProg = stopIndexBuilds( dbname, cmdObj );
+                    indexesInProg = stopIndexBuilds( srcCtx.db(), cmdObj );
                     capped = nsd->isCapped();
                     if ( capped )
                         for( DiskLoc i = nsd->firstExtent(); !i.isNull(); i = i.ext()->xnext )
