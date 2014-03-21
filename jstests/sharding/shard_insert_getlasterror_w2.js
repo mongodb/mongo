@@ -1,72 +1,76 @@
 // replica set as solo shard
 // TODO: Add assertion code that catches hang
 
-load('jstests/libs/grid.js')
+(function() {
+    "use strict";
 
-function go() {
-
-    var N = 2000
+    var numDocs = 2000;
+    var baseName = "shard_insert_getlasterror_w2";
+    var testDBName = baseName;
+    var testCollName = 'coll';
 
     // ~1KB string
-    var Text = ''
-        for (var i = 0; i < 40; i++)
-            Text += 'abcdefghijklmnopqrstuvwxyz'
+    var textString = '';
+    for (var i = 0; i < 40; i++) {
+        textString += 'abcdefghijklmnopqrstuvwxyz';
+    }
 
-    // Create replica set with 3 servers
-    var repset1 = new ReplicaSet('repset1', 3) .begin()
+    // Spin up a sharded cluster, but do not add the shards
+    var shardingTestConfig = {
+        name : baseName,
+        mongos : 1,
+        shards : 1,
+        config : 3,
+        rs : { nodes : 3 },
+        other : { manualAddShard : true }
+    };
+    var shardingTest = new ShardingTest(shardingTestConfig);
+
+    // Get connection to the individual shard
+    var replSet1 = shardingTest.rs0;
 
     // Add data to it
-    var conn1a = repset1.getMaster()
-    var db1a = conn1a.getDB('test');
-    var bulk = db1a.foo.initializeUnorderedBulkOp();
-    for (var i = 0; i < N; i++) {
-        bulk.insert({ x: i, text: Text });
+    var testDBReplSet1 = replSet1.getMaster().getDB(testDBName);
+    var bulk = testDBReplSet1.foo.initializeUnorderedBulkOp();
+    for (var i = 0; i < numDocs; i++) {
+        bulk.insert({ x: i, text: textString });
     }
     assert.writeOK(bulk.execute({ w: 2 }));
 
-    // Create 3 sharding config servers
-    var configsetSpec = new ConfigSet(3)
-    var configsetConns = configsetSpec.begin()
+    // Get connection to mongos for the cluster
+    var mongosConn = shardingTest.s;
+    var testDB = mongosConn.getDB(testDBName);
 
-    // Create sharding router (mongos)
-    var routerSpec = new Router(configsetSpec)
-    var routerConn = routerSpec.begin()
-    var dba = routerConn.getDB('admin')
-    var db = routerConn.getDB('test')
-
-    // Add repset1 as only shard
-    addShard (routerConn, repset1.getURL())
+    // Add replSet1 as only shard
+    mongosConn.adminCommand({ addshard : replSet1.getURL() });
 
     // Enable sharding on test db and its collection foo
-    enableSharding (routerConn, 'test')
-    db['foo'].ensureIndex({x: 1})
-    shardCollection (routerConn, 'test', 'foo', {x: 1})
-
-    sleep(30000)
-    printjson (db['foo'].stats())
-    dba.printShardingStatus()
-    printjson (db['foo'].count())
+    assert.commandWorked(mongosConn.getDB('admin').runCommand({ enablesharding : testDBName }));
+    testDB[testCollName].ensureIndex({ x : 1 });
+    assert.commandWorked(mongosConn.getDB('admin').
+                         runCommand({ shardcollection : testDBName + '.' + testCollName,
+                                      key : { x : 1 }}))
 
     // Test case where GLE should return an error
-    db.foo.insert({_id:'a', x:1});
-    assert.writeError(db.foo.insert({ _id: 'a', x: 1 },
+    testDB.foo.insert({_id:'a', x:1});
+    assert.writeError(testDB.foo.insert({ _id: 'a', x: 1 },
                                     { writeConcern: { w: 2, wtimeout: 30000 }}));
 
     // Add more data
-    bulk = db.foo.initializeUnorderedBulkOp();
-    for (var i = N; i < 2*N; i++) {
-        bulk.insert({ x: i, text: Text});
+    bulk = testDB.foo.initializeUnorderedBulkOp();
+    for (var i = numDocs; i < 2 * numDocs; i++) {
+        bulk.insert({ x: i, text: textString });
     }
     assert.writeOK(bulk.execute({ w: 2, wtimeout: 30000 }));
 
-    // take down the slave and make sure it fails over
-    repset1.stop(1);
-    repset1.stop(2);
-    db.getMongo().adminCommand({setParameter: 1, logLevel:1});
-    db.getMongo().setSlaveOk();
+    // Take down two nodes and make sure slaveOk reads still work
+    replSet1.stop(1);
+    replSet1.stop(2);
+    testDB.getMongo().adminCommand({ setParameter : 1, logLevel : 1 });
+    testDB.getMongo().setSlaveOk();
     print("trying some queries");
     assert.soon(function() { try {
-                db.foo.find().next();
+                testDB.foo.find().next();
             }
             catch(e) {
                 print(e);
@@ -74,13 +78,10 @@ function go() {
             }
             return true;
         }, "Queries took too long to complete correctly.",
-        2 * 60 * 1000 );
+        2 * 60 * 1000);
     
-    // Done
-    routerSpec.end()
-    configsetSpec.end()
-    repset1.stopSet()
-}
+    // Shutdown cluster
+    shardingTest.stop();
 
-//Uncomment below to execute
-go()
+    print('shard_insert_getlasterror_w2.js SUCCESS');
+})();
