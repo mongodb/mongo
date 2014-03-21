@@ -251,6 +251,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 			F_CLR(btree, WT_BTREE_NO_EVICTION);
 	}
 
+	/*
+	 * Disable eviction from bulk handles.  Among other things, this saves
+	 * a round trip to the eviction server when completing a bulk load.
+	 */
+	if (F_ISSET(btree, WT_BTREE_BULK))
+		F_SET(btree, WT_BTREE_NO_EVICTION);
+
 	/* Checksums */
 	WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
 	if (WT_STRING_MATCH("on", cval.str, cval.len))
