@@ -25,11 +25,12 @@ __wt_block_ckpt_init(
 
 	ci->root_offset = WT_BLOCK_INVALID_OFFSET;
 
-	WT_RET(__wt_block_extlist_init(session, &ci->alloc, name, "alloc"));
-	WT_RET(__wt_block_extlist_init(session, &ci->avail, name, "avail"));
-	WT_RET(__wt_block_extlist_init(session, &ci->discard, name, "discard"));
+	WT_RET(__wt_block_extlist_init(session, &ci->alloc, name, "alloc", 0));
+	WT_RET(__wt_block_extlist_init(session, &ci->avail, name, "avail", 1));
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, name, "ckpt_avail"));
+	    session, &ci->discard, name, "discard", 0));
+	WT_RET(__wt_block_extlist_init(
+	    session, &ci->ckpt_avail, name, "ckpt_avail", 0));
 
 	return (0);
 }
@@ -365,7 +366,7 @@ __ckpt_process(
 	 */
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, "live", "ckpt_avail"));
+	    session, &ci->ckpt_avail, "live", "ckpt_avail", 0));
 
 	/*
 	 * We've allocated our last page, update the checkpoint size.  We need
@@ -568,10 +569,11 @@ live_update:
 	 * avail list alone.
 	 */
 	__wt_block_extlist_free(session, &ci->alloc);
-	WT_ERR(__wt_block_extlist_init(session, &ci->alloc, "live", "alloc"));
+	WT_ERR(__wt_block_extlist_init(
+	    session, &ci->alloc, "live", "alloc", 0));
 	__wt_block_extlist_free(session, &ci->discard);
-	WT_ERR(
-	    __wt_block_extlist_init(session, &ci->discard, "live", "discard"));
+	WT_ERR(__wt_block_extlist_init(
+	    session, &ci->discard, "live", "discard", 0));
 
 #ifdef HAVE_DIAGNOSTIC
 	/*

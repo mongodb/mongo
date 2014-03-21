@@ -88,7 +88,7 @@ __wt_block_verify_start(
 	 * set of checkpoints.
 	 */
 	WT_RET(__wt_block_extlist_init(
-	    session, &block->verify_alloc, "verify", "alloc"));
+	    session, &block->verify_alloc, "verify", "alloc", 0));
 
 	/*
 	 * The only checkpoint avail list we care about is the last one written;

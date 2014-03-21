@@ -166,32 +166,39 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 	 * If we are inserting a new size onto the size skiplist, we'll need a
 	 * new WT_SIZE structure for that skiplist.
 	 */
-	__block_size_srch(el->sz, ext->size, sstack);
-	szp = *sstack[0];
-	if (szp == NULL || szp->size != ext->size) {
-		WT_RET(__wt_block_size_alloc(session, &szp));
-		szp->size = ext->size;
-		szp->depth = ext->depth;
+	if (el->track_size) {
+		__block_size_srch(el->sz, ext->size, sstack);
+		szp = *sstack[0];
+		if (szp == NULL || szp->size != ext->size) {
+			WT_RET(__wt_block_size_alloc(session, &szp));
+			szp->size = ext->size;
+			szp->depth = ext->depth;
+			for (i = 0; i < ext->depth; ++i) {
+				szp->next[i] = *sstack[i];
+				*sstack[i] = szp;
+			}
+		}
+
+		/*
+		 * Insert the new WT_EXT structure into the size element's
+		 * offset skiplist.
+		 */
+		__block_off_srch(szp->off, ext->off, astack, 1);
 		for (i = 0; i < ext->depth; ++i) {
-			szp->next[i] = *sstack[i];
-			*sstack[i] = szp;
+			ext->next[i + ext->depth] = *astack[i];
+			*astack[i] = ext;
 		}
 	}
+#ifdef HAVE_DIAGNOSTIC
+	if (!el->track_size)
+		for (i = 0; i < ext->depth; ++i)
+			ext->next[i + ext->depth] = NULL;
+#endif
 
 	/* Insert the new WT_EXT structure into the offset skiplist. */
 	__block_off_srch(el->off, ext->off, astack, 0);
 	for (i = 0; i < ext->depth; ++i) {
 		ext->next[i] = *astack[i];
-		*astack[i] = ext;
-	}
-
-	/*
-	 * Insert the new WT_EXT structure into the size element's offset
-	 * skiplist.
-	 */
-	__block_off_srch(szp->off, ext->off, astack, 1);
-	for (i = 0; i < ext->depth; ++i) {
-		ext->next[i + ext->depth] = *astack[i];
 		*astack[i] = ext;
 	}
 
@@ -306,21 +313,32 @@ __block_off_remove(
 	 * Find and remove the record from the size's offset skiplist; if that
 	 * empties the by-size skiplist entry, remove it as well.
 	 */
-	__block_size_srch(el->sz, ext->size, sstack);
-	szp = *sstack[0];
-	if (szp == NULL || szp->size != ext->size)
-		return (EINVAL);
-	__block_off_srch(szp->off, off, astack, 1);
-	ext = *astack[0];
-	if (ext == NULL || ext->off != off)
-		goto corrupt;
-	for (i = 0; i < ext->depth; ++i)
-		*astack[i] = ext->next[i + ext->depth];
-	if (szp->off[0] == NULL) {
-		for (i = 0; i < szp->depth; ++i)
-			*sstack[i] = szp->next[i];
-		__wt_block_size_free(session, szp);
+	if (el->track_size) {
+		__block_size_srch(el->sz, ext->size, sstack);
+		szp = *sstack[0];
+		if (szp == NULL || szp->size != ext->size)
+			return (EINVAL);
+		__block_off_srch(szp->off, off, astack, 1);
+		ext = *astack[0];
+		if (ext == NULL || ext->off != off)
+			goto corrupt;
+		for (i = 0; i < ext->depth; ++i)
+			*astack[i] = ext->next[i + ext->depth];
+		if (szp->off[0] == NULL) {
+			for (i = 0; i < szp->depth; ++i)
+				*sstack[i] = szp->next[i];
+			__wt_block_size_free(session, szp);
+		}
 	}
+#ifdef HAVE_DIAGNOSTIC
+	if (!el->track_size) {
+		int not_null;
+		for (i = 0, not_null = 0; i < ext->depth; ++i)
+			if (ext->next[i + ext->depth] != NULL)
+				not_null = 1;
+		WT_ASSERT(session, not_null == 0);
+	}
+#endif
 
 	--el->entries;
 	el->bytes -= (uint64_t)ext->size;
@@ -457,6 +475,9 @@ __wt_block_alloc(
 {
 	WT_EXT *ext, **estack[WT_SKIP_MAXDEPTH];
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+
+	/* Assert we're maintaining the by-size skiplist. */
+	WT_ASSERT(session, block->live.avail.track_size != 0);
 
 	WT_STAT_FAST_DATA_INCR(session, block_alloc);
 	if (size % block->allocsize != 0)
@@ -1205,7 +1226,7 @@ __wt_block_extlist_truncate(
  */
 int
 __wt_block_extlist_init(WT_SESSION_IMPL *session,
-    WT_EXTLIST *el, const char *name, const char *extname)
+    WT_EXTLIST *el, const char *name, const char *extname, int track_size)
 {
 	char buf[128];
 
@@ -1214,6 +1235,7 @@ __wt_block_extlist_init(WT_SESSION_IMPL *session,
 	WT_RET(__wt_strdup(session, buf, &el->name));
 
 	el->offset = WT_BLOCK_INVALID_OFFSET;
+	el->track_size = track_size;
 	return (0);
 }
 
