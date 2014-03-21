@@ -32,8 +32,7 @@ __block_off_srch_last(WT_EXT **head, WT_EXT ***stack)
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, extp = &head[i]; i >= 0;)
 		if (*extp != NULL) {
-			if (i == 0)
-				last = *extp;
+			last = *extp;
 			extp = &(*extp)->next[i];
 		} else
 			stack[i--] = extp--;
@@ -913,6 +912,9 @@ __block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 	 if (ext != NULL && ext->off + ext->size == off)
 		ext->size += size;
 	else {
+		/* Assert we're appending to the list. */
+		WT_ASSERT(session, ext == NULL || ext->off + ext->size < off);
+
 		WT_RET(__wt_block_ext_alloc(session, &ext));
 		ext->off = off;
 		ext->size = size;
