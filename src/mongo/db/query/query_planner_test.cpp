@@ -1218,6 +1218,26 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {foo: 1, bar: 1}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, ElemMatchValueIndexability) {
+        addIndex(BSON("foo" << 1));
+
+        // An ELEM_MATCH_VALUE can be indexed if all of its child predicates
+        // are "index bounds generating".
+        runQuery(fromjson("{foo: {$elemMatch: {$gt: 5, $lt: 10}}}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {foo:{$elemMatch:{$gt:5,$lt:10}}}}}");
+        assertSolutionExists("{fetch: {filter: {foo: {$elemMatch: {$gt: 5, $lt: 10}}}, node: "
+                                "{ixscan: {filter: null, pattern: {foo: 1}}}}}");
+
+        // We cannot build index bounds for the $size predicate. This means that the
+        // ELEM_MATCH_VALUE is not indexable, and we get no indexed solutions.
+        runQuery(fromjson("{foo: {$elemMatch: {$gt: 5, $size: 10}}}"));
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {foo:{$elemMatch:{$gt:5,$size:10}}}}}");
+    }
+
     TEST_F(QueryPlannerTest, ElemMatchNested) {
         addIndex(BSON("a.b.c" << 1));
         runQuery(fromjson("{ a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1, $lte:1 } } } } }}"));
