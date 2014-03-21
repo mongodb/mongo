@@ -7,11 +7,38 @@
 
 #include "wt_internal.h"
 
+static int __block_append(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
 static int __block_extlist_dump(
 	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
 static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
+
+/*
+ * __block_off_srch_last --
+ *	Return the last element in the list, along with a stack for appending.
+ */
+static inline WT_EXT *
+__block_off_srch_last(WT_EXT **head, WT_EXT ***stack)
+{
+	WT_EXT **extp, *last;
+	int i;
+
+	last = NULL;				/* The list may be empty */
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, extp = &head[i]; i >= 0;)
+		if (*extp != NULL) {
+			if (i == 0)
+				last = *extp;
+			extp = &(*extp)->next[i];
+		} else
+			stack[i--] = extp--;
+	return (last);
+}
 
 /*
  * __block_off_srch --
@@ -125,30 +152,6 @@ __block_off_srch_pair(
 			--extp;
 		}
 	}
-}
-
-/*
- * __block_extlist_last --
- *	Return the last extent in the skiplist.
- */
-static inline WT_EXT *
-__block_extlist_last(WT_EXT **head)
-{
-	WT_EXT *ext, **extp;
-	int i;
-
-	ext = NULL;
-
-	for (i = WT_SKIP_MAXDEPTH - 1, extp = &head[i]; i >= 0;) {
-		if (*extp == NULL) {
-			--i;
-			--extp;
-			continue;
-		}
-		ext = *extp;
-		extp = &(*extp)->next[i];
-	}
-	return (ext);
 }
 
 /*
@@ -499,16 +502,16 @@ __wt_block_alloc(
 	 * If we don't have anything big enough, extend the file.
 	 */
 	if (block->allocfirst) {
-		if (!__block_first_srch(block->live.avail.off, size, estack)) {
-			WT_RET(__block_extend(session, block, offp, size));
-			goto done;
-		}
+		if (!__block_first_srch(block->live.avail.off, size, estack))
+			goto append;
 		ext = *estack[0];
 	} else {
 		__block_size_srch(block->live.avail.sz, size, sstack);
 		if ((szp = *sstack[0]) == NULL) {
-			WT_RET(__block_extend(session, block, offp, size));
-			goto done;
+append:			WT_RET(__block_extend(session, block, offp, size));
+			WT_RET(__block_append(
+			    session, &block->live.alloc, *offp, (off_t)size));
+			return(0);
 		}
 
 		/* Take the first record. */
@@ -540,7 +543,7 @@ __wt_block_alloc(
 		__wt_block_ext_free(session, ext);
 	}
 
-done:	/* Add the newly allocated extent to the list of allocations. */
+	/* Add the newly allocated extent to the list of allocations. */
 	WT_RET(__block_merge(session, &block->live.alloc, *offp, (off_t)size));
 	return (0);
 }
@@ -886,6 +889,45 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 }
 
 /*
+ * __block_append --
+ *	Append a new entry to the allocation list.
+ */
+static int
+__block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+{
+	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
+	u_int i;
+
+	WT_ASSERT(session, el->track_size == 0);
+
+	/*
+	 * Identical to __block_merge, when we know the file is being extended,
+	 * that is, the information is either going to be used to extend the
+	 * last object on the list, or become a new object ending the list.
+	 *
+	 * First, get a stack for the last object in the skiplist, then check
+	 * for a simple extension.  If that doesn't work, allocate a new list
+	 * structure, and append it.
+	 */
+	 ext = __block_off_srch_last(el->off, astack);
+	 if (ext != NULL && ext->off + ext->size == off)
+		ext->size += size;
+	else {
+		WT_RET(__wt_block_ext_alloc(session, &ext));
+		ext->off = off;
+		ext->size = size;
+
+		for (i = 0; i < ext->depth; ++i)
+			 *astack[i] = ext;
+		++el->entries;
+	}
+
+	el->bytes += (uint64_t)size;
+
+	return (0);
+}
+
+/*
  * __wt_block_insert_ext --
  *	Insert an extent into an extent list, merging if possible.
  */
@@ -1188,7 +1230,7 @@ int
 __wt_block_extlist_truncate(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
-	WT_EXT *ext;
+	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
 	WT_FH *fh;
 	off_t size;
 
@@ -1198,7 +1240,7 @@ __wt_block_extlist_truncate(
 	 * Check if the last available extent is at the end of the file, and if
 	 * so, truncate the file and discard the extent.
 	 */
-	if ((ext = __block_extlist_last(el->off)) == NULL)
+	if ((ext = __block_off_srch_last(el->off, astack)) == NULL)
 		return (0);
 	if (ext->off + ext->size != fh->size)
 		return (0);
