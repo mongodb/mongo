@@ -149,9 +149,10 @@ namespace mongo {
                 "0=off 1=slow, 2=all")
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("operationProfiling.mode", "", moe::Int,
+        general_options.addOptionChaining("operationProfiling.mode", "", moe::String,
                 "(off/slowOp/all)")
-                                         .setSources(moe::SourceYAMLConfig);
+                                         .setSources(moe::SourceYAMLConfig)
+                                         .format("(:?off)|(:?slowOp)|(:?all)", "(off/slowOp/all)");
 
         general_options.addOptionChaining("cpu", "cpu", moe::Switch,
                 "periodically show cpu and iowait utilization")
