@@ -1,61 +1,93 @@
-// Test for cloning a db from a replica set [SERVER-1643] -Tony
+// Test cloning a database from a replica set (as full replica set uri, just the PRIMARY, or just a
+// SECONDARY) to a standalone server and viceversa (SERVER-1643)
 
-load('jstests/libs/grid.js')
+(function() {
+    "use strict";
 
-doTest = function( signal ) {
-
-    var N = 2000
-
-    print("~1KB string");
-    var Text = ''
-    for (var i = 0; i < 40; i++)
-        Text += 'abcdefghijklmnopqrstuvwxyz'
-
-    print("Create replica set");
-    var repset = new ReplicaSet ('testSet', 3) .begin()
-    var master = repset.getMaster()
-    var db1 = master.getDB('test')
-    
-    print("Insert data");
-    var bulk = db1['foo'].initializeUnorderedBulkOp();
-    for (var i = 0; i < N; i++) {
-        bulk.insert({ x: i, text: Text });
-    }
-    assert.writeOK(bulk.execute());
-    
-    print("Create single server");
-    var solo = new Server ('singleTarget')
-    var soloConn = solo.begin()
-    soloConn.getDB("admin").runCommand({setParameter:1,logLevel:5});
-    
-    var db2 = soloConn.getDB('test')
-    
-    print("Clone db from replica set to single server");
-    db2.cloneDatabase (repset.getURL())
-    
-    print("Confirm clone worked");
-    assert.eq (Text, db2['foo'] .findOne({x: N-1}) ['text'], 'cloneDatabase failed (test1)')
-    
-    print("Now test the reverse direction");
-    db1 = master.getDB('test2')
-    db2 = soloConn.getDB('test2')
-
-    bulk = db2['foo'].initializeUnorderedBulkOp();
-    for (var i = 0; i < N; i++) {
-        bulk.insert({ x: i, text: Text });
-    }
-    assert.writeOK(bulk.execute());
-    db1.cloneDatabase (solo.host())
-    assert.eq (Text, db2['foo'] .findOne({x: N-1}) ['text'], 'cloneDatabase failed (test2)')
-
-    print("Shut down replica set and single server");
-    solo.end()
-    repset.stopSet( signal )
-}
-
-if (jsTest.options().keyFile || jsTest.options().useX509) {
-    print("Skipping test because clone command doesn't work with authentication enabled: SERVER-4245")
+if (jsTest.options().keyFile) {
+    jsTest.log("Skipping test because clone command doesn't work with authentication enabled:" +
+              " SERVER-4245");
 } else {
-    doTest( 15 );
-    print("replsets/cloneDb.js SUCCESS");
+    var numDocs = 2000;
+
+    // 1kb string
+    var str = new Array(1000).toString();
+
+    var replsetDBName = 'cloneDBreplset';
+    var standaloneDBName = 'cloneDBstandalone';
+    var testColName = 'foo';
+
+    jsTest.log("Create replica set");
+    var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+    replTest.startSet();
+    replTest.initiate();
+    var master = replTest.getMaster();
+    var secondary = replTest.liveNodes.slaves[0];
+    var masterDB = master.getDB(replsetDBName);
+    masterDB.dropDatabase();
+    
+    jsTest.log("Create standalone server");
+    var standalone = MongoRunner.runMongod();
+    standalone.getDB("admin").runCommand({setParameter:1,logLevel:5});
+    var standaloneDB = standalone.getDB(replsetDBName);
+    standaloneDB.dropDatabase();
+    
+    jsTest.log("Insert data into replica set");
+    var bulk = masterDB[testColName].initializeUnorderedBulkOp();
+    for (var i = 0; i < numDocs; i++) {
+        bulk.insert({x: i, text: str});
+    }
+    assert.writeOK(bulk.execute());
+    
+    jsTest.log("Clone db from replica set to standalone server");
+    standaloneDB.cloneDatabase(replTest.getURL());
+    assert.eq(numDocs, standaloneDB[testColName].count(),
+              'cloneDatabase from replset to standalone failed (document counts do not match)');
+
+    jsTest.log("Clone db from replica set PRIMARY to standalone server");
+    standaloneDB.dropDatabase();
+    standaloneDB.cloneDatabase(master.host);
+    assert.eq(numDocs, standaloneDB[testColName].count(),
+              'cloneDatabase from PRIMARY to standalone failed (document counts do not match)');
+    
+    /* cloning from a SECONDARY does not work (SERVER-13357)
+    jsTest.log("Clone db from replica set SECONDARY to standalone server");
+    standaloneDB.dropDatabase();
+    standaloneDB.cloneDatabase(secondary.host);
+    assert.eq(numDocs, standaloneDB[testColName].count(),
+              'cloneDatabase from SECONDARY to standalone failed (document counts do not match)');
+    */
+    
+    jsTest.log("Switch db and insert data into standalone server");
+    masterDB = master.getDB(standaloneDBName);
+    var secondaryDB = secondary.getDB(standaloneDBName);
+    standaloneDB = standalone.getDB(standaloneDBName);
+    masterDB.dropDatabase();
+    secondaryDB.dropDatabase();
+    standaloneDB.dropDatabase();
+
+    bulk = standaloneDB[testColName].initializeUnorderedBulkOp();
+    for (var i = 0; i < numDocs; i++) {
+        bulk.insert({x: i, text: str});
+    }
+    assert.writeOK(bulk.execute());
+
+    jsTest.log("Clone db from standalone server to replica set PRIMARY");
+    masterDB.cloneDatabase(standalone.host);
+    replTest.awaitReplication();
+    assert.eq(numDocs, masterDB[testColName].count(),
+              'cloneDatabase from standalone to PRIMARY failed (document counts do not match)');
+
+    jsTest.log("Clone db from standalone server to replica set SECONDARY");
+    masterDB.dropDatabase();
+    secondaryDB.cloneDatabase(standalone.host);
+    assert.eq(0, secondaryDB[testColName].count(),
+              'cloneDatabase from standalone to SECONDARY succeeded and should not accept writes');
+
+    jsTest.log("Shut down replica set and standalone server");
+    MongoRunner.stopMongod(standalone.port);
+
+    replTest.stopSet();
 }
+
+})();
