@@ -38,6 +38,7 @@
 #include "mongo/util/net/message.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/text.h"
+#include "mongo/util/timer.h"
 
 using namespace mongo;
 using namespace std;
@@ -48,11 +49,26 @@ class Forwarder {
 public:
     Forwarder( MessagingPort &mp ) : mp_( mp ) {
     }
+
     void operator()() const {
         DBClientConnection dest;
         string errmsg;
-        while (!dest.connect(mongoBridgeGlobalParams.destUri, errmsg))
-            sleepmillis( 500 );
+
+        Timer connectTimer;
+        while (!dest.connect(mongoBridgeGlobalParams.destUri, errmsg)) {
+            // If we can't connect for the configured timeout, give up
+            //
+            if (connectTimer.seconds() >= mongoBridgeGlobalParams.connectTimeoutSec) {
+                cout << "Unable to establish connection from " << mp_.psock->remoteString() 
+                     << " to " << mongoBridgeGlobalParams.destUri 
+                     << " after " << connectTimer.seconds() << " seconds. Giving up." << endl;
+                mp_.shutdown();
+                return;
+            }
+
+            sleepmillis(500);
+        }
+
         Message m;
         while( 1 ) {
             try {
