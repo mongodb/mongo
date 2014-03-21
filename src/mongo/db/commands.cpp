@@ -185,7 +185,7 @@ namespace mongo {
         help << "no help defined";
     }
 
-    std::vector<BSONObj> Command::stopIndexBuilds(const std::string& dbname, 
+    std::vector<BSONObj> Command::stopIndexBuilds(Database* db,
                                                   const BSONObj& cmdObj) {
         return std::vector<BSONObj>();
     }

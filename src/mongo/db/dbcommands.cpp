@@ -170,14 +170,27 @@ namespace mongo {
 
         virtual LockType locktype() const { return WRITE; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
-            std::string toDeleteRegex = "^"+dbname+"\\.";
-            BSONObj criteria = BSON("ns" << systemIndexes <<
-                                    "op" << "insert" <<
-                                    "insert.ns" << BSON("$regex" << toDeleteRegex));
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            invariant(db);
+            std::list<std::string> collections;
+            db->namespaceIndex().getNamespaces(collections, true /* onlyCollections */);
+
+            std::vector<BSONObj> allKilledIndexes;
+            for (std::list<std::string>::iterator it = collections.begin(); 
+                 it != collections.end(); 
+                 ++it) {
+                std::string ns = *it;
+
+                IndexCatalog::IndexKillCriteria criteria;
+                criteria.ns = ns;
+                std::vector<BSONObj> killedIndexes = 
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+                allKilledIndexes.insert(allKilledIndexes.end(), 
+                                        killedIndexes.begin(), 
+                                        killedIndexes.end());
+            }
+            return allKilledIndexes;
         }
 
         CmdDropDatabase() : Command("dropDatabase") {}
@@ -192,7 +205,7 @@ namespace mongo {
             int p = (int) e.number();
             if ( p != 1 )
                 return false;
-            stopIndexBuilds(dbname, cmdObj);
+            stopIndexBuilds(cc().database(), cmdObj);
             dropDatabase(dbname);
             result.append( "dropped" , dbname );
             log() << "dropDatabase " << dbname << " finished" << endl;
@@ -224,11 +237,27 @@ namespace mongo {
         }
         CmdRepairDatabase() : Command("repairDatabase") {}
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname + ".system.indexes";
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert");
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            invariant(db);
+            std::list<std::string> collections;
+            db->namespaceIndex().getNamespaces(collections, true /* onlyCollections */);
+
+            std::vector<BSONObj> allKilledIndexes;
+            for (std::list<std::string>::iterator it = collections.begin(); 
+                 it != collections.end(); 
+                 ++it) {
+                std::string ns = *it;
+
+                IndexCatalog::IndexKillCriteria criteria;
+                criteria.ns = ns;
+                std::vector<BSONObj> killedIndexes = 
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+                allKilledIndexes.insert(allKilledIndexes.end(), 
+                                        killedIndexes.begin(), 
+                                        killedIndexes.end());
+            }
+            return allKilledIndexes;
         }
 
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -241,7 +270,7 @@ namespace mongo {
                 return false;
             }
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(dbname, cmdObj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(cc().database(), cmdObj);
 
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
@@ -390,14 +419,13 @@ namespace mongo {
         virtual void help( stringstream& help ) const { help << "drop a collection\n{drop : <collectionName>}"; }
         virtual LockType locktype() const { return WRITE; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
-            std::string systemIndexes = dbname+".system.indexes";
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" <<
-                                    "insert.ns" << nsToDrop);
+            std::string nsToDrop = db->name() + '.' + cmdObj.firstElement().valuestr();
 
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = nsToDrop;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
         }
 
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -420,7 +448,7 @@ namespace mongo {
 
             int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
 
-            stopIndexBuilds(dbname, cmdObj);
+            stopIndexBuilds(cc().database(), cmdObj);
 
             result.append( "ns", nsToDrop );
             result.append( "nIndexesWas", numIndexes );

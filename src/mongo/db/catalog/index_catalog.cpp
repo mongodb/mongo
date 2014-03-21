@@ -34,13 +34,13 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/index_legacy.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/btree_based_access_method.h"
@@ -50,14 +50,15 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/structure/catalog/namespace_details-inl.h"
 #include "mongo/util/assert_util.h"
@@ -322,15 +323,19 @@ namespace mongo {
         invariant( _details->_catalogFindIndexByName( idxName, true ) >= 0 );
 
         try {
-            // Set curop description before setting indexBuildInProg, so that there's something
-            // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
-            // killable index, so we don't overwrite commands in currentOp.
-            if ( mayInterrupt ) {
-                cc().curop()->setQuery( spec );
-            }
+            Client& client = cc();
 
+            _inProgressIndexes[descriptor] = &client;
+
+            // buildAnIndex can yield.  During a yield, the Collection that owns this
+            // IndexCatalog can be dropped, which means both the Collection and IndexCatalog
+            // can be destructed out from under us.  The runner used by the index build will
+            // throw a particular exception when it detects that this occurred.
             buildAnIndex( _collection, entry, mayInterrupt );
             indexBuildBlock.success();
+
+            InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
+            _inProgressIndexes.erase(it);
 
             // sanity check
             int idxNo = _details->_catalogFindIndexByName( idxName, true );
@@ -339,16 +344,25 @@ namespace mongo {
             return Status::OK();
         }
         catch ( const AssertionException& exc ) {
-            log() << "index build failed."
-                  << " spec: " << spec
-                  << " error: " << exc;
+            // At this point, *this may have been destructed, if we dropped the collection
+            // while we were yielding.  indexBuildBlock will not touch an invalid _collection
+            // pointer if you call abort() on it.
+
+            log() << "index build failed." << " spec: " << spec << " error: " << exc;
 
             if ( shutdownBehavior == SHUTDOWN_LEAVE_DIRTY &&
                  exc.getCode() == ErrorCodes::InterruptedAtShutdown ) {
                 indexBuildBlock.abort();
             }
+            else if ( exc.getCode() == ErrorCodes::CursorNotFound ) {
+                // The cursor was killed because the collection was dropped. No need to clean up.
+                indexBuildBlock.abort();
+            }
             else {
                 indexBuildBlock.fail();
+
+                InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
+                _inProgressIndexes.erase(it);            
             }
 
             ErrorCodes::Error codeToUse = ErrorCodes::fromInt( exc.getCode() );
@@ -1244,7 +1258,6 @@ namespace mongo {
         return key;
     }
 
-
     BSONObj IndexCatalog::_fixIndexSpec( const BSONObj& spec ) {
         BSONObj o = IndexLegacy::adjustIndexSpecObject( spec );
 
@@ -1297,5 +1310,42 @@ namespace mongo {
         }
 
         return b.obj();
+    }
+
+    std::vector<BSONObj> 
+    IndexCatalog::killMatchingIndexBuilds(const IndexCatalog::IndexKillCriteria& criteria) {
+        verify(Lock::somethingWriteLocked());
+        std::vector<BSONObj> indexes;
+        for (InProgressIndexesMap::iterator it = _inProgressIndexes.begin();
+             it != _inProgressIndexes.end();
+             it++) {
+            // check criteria
+            IndexDescriptor* desc = it->first;
+            Client* client = it->second;
+            if (!criteria.ns.empty() && (desc->parentNS() != criteria.ns)) {
+                continue;
+            }
+            if (!criteria.name.empty() && (desc->indexName() != criteria.name)) {
+                continue;
+            }
+            if (!criteria.key.isEmpty() && (desc->keyPattern() != criteria.key)) {
+                continue;
+            }
+            indexes.push_back(desc->keyPattern());
+            CurOp* op = client->curop();
+            log() << "halting index build: " << desc->keyPattern();
+            // Note that we can only be here if the background index build in question is
+            // yielding.  The bg index code is set up specially to check for interrupt
+            // immediately after it recovers from yield, such that no further work is done
+            // on the index build.  Thus this thread does not have to synchronize with the
+            // bg index operation; we can just assume that it is safe to proceed.
+            killCurrentOp.kill(op->opNum());
+        }
+
+        if (indexes.size() > 0) {
+            log() << "halted " << indexes.size() << " index build(s)" << endl;
+        }
+
+        return indexes;
     }
 }

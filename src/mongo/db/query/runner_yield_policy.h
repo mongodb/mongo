@@ -77,6 +77,7 @@ namespace mongo {
 
             runner->collection()->cursorCache()->registerRunner( _runnerYielding );
 
+            // Note that this call checks for interrupt, and thus can throw if interrupt flag is set
             staticYield(micros, record);
 
             if ( runner->collection() ) {
