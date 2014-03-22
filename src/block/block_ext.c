@@ -500,7 +500,7 @@ __wt_block_alloc(
 	 *
 	 * If we don't have anything big enough, extend the file.
 	 */
-	if (block->live.avail.bytes < size)
+	if (block->live.avail.bytes < (uint64_t)size)
 		goto append;
 	if (block->allocfirst) {
 		if (!__block_first_srch(block->live.avail.off, size, estack))
