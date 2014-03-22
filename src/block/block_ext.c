@@ -427,7 +427,7 @@ __wt_block_off_remove_overlap(
  * __block_extend --
  *	Extend the file to allocate space.
  */
-static int
+static inline int
 __block_extend(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
 {
