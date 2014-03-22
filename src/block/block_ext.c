@@ -427,7 +427,7 @@ __wt_block_off_remove_overlap(
  * __block_extend --
  *	Extend the file to allocate space.
  */
-static int
+static inline int
 __block_extend(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
 {
@@ -500,6 +500,8 @@ __wt_block_alloc(
 	 *
 	 * If we don't have anything big enough, extend the file.
 	 */
+	if (block->live.avail.bytes < size)
+		goto append;
 	if (block->allocfirst) {
 		if (!__block_first_srch(block->live.avail.off, size, estack))
 			goto append;
