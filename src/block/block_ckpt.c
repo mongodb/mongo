@@ -59,12 +59,12 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	*root_addr_sizep = 0;
 
-	if (WT_VERBOSE_ISSET(session, ckpt)) {
+	if (WT_VERBOSE_ISSET(session, checkpoint)) {
 		if (addr != NULL) {
 			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 			WT_ERR(__ckpt_string(session, block, addr, tmp));
 		}
-		WT_VERBOSE_ERR(session, ckpt,
+		WT_VERBOSE_ERR(session, checkpoint,
 		    "%s: load-checkpoint: %s", block->name,
 		    addr == NULL ? "[Empty]" : (const char *)tmp->data);
 	}
@@ -128,7 +128,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * enough I don't bother).
 	 */
 	if (!checkpoint) {
-		WT_VERBOSE_ERR(session, ckpt,
+		WT_VERBOSE_ERR(session, checkpoint,
 		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size);
 		WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
 	}
@@ -437,12 +437,12 @@ __ckpt_process(
 		    !F_ISSET(ckpt, WT_CKPT_DELETE))
 			continue;
 
-		if (WT_VERBOSE_ISSET(session, ckpt)) {
+		if (WT_VERBOSE_ISSET(session, checkpoint)) {
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 			WT_ERR(__ckpt_string(
 			    session, block, ckpt->raw.data, tmp));
-			WT_VERBOSE_ERR(session, ckpt,
+			WT_VERBOSE_ERR(session, checkpoint,
 			    "%s: delete-checkpoint: %s: %s",
 			    block->name, ckpt->name, (const char *)tmp->data);
 		}
@@ -696,10 +696,10 @@ __ckpt_update(
 	WT_RET(__wt_block_ckpt_to_buffer(session, block, &endp, ci));
 	ckpt->raw.size = WT_PTRDIFF(endp, ckpt->raw.mem);
 
-	if (WT_VERBOSE_ISSET(session, ckpt)) {
+	if (WT_VERBOSE_ISSET(session, checkpoint)) {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__ckpt_string(session, block, ckpt->raw.data, tmp));
-		WT_VERBOSE_ERR(session, ckpt,
+		WT_VERBOSE_ERR(session, checkpoint,
 		    "%s: create-checkpoint: %s: %s",
 		    block->name, ckpt->name, (const char *)tmp->data);
 	}
