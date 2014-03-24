@@ -296,6 +296,24 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
+	Config('async', '', r'''
+	    asynchronous operations configuration options.''',
+	    type='category', subconfig=[
+	    Config('auto_free', 'true', r'''
+	        should the handle be freed after use?''',
+	        type='boolean'),
+	    Config('enabled', 'false', r'''
+	        enable asynchronous operation''',
+	        type='boolean'),
+	    Config('ops_max', '1024', r'''
+	        maximum number of expected simultaneous asynchronous
+                operations.''', min='10', max='4096'),
+                # !!! Must match WT_ASYNC_MAX_OPS
+	    Config('threads', '2', r'''
+	        the number of worker threads to service asynchronous
+                requests''',
+                min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
+            ]),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',

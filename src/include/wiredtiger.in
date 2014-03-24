@@ -69,6 +69,9 @@ extern "C" {
 /*******************************************
  * Public forward structure declarations
  *******************************************/
+struct __wt_async_callback;
+	typedef struct __wt_async_callback WT_ASYNC_CALLBACK;
+struct __wt_async_op;	    typedef struct __wt_async_op WT_ASYNC_OP;
 struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
 struct __wt_compressor;	    typedef struct __wt_compressor WT_COMPRESSOR;
 struct __wt_config_item;    typedef struct __wt_config_item WT_CONFIG_ITEM;
@@ -146,6 +149,327 @@ struct __wt_item {
  * function will pack single integers into at most this many bytes.
  */
 #define	WT_INTPACK32_MAXSIZE	((int)sizeof (int32_t) + 1)
+
+/*!
+ * A WT_ASYNC_OP handle is the interface to an asynchronous operation.
+ *
+ * An asynchronous operation describes a data manipulation to be performed
+ * asynchronously by a WiredTiger worker thread.  These operations implement
+ * the CRUD (create, read, update and delete) operations.  Each operation
+ * is a self-contained work unit.  The operation will be performed in the
+ * context of the worker thread's session.  Each operation is performed
+ * within the context of a transaction.  The application is notified of its
+ * completion with a callback.  The transaction is resolved once the
+ * callback returns.
+ *
+ * The table referenced in an operation must already exist.
+ *
+ * Raw data is represented by key/value pairs of WT_ITEM structures, but
+ * operations can also provide access to fields within the key and value if the
+ * formats are described in the WT_SESSION::create method.
+ *
+ * <b>Thread safety:</b> A WT_ASYNC_OP handle is not shared between threads.
+ */
+struct __wt_async_op {
+	/*! The connection for this operation. */
+	WT_CONNECTION *connection;
+
+	/*!
+	 * The name of the data source for the operation, matches the \c uri
+	 * parameter to WT_SESSION::create used to create the table.
+	 */
+	const char *uri;
+	uint64_t uri_hash;
+
+	/*!
+	 * The format of the data packed into key items.  See @ref packing for
+	 * details.  If not set, a default value of "u" is assumed, and
+	 * applications must use WT_ITEM structures to manipulate untyped byte
+	 * arrays.
+	 */
+	const char *key_format;
+
+	/*!
+	 * The format of the data packed into value items.  See @ref packing
+	 * for details.  If not set, a default value of "u" is assumed, and
+	 * applications must use WT_ITEM structures to manipulate untyped byte
+	 * arrays.
+	 */
+	const char *value_format;
+
+	/*!
+	 * @name Data access
+	 * @{
+	 */
+	/*!
+	 * Get the key for the current record.
+	 *
+	 * @snippet ex_all.c Get the cursor's string key
+	 *
+	 * @snippet ex_all.c Get the cursor's record number key
+	 *
+	 * @param op the operation handle
+	 * @param ... pointers to hold key fields corresponding to
+	 * WT_ASYNC_OP::key_format.
+	 * @errors
+	 */
+	int __F(get_key)(WT_ASYNC_OP *op, ...);
+
+	/*!
+	 * Get the value for the current record.
+	 *
+	 * @snippet ex_all.c Get the operation's string value
+	 *
+	 * @snippet ex_all.c Get the operation's raw value
+	 *
+	 * @param op the operation handle
+	 * @param ... pointers to hold value fields corresponding to
+	 * WT_ASYNC_OP::value_format.
+	 * @errors
+	 */
+	int __F(get_value)(WT_ASYNC_OP *op, ...);
+
+	/*!
+	 * Set the key for the next operation.
+	 *
+	 * @snippet ex_all.c Set the operation's string key
+	 *
+	 * @snippet ex_all.c Set the operation's record number key
+	 *
+	 * @param op the operation handle
+	 * @param ... key fields corresponding to WT_ASYNC_OP::key_format.
+	 *
+	 * If an error occurs during this operation, a flag will be set in the
+	 * operation, and the next operation to access the key will fail.  This
+	 * simplifies error handling in applications.
+	 */
+	void __F(set_key)(WT_ASYNC_OP *op, ...);
+
+	/*!
+	 * Set the value for the next operation.
+	 *
+	 * @snippet ex_all.c Set the operation's string value
+	 *
+	 * @snippet ex_all.c Set the operation's raw value
+	 *
+	 * @param op the operation handle
+	 * @param ... value fields corresponding to WT_ASYNC_OP::value_format.
+	 *
+	 * If an error occurs during this operation, a flag will be set in the
+	 * operation, and the next operation to access the value will fail
+	 * This simplifies error handling in applications.
+	 */
+	void __F(set_value)(WT_ASYNC_OP *op, ...);
+	/*! @} */
+
+	/*!
+	 * Return the record matching the key. The key must first be set.
+	 *
+	 * @snippet ex_all.c Search for an exact match
+	 *
+	 * On success, the operation contains the returned record.
+	 *
+	 * @param op the operation handle
+	 * @errors
+	 */
+	int __F(search)(WT_ASYNC_OP *op);
+
+	/*!
+	 * @name Data modification
+	 * @{
+	 */
+	/*!
+	 * Insert a record and optionally update an existing record.
+	 *
+	 * If the operation was configured with "overwrite=true" (the default),
+	 * both the key and value must be set; if the record already exists,
+	 * the key's value will be updated, otherwise, the record will be
+	 * inserted.
+	 *
+	 * @snippet ex_all.c Insert a new record or overwrite an existing record
+	 *
+	 * If the operation was not configured with "overwrite=true", both the
+	 * key and value must be set and the record must not already exist; the
+	 * record will be inserted.
+	 *
+	 * @snippet ex_all.c Insert a new record and fail if the record exists
+	 *
+	 * If an operation with record number keys was configured with
+	 * "append=true" (not the default), the value must be set; a new record
+	 * will be appended and the record number set as the operation's
+	 * key value.
+	 *
+	 * @snippet ex_all.c Insert a new record and assign a record number
+	 *
+	 * Inserting a new record after the current maximum record in a
+	 * fixed-length bit field column-store (that is, a store with an
+	 * 'r' type key and 't' type value) may implicitly create the missing
+	 * records as records with a value of 0.
+	 *
+	 * When loading a large amount of data into a new object, using
+	 * normal cursor operations with the \c bulk configuration string
+	 * enabled will be much faster than asynchronous operations.
+	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
+	 *
+	 * @param op the operation handle
+	 * @errors
+	 * In particular, if \c overwrite is not configured and a record with
+	 * the specified key already exists, ::WT_DUPLICATE_KEY is returned.
+	 */
+	int __F(insert)(WT_ASYNC_OP *op);
+
+	/*!
+	 * Update a record and optionally insert an existing record.
+	 *
+	 * If the operation was configured with "overwrite=true" (the default),
+	 * both the key and value must be set; if the record already exists, the
+	 * key's value will be updated, otherwise, the record will be inserted.
+	 *
+	 * @snippet ex_all.c Update an existing record or insert a new record
+	 *
+	 * If the operation was not configured with "overwrite=true", both the
+	 * key and value must be set and the record must already exist; the
+	 * record will be updated.
+	 *
+	 * @snippet ex_all.c Update an existing record and fail if DNE
+	 *
+	 * The maximum length of a single column stored in a table is not fixed
+	 * (as it partially depends on the underlying file configuration), but
+	 * is always a small number of bytes less than 4GB.
+	 *
+	 * @param op the operation handle
+	 * @errors
+	 * In particular, if \c overwrite is not configured and no record with
+	 * the specified key exists, ::WT_NOTFOUND is returned.
+	 */
+	int __F(update)(WT_ASYNC_OP *op);
+
+	/*!
+	 * Remove a record.
+	 *
+	 * If the operation was configured with "overwrite=true" (the default),
+	 * the key must be set; the key's record will be removed if it exists,
+	 * no error will be returned if the record does not exist.
+	 *
+	 * @snippet ex_all.c Remove a record
+	 *
+	 * If the operation was not configured with "overwrite=true", the key
+	 * must be set and the key's record must exist; the record will be
+	 * removed.
+	 *
+	 * @snippet ex_all.c Remove a record and fail if DNE
+	 *
+	 * Removing a record in a fixed-length bit field column-store
+	 * (that is, a store with an 'r' type key and 't' type value) is
+	 * identical to setting the record's value to 0.
+	 *
+	 * @param op the operation handle
+	 * @errors
+	 * In particular, if \c overwrite is not configured and no record with
+	 * the specified key exists, ::WT_NOTFOUND is returned.
+	 */
+	int __F(remove)(WT_ASYNC_OP *op);
+	/*! @} */
+
+	/*!
+	 * Close the operation.
+	 *
+	 * This releases the resources associated with the operation handle.
+	 * If the operation was configured with "auto_free=true" (the default),
+	 * this method must not be called.  In that case, the resources
+	 * associated with the operation handle will be released automatically
+	 * after the operation completes.
+	 *
+	 * Operations are closed implicitly by ending the enclosing connection.
+	 *
+	 * @snippet ex_all.c Close the operation
+	 *
+	 * @param op the operation handle
+	 * @errors
+	 * In particular, if \c auto_free is configured, ::EINVAL is returned.
+	 */
+	int __F(close)(WT_HANDLE_CLOSED(WT_ASYNC_OP) *op);
+
+	/*!
+	 * Get the unique identifier for this operation.
+	 *
+	 * @snippet ex_all.c Get the operation's identifier.
+	 *
+	 * @param op the operation handle
+	 * @param ... pointers to hold value fields corresponding to
+	 * WT_ASYNC_OP::value_format.
+	 * @errors
+	 */
+	uint64_t __F(get_id)(WT_ASYNC_OP *op);
+
+	/*!
+	 * Wait for the operation to complete.
+	 *
+	 * This waits for the worker thread to complete the operation and
+	 * returns.  If the operation is already complete, it will return
+	 * immediately.
+	 *
+	 * If the operation was configured with "auto_free=true" (the default),
+	 * this method must not be called.
+	 *
+	 * @snippet ex_all.c Wait for the operation to complete.
+	 *
+	 * @param op the operation handle
+	 * @errors
+	 * In particular, if \c auto_free is configured, ::EINVAL is returned.
+	 */
+	int __F(wait)(WT_HANDLE_CLOSED(WT_ASYNC_OP) *op);
+
+	/*
+	 * Protected fields, only to be used by operation implementations.
+	 */
+#if !defined(SWIG) && !defined(DOXYGEN)
+	/*
+	 * !!!
+	 * Explicit representations of structures from queue.h.
+	 * TAILQ_ENTRY(wt_async_op) q;
+	 */
+	struct {
+		WT_CURSOR *tqe_next;
+		WT_CURSOR **tqe_prev;
+	} q;				/* Linked list of WT_ASYNC_OPS. */
+
+	uint64_t recno;			/* Record number, normal and raw mode */
+	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
+
+	void	*lang_private;		/* Language specific private storage */
+
+	WT_ITEM key, value;
+	int saved_err;			/* Saved error in set_{key,value}. */
+
+	uint32_t	internal_id;	/* Array position id. */
+	uint64_t	unique_id;	/* Unique identifier. */
+
+#define	WT_ASYNCOP_COMPLETE	0x0001
+#define	WT_ASYNCOP_ENQUEUED	0x0002
+#define	WT_ASYNCOP_FREE		0x0004
+#define	WT_ASYNCOP_READY	0x0008
+#define	WT_ASYNCOP_WORKING	0x0010
+	uint32_t	state;		/* Op state */
+	WT_ASYNC_OPTYPE	optype;		/* Operation type */
+
+#define WT_ASYNCOP_DATA_SOURCE	0x0001
+#define	WT_ASYNCOP_DUMP_HEX	0x0002
+#define	WT_ASYNCOP_DUMP_PRINT	0x0004
+#define	WT_ASYNCOP_KEY_EXT	0x0008	/* Key points out of the tree. */
+#define	WT_ASYNCOP_KEY_INT	0x0010	/* Key points into the tree. */
+#define	WT_ASYNCOP_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
+#define	WT_ASYNCOP_OVERWRITE	0x0020
+#define	WT_ASYNCOP_RAW		0x0040
+#define	WT_ASYNCOP_VALUE_EXT	0x0080	/* Value points out of the tree. */
+#define	WT_ASYNCOP_VALUE_INT	0x0100	/* Value points into the tree. */
+#define	WT_ASYNCOP_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
+	uint32_t flags;
+#endif
+};
 
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
@@ -1317,6 +1641,27 @@ struct __wt_connection {
 	int __F(is_new)(WT_CONNECTION *connection);
 
 	/*!
+	 * @name Async operation handles
+	 * @{
+	 */
+	/*!
+	 * Return an async operation handle
+	 *
+	 * @snippet ex_async.c Allocate a handle
+	 *
+	 * @param connection the connection handle
+	 * @param uri the connection handle
+	 * @configstart{connection.new_async_op, see dist/api_data.py}
+	 * @configend
+	 * @param[out] sessionp the new session handle
+	 * @errors
+	 */
+	int __F(new_async_op)(WT_CONNECTION *connection,
+	    const char *uri, const char *config, WT_ASYNC_CALLBACK *callback,
+	    WT_ASYNC_OP **opp);
+	/*! @} */
+
+	/*!
 	 * @name Session handles
 	 * @{
 	 */
@@ -1626,6 +1971,30 @@ int wiredtiger_open(const char *home,
  * @returns a string representation of the error
  */
 const char *wiredtiger_strerror(int err);
+
+/*!
+ * The interface implemented by applications to accept notifications
+ * of the completion of asynchronous operations.
+ *
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::new_async_op.
+ *
+ * @snippet ex_async.c allocate handle
+ */
+struct __wt_async_callback {
+	/*!
+	 * Callback to receive completion notification.
+	 *
+	 * @param[in] op the operation handle
+	 * @param[in] ret the result of the async operation
+	 * @param[in] flags currently unused
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet ex_async.c Implement WT_ASYNC_CALLBACK
+	 */
+	int (*notify)(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op,
+	    int ret, uint32_t flags);
+};
 
 /*!
  * The interface implemented by applications to handle error, informational and
