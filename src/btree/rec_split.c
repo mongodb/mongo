@@ -393,12 +393,12 @@ err:		__wt_free(session, alloc_index);
 }
 
 /*
- * __wt_multi_inmem_build --
+ * __split_inmem_build --
  *	Instantiate a page in a multi-block set, when an update couldn't be
  * written.
  */
 static int
-__wt_multi_inmem_build(
+__split_inmem_build(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, WT_MULTI *multi)
 {
 	WT_CURSOR_BTREE cbt;
@@ -511,7 +511,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 			    multi->addr.addr, addr->size, &addr->addr));
 		} else
 			WT_RET(
-			    __wt_multi_inmem_build(session, page, ref, multi));
+			    __split_inmem_build(session, page, ref, multi));
 
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
