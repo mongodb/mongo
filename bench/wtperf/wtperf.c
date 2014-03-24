@@ -778,9 +778,9 @@ monitor(void *arg)
 			abort();
 		}
 		if (min_thr != 0 &&
-		    (cur_reads != 0 && cur_reads < min_thr) ||
+		    ((cur_reads != 0 && cur_reads < min_thr) ||
 		    (cur_inserts != 0 && cur_inserts < min_thr) ||
-		    (cur_updates != 0 && cur_updates < min_thr)) {
+		    (cur_updates != 0 && cur_updates < min_thr))) {
 			lprintf(cfg, ret, 0,
 			    "minimum throughput not met: threshold %" PRIu64
 			    " reads %" PRIu64 " inserts %" PRIu64
