@@ -1264,7 +1264,7 @@ struct __wt_connection {
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
-	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
+	 * chosen from the following options: \c "block"\, \c "checkpoint"\, \c
 	 * "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "log"\,
 	 * \c "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\,
 	 * \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\,
@@ -1598,7 +1598,7 @@ struct __wt_connection {
  * information., a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
- * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
+ * values chosen from the following options: \c "block"\, \c "checkpoint"\, \c
  * "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "log"\, \c
  * "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\, \c
  * "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,

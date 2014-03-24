@@ -959,7 +959,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		uint32_t flag;
 	} *ft, verbtypes[] = {
 		{ "block",		WT_VERB_block },
-		{ "ckpt",		WT_VERB_ckpt },
+		{ "checkpoint",		WT_VERB_checkpoint },
 		{ "compact",		WT_VERB_compact },
 		{ "evict",		WT_VERB_evict },
 		{ "evictserver",	WT_VERB_evictserver },
