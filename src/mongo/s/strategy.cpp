@@ -430,7 +430,9 @@ namespace mongo {
         // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
         // for now has same semantics as legacy request
         DBConfigPtr config = grid.getDBConfig( ns );
-        ChunkManagerPtr info = config->getChunkManagerIfExists( ns );
+        ShardPtr primary;
+        ChunkManagerPtr info;
+        config->getChunkManagerOrPrimary( ns, info, primary );
 
         //
         // TODO: Cleanup cursor cache, consolidate into single codepath

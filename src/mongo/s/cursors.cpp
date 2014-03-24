@@ -199,7 +199,6 @@ namespace mongo {
         scoped_lock lk( _mutex );
         MapSharded::const_iterator i = _cursors.find( id );
         if ( i == _cursors.end() ) {
-            OCCASIONALLY log() << "Sharded CursorCache missing cursor id: " << id << endl;
             return ShardedClientCursorPtr();
         }
         i->second->accessed();
