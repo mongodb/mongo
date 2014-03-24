@@ -97,7 +97,8 @@ namespace mongo {
         try {
             if (!_connection->runCommand("admin", cmd.obj(), res)) {
                 if (res["errmsg"].str().find("no such cmd") != std::string::npos) {
-                    log() << "upstream updater is unsupported on this version";
+                    LOG(1) << "upstream updater is not supported by the member from which we"
+                              " are syncing, using oplogreader-based updating instead";
                     _supportsUpdater = false;
                 }
                 resetConnection();
