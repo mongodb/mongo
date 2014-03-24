@@ -137,7 +137,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		for (i = 0; i < mod->mod_splits_entries; ++i) {
 			__wt_free_ref_array(session, page,
 			    mod->mod_splits[i].refs,
-			    mod->mod_splits[i].entries);
+			    mod->mod_splits[i].entries, 0);
 			__wt_free(session, mod->mod_splits[i].refs);
 		}
 		__wt_free(session, mod->mod_splits);
@@ -185,7 +185,7 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free any memory allocated for the original set of WT_REFs. */
 	__wt_free_ref_array(session,
-	    page, page->pg_intl_orig_index, page->pg_intl_orig_entries);
+	    page, page->pg_intl_orig_index, page->pg_intl_orig_entries, 0);
 
 	/* Free any memory allocated for the child index array. */
 	__wt_free(session, page->pg_intl_index);
@@ -230,14 +230,31 @@ __free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
  *	Discard an array of WT_REFs.
  */
 void
-__wt_free_ref_array(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, uint32_t entries)
+__wt_free_ref_array(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_REF *refarg, uint32_t entries, int free_pages)
 {
+	WT_REF *ref;
 	uint32_t i;
 
-	if (ref == NULL)
+	if (refarg == NULL)
 		return;
-	for (i = 0; i < entries; ++i, ++ref)
+
+	/*
+	 * Optionally free the pages referenced by the WT_REFs.  (The path to
+	 * free the referenced page is used for error cleanup, no instantiated
+	 * and then discarded page should have WT_REF entries with non-NULL
+	 * pages.  The page may have been marked dirty as well; page discard
+	 * checks for that, so we mark it clean explicitly.
+	 */
+	if (free_pages)
+		for (ref = refarg, i = 0; i < entries; ++ref, ++i)
+			if (ref->page != NULL) {
+				ref->page->modify->write_gen = 0;
+				__wt_cache_dirty_decr(session, ref->page);
+				__wt_page_out(session, &ref->page);
+			}
+
+	for (ref = refarg, i = 0; i < entries; ++ref, ++i)
 		__free_ref(session, page, ref);
 }
 

@@ -377,7 +377,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 	if (0) {
 err:		__wt_free(session, alloc_index);
-		__wt_free_ref_array(session, parent, alloc_ref, entries);
+		__wt_free_ref_array(session, parent, alloc_ref, entries, 1);
 		__wt_free(session, alloc_ref);
 
 		/*
@@ -497,27 +497,26 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_MULTI *multi, WT_REF *refarg, uint32_t entries)
 {
 	WT_ADDR *addr;
-	WT_DECL_RET;
 	WT_REF *ref;
 	uint32_t i;
 
 	addr = NULL;
 	for (ref = refarg, i = 0; i < entries; ++multi, ++ref, ++i) {
 		if (multi->skip == NULL) {
-			WT_ERR(__wt_calloc_def(session, 1, &addr));
+			WT_RET(__wt_calloc_def(session, 1, &addr));
 			ref->addr = addr;
 			addr->size = multi->addr.size;
 			addr->type = multi->addr.type;
-			WT_ERR(__wt_strndup(session,
+			WT_RET(__wt_strndup(session,
 			    multi->addr.addr, addr->size, &addr->addr));
 		} else
-			WT_ERR(
+			WT_RET(
 			    __wt_multi_inmem_build(session, page, ref, multi));
 
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			WT_ERR(__wt_strndup(session,
+			WT_RET(__wt_strndup(session,
 			    multi->key.ikey,
 			    multi->key.ikey->size + sizeof(WT_IKEY),
 			    &ref->key.ikey));
@@ -537,9 +536,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		}
 	}
 	return (0);
-
-err:	__wt_free_ref_array(session, page, refarg, entries);
-	return (ret);
 }
 
 /*
@@ -719,7 +715,8 @@ err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);
 
 	__wt_free(session, alloc_index);
-	__wt_free_ref_array(session, page, alloc_ref, mod->mod_multi_entries);
+	__wt_free_ref_array(
+	    session, page, alloc_ref, mod->mod_multi_entries, 1);
 	__wt_free(session, alloc_ref);
 
 	return (ret);
