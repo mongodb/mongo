@@ -663,12 +663,13 @@ monitor(void *arg)
 	CONFIG *cfg;
 	FILE *fp;
 	size_t len;
-	uint64_t reads, inserts, updates;
+	uint64_t min_thr, reads, inserts, updates;
 	uint64_t cur_reads, cur_inserts, cur_updates;
 	uint64_t last_reads, last_inserts, last_updates;
 	uint32_t read_avg, read_min, read_max;
 	uint32_t insert_avg, insert_min, insert_max;
 	uint32_t update_avg, update_min, update_max;
+	uint32_t latency_max;
 	u_int i;
 	int ret;
 	char buf[64], *path;
@@ -677,6 +678,9 @@ monitor(void *arg)
 	assert(cfg->sample_interval != 0);
 	fp = NULL;
 	path = NULL;
+
+	min_thr = (uint64_t)cfg->min_throughput;
+	latency_max = (uint32_t)sec_to_ns(cfg->max_latency);
 
 	/* Open the logging file. */
 	len = strlen(cfg->monitor_dir) + 100;
@@ -735,8 +739,8 @@ monitor(void *arg)
 		latency_insert(cfg, &insert_avg, &insert_min, &insert_max);
 		latency_update(cfg, &update_avg, &update_min, &update_max);
 
-		cur_reads = reads - last_reads;
-		cur_updates = updates - last_updates;
+		cur_reads = (reads - last_reads) / cfg->sample_interval;
+		cur_updates = (updates - last_updates) / cfg->sample_interval;
 		/*
 		 * For now the only item we need to worry about changing is
 		 * inserts when we transition from the populate phase to
@@ -745,7 +749,8 @@ monitor(void *arg)
 		if (inserts < last_inserts)
 			cur_inserts = 0;
 		else
-			cur_inserts = inserts - last_inserts;
+			cur_inserts =
+			    (inserts - last_inserts) / cfg->sample_interval;
 
 		(void)fprintf(fp,
 		    "%s,%" PRIu32
@@ -756,14 +761,33 @@ monitor(void *arg)
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    "\n",
 		    buf, cfg->totalsec,
-		    cur_reads / cfg->sample_interval,
-		    cur_inserts / cfg->sample_interval,
-		    cur_updates / cfg->sample_interval,
+		    cur_reads, cur_inserts, cur_updates,
 		    cfg->ckpt ? 'Y' : 'N',
 		    read_avg, read_min, read_max,
 		    insert_avg, insert_min, insert_max,
 		    update_avg, update_min, update_max);
 
+		if (latency_max != 0 &&
+		    (read_max > latency_max || insert_max > latency_max ||
+		     update_max > latency_max)) {
+			lprintf(cfg, ret, 0,
+			    "max latency exceeded: threshold %" PRIu32
+			    " read max %" PRIu32 " insert max %" PRIu32
+			    " update max %" PRIu32, latency_max,
+			    read_max, insert_max, update_max);
+			abort();
+		}
+		if (min_thr != 0 &&
+		    (cur_reads != 0 && cur_reads < min_thr) ||
+		    (cur_inserts != 0 && cur_inserts < min_thr) ||
+		    (cur_updates != 0 && cur_updates < min_thr)) {
+			lprintf(cfg, ret, 0,
+			    "minimum throughput not met: threshold %" PRIu64
+			    " reads %" PRIu64 " inserts %" PRIu64
+			    " updates %" PRIu64, min_thr, cur_reads,
+			    cur_inserts, cur_updates);
+			abort();
+		}
 		last_reads = reads;
 		last_inserts = inserts;
 		last_updates = updates;
