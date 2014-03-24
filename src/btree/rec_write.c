@@ -3953,8 +3953,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 *
 				 * Write a placeholder record.
 				 */
-				 WT_ASSERT(session,
-				     F_ISSET(r, WT_SKIP_UPDATE_RESTORE));
+				WT_ASSERT(session,
+				    F_ISSET(r, WT_SKIP_UPDATE_RESTORE));
 
 				WT_ERR(__rec_cell_build_val(
 				    session, r, "@", 1, (uint64_t)0));
@@ -4037,19 +4037,12 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		}
 
 		/*
-		 * If the key is an overflow key, check to see if the backing
-		 * overflow key blocks have been freed, we have to build a new
-		 * key.
-		 */
-		onpage_ovfl = kpack->ovfl;
-		if (onpage_ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM) {
-			onpage_ovfl = 0;
-			WT_ASSERT(session, ikey != NULL);
-		}
-
-		/*
 		 * Build key cell.
+		 *
+		 * If the key is an overflow key that hasn't been removed, use
+		 * the original backing blocks.
 		 */
+		onpage_ovfl = kpack->ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM;
 		if (onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
@@ -4129,10 +4122,10 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			}
 
 			/*
-			 * In one path above, we copied the key from the page
-			 * rather than building the actual key.  In that case,
-			 * we have to build the actual key now because we are
-			 * about to promote it.
+			 * In one path above, we copied address blocks from the
+			 * page rather than building the actual key.  In that
+			 * case, we have to build the actual key now because we
+			 * are about to promote it.
 			 */
 			if (onpage_ovfl) {
 				WT_ERR(__wt_dsk_cell_data_ref(

@@ -122,8 +122,8 @@ __ovfl_discard_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_ovfl_discard_add --
- *	Add a new entry to the page's list of discard overflow records that have
- * been discarded.
+ *	Add a new entry to the page's list of overflow records that have been
+ * discarded.
  */
 int
 __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
@@ -146,7 +146,7 @@ __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
 
 /*
  * __wt_ovfl_discard_free --
- *	Discard the page's list of discard overflow record addresses.
+ *	Free the page's list of discarded overflow record addresses.
  */
 void
 __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -536,7 +536,7 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 
 /*
  * __wt_ovfl_reuse_free --
- *	Discard the page's list of overflow records tracked for reuse.
+ *	Free the page's list of overflow records tracked for reuse.
  */
 void
 __wt_ovfl_reuse_free(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -835,7 +835,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 
 /*
  * __wt_ovfl_txnc_free --
- *	Discard the page's list of transaction-cached overflow records.
+ *	Free the page's list of transaction-cached overflow records.
  */
 void
 __wt_ovfl_txnc_free(WT_SESSION_IMPL *session, WT_PAGE *page)
