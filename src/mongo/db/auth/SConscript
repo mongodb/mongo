@@ -37,8 +37,7 @@ env.Library('authcore', ['action_set.cpp',
                      '$BUILD_DIR/mongo/stringutils'])
 
 env.Library('authservercommon',
-            ['auth_server_parameters.cpp',
-             'authorization_manager_global.cpp',
+            ['authorization_manager_global.cpp',
              'authz_session_external_state_server_common.cpp',
              'security_key.cpp'],
             LIBDEPS=['authcore'])

@@ -115,9 +115,6 @@ namespace mongo {
                 "TODO")
                                          .setSources(moe::SourceYAMLConfig);
 
-        general_options.addOptionChaining("security.supportCompatibilityFormPrivilegeDocuments", "",
-                moe::String, "TODO")
-                                         .setSources(moe::SourceYAMLConfig);
 
         // Network Options
 
@@ -793,12 +790,6 @@ namespace mongo {
             return Status(ErrorCodes::BadValue,
                           "security.enableLocalhostAuthBypass is currently not supported in config "
                           "files");
-        }
-
-        if (params.count("security.supportCompatibilityFormPrivilegeDocuments")) {
-            return Status(ErrorCodes::BadValue,
-                          "security.supportCompatibilityFormPrivilegeDocuments is currently not "
-                          "supported in config files");
         }
 
         if (params.count("storage.dbPath")) {

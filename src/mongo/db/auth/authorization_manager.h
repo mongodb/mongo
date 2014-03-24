@@ -127,17 +127,6 @@ namespace mongo {
         // TODO: Make the following functions no longer static.
 
         /**
-         * Sets whether or not we allow old style (pre v2.4) privilege documents for this whole
-         * server.  Only relevant prior to upgrade.
-         */
-        static void setSupportOldStylePrivilegeDocuments(bool enabled);
-
-        /**
-         * Returns true if we allow old style privilege privilege documents for this whole server.
-         */
-        static bool getSupportOldStylePrivilegeDocuments();
-
-        /**
          * Takes a vector of privileges and fills the output param "resultArray" with a BSON array
          * representation of the privileges.
          */
@@ -456,8 +445,6 @@ namespace mongo {
          * process.  Stores a pointer to a new user object into *acquiredUser on success.
          */
         Status _fetchUserV1(const UserName& userName, std::auto_ptr<User>* acquiredUser);
-
-        static bool _doesSupportOldStylePrivileges;
 
         /**
          * True if access control enforcement is enabled in this AuthorizationManager.

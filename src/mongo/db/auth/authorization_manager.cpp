@@ -109,8 +109,6 @@ namespace mongo {
     const int AuthorizationManager::schemaVersion26Final;
 #endif
 
-    bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
-
     /**
      * Guard object for synchronizing accesses to data cached in AuthorizationManager instances.
      * This guard allows one thread to access the cache at a time, and provides an exception-safe
@@ -282,14 +280,6 @@ namespace mongo {
         }
         *version = newVersion;
         return Status::OK();
-    }
-
-    void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
-        _doesSupportOldStylePrivileges = enabled;
-    }
-
-    bool AuthorizationManager::getSupportOldStylePrivilegeDocuments() {
-        return _doesSupportOldStylePrivileges;
     }
 
     void AuthorizationManager::setAuthEnabled(bool enabled) {
