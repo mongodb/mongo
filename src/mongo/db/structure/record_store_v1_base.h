@@ -1,4 +1,4 @@
-// record_store.h
+// record_store_v1_base.h
 
 /**
 *    Copyright (C) 2013 10gen Inc.
@@ -30,37 +30,46 @@
 
 #pragma once
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/structure/record_store.h"
 
 namespace mongo {
 
-    class Collection;
     class DocWriter;
     class ExtentManager;
-    class MAdvise;
     class NamespaceDetails;
     class Record;
 
-    class RecordStore {
-        MONGO_DISALLOW_COPYING(RecordStore);
+    class RecordStoreV1Base : public RecordStore {
     public:
-        RecordStore( const StringData& ns );
-        virtual ~RecordStore();
+        RecordStoreV1Base( const StringData& ns,
+                           NamespaceDetails* details,
+                           ExtentManager* em,
+                           bool isSystemIndexes );
 
-        virtual Record* recordFor( const DiskLoc& loc ) const = 0;
+        virtual ~RecordStoreV1Base();
 
-        virtual void deleteRecord( const DiskLoc& dl ) = 0;
+        Record* recordFor( const DiskLoc& loc ) const;
 
-        virtual StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax ) = 0;
+        void deleteRecord( const DiskLoc& dl );
 
-        virtual StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax ) = 0;
+        StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax );
 
-        // TODO: this makes me sad, it shouldn't be in the interface
-        // do not use this anymore
-        virtual void increaseStorageSize( int size, int quotaMax ) = 0;
+        StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax );
+
+        void increaseStorageSize( int size, int quotaMax );
+
     protected:
-        std::string _ns;
+        virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax ) = 0;
+
+        /** add a record to the end of the linked list chain within this extent.
+            require: you must have already declared write intent for the record header.
+        */
+        void _addRecordToRecListInExtent(Record* r, DiskLoc loc);
+
+        NamespaceDetails* _details;
+        ExtentManager* _extentManager;
+        bool _isSystemIndexes;
     };
 
 }

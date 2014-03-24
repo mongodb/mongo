@@ -39,12 +39,13 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/record_store_v1_capped.h"
+#include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/structure/collection_iterator.h"
 
-#include "mongo/db/pdfile.h" // XXX-ERH
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
 namespace mongo {
