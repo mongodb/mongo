@@ -48,6 +48,10 @@ namespace mongo {
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 
+    private:
+        DiskLoc _allocFromExistingExtents( int lengthWithHeaders );
+
+        bool _normalCollection;
     };
 
 }

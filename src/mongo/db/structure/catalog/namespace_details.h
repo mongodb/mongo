@@ -384,7 +384,9 @@ namespace mongo {
             @param lenToAlloc is WITH header
             @return null diskloc if no room - allocate a new extent then
         */
+    private:
         DiskLoc alloc(Collection* collection, const StringData& ns, int lenToAlloc);
+    public:
 
         /* add a given record to the deleted chains for this NS */
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
@@ -415,15 +417,15 @@ namespace mongo {
          */
         void swapIndex( int a, int b );
 
-        DiskLoc _alloc(Collection* collection, const StringData& ns, int len);
         void maybeComplain( const StringData& ns, int len ) const;
-        DiskLoc __stdAlloc(int len, bool willBeAt);
         void compact(); // combine adjacent deleted records
 
         friend class Database;
         friend class NamespaceIndex;
         friend class IndexCatalog;
         friend class IndexCatalogEntry;
+        friend class SimpleRecordStoreV1;
+        friend class CappedRecordStoreV1;
 
         struct ExtraOld {
             // note we could use this field for more chaining later, so don't waste it:

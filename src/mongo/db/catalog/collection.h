@@ -126,6 +126,8 @@ namespace mongo {
         const IndexCatalog* getIndexCatalog() const { return &_indexCatalog; }
         IndexCatalog* getIndexCatalog() { return &_indexCatalog; }
 
+        const RecordStore* getRecordStore() const { return _recordStore.get(); }
+
         CollectionCursorCache* cursorCache() const { return &_cursorCache; }
 
         bool requiresIdIndex() const;

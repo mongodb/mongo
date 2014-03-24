@@ -52,18 +52,6 @@
 
 namespace mongo {
 
-    static Counter64 freelistAllocs;
-    static Counter64 freelistBucketExhausted;
-    static Counter64 freelistIterations;
-
-    static ServerStatusMetricField<Counter64> dFreelist1( "storage.freelist.search.requests",
-                                                          &freelistAllocs );
-
-    static ServerStatusMetricField<Counter64> dFreelist2( "storage.freelist.search.bucketExhausted",
-                                                          &freelistBucketExhausted );
-
-    static ServerStatusMetricField<Counter64> dFreelist3( "storage.freelist.search.scanned",
-                                                          &freelistIterations );
 
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
@@ -179,14 +167,15 @@ namespace mongo {
     */
     DiskLoc NamespaceDetails::alloc(Collection* collection, const StringData& ns, int lenToAlloc) {
         // if we are capped, collection must be non-NULL
-        invariant( !isCapped() || collection );
+        invariant( isCapped() );
+        invariant( collection );
 
         {
             // align very slightly.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         }
 
-        DiskLoc loc = _alloc(collection, ns, lenToAlloc);
+        DiskLoc loc = cappedAlloc(collection, ns, lenToAlloc);
         if ( loc.isNull() )
             return loc;
 
@@ -201,28 +190,6 @@ namespace mongo {
         DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << endl;
 
         int left = regionlen - lenToAlloc;
-        if ( ! isCapped() ) {
-            if ( left < 24 || left < (lenToAlloc >> 3) ) {
-                // you get the whole thing.
-                return loc;
-            }
-        }
-
-        // don't quantize:
-        //   - capped collections: just wastes space
-        //   - $ collections (indexes) as we already have those aligned the way we want SERVER-8425
-        if ( !isCapped() && NamespaceString::normal( ns ) ) {
-            // we quantize here so that it only impacts newly sized records
-            // this prevents oddities with older records and space re-use SERVER-8435
-            lenToAlloc = std::min( r->lengthWithHeaders(),
-                                   NamespaceDetails::quantizeAllocationSpace( lenToAlloc ) );
-            left = regionlen - lenToAlloc;
-
-            if ( left < 24 ) {
-                // you get the whole thing.
-                return loc;
-            }
-        }
 
         /* split off some for further use. */
         getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
@@ -237,98 +204,6 @@ namespace mongo {
         addDeletedRec(newDel, newDelLoc);
 
         return loc;
-    }
-
-    /* for non-capped collections.
-       @param peekOnly just look up where and don't reserve
-       returned item is out of the deleted list upon return
-    */
-    DiskLoc NamespaceDetails::__stdAlloc(int len, bool peekOnly) {
-        freelistAllocs.increment();
-        DiskLoc *prev;
-        DiskLoc *bestprev = 0;
-        DiskLoc bestmatch;
-        int bestmatchlen = 0x7fffffff;
-        int b = bucket(len);
-        DiskLoc cur = _deletedList[b];
-        prev = &_deletedList[b];
-        int extra = 5; // look for a better fit, a little.
-        int chain = 0;
-        while ( 1 ) {
-            { // defensive check
-                int fileNumber = cur.a();
-                int fileOffset = cur.getOfs();
-                if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
-                    StringBuilder sb;
-                    sb << "Deleted record list corrupted in bucket " << b
-                       << ", link number " << chain
-                       << ", invalid link is " << cur.toString()
-                       << ", throwing Fatal Assertion";
-                    problem() << sb.str() << endl;
-                    fassertFailed(16469);
-                }
-            }
-            if ( cur.isNull() ) {
-                // move to next bucket.  if we were doing "extra", just break
-                if ( bestmatchlen < 0x7fffffff )
-                    break;
-
-                if ( chain > 0 ) {
-                    // if we looked at things in the right bucket, but they were not suitable
-                    freelistBucketExhausted.increment();
-                }
-
-                b++;
-                if ( b > MaxBucket ) {
-                    // out of space. alloc a new extent.
-                    freelistIterations.increment( 1 + chain );
-                    return DiskLoc();
-                }
-                cur = _deletedList[b];
-                prev = &_deletedList[b];
-                continue;
-            }
-            DeletedRecord *r = cur.drec();
-            if ( r->lengthWithHeaders() >= len &&
-                 r->lengthWithHeaders() < bestmatchlen ) {
-                bestmatchlen = r->lengthWithHeaders();
-                bestmatch = cur;
-                bestprev = prev;
-                if (r->lengthWithHeaders() == len)
-                    // exact match, stop searching
-                    break;
-            }
-            if ( bestmatchlen < 0x7fffffff && --extra <= 0 )
-                break;
-            if ( ++chain > 30 && b < MaxBucket ) {
-                // too slow, force move to next bucket to grab a big chunk
-                //b++;
-                freelistIterations.increment( chain );
-                chain = 0;
-                cur.Null();
-            }
-            else {
-                /*this defensive check only made sense for the mmap storage engine:
-                  if ( r->nextDeleted.getOfs() == 0 ) {
-                    problem() << "~~ Assertion - bad nextDeleted " << r->nextDeleted.toString() <<
-                    " b:" << b << " chain:" << chain << ", fixing.\n";
-                    r->nextDeleted.Null();
-                }*/
-                cur = r->nextDeleted();
-                prev = &r->nextDeleted();
-            }
-        }
-
-        /* unlink ourself from the deleted list */
-        if( !peekOnly ) {
-            DeletedRecord *bmr = bestmatch.drec();
-            *getDur().writing(bestprev) = bmr->nextDeleted();
-            bmr->nextDeleted().writing().setInvalid(); // defensive.
-            verify(bmr->extentOfs() < bestmatch.getOfs());
-        }
-
-        freelistIterations.increment( 1 + chain );
-        return bestmatch;
     }
 
     DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
@@ -365,14 +240,6 @@ namespace mongo {
             }
             verify( len * 5 > _lastExtentSize ); // assume it is unusually large record; if not, something is broken
         }
-    }
-
-    /* alloc with capped table handling. */
-    DiskLoc NamespaceDetails::_alloc(Collection* collection, const StringData& ns, int len) {
-        if ( ! isCapped() )
-            return __stdAlloc(len, false);
-
-        return cappedAlloc(collection, ns,len);
     }
 
     NamespaceDetails::Extra* NamespaceDetails::allocExtra( const StringData& ns,
