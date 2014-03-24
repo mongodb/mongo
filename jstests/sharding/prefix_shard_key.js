@@ -119,7 +119,7 @@ for( i=0; i < 3; i++ ){
     var coll2 = db.foo2;
     coll2.drop();
     var moveRes = admin.runCommand( { movePrimary : coll2.getDB() + "", to : shards[0]._id } );
-    assert.eq( moveRes.ok , 1 , "primary not moved correctly" );
+    assert.eq( moveRes.ok, 1, "primary not moved correctly: " + tojson( moveRes ));
 
     // declare a longer index
     if ( i == 0 ) {
