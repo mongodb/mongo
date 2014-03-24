@@ -656,7 +656,7 @@ __wt_split_evict(
 	/*
 	 * A note on error handling: failures before we swapped the new page
 	 * index into the parent can be resolved by simply freeing allocated
-	 * memory because the original page is unchnaged, we can continue to
+	 * memory because the original page is unchanged, we can continue to
 	 * use it and we have not yet modified the parent.  (See below for
 	 * an exception, we cannot discard pages to hold unresolved changes.)
 	 * Failures after we swap the new page index into the parent are also
