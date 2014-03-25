@@ -769,25 +769,21 @@ monitor(void *arg)
 
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
-		     update_max > latency_max)) {
-			lprintf(cfg, ret, 0,
+		     update_max > latency_max))
+			lprintf(cfg, WT_PANIC, 0,
 			    "max latency exceeded: threshold %" PRIu32
 			    " read max %" PRIu32 " insert max %" PRIu32
 			    " update max %" PRIu32, latency_max,
 			    read_max, insert_max, update_max);
-			abort();
-		}
 		if (min_thr != 0 &&
 		    ((cur_reads != 0 && cur_reads < min_thr) ||
 		    (cur_inserts != 0 && cur_inserts < min_thr) ||
-		    (cur_updates != 0 && cur_updates < min_thr))) {
-			lprintf(cfg, ret, 0,
+		    (cur_updates != 0 && cur_updates < min_thr)))
+			lprintf(cfg, WT_PANIC, 0,
 			    "minimum throughput not met: threshold %" PRIu64
 			    " reads %" PRIu64 " inserts %" PRIu64
 			    " updates %" PRIu64, min_thr, cur_reads,
 			    cur_inserts, cur_updates);
-			abort();
-		}
 		last_reads = reads;
 		last_inserts = inserts;
 		last_updates = updates;
