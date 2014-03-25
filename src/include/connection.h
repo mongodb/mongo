@@ -204,10 +204,9 @@ struct __wt_connection_impl {
 #endif
 
 	WT_ASYNC	*async;		/* Async structure */
-	int		 async_autofree;/* Async op autofree */
 	int		 async_cfg;	/* Global async configuration */
 	uint32_t	 async_size;	/* Async op array size */
-	int		 async_workers;	/* Number of async workers */
+	uint32_t	 async_workers;	/* Number of async workers */
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */

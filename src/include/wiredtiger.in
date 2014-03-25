@@ -179,7 +179,8 @@ struct __wt_async_op {
 	 * parameter to WT_SESSION::create used to create the table.
 	 */
 	const char *uri;
-	uint64_t uri_hash;
+	const char *config;
+	uint64_t uri_cfg_hash;
 
 	/*!
 	 * The format of the data packed into key items.  See @ref packing for
@@ -375,25 +376,6 @@ struct __wt_async_op {
 	/*! @} */
 
 	/*!
-	 * Close the operation.
-	 *
-	 * This releases the resources associated with the operation handle.
-	 * If the operation was configured with "auto_free=true" (the default),
-	 * this method must not be called.  In that case, the resources
-	 * associated with the operation handle will be released automatically
-	 * after the operation completes.
-	 *
-	 * Operations are closed implicitly by ending the enclosing connection.
-	 *
-	 * @snippet ex_all.c Close the operation
-	 *
-	 * @param op the operation handle
-	 * @errors
-	 * In particular, if \c auto_free is configured, ::EINVAL is returned.
-	 */
-	int __F(close)(WT_HANDLE_CLOSED(WT_ASYNC_OP) *op);
-
-	/*!
 	 * Get the unique identifier for this operation.
 	 *
 	 * @snippet ex_all.c Get the operation's identifier.
@@ -404,24 +386,6 @@ struct __wt_async_op {
 	 * @errors
 	 */
 	uint64_t __F(get_id)(WT_ASYNC_OP *op);
-
-	/*!
-	 * Wait for the operation to complete.
-	 *
-	 * This waits for the worker thread to complete the operation and
-	 * returns.  If the operation is already complete, it will return
-	 * immediately.
-	 *
-	 * If the operation was configured with "auto_free=true" (the default),
-	 * this method must not be called.
-	 *
-	 * @snippet ex_all.c Wait for the operation to complete.
-	 *
-	 * @param op the operation handle
-	 * @errors
-	 * In particular, if \c auto_free is configured, ::EINVAL is returned.
-	 */
-	int __F(wait)(WT_HANDLE_CLOSED(WT_ASYNC_OP) *op);
 
 	/*
 	 * Protected fields, only to be used by operation implementations.
@@ -448,11 +412,10 @@ struct __wt_async_op {
 	uint32_t	internal_id;	/* Array position id. */
 	uint64_t	unique_id;	/* Unique identifier. */
 
-#define	WT_ASYNCOP_COMPLETE	0x0001
-#define	WT_ASYNCOP_ENQUEUED	0x0002
-#define	WT_ASYNCOP_FREE		0x0004
-#define	WT_ASYNCOP_READY	0x0008
-#define	WT_ASYNCOP_WORKING	0x0010
+#define	WT_ASYNCOP_ENQUEUED	0x0001
+#define	WT_ASYNCOP_FREE		0x0002
+#define	WT_ASYNCOP_READY	0x0004
+#define	WT_ASYNCOP_WORKING	0x0008
 	uint32_t	state;		/* Op state */
 	WT_ASYNC_OPTYPE	optype;		/* Operation type */
 
@@ -1645,18 +1608,28 @@ struct __wt_connection {
 	 * @{
 	 */
 	/*!
+	 * Wait for all outstanding operations to complete.
+	 *
+	 * @snippet ex_async.c Allocate a handle
+	 *
+	 * @param connection the connection handle
+	 * @errors
+	 */
+	int __F(async_flush)(WT_CONNECTION *connection);
+
+	/*!
 	 * Return an async operation handle
 	 *
 	 * @snippet ex_async.c Allocate a handle
 	 *
 	 * @param connection the connection handle
 	 * @param uri the connection handle
-	 * @configstart{connection.new_async_op, see dist/api_data.py}
+	 * @configstart{connection.async_new_op, see dist/api_data.py}
 	 * @configend
 	 * @param[out] sessionp the new session handle
 	 * @errors
 	 */
-	int __F(new_async_op)(WT_CONNECTION *connection,
+	int __F(async_new_op)(WT_CONNECTION *connection,
 	    const char *uri, const char *config, WT_ASYNC_CALLBACK *callback,
 	    WT_ASYNC_OP **opp);
 	/*! @} */
@@ -1977,7 +1950,7 @@ const char *wiredtiger_strerror(int err);
  * of the completion of asynchronous operations.
  *
  * Applications register their implementation with WiredTiger by calling
- * WT_CONNECTION::new_async_op.
+ * WT_CONNECTION::async_new_op.
  *
  * @snippet ex_async.c allocate handle
  */

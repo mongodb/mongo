@@ -28,9 +28,6 @@ __async_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	if (*runp == 0)
 		return (0);
 
-	WT_RET(__wt_config_gets(session, cfg, "async.auto_free", &cval));
-	conn->async_autofree = cval.val != 0;
-
 	WT_RET(__wt_config_gets(session, cfg, "async.ops_max", &cval));
 	conn->async_size = cval.val;
 
@@ -40,32 +37,6 @@ __async_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	ret = 0;
 err:
 	return (ret);
-}
-
-/*
- * __async_worker --
- *	The async worker threads.
- */
-static void *
-__async_worker(void *arg)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	session = arg;
-	conn = S2C(session);
-
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
-		/* Wait until the next event. */
-		WT_ERR_TIMEDOUT_OK(
-		    __wt_cond_wait(session, async->ops_cond, 1000000));
-	}
-
-	if (0) {
-err:		__wt_err(session, ret, "log archive server error");
-	}
-	return (NULL);
 }
 
 /*
@@ -96,8 +67,8 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	async = conn->async;
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
 	WT_RET(__wt_spin_init(session, &async->opsq_lock, "ops queue"));
-	WT_RET(__wt_cond_alloc(session,
-	    "async op", 0, &async->ops_cond));
+	WT_RET(__wt_cond_alloc(session, "async op", 0, &async->ops_cond));
+	WT_RET(__wt_cond_alloc(session, "async flush", 0, &async->flush_cond));
 	WT_RET(__wt_async_init(session));
 
 	/*
@@ -114,7 +85,7 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		 * Start the threads.
 		 */
 		WT_RET(__wt_thread_create(session, &async->worker_tids[i],
-		    __async_worker, async->worker_sessions[i]));
+		    __wt_async_worker, async->worker_sessions[i]));
 	}
 
 	return (0);
@@ -122,42 +93,55 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 /*
  * __wt_async_destroy --
- *	Destroy the log archiving server thread and logging subsystem.
+ *	Destroy the async worker threads and async subsystem.
  */
 int
 __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 {
+	WT_ASYNC *async;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
+	int i;
 
 	session = conn->default_session;
+	async = conn->async;
 
-	if (!conn->logging)
+	if (!conn->async_cfg)
 		return (0);
-	if (conn->arch_tid_set) {
-		WT_TRET(__wt_cond_signal(session, conn->arch_cond));
-		WT_TRET(__wt_thread_join(session, conn->arch_tid));
-		conn->arch_tid_set = 0;
-	}
-	WT_TRET(__wt_cond_destroy(session, &conn->arch_cond));
-
-	WT_TRET(__wt_log_close(session));
-
-	__wt_free(session, conn->log_path);
+	for (i = 0; i < conn->async_workers; i++)
+		if (async->worker_tids[i] != 0) {
+			WT_TRET(__wt_cond_signal(session, async->ops_cond));
+			WT_TRET(__wt_thread_join(
+			    session, async->worker_tids[i]));
+			async->worker_tids[i] = 0;
+		}
+	WT_TRET(__wt_cond_destroy(session, &async->ops_cond));
+	WT_TRET(__wt_cond_destroy(session, &async->flush_cond));
 
 	/* Close the server thread's session. */
-	if (conn->arch_session != NULL) {
-		wt_session = &conn->arch_session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-		conn->arch_session = NULL;
-	}
+	for (i = 0; i < conn->async_workers; i++)
+		if (async->worker_session[i] != NULL) {
+			wt_session = &async->worker_sessions[i]->iface;
+			WT_TRET(wt_session->close(wt_session, NULL));
+			async->worker_sessions[i] = NULL;
+		}
 
-	WT_TRET(__wt_log_slot_destroy(session));
-	__wt_spin_destroy(session, &conn->log->log_lock);
-	__wt_spin_destroy(session, &conn->log->log_slot_lock);
-	__wt_spin_destroy(session, &conn->log->log_sync_lock);
-	__wt_free(session, conn->log);
+	__wt_spin_destroy(session, &async->ops_lock);
+	__wt_spin_destroy(session, &async->opsq_lock);
+	__wt_free(session, conn->async);
 
 	return (ret);
+}
+
+int
+__wt_async_flush(WT_CONNECTION_IMPL *conn)
+{
+	return (0);
+}
+
+int
+__wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri, const char *cfg[],
+    WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP **asyncopp)
+{
+	return (0);
 }

@@ -5,12 +5,55 @@
  * See the file LICENSE for redistribution information.
  */
 
-type
+/*
+ * Initialize a static WT_ASYNC_OP structure.
+ */
+#define	WT_ASYNC_OP_STATIC_INIT(n,					\
+        get_key,							\
+	get_value,							\
+	set_key,							\
+	set_value,							\
+	search,								\
+	insert,								\
+	update,								\
+	remove,								\
+        get_id)								\
+	static const WT_ASYNC_OP n = {					\
+	NULL,					/* connection */	\
+	NULL,					/* uri */		\
+	NULL,					/* config */		\
+	0,					/* uri_cfg_hash */	\
+	NULL,					/* key_format */	\
+	NULL,					/* value_format */	\
+	(int (*)(WT_ASYNC_OP *, ...))(get_key),				\
+	(int (*)(WT_ASYNC_OP *, ...))(get_value),			\
+	(void (*)(WT_ASYNC_OP *, ...))(set_key),			\
+	(void (*)(WT_ASYNC_OP *, ...))(set_value),			\
+	search,								\
+	insert,								\
+	update,								\
+	remove,								\
+	get_id,								\
+	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
+	0,				/* recno key */			\
+	{ 0 },				/* recno raw buffer */		\
+	NULL,				/* lang_private */		\
+	{ NULL, 0, 0, NULL, 0 }		/* WT_ITEM key */		\
+	{ NULL, 0, 0, NULL, 0 }		/* WT_ITEM value */		\
+	0,				/* int saved_err */		\
+	0,				/* uint32_t internal_id */	\
+	0,				/* uint64_t unique_id */	\
+	0,				/* uint32_t state */		\
+	0,				/* WT_ASYNC_OPTYPE optype */	\
+	0				/* uint32_t flags */		\
+}
+
 struct __wt_async_callback;
                 typedef struct __wt_async_callback WT_ASYNC_CALLBACK;
 
 /*! Asynchronous operation types. */
 typedef enum {
+	WT_AOP_FLUSH,	/*!< Flush the operation queue */
 	WT_AOP_INSERT,	/*!< Insert if key is not in the data source */
 	WT_AOP_PUT,	/*!< Set the value for a key (unconditional) */
 	WT_AOP_REMOVE,	/*!< Remove a key from the data source */
@@ -36,12 +79,16 @@ typedef struct {
 
 	/* Notify any waiting threads when work is enqueued. */
 	WT_CONDVAR	*ops_cond;
+	WT_CONDVAR	*flush_cond;
+	uint32_t	 flush_count;
+	uint32_t	 flush_id;
 
 #define	WT_ASYNC_MAX_WORKERS	20
 	WT_SESSION_IMPL	*worker_sessions[WT_ASYNC_MAX_WORKERS];
 					/* Async worker threads */
 	pthread_t	 worker_tids[WT_ASYNC_MAX_WORKERS];
 
+#define	WT_ASYNC_FLUSHING	0x0001
 	uint32_t	 flags;
 } WT_ASYNC;
 

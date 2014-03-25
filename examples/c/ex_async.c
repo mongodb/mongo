@@ -34,7 +34,7 @@
 
 const char *home = NULL;
 const char *uri = "table:async";
-uint64_t insert_done, search_id;
+uint64_t search_id;
 int global_error = 0;
 
 /*! [async example callback implementation] */
@@ -55,8 +55,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		t_ret = op->get_key(cursor, &key);
 		t_ret = op->get_value(cursor, &value);
 		printf("Got record: %s : %s\n", key, value);
-	} else
-		insert_done = 1;
+	}
 	return (t_ret);
 }
 
@@ -87,7 +86,7 @@ int main(void)
 	/*! [async example table create] */
 
 	/*! [async example insert] */
-	for (i=0; i < 10; i++) {
+	for (i = 0; i < 10; i++) {
 		ret = conn->new_async_op(conn, uri, NULL, &cb, &op);
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);

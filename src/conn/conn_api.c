@@ -439,6 +439,44 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __conn_async_flush --
+ *	WT_CONNECTION.async_flush method.
+ */
+static int
+__conn_async_flush(WT_CONNECTION *wt_conn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL(conn, session, async_flush, NULL, NULL);
+	WT_ERR(__wt_async_flush(conn));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_async_new_op --
+ *	WT_CONNECTION.async_new_op method.
+ */
+static int
+__conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
+    WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP **asyncopp)
+{
+	WT_ASYNC_OP *op_ret;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL(conn, session, async_new_op, config, cfg);
+	WT_ERR(__wt_async_new_op(conn, uri, config, callback, cfg, &op));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __conn_get_home --
  *	WT_CONNECTION.get_home method.
  */
@@ -1006,6 +1044,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
 	static const WT_CONNECTION stdc = {
+		__conn_async_flush,
+		__conn_async_new_op,
 		__conn_close,
 		__conn_reconfigure,
 		__conn_get_home,
