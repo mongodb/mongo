@@ -45,7 +45,7 @@ x.next();
 
 s.adminCommand( { moveChunk : "test.foo" , find : { _id : 0 } , to : secondaryName.name } )
 
-join = startParallelShell( "sleep(5); db.x.insert( {x:1} ); db.adminCommand( { moveChunk : 'test.foo' , find : { _id : " + docsPerChunk * 3 + " } , to : '" + secondaryName.name + "' } )" )
+join = startParallelShell( "db.x.insert( {x:1} ); db.adminCommand( { moveChunk : 'test.foo' , find : { _id : " + docsPerChunk * 3 + " } , to : '" + secondaryName.name + "', _waitForDelete: true } )" )
 assert.soon( function(){ return db.x.count() > 0; } , "XXX" , 30000 , 1 )
 
 
@@ -58,7 +58,6 @@ print( "cursor should be gone" )
 join();
 
 //assert.soon( function(){ return numDocs == t.count(); } , "at end 1" )
-sleep( 5000 )
 assert.eq( numDocs , t.count() , "at end 2" )
 assert.eq( numDocs , primary.count() + secondary.count() , "at end 3" )
 
