@@ -47,11 +47,11 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	(void)cb;
 	t_ret = 0;
 	if (ret != 0) {
-		printf("ID %" PRIu64 " error %d\n", op->get_id, ret);
+		printf("ID %" PRIu64 " error %d\n", op->get_id(op), ret);
 		global_error = ret;
 		return (1);
 	}
-	if (op->get_id == search_id) {
+	if (op->get_id(op) == search_id) {
 		t_ret = op->get_key(cursor, &key);
 		t_ret = op->get_value(cursor, &value);
 		printf("Got record: %s : %s\n", key, value);
@@ -66,10 +66,11 @@ static WT_ASYNC_CALLBACK cb = { cb_asyncop };
 int main(void)
 {
 	/*! [async example connection] */
-	WT_ASYNC_OP *op, *op1;
+	WT_ASYNC_OP *op, *opget;
 	WT_CONNECTION *wt_conn;
 	WT_SESSION *session;
-	int ret;
+	int i, ret;
+	char k[16], v[16];
 
 	if ((ret = wiredtiger_open(home, NULL,
 	    "create,async=(enabled=true,ops_max=10,threads=2)", &conn)) != 0) {
@@ -85,19 +86,22 @@ int main(void)
 	    "key_format=S,value_format=S");
 	/*! [async example table create] */
 
-	/*! [async example open cursor] */
-	ret = conn->new_async_op(conn, uri, NULL, &cb, &op);
-	ret = conn->new_async_op(conn, uri, NULL, &cb, &op1);
-	/*! [async example open cursor] */
-
 	/*! [async example insert] */
-	op->set_key(op, "key1");
-	op->set_value(op, "value1");
-	ret = op->insert(op);
+	for (i=0; i < 10; i++) {
+		ret = conn->new_async_op(conn, uri, NULL, &cb, &op);
+		snprintf(k, sizeof(k), "key%d", i);
+		snprintf(v, sizeof(v), "value%d", i);
+		op->set_key(op, k);
+		op->set_value(op, v);
+		ret = op->insert(op);
+	}
 	
-	op1->set_key(op1, "key1");
-	search_id = op1->get_id(op1);
-	op1->search(op1);
+	conn->async_flush(conn);
+
+	ret = conn->new_async_op(conn, uri, NULL, &cb, &opget);
+	opget->set_key(opget, "key1");
+	search_id = opget->get_id(opget);
+	opget->search(opget);
 	/*! [async example insert] */
 
 	/*! [async example close] */
