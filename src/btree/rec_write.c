@@ -487,12 +487,14 @@ __rec_write_init(
 	}
 
 	/*
-	 * Clean up any pre-existing boundary structures: almost none of this
-	 * should be necessary (already_compressed is the notable exception),
-	 * but it's cheap.
+	 * Clean up any used boundary structures. It is worth short-circuiting
+	 * the traversal because sometimes the boundary list can grow to over
+	 * a million entries. The only field we really need to clear is
+	 * already_compressed, but let's be paranoid.
 	 */
 	if (r->bnd != NULL)
-		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
+		for (bnd = r->bnd, i = 0;
+		     i < r->bnd_entries && bnd->entries > 0; ++bnd, ++i) {
 			bnd->start = NULL;
 			bnd->recno = 0;
 			bnd->entries = 0;

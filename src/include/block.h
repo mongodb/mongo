@@ -20,23 +20,24 @@
  *	alloc:	 the extents allocated in this checkpoint
  *	avail:	 the extents available for allocation
  *	discard: the extents freed in this checkpoint
- * Each of the extent lists is based on two skiplists: first, a by-offset list
- * linking WT_EXT elements and sorted by file offset (low-to-high), second, a
- * by-size list linking WT_SIZE elements and sorted by chunk size (low-to-high).
- *	Additionally, each WT_SIZE element on the by-size has a skiplist of its
- * own, linking WT_EXT elements and sorted by file offset (low-to-high).  This
- * list has an entry for extents of a particular size.
- *	The trickiness is that each individual WT_EXT element appears on two
- * skiplists.  In order to minimize allocation calls, we allocate a single
- * array of WT_EXT pointers at the end of the WT_EXT structure, for both
- * skiplists, and store the depth of the skiplist in the WT_EXT structure.
- * The skiplist entries for the offset skiplist start at WT_EXT.next[0] and
- * the entries for the size skiplist start at WT_EXT.next[WT_EXT.depth].
  *
- * XXX
- * We maintain the per-size skiplists for the alloc and discard extent lists,
- * but there's no reason for that, the avail list is the only list we search
- * by size.
+ * An extent list is based on two skiplists: first, a by-offset list linking
+ * WT_EXT elements and sorted by file offset (low-to-high), second, a by-size
+ * list linking WT_SIZE elements and sorted by chunk size (low-to-high).
+ *
+ * Additionally, each WT_SIZE element on the by-size has a skiplist of its own,
+ * linking WT_EXT elements and sorted by file offset (low-to-high).  This list
+ * has an entry for extents of a particular size.
+ *
+ * The trickiness is each individual WT_EXT element appears on two skiplists.
+ * In order to minimize allocation calls, we allocate a single array of WT_EXT
+ * pointers at the end of the WT_EXT structure, for both skiplists, and store
+ * the depth of the skiplist in the WT_EXT structure.  The skiplist entries for
+ * the offset skiplist start at WT_EXT.next[0] and the entries for the size
+ * skiplist start at WT_EXT.next[WT_EXT.depth].
+ *
+ * One final complication: we only maintain the per-size skiplist for the avail
+ * list, the alloc and discard extent lists are not searched based on size.
  */
 
 /*
@@ -51,6 +52,8 @@ struct __wt_extlist {
 
 	off_t	 offset;			/* Written extent offset */
 	uint32_t cksum, size;			/* Written extent cksum, size */
+
+	int	track_size;			/* Maintain per-size skiplist */
 
 	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Size/offset skiplists */
 	WT_SIZE *sz[WT_SKIP_MAXDEPTH];

@@ -45,14 +45,20 @@ __block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 int
 __wt_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 {
+	WT_EXT *ext;
 	WT_BLOCK_MGR_SESSION *bms;
+	u_int i;
 
 	bms = session->block_manager;
 
 	/* Return a WT_EXT structure for use from a cached list. */
 	if (bms != NULL && bms->ext_cache != NULL) {
-		(*extp) = bms->ext_cache;
-		bms->ext_cache = bms->ext_cache->next[0];
+		ext = bms->ext_cache;
+		bms->ext_cache = ext->next[0];
+
+		/* Clear any left-over references. */
+		for (i = 0; i < ext->depth; ++i)
+			ext->next[i] = ext->next[i + ext->depth] = NULL;
 
 		/*
 		 * The count is advisory to minimize our exposure to bugs, but
@@ -60,6 +66,8 @@ __wt_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 		 */
 		if (bms->ext_cache_cnt > 0)
 			--bms->ext_cache_cnt;
+
+		*extp = ext;
 		return (0);
 	}
 

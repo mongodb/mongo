@@ -112,7 +112,8 @@ extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session,
 extern int __wt_block_extlist_init(WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     const char *name,
-    const char *extname);
+    const char *extname,
+    int track_size);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
 extern int __wt_block_map( WT_SESSION_IMPL *session,
     WT_BLOCK *block,

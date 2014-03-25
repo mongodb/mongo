@@ -355,7 +355,7 @@ connection_runtime_config = [
 	    list, such as <code>"verbose=[evictserver,read]"</code>''',
 	    type='list', choices=[
 	        'block',
-	        'ckpt',
+	        'checkpoint',
 	        'compact',
 	        'evict',
 	        'evictserver',

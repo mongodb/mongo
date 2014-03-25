@@ -662,11 +662,18 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_PAGE *page;
 	WT_TXN *txn;
 	uint32_t flags;
+	uint64_t internal_bytes, leaf_bytes;
+	uint64_t internal_pages, leaf_pages;
+	struct timespec end, start;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	page = NULL;
 	txn = &session->txn;
+	internal_bytes = leaf_bytes = 0;
+	internal_pages = leaf_pages = 0;
+	if (WT_VERBOSE_ISSET(session, checkpoint))
+		WT_RET(__wt_epoch(session, &start));
 
 	switch (syncop) {
 	case WT_SYNC_CHECKPOINT:
@@ -686,6 +693,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_refresh(
 					    session, WT_TXN_NONE, 1);
+				leaf_bytes += page->memory_footprint;
+				++leaf_pages;
 				ret = __wt_rec_write(session, page, NULL, 0);
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_release_snapshot(session);
@@ -726,8 +735,11 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		WT_ERR(__wt_tree_walk(session, &page, flags));
 		while (page != NULL) {
 			/* Write dirty pages. */
-			if (__wt_page_is_modified(page))
+			if (__wt_page_is_modified(page)) {
+				internal_bytes += page->memory_footprint;
+				++internal_pages;
 				WT_ERR(__wt_rec_write(session, page, NULL, 0));
+			}
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
 		break;
@@ -738,6 +750,18 @@ err:	/* On error, clear any left-over tree walk. */
 	if (page != NULL)
 		WT_TRET(__wt_page_release(session, page));
 
+	if (WT_VERBOSE_ISSET(session, checkpoint)) {
+		WT_RET(__wt_epoch(session, &end));
+		WT_VERBOSE_ERR(session, checkpoint,
+		    "__wt_sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
+		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
+		    " bytes, %" PRIu64 " pages of internal\n\t"
+		    "Took: %" PRIu64 "ms\n",
+		    syncop == WT_SYNC_WRITE_LEAVES ?
+		    "WRITE_LEAVES" : "CHECKPOINT",
+		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
+		    WT_TIMEDIFF(end, start) / WT_MILLION);
+	}
 	if (btree->checkpointing) {
 		/*
 		 * Clear the checkpoint flag and push the change; not required,
