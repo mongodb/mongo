@@ -167,7 +167,7 @@ DBQuery.prototype.count = function( applySkipLimit ) {
         if ( this._special ) {
             cmd.query = this._query.query;
             if ( this._query.$maxTimeMS ) {
-                cmd.$maxTimeMS = this._query.$maxTimeMS;
+                cmd.maxTimeMS = this._query.$maxTimeMS;
             }
             if ( this._query.$hint ) {
                 cmd.hint = this._query.$hint;
