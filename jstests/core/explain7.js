@@ -170,12 +170,24 @@ for( i = 30; i < 150; ++i ) {
     t.save( { a:i, b:i } );
 }
 
-explain = assertUnhintedExplain( { n:150},
+// Non-covered $or query.
+explain = assertUnhintedExplain( { n:150, nscannedObjects:300 },
+                                 t.find( { $or:[ { a:{ $gte:-1, $lte:200 },
+                                                   b:{ $gte:0, $lte:201 } },
+                                                 { a:{ $gte:0, $lte:201 },
+                                                   b:{ $gte:-1, $lte:200 } } ] },
+                                         { _id:1, a:1, b:1 } ).hint( { a:1, b:1 } ) );
+printjson(explain);
+assert.eq( 150, explain.clauses[ 0 ].nscannedObjects );
+assert.eq( 150, explain.clauses[ 1 ].nscannedObjects );
+
+// Covered $or query.
+explain = assertUnhintedExplain( { n:150, nscannedObjects:0 },
                                  t.find( { $or:[ { a:{ $gte:-1, $lte:200 },
                                                    b:{ $gte:0, $lte:201 } },
                                                  { a:{ $gte:0, $lte:201 },
                                                    b:{ $gte:-1, $lte:200 } } ] },
                                          { _id:0, a:1, b:1 } ).hint( { a:1, b:1 } ) );
 printjson(explain);
-// Check nscannedObjects for each clause.
 assert.eq( 0, explain.clauses[ 0 ].nscannedObjects );
+assert.eq( 0, explain.clauses[ 1 ].nscannedObjects );

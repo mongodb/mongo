@@ -1,3 +1,4 @@
+load('jstests/libs/parallelTester.js')
 
 N = 1000;
 HOST = db.getMongo().host

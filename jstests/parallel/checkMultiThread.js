@@ -1,3 +1,4 @@
+load('jstests/libs/parallelTester.js')
 
 var start = new Date();
 print("start: " + start);

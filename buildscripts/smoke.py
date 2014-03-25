@@ -392,14 +392,14 @@ def ternary( b , l="true", r="false" ):
         return l
     return r
 
-
 # Blech.
 def skipTest(path):
     basename = os.path.basename(path)
     parentPath = os.path.dirname(path)
     parentDir = os.path.basename(parentPath)
     if small_oplog: # For tests running in parallel
-        if basename in ["cursor8.js", "indexh.js", "dropdb.js", "connections_opened.js", "opcounters.js", "dbadmin.js"]:
+        if basename in ["cursor8.js", "indexh.js", "dropdb.js", 
+                        "connections_opened.js", "opcounters.js", "dbadmin.js"]:
             return True
     if use_ssl:
         # Skip tests using mongobridge since it does not support SSL
@@ -442,6 +442,14 @@ def skipTest(path):
 
     return False
 
+def setShellWriteModeForTest(path, argv):
+    forceCommandsForSuite = ["aggregation", "replsets", "parallel"]
+    swm = shell_write_mode;
+    if swm == "legacy": # change when the default changes to "commands"
+        if use_write_commands or [s for s in forceCommandsForSuite if s in path]:
+            swm = "commands"
+    argv += ["--writeMode", swm]
+
 def runTest(test, result):
     # result is a map containing test result details, like result["url"]
 
@@ -468,10 +476,9 @@ def runTest(test, result):
             path = argv[1]
     elif ext == ".js":
         argv = [shell_executable, "--port", mongod_port, '--authenticationMechanism', authMechanism]
-        if use_write_commands or "aggregation" in path or "replsets" in path:
-            argv += ["--writeMode", "commands"]
-        else:
-            argv += ["--writeMode", shell_write_mode]
+        
+        setShellWriteModeForTest(path, argv)
+        
         if not usedb:
             argv += ["--nodb"]
         if small_oplog or small_oplog_rs:
@@ -524,8 +531,7 @@ def runTest(test, result):
                      'TestData.authMechanism = ' + ternary( authMechanism,
                                                '"' + str(authMechanism) + '"', 'null') + ";" + \
                      'TestData.useSSL = ' + ternary( use_ssl ) + ";" + \
-                     'TestData.useX509 = ' + ternary( use_x509 ) + ";" + \
-                     'TestData.useWriteCommands = ' + ternary( use_write_commands ) + ";"
+                     'TestData.useX509 = ' + ternary( use_x509 ) + ";"
         # this updates the default data directory for mongod processes started through shell (src/mongo/shell/servers.js)
         evalString += 'MongoRunner.dataDir = "' + os.path.abspath(smoke_db_prefix + '/data/db') + '";'
         evalString += 'MongoRunner.dataPath = MongoRunner.dataDir + "/";'
@@ -890,7 +896,19 @@ def expand_suites(suites,expandUseDB=True):
     module_suites = get_module_suites()
     for suite in suites:
         if suite == 'all':
-            return expand_suites(['test', 'perf', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'],expandUseDB=expandUseDB)
+            return expand_suites(['test', 
+                                  'perf', 
+                                  'js', 
+                                  'jsPerf', 
+                                  'jsSlowNightly', 
+                                  'jsSlowWeekly', 
+                                  'clone', 
+                                  'parallel', 
+                                  'repl', 
+                                  'auth', 
+                                  'sharding', 
+                                  'tool'],
+                                 expandUseDB=expandUseDB)
         if suite == 'test':
             if os.sys.platform == "win32":
                 program = 'test.exe'
@@ -951,8 +969,10 @@ def add_exe(e):
     return e
 
 def set_globals(options, tests):
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs
-    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure
+    global small_oplog, small_oplog_rs
+    global no_journal, set_parameters, set_parameters_mongos, no_preallocj
+    global auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
     global use_ssl, use_x509
     global file_of_commands_mode
     global report_file, shell_write_mode, use_write_commands
@@ -1093,8 +1113,8 @@ def add_to_failfile(tests, options):
 
 def main():
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog
-    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
-    global use_write_commands
+    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth
+    global keyFile, smoke_db_prefix, test_path, use_write_commands
 
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',

@@ -1,6 +1,10 @@
 // Drop a collection while a map/reduce job is running against it.  SERVER-6757
 
-t = db.jstests_mr_drop;
+// Use a different DB to prevent other tests from breaking this race-y test when run in parallel.
+// Formerly another test could take out a write lock on the DB, preventing map/reduce and drop()
+// from running until the other action completed. When the other action completed, the drop thread
+// was finished sleeping and ready to drop and would drop before map/reduce was able to start.
+t = db.getSiblingDB('MrDrop').jstests_mr_drop;
 t.drop();
 
 Random.setRandomSeed();
@@ -20,7 +24,7 @@ for( i = 0; i < 10000; ++i ) {
 }
 
 // Schedule a collection drop two seconds in the future.
-s = startParallelShell( "sleep( 2000 ); db.jstests_mr_drop.drop();" );
+s = startParallelShell( "sleep( 2000 ); db.getSiblingDB('MrDrop').jstests_mr_drop.drop();" );
 
 // Run the map/reduce job.  Check for command failure internally.  The job succeeds even if the
 // source collection is dropped in progress.
