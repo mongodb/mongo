@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/get_runner.h"
-#include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
@@ -95,20 +94,13 @@ namespace mongo {
         uassertStatusOK(getRunnerCount(collection, query, hintObj, &rawRunner));
         auto_ptr<Runner> runner(rawRunner);
 
-        ElapsedTracker timeToStartYielding(128, 10);
         try {
             const ScopedRunnerRegistration safety(runner.get());
+            runner->setYieldPolicy(Runner::YIELD_AUTO);
 
             long long count = 0;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, NULL))) {
-
-                // Lazily yield, avoiding a performance regression when
-                // scanning a very small number of documents.
-                if (timeToStartYielding.intervalHasElapsed()) {
-                    runner->setYieldPolicy(Runner::YIELD_AUTO);
-                }
-
                 if (skip > 0) {
                     --skip;
                 }
