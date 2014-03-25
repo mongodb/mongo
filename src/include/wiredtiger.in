@@ -1484,6 +1484,37 @@ struct __wt_session {
  */
 struct __wt_connection {
 	/*!
+	 * @name Async operation handles
+	 * @{
+	 */
+	/*!
+	 * Wait for all outstanding operations to complete.
+	 *
+	 * @snippet ex_async.c Allocate a handle
+	 *
+	 * @param connection the connection handle
+	 * @errors
+	 */
+	int __F(async_flush)(WT_CONNECTION *connection);
+
+	/*!
+	 * Return an async operation handle
+	 *
+	 * @snippet ex_async.c Allocate a handle
+	 *
+	 * @param connection the connection handle
+	 * @param uri the connection handle
+	 * @configstart{connection.async_new_op, see dist/api_data.py}
+	 * @configend
+	 * @param[out] sessionp the new session handle
+	 * @errors
+	 */
+	int __F(async_new_op)(WT_CONNECTION *connection,
+	    const char *uri, const char *config, WT_ASYNC_CALLBACK *callback,
+	    WT_ASYNC_OP **asyncopp);
+	/*! @} */
+
+	/*!
 	 * Close a connection.
 	 *
 	 * Any open sessions will be closed.
@@ -1602,37 +1633,6 @@ struct __wt_connection {
 	 * handle.
 	 */
 	int __F(is_new)(WT_CONNECTION *connection);
-
-	/*!
-	 * @name Async operation handles
-	 * @{
-	 */
-	/*!
-	 * Wait for all outstanding operations to complete.
-	 *
-	 * @snippet ex_async.c Allocate a handle
-	 *
-	 * @param connection the connection handle
-	 * @errors
-	 */
-	int __F(async_flush)(WT_CONNECTION *connection);
-
-	/*!
-	 * Return an async operation handle
-	 *
-	 * @snippet ex_async.c Allocate a handle
-	 *
-	 * @param connection the connection handle
-	 * @param uri the connection handle
-	 * @configstart{connection.async_new_op, see dist/api_data.py}
-	 * @configend
-	 * @param[out] sessionp the new session handle
-	 * @errors
-	 */
-	int __F(async_new_op)(WT_CONNECTION *connection,
-	    const char *uri, const char *config, WT_ASYNC_CALLBACK *callback,
-	    WT_ASYNC_OP **opp);
-	/*! @} */
 
 	/*!
 	 * @name Session handles
