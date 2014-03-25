@@ -301,3 +301,12 @@ assert(res.ok == 1,
 res = t.runCommand("collMod", {usePowerOf2Sizes: true, maxTimeMS: 60*1000});
 assert(res.ok == 1,
        "expected collmod with maxtime to succeed, ok=" + res.ok + ", code=" + res.code);
+
+//
+// test count shell helper SERVER-13334
+//
+t.drop();
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut",
+                                     mode: "alwaysOn"}).ok);
+assert.doesNotThrow(function() { t.find({}).maxTimeMS(1).count(); });
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}).ok);
