@@ -73,6 +73,10 @@ assert.eq(modes["1 and 2"]["server"], 1);
 assert.eq(modes["3 or 4"]["sf"], 1);
 assert.eq(modes["3 and 4"]["sf"], 2);
 
+// create collection to guard against timeouts due to file allocation
+assert.commandWorked(master.getDB("foo").createCollection("bar"));
+replTest.awaitReplication();
+
 myprint("bridging");
 replTest.bridge();
 myprint("bridge 1");
