@@ -680,7 +680,7 @@ monitor(void *arg)
 	path = NULL;
 
 	min_thr = (uint64_t)cfg->min_throughput;
-	latency_max = (uint32_t)sec_to_ns(cfg->max_latency);
+	latency_max = (uint32_t)ms_to_ns(cfg->max_latency);
 
 	/* Open the logging file. */
 	len = strlen(cfg->monitor_dir) + 100;

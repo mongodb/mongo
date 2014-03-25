@@ -101,8 +101,8 @@ DEF_OPT_AS_UINT32(min_throughput, 0,
     "abort if any throughput measured is less than this amount.  Requires"
     "sample_interval to be configured")
 DEF_OPT_AS_UINT32(max_latency, 0,
-    "abort if any latency measured exceeds this number of seconds.  Requires"
-    "sample_interval to be configured")
+    "abort if any latency measured exceeds this number of milliseconds."
+    "Requires sample_interval to be configured")
 DEF_OPT_AS_BOOL(pareto, 0, "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "number of operations to group into each transaction in the populate "
