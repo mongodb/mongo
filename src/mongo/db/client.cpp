@@ -566,6 +566,7 @@ namespace mongo {
         upsert = false;
         keyUpdates = 0;  // unsigned, so -1 not possible
         planSummary = "";
+        execStats.reset();
         
         exceptionInfo.reset();
         
