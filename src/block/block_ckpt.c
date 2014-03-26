@@ -30,7 +30,7 @@ __wt_block_ckpt_init(
 	WT_RET(__wt_block_extlist_init(
 	    session, &ci->discard, name, "discard", 0));
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, name, "ckpt_avail", 0));
+	    session, &ci->ckpt_avail, name, "ckpt_avail", 1));
 
 	return (0);
 }
@@ -364,18 +364,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 */
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, "live", "ckpt_avail", 0));
-
-	/*
-	 * We've allocated our last page, update the checkpoint size.  We need
-	 * to calculate the live system's checkpoint size before reading and
-	 * merging checkpoint allocation and discard information from the
-	 * checkpoints we're deleting, those operations change the underlying
-	 * byte counts.
-	 */
-	ckpt_size = ci->ckpt_size;
-	ckpt_size += ci->alloc.bytes;
-	ckpt_size -= ci->discard.bytes;
+	    session, &ci->ckpt_avail, "live", "ckpt_avail", 1));
 
 	/*
 	 * To delete a checkpoint, we'll need checkpoint information for it and
@@ -420,6 +409,16 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 */
 	__wt_spin_lock(session, &block->live_lock);
 	locked = 1;
+
+	/*
+	 * We've allocated our last page, update the checkpoint size.  We need
+	 * to calculate the live system's checkpoint size before merging
+	 * checkpoint allocation and discard information from the checkpoints
+	 * we're deleting, those operations change the underlying byte counts.
+	 */
+	ckpt_size = ci->ckpt_size;
+	ckpt_size += ci->alloc.bytes;
+	ckpt_size -= ci->discard.bytes;
 
 	/* Skip the additional processing if we aren't deleting checkpoints. */
 	if (!deleting)
