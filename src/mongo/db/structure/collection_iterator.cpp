@@ -87,6 +87,8 @@ namespace mongo {
         return _curr.isNull();
     }
 
+    DiskLoc FlatIterator::curr() { return _curr; }
+
     DiskLoc FlatIterator::getNext() {
         DiskLoc ret = _curr;
 
@@ -176,6 +178,8 @@ namespace mongo {
     }
 
     bool CappedIterator::isEOF() { return _curr.isNull(); }
+
+    DiskLoc CappedIterator::curr() { return _curr; }
 
     DiskLoc CappedIterator::getNext() {
         DiskLoc ret = _curr;

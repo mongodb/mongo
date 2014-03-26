@@ -48,7 +48,11 @@ namespace mongo {
         // True if getNext will produce no more data, false otherwise.
         virtual bool isEOF() = 0;
 
-        // Return the next item from the collection.  Returns DiskLoc() if isEOF.
+        // Return the DiskLoc that the iterator points at.  Returns DiskLoc() if isEOF.
+        virtual DiskLoc curr() = 0;
+
+        // Return the DiskLoc that the iterator points at and move the iterator to the next item
+        // from the collection.  Returns DiskLoc() if isEOF.
         virtual DiskLoc getNext() = 0;
 
         // Can only be called after prepareToYield and before recoverFromYield.
@@ -76,6 +80,7 @@ namespace mongo {
 
         virtual bool isEOF();
         virtual DiskLoc getNext();
+        virtual DiskLoc curr();
 
         virtual void invalidate(const DiskLoc& dl);
         virtual void prepareToYield();
@@ -108,6 +113,7 @@ namespace mongo {
         // If this is a tailable cursor, isEOF could change its mind after a call to getNext().
         virtual bool isEOF();
         virtual DiskLoc getNext();
+        virtual DiskLoc curr();
 
         virtual void invalidate(const DiskLoc& dl);
         virtual void prepareToYield();
