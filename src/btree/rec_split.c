@@ -457,8 +457,15 @@ __split_inmem_build(
 	 */
 	WT_RET(__wt_page_inmem(session,
 	    NULL, NULL, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &page));
+
+	/*
+	 * Clear the disk image and link the page into the passed-in WT_REF to
+	 * simplify error handling: our caller will not discard the disk image
+	 * when discarding the original page, and our caller will discard the
+	 * allocated page on error, when discarding the allocated WT_REF.
+	 */
 	multi->skip_dsk = NULL;
-	ref->page = page;
+	WT_LINK_PAGE(orig->parent, ref, page);
 
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip) {
@@ -503,9 +510,6 @@ __split_inmem_build(
 		WT_ILLEGAL_VALUE(session);
 		}
 	}
-
-	/* Link the new page to the original page's parent. */
-	WT_LINK_PAGE(orig->parent, ref, page);
 
 	return (0);
 }
