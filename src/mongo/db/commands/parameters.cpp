@@ -30,6 +30,8 @@
 
 #include "mongo/pch.h"
 
+#include <set>
+
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -111,40 +113,95 @@ namespace mongo {
             appendParameterNames( help );
         }
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            int s = 0;
+            int numSet = 0;
             bool found = false;
 
-            const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
-            BSONObjIterator i( cmdObj );
-            i.next(); // skip past command name
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                ServerParameter::Map::const_iterator j = m.find( e.fieldName() );
-                if ( j == m.end() )
-                    continue;
+            const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
 
-                if ( ! j->second->allowedToChangeAtRuntime() ) {
-                    errmsg = str::stream()
-                        << "not allowed to change ["
-                        << e.fieldName()
-                        << "] at runtime";
+            // First check that we aren't setting the same parameter twice and that we actually are
+            // setting parameters that we have registered and can change at runtime
+            BSONObjIterator parameterCheckIterator(cmdObj);
+
+            // We already know that "setParameter" will be the first element in this object, so skip
+            // past that
+            parameterCheckIterator.next();
+
+            // Set of all the parameters the user is attempting to change
+            std::map<std::string, BSONElement> parametersToSet;
+
+            // Iterate all parameters the user passed in to do the initial validation checks,
+            // including verifying that we are not setting the same parameter twice.
+            while (parameterCheckIterator.more()) {
+                BSONElement parameter = parameterCheckIterator.next();
+                std::string parameterName = parameter.fieldName();
+
+                ServerParameter::Map::const_iterator foundParameter =
+                    parameterMap.find(parameterName);
+
+                // Check to see if this is actually a valid parameter
+                if (foundParameter == parameterMap.end()) {
+                    errmsg = str::stream() << "attempted to set unrecognized parameter ["
+                                           << parameterName
+                                           << "], use help:true to see options ";
                     return false;
                 }
 
-                if ( s == 0 )
-                    j->second->append(txn, result, "was" );
+                // Make sure we are allowed to change this parameter
+                if (!foundParameter->second->allowedToChangeAtRuntime()) {
+                    errmsg = str::stream() << "not allowed to change [" << parameterName
+                                           << "] at runtime";
+                    return false;
+                }
 
-                Status status = j->second->set( e );
-                if ( status.isOK() ) {
-                    s++;
+                // Make sure we are only setting this parameter once
+                if (parametersToSet.count(parameterName)) {
+                    errmsg = str::stream() << "attempted to set parameter ["
+                                           << parameterName
+                                           << "] twice in the same setParameter command, "
+                                           << "once to value: ["
+                                           << parametersToSet[parameterName].toString(false)
+                                           << "], and once to value: [" << parameter.toString(false)
+                                           << "]";
+                    return false;
+                }
+
+                parametersToSet[parameterName] = parameter;
+            }
+
+            // Iterate the parameters that we have confirmed we are setting and actually set them.
+            // Not that if setting any one parameter fails, the command will fail, but the user
+            // won't see what has been set and what hasn't.  See SERVER-8552.
+            for (std::map<std::string, BSONElement>::iterator it = parametersToSet.begin();
+                 it != parametersToSet.end(); ++it) {
+                BSONElement parameter = it->second;
+                std::string parameterName = it->first;
+
+                ServerParameter::Map::const_iterator foundParameter =
+                    parameterMap.find(parameterName);
+
+                if (foundParameter == parameterMap.end()) {
+                    errmsg = str::stream() << "Parameter: " << parameterName << " that was "
+                                           << "avaliable during our first lookup in the registered "
+                                           << "parameters map is no longer available.";
+                    return false;
+                }
+
+                if (numSet == 0) {
+                    foundParameter->second->append(txn, result, "was");
+                }
+
+                Status status = foundParameter->second->set(parameter);
+                if (status.isOK()) {
+                    numSet++;
                     continue;
                 }
+
                 errmsg = status.reason();
-                result.append( "code", status.code() );
+                result.append("code", status.code());
                 return false;
             }
 
-            if( s == 0 && !found ) {
+            if (numSet == 0 && !found) {
                 errmsg = "no option found to set, use help:true to see options ";
                 return false;
             }
