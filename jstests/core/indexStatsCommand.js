@@ -1,7 +1,7 @@
-db.jstests_commands.drop();
-db.createCollection("jstests_commands");
+db.indexStatsCommand.drop();
+db.createCollection("indexStatsCommand");
 
-t = db.jstests_commands;
+t = db.indexStatsCommand;
 
 for (var i = 0; i < 3000; ++i) {
     t.insert({i: i, d: i % 13});

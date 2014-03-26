@@ -1,7 +1,7 @@
-db.jstests_commands.drop();
-db.createCollection("jstests_commands");
+db.storageDetailsCommand.drop();
+db.createCollection("storageDetailsCommand");
 
-t = db.jstests_commands;
+t = db.storageDetailsCommand;
 
 for (var i = 0; i < 3000; ++i) {
     t.insert({i: i, d: i % 13});
