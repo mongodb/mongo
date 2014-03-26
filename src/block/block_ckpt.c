@@ -369,17 +369,6 @@ __ckpt_process(
 	    session, &ci->ckpt_avail, "live", "ckpt_avail", 1));
 
 	/*
-	 * We've allocated our last page, update the checkpoint size.  We need
-	 * to calculate the live system's checkpoint size before reading and
-	 * merging checkpoint allocation and discard information from the
-	 * checkpoints we're deleting, those operations change the underlying
-	 * byte counts.
-	 */
-	ckpt_size = ci->ckpt_size;
-	ckpt_size += ci->alloc.bytes;
-	ckpt_size -= ci->discard.bytes;
-
-	/*
 	 * To delete a checkpoint, we'll need checkpoint information for it and
 	 * the subsequent checkpoint into which it gets rolled; read them from
 	 * disk before we lock things down.
@@ -422,6 +411,16 @@ __ckpt_process(
 	 */
 	__wt_spin_lock(session, &block->live_lock);
 	locked = 1;
+
+	/*
+	 * We've allocated our last page, update the checkpoint size.  We need
+	 * to calculate the live system's checkpoint size before merging
+	 * checkpoint allocation and discard information from the checkpoints
+	 * we're deleting, those operations change the underlying byte counts.
+	 */
+	ckpt_size = ci->ckpt_size;
+	ckpt_size += ci->alloc.bytes;
+	ckpt_size -= ci->discard.bytes;
 
 	/* Skip the additional processing if we aren't deleting checkpoints. */
 	if (!deleting)
