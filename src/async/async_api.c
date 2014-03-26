@@ -12,9 +12,12 @@
  *	WT_ASYNC_OP->get_key implementation for op handles.
  */
 static int
-__async_get_key(WT_ASYNC_OP *op, ...)
+__async_get_key(WT_ASYNC_OP *asyncop, ...)
 {
-	fprintf(stderr, "async_get_key: called\n");
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	fprintf(stderr, "async_get_key: called id %d\n", op->internal_id);
 	return (0);
 }
 
@@ -23,9 +26,12 @@ __async_get_key(WT_ASYNC_OP *op, ...)
  *	WT_ASYNC_OP->get_value implementation for op handles.
  */
 static int
-__async_get_value(WT_ASYNC_OP *op, ...)
+__async_get_value(WT_ASYNC_OP *asyncop, ...)
 {
-	fprintf(stderr, "async_get_value: called\n");
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	fprintf(stderr, "async_get_value: called id %d\n", op->internal_id);
 	return (0);
 }
 
@@ -33,10 +39,13 @@ __async_get_value(WT_ASYNC_OP *op, ...)
  * __async_set_key --
  *	WT_ASYNC_OP->set_key implementation for op handles.
  */
-static int
-__async_set_key(WT_ASYNC_OP *op, ...)
+static void
+__async_set_key(WT_ASYNC_OP *asyncop, ...)
 {
-	fprintf(stderr, "async_set_key: called\n");
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	fprintf(stderr, "async_set_key: called id %d\n", op->internal_id);
 	return (0);
 }
 
@@ -44,10 +53,13 @@ __async_set_key(WT_ASYNC_OP *op, ...)
  * __async_set_value --
  *	WT_ASYNC_OP->set_value implementation for op handles.
  */
-static int
-__async_set_value(WT_ASYNC_OP *op, ...)
+static void
+__async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
-	fprintf(stderr, "async_set_value: called\n");
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	fprintf(stderr, "async_set_value: called id %d\n", op->internal_id);
 	return (0);
 }
 
@@ -56,10 +68,13 @@ __async_set_value(WT_ASYNC_OP *op, ...)
  *	WT_ASYNC_OP->search implementation for op handles.
  */
 static int
-__async_search(WT_ASYNC_OP *op)
+__async_search(WT_ASYNC_OP *asyncop)
 {
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_search);
-	fprintf(stderr, "async_search: called\n");
+	fprintf(stderr, "async_search: called id %d\n", op->internal_id);
 	return (0);
 }
 
@@ -68,10 +83,14 @@ __async_search(WT_ASYNC_OP *op)
  *	WT_ASYNC_OP->insert implementation for op handles.
  */
 static int
-__async_insert(WT_ASYNC_OP *op)
+__async_insert(WT_ASYNC_OP *asyncop)
 {
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_insert);
-	fprintf(stderr, "async_insert: called\n");
+	fprintf(stderr, "async_insert: called id %d\n", op->internal_id);
 	return (0);
 }
 
@@ -80,8 +99,11 @@ __async_insert(WT_ASYNC_OP *op)
  *	WT_ASYNC_OP->update implementation for op handles.
  */
 static int
-__async_update(WT_ASYNC_OP *op)
+__async_update(WT_ASYNC_OP *asyncop)
 {
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_update);
 	fprintf(stderr, "async_update: called\n");
 	return (0);
@@ -92,8 +114,11 @@ __async_update(WT_ASYNC_OP *op)
  *	WT_ASYNC_OP->remove implementation for op handles.
  */
 static int
-__async_remove(WT_ASYNC_OP *op)
+__async_remove(WT_ASYNC_OP *asyncop)
 {
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_remove);
 	fprintf(stderr, "async_remove: called\n");
 	return (0);
@@ -104,8 +129,11 @@ __async_remove(WT_ASYNC_OP *op)
  *	WT_ASYNC_OP->get_id implementation for op handles.
  */
 static uint64_t
-__async_get_id(WT_ASYNC_OP *op)
+__async_get_id(WT_ASYNC_OP *asyncop)
 {
+	WT_ASYNC_OP_IMPL *op;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	fprintf(stderr, "async_get_id: returning %" PRIu64 "\n", op->unique_id);
 	return (op->unique_id);
 }
@@ -117,7 +145,8 @@ __async_get_id(WT_ASYNC_OP *op)
 int
 __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 {
-	WT_ASYNC_OP_STATIC_INIT(iface,
+	static const WT_ASYNC_OP stds = {
+	    NULL, NULL, NULL,
 	    __async_get_key,		/* get-key */
 	    __async_get_value,		/* get-value */
 	    __async_set_key,		/* set-key */
@@ -126,18 +155,17 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	    __async_insert,		/* insert */
 	    __async_update,		/* update */
 	    __async_remove,		/* remove */
-	    __async_get_id);		/* get-id */
+	    __async_get_id		/* get-id */
+	};
 	WT_ASYNC *async;
-	WT_ASYNC_OP *asyncop;
 	WT_ASYNC_OP_IMPL *op;
-	WT_DECL_RET;
 	uint32_t i;
 
 	async = conn->async;
 	for (i = 0; i < WT_ASYNC_MAX_OPS; i++) {
 		op = &async->async_ops[i];
-		*op->iface = iface;
-		op->iface.conn = (WT_CONNECTION *)conn;
+		op->iface = stds;
+		op->iface.connection = (WT_CONNECTION *)conn;
 		op->internal_id = i;
 		op->state = WT_ASYNCOP_FREE;
 	}

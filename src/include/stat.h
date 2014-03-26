@@ -118,6 +118,7 @@ struct __wt_stats {
 #define	WT_CONNECTION_STATS_BASE	1000
 struct __wt_connection_stats {
 	WT_STATS async_cur_queue;
+	WT_STATS async_flush;
 	WT_STATS async_full;
 	WT_STATS async_max_queue;
 	WT_STATS async_op_alloc;

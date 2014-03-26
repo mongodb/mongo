@@ -51,6 +51,8 @@ typedef enum __wt_page_state WT_PAGE_STATE;
 typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
+struct __wt_async;
+    typedef struct __wt_async WT_ASYNC;
 struct __wt_async_op_impl;
     typedef struct __wt_async_op_impl WT_ASYNC_OP_IMPL;
 struct __wt_async_worker_args;
@@ -239,6 +241,7 @@ struct __wt_update;
 #include "dhandle.h"			/* required by btree.h */
 
 #include "api.h"
+#include "async.h"
 #include "block.h"
 #include "bloom.h"
 #include "btmem.h"

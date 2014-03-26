@@ -31,7 +31,6 @@ static const WT_CONFIG_CHECK confchk_connection_open_session[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_async_subconfigs[] = {
-	{ "auto_free", "boolean", NULL, NULL },
 	{ "enabled", "boolean", NULL, NULL },
 	{ "ops_max", "int", "min=10,max=4096", NULL },
 	{ "threads", "int", "min=1,max=20", NULL },
@@ -340,10 +339,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_connection_open_session
 	},
 	{ "connection.reconfigure",
-	  "async=(auto_free=,enabled=0,ops_max=1024,threads=2),"
-	  "cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
-	  "eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	  "name=,reserve=0,size=500MB),statistics=none,verbose=",
+	  "async=(enabled=0,ops_max=1024,threads=2),cache_size=100MB,"
+	  "error_prefix=,eviction_dirty_target=80,eviction_target=80,"
+	  "eviction_trigger=95,shared_cache=(chunk=10MB,name=,reserve=0,"
+	  "size=500MB),statistics=none,verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",
@@ -446,10 +445,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_table_meta
 	},
 	{ "wiredtiger_open",
-	  "async=(auto_free=,enabled=0,ops_max=1024,threads=2),"
-	  "buffer_alignment=-1,cache_size=100MB,"
-	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),"
-	  "checkpoint_sync=,create=0,direct_io=,error_prefix=,"
+	  "async=(enabled=0,ops_max=1024,threads=2),buffer_alignment=-1,"
+	  "cache_size=100MB,checkpoint=(name=\"WiredTigerCheckpoint\","
+	  "wait=0),checkpoint_sync=,create=0,direct_io=,error_prefix=,"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
 	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"

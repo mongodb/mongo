@@ -556,8 +556,8 @@ extern int __wt_async_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_async_flush(WT_CONNECTION_IMPL *conn);
 extern int __wt_async_new_op(WT_CONNECTION_IMPL *conn,
     const char *uri,
-    const char *cfg[],
-    WT_ASYNC_CALLBACK *callback,
+    const char *config,
+    WT_ASYNC_CALLBACK *cb,
     WT_ASYNC_OP_IMPL **opp);
 extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);

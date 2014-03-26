@@ -5,53 +5,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * Initialize a static WT_ASYNC_OP structure.
- */
-#define	WT_ASYNC_OP_STATIC_INIT(n,					\
-	get_key,							\
-	get_value,							\
-	set_key,							\
-	set_value,							\
-	search,								\
-	insert,								\
-	update,								\
-	remove,								\
-	get_id)								\
-	static const WT_ASYNC_OP n = {					\
-	NULL,					/* connection */	\
-	NULL,					/* uri */		\
-	NULL,					/* config */		\
-	0,					/* uri_cfg_hash */	\
-	NULL,					/* key_format */	\
-	NULL,					/* value_format */	\
-	(int (*)(WT_ASYNC_OP *, ...))(get_key),				\
-	(int (*)(WT_ASYNC_OP *, ...))(get_value),			\
-	(void (*)(WT_ASYNC_OP *, ...))(set_key),			\
-	(void (*)(WT_ASYNC_OP *, ...))(set_value),			\
-	search,								\
-	insert,								\
-	update,								\
-	remove,								\
-	get_id,								\
-	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
-	0,				/* recno key */			\
-	{ 0 },				/* recno raw buffer */		\
-	NULL,				/* lang_private */		\
-	{ NULL, 0, 0, NULL, 0 }		/* WT_ITEM key */		\
-	{ NULL, 0, 0, NULL, 0 }		/* WT_ITEM value */		\
-	NULL,				/* WT_ASYNC_CALLBACK cb */	\
-	0,				/* int saved_err */		\
-	0,				/* uint32_t internal_id */	\
-	0,				/* uint64_t unique_id */	\
-	0,				/* uint32_t state */		\
-	0,				/* WT_ASYNC_OPTYPE optype */	\
-	0				/* uint32_t flags */		\
-}
-
-struct __wt_async_callback;
-		typedef struct __wt_async_callback WT_ASYNC_CALLBACK;
-
 /*! Asynchronous operation types. */
 typedef enum {
 	WT_AOP_FLUSH,	/*!< Flush the operation queue */
@@ -118,12 +71,11 @@ struct __wt_async_op_impl {
 #define	WT_ASYNCOP_VALUE_INT	0x0100	/* Value points into the tree. */
 #define	WT_ASYNCOP_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
 	uint32_t flags;
-#endif
 };
 /*
  * Definition of the async subsystem.
  */
-typedef struct {
+struct __wt_async {
 #define	WT_ASYNC_MAX_OPS	4096
 	WT_ASYNC_OP_IMPL	 async_ops[WT_ASYNC_MAX_OPS];
 					/* Async ops */
@@ -139,18 +91,21 @@ typedef struct {
 
 	/* Notify any waiting threads when work is enqueued. */
 	WT_CONDVAR		*ops_cond;
+	/* Notify any waiting threads when flushing is done. */
 	WT_CONDVAR		*flush_cond;
-	uint32_t		 flush_count;
-	uint32_t		 flush_id;
+	WT_ASYNC_OP_IMPL	 flush_op;	/* Special flush op */
+	uint32_t		 flush_count;	/* Worker count */
 
 #define	WT_ASYNC_MAX_WORKERS	20
 	WT_SESSION_IMPL		*worker_sessions[WT_ASYNC_MAX_WORKERS];
 					/* Async worker threads */
 	pthread_t		 worker_tids[WT_ASYNC_MAX_WORKERS];
 
-#define	WT_ASYNC_FLUSHING	0x0001
+#define	WT_ASYNC_FLUSH_COMPLETE		0x0001	/* Notify flush caller */
+#define	WT_ASYNC_FLUSH_IN_PROGRESS	0x0002	/* Prevent more callers */
+#define	WT_ASYNC_FLUSHING		0x0004	/* Notify workers */
 	uint32_t		 flags;
-} WT_ASYNC;
+};
 
 /*
  * WT_ASYNC_WORKER_ARGS --

@@ -299,9 +299,6 @@ connection_runtime_config = [
 	Config('async', '', r'''
 	    asynchronous operations configuration options.''',
 	    type='category', subconfig=[
-	    Config('auto_free', 'true', r'''
-	        should the handle be freed after use?''',
-	        type='boolean'),
 	    Config('enabled', 'false', r'''
 	        enable asynchronous operation''',
 	        type='boolean'),

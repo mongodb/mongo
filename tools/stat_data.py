@@ -1,6 +1,7 @@
 # DO NOT EDIT: automatically built by dist/stat.py. */
 
 no_scale_per_second_list = [
+    'async: maximum work queue length',
     'cache: tracked dirty bytes in the cache',
     'cache: bytes currently in the cache',
     'cache: maximum bytes configured',

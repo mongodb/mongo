@@ -315,6 +315,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	memset(stats, 0, sizeof(*stats));
 
 	stats->async_cur_queue.desc = "async: current work queue length";
+	stats->async_flush.desc = "async: number of async flush calls";
 	stats->async_full.desc = "async: number of times op allocation failed";
 	stats->async_max_queue.desc = "async: maximum work queue length";
 	stats->async_op_alloc.desc = "async op allocation";
@@ -440,6 +441,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 
 	stats = (WT_CONNECTION_STATS *)stats_arg;
 	stats->async_cur_queue.v = 0;
+	stats->async_flush.v = 0;
 	stats->async_full.v = 0;
 	stats->async_max_queue.v = 0;
 	stats->async_op_alloc.v = 0;

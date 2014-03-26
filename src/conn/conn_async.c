@@ -18,9 +18,11 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 	WT_ASYNC_OP_IMPL *op;
 	int i;
 
+	WT_UNUSED(i);
+	WT_UNUSED(op);
 	async = conn->async;
 	WT_STAT_FAST_CONN_INCR(conn->default_session, async_op_alloc);
-	*op = NULL;
+	*opp = NULL;
 	return (0);
 }
 
@@ -31,7 +33,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 static int
 __async_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
-	WT_CONFIG_ITEM cval, sval;
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
@@ -52,7 +54,6 @@ __async_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	conn->async_workers = cval.val;
 
 	ret = 0;
-err:
 	return (ret);
 }
 
@@ -65,7 +66,8 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_ASYNC *async;
 	WT_SESSION_IMPL *session;
-	int i, run;
+	int run;
+	uint32_t i;
 
 	session = conn->default_session;
 
@@ -96,8 +98,8 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		 * Each worker has its own session.
 		 */
 		WT_RET(__wt_open_session(
-		    conn, 1, NULL, NULL, &async->worker_session[i]));
-		async->worker_session[i]->name = "async-worker";
+		    conn, 1, NULL, NULL, &async->worker_sessions[i]));
+		async->worker_sessions[i]->name = "async-worker";
 		/*
 		 * Start the threads.
 		 */
@@ -118,7 +120,8 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 	WT_ASYNC *async;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	int i;
+	WT_SESSION_IMPL *session;
+	uint32_t i;
 
 	session = conn->default_session;
 	async = conn->async;
@@ -137,7 +140,7 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 
 	/* Close the server thread's session. */
 	for (i = 0; i < conn->async_workers; i++)
-		if (async->worker_session[i] != NULL) {
+		if (async->worker_sessions[i] != NULL) {
 			wt_session = &async->worker_sessions[i]->iface;
 			WT_TRET(wt_session->close(wt_session, NULL));
 			async->worker_sessions[i] = NULL;
@@ -158,8 +161,6 @@ int
 __wt_async_flush(WT_CONNECTION_IMPL *conn)
 {
 	WT_ASYNC *async;
-	WT_ASYNC_OP_IMPL *op;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	if (!conn->async_cfg)
@@ -176,31 +177,31 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
  *	Implementation of the WT_CONN->async_new_op method.
  */
 int
-__wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri, const char *cfg[],
-    WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP_IMPL **opp)
+__wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
+    const char *config, WT_ASYNC_CALLBACK *cb,
+    WT_ASYNC_OP_IMPL **opp)
 {
 	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	uint32_t i;
 
 	if (!conn->async_cfg)
 		return (0);
 
 	async = conn->async;
 	session = conn->default_session;
-	*asyncopp = NULL;
+	*opp = NULL;
 
 	WT_ERR(__async_new_op_alloc(conn, &op));
 	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
 	WT_ERR(__wt_strdup(session, uri, &op->uri));
-	WT_ERR(__wt_strdup(session, cfg, &op->config));
+	WT_ERR(__wt_strdup(session, config, &op->config));
 	op->uri_hash = __wt_hash_city64(uri, strlen(uri));
-	op->cfg_hash = __wt_hash_city64(cfg, strlen(cfg));
-	op->cb = callback;
+	op->cfg_hash = __wt_hash_city64(config, strlen(config));
+	op->cb = cb;
 
-	*asyncopp = op->iface;
+	*opp = op;
 
 err:
 	return (ret);
