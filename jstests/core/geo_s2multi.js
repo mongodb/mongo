@@ -1,4 +1,4 @@
-t = db.geo_s2index
+t = db.geo_s2multi
 t.drop()
 
 t.ensureIndex({geo: "2dsphere"})
