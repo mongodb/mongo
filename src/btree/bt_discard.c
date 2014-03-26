@@ -11,6 +11,7 @@ static void __free_page_modify(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static void __free_ref(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *);
 static void __free_skip_array(WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t);
 static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
@@ -127,21 +128,9 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	}
 
-	/*
-	 * Free any split chunks created when underlying pages split into this
-	 * page.
-	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		for (i = 0; i < mod->mod_splits_entries; ++i) {
-			__wt_free_ref_array(session, page,
-			    mod->mod_splits[i].refs,
-			    mod->mod_splits[i].entries, 0);
-			__wt_free(session, mod->mod_splits[i].refs);
-		}
-		__wt_free(session, mod->mod_splits);
-
 		/*
 		 * If a root page split, there may be one or more pages linked
 		 * from the page; walk the list, discarding pages.
@@ -183,12 +172,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/* Free any memory allocated for the original set of WT_REFs. */
-	__wt_free_ref_array(session,
-	    page, page->pg_intl_orig_index, page->pg_intl_orig_entries, 0);
-
-	/* Free any memory allocated for the child index array. */
-	__wt_free(session, page->pg_intl_index);
+	__wt_free_ref_index(session, page, page->pg_intl_index, 0);
 }
 
 /*
@@ -226,36 +210,40 @@ __free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 }
 
 /*
- * __wt_free_ref_array --
- *	Discard an array of WT_REFs.
+ * __wt_free_ref_index --
+ *	Discard a page index, the WT_REF's it references, and optionally, any
+ * pages.
  */
 void
-__wt_free_ref_array(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_REF *refarg, uint32_t entries, int free_pages)
+__wt_free_ref_index(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_PAGE_INDEX *pindex_arg, int free_pages)
 {
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 	uint32_t i;
 
-	if (refarg == NULL)
+	if (pindex_arg == NULL)
 		return;
 
 	/*
-	 * Optionally free the pages referenced by the WT_REFs.  (The path to
-	 * free the referenced page is used for error cleanup, no instantiated
-	 * and then discarded page should have WT_REF entries with non-NULL
-	 * pages.  The page may have been marked dirty as well; page discard
-	 * checks for that, so we mark it clean explicitly.
+	 * Optionally free the referenced pages.  (The path to free referenced
+	 * page is used for error cleanup, no instantiated and then discarded
+	 * page should have WT_REF entries with real pages.  The page may have
+	 * been marked dirty as well; page discard checks for that, so we mark
+	 * it clean explicitly.)
 	 */
-	if (free_pages)
-		for (ref = refarg, i = 0; i < entries; ++ref, ++i)
-			if (ref->page != NULL) {
+	for (pindex = pindex_arg, i = 0; i < pindex->entries; ++i) {
+		ref = pindex->index[i];
+		if (free_pages && ref != NULL && ref->page != NULL) {
+			if (ref->page->modify != NULL) {
 				ref->page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, ref->page);
-				__wt_page_out(session, &ref->page);
 			}
-
-	for (ref = refarg, i = 0; i < entries; ++ref, ++i)
-		__free_ref(session, page, ref);
+			__wt_page_out(session, &ref->page);
+		}
+		__free_ref(session, page, pindex->index[i]);
+	}
+	__wt_free(session, pindex_arg);
 }
 
 /*

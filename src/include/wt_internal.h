@@ -207,8 +207,6 @@ struct __wt_session_impl;
     typedef struct __wt_session_impl WT_SESSION_IMPL;
 struct __wt_size;
     typedef struct __wt_size WT_SIZE;
-struct __wt_split_list;
-    typedef struct __wt_split_list WT_SPLIT_LIST;
 struct __wt_stats;
     typedef struct __wt_stats WT_STATS;
 struct __wt_table;

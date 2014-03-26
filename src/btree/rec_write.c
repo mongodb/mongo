@@ -443,6 +443,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_DECL_RET;
 	WT_PAGE *next;
 	WT_PAGE_MODIFY *mod;
+	uint32_t i;
 
 	mod = page->modify;
 
@@ -482,8 +483,9 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_ERR(__wt_multi_to_ref(session, next,
-	    mod->mod_multi, next->pg_intl_orig_index, mod->mod_multi_entries));
+	for (i = 0; i < mod->mod_multi_entries; ++i)
+		WT_ERR(__wt_multi_to_ref(session, next,
+		    &mod->mod_multi[i], &next->pg_intl_index->index[i], NULL));
 
 	/*
 	 * We maintain a list of pages written for the root in order to free the
@@ -4284,8 +4286,6 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 	__wt_free(session, mod->mod_multi);
 	mod->mod_multi_entries = 0;
-	__wt_cache_page_inmem_decr(session, page, mod->mod_multi_size);
-	mod->mod_multi_size = 0;
 
 	/*
 	 * This routine would be trivial, and only walk a single page freeing
@@ -4294,10 +4294,15 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * a linked list, and we also have to discard overflow items written
 	 * for the page.
 	 */
-	if (mod->mod_root_split != NULL) {
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		if (mod->mod_root_split == NULL)
+			break;
 		WT_RET(__rec_split_discard(session, mod->mod_root_split));
 		WT_RET(__wt_ovfl_track_wrapup(session, mod->mod_root_split));
 		__wt_page_out(session, &mod->mod_root_split);
+		break;
 	}
 	return (ret);
 }
@@ -4600,7 +4605,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	uint32_t i;
-	size_t incr, size;
+	size_t size;
 	void *p;
 
 	mod = page->modify;
@@ -4617,18 +4622,15 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Allocate, then initialize the array of replacement blocks. */
 	WT_RET(__wt_calloc(
 	    session, r->bnd_next, sizeof(WT_MULTI), &mod->mod_multi));
-	incr = r->bnd_next * sizeof(WT_MULTI);
 
 	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		WT_RET(__wt_row_ikey(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
-		incr += sizeof(WT_IKEY) + bnd->key.size;
 
 		if (bnd->skip == NULL) {
 			multi->addr = bnd->addr;
 			bnd->addr.addr = NULL;
-			incr += sizeof(WT_ADDR) + multi->addr.size;
 
 			multi->size = bnd->size;
 			multi->cksum = bnd->cksum;
@@ -4641,10 +4643,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			bnd->dsk = NULL;
 		}
 	}
-
-	__wt_cache_page_inmem_incr(session, page, incr);
 	mod->mod_multi_entries = r->bnd_next;
-	mod->mod_multi_size = incr;
 
 	return (0);
 }
@@ -4659,7 +4658,6 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BOUNDARY *bnd;
 	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
-	size_t incr;
 	uint32_t i;
 
 	mod = page->modify;
@@ -4667,7 +4665,6 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Allocate, then initialize the array of replacement blocks. */
 	WT_RET(__wt_calloc(
 	    session, r->bnd_next, sizeof(WT_MULTI), &mod->mod_multi));
-	incr = r->bnd_next * sizeof(WT_MULTI);
 
 	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
@@ -4676,7 +4673,6 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (bnd->skip == NULL) {
 			multi->addr = bnd->addr;
 			bnd->addr.addr = NULL;
-			incr += sizeof(WT_ADDR) + multi->addr.size;
 
 			multi->size = bnd->size;
 			multi->cksum = bnd->cksum;
@@ -4689,10 +4685,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			bnd->dsk = NULL;
 		}
 	}
-
-	__wt_cache_page_inmem_incr(session, page, incr);
 	mod->mod_multi_entries = r->bnd_next;
-	mod->mod_multi_size = incr;
 
 	return (0);
 }

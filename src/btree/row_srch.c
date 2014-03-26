@@ -178,62 +178,14 @@ restart:
 			goto descend;
 
 		/*
-		 * Binary search of internal pages.  There are three versions:
-		 * the case of no application-specified collation where the page
-		 * has not been split into (avoiding indirection through the
-		 * page's index array), the case of no application-specified
-		 * collation where the page has been split into, and the case
-		 * of application-specified collation (application-specified
-		 * collation is likely to dominate, so we don't bother with the
-		 * additional form).
+		 * Two versions of the binary search of internal pages: with and
+		 * without application-specified collation.
 		 */
 		base = 0;
 		ref = NULL;
 		limit = pindex->entries - 1;
 
-		if (btree->collator == NULL &&
-		    pindex->entries == page->pg_intl_orig_entries) {
-			for (; limit != 0; limit >>= 1) {
-				indx = base + (limit >> 1);
-				ref = &page->pg_intl_orig_index[indx];
-
-				/*
-				 * If about to compare an application key with
-				 * the 0th index on an internal page, pretend
-				 * the 0th index sorts less than any application
-				 * key.  This test is so we don't have to update
-				 * internal pages if the application stores a
-				 * new, "smallest" key in the tree.
-				 */
-				if (indx != 0) {
-					__wt_ref_key(page,
-					    ref, &item->data, &item->size);
-					match = WT_MIN(skiplow, skiphigh);
-					cmp = __wt_lex_compare_skip(
-					    srch_key, item, &match);
-					if (cmp == 0)
-						goto descend;
-					if (cmp < 0) {
-						skiphigh = match;
-						continue;
-					}
-					skiplow = match;
-				}
-				base = indx + 1;
-				--limit;
-			}
-			/*
-			 * Reference the slot used for next step down the tree.
-			 *
-			 * Base is the smallest index greater than key and may
-			 * be the (last + 1) index.  (Base cannot be the 0th
-			 * index as the 0th index always sorts less than any
-			 * application key).  The slot for descent is the one
-			 * before base.
-			 */
-			if (cmp != 0)
-				ref = &page->pg_intl_orig_index[base - 1];
-		} else if (btree->collator == NULL) {
+		if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				ref = pindex->index[indx];

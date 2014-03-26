@@ -235,51 +235,29 @@ struct __wt_page_modify {
 		uint8_t	 reuse;
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
-	size_t   multi_size;		/* Multiple blocks memory footprint */
 	} m;
 #define	mod_multi		u1.m.multi
 #define	mod_multi_entries	u1.m.multi_entries
-#define	mod_multi_size		u1.m.multi_size
 	} u1;
 
 	/*
-	 * Internal pages need to be able to split (have new arrays of WT_REF
-	 * structures inserted into the page).  Column-store leaf pages need
-	 * update and append lists.
+	 * Internal pages need to be able to chain root-page splits.  Column-
+	 * store leaf pages need update and append lists.
 	 *
 	 * Ugly union/struct layout to conserve memory, a page is either a leaf
 	 * page or an internal page.
 	 */
 	union {
-	struct {
 		/*
-		 * When pages which have split into multiple blocks are evicted,
-		 * the multiple blocks are converted into a WT_REF array and
-		 * inserted in the parent's index.  Those arrays only appear in
-		 * internal pages with children that split and were subsequently
-		 * evicted.
-		 */
-		struct __wt_split_list {
-			WT_REF	*refs;	/* Split child WT_REF arrays, count */
-			uint32_t entries;
-		} *splits;		/* Split child WT_REFs element count */
-		uint32_t splits_entries;
-
-		/*
-		 * When a root page splits, we create a fake page and write it;
-		 * that fake page can also split and so on, and we continue this
-		 * process until we write a single replacement root block.  We
-		 * use the root split field of this structure to track that list
-		 * of fake pages, so they are discarded when they're no longer
-		 * needed.
+		 * When a root page splits, we create a new page and write it;
+		 * the new page can also split and so on, and we continue this
+		 * process until we write a single replacement root page.  We
+		 * use the root split field to track the list of created pages
+		 * so they can be discarded when no longer needed.
 		 */
 		WT_PAGE *root_split;	/* Linked list of root split pages */
-	} intl;
-#define	mod_root_split		u2.intl.root_split
-#define	mod_splits		u2.intl.splits
-#define	mod_splits_entries	u2.intl.splits_entries
+#define	mod_root_split		u2.root_split
 	struct {
-
 		/*
 		 * Appended items to column-stores: there is only a single one
 		 * of these per column-store tree.
@@ -397,16 +375,9 @@ struct __wt_page {
 				uint32_t entries;
 				WT_REF	**index;
 			} * volatile index;	/* Collated children */
-
-			WT_REF	*orig_index;	/* Original children */
-			uint32_t orig_entries;	/* Original children count */
 		} intl;
 #undef	pg_intl_recno
 #define	pg_intl_recno		u.intl.recno
-#undef	pg_intl_orig_index
-#define	pg_intl_orig_index	u.intl.orig_index
-#undef	pg_intl_orig_entries
-#define	pg_intl_orig_entries	u.intl.orig_entries
 #undef	pg_intl_index
 #define	pg_intl_index		u.intl.index
 #define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
