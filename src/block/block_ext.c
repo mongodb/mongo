@@ -888,7 +888,8 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 	/*
 	 * Sometimes the list we are merging is much bigger than the other: if
 	 * so, swap the lists around to reduce the amount of work we need to do
-	 * during the merge.  The size lists have to match as well, so
+	 * during the merge.  The size lists have to match as well, so this is
+	 * only possible if both lists are tracking sizes, or neither are.
 	 */
 	if (a->track_size == b->track_size && a->entries > b->entries) {
 		tmp = *a;
