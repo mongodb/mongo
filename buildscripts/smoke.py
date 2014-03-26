@@ -443,10 +443,10 @@ def skipTest(path):
     return False
 
 def setShellWriteModeForTest(path, argv):
-    forceCommandsForSuite = ["aggregation", "replsets", "parallel"]
+    forceCommandsForSuite = ["aggregation", "replsets", "parallel", "core"]
     swm = shell_write_mode;
     if swm == "legacy": # change when the default changes to "commands"
-        if use_write_commands or [s for s in forceCommandsForSuite if s in path]:
+        if use_write_commands or any("jstests/" + s in path for s in forceCommandsForSuite):
             swm = "commands"
     argv += ["--writeMode", swm]
 
@@ -814,7 +814,7 @@ def report():
 
 # Keys are the suite names (passed on the command line to smoke.py)
 # Values are pairs: (filenames, <start mongod before running tests>)
-suiteGlobalConfig = {"js": ("[!_]*.js", True),
+suiteGlobalConfig = {"js": ("core/[!_]*.js", True),
                      "quota": ("quota/*.js", True),
                      "jsPerf": ("perf/*.js", True),
                      "disk": ("disk/*.js", True),
