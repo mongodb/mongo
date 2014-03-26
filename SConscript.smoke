@@ -76,6 +76,7 @@ addSmokeSuite( "smokeModuleTests", "$MODULETEST_LIST" )
 # These tests require the mongo shell
 if shellEnv is not None:
     addSmoketest( "smokeJs", [add_exe("mongo"), add_exe("mongod")] )
+    addSmoketest( "smokeJsCore", [add_exe("mongo"), add_exe("mongod")] )
     addSmoketest( "smokeClone", [ add_exe("mongo"), add_exe("mongod") ] )
     addSmoketest( "smokeRepl", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongobridge") ] )
     addSmoketest( "smokeReplSets", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongobridge") ] )
