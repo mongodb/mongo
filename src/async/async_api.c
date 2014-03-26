@@ -46,7 +46,7 @@ __async_set_key(WT_ASYNC_OP *asyncop, ...)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	fprintf(stderr, "async_set_key: called id %d\n", op->internal_id);
-	return (0);
+	return;
 }
 
 /*
@@ -60,7 +60,7 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	fprintf(stderr, "async_set_value: called id %d\n", op->internal_id);
-	return (0);
+	return;
 }
 
 /*

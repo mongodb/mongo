@@ -27,6 +27,7 @@
  * ex_async.c
  * 	demonstrates how to use the asynchronous API.
  */
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -55,10 +56,10 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	}
 	if (op->get_id(op) == search_id) {
 		/*! [Get the op's string key] */
-		t_ret = op->get_key(cursor, &key);
+		t_ret = op->get_key(op, &key);
 		/*! [Get the op's string key] */
 		/*! [Get the op's string value] */
-		t_ret = op->get_value(cursor, &value);
+		t_ret = op->get_value(op, &value);
 		/*! [Get the op's string value] */
 		printf("Got record: %s : %s\n", key, value);
 	}
@@ -78,7 +79,8 @@ int main(void)
 	char k[16], v[16];
 
 	if ((ret = wiredtiger_open(home, NULL,
-	    "create,async=(enabled=true,ops_max=10,threads=2)", &conn)) != 0) {
+	    "create,cache_size=100MB,async=(enabled=true,ops_max=10,threads=2)",
+	    &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 		return (ret);
@@ -86,14 +88,14 @@ int main(void)
 	/*! [example connection] */
 
 	/*! [example table create] */
-	ret = conn->open_session(wt_conn, NULL, NULL, &session);
+	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri,
 	    "key_format=S,value_format=S");
 	/*! [example table create] */
 
 	for (i = 0; i < 10; i++) {
 		/*! [Allocate a handle] */
-		ret = conn->new_async_op(conn, uri, NULL, &cb, &op);
+		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
 		/*! [Allocate a handle] */
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
@@ -109,16 +111,16 @@ int main(void)
 	}
 
 	/*! [flush] */
-	conn->async_flush(conn);
+	wt_conn->async_flush(wt_conn);
 	/*! [flush] */
 
-	ret = conn->new_async_op(conn, uri, NULL, &cb, &opget);
+	ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &opget);
 	opget->set_key(opget, "key1");
 	search_id = opget->get_id(opget);
 	opget->search(opget);
 
 	/*! [example close] */
-	ret = conn->close(conn, NULL);
+	ret = wt_conn->close(wt_conn, NULL);
 	/*! [example close] */
 
 	return (ret);
