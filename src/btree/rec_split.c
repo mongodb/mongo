@@ -579,7 +579,6 @@ int
 __wt_split_evict(
     WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page, int exclusive)
 {
-	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack;
 	WT_DECL_RET;
@@ -591,7 +590,6 @@ __wt_split_evict(
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, locked;
 
-	btree = S2BT(session);
 	kpack = &_kpack;
 	alloc_index = NULL;
 	alloc_ref = NULL;
