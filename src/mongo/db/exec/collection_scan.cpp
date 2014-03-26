@@ -34,11 +34,29 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
+#include "mongo/util/fail_point_service.h"
 
 #include "mongo/db/client.h" // XXX-ERH
 #include "mongo/db/pdfile.h" // XXX-ERH/ACM
 
 namespace mongo {
+
+    // Some fail points for testing.
+    MONGO_FP_DECLARE(collscanInMemoryFail);
+    MONGO_FP_DECLARE(collscanInMemorySucceed);
+
+    // static
+    bool CollectionScan::diskLocInMemory(DiskLoc loc) {
+        if (MONGO_FAIL_POINT(collscanInMemoryFail)) {
+            return false;
+        }
+
+        if (MONGO_FAIL_POINT(collscanInMemorySucceed)) {
+            return true;
+        }
+
+        return loc.rec()->likelyInPhysicalMemory();
+    }
 
     CollectionScan::CollectionScan(const CollectionScanParams& params,
                                    WorkingSet* workingSet,
@@ -46,12 +64,22 @@ namespace mongo {
         : _workingSet(workingSet),
           _filter(filter),
           _params(params),
-          _nsDropped(false) { }
+          _nsDropped(false) {
+
+        // We pre-allocate a WSID and use it to pass up fetch requests.  It is only
+        // used to pass up fetch requests and we should never use it for anything else.
+        _wsidForFetch = _workingSet->allocate();
+        WorkingSetMember* member = _workingSet->get(_wsidForFetch);
+        // Kind of a lie since the obj isn't pointing to the data at loc. but the obj
+        // won't be used.
+        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
         if (_nsDropped) { return PlanStage::DEAD; }
 
+        // Do some init if we haven't already.
         if (NULL == _iter) {
             Collection* collection = cc().database()->getCollection( _params.ns );
             if ( collection == NULL ) {
@@ -67,6 +95,19 @@ namespace mongo {
             return PlanStage::NEED_TIME;
         }
 
+        // See if the record we're about to access is in memory.  If it's not, pass a fetch
+        // request up.
+        if (!isEOF()) {
+            DiskLoc curr = _iter->curr();
+            if (!curr.isNull() && !diskLocInMemory(curr)) {
+                WorkingSetMember* member = _workingSet->get(_wsidForFetch);
+                member->loc = curr;
+                *out = _wsidForFetch;
+                return PlanStage::NEED_FETCH;
+            }
+        }
+
+        // What we'll return to the user.
         DiskLoc nextLoc;
 
         // Should we try getNext() on the underlying _iter if we're EOF?  Yes, if we're tailable.
@@ -120,10 +161,22 @@ namespace mongo {
         ++_commonStats.invalidates;
 
         // We don't care about mutations since we apply any filters to the result when we (possibly)
-        // return it.  Deletions can harm the underlying CollectionIterator so we pass them down.
-        if (NULL != _iter && (INVALIDATION_DELETION == type)) {
+        // return it.
+        if (INVALIDATION_DELETION != type) {
+            return;
+        }
+
+        // If we're here, 'dl' is being deleted.
+
+        // Deletions can harm the underlying CollectionIterator so we must pass them down.
+        if (NULL != _iter) {
             _iter->invalidate(dl);
         }
+
+        // We might have 'dl' inside of the WSM that _wsidForFetch references.  This is OK because
+        // the runner who handles the fetch request does so before releasing any locks (and allowing
+        // the DiskLoc to be deleted).  We also don't use any data in the WSM referenced by
+        // _wsidForFetch so it's OK to leave the DiskLoc there.
     }
 
     void CollectionScan::prepareToYield() {
