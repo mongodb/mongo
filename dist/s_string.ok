@@ -11,10 +11,12 @@ API
 APIs
 ARG
 ARGS
+ASYNC
 Addr
 Ailamaki
 Alakuijala
 Alloc
+Async
 Athanassoulis
 Athlon
 BBBBB
@@ -177,6 +179,7 @@ NoAddr
 Noll
 Nul
 ONPAGE
+OPTYPE
 OUTBUFF
 OVFL
 PADDR
@@ -302,6 +305,7 @@ argc
 args
 argv
 async
+asyncopp
 autockpt
 autocommit
 bdb
@@ -338,6 +342,7 @@ bzDecompressInit
 bzip
 calloc
 catfmt
+cb
 cd
 cfg
 cfkos
@@ -444,6 +449,7 @@ encodings
 endian
 english
 enqueue
+enqueued
 enum's
 env
 eof
@@ -685,6 +691,7 @@ onpage
 oo
 opendir
 openfile
+optype
 os
 ovfl
 packv

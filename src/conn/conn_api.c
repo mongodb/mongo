@@ -464,7 +464,7 @@ static int
 __conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
     WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP **asyncopp)
 {
-	WT_ASYNC_OP *op_ret;
+	WT_ASYNC_OP_IMPL *op;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -472,6 +472,8 @@ __conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, async_new_op, config, cfg);
 	WT_ERR(__wt_async_new_op(conn, uri, config, callback, cfg, &op));
+
+	*asyncopp = &op->iface;
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

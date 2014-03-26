@@ -37,7 +37,7 @@ const char *uri = "table:async";
 uint64_t search_id;
 int global_error = 0;
 
-/*! [async example callback implementation] */
+/*! [example callback implementation] */
 static int
 cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 {
@@ -47,24 +47,30 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	(void)cb;
 	t_ret = 0;
 	if (ret != 0) {
+		/*! [Get identifier] */
 		printf("ID %" PRIu64 " error %d\n", op->get_id(op), ret);
+		/*! [Get identifier] */
 		global_error = ret;
 		return (1);
 	}
 	if (op->get_id(op) == search_id) {
+		/*! [Get the op's string key] */
 		t_ret = op->get_key(cursor, &key);
+		/*! [Get the op's string key] */
+		/*! [Get the op's string value] */
 		t_ret = op->get_value(cursor, &value);
+		/*! [Get the op's string value] */
 		printf("Got record: %s : %s\n", key, value);
 	}
 	return (t_ret);
 }
 
 static WT_ASYNC_CALLBACK cb = { cb_asyncop };
-/*! [async example callback implementation] */
+/*! [example callback implementation] */
 
 int main(void)
 {
-	/*! [async example connection] */
+	/*! [example connection] */
 	WT_ASYNC_OP *op, *opget;
 	WT_CONNECTION *wt_conn;
 	WT_SESSION *session;
@@ -77,35 +83,43 @@ int main(void)
 		    home, wiredtiger_strerror(ret));
 		return (ret);
 	}
-	/*! [async example connection] */
+	/*! [example connection] */
 
-	/*! [async example table create] */
+	/*! [example table create] */
 	ret = conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri,
 	    "key_format=S,value_format=S");
-	/*! [async example table create] */
+	/*! [example table create] */
 
-	/*! [async example insert] */
 	for (i = 0; i < 10; i++) {
+		/*! [Allocate a handle] */
 		ret = conn->new_async_op(conn, uri, NULL, &cb, &op);
+		/*! [Allocate a handle] */
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
+		/*! [Set the op's string key] */
 		op->set_key(op, k);
+		/*! [Set the op's string key] */
+		/*! [Set the op's string value] */
 		op->set_value(op, v);
+		/*! [Set the op's string value] */
+		/*! [example insert] */
 		ret = op->insert(op);
+		/*! [example insert] */
 	}
-	
+
+	/*! [flush] */
 	conn->async_flush(conn);
+	/*! [flush] */
 
 	ret = conn->new_async_op(conn, uri, NULL, &cb, &opget);
 	opget->set_key(opget, "key1");
 	search_id = opget->get_id(opget);
 	opget->search(opget);
-	/*! [async example insert] */
 
-	/*! [async example close] */
+	/*! [example close] */
 	ret = conn->close(conn, NULL);
-	/*! [async example close] */
+	/*! [example close] */
 
 	return (ret);
 }

@@ -8,6 +8,23 @@
 #include "wt_internal.h"
 
 /*
+ * __async_new_op_alloc --
+ *	Find and allocate the next available async op handle.
+ */
+static int
+__async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
+{
+	WT_ASYNC *async;
+	WT_ASYNC_OP_IMPL *op;
+	int i;
+
+	async = conn->async;
+	WT_STAT_FAST_CONN_INCR(conn->default_session, async_op_alloc);
+	*op = NULL;
+	return (0);
+}
+
+/*
  * __async_config --
  *	Parse and setup the async API options.
  */
@@ -69,7 +86,7 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &async->opsq_lock, "ops queue"));
 	WT_RET(__wt_cond_alloc(session, "async op", 0, &async->ops_cond));
 	WT_RET(__wt_cond_alloc(session, "async flush", 0, &async->flush_cond));
-	WT_RET(__wt_async_init(session));
+	WT_RET(__wt_async_op_init(conn));
 
 	/*
 	 * Start up the worker threads.
@@ -133,15 +150,58 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 	return (ret);
 }
 
+/*
+ * __wt_async_flush --
+ *	Implementation of the WT_CONN->async_flush method.
+ */
 int
 __wt_async_flush(WT_CONNECTION_IMPL *conn)
 {
+	WT_ASYNC *async;
+	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	if (!conn->async_cfg)
+		return (0);
+
+	async = conn->async;
+	session = conn->default_session;
+	WT_STAT_FAST_CONN_INCR(session, async_flush);
 	return (0);
 }
 
+/*
+ * __wt_async_new_op --
+ *	Implementation of the WT_CONN->async_new_op method.
+ */
 int
 __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri, const char *cfg[],
-    WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP **asyncopp)
+    WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP_IMPL **opp)
 {
-	return (0);
+	WT_ASYNC *async;
+	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	uint32_t i;
+
+	if (!conn->async_cfg)
+		return (0);
+
+	async = conn->async;
+	session = conn->default_session;
+	*asyncopp = NULL;
+
+	WT_ERR(__async_new_op_alloc(conn, &op));
+	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
+	WT_ERR(__wt_strdup(session, uri, &op->uri));
+	WT_ERR(__wt_strdup(session, cfg, &op->config));
+	op->uri_hash = __wt_hash_city64(uri, strlen(uri));
+	op->cfg_hash = __wt_hash_city64(cfg, strlen(cfg));
+	op->cb = callback;
+
+	*asyncopp = op->iface;
+
+err:
+	return (ret);
 }

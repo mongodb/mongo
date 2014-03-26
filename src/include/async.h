@@ -9,7 +9,7 @@
  * Initialize a static WT_ASYNC_OP structure.
  */
 #define	WT_ASYNC_OP_STATIC_INIT(n,					\
-        get_key,							\
+	get_key,							\
 	get_value,							\
 	set_key,							\
 	set_value,							\
@@ -17,7 +17,7 @@
 	insert,								\
 	update,								\
 	remove,								\
-        get_id)								\
+	get_id)								\
 	static const WT_ASYNC_OP n = {					\
 	NULL,					/* connection */	\
 	NULL,					/* uri */		\
@@ -40,6 +40,7 @@
 	NULL,				/* lang_private */		\
 	{ NULL, 0, 0, NULL, 0 }		/* WT_ITEM key */		\
 	{ NULL, 0, 0, NULL, 0 }		/* WT_ITEM value */		\
+	NULL,				/* WT_ASYNC_CALLBACK cb */	\
 	0,				/* int saved_err */		\
 	0,				/* uint32_t internal_id */	\
 	0,				/* uint64_t unique_id */	\
@@ -49,7 +50,7 @@
 }
 
 struct __wt_async_callback;
-                typedef struct __wt_async_callback WT_ASYNC_CALLBACK;
+		typedef struct __wt_async_callback WT_ASYNC_CALLBACK;
 
 /*! Asynchronous operation types. */
 typedef enum {
@@ -61,35 +62,94 @@ typedef enum {
 	WT_AOP_UPDATE	/*!< Set the value of an existing key */
 } WT_ASYNC_OPTYPE;
 
+#define	O2C(op)	((WT_CONNECTION_IMPL *)(op)->iface.connection)
+#define	O2S(op)								\
+    (((WT_CONNECTION_IMPL *)(op)->iface.connection)->default_session)
+/*
+ * WT_ASYNC_OP_IMPL --
+ *	Implementation of the WT_ASYNC_OP.
+ */
+struct __wt_async_op_impl {
+	WT_ASYNC_OP	iface;
+
+	const char *uri;
+	const char *config;
+	uint64_t uri_hash;
+	uint64_t cfg_hash;
+
+	/*
+	 * !!!
+	 * Explicit representations of structures from queue.h.
+	 * TAILQ_ENTRY(wt_async_op) q;
+	 */
+	struct {
+		WT_ASYNC_OP_IMPL *tqe_next;
+		WT_ASYNC_OP_IMPL **tqe_prev;
+	} q;				/* Linked list of WT_ASYNC_OPS. */
+
+	uint64_t recno;			/* Record number, normal and raw mode */
+	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
+
+	void	*lang_private;		/* Language specific private storage */
+
+	WT_ITEM key, value;
+	int saved_err;			/* Saved error in set_{key,value}. */
+	WT_ASYNC_CALLBACK	*cb;
+
+	uint32_t	internal_id;	/* Array position id. */
+	uint64_t	unique_id;	/* Unique identifier. */
+
+#define	WT_ASYNCOP_ENQUEUED	0x0001
+#define	WT_ASYNCOP_FREE		0x0002
+#define	WT_ASYNCOP_READY	0x0004
+#define	WT_ASYNCOP_WORKING	0x0008
+	uint32_t	state;		/* Op state */
+	WT_ASYNC_OPTYPE	optype;		/* Operation type */
+
+#define	WT_ASYNCOP_DATA_SOURCE	0x0001
+#define	WT_ASYNCOP_DUMP_HEX	0x0002
+#define	WT_ASYNCOP_DUMP_PRINT	0x0004
+#define	WT_ASYNCOP_KEY_EXT	0x0008	/* Key points out of the tree. */
+#define	WT_ASYNCOP_KEY_INT	0x0010	/* Key points into the tree. */
+#define	WT_ASYNCOP_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
+#define	WT_ASYNCOP_OVERWRITE	0x0020
+#define	WT_ASYNCOP_RAW		0x0040
+#define	WT_ASYNCOP_VALUE_EXT	0x0080	/* Value points out of the tree. */
+#define	WT_ASYNCOP_VALUE_INT	0x0100	/* Value points into the tree. */
+#define	WT_ASYNCOP_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
+	uint32_t flags;
+#endif
+};
 /*
  * Definition of the async subsystem.
  */
 typedef struct {
 #define	WT_ASYNC_MAX_OPS	4096
-	WT_ASYNC_OP	async_ops[WT_ASYNC_MAX_OPS];
+	WT_ASYNC_OP_IMPL	 async_ops[WT_ASYNC_MAX_OPS];
 					/* Async ops */
 #define	OPS_INVALID_INDEX	0xffffffff
-	uint32_t	ops_index;	/* Active slot index */
+	uint32_t		 ops_index;	/* Active slot index */
+	uint64_t		 op_id;
 	/*
 	 * Synchronization resources
 	 */
-	WT_SPINLOCK      ops_lock;      /* Locked: ops array */
-	WT_SPINLOCK      opsq_lock;	/* Locked: work queue */
+	WT_SPINLOCK		 ops_lock;      /* Locked: ops array */
+	WT_SPINLOCK		 opsq_lock;	/* Locked: work queue */
 	SLIST_HEAD(__wt_async_lh, __wt_async_op) oplh;
 
 	/* Notify any waiting threads when work is enqueued. */
-	WT_CONDVAR	*ops_cond;
-	WT_CONDVAR	*flush_cond;
-	uint32_t	 flush_count;
-	uint32_t	 flush_id;
+	WT_CONDVAR		*ops_cond;
+	WT_CONDVAR		*flush_cond;
+	uint32_t		 flush_count;
+	uint32_t		 flush_id;
 
 #define	WT_ASYNC_MAX_WORKERS	20
-	WT_SESSION_IMPL	*worker_sessions[WT_ASYNC_MAX_WORKERS];
+	WT_SESSION_IMPL		*worker_sessions[WT_ASYNC_MAX_WORKERS];
 					/* Async worker threads */
-	pthread_t	 worker_tids[WT_ASYNC_MAX_WORKERS];
+	pthread_t		 worker_tids[WT_ASYNC_MAX_WORKERS];
 
 #define	WT_ASYNC_FLUSHING	0x0001
-	uint32_t	 flags;
+	uint32_t		 flags;
 } WT_ASYNC;
 
 /*
@@ -99,134 +159,3 @@ typedef struct {
 struct __wt_async_worker_args {
 	u_int id;
 };
-
-
-	int64_t	 slot_state;		/* Slot state */
-	uint64_t slot_group_size;	/* Group size */
-	int32_t	 slot_error;		/* Error value */
-#define	SLOT_INVALID_INDEX	0xffffffff
-	uint32_t slot_index;		/* Active slot index */
-	off_t	 slot_start_offset;	/* Starting file offset */
-	WT_LSN	slot_release_lsn;	/* Slot release LSN */
-	WT_LSN	slot_start_lsn;	/* Slot starting LSN */
-	WT_LSN	slot_end_lsn;	/* Slot ending LSN */
-	WT_FH	*slot_fh;		/* File handle for this group */
-	WT_ITEM slot_buf;		/* Buffer for grouped writes */
-	int32_t	slot_churn;		/* Active slots are scarce. */
-#define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
-#define	SLOT_BUFFERED	0x02			/* Buffer writes */
-#define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
-#define	SLOT_SYNC	0x08			/* Needs sync on release */
-	uint32_t flags;		/* Flags */
-} WT_LOGSLOT WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
-
-typedef struct {
-	WT_LOGSLOT	*slot;
-	off_t		 offset;
-} WT_MYSLOT;
-
-#define	LOG_FIRST_RECORD	log->allocsize	/* Offset of first record */
-
-typedef struct {
-	uint32_t	allocsize;	/* Allocation alignment size */
-	/*
-	 * Log file information
-	 */
-	uint32_t	 fileid;	/* Current log file number */
-	WT_FH           *log_fh;	/* Logging file handle */
-	WT_FH           *log_close_fh;	/* Logging file handle to close */
-
-	/*
-	 * System LSNs
-	 */
-	WT_LSN		alloc_lsn;	/* Next LSN for allocation */
-	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
-	WT_LSN		first_lsn;	/* First LSN */
-	WT_LSN		sync_lsn;	/* LSN of the last sync */
-	WT_LSN		trunc_lsn;	/* End LSN for recovery truncation */
-	WT_LSN		write_lsn;	/* Last LSN written to log file */
-
-	/*
-	 * Synchronization resources
-	 */
-	WT_SPINLOCK      log_lock;      /* Locked: Logging fields */
-	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
-	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
-
-	/* Notify any waiting threads when sync_lsn is updated. */
-	WT_CONDVAR	*log_sync_cond;
-
-	/*
-	 * Consolidation array information
-	 * SLOT_ACTIVE must be less than SLOT_POOL.
-	 * Our testing shows that the more consolidation we generate the
-	 * better the performance we see which equates to an active slot
-	 * slot count of one.
-	 */
-#define	SLOT_ACTIVE	1
-#define	SLOT_POOL	16
-	uint32_t	 pool_index;		/* Global pool index */
-	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
-	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
-
-#define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
-	uint32_t	 flags;
-} WT_LOG;
-
-typedef struct {
-	uint32_t	len;		/* 00-03: Record length including hdr */
-	uint32_t	checksum;	/* 04-07: Checksum of the record */
-	uint8_t		unused[8];	/* 08-15: Padding */
-	uint8_t		record[0];	/* Beginning of actual data */
-} WT_LOG_RECORD;
-
-/*
- * WT_LOG_DESC --
- *	The log file's description.
- */
-struct __wt_log_desc {
-#define	WT_LOG_MAGIC		0x101064
-	uint32_t	log_magic;	/* 00-03: Magic number */
-#define	WT_LOG_MAJOR_VERSION	1
-	uint16_t	majorv;		/* 04-05: Major version */
-#define	WT_LOG_MINOR_VERSION	0
-	uint16_t	minorv;		/* 06-07: Minor version */
-	uint64_t	log_size;	/* 08-15: Log file size */
-};
-
-/*
- * WT_LOG_REC_DESC --
- *	A descriptor for a log record type.
- */
-struct __wt_log_rec_desc {
-	const char *fmt;
-	int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
-};
-
-/*
- * WT_LOG_OP_DESC --
- *	A descriptor for a log operation type.
- */
-struct __wt_log_op_desc {
-	const char *fmt;
-	int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
-};
-
-/*
- * DO NOT EDIT: automatically built by dist/log.py.
- * Log record declarations: BEGIN
- */
-#define	WT_LOGREC_CHECKPOINT	0
-#define	WT_LOGREC_COMMIT	1
-#define	WT_LOGREC_FILE_SYNC	2
-#define	WT_LOGREC_MESSAGE	3
-#define	WT_LOGOP_COL_PUT	0
-#define	WT_LOGOP_COL_REMOVE	1
-#define	WT_LOGOP_COL_TRUNCATE	2
-#define	WT_LOGOP_ROW_PUT	3
-#define	WT_LOGOP_ROW_REMOVE	4
-#define	WT_LOGOP_ROW_TRUNCATE	5
-/*
- * Log record declarations: END
- * DO NOT EDIT: automatically built by dist/log.py.
- */

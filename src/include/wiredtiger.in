@@ -175,14 +175,6 @@ struct __wt_async_op {
 	WT_CONNECTION *connection;
 
 	/*!
-	 * The name of the data source for the operation, matches the \c uri
-	 * parameter to WT_SESSION::create used to create the table.
-	 */
-	const char *uri;
-	const char *config;
-	uint64_t uri_cfg_hash;
-
-	/*!
 	 * The format of the data packed into key items.  See @ref packing for
 	 * details.  If not set, a default value of "u" is assumed, and
 	 * applications must use WT_ITEM structures to manipulate untyped byte
@@ -205,9 +197,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the key for the current record.
 	 *
-	 * @snippet ex_all.c Get the cursor's string key
-	 *
-	 * @snippet ex_all.c Get the cursor's record number key
+	 * @snippet ex_async.c Get the op's string key
 	 *
 	 * @param op the operation handle
 	 * @param ... pointers to hold key fields corresponding to
@@ -219,9 +209,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the value for the current record.
 	 *
-	 * @snippet ex_all.c Get the operation's string value
-	 *
-	 * @snippet ex_all.c Get the operation's raw value
+	 * @snippet ex_async.c Get the op's string value
 	 *
 	 * @param op the operation handle
 	 * @param ... pointers to hold value fields corresponding to
@@ -233,9 +221,7 @@ struct __wt_async_op {
 	/*!
 	 * Set the key for the next operation.
 	 *
-	 * @snippet ex_all.c Set the operation's string key
-	 *
-	 * @snippet ex_all.c Set the operation's record number key
+	 * @snippet ex_async.c Set the op's string key
 	 *
 	 * @param op the operation handle
 	 * @param ... key fields corresponding to WT_ASYNC_OP::key_format.
@@ -249,9 +235,7 @@ struct __wt_async_op {
 	/*!
 	 * Set the value for the next operation.
 	 *
-	 * @snippet ex_all.c Set the operation's string value
-	 *
-	 * @snippet ex_all.c Set the operation's raw value
+	 * @snippet ex_async.c Set the op's string value
 	 *
 	 * @param op the operation handle
 	 * @param ... value fields corresponding to WT_ASYNC_OP::value_format.
@@ -378,7 +362,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the unique identifier for this operation.
 	 *
-	 * @snippet ex_all.c Get the operation's identifier.
+	 * @snippet ex_async.c Get identifier
 	 *
 	 * @param op the operation handle
 	 * @param ... pointers to hold value fields corresponding to
@@ -387,51 +371,7 @@ struct __wt_async_op {
 	 */
 	uint64_t __F(get_id)(WT_ASYNC_OP *op);
 
-	/*
-	 * Protected fields, only to be used by operation implementations.
-	 */
-#if !defined(SWIG) && !defined(DOXYGEN)
-	/*
-	 * !!!
-	 * Explicit representations of structures from queue.h.
-	 * TAILQ_ENTRY(wt_async_op) q;
-	 */
-	struct {
-		WT_CURSOR *tqe_next;
-		WT_CURSOR **tqe_prev;
-	} q;				/* Linked list of WT_ASYNC_OPS. */
-
-	uint64_t recno;			/* Record number, normal and raw mode */
-	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
-
-	void	*lang_private;		/* Language specific private storage */
-
-	WT_ITEM key, value;
-	int saved_err;			/* Saved error in set_{key,value}. */
-
-	uint32_t	internal_id;	/* Array position id. */
-	uint64_t	unique_id;	/* Unique identifier. */
-
-#define	WT_ASYNCOP_ENQUEUED	0x0001
-#define	WT_ASYNCOP_FREE		0x0002
-#define	WT_ASYNCOP_READY	0x0004
-#define	WT_ASYNCOP_WORKING	0x0008
-	uint32_t	state;		/* Op state */
-	WT_ASYNC_OPTYPE	optype;		/* Operation type */
-
-#define WT_ASYNCOP_DATA_SOURCE	0x0001
-#define	WT_ASYNCOP_DUMP_HEX	0x0002
-#define	WT_ASYNCOP_DUMP_PRINT	0x0004
-#define	WT_ASYNCOP_KEY_EXT	0x0008	/* Key points out of the tree. */
-#define	WT_ASYNCOP_KEY_INT	0x0010	/* Key points into the tree. */
-#define	WT_ASYNCOP_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
-#define	WT_ASYNCOP_OVERWRITE	0x0020
-#define	WT_ASYNCOP_RAW		0x0040
-#define	WT_ASYNCOP_VALUE_EXT	0x0080	/* Value points out of the tree. */
-#define	WT_ASYNCOP_VALUE_INT	0x0100	/* Value points into the tree. */
-#define	WT_ASYNCOP_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
-	uint32_t flags;
-#endif
+	/*! @} */
 };
 
 /*!
@@ -1490,7 +1430,7 @@ struct __wt_connection {
 	/*!
 	 * Wait for all outstanding operations to complete.
 	 *
-	 * @snippet ex_async.c Allocate a handle
+	 * @snippet ex_async.c flush
 	 *
 	 * @param connection the connection handle
 	 * @errors
@@ -1505,8 +1445,21 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param uri the connection handle
 	 * @configstart{connection.async_new_op, see dist/api_data.py}
+	 * @config{append, append the value as a new record\, creating a new
+	 * record number key; valid only for operations with record number
+	 * keys., a boolean flag; default \c false.}
+	 * @config{overwrite, configures whether the cursor's insert\, update
+	 * and remove methods check the existing state of the record.  If \c
+	 * overwrite is \c false\, WT_CURSOR::insert fails with
+	 * ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update and
+	 * WT_CURSOR::remove fail with ::WT_NOTFOUND if the record does not
+	 * exist., a boolean flag; default \c true.}
+	 * @config{raw, ignore the encodings for the key and value\, manage data
+	 * as if the formats were \c "u". See @ref cursor_raw for details., a
+	 * boolean flag; default \c false.}
 	 * @configend
-	 * @param[out] sessionp the new session handle
+	 * @param callback the operation callback
+	 * @param[out] asyncopp the new op handle
 	 * @errors
 	 */
 	int __F(async_new_op)(WT_CONNECTION *connection,
@@ -1535,6 +1488,19 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{connection.reconfigure, see dist/api_data.py}
+	 * @config{async = (, asynchronous operations configuration options.., a
+	 * set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_free, should the handle be freed
+	 * after use?., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable asynchronous
+	 * operation., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;ops_max, maximum number of expected
+	 * simultaneous asynchronous operations.., an integer between 10 and
+	 * 4096; default \c 1024.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the
+	 * number of worker threads to service asynchronous requests., an
+	 * integer between 1 and 20; default \c 2.}
+	 * @config{ ),,}
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both., an integer between 1MB and 10TB; default \c 100MB.}
@@ -1785,6 +1751,18 @@ struct __wt_connection {
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
+ * @config{async = (, asynchronous operations configuration options.., a set of
+ * related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_free, should the handle be freed after
+ * use?., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable asynchronous operation., a
+ * boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;ops_max,
+ * maximum number of expected simultaneous asynchronous operations.., an integer
+ * between 10 and 4096; default \c 1024.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number of worker threads to
+ * service asynchronous requests., an integer between 1 and 20; default \c 2.}
+ * @config{ ),,}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
  * I/O. The default value of -1 indicates a platform-specific alignment value
  * should be used (4KB on Linux systems\, zero elsewhere)., an integer between
@@ -1952,7 +1930,7 @@ const char *wiredtiger_strerror(int err);
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::async_new_op.
  *
- * @snippet ex_async.c allocate handle
+ * @snippet ex_async.c Allocate a handle
  */
 struct __wt_async_callback {
 	/*!
@@ -1963,10 +1941,10 @@ struct __wt_async_callback {
 	 * @param[in] flags currently unused
 	 * @returns zero for success, non-zero to indicate an error.
 	 *
-	 * @snippet ex_async.c Implement WT_ASYNC_CALLBACK
+	 * @snippet ex_async.c example callback implementation
 	 */
 	int (*notify)(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op,
-	    int ret, uint32_t flags);
+	    WT_DECL_RET, uint32_t flags);
 };
 
 /*!
@@ -2946,176 +2924,194 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * keys.  See @ref data_statistics for more information.
  * @{
  */
+/*! async: current work queue length */
+#define	WT_STAT_CONN_ASYNC_CUR_QUEUE			1000
+/*! async: number of times op allocation failed */
+#define	WT_STAT_CONN_ASYNC_FULL				1001
+/*! async: maximum work queue length */
+#define	WT_STAT_CONN_ASYNC_MAX_QUEUE			1002
+/*! async op allocation */
+#define	WT_STAT_CONN_ASYNC_OP_ALLOC			1003
+/*! async op insert calls */
+#define	WT_STAT_CONN_ASYNC_OP_INSERT			1004
+/*! async op remove calls */
+#define	WT_STAT_CONN_ASYNC_OP_REMOVE			1005
+/*! async op search calls */
+#define	WT_STAT_CONN_ASYNC_OP_SEARCH			1006
+/*! async op update calls */
+#define	WT_STAT_CONN_ASYNC_OP_UPDATE			1007
+/*! async: number of operations performed */
+#define	WT_STAT_CONN_ASYNC_OPS				1008
 /*! block manager: mapped bytes read */
-#define	WT_STAT_CONN_BLOCK_BYTE_MAP_READ		1000
+#define	WT_STAT_CONN_BLOCK_BYTE_MAP_READ		1009
 /*! block manager: bytes read */
-#define	WT_STAT_CONN_BLOCK_BYTE_READ			1001
+#define	WT_STAT_CONN_BLOCK_BYTE_READ			1010
 /*! block manager: bytes written */
-#define	WT_STAT_CONN_BLOCK_BYTE_WRITE			1002
+#define	WT_STAT_CONN_BLOCK_BYTE_WRITE			1011
 /*! block manager: mapped blocks read */
-#define	WT_STAT_CONN_BLOCK_MAP_READ			1003
+#define	WT_STAT_CONN_BLOCK_MAP_READ			1012
 /*! block manager: blocks pre-loaded */
-#define	WT_STAT_CONN_BLOCK_PRELOAD			1004
+#define	WT_STAT_CONN_BLOCK_PRELOAD			1013
 /*! block manager: blocks read */
-#define	WT_STAT_CONN_BLOCK_READ				1005
+#define	WT_STAT_CONN_BLOCK_READ				1014
 /*! block manager: blocks written */
-#define	WT_STAT_CONN_BLOCK_WRITE			1006
+#define	WT_STAT_CONN_BLOCK_WRITE			1015
 /*! cache: tracked dirty bytes in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			1007
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			1016
 /*! cache: bytes currently in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			1008
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			1017
 /*! cache: maximum bytes configured */
-#define	WT_STAT_CONN_CACHE_BYTES_MAX			1009
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			1018
 /*! cache: bytes read into cache */
-#define	WT_STAT_CONN_CACHE_BYTES_READ			1010
+#define	WT_STAT_CONN_CACHE_BYTES_READ			1019
 /*! cache: bytes written from cache */
-#define	WT_STAT_CONN_CACHE_BYTES_WRITE			1011
+#define	WT_STAT_CONN_CACHE_BYTES_WRITE			1020
 /*! cache: checkpoint blocked page eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_CHECKPOINT		1012
+#define	WT_STAT_CONN_CACHE_EVICTION_CHECKPOINT		1021
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		1013
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		1022
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		1014
+#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		1023
 /*! cache: pages selected for eviction unable to be evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		1015
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		1024
 /*! cache: pages evicted because they exceeded the in-memory maximum */
-#define	WT_STAT_CONN_CACHE_EVICTION_FORCE		1016
+#define	WT_STAT_CONN_CACHE_EVICTION_FORCE		1025
 /*! cache: failed eviction of pages that exceeded the in-memory maximum */
-#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL		1017
+#define	WT_STAT_CONN_CACHE_EVICTION_FORCE_FAIL		1026
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		1018
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		1027
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		1019
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		1028
 /*! cache: internal page merge operations completed */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE		1020
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE		1029
 /*! cache: internal page merge attempts that could not complete */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_FAIL		1021
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_FAIL		1030
 /*! cache: internal levels merged */
-#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_LEVELS	1022
+#define	WT_STAT_CONN_CACHE_EVICTION_MERGE_LEVELS	1031
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1023
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		1032
 /*! cache: pages walked for eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK		1024
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK		1033
 /*! pages split because they were unable to be evicted */
-#define	WT_STAT_CONN_CACHE_INMEM_SPLIT			1025
+#define	WT_STAT_CONN_CACHE_INMEM_SPLIT			1034
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			1026
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			1035
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			1027
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			1036
 /*! cache: pages read into cache */
-#define	WT_STAT_CONN_CACHE_READ				1028
+#define	WT_STAT_CONN_CACHE_READ				1037
 /*! cache: pages written from cache */
-#define	WT_STAT_CONN_CACHE_WRITE			1029
+#define	WT_STAT_CONN_CACHE_WRITE			1038
 /*! pthread mutex condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				1030
+#define	WT_STAT_CONN_COND_WAIT				1039
 /*! cursor creation */
-#define	WT_STAT_CONN_CURSOR_CREATE			1031
+#define	WT_STAT_CONN_CURSOR_CREATE			1040
 /*! Btree cursor insert calls */
-#define	WT_STAT_CONN_CURSOR_INSERT			1032
+#define	WT_STAT_CONN_CURSOR_INSERT			1041
 /*! Btree cursor next calls */
-#define	WT_STAT_CONN_CURSOR_NEXT			1033
+#define	WT_STAT_CONN_CURSOR_NEXT			1042
 /*! Btree cursor prev calls */
-#define	WT_STAT_CONN_CURSOR_PREV			1034
+#define	WT_STAT_CONN_CURSOR_PREV			1043
 /*! Btree cursor remove calls */
-#define	WT_STAT_CONN_CURSOR_REMOVE			1035
+#define	WT_STAT_CONN_CURSOR_REMOVE			1044
 /*! Btree cursor reset calls */
-#define	WT_STAT_CONN_CURSOR_RESET			1036
+#define	WT_STAT_CONN_CURSOR_RESET			1045
 /*! Btree cursor search calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH			1037
+#define	WT_STAT_CONN_CURSOR_SEARCH			1046
 /*! Btree cursor search near calls */
-#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			1038
+#define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			1047
 /*! Btree cursor update calls */
-#define	WT_STAT_CONN_CURSOR_UPDATE			1039
+#define	WT_STAT_CONN_CURSOR_UPDATE			1048
 /*! dhandle: connection dhandles swept */
-#define	WT_STAT_CONN_DH_CONN_HANDLES			1040
+#define	WT_STAT_CONN_DH_CONN_HANDLES			1049
 /*! dhandle: connection sweep attempts */
-#define	WT_STAT_CONN_DH_CONN_SWEEPS			1041
+#define	WT_STAT_CONN_DH_CONN_SWEEPS			1050
 /*! dhandle: session dhandles swept */
-#define	WT_STAT_CONN_DH_SESSION_HANDLES			1042
+#define	WT_STAT_CONN_DH_SESSION_HANDLES			1051
 /*! dhandle: session sweep attempts */
-#define	WT_STAT_CONN_DH_SESSION_SWEEPS			1043
+#define	WT_STAT_CONN_DH_SESSION_SWEEPS			1052
 /*! dhandle: sweeps conflicting with evict */
-#define	WT_STAT_CONN_DH_SWEEP_EVICT			1044
+#define	WT_STAT_CONN_DH_SWEEP_EVICT			1053
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				1045
+#define	WT_STAT_CONN_FILE_OPEN				1054
 /*! log: log buffer size increases */
-#define	WT_STAT_CONN_LOG_BUFFER_GROW			1046
+#define	WT_STAT_CONN_LOG_BUFFER_GROW			1055
 /*! log: total log buffer size */
-#define	WT_STAT_CONN_LOG_BUFFER_SIZE			1047
+#define	WT_STAT_CONN_LOG_BUFFER_SIZE			1056
 /*! log: user provided log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_USER			1048
+#define	WT_STAT_CONN_LOG_BYTES_USER			1057
 /*! log: log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1049
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1058
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1050
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1059
 /*! log: log read operations */
-#define	WT_STAT_CONN_LOG_READS				1051
+#define	WT_STAT_CONN_LOG_READS				1060
 /*! log: records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1052
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1061
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			1053
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			1062
 /*! log: log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				1054
+#define	WT_STAT_CONN_LOG_SCANS				1063
 /*! log: consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1055
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1064
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1056
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1065
 /*! log: consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			1057
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			1066
 /*! log: consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1058
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1067
 /*! log: slots selected for switching that were unavailable */
-#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1059
+#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1068
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1060
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1069
 /*! log: failed to find a slot large enough for record */
-#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1061
+#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1070
 /*! log: consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1062
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1071
 /*! log: log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				1063
+#define	WT_STAT_CONN_LOG_SYNC				1072
 /*! log: log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				1064
+#define	WT_STAT_CONN_LOG_WRITES				1073
 /*! sleep for LSM checkpoint throttle */
-#define	WT_STAT_CONN_LSM_CHECKPOINT_THROTTLE		1065
+#define	WT_STAT_CONN_LSM_CHECKPOINT_THROTTLE		1074
 /*! sleep for LSM merge throttle */
-#define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1066
+#define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1075
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			1067
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			1076
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1068
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1077
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1069
+#define	WT_STAT_CONN_MEMORY_FREE			1078
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1070
+#define	WT_STAT_CONN_MEMORY_GROW			1079
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1071
+#define	WT_STAT_CONN_READ_IO				1080
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1072
+#define	WT_STAT_CONN_REC_PAGES				1081
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1073
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1082
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1074
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1083
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1075
+#define	WT_STAT_CONN_RWLOCK_READ			1084
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1076
+#define	WT_STAT_CONN_RWLOCK_WRITE			1085
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1077
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1086
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1078
+#define	WT_STAT_CONN_TXN_BEGIN				1087
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1079
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1088
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1080
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1089
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1081
+#define	WT_STAT_CONN_TXN_COMMIT				1090
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1082
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1091
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1083
+#define	WT_STAT_CONN_TXN_ROLLBACK			1092
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1084
+#define	WT_STAT_CONN_WRITE_IO				1093
 
 /*!
  * @}

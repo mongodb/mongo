@@ -578,6 +578,23 @@ methods = {
 'connection.add_compressor' : Method([]),
 'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
+'connection.async_new_op' : Method([
+	Config('append', 'false', r'''
+	    append the value as a new record, creating a new record
+	    number key; valid only for operations with record number keys''',
+	    type='boolean'),
+	Config('overwrite', 'true', r'''
+	    configures whether the cursor's insert, update and remove
+	    methods check the existing state of the record.  If \c overwrite
+	    is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
+	    if the record exists, WT_CURSOR::update and WT_CURSOR::remove
+	    fail with ::WT_NOTFOUND if the record does not exist''',
+	    type='boolean'),
+	Config('raw', 'false', r'''
+	    ignore the encodings for the key and value, manage data as if
+	    the formats were \c "u".  See @ref cursor_raw for details''',
+	    type='boolean'),
+]),
 'connection.close' : Method([]),
 'connection.reconfigure' : Method(connection_runtime_config),
 
