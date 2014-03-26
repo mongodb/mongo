@@ -30,7 +30,7 @@ __wt_block_ckpt_init(
 	WT_RET(__wt_block_extlist_init(
 	    session, &ci->discard, name, "discard", 0));
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, name, "ckpt_avail", 0));
+	    session, &ci->ckpt_avail, name, "ckpt_avail", 1));
 
 	return (0);
 }
@@ -366,7 +366,7 @@ __ckpt_process(
 	 */
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
 	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, "live", "ckpt_avail", 0));
+	    session, &ci->ckpt_avail, "live", "ckpt_avail", 1));
 
 	/*
 	 * We've allocated our last page, update the checkpoint size.  We need

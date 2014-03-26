@@ -880,8 +880,29 @@ int
 __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 {
 	WT_EXT *ext;
+	WT_EXTLIST tmp;
+	u_int i;
 
 	WT_VERBOSE_RET(session, block, "merging %s into %s", a->name, b->name);
+
+	/*
+	 * Sometimes the list we are merging is much bigger than the other: if
+	 * so, swap the lists around to reduce the amount of work we need to do
+	 * during the merge.  The size lists have to match as well, so
+	 */
+	if (a->track_size == b->track_size && a->entries > b->entries) {
+		tmp = *a;
+		a->bytes = b->bytes;
+		b->bytes = tmp.bytes;
+		a->entries = b->entries;
+		b->entries = tmp.entries;
+		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
+			a->off[i] = b->off[i];
+			b->off[i] = tmp.off[i];
+			a->sz[i] = b->sz[i];
+			b->sz[i] = tmp.sz[i];
+		}
+	}
 
 	WT_EXT_FOREACH(ext, a->off)
 		WT_RET(__block_merge(session, b, ext->off, ext->size));
