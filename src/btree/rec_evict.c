@@ -366,6 +366,12 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * inserting the whole mess into the page's parent.
 	 *	Don't set the update-restore flag for internal pages, they don't
 	 * have updates that can be saved and restored.
+	 *	Don't set the update-restore flag for small pages.  (If a small
+	 * page were selected by eviction and then modified, and we configure it
+	 * for update-restore, we'll end up splitting one or two pages into the
+	 * parent, which is a waste of effort.  If we don't set update-restore,
+	 * eviction will return EBUSY, which makes more sense, the page was just
+	 * modified.)
 	 *	Don't set the update-restore flag for any page other than the
 	 * top one; only the reconciled top page goes through the split path
 	 * (and child pages are pages we expect to merge into the top page, they
@@ -375,7 +381,8 @@ __rec_review(WT_SESSION_IMPL *session,
 		flags = WT_EVICTION_LOCKED;
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
-		else if (top && !WT_PAGE_IS_INTERNAL(page))
+		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
+		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, page, NULL, flags));
 	} else {
