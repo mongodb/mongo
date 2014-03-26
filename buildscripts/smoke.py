@@ -442,11 +442,13 @@ def skipTest(path):
 
     return False
 
+forceCommandsForSuite = ["aggregation", "replsets", "parallel", "core", "auth"]
+# look for jstests and one of the above suites separated by either posix or windows slashes
+forceCommandsRE = re.compile(r"jstests[/\\](%s)" % ('|'.join(forceCommandsForSuite)))
 def setShellWriteModeForTest(path, argv):
-    forceCommandsForSuite = ["aggregation", "replsets", "parallel", "core", "auth"]
-    swm = shell_write_mode;
+    swm = shell_write_mode
     if swm == "legacy": # change when the default changes to "commands"
-        if use_write_commands or any("jstests/" + s in path for s in forceCommandsForSuite):
+        if use_write_commands or forceCommandsRE.search(path):
             swm = "commands"
     argv += ["--writeMode", swm]
 
@@ -814,7 +816,7 @@ def report():
 
 # Keys are the suite names (passed on the command line to smoke.py)
 # Values are pairs: (filenames, <start mongod before running tests>)
-suiteGlobalConfig = {"js": ("core/[!_]*.js", True),
+suiteGlobalConfig = {"js": ("core/*.js", True),
                      "quota": ("quota/*.js", True),
                      "jsPerf": ("perf/*.js", True),
                      "disk": ("disk/*.js", True),
@@ -833,7 +835,7 @@ suiteGlobalConfig = {"js": ("core/[!_]*.js", True),
                      "failPoint": ("fail_point/*.js", False),
                      "ssl": ("ssl/*.js", True),
                      "sslSpecial": ("sslSpecial/*.js", True),
-                     "jsCore": ("core/[!_]*.js", True),
+                     "jsCore": ("core/*.js", True),
                      "gle": ("gle/*.js", True),
                      }
 
