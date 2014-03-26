@@ -4304,6 +4304,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_page_out(session, &mod->mod_root_split);
 		break;
 	}
+
 	return (ret);
 }
 
