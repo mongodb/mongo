@@ -4294,11 +4294,17 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * a linked list, and we also have to discard overflow items written
 	 * for the page.
 	 */
-	if (mod->mod_root_split != NULL) {
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		if (mod->mod_root_split == NULL)
+			break;
 		WT_RET(__rec_split_discard(session, mod->mod_root_split));
 		WT_RET(__wt_ovfl_track_wrapup(session, mod->mod_root_split));
 		__wt_page_out(session, &mod->mod_root_split);
+		break;
 	}
+
 	return (ret);
 }
 
