@@ -196,7 +196,6 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
@@ -206,7 +205,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	int panic;
 	void *p;
 
-	btree = S2BT(session);
 	alloc_index = NULL;
 	alloc_ref = NULL;
 	panic = 0;
