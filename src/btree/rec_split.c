@@ -7,6 +7,51 @@
 
 #include "wt_internal.h"
 
+static u_int __split_deepen_child_count = 250;		/* Tuning... */
+static u_int __split_deepen_entries = 250;
+static u_int __split_deepen_max_internal_pages = 250;
+
+/*
+ * __split_should_deepen --
+ *	Return if we should deepen the tree.
+ */
+static int
+__split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/*
+	 * Splits are based on either the number of child pages that will be
+	 * created by the split (avoiding an internal page that will be slow
+	 * to search), or by the memory footprint of the parent page (avoiding
+	 * an internal page that will eat up all of the cache and put eviction
+	 * pressure on the system).
+	 *
+	 * Paranoia: don't try and split if we don't have anything to split.
+	 */
+	if (mod->mod_splits_entries < 50)
+		return (0);
+
+	/*
+	 * Split to deepen the tree if the page's memory footprint is N times
+	 * the maximum internal page size of the backing file.
+	 */
+	if (page->memory_footprint >
+	    __split_deepen_max_internal_pages * S2BT(session)->maxintlpage)
+		return (1);
+
+	/*
+	 * Split to deepen the tree if the split will result in at least N
+	 * children in the newly created intermediate layer.
+	 */
+	if (mod->mod_splits_entries > __split_deepen_child_count)
+		return (1);
+
+	return (0);
+}
+
 /*
  * __split_list_alloc --
  *	Allocate room for a new WT_REF array as necessary.
@@ -167,7 +212,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	panic = 0;
 
 	pindex = parent->pg_intl_index;
-	entries = (uint32_t)btree->split_deepen;
+	entries = __split_deepen_entries;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_VERBOSE_ERR(session, split,
@@ -545,7 +590,6 @@ __wt_split_evict(
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod, *parent_mod;
 	WT_REF *alloc_ref, **refp, *split;
-	uint64_t bytes;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, locked;
 
@@ -705,20 +749,9 @@ __wt_split_evict(
 	 * split into them.  If they're big enough, deepen the tree that point.
 	 *	Do the check here because we've just split into a parent page
 	 * and we're already holding the page locked.
-	 *
-	 * A rough metric: addresses in the standard block manager are 10B, more
-	 * or less, and let's pretend a standard key is 0B for column-store and
-	 * 20B for row-store.  If writing the parent page requires more than N
-	 * pages, deepen the tree to add those pages.
 	 */
-	if (!exclusive) {
-		bytes = 10;
-		if (parent->type == WT_PAGE_ROW_INT)
-			bytes += 20;
-		if ((bytes * result_entries) /
-		    btree->maxintlpage > (uint64_t)btree->split_deepen)
-			ret = __split_deepen(session, parent);
-	}
+	if (!exclusive && __split_should_deepen(session, page))
+		ret = __split_deepen(session, parent);
 
 err:	if (locked)
 		WT_PAGE_UNLOCK(session, parent);

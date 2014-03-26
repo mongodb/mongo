@@ -97,7 +97,6 @@ struct __wt_btree {
 	int   prefix_compression;	/* Reconcile: prefix compression */
 	u_int prefix_compression_min;	/* Reconcile: prefix compression min */
 	int   split_pct;		/* Reconcile: split page percent */
-	int   split_deepen;		/* Reconcile: split page deepen */
 	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
 	WT_RWLOCK *ovfl_lock;		/* Reconcile: overflow lock */
 

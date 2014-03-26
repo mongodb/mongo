@@ -83,7 +83,6 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "os_cache_max", "int", "min=0", NULL},
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "prefix_compression_min", "int", "min=0", NULL},
-	{ "split_deepen", "int", "min=50", NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
 	{ "value_format", "format", NULL, NULL},
 	{ "version", "string", NULL, NULL},
@@ -168,7 +167,6 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "prefix_compression", "boolean", NULL, NULL},
 	{ "prefix_compression_min", "int", "min=0", NULL},
 	{ "source", "string", NULL, NULL},
-	{ "split_deepen", "int", "min=50", NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
 	{ "type", "string", NULL, NULL},
 	{ "value_format", "format", NULL, NULL},
@@ -340,8 +338,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  ",internal_key_truncate=,internal_page_max=4KB,key_format=u,"
 	  "key_gap=10,leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB"
 	  ",os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,"
-	  "prefix_compression_min=4,split_deepen=250,split_pct=75,"
-	  "value_format=u,version=(major=0,minor=0)",
+	  "prefix_compression_min=4,split_pct=75,value_format=u,"
+	  "version=(major=0,minor=0)",
 	  confchk_file_meta
 	},
 	{ "index.meta",
@@ -379,7 +377,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "chunk_size=10MB,merge_max=15,merge_min=0,merge_threads=2),"
 	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
 	  "prefix_compression=,prefix_compression_min=4,source=,"
-	  "split_deepen=250,split_pct=75,type=file,value_format=u",
+	  "split_pct=75,type=file,value_format=u",
 	  confchk_session_create
 	},
 	{ "session.drop",

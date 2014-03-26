@@ -595,8 +595,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
 	btree->split_pct = (int)cval.val;
-	WT_RET(__wt_config_gets(session, cfg, "split_deepen", &cval));
-	btree->split_deepen = (int)cval.val;
 
 	/*
 	 * When a page is forced to split, we want at least 50 entries on its
