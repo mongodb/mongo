@@ -43,10 +43,14 @@ namespace mongo {
         if ( key.isEmpty() )
             return Status(code, "Index keys cannot be empty.");
 
-        // Ensures that the fields on which we are building the index are valid: a field must not
-        // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
-        // contain an empty field. If a field cannot be created or updated, it should not be
-        // indexable.
+        string pluginName = IndexNames::findPluginName( key );
+        if ( pluginName.size() ) {
+            if ( !IndexNames::isKnownName( pluginName ) )
+                return Status(code,
+                              mongoutils::str::stream() << "Unknown index plugin '"
+                                                        << pluginName << '\'');
+        }
+
         BSONObjIterator it( key );
         while ( it.more() ) {
             BSONElement keyElement = it.next();
@@ -54,6 +58,15 @@ namespace mongo {
             if ( !keyElement.isNumber() && keyElement.type() != String ) {
                 return Status(code, "Index keys must have numeric type or string type.");
             }
+
+            if ( keyElement.type() == String && pluginName != keyElement.str() ) {
+                return Status(code, "Can't use more than one index plugin for a single index.");
+            }
+
+            // Ensure that the fields on which we are building the index are valid: a field must not
+            // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
+            // contain an empty field. If a field cannot be created or updated, it should not be
+            // indexable.
 
             FieldRef keyField( keyElement.fieldName() );
 
@@ -92,14 +105,6 @@ namespace mongo {
                                         "field name starts with '$'.");
                 }
             }
-        }
-
-        string pluginName = IndexNames::findPluginName( key );
-        if ( pluginName.size() ) {
-            if ( !IndexNames::isKnownName( pluginName ) )
-                return Status(code,
-                              mongoutils::str::stream() << "Unknown index plugin '"
-                                                        << pluginName << '\'');
         }
 
         return Status::OK();
