@@ -52,6 +52,9 @@ from packing import pack, unpack
 %typemap(in, numinputs=0) WT_SESSION ** (WT_SESSION *temp = NULL) {
 	$1 = &temp;
 }
+%typemap(in, numinputs=0) WT_ASYNC_OP ** (WT_ASYNC_OP *temp = NULL) {
+	$1 = &temp;
+}
 %typemap(in, numinputs=0) WT_CURSOR ** (WT_CURSOR *temp = NULL) {
 	$1 = &temp;
 }
@@ -77,6 +80,28 @@ from packing import pack, unpack
 			Py_XINCREF($result);
 			pcb->pyobj = $result;
 			((WT_SESSION_IMPL *)(*$1))->lang_private = pcb;
+		}
+	}
+}
+%typemap(argout) WT_ASYNC_OP ** {
+	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
+	    SWIGTYPE_p___wt_async_op, 0);
+	if (*$1 != NULL) {
+		PY_CALLBACK *pcb;
+
+		PyObject_SetAttrString($result, "is_column",
+		    PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
+		PyObject_SetAttrString($result, "key_format",
+		    PyString_InternFromString((*$1)->key_format));
+		PyObject_SetAttrString($result, "value_format",
+		    PyString_InternFromString((*$1)->value_format));
+
+		if (__wt_calloc_def((WT_ASYNC_OP_IMPL *)(*$1), 1, &pcb) != 0)
+			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+		else {
+			Py_XINCREF($result);
+			pcb->pyobj = $result;
+			((WT_ASYNC_OP_IMPL *)(*$1))->lang_private = pcb;
 		}
 	}
 }

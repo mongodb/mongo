@@ -85,7 +85,8 @@ __wt_async_worker(void *arg)
 		 * Dequeue op.  We get here with the opqs lock held.
 		 */
 		op = &async->flush_op;
-		if (op == &async->flush_op && FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS)) {
+		if (op == &async->flush_op &&
+		    FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS)) {
 			/*
 			 * We're the worker to take the flush op off the queue.
 			 * Set the flushing flag and set count to 1.
