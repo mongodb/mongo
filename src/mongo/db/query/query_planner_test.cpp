@@ -1297,25 +1297,25 @@ namespace {
 
         // Polygon
         runQuery(fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}"));
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
 
         // Center
         runQuery(fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}"));
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
 
         // Centersphere
         runQuery(fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
 
         // Within box.
         runQuery(fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}"));
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {geo2d: {a: '2d'}}}}");
 
@@ -1329,7 +1329,7 @@ namespace {
         runQuery(fromjson("{loc:{$near:{$geometry:{type:'Point',"
                                                   "coordinates : [-81.513743,28.369947] },"
                                " $maxDistance :100}},a: 'mouse'}"));
-        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertNumSolutions(1U);
         assertSolutionExists("{fetch: {node: {geoNear2dsphere: {loc: '2dsphere'}}}}");
     }
 
@@ -1339,12 +1339,12 @@ namespace {
 
         runQuery(fromjson("{a: {$geoIntersects: {$geometry: {type: 'Point',"
                                                            "coordinates: [10.0, 10.0]}}}}"));
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
 
         runQuery(fromjson("{a : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
 
@@ -1355,7 +1355,7 @@ namespace {
         // Can only do near + old point.
         addIndex(BSON("a" << "2d"));
         runQuery(fromjson("{a: {$near: [0,0], $maxDistance:0.3 }}"));
-        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertNumSolutions(1U);
         assertSolutionExists("{geoNear2d: {a: '2d'}}");
     }
 
@@ -1369,7 +1369,7 @@ namespace {
 
         runQuery(fromjson("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
                                           "$maxDistance:100}}}"));
-        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertNumSolutions(1U);
         assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
     }
 
@@ -1378,7 +1378,7 @@ namespace {
         addIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
 
-        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertNumSolutions(1U);
         assertSolutionExists("{geoNear2dsphere: {x: 1, a: '2dsphere'}}");
     }
 
@@ -1391,7 +1391,7 @@ namespace {
         addIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(fromjson("{x:1}"));
 
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1, a: '2dsphere'}}}}}");
     }
@@ -1403,9 +1403,20 @@ namespace {
         runQuery(fromjson("{$or: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
                                  " {b : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}"));
 
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {b: '2d'}}]}}}}");
+    }
+
+    // SERVER-3984, $or 2d index
+    TEST_F(QueryPlannerTest, Or2DSameFieldNonNear) {
+        addIndex(BSON("a" << "2d"));
+        runQuery(fromjson("{$or: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
+                                 " {a : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {or: {nodes: [{geo2d: {a: '2d'}}, {geo2d: {a: '2d'}}]}}}}");
     }
 
     // SERVER-3984, $or 2dsphere index
@@ -1415,10 +1426,71 @@ namespace {
         runQuery(fromjson("{$or: [ {a: {$geoIntersects: {$geometry: {type: 'Point', coordinates: [10.0, 10.0]}}}},"
                                  " {b: {$geoWithin: { $centerSphere: [[ 10, 20 ], 0.01 ] } }} ]}"));
 
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{or: {nodes: [{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
                                            "{fetch: {node: {ixscan: {pattern: {b: '2dsphere'}}}}}]}}");
+    }
+
+    TEST_F(QueryPlannerTest, And2DSameFieldNonNear) {
+        addIndex(BSON("a" << "2d"));
+        runQuery(fromjson("{$and: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
+                                  " {a : { $within : { $center : [[ 5, 5 ], 7 ] } }} ]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {andHash: {nodes: ["
+                                "{geo2d: {a: '2d'}}, {geo2d: {a: '2d'}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, And2DWith2DNearSameField) {
+        addIndex(BSON("a" << "2d"));
+        runQuery(fromjson("{$and: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
+                                  " {a : { $near : [ 5, 5 ] } } ]}"));
+
+        // GEO_NEAR must use the index, and GEO predicate becomes a filter.
+        assertNumSolutions(1U);
+        assertSolutionExists("{geoNear2d: {a: '2d'}}");
+    }
+
+    TEST_F(QueryPlannerTest, And2DSphereSameFieldNonNear) {
+        addIndex(BSON("a" << "2dsphere"));
+        runQuery(fromjson("{$and: [ {a: {$geoIntersects: {$geometry: "
+                                        "{type: 'Point', coordinates: [3.0, 1.0]}}}},"
+                                 "  {a: {$geoIntersects: {$geometry: "
+                                        "{type: 'Point', coordinates: [4.0, 1.0]}}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        // Bounds of the two 2dsphere geo predicates are combined into
+        // a single index scan.
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, And2DSphereWithNearSameField) {
+        addIndex(BSON("a" << "2dsphere"));
+        runQuery(fromjson("{$and: [{a: {$geoIntersects: {$geometry: "
+                                        "{type: 'Point', coordinates: [3.0, 1.0]}}}},"
+                                  "{a: {$near: {$geometry: "
+                                        "{type: 'Point', coordinates: [10.0, 10.0]}}}}]}"));
+
+        // GEO_NEAR must use the index, and GEO predicate becomes a filter.
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, Or2DSphereSameFieldNonNear) {
+        addIndex(BSON("a" << "2dsphere"));
+        runQuery(fromjson("{$or: [ {a: {$geoIntersects: {$geometry: "
+                                      "{type: 'Point', coordinates: [3.0, 1.0]}}}},"
+                                 "  {a: {$geoIntersects: {$geometry: "
+                                      "{type: 'Point', coordinates: [4.0, 1.0]}}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: ["
+                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
+                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}]}}");
     }
 
     //
