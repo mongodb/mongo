@@ -88,6 +88,10 @@ struct __wt_async {
 	WT_SPINLOCK		 ops_lock;      /* Locked: ops array */
 	WT_SPINLOCK		 opsq_lock;	/* Locked: work queue */
 	SLIST_HEAD(__wt_async_lh, __wt_async_op) oplh;
+#define	WT_ASYNC_FLUSH_COMPLETE		0x0001	/* Notify flush caller */
+#define	WT_ASYNC_FLUSH_IN_PROGRESS	0x0002	/* Prevent more callers */
+#define	WT_ASYNC_FLUSHING		0x0004	/* Notify workers */
+	uint32_t		 opsq_flush;	/* Queue flush op */
 
 	/* Notify any waiting threads when work is enqueued. */
 	WT_CONDVAR		*ops_cond;
@@ -101,9 +105,6 @@ struct __wt_async {
 					/* Async worker threads */
 	pthread_t		 worker_tids[WT_ASYNC_MAX_WORKERS];
 
-#define	WT_ASYNC_FLUSH_COMPLETE		0x0001	/* Notify flush caller */
-#define	WT_ASYNC_FLUSH_IN_PROGRESS	0x0002	/* Prevent more callers */
-#define	WT_ASYNC_FLUSHING		0x0004	/* Notify workers */
 	uint32_t		 flags;
 };
 

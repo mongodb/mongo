@@ -16,15 +16,55 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 {
 	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
-	int i;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	uint32_t found, i, save_i;
 
-	WT_UNUSED(i);
-	WT_UNUSED(op);
 	async = conn->async;
+	session = conn->default_session;
 	WT_STAT_FAST_CONN_INCR(conn->default_session, async_op_alloc);
 	*opp = NULL;
-	*opp = &async->flush_op;
-	return (0);
+	ret = 0;
+	__wt_spin_lock(session, &async->ops_lock);
+	save_i = async->ops_index;
+	/*
+	 * Look after the last one allocated for a free one.  We'd expect
+	 * ops to be freed mostly FIFO so we should quickly find one.
+	 */
+	for (found = 0, i = save_i; i < conn->async_size; i++) {
+		op = &async->async_ops[i];
+		if (FLD_ISSET(op->state, WT_ASYNCOP_FREE)) {
+			found = 1;
+			break;
+		}
+	}
+	/*
+	 * Loop around back to the beginning if we need to.
+	 */
+	if (!found) {
+		for (i = 0; i < save_i; i++) {
+			op = &async->async_ops[i];
+			if (FLD_ISSET(op->state, WT_ASYNCOP_FREE)) {
+				found = 1;
+				break;
+			}
+		}
+	}
+	if (!found) {
+		ret = ENOMEM;
+		WT_STAT_FAST_CONN_INCR(session, async_full);
+		goto err;
+	}
+	/*
+	 * Start the next search at the next entry after this one.
+	 * Set the state of this op handle as READY for the user to use.
+	 */
+	FLD_SET(op->state, WT_ASYNCOP_READY);
+	op->unique_id = async->op_id++;
+	async->ops_index = (i + 1) % conn->async_size;
+	*opp = op;
+err:	__wt_spin_unlock(session, &async->ops_lock);
+	return (ret);
 }
 
 /*
@@ -162,6 +202,7 @@ int
 __wt_async_flush(WT_CONNECTION_IMPL *conn)
 {
 	WT_ASYNC *async;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	if (!conn->async_cfg)
@@ -171,7 +212,44 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	session = conn->default_session;
 	WT_STAT_FAST_CONN_INCR(session, async_flush);
 	fprintf(stderr, "Async flush called\n");
-	return (0);
+	/*
+	 * We have to do several things.  First we have to prevent
+	 * other callers from racing with us so that only one
+	 * flush is happening at a time.  Next we have to wait for
+	 * the worker threads to notice the flush and indicate
+	 * that the flush is complete on their side.  Then we
+	 * clear the flush flags and return.
+	 */
+	__wt_spin_lock(session, &async->opsq_lock);
+	fprintf(stderr, "Async flush locked, check race\n");
+	if (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS))
+		goto err;
+
+	/*
+	 * We're the owner of this flush operation.  Set the
+	 * WT_ASYNC_FLUSH_IN_PROGRESS to prevent other callers.
+	 * We're also preventing all worker threads from taking
+	 * things off the work queue with the lock.
+	 */
+	fprintf(stderr, "Async flush: set in progress\n");
+	FLD_SET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS);
+	async->flush_count = 0;
+	WT_ERR(__wt_async_op_enqueue(conn, &async->flush_op, 1));
+	fprintf(stderr, "Async flush: enqueued op, wait for complete\n");
+	while (!FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_COMPLETE)) {
+		__wt_spin_unlock(session, &async->opsq_lock);
+		WT_ERR_TIMEDOUT_OK(
+		    __wt_cond_wait(NULL, async->flush_cond, 100000));
+		__wt_spin_lock(session, &async->opsq_lock);
+	}
+	/*
+	 * Flush is done.  Clear the flags.
+	 */
+	fprintf(stderr, "Async flush: complete.  clear flags\n");
+	FLD_CLR(async->opsq_flush,
+	   (WT_ASYNC_FLUSH_COMPLETE | WT_ASYNC_FLUSH_IN_PROGRESS));
+err:	__wt_spin_unlock(session, &async->opsq_lock);
+	return (ret);
 }
 
 /*
@@ -196,7 +274,6 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 	*opp = NULL;
 
 	WT_ERR(__async_new_op_alloc(conn, &op));
-	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
 	WT_ERR(__wt_strdup(session, uri, &op->uri));
 	WT_ERR(__wt_strdup(session, config, &op->config));
 	if (uri != NULL)

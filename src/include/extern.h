@@ -1,5 +1,8 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
+extern int __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
+    WT_ASYNC_OP_IMPL *op,
+    int locked);
 extern int __wt_async_op_init(WT_CONNECTION_IMPL *conn);
 extern void *__wt_async_worker(void *arg);
 extern int __wt_block_addr_to_buffer(WT_BLOCK *block,
