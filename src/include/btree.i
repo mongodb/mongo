@@ -643,7 +643,11 @@ static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
+	WT_BTREE *btree;
 	WT_REF *ref;
+	int locked;
+
+	btree = S2BT(session);
 
 	/*
 	 * Discard our hazard pointer.  Ignore pages we don't have and the root
@@ -654,15 +658,22 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Attempt to evict pages with the special "oldest" read generation. */
 	if (page->read_gen != WT_READGEN_OLDEST ||
-	    F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    (btree->checkpointing && __wt_page_is_modified(page)))
 		return (__wt_hazard_clear(session, page));
 
+	/*
+	 * Take some care with order of operations: if we release the hazard
+	 * reference without first locking the page, it could be evicted in
+	 * between.
+	 */
 	ref = __wt_page_ref(session, page);
-	WT_RET(__wt_hazard_clear(session, page));
+	locked = WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	WT_TRET(__wt_hazard_clear(session, page));
+	if (!locked)
+		return (ret);
 
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
-		return (0);
-
+	(void)WT_ATOMIC_ADD(btree->evict_busy, 1);
 	if ((ret = __wt_evict_page(session, &page)) == 0)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 	else {
@@ -670,6 +681,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (ret == EBUSY)
 			ret = 0;
 	}
+	(void)WT_ATOMIC_SUB(btree->evict_busy, 1);
+
 	return (ret);
 }
 

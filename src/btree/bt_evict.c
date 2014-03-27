@@ -446,7 +446,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	 * We have disabled further eviction: wait for concurrent LRU eviction
 	 * activity to drain.
 	 */
-	while (btree->lru_count > 0)
+	while (btree->evict_busy > 0)
 		__wt_yield();
 
 	return (0);
@@ -1163,10 +1163,10 @@ __evict_get_page(
 		}
 
 		/*
-		 * Increment the LRU count in the btree handle to prevent it
+		 * Increment the busy count in the btree handle to prevent it
 		 * from being closed under us.
 		 */
-		(void)WT_ATOMIC_ADD(evict->btree->lru_count, 1);
+		(void)WT_ATOMIC_ADD(evict->btree->evict_busy, 1);
 
 		*btreep = evict->btree;
 		*pagep = evict->page;
@@ -1217,7 +1217,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, &page));
 
-	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
+	(void)WT_ATOMIC_SUB(btree->evict_busy, 1);
 
 	cache = S2C(session)->cache;
 	if (ret == 0 && F_ISSET(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK))
