@@ -40,7 +40,9 @@ namespace mongo {
         if (!handlePreValidationMongosOptions(moe::startupOptionsParsed, context->args())) {
             ::_exit(EXIT_SUCCESS);
         }
-        Status ret = moe::startupOptionsParsed.validate();
+        // Run validation, but tell the Environment that we don't want it to be set as "valid",
+        // since we may be making it invalid in the canonicalization process.
+        Status ret = moe::startupOptionsParsed.validate(false/*setValid*/);
         if (!ret.isOK()) {
             return ret;
         }
@@ -49,6 +51,10 @@ namespace mongo {
             return ret;
         }
         ret = canonicalizeMongosOptions(&moe::startupOptionsParsed);
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
