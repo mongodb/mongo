@@ -65,6 +65,21 @@ namespace mongo {
     bool handlePreValidationMongosOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args);
 
+    /**
+     * Handle custom validation of mongos options that can not currently be done by using
+     * Constraints in the Environment.  See the "validate" function in the Environment class for
+     * more details.
+     */
+    Status validateMongosOptions(const moe::Environment& params);
+
+    /**
+     * Canonicalize mongos options for the given environment.
+     *
+     * For example, the options "dur", "nodur", "journal", "nojournal", and
+     * "storage.journaling.enabled" should all be merged into "storage.journaling.enabled".
+     */
+    Status canonicalizeMongosOptions(moe::Environment* params);
+
     Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args);
 
     bool isMongos();

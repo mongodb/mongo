@@ -466,6 +466,12 @@ namespace mongo {
     }
 
     Status validateMongodOptions(const moe::Environment& params) {
+
+        Status ret = validateServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
         if ((params.count("nodur") || params.count("nojournal")) &&
             (params.count("dur") || params.count("journal"))) {
             return Status(ErrorCodes::BadValue,
@@ -476,6 +482,11 @@ namespace mongo {
     }
 
     Status canonicalizeMongodOptions(moe::Environment* params) {
+
+        Status ret = canonicalizeServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
 
         // "storage.journal.enabled" comes from the config file, so override it if any of "journal",
         // "nojournal", "dur", and "nodur" are set, since those come from the command line.

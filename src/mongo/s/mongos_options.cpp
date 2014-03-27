@@ -152,6 +152,26 @@ namespace mongo {
         return true;
     }
 
+    Status validateMongosOptions(const moe::Environment& params) {
+
+        Status ret = validateServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        return Status::OK();
+    }
+
+    Status canonicalizeMongosOptions(moe::Environment* params) {
+
+        Status ret = canonicalizeServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        return Status::OK();
+    }
+
     Status storeMongosOptions(const moe::Environment& params,
                               const std::vector<std::string>& args) {
 

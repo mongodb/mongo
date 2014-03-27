@@ -260,12 +260,14 @@ namespace {
         options->addOptionChaining("objcheck", "objcheck", moe::Switch,
                 "inspect client data for validity on receipt (DEFAULT)")
                                   .hidden()
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("noobjcheck");
 
         options->addOptionChaining("noobjcheck", "noobjcheck", moe::Switch,
                 "do NOT inspect client data for validity on receipt")
                                   .hidden()
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("objcheck");
 
         options->addOptionChaining("net.wireObjectCheck", "", moe::Bool,
                 "inspect client data for validity on receipt (DEFAULT)")
@@ -378,6 +380,42 @@ namespace {
 
     void printCommandLineOpts() {
         log() << "options: " << serverGlobalParams.parsedOpts << endl;
+    }
+
+    Status validateServerOptions(const moe::Environment& params) {
+        // This function should contain custom validation that cannot be expressed as simple
+        // constraints on the options.
+
+        return Status::OK();
+    }
+
+    Status canonicalizeServerOptions(moe::Environment* params) {
+
+        // "net.wireObjectCheck" comes from the config file, so override it if either "objcheck" or
+        // "noobjcheck" are set, since those come from the command line.
+        if (params->count("objcheck")) {
+            Status ret = params->set("net.wireObjectCheck", moe::Value(true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("objcheck");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        if (params->count("noobjcheck")) {
+            Status ret = params->set("net.wireObjectCheck", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noobjcheck");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        return Status::OK();
     }
 
     Status storeServerOptions(const moe::Environment& params,
@@ -514,21 +552,8 @@ namespace {
             }
         }
 
-        // Check "net.wireObjectCheck" first which comes from the config file so that specifying
-        // "objcheck" or "noobjcheck" which come from the command line will override
-        // "net.wireObjectCheck"
         if (params.count("net.wireObjectCheck")) {
             serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
-        }
-
-        if (params.count("objcheck")) {
-            serverGlobalParams.objcheck = true;
-        }
-        if (params.count("noobjcheck")) {
-            if (params.count("objcheck")) {
-                return Status(ErrorCodes::BadValue, "can't have both --objcheck and --noobjcheck");
-            }
-            serverGlobalParams.objcheck = false;
         }
 
         if (params.count("net.bindIp")) {
