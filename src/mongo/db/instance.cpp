@@ -164,7 +164,7 @@ namespace mongo {
 
                 Client& me = cc();
                 scoped_lock bl(Client::clientsMutex);
-                scoped_ptr<Matcher> m(new Matcher(filter));
+                Matcher m(filter);
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
                     Client *c = *i;
                     verify( c );
@@ -175,7 +175,7 @@ namespace mongo {
                     verify( co );
                     if( all || co->displayInCurop() ) {
                         BSONObj info = co->info();
-                        if ( all || m->matches( info )) {
+                        if ( all || m.matches( info )) {
                             vals.push_back( info );
                         }
                     }
@@ -255,7 +255,7 @@ namespace mongo {
 
         CurOp& op = *(c.curop());
 
-        shared_ptr<AssertionException> ex;
+        scoped_ptr<AssertionException> ex;
 
         try {
             NamespaceString ns(d.getns());
@@ -409,7 +409,7 @@ namespace mongo {
             break;
         }
         
-        auto_ptr<CurOp> nestedOp;
+        scoped_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();
         if ( currentOpP->active() ) {
             nestedOp.reset( new CurOp( &c , currentOpP ) );
@@ -691,7 +691,7 @@ namespace mongo {
         curop.debug().ntoreturn = ntoreturn;
         curop.debug().cursorid = cursorid;
 
-        shared_ptr<AssertionException> ex;
+        scoped_ptr<AssertionException> ex;
         scoped_ptr<Timer> timer;
         int pass = 0;
         bool exhaust = false;
