@@ -218,20 +218,6 @@ namespace mongo {
             // This option currently has no effect for mongos
         }
 
-        // Check "net.http.enabled" before "httpinterface" and "nohttpinterface", since this comes
-        // from a config file and those come from the command line
-        if (params.count("net.http.enabled")) {
-            serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
-        }
-
-        if (params.count("httpinterface")) {
-            if (params.count("nohttpinterface")) {
-                return Status(ErrorCodes::BadValue,
-                              "can't have both --httpinterface and --nohttpinterface");
-            }
-            serverGlobalParams.isHttpInterfaceEnabled = true;
-        }
-
         // --noAutoSplit is on the command line, while sharding.autoSplit is in the JSON config.
         // Disable auto splitting if either one specifies that we should.
         if (params.count("noAutoSplit") ||

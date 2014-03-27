@@ -476,10 +476,83 @@ namespace mongo {
                           "Can't specify both --journal and --nojournal options.");
         }
 
+        // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in all cases in the
+        // future
+        if (params.count("net.http.RESTInterfaceEnabled")) {
+
+            // If we are explicitly setting httpinterface to false in the config file (the source of
+            // "net.http.enabled") and not overriding it on the command line (the source of
+            // "httpinterface"), then we can fail with an error message without breaking backwards
+            // compatibility.
+            if (!params.count("httpinterface") &&
+                 params.count("net.http.enabled") &&
+                 params["net.http.enabled"].as<bool>() == false) {
+                return Status(ErrorCodes::BadValue,
+                              "httpinterface must be enabled to use the rest api");
+            }
+        }
+
+        if (params.count("net.http.JSONPEnabled")) {
+
+            // If we are explicitly setting httpinterface to false in the config file (the source of
+            // "net.http.enabled") and not overriding it on the command line (the source of
+            // "httpinterface"), then we can fail with an error message without breaking backwards
+            // compatibility.
+            if (!params.count("httpinterface") &&
+                 params.count("net.http.enabled") &&
+                 params["net.http.enabled"].as<bool>() == false) {
+                return Status(ErrorCodes::BadValue,
+                        "httpinterface must be enabled to use jsonp");
+            }
+        }
+
         return Status::OK();
     }
 
     Status canonicalizeMongodOptions(moe::Environment* params) {
+
+        // Need to handle this before canonicalizing the general "server options", since
+        // httpinterface and nohttpinterface are shared between mongos and mongod, but mongod has
+        // extra validation required.
+        if (params->count("net.http.RESTInterfaceEnabled")) {
+            bool httpEnabled = false;
+            if (params->count("net.http.enabled")) {
+                Status ret = params->get("net.http.enabled", &httpEnabled);
+                if (!ret.isOK()) {
+                    return ret;
+                }
+            }
+            if (params->count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --rest and --nohttpinterface" <<
+                    startupWarningsLog;
+            }
+            else if (!(params->count("httpinterface") ||
+                       (params->count("net.http.enabled") && httpEnabled == true))) {
+                log() << "** WARNING: --rest is specified without --httpinterface," <<
+                    startupWarningsLog;
+                log() << "**          enabling http interface" << startupWarningsLog;
+                Status ret = params->set("httpinterface", moe::Value(true));
+                if (!ret.isOK()) {
+                    return ret;
+                }
+            }
+        }
+
+        if (params->count("net.http.JSONPEnabled")) {
+            if (params->count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface" <<
+                    startupWarningsLog;
+            }
+            else if (!params->count("httpinterface")) {
+                log() << "** WARNING --jsonp is specified without --httpinterface," <<
+                    startupWarningsLog;
+                log() << "**         enabling http interface" << startupWarningsLog;
+                Status ret = params->set("httpinterface", moe::Value(true));
+                if (!ret.isOK()) {
+                    return ret;
+                }
+            }
+        }
 
         Status ret = canonicalizeServerOptions(params);
         if (!ret.isOK()) {
@@ -671,68 +744,10 @@ namespace mongo {
             storageGlobalParams.preallocj = false;
         }
 
-        // Check "net.http.enabled" before "httpinterface" and "nohttpinterface", since this comes
-        // from a config file and those come from the command line
-        if (params.count("net.http.enabled")) {
-            serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
-        }
-
-        if (params.count("httpinterface")) {
-            if (params.count("nohttpinterface")) {
-                return Status(ErrorCodes::BadValue,
-                              "can't have both --httpinterface and --nohttpinterface");
-            }
-            serverGlobalParams.isHttpInterfaceEnabled = true;
-        }
-        // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in the future
         if (params.count("net.http.RESTInterfaceEnabled")) {
-
-            // If we are explicitly setting httpinterface to false in the config file (the source of
-            // "net.http.enabled") and not overriding it on the command line (the source of
-            // "httpinterface"), then we can fail with an error message without breaking backwards
-            // compatibility.
-            if (!params.count("httpinterface") &&
-                params.count("net.http.enabled") &&
-                params["net.http.enabled"].as<bool>() == false) {
-                return Status(ErrorCodes::BadValue,
-                              "httpinterface must be enabled to use the rest api");
-            }
-
-            if (params.count("nohttpinterface")) {
-                log() << "** WARNING: Should not specify both --rest and --nohttpinterface" <<
-                    startupWarningsLog;
-            }
-            else if (!params.count("httpinterface")) {
-                log() << "** WARNING: --rest is specified without --httpinterface," <<
-                    startupWarningsLog;
-                log() << "**          enabling http interface" << startupWarningsLog;
-                serverGlobalParams.isHttpInterfaceEnabled = true;
-            }
             serverGlobalParams.rest = true;
         }
         if (params.count("net.http.JSONPEnabled")) {
-
-            // If we are explicitly setting httpinterface to false in the config file (the source of
-            // "net.http.enabled") and not overriding it on the command line (the source of
-            // "httpinterface"), then we can fail with an error message without breaking backwards
-            // compatibility.
-            if (!params.count("httpinterface") &&
-                params.count("net.http.enabled") &&
-                params["net.http.enabled"].as<bool>() == false) {
-                return Status(ErrorCodes::BadValue,
-                              "httpinterface must be enabled to use jsonp");
-            }
-
-            if (params.count("nohttpinterface")) {
-                log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface" <<
-                    startupWarningsLog;
-            }
-            else if (!params.count("httpinterface")) {
-                log() << "** WARNING: --jsonp is specified without --httpinterface," <<
-                    startupWarningsLog;
-                log() << "**          enabling http interface" << startupWarningsLog;
-                serverGlobalParams.isHttpInterfaceEnabled = true;
-            }
             serverGlobalParams.jsonp = true;
         }
         if (params.count("noscripting")) {
