@@ -35,6 +35,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -173,6 +175,15 @@ namespace mongo {
             for ( size_t i = 0; i < specs.size(); i++ ) {
                 BSONObj spec = specs[i];
 
+                if ( spec["unique"].trueValue() ) {
+                    status = checkUniqueIndexConstraints( ns.ns(), spec["key"].Obj() );
+
+                    if ( !status.isOK() ) {
+                        appendCommandStatus( result, status );
+                        return false;
+                    }
+                }
+
                 status = collection->getIndexCatalog()->createIndex( spec, true );
                 if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
                     if ( !result.hasField( "note" ) )
@@ -195,6 +206,27 @@ namespace mongo {
             return true;
         }
 
+    private:
+        static Status checkUniqueIndexConstraints(const StringData& ns,
+                                                  const BSONObj& newIdxKey) {
+            Lock::assertWriteLocked( ns );
+
+            if ( shardingState.enabled() ) {
+                CollectionMetadataPtr metadata(
+                        shardingState.getCollectionMetadata( ns.toString() ));
+
+                if ( metadata ) {
+                    BSONObj shardKey(metadata->getKeyPattern());
+                    if ( !isUniqueIndexCompatible( shardKey, newIdxKey )) {
+                        return Status(ErrorCodes::CannotCreateIndex,
+                                str::stream() << "cannot create unique index over " << newIdxKey
+                                              << " with shard key pattern " << shardKey);
+                    }
+                }
+            }
+
+            return Status::OK();
+        }
 
     } cmdCreateIndex;
 
