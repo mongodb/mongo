@@ -143,4 +143,43 @@ expectedResult = {
 };
 testGetCmdLineOpts({}, expectedResult);
 
+
+
+// Unix Socket
+if (!_isWindows()) {
+    jsTest.log("Testing \"nounixsocket\" command line option");
+    expectedResult = {
+        "parsed" : {
+            "net" : {
+                "unixDomainSocket" : {
+                    "enabled" : false
+                }
+            }
+        }
+    };
+    testGetCmdLineOpts({ nounixsocket : "" }, expectedResult);
+
+    jsTest.log("Testing \"net.wireObjectCheck\" config file option");
+    expectedResult = {
+        "parsed" : {
+            "config" : "jstests/libs/config_files/enable_unixsocket.json",
+            "net" : {
+                "unixDomainSocket" : {
+                    "enabled" : true
+                }
+            }
+        }
+    };
+    testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_unixsocket.json" },
+                       expectedResult);
+
+    jsTest.log("Testing with no explicit network option setting");
+    expectedResult = {
+        "parsed" : {
+            "net" : { }
+        }
+    };
+    testGetCmdLineOpts({}, expectedResult);
+}
+
 print(baseName + " succeeded.");
