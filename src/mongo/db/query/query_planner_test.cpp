@@ -1322,6 +1322,17 @@ namespace {
         // TODO: test that we *don't* annotate for things we shouldn't.
     }
 
+    TEST_F(QueryPlannerTest, Basic2DSphereCompound) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("loc" << "2dsphere"));
+
+        runQuery(fromjson("{loc:{$near:{$geometry:{type:'Point',"
+                                                  "coordinates : [-81.513743,28.369947] },"
+                               " $maxDistance :100}},a: 'mouse'}"));
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{fetch: {node: {geoNear2dsphere: {loc: '2dsphere'}}}}");
+    }
+
     TEST_F(QueryPlannerTest, Basic2DSphereNonNear) {
         // 2dsphere can do: within+geometry, intersects+geometry
         addIndex(BSON("a" << "2dsphere"));
