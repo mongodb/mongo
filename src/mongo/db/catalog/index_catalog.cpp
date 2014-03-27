@@ -778,7 +778,7 @@ namespace mongo {
         }
         else {
             if ( numIndexesTotal() || numSystemIndexesEntries || _entries.size() ) {
-                error() << "about to fassert - "
+                error() << "About to fassert - "
                         << " numIndexesTotal(): " << numIndexesTotal()
                         << " numSystemIndexesEntries: " << numSystemIndexesEntries
                         << " _entries.size(): " << _entries.size()

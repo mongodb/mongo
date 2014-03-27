@@ -649,9 +649,9 @@ namespace mongo {
                     startupWarningsLog;
             }
             else if (!params.count("httpinterface")) {
-                log() << "** WARNING --jsonp is specified without --httpinterface," <<
+                log() << "** WARNING: --jsonp is specified without --httpinterface," <<
                     startupWarningsLog;
-                log() << "**         enabling http interface" << startupWarningsLog;
+                log() << "**          enabling http interface" << startupWarningsLog;
                 serverGlobalParams.isHttpInterfaceEnabled = true;
             }
             serverGlobalParams.jsonp = true;

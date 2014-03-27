@@ -528,8 +528,8 @@ namespace mongo {
             const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
             // Can only do this for 2dsphere.
             if (!mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
-                warning() << "Planner error trying to build geo bounds for " << elt.toString()
-                          << " index element.";
+                warning() << "Planner error, trying to build geo bounds for non-2dsphere"
+                          << " index element: "  << elt.toString() << endl;
                 verify(0);
             }
 
@@ -538,7 +538,7 @@ namespace mongo {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
         else {
-            warning() << "Planner error, trying to build bounds for expr "
+            warning() << "Planner error, trying to build bounds for expression: "
                       << expr->toString() << endl;
             verify(0);
         }

@@ -94,7 +94,7 @@ namespace mongo {
             // Start at one key, end at another.
             Status status = _indexCursor->seek(_params.bounds.startKey);
             if (!status.isOK()) {
-                warning() << "Seek failed: " << status.toString();
+                warning() << "IndexCursor seek failed: " << status.toString();
                 _hitEnd = true;
             }
             if (!isEOF()) {

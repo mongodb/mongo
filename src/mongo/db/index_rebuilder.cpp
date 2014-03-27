@@ -66,8 +66,8 @@ namespace mongo {
             }
             checkNS(collNames);
         }
-        catch (const DBException&) {
-            warning() << "index rebuilding did not complete" << endl;
+        catch (const DBException& e) {
+            warning() << "Index rebuilding did not complete: " << e.what() << endl;
         }
         boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
         ReplSet::rss.indexRebuildDone = true;

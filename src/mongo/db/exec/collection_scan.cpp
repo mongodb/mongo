@@ -190,7 +190,7 @@ namespace mongo {
         ++_commonStats.unyields;
         if (NULL != _iter) {
             if (!_iter->recoverFromYield()) {
-                warning() << "collection dropped during yield of collscan or state deleted";
+                warning() << "Collection dropped or state deleted during yield of CollectionScan";
                 _nsDropped = true;
             }
         }
