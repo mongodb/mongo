@@ -71,7 +71,7 @@ def make_tar_archive(opts):
         if not os.path.exists(enclosing_directory):
             os.makedirs(enclosing_directory)
             created_directories.append(enclosing_directory)
-        shutil.copyfile(input_filename, preferred_filename)
+        shutil.copy2(input_filename, preferred_filename)
 
     # execute the full tar command
     proc = Popen(tar_command, stdout=PIPE, stderr=STDOUT, bufsize=0)
