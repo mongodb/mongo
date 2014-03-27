@@ -58,12 +58,19 @@ namespace mongo {
     };
 
     /**
-     * The distributed lock is a configdb backed way of synchronizing system-wide tasks. A task must be identified by a
-     * unique name across the system (e.g., "balancer"). A lock is taken by writing a document in the configdb's locks
-     * collection with that name.
+     * The distributed lock is a configdb backed way of synchronizing system-wide tasks. A task
+     * must be identified by a unique name across the system (e.g., "balancer"). A lock is taken
+     * by writing a document in the configdb's locks collection with that name.
      *
-     * To be maintained, each taken lock needs to be revalidated ("pinged") within a pre-established amount of time. This
-     * class does this maintenance automatically once a DistributedLock object was constructed.
+     * To be maintained, each taken lock needs to be revalidated ("pinged") within a
+     * pre-established amount of time. This class does this maintenance automatically once a
+     * DistributedLock object was constructed. The ping procedure records the local time to
+     * the ping document, but that time is untrusted and is only used as a point of reference
+     * of whether the ping was refreshed or not. Ultimately, the clock a configdb is the source
+     * of truth when determining whether a ping is still fresh or not. This is achieved by
+     * (1) remembering the ping document time along with config server time when unable to
+     * take a lock, and (2) ensuring all config servers report similar times and have similar
+     * time rates (the difference in times must start and stay small).
      */
     class MONGO_CLIENT_API DistributedLock {
     public:
@@ -148,9 +155,13 @@ namespace mongo {
         const ConnectionString& getRemoteConnection();
 
         /**
-         * Check the skew between a cluster of servers
+         * Checks the skew among a cluster of servers and returns true if the min and max clock
+         * times among the servers are within maxClockSkew.
          */
-        static bool checkSkew( const ConnectionString& cluster, unsigned skewChecks = NUM_LOCK_SKEW_CHECKS, unsigned long long maxClockSkew = MAX_LOCK_CLOCK_SKEW, unsigned long long maxNetSkew = MAX_LOCK_NET_SKEW );
+        static bool checkSkew( const ConnectionString& cluster,
+                               unsigned skewChecks = NUM_LOCK_SKEW_CHECKS,
+                               unsigned long long maxClockSkew = MAX_LOCK_CLOCK_SKEW,
+                               unsigned long long maxNetSkew = MAX_LOCK_NET_SKEW );
 
         /**
          * Get the remote time from a server or cluster
