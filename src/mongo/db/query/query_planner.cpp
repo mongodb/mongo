@@ -610,7 +610,7 @@ namespace mongo {
             for (size_t i = 0; i < tag->first.size(); ++i) {
                 // GEO_NEAR has a non-2d index it can use.  We can deal w/that in normal planning.
                 if (!is2DIndex(relevantIndices[tag->first[i]].keyPattern)) {
-                    newFirst.push_back(i);
+                    newFirst.push_back(tag->first[i]);
                     continue;
                 }
 
@@ -668,6 +668,8 @@ namespace mongo {
                 query.root()->resetTag();
                 return Status::OK();
             }
+
+            QLOG() << "Rated tree after geonear processing:" << query.root()->toString();
         }
 
         // Likewise, if there is a TEXT it must have an index it can use directly.
@@ -702,6 +704,8 @@ namespace mongo {
             // At this point, we know that there is only one text index and that the TEXT node is
             // assigned to it.
             invariant(1 == tag->first.size() + tag->notFirst.size());
+
+            QLOG() << "Rated tree after text processing:" << query.root()->toString();
         }
 
         // If we have any relevant indices, we try to create indexed plans.
