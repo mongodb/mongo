@@ -484,6 +484,7 @@ coreServerFiles = [ "db/client_basic.cpp",
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
                     "db/log_process_details.cpp",
+                    "db/conn_pool_options.cpp"
                     ]
 
 env.Library('ntservice', ['util/ntservice.cpp'],

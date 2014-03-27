@@ -35,17 +35,37 @@ namespace mongo {
      */
     class MONGO_CLIENT_API PoolForHost {
     public:
-        PoolForHost()
-            : _created(0), _minValidCreationTimeMicroSec(0) {}
 
-        PoolForHost( const PoolForHost& other ) {
+        // Sentinel value indicating pool has no cleanup limit
+        static const int kPoolSizeUnlimited;
+
+        PoolForHost() :
+            _created(0),
+            _minValidCreationTimeMicroSec(0),
+            _type(ConnectionString::INVALID),
+            _maxPoolSize(kPoolSizeUnlimited) {
+        }
+
+        PoolForHost(const PoolForHost& other) :
+            _created(other._created),
+            _minValidCreationTimeMicroSec(other._minValidCreationTimeMicroSec),
+            _type(other._type),
+            _maxPoolSize(other._maxPoolSize) {
+            verify(_created == 0);
             verify(other._pool.size() == 0);
-            _created = other._created;
-            _minValidCreationTimeMicroSec = other._minValidCreationTimeMicroSec;
-            verify( _created == 0 );
         }
 
         ~PoolForHost();
+
+        /**
+         * Returns the maximum number of connections stored in the pool
+         */
+        int getMaxPoolSize() { return _maxPoolSize; }
+
+        /**
+         * Sets the maximum number of connections stored in the pool
+         */
+        void setMaxPoolSize( int maxPoolSize ) { _maxPoolSize = maxPoolSize; }
 
         int numAvailable() const { return (int)_pool.size(); }
 
@@ -85,8 +105,6 @@ namespace mongo {
          */
         void initializeHostName(const std::string& hostName);
 
-        static void setMaxPerHost( unsigned max ) { _maxPerHost = max; }
-        static unsigned getMaxPerHost() { return _maxPerHost; }
     private:
 
         struct StoredConnection {
@@ -105,7 +123,8 @@ namespace mongo {
         uint64_t _minValidCreationTimeMicroSec;
         ConnectionString::ConnectionType _type;
 
-        static unsigned _maxPerHost;
+        // The maximum number of connections we'll save in the pool
+        int _maxPoolSize;
     };
 
     class DBConnectionHook {
@@ -140,6 +159,22 @@ namespace mongo {
 
         /** right now just controls some asserts.  defaults to "dbconnectionpool" */
         void setName( const string& name ) { _name = name; }
+
+        /**
+         * Returns the maximum number of connections pooled per-host
+         *
+         * This setting only applies to new host connection pools, previously-pooled host pools are
+         * unaffected.
+         */
+        int getMaxPoolSize() { return _maxPoolSize; }
+
+        /**
+         * Sets the maximum number of connections pooled per-host.
+         *
+         * This setting only applies to new host connection pools, previously-pooled host pools are
+         * unaffected.
+         */
+        void setMaxPoolSize( int maxPoolSize ) { _maxPoolSize = maxPoolSize; }
 
         void onCreate( DBClientBase * conn );
         void onHandedOut( DBClientBase * conn );
@@ -203,6 +238,11 @@ namespace mongo {
 
         mongo::mutex _mutex;
         string _name;
+
+        // The maximum number of connections we'll save in the pool per-host
+        // PoolForHost::kPoolSizeUnlimited is a sentinel value meaning "no limit"
+        // 0 effectively disables the pool
+        int _maxPoolSize;
 
         PoolMap _pools;
 

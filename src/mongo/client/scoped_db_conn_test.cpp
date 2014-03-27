@@ -193,7 +193,7 @@ namespace mongo_test {
     class DummyServerFixture: public mongo::unittest::Test {
     public:
         void setUp() {
-            _maxPoolSizePerHost = mongo::PoolForHost::getMaxPerHost();
+            _maxPoolSizePerHost = mongo::pool.getMaxPoolSize();
             _dummyServer = new DummyServer(TARGET_PORT);
 
             _dummyServer->run(&dummyHandler);
@@ -217,7 +217,7 @@ namespace mongo_test {
             ScopedDbConnection::clearPool();
             delete _dummyServer;
 
-            mongo::PoolForHost::setMaxPerHost(_maxPoolSizePerHost);
+            mongo::pool.setMaxPoolSize(_maxPoolSizePerHost);
         }
 
     protected:
@@ -349,7 +349,7 @@ namespace mongo_test {
     }
 
     TEST_F(DummyServerFixture, InvalidateBadConnEvenWhenPoolIsFull) {
-        mongo::PoolForHost::setMaxPerHost(2);
+        mongo::pool.setMaxPoolSize(2);
 
         ScopedDbConnection conn1(TARGET_HOST);
         ScopedDbConnection conn2(TARGET_HOST);
