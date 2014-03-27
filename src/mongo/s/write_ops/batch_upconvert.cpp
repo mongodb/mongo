@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/multi_command_dispatch.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -101,6 +102,7 @@ namespace mongo {
                 request->getInsertRequest()->addToDocuments( *it );
             }
             request->setOrdered( ordered );
+            request->setWriteConcern( WriteConcernOptions::Acknowledged );
 
             insertRequests->push_back( request );
         }
@@ -128,6 +130,7 @@ namespace mongo {
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Update );
         request->setNS( nss.ns() );
         request->getUpdateRequest()->addToUpdates( updateDoc );
+        request->setWriteConcern( WriteConcernOptions::Acknowledged );
 
         return request;
     }
@@ -150,6 +153,7 @@ namespace mongo {
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Delete );
         request->setNS( nss.ns() );
         request->getDeleteRequest()->addToDeletes( deleteDoc );
+        request->setWriteConcern( WriteConcernOptions::Acknowledged );
 
         return request;
     }
