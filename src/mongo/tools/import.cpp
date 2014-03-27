@@ -569,9 +569,8 @@ public:
         // the message is vague on lastErrorFailures as we don't call it on every single operation. 
         // so if we have a lastErrorFailure there might be more than just what has been counted.
         toolInfoLog() << (lastErrorFailures ? "tried to import " : "imported ")
-                      << (num - headerRows)
-                      << (((num - headerRows) == 1) ? " object" : " objects")
-                      << std::endl;
+                      << (num - headerRows) << " document"
+                      << (((num - headerRows) == 1) ? "" : "s") << std::endl;
 
         if ( !hadErrors )
             return 0;
