@@ -23,6 +23,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 	async = conn->async;
 	WT_STAT_FAST_CONN_INCR(conn->default_session, async_op_alloc);
 	*opp = NULL;
+	*opp = &async->flush_op;
 	return (0);
 }
 
@@ -169,6 +170,7 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	async = conn->async;
 	session = conn->default_session;
 	WT_STAT_FAST_CONN_INCR(session, async_flush);
+	fprintf(stderr, "Async flush called\n");
 	return (0);
 }
 
@@ -197,8 +199,14 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
 	WT_ERR(__wt_strdup(session, uri, &op->uri));
 	WT_ERR(__wt_strdup(session, config, &op->config));
-	op->uri_hash = __wt_hash_city64(uri, strlen(uri));
-	op->cfg_hash = __wt_hash_city64(config, strlen(config));
+	if (uri != NULL)
+		op->uri_hash = __wt_hash_city64(uri, strlen(uri));
+	else
+		op->uri_hash = 0;
+	if (config != NULL)
+		op->cfg_hash = __wt_hash_city64(config, strlen(config));
+	else
+		op->cfg_hash = 0;
 	op->cb = cb;
 
 	*opp = op;

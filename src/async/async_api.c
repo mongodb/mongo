@@ -139,11 +139,11 @@ __async_get_id(WT_ASYNC_OP *asyncop)
 }
 
 /*
- * __wt_async_op_init --
- *	Initialize all the op handles.
+ * __async_op_init --
+ *	Initialize all the op handle fields.
  */
-int
-__wt_async_op_init(WT_CONNECTION_IMPL *conn)
+static int
+__async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 {
 	static const WT_ASYNC_OP stds = {
 	    NULL, NULL, NULL,
@@ -157,17 +157,30 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	    __async_remove,		/* remove */
 	    __async_get_id		/* get-id */
 	};
+
+	op->iface = stds;
+	op->iface.connection = (WT_CONNECTION *)conn;
+	op->internal_id = id;
+	op->state = WT_ASYNCOP_FREE;
+	return (0);
+}
+/*
+ * __wt_async_op_init --
+ *	Initialize all the op handles.
+ */
+int
+__wt_async_op_init(WT_CONNECTION_IMPL *conn)
+{
 	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
 	uint32_t i;
 
 	async = conn->async;
+	op = &async->flush_op;
+	__async_op_init(conn, op, OPS_INVALID_INDEX);
 	for (i = 0; i < WT_ASYNC_MAX_OPS; i++) {
 		op = &async->async_ops[i];
-		op->iface = stds;
-		op->iface.connection = (WT_CONNECTION *)conn;
-		op->internal_id = i;
-		op->state = WT_ASYNCOP_FREE;
+		__async_op_init(conn, op, i);
 	}
 	return (0);
 }
