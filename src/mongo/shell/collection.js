@@ -206,7 +206,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
         if (options.ordered === undefined) {
             //do nothing, like above
         } else {
-            flags = options.ordered ? 1 : 0;
+            flags = options.ordered ? 0 : 1;
         }
         
         if (options.writeConcern)

@@ -66,7 +66,13 @@ if (!db.getMongo().useWriteCommands() ) {
     assert.eq(1, res.nRemoved, tojson(res));
 }
 
-assert.writeError(collA.insert([{_id:1}, {_id:1}], {ordered:true, writeConcern:{w:1}}));
-assert.writeError(collA.insert([{_id:1}, {_id:1}], {ordered:false, writeConcern:{w:1}}));
+// Test ordered write concern, and that the write concern isn't run/error.
+assert.writeOK(collA.insert({_id:1}));
 
+var res = assert.writeError(collA.insert([{_id:1}, {_id:1}], {ordered:true, writeConcern:{w:1}}));
+assert.eq(1, res.getWriteErrors().length, tojson(res));
+assert.eq(undefined, res.writeConcernErrors, tojson(res));
 
+var res = assert.writeError(collA.insert([{_id:1}, {_id:1}], {ordered:false, writeConcern:{w:1}}));
+assert.eq(2, res.getWriteErrors().length, tojson(res))
+assert.eq(undefined, res.writeConcernErrors, tojson(res))
