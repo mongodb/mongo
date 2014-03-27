@@ -837,6 +837,8 @@ suiteGlobalConfig = {"js": ("core/*.js", True),
                      "sslSpecial": ("sslSpecial/*.js", True),
                      "jsCore": ("core/*.js", True),
                      "gle": ("gle/*.js", True),
+                     "slow1": ("slow1/*.js", True),
+                     "slow2": ("slow2/*.js", True),
                      }
 
 def get_module_suites():
@@ -909,6 +911,8 @@ def expand_suites(suites,expandUseDB=True):
                                   'repl', 
                                   'auth', 
                                   'sharding', 
+                                  'slow1',
+                                  'slow2',
                                   'tool'],
                                  expandUseDB=expandUseDB)
         if suite == 'test':

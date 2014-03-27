@@ -88,6 +88,8 @@ if shellEnv is not None:
     addSmoketest( "smokeJsPerf", [ add_exe("mongo"), add_exe("mongod") ] )
     addSmoketest( "smokeNoPassthroughWithMongod", [add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ])
     addSmoketest( "smokeNoPassthrough", [add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ])
+    addSmoketest( "smokeSlow1", [add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ])
+    addSmoketest( "smokeSlow2", [add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ])
     addSmoketest( "smokeQuota", [ add_exe("mongo"), add_exe("mongod") ] )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), add_exe("mongos"), "tools" ] )
     addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] )
