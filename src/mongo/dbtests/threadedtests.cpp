@@ -829,13 +829,16 @@ namespace ThreadedTests {
         }
     };
 
-    class WriteLocksAreGreedy : public ThreadedTest<3> {
+    const int WriteLocksAreGreedy_ThreadCount = 3;
+    class WriteLocksAreGreedy : public ThreadedTest<WriteLocksAreGreedy_ThreadCount> {
     public:
-        WriteLocksAreGreedy() : m("gtest") {}
+        WriteLocksAreGreedy() : m("gtest"), _barrier(WriteLocksAreGreedy_ThreadCount) {}
     private:
         RWLock m;
+        boost::barrier _barrier;
         virtual void validate() { }
         virtual void subthread(int x) {
+            _barrier.wait();
             int Z = 0;
             Client::initThread("utest");
             if( x == 1 ) { 
@@ -863,11 +866,11 @@ namespace ThreadedTests {
         }
     };
 
-    const int ThreadTest_ThreadCount = 3;
-    class QLockTest : public ThreadedTest<ThreadTest_ThreadCount> {
+    const int QLockTest_ThreadCount = 3;
+    class QLockTest : public ThreadedTest<QLockTest_ThreadCount> {
     public:
         bool gotW;
-        QLockTest() : gotW(false), m(), _barrier(ThreadTest_ThreadCount) { }
+        QLockTest() : gotW(false), m(), _barrier(QLockTest_ThreadCount) { }
         void setup() {}
         ~QLockTest() {}
     private:
