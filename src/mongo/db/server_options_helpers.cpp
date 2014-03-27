@@ -212,7 +212,8 @@ namespace {
 
         options->addOptionChaining("httpinterface", "httpinterface", moe::Switch,
                 "enable http interface")
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("nohttpinterface");
 
         options->addOptionChaining("net.http.enabled", "", moe::Bool, "enable http interface")
                                   .setSources(moe::SourceYAMLConfig);
@@ -255,7 +256,8 @@ namespace {
         options->addOptionChaining("nohttpinterface", "nohttpinterface", moe::Switch,
                 "disable http interface")
                                   .hidden()
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("httpinterface");
 
         options->addOptionChaining("objcheck", "objcheck", moe::Switch,
                 "inspect client data for validity on receipt (DEFAULT)")
@@ -415,6 +417,29 @@ namespace {
             }
         }
 
+        // "net.http.enabled" comes from the config file, so override it if "nohttpinterface" or
+        // "httpinterface" are set since those come from the command line.
+        if (params->count("nohttpinterface")) {
+            Status ret = params->set("net.http.enabled", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nohttpinterface");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("httpinterface")) {
+            Status ret = params->set("net.http.enabled", moe::Value(true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("httpinterface");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
         return Status::OK();
     }
 
@@ -507,6 +532,10 @@ namespace {
 
         if (params.count("net.bindIp")) {
             serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
+        }
+
+        if (params.count("net.http.enabled")) {
+            serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
         }
 
         if (params.count("security.clusterAuthMode")) {

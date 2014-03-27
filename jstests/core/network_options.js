@@ -29,6 +29,7 @@ function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
     MongoRunner.stopMongod(mongod.port);
 }
 
+// Object Check
 jsTest.log("Testing \"objcheck\" command line option");
 var expectedResult = {
     "parsed" : {
@@ -60,7 +61,81 @@ expectedResult = {
 };
 testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_objcheck.json" }, expectedResult);
 
-jsTest.log("Testing with no explicit object check setting");
+jsTest.log("Testing with no explicit network option setting");
+expectedResult = {
+    "parsed" : {
+        "net" : { }
+    }
+};
+testGetCmdLineOpts({}, expectedResult);
+
+
+
+// HTTP Interface
+jsTest.log("Testing \"httpinterface\" command line option");
+var expectedResult = {
+    "parsed" : {
+        "net" : {
+            "http" : {
+                "enabled" : true
+            }
+        }
+    }
+};
+testGetCmdLineOpts({ httpinterface : "" }, expectedResult);
+
+jsTest.log("Testing \"nohttpinterface\" command line option");
+expectedResult = {
+    "parsed" : {
+        "net" : {
+            "http" : {
+                "enabled" : false
+            }
+        }
+    }
+};
+testGetCmdLineOpts({ nohttpinterface : "" }, expectedResult);
+
+jsTest.log("Testing implicit enabling of http interface with \"jsonp\" command line option");
+expectedResult = {
+    "parsed" : {
+        "net" : {
+            "http" : {
+                "JSONPEnabled" : true,
+                "enabled" : true
+            }
+        }
+    }
+};
+testGetCmdLineOpts({ jsonp : "" }, expectedResult);
+
+jsTest.log("Testing implicit enabling of http interface with \"rest\" command line option");
+expectedResult = {
+    "parsed" : {
+        "net" : {
+            "http" : {
+                "RESTInterfaceEnabled" : true,
+                "enabled" : true
+            }
+        }
+    }
+};
+testGetCmdLineOpts({ rest : "" }, expectedResult);
+
+jsTest.log("Testing \"net.http.enabled\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/enable_httpinterface.json",
+        "net" : {
+            "http" : {
+                "enabled" : true
+            }
+        }
+    }
+};
+testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_httpinterface.json" }, expectedResult);
+
+jsTest.log("Testing with no explicit network option setting");
 expectedResult = {
     "parsed" : {
         "net" : { }
