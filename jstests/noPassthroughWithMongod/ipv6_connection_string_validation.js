@@ -14,7 +14,7 @@ if ("undefined" == typeof inner_mode) {
     var mongod = startMongod( "--port", port, "--ipv6", "--dbpath", MongoRunner.dataPath + baseName );
     var args = [ "mongo", "--nodb", "--ipv6",
                  "--eval", "inner_mode=true;port=" + port + ";",
-                 "jstests/slowNightly/ipv6_connection_string_validation.js" ];
+                 "jstests/noPassthroughWithMongod/ipv6_connection_string_validation.js" ];
 
     // Start another shell running this test in "inner" mode
     jsTest.log("Outer mode test starting inner mode test");
