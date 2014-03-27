@@ -440,6 +440,19 @@ namespace {
             }
         }
 
+        // "net.unixDomainSocket.enabled" comes from the config file, so override it if
+        // "nounixsocket" is set since that comes from the command line.
+        if (params->count("nounixsocket")) {
+            Status ret = params->set("net.unixDomainSocket.enabled", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nounixsocket");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
         return Status::OK();
     }
 
@@ -599,14 +612,8 @@ namespace {
             serverGlobalParams.socket = params["net.unixDomainSocket.pathPrefix"].as<string>();
         }
 
-        // --nounixsocket is checked after this since net.unixDomainSocket.enabled is from the
-        // config file and the command line should override the config file
         if (params.count("net.unixDomainSocket.enabled")) {
             serverGlobalParams.noUnixSocket = !params["net.unixDomainSocket.enabled"].as<bool>();
-        }
-
-        if (params.count("nounixsocket")) {
-            serverGlobalParams.noUnixSocket = true;
         }
 
         if (params.count("processManagement.fork") && !params.count("shutdown")) {
