@@ -142,10 +142,11 @@ namespace optionenvironment {
             template <typename T>
             Status get(const Key& key, T* value_contents) const;
 
-            /** Runs all registered Constraints and returns the result.  On success, marks this as a
-             *  valid Environment so that any modifications will re run all Constraints
+            /** Runs all registered Constraints and returns the result.  If "setValid" is true and
+             * validation succeeds, marks this as a valid Environment so that any modifications will
+             * re run all Constraints
              */
-            Status validate();
+            Status validate(bool setValid=true);
 
             /** Sets all variables in the given Environment in this Environment.  Does not add
              *  Constraints
