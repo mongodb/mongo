@@ -118,6 +118,12 @@ namespace optionenvironment {
              */
             Status set(const Key& key, const Value& value);
 
+            /** Remove the Value from this Environment with the given Key.  If "validate" has
+             * already been called on this Environment, runs all Constraints on the new Environment.
+             * If any of the Constraints fail, reverts to the old Environment and returns an error
+             */
+            Status remove(const Key& key);
+
             /** Add a default Value to this Environment with the given Key.  Fails if validate has
              *  already been called on our environment.  The get functions will return the default
              *  if one exists and the value has not been explicitly set.

@@ -465,6 +465,71 @@ namespace mongo {
         return true;
     }
 
+    Status validateMongodOptions(const moe::Environment& params) {
+        if ((params.count("nodur") || params.count("nojournal")) &&
+            (params.count("dur") || params.count("journal"))) {
+            return Status(ErrorCodes::BadValue,
+                          "Can't specify both --journal and --nojournal options.");
+        }
+
+        return Status::OK();
+    }
+
+    Status canonicalizeMongodOptions(moe::Environment* params) {
+
+        // "storage.journal.enabled" comes from the config file, so override it if any of "journal",
+        // "nojournal", "dur", and "nodur" are set, since those come from the command line.
+        if (params->count("nodur") || params->count("nojournal")) {
+            Status ret = params->set("storage.journal.enabled", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nodur");
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nojournal");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        if (params->count("dur") || params->count("journal")) {
+            Status ret = params->set("storage.journal.enabled", moe::Value(true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("dur");
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("journal");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "storage.journal.durOptions" comes from the config file, so override it if "durOptions"
+        // is set since that comes from the command line.
+        if (params->count("durOptions")) {
+            int durOptions;
+            Status ret = params->get("durOptions", &durOptions);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->set("storage.journal.debugFlags", moe::Value(durOptions));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("durOptions");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        return Status::OK();
+    }
+
     Status storeMongodOptions(const moe::Environment& params,
                               const std::vector<std::string>& args) {
 
@@ -547,29 +612,11 @@ namespace mongo {
             storageGlobalParams.quota = true;
             storageGlobalParams.quotaFiles = params["storage.quota.maxFilesPerDB"].as<int>() - 1;
         }
-        if ((params.count("nodur") || params.count("nojournal")) &&
-            (params.count("dur") || params.count("journal"))) {
-            return Status(ErrorCodes::BadValue,
-                          "Can't specify both --journal and --nojournal options.");
-        }
 
-        // "storage.journal.enabled" comes from the config file, so check it before we check
-        // "journal", "nojournal", "dur", and "nodur", since those come from the command line.
         if (params.count("storage.journal.enabled")) {
             storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
         }
 
-        if (params.count("nodur") || params.count("nojournal")) {
-            storageGlobalParams.dur = false;
-        }
-
-        if (params.count("dur") || params.count("journal")) {
-            storageGlobalParams.dur = true;
-        }
-
-        if (params.count("durOptions")) {
-            storageGlobalParams.durOptions = params["durOptions"].as<int>();
-        }
         if (params.count("storage.journal.commitIntervalMs")) {
             // don't check if dur is false here as many will just use the default, and will default
             // to off on win32.  ie no point making life a little more complex by giving an error on
@@ -677,9 +724,10 @@ namespace mongo {
             _diaglog.setLevel(x);
         }
 
-        if ((params.count("dur") || params.count("journal")) && params.count("repair")) {
+        if ((params.count("storage.journal.enabled") &&
+             params["storage.journal.enabled"].as<bool>() == true) && params.count("repair")) {
             return Status(ErrorCodes::BadValue,
-                          "Can't specify both --journal and --repair options.");
+                          "Can't have journaling enabled when using --repair option.");
         }
 
         if (params.count("repair")) {
@@ -836,10 +884,9 @@ namespace mongo {
 
             // If we haven't explicitly specified a journal option, default journaling to true for
             // the config server role
-            if (!params.count("nodur") &&
-                !params.count("nojournal") &&
-                !params.count("storage.journal.enabled"))
+            if (!params.count("storage.journal.enabled")) {
                 storageGlobalParams.dur = true;
+            }
 
             if (!params.count("storage.dbPath"))
                 storageGlobalParams.dbpath = "/data/configdb";
@@ -917,10 +964,7 @@ namespace mongo {
             log() << "--pretouch " << replSettings.pretouch << endl;
 
         // Check if we are 32 bit and have not explicitly specified any journaling options
-        if (sizeof(void*) == 4 &&
-            !(params.count("nodur") || params.count("nojournal") ||
-              params.count("dur") || params.count("journal") ||
-              params.count("storage.journal.enabled"))) {
+        if (sizeof(void*) == 4 && !params.count("storage.journal.enabled")) {
             // trying to make this stand out more like startup warnings
             log() << endl;
             warning() << "32-bit servers don't have journaling enabled by default. "

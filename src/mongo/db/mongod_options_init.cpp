@@ -44,6 +44,14 @@ namespace mongo {
         if (!ret.isOK()) {
             return ret;
         }
+        ret = validateMongodOptions(moe::startupOptionsParsed);
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = canonicalizeMongodOptions(&moe::startupOptionsParsed);
+        if (!ret.isOK()) {
+            return ret;
+        }
         return Status::OK();
     }
 
