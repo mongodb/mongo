@@ -352,8 +352,8 @@ namespace mongo {
                   << "' lacks a unique index on _id."
                   << " This index is needed for replication to function properly"
                   << startupWarningsLog;
-            log() << "\t To fix this, on the primary run 'db." << i->substr(i->find('.')+1)
-                  << ".createIndex({_id: 1}, {unique: true})'"
+            log() << "\t To fix this, you need to create a unique index on _id."
+                  << " See http://dochub.mongodb.org/core/build-replica-set-indexes"
                   << startupWarningsLog;
         }
     }
