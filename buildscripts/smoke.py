@@ -442,9 +442,9 @@ def skipTest(path):
 
     return False
 
-forceCommandsForSuite = ["aggregation", "replsets", "parallel", "core", "auth"]
+forceCommandsForDirs = ["aggregation", "auth", "core", "parallel", "replsets"]
 # look for jstests and one of the above suites separated by either posix or windows slashes
-forceCommandsRE = re.compile(r"jstests[/\\](%s)" % ('|'.join(forceCommandsForSuite)))
+forceCommandsRE = re.compile(r"jstests[/\\](%s)" % ('|'.join(forceCommandsForDirs)))
 def setShellWriteModeForTest(path, argv):
     swm = shell_write_mode
     if swm == "legacy": # change when the default changes to "commands"
@@ -902,7 +902,7 @@ def expand_suites(suites,expandUseDB=True):
         if suite == 'all':
             return expand_suites(['test', 
                                   'perf', 
-                                  'js', 
+                                  'jsCore', 
                                   'jsPerf', 
                                   'noPassthroughWithMongod', 
                                   'noPassthrough', 
