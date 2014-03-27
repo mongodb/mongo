@@ -184,10 +184,42 @@ namespace mongo {
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type || STAGE_TEXT == type ||
-            STAGE_GEO_NEAR_2DSPHERE == type) {
-            return true;
+        const MatchExpression::MatchType exprType = expr->matchType();
+
+        //
+        // First handle special solution tree leaf types. In general, normal index bounds
+        // building is not used for special leaf types, and hence we cannot merge leaves.
+        //
+        // This rule is always true for OR, but there are exceptions for AND.
+        // Specifically, we can often merge a predicate with a special leaf type
+        // by adding a filter to the special leaf type.
+        //
+
+        if (STAGE_GEO_2D == type) {
+            // Don't merge GEO with a geo leaf. Instead, we will generate an AND_HASH solution
+            // with two separate leaves.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::GEO != exprType;
         }
+
+        if (STAGE_TEXT == type) {
+            // Currently only one text predicate is allowed, but to be safe, make sure that we
+            // do not try to merge two text predicates.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::TEXT != exprType;
+        }
+
+        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+            // Currently only one GEO_NEAR is allowed, but to be safe, make sure that we
+            // do not try to merge two GEO_NEAR predicates.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::GEO_NEAR != exprType;
+        }
+
+        //
+        // If we're here, then we're done checking for special leaf nodes, and the leaf
+        // must be a regular index scan.
+        //
 
         invariant(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);

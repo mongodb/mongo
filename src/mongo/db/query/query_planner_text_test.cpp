@@ -553,4 +553,14 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");
     }
 
+    TEST_F(QueryPlannerTest, AndTextWithGeoNonNear) {
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$text: {$search: 'foo'}, a: {$geoIntersects: {$geometry: "
+                            "{type: 'Point', coordinates: [3.0, 1.0]}}}}"));
+
+        // Mandatory text index is used, and geo predicate becomes a filter.
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {text: {search: 'foo'}}}}");
+    }
+
 }  // namespace

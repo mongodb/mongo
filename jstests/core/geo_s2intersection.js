@@ -139,3 +139,26 @@ testPoint = {type: "Point",
 result = t.find({geo: {$geoIntersects: {$geometry: testPoint}}});
 assert.eq(result.count(), 1);
 assert.eq(result[0]['name'], 'canonPoly');
+
+// Case 12: Make sure that we properly handle and $and of two
+// $geoIntersects predicates.
+t.drop();
+t.ensureIndex({a: "2dsphere"});
+t.insert({a: {type: "Polygon", coordinates: [[[0,0], [3,6], [6,0], [0,0]]]}});
+
+var firstPoint = {$geometry: {type: "Point", coordinates: [3.0, 1.0]}};
+var secondPoint = {$geometry: {type: "Point", coordinates: [4.0, 1.0]}};
+
+// First point should intersect with the polygon.
+result = t.find({a: {$geoIntersects: firstPoint}});
+assert.eq(result.count(), 1);
+
+// Second point also intersects with the polygon.
+result = t.find({a: {$geoIntersects: secondPoint}});
+assert.eq(result.count(), 1);
+
+// Both points intersect with the polygon, so the $and of
+// two $geoIntersects should as well.
+result = t.find({$and: [{a: {$geoIntersects: firstPoint}},
+                        {a: {$geoIntersects: secondPoint}}]});
+assert.eq(result.count(), 1);
