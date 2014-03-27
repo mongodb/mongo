@@ -1,13 +1,14 @@
 // Test $text explain.  SERVER-12037.
 
 var coll = db.fts_explain;
+var res;
 
 coll.drop();
-coll.ensureIndex({content: "text"}, {default_language: "none"});
-assert.gleSuccess(db);
+res = coll.ensureIndex({content: "text"}, {default_language: "none"});
+assert.commandWorked(res);
 
-coll.insert({content: "some data"});
-assert.gleSuccess(db);
+res = coll.insert({content: "some data"});
+assert.writeOK(res);
 
 var explain = coll.find({$text:{$search: "\"a\" -b -\"c\""}}).explain(true);
 assert.eq(explain.cursor, "TextCursor");

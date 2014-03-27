@@ -8,68 +8,69 @@ coll.drop();
 // Index build should fail for invalid values of "2dsphereIndexVersion".
 //
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": -1});
-assert.gleError(db);
+var res;
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": -1});
+assert.commandFailed(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 0});
-assert.gleError(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 0});
+assert.commandFailed(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 3});
-assert.gleError(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 3});
+assert.commandFailed(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": Infinity});
-assert.gleError(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": Infinity});
+assert.commandFailed(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": "foo"});
-assert.gleError(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": "foo"});
+assert.commandFailed(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": {a: 1}});
-assert.gleError(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": {a: 1}});
+assert.commandFailed(res);
 coll.drop();
 
 //
 // Index build should succeed for valid values of "2dsphereIndexVersion".
 //
 
-coll.ensureIndex({geo: "2dsphere"});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"});
+assert.commandWorked(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
+assert.commandWorked(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(1)});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(1)});
+assert.commandWorked(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(1)});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(1)});
+assert.commandWorked(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
+assert.commandWorked(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(2)});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(2)});
+assert.commandWorked(res);
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(2)});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(2)});
+assert.commandWorked(res);
 coll.drop();
 
 //
 // {2dsphereIndexVersion: 2} should be the default for new indexes.
 //
 
-coll.ensureIndex({geo: "2dsphere"});
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"});
+assert.commandWorked(res);
 var specObj = coll.getDB().system.indexes.findOne({ns: coll.getFullName(), name: "geo_2dsphere"});
 assert.eq(2, specObj["2dsphereIndexVersion"]);
 coll.drop();
@@ -112,39 +113,39 @@ var geometryCollectionDoc = {geo: {type: "GeometryCollection",
                                                                 [-73.97036, 40.76811]]]}]}};
 
 // {2dsphereIndexVersion: 2} indexes allow all supported GeoJSON objects.
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
-assert.gleSuccess(db);
-coll.insert(pointDoc);
-assert.gleSuccess(db);
-coll.insert(lineStringDoc);
-assert.gleSuccess(db);
-coll.insert(polygonDoc);
-assert.gleSuccess(db);
-coll.insert(multiPointDoc);
-assert.gleSuccess(db);
-coll.insert(multiLineStringDoc);
-assert.gleSuccess(db);
-coll.insert(multiPolygonDoc);
-assert.gleSuccess(db);
-coll.insert(geometryCollectionDoc);
-assert.gleSuccess(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
+assert.commandWorked(res);
+res = coll.insert(pointDoc);
+assert.writeOK(res);
+res = coll.insert(lineStringDoc);
+assert.writeOK(res);
+res = coll.insert(polygonDoc);
+assert.writeOK(res);
+res = coll.insert(multiPointDoc);
+assert.writeOK(res);
+res = coll.insert(multiLineStringDoc);
+assert.writeOK(res);
+res = coll.insert(multiPolygonDoc);
+assert.writeOK(res);
+res = coll.insert(geometryCollectionDoc);
+assert.writeOK(res);
 coll.drop();
 
 // {2dsphereIndexVersion: 1} indexes allow only Point, LineString, and Polygon.
-coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
-assert.gleSuccess(db);
-coll.insert(pointDoc);
-assert.gleSuccess(db);
-coll.insert(lineStringDoc);
-assert.gleSuccess(db);
-coll.insert(polygonDoc);
-assert.gleSuccess(db);
-coll.insert(multiPointDoc);
-assert.gleError(db);
-coll.insert(multiLineStringDoc);
-assert.gleError(db);
-coll.insert(multiPolygonDoc);
-assert.gleError(db);
-coll.insert(geometryCollectionDoc);
-assert.gleError(db);
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
+assert.commandWorked(res);
+res = coll.insert(pointDoc);
+assert.writeOK(res);
+res = coll.insert(lineStringDoc);
+assert.writeOK(res);
+res = coll.insert(polygonDoc);
+assert.writeOK(res);
+res = coll.insert(multiPointDoc);
+assert.writeError(res);
+res = coll.insert(multiLineStringDoc);
+assert.writeError(res);
+res = coll.insert(multiPolygonDoc);
+assert.writeError(res);
+res = coll.insert(geometryCollectionDoc);
+assert.writeError(res);
 coll.drop();
