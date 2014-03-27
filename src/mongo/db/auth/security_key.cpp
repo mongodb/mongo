@@ -62,7 +62,7 @@ namespace mongo {
  
     bool authenticateInternalUser(DBClientWithCommands* conn){
         if (!isInternalAuthSet()) {
-            log() << "ERROR: No authentication params set for internal user" << endl;
+            log() << "ERROR: No authentication parameters set for internal user" << endl;
             return false;
         }
         try { 
