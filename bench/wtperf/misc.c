@@ -40,94 +40,35 @@ enomem(const CONFIG *cfg)
 	return (ENOMEM);
 }
 
-/*
- * setup_path --
- *	Open a file in the monitor directory.
- */
-int
-setup_path(CONFIG *cfg, const char *suffix, FILE **fpp)
-{
-	FILE *fp;
-	size_t len;
-	int ret;
-	char *name;
-
-	*fpp = NULL;
-
-	len = strlen(cfg->monitor_dir) + strlen("/") +
-	    strlen(cfg->table_name) + strlen(".") + strlen(suffix) + 1;
-	if ((name = calloc(len, 1)) == NULL)
-		return (enomem(cfg));
-
-	snprintf(
-	    name, len, "%s/%s.%s", cfg->monitor_dir, cfg->table_name, suffix);
-	if ((fp = fopen(name, "a")) == NULL) {
-		ret = errno;
-		fprintf(stderr, "%s: %s\n", name, strerror(ret));
-	}
-	free(name);
-	if (fp == NULL)
-		return (ret);
-
-	/* Configure line buffering for the file. */
-	(void)setvbuf(fp, NULL, _IOLBF, 0);
-	*fpp = fp;
-
-	return (0);
-}
-
 /* Setup the logging output mechanism. */
 int
 setup_log_file(CONFIG *cfg)
 {
+	int ret;
+	char *fname;
+
+	ret = 0;
+
 	if (cfg->verbose < 1)
 		return (0);
 
-	return (setup_path(cfg, "stat", &cfg->logf));
-}
+	if ((fname = calloc(strlen(cfg->monitor_dir) +
+	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL)
+		return (enomem(cfg));
 
-/*
- * conn_stats_print --
- *	Dump out the final connection statistics from the run.
- */
-void
-conn_stats_print(CONFIG *cfg)
-{
-	static int report;
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	WT_CURSOR *cursor;
-	FILE *fp;
-	uint64_t v;
-	int ret;
-	char buf[64];
-	const char *pval, *desc;
-
-	snprintf(buf, sizeof(buf), "pstat.%d", ++report);
-	if (setup_path(cfg, buf, &fp) != 0)
-		return;
-
-	conn = cfg->conn;
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		lprintf(cfg, ret, 0, "statistics: WT_CONNECTION.open_session");
-		return;
+	sprintf(fname, "%s/%s.stat", cfg->monitor_dir, cfg->table_name);
+	cfg->logf = fopen(fname, "w");
+	if (cfg->logf == NULL) {
+		ret = errno;
+		fprintf(stderr, "%s: %s\n", fname, strerror(ret));
 	}
-	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, NULL, &cursor)) != 0 && ret != EINVAL)
-		lprintf(cfg, ret, 0, "statistics: WT_SESSION.open_cursor");
-	if (ret != 0)
-		return;
+	free(fname);
+	if (cfg->logf == NULL)
+		return (ret);
 
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
-			lprintf(cfg, errno, 0, "fprintf");
-			break;
-		}
-	if (ret != WT_NOTFOUND)
-		lprintf(cfg, ret, 0, "WT_CURSOR.next");
-
-	(void)session->close(session, NULL);
+	/* Use line buffering for the log file. */
+	(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
+	return (0);
 }
 
 /*

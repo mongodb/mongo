@@ -1008,9 +1008,6 @@ err:
 			return (ret);
 	}
 
-	/* Dump the run's connection statistics. */
-	conn_stats_print(cfg);
-
 	/*
 	 * Reopen the connection.  We do this so that the workload phase always
 	 * starts with the on-disk files, and so that read-only workloads can

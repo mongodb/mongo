@@ -217,7 +217,6 @@ int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
-void	 conn_stats_print(CONFIG *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
@@ -226,7 +225,6 @@ int	 enomem(const CONFIG *);
 void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 	   WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 int	 setup_log_file(CONFIG *);
-int	 setup_path(CONFIG *, const char *, FILE **);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);
