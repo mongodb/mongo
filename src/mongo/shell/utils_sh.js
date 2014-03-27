@@ -7,7 +7,7 @@ sh._checkMongos = function() {
 }
 
 sh._checkFullName = function( fullName ) {
-    assert( fullName , "neeed a full name" )
+    assert( fullName , "need a full name" )
     assert( fullName.indexOf( "." ) > 0 , "name needs to be fully qualified <db>.<collection>'" )
 }
 
