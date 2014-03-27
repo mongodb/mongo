@@ -70,7 +70,7 @@ namespace mongo {
             Database* db = cc().database();
             Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
             if (NULL == collection) {
-                warning() << "Can't ixscan null ns " << qsol.ns << endl;
+                warning() << "Can't ixscan null namespace " << qsol.ns << endl;
                 return NULL;
             }
 
@@ -78,8 +78,8 @@ namespace mongo {
 
             params.descriptor = collection->getIndexCatalog()->findIndexByKeyPattern( ixn->indexKeyPattern );
             if ( params.descriptor == NULL ) {
-                warning() << "Can't find idx " << ixn->indexKeyPattern.toString()
-                          << "in ns " << qsol.ns << endl;
+                warning() << "Can't find index " << ixn->indexKeyPattern.toString()
+                          << "in namespace " << qsol.ns << endl;
                 return NULL;
             }
 
@@ -223,13 +223,13 @@ namespace mongo {
             Database* db = cc().database();
             Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
             if (NULL == collection) {
-                warning() << "null collection for text?";
+                warning() << "Null collection for text";
                 return NULL;
             }
             vector<IndexDescriptor*> idxMatches;
             collection->getIndexCatalog()->findIndexByType("text", idxMatches);
             if (1 != idxMatches.size()) {
-                warning() << "no text idx, or more than one text idx?";
+                warning() << "No text index, or more than one text index";
                 return NULL;
             }
             IndexDescriptor* index = idxMatches[0];
@@ -248,7 +248,7 @@ namespace mongo {
 
             Status parseStatus = params.query.parse(node->query, language);
             if (!parseStatus.isOK()) {
-                warning() << "cant parse fts query";
+                warning() << "Can't parse text search query";
                 return NULL;
             }
 
@@ -272,7 +272,7 @@ namespace mongo {
             Database* db = cc().database();
             Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
             if (NULL == collection) {
-                warning() << "Can't distinct-scan null ns " << qsol.ns << endl;
+                warning() << "Can't distinct-scan null namespace " << qsol.ns << endl;
                 return NULL;
             }
 
@@ -290,13 +290,13 @@ namespace mongo {
 
             Database* db = cc().database();
             if (NULL == db) {
-                warning() << "Can't fast-count null ns (db null)" << qsol.ns << endl;
+                warning() << "Can't fast-count null namespace (database null)" << qsol.ns << endl;
                 return NULL;
             }
 
             Collection* collection = db ? db->getCollection(qsol.ns) : NULL;
             if (NULL == collection) {
-                warning() << "Can't fast-count null ns (coll null)" << qsol.ns << endl;
+                warning() << "Can't fast-count null namespace (collection null)" << qsol.ns << endl;
                 return NULL;
             }
 
@@ -315,7 +315,7 @@ namespace mongo {
             mongoutils::str::stream ss;
             root->appendToString(&ss, 0);
             string nodeStr(ss);
-            warning() << "Could not build exec tree for node " << nodeStr << endl;
+            warning() << "Can't build exec tree for node " << nodeStr << endl;
             return NULL;
         }
     }
