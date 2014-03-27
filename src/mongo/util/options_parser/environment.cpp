@@ -153,7 +153,7 @@ namespace optionenvironment {
     /** Validate the Environment by iterating over all our constraints and calling them on our
      *  Environment
      */
-    Status Environment::validate() {
+    Status Environment::validate(bool setValid) {
 
         // 1. Iterate and check all KeyConstraints
         typedef std::vector<KeyConstraint*>::iterator it_keyConstraint;
@@ -175,8 +175,10 @@ namespace optionenvironment {
             }
         }
 
-        // 3. Our Environment is now valid.  Record this and return success
-        valid = true;
+        // 3. Our Environment is now valid.  Record this if we should and return success
+        if (setValid) {
+            valid = true;
+        }
         return Status::OK();
     }
 
