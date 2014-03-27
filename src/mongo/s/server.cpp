@@ -324,11 +324,9 @@ static bool runMongosServer( bool doUpgrade ) {
 
     // set some global state
 
+    // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     pool.addHook( new ShardingConnectionHook( false ) );
-    pool.setName( "mongos connectionpool" );
-
     shardConnectionPool.addHook( new ShardingConnectionHook( true ) );
-    shardConnectionPool.setName( "mongos shardconnection connectionpool" );
 
     // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
     DBClientConnection::setLazyKillCursor( false );

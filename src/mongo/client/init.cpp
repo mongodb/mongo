@@ -20,6 +20,7 @@
 #include <cstdlib>
 
 #include "mongo/base/initializer.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/util/background.h"
 
@@ -46,6 +47,10 @@ namespace client {
         Status result = runGlobalInitializers(0, NULL, NULL);
         if (!result.isOK())
             return result;
+
+        // Setup default pool parameters
+        mongo::pool.setName("connection pool");
+        mongo::pool.setMaxPoolSize(50);
 
         PeriodicTask::startRunningPeriodicTasks();
 
