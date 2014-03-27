@@ -282,10 +282,9 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
-extern void __wt_free_ref_array(WT_SESSION_IMPL *session,
+extern void __wt_free_ref_index(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    WT_REF *refarg,
-    uint32_t entries,
+    WT_PAGE_INDEX *pindex_arg,
     int free_pages);
 extern void __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
@@ -349,7 +348,7 @@ extern int __wt_page_alloc(WT_SESSION_IMPL *session,
     uint8_t type,
     uint64_t recno,
     uint32_t alloc_entries,
-    int alloc_ref,
+    int alloc_refs,
     WT_PAGE **pagep);
 extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
@@ -396,10 +395,10 @@ extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
     int exclusive);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
+    WT_PAGE *orig,
     WT_MULTI *multi,
-    WT_REF *refarg,
-    uint32_t entries);
+    WT_REF **refp,
+    size_t *incrp);
 extern int __wt_split_evict( WT_SESSION_IMPL *session,
     WT_REF *parent_ref,
     WT_PAGE *page,

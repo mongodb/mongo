@@ -1069,7 +1069,7 @@ __slvg_col_build_internal(
 	WT_ADDR *addr;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_REF *ref;
+	WT_REF *ref,**refp;
 	WT_TRACK *trk;
 	uint32_t i;
 
@@ -1081,7 +1081,10 @@ __slvg_col_build_internal(
 	page->parent = NULL;				/* Root page */
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (ref = page->pg_intl_orig_index, i = 0; i < ss->pages_next; ++i) {
+	for (refp =
+	    page->pg_intl_index->index, i = 0; i < ss->pages_next; ++i) {
+		ref = *refp++;
+
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
@@ -1651,7 +1654,7 @@ __slvg_row_build_internal(
 	WT_ADDR *addr;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_REF *ref;
+	WT_REF *ref, **refp;
 	WT_TRACK *trk;
 	uint32_t i;
 
@@ -1663,7 +1666,10 @@ __slvg_row_build_internal(
 	page->parent = NULL;
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (ref = page->pg_intl_orig_index, i = 0; i < ss->pages_next; ++i) {
+	for (refp =
+	    page->pg_intl_index->index, i = 0; i < ss->pages_next; ++i) {
+		ref = *refp++;
+
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 

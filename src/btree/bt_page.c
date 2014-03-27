@@ -128,50 +128,45 @@ __wt_page_in_func(
  */
 int
 __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
-    uint64_t recno, uint32_t alloc_entries, int alloc_ref, WT_PAGE **pagep)
+    uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_REF **refp;
-	uint32_t i;
+	WT_PAGE_INDEX *pindex;
 	size_t size;
-	void *p, *t;
+	uint32_t i;
+	void *p;
 
 	*pagep = NULL;
 
 	cache = S2C(session)->cache;
+	page = NULL;
 
-	/*
-	 * Allocate a page, and for most page types, the additional memory it
-	 * needs to describe the disk image.
-	 */
 	size = sizeof(WT_PAGE);
 	switch (type) {
 	case WT_PAGE_COL_FIX:
-		/*
-		 * The exception is fixed-length column-store, where we don't
-		 * describe the disk image, it's too expensive at N bits per
-		 * item.  Ignore the passed-in value, other than setting the
-		 * number of items on the page.
-		 */
-		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		if (alloc_ref)
-			size += alloc_entries * sizeof(WT_REF);
 		break;
 	case WT_PAGE_COL_VAR:
+		/*
+		 * Variable-length column-store leaf page: allocate memory to
+		 * describe the page's contents with the initial allocation.
+		 */
 		size += alloc_entries * sizeof(WT_COL);
 		break;
 	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Row-store leaf page: allocate memory to describe the page's
+		 * contents with the initial allocation.
+		 */
 		size += alloc_entries * sizeof(WT_ROW);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 
 	WT_RET(__wt_calloc(session, 1, size, &page));
-	p = (uint8_t *)page + sizeof(WT_PAGE);
 
 	page->type = type;
 	page->read_gen = WT_READGEN_NOTSET;
@@ -182,47 +177,49 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
 		page->pg_fix_entries = alloc_entries;
 		break;
 	case WT_PAGE_COL_INT:
-		page->pg_intl_recno = recno;
-		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
+		page->pg_intl_recno = recno;
+
 		/*
-		 * Internal pages have an array of references to WT_REF objects
-		 * so they can split, and in most cases, pages being allocated
-		 * have an array of WT_REF objects (the exception is an internal
-		 * page being created to deepen the tree).  Allocate the array
-		 * of references in all cases, and optionally initialize that
-		 * array to point to the initial WT_REF object array (note the
-		 * WT_REF object array isn't yet initialized, that will be done
-		 * when our caller reads through the storage image).
+		 * Internal pages have an array of references to objects so they
+		 * can split.  Allocate the array of references and optionally,
+		 * the objects to which they point.
 		 */
-		if ((ret = __wt_calloc(session, 1,
+		WT_ERR(__wt_calloc(session, 1,
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *),
-		    &t)) != 0) {
-			__wt_free(session, page);
-			return (ret);
-		}
+		    &p));
 		size +=
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *);
-		page->pg_intl_index = t;
-		page->pg_intl_index->entries = alloc_entries;
+		page->pg_intl_index = p;
 		page->pg_intl_index->index =
-		    (WT_REF **)((WT_PAGE_INDEX *)t + 1);
-		if (alloc_ref) {
-			page->pg_intl_orig_index = p;
-			page->pg_intl_orig_entries = alloc_entries;
-			for (i = 0, refp =
-			    page->pg_intl_index->index; i < alloc_entries; ++i)
-				*refp++ = &page->pg_intl_orig_index[i];
+		    (WT_REF **)((WT_PAGE_INDEX *)p + 1);
+		page->pg_intl_index->entries = alloc_entries;
+		if (alloc_refs)
+			for (pindex = page->pg_intl_index, i = 0;
+			    i < page->pg_intl_index->entries; ++i) {
+				WT_ERR(__wt_calloc_def(
+				    session, 1, &pindex->index[i]));
+				size += sizeof(WT_REF);
+			}
+		if (0) {
+err:			if (page->pg_intl_index != NULL) {
+				for (pindex = page->pg_intl_index, i = 0;
+				    i < page->pg_intl_index->entries; ++i)
+					__wt_free(session, pindex->index[i]);
+				__wt_free(session, page->pg_intl_index);
+			}
+			__wt_free(session, page);
+			return (ret);
 		}
 		break;
 	case WT_PAGE_COL_VAR:
 		page->pg_var_recno = recno;
-		page->pg_var_d = p;
+		page->pg_var_d = (WT_COL *)((uint8_t *)page + sizeof(WT_PAGE));
 		page->pg_var_entries = alloc_entries;
 		break;
 	case WT_PAGE_ROW_LEAF:
+		page->pg_row_d = (WT_ROW *)((uint8_t *)page + sizeof(WT_PAGE));
 		page->pg_row_entries = alloc_entries;
-		page->pg_row_d = p;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -370,7 +367,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_HEADER *dsk;
-	WT_REF *ref;
+	WT_REF **refp, *ref;
 	uint32_t i;
 
 	btree = S2BT(session);
@@ -381,12 +378,13 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Walk the page, building references: the page contains value items.
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
-	ref = page->pg_intl_orig_index;
+	refp = page->pg_intl_index->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+		ref = *refp++;
+
 		__wt_cell_unpack(cell, unpack);
 		ref->addr = cell;
 		ref->key.recno = unpack->v;
-		++ref;
 	}
 }
 
@@ -497,7 +495,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_DECL_ITEM(current);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
-	WT_REF *ref;
+	WT_REF *ref, **refp;
 	uint32_t i;
 
 	btree = S2BT(session);
@@ -511,8 +509,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * location cookie pairs.  Keys are on-page/overflow items and location
 	 * cookies are WT_CELL_ADDR_XXX items.
 	 */
-	ref = page->pg_intl_orig_index;
+	refp = page->pg_intl_index->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+		ref = *refp;
+
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
@@ -527,7 +527,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, page->type, unpack, current));
 
-			WT_ERR(__wt_row_ikey(session,
+			WT_ERR(__wt_row_ikey_incr(session, page,
 			    WT_PAGE_DISK_OFFSET(page, cell),
 			    current->data, current->size, &ref->key.ikey));
 
@@ -569,8 +569,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 					__wt_page_modify_set(session, page);
 				}
 			}
-
-			++ref;
+			++refp;
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
