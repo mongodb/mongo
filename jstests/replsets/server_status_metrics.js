@@ -60,15 +60,15 @@ var startNum = testDB.serverStatus().metrics.getLastError.wtime.num
 
 printjson(primary.getDB("test").serverStatus().metrics);
 
-assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 1, wtimeout: 50 }}));
+assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 1, wtimeout: 5000 }}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: -11, wtimeout: 50 }}));
+assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: -11, wtimeout: 5000 }}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 2, wtimeout: 50 }}));
+assert.writeOK(testDB.a.insert({ x: 1 }, { writeConcern: { w: 2, wtimeout: 5000 }}));
 assert(testDB.serverStatus().metrics.getLastError.wtime.totalMillis >= startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 1);
 
