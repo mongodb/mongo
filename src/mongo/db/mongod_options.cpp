@@ -706,6 +706,37 @@ namespace mongo {
             }
         }
 
+        if (params->count("profile")) {
+            int profilingMode;
+            Status ret = params->get("profile", &profilingMode);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            std::string profilingModeString;
+            if (profilingMode == 0) {
+                profilingModeString = "off";
+            }
+            else if (profilingMode == 1) {
+                profilingModeString = "slowOp";
+            }
+            else if (profilingMode == 2) {
+                profilingModeString = "all";
+            }
+            else {
+                StringBuilder sb;
+                sb << "Bad value for profile: " << profilingMode
+                    << ".  Supported modes are: (0=off|1=slowOp|2=all)";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+            ret = params->set("operationProfiling.mode", moe::Value(profilingModeString));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("profile");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
 
         return Status::OK();
     }
@@ -761,6 +792,26 @@ namespace mongo {
                 storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size()-1);
         }
 #endif
+
+        if (params.count("operationProfiling.mode")) {
+            std::string profilingMode = params["operationProfiling.mode"].as<std::string>();
+            if (profilingMode == "off") {
+                serverGlobalParams.defaultProfile = 0;
+            }
+            else if (profilingMode == "slowOp") {
+                serverGlobalParams.defaultProfile = 1;
+            }
+            else if (profilingMode == "all") {
+                serverGlobalParams.defaultProfile = 2;
+            }
+            else {
+                StringBuilder sb;
+                sb << "Bad value for operationProfiling.mode: " << profilingMode
+                    << ".  Supported modes are: (off|slowOp|all)";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+        }
+
         if ( params.count("operationProfiling.slowOpThresholdMs")) {
             serverGlobalParams.slowMS = params["operationProfiling.slowOpThresholdMs"].as<int>();
         }
@@ -1000,29 +1051,6 @@ namespace mongo {
             replSettings.master = true;
             if (!params.count("replication.oplogSizeMB"))
                 replSettings.oplogSize = 5 * 1024 * 1024;
-        }
-        if (params.count("profile")) {
-            serverGlobalParams.defaultProfile = params["profile"].as<int>();
-        }
-        else {
-            if (params.count("operationProfiling.mode")) {
-                std::string profilingMode = params["operationProfiling.mode"].as<std::string>();
-                if (profilingMode == "off") {
-                    serverGlobalParams.defaultProfile = 0;
-                }
-                else if (profilingMode == "slowOp") {
-                    serverGlobalParams.defaultProfile = 1;
-                }
-                else if (profilingMode == "all") {
-                    serverGlobalParams.defaultProfile = 2;
-                }
-                else {
-                    StringBuilder sb;
-                    sb << "Bad value for operationProfiling.mode: " << profilingMode
-                       << ".  Supported modes are: (off|slowOp|all)";
-                    return Status(ErrorCodes::BadValue, sb.str());
-                }
-            }
         }
         if (params.count("net.ipv6")) {
             enableIPv6();
