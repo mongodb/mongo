@@ -73,7 +73,7 @@ var _bulk_api_module = (function() {
     }
 
     if (typeof opts.j != 'undefined' && typeof opts.j != 'boolean')
-      throw Error("j value must either true or false if defined, not " + opts.j);
+      throw Error("j value must be true or false if defined, not " + opts.j);
 
     this._wc = opts;
     
