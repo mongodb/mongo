@@ -515,8 +515,8 @@ namespace mongo {
             const SortableDataItem& lastItem = *lastItemIt;
             const WorkingSetComparator& cmp = *_sortKeyComparator;
             if (cmp(item, lastItem)) {
-                _memUsage += _ws->get(item.wsid)->getMemUsage() -
-                             _ws->get(lastItem.wsid)->getMemUsage();
+                _memUsage -= _ws->get(lastItem.wsid)->getMemUsage();
+                _memUsage += _ws->get(item.wsid)->getMemUsage();
                 wsidToFree = lastItem.wsid;
                 // According to std::set iterator validity rules,
                 // it does not matter which of erase()/insert() happens first.
