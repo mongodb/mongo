@@ -44,6 +44,14 @@ def main(argv):
     else:
         raise ValueError('Unsupported archive format "%s"' % opts.archive_format)
 
+def delete_directory(dir):
+    '''Recursively deletes a directory and its contents.
+    '''
+    try:
+        shutil.rmtree(dir)
+    except Exception:
+        pass
+
 def make_tar_archive(opts):
     '''Given the parsed options, generates the 'opt.output_filename'
     tarball containing all the files in 'opt.input_filename' renamed
@@ -61,37 +69,36 @@ def make_tar_archive(opts):
     tar_options = "cvf"
     if opts.archive_format is 'tgz':
         tar_options += "z"
-    created_directories = []
+
+    # clean and create a temp directory to copy files to
+    enclosing_archive_directory = "buildarchive"
+    delete_directory(enclosing_archive_directory)
+    os.makedirs(enclosing_archive_directory)
+
     tar_command = ["tar", tar_options, opts.output_filename]
+
     for input_filename in opts.input_filenames:
         preferred_filename = get_preferred_filename(input_filename, opts.transformations)
+        temp_file_location = os.path.join(enclosing_archive_directory, preferred_filename)
+        enclosing_file_directory = os.path.dirname(temp_file_location)
+        if not os.path.exists(enclosing_file_directory):
+            os.makedirs(enclosing_file_directory)
+        print "copying %s => %s" % (input_filename, temp_file_location)
+        shutil.copy2(input_filename, temp_file_location)
         tar_command.append(preferred_filename)
-        print "copying %s => %s" % (input_filename, preferred_filename)
-        enclosing_directory = os.path.dirname(preferred_filename)
-        if not os.path.exists(enclosing_directory):
-            os.makedirs(enclosing_directory)
-            created_directories.append(enclosing_directory)
-        shutil.copy2(input_filename, preferred_filename)
 
+    print " ".join(tar_command)
     # execute the full tar command
-    proc = Popen(tar_command, stdout=PIPE, stderr=STDOUT, bufsize=0)
+    run_directory = os.path.join(os.getcwd(), enclosing_archive_directory)
+    proc = Popen(tar_command, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=run_directory)
     proc.wait()
 
-    # clean up temp directories/files created
-    for input_filename in opts.input_filenames:
-        preferred_filename = get_preferred_filename(input_filename, opts.transformations)
-        # don't delete the original file
-        if input_filename is preferred_filename:
-            continue
-        enclosing_directory = os.path.dirname(preferred_filename)
-        try:
-            # only delete enclosing directory if we created it
-            if enclosing_directory in created_directories:
-                shutil.rmtree(enclosing_directory)
-            else:
-                os.remove(preferred_filename)
-        except Exception:
-            pass
+    # move the file back to the parent directory
+    current_tarball_location = os.path.join(run_directory, opts.output_filename)
+    shutil.move(current_tarball_location, opts.output_filename)
+
+    # delete temp directory
+    delete_directory(enclosing_archive_directory)
 
 def make_zip_archive(opts):
     '''Given the parsed options, generates the 'opt.output_filename'
