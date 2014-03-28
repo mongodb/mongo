@@ -31,8 +31,11 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace OplogStartTests {
+
+    static const char* kCollscanFetchFpName = "collscanInMemorySucceed";
 
     class Base {
     public:
@@ -42,10 +45,21 @@ namespace OplogStartTests {
                 c = _context.db()->createCollection(ns());
             }
             c->getIndexCatalog()->ensureHaveIdIndex();
+
+            // We want everything in the collscan to be in memory to avoid spurious fetch
+            // requests.
+            FailPointRegistry* registry = getGlobalFailPointRegistry();
+            FailPoint* failPoint = registry->getFailPoint(kCollscanFetchFpName);
+            failPoint->setMode(FailPoint::alwaysOn);
         }
 
         ~Base() {
             client()->dropCollection(ns());
+
+            // Undo fail point set in ctor.
+            FailPointRegistry* registry = getGlobalFailPointRegistry();
+            FailPoint* failPoint = registry->getFailPoint(kCollscanFetchFpName);
+            failPoint->setMode(FailPoint::off);
         }
 
     protected:
