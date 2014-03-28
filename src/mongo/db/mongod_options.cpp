@@ -288,25 +288,37 @@ namespace mongo {
         // Master Slave Options
 
         ms_options.addOptionChaining("master", "master", moe::Switch, "master mode")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("slave", "slave", moe::Switch, "slave mode")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("source", "source", moe::String,
                 "when slave: specify master as <server:port>")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("only", "only", moe::String,
                 "when slave: specify a single database to replicate")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("slavedelay", "slavedelay", moe::Int,
                 "specify delay (in seconds) to be used when applying master ops to slave")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         ms_options.addOptionChaining("autoresync", "autoresync", moe::Switch,
                 "automatically resync if slave data is stale")
+                                    .incompatibleWith("replication.replSet")
+                                    .incompatibleWith("replication.replSetName")
                                     .setSources(moe::SourceAllLegacy);
 
         // Replication Options
@@ -317,13 +329,11 @@ namespace mongo {
 
         rs_options.addOptionChaining("replication.replSet", "replSet", moe::String,
                 "arg is <setname>[/<optionalseedhostlist>]")
-                                    .setSources(moe::SourceAllLegacy)
-                                    .incompatibleWith("replication.replSetName");
+                                    .setSources(moe::SourceAllLegacy);
 
         rs_options.addOptionChaining("replication.replSetName", "", moe::String, "arg is <setname>")
                                     .setSources(moe::SourceYAMLConfig)
-                                    .format("[^/]+", "[replica set name with no \"/\"]")
-                                    .incompatibleWith("replication.replSet");
+                                    .format("[^/]+", "[replica set name with no \"/\"]");
 
         rs_options.addOptionChaining("replication.secondaryIndexPrefetch", "replIndexPrefetch", moe::String,
                 "specify index prefetching behavior (if secondary) [none|_id_only|all]")
@@ -753,6 +763,17 @@ namespace mongo {
             }
         }
 
+        // Ensure that "replication.replSet" logically overrides "replication.replSetName".  We
+        // can't canonicalize them as the same option, because they mean slightly different things.
+        // "replication.replSet" can include a seed list, while "replication.replSetName" just has
+        // the replica set name.
+        if (params->count("replication.replSet") && params->count("replication.replSetName")) {
+            ret = params->remove("replication.replSetName");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
         return Status::OK();
     }
 
@@ -941,16 +962,6 @@ namespace mongo {
         }
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
-            if( params.count("replication.replSet") ) {
-                return Status(ErrorCodes::BadValue,
-                              "--autoresync is not used with --replSet\nsee "
-                              "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
-            }
-            if( params.count("replication.replSetName") ) {
-                return Status(ErrorCodes::BadValue,
-                              "--autoresync is not used with replication.replSetName\nsee "
-                              "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
-            }
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
@@ -960,23 +971,9 @@ namespace mongo {
             replSettings.pretouch = params["pretouch"].as<int>();
         }
         if (params.count("replication.replSetName")) {
-            if (params.count("slavedelay")) {
-                return Status(ErrorCodes::BadValue,
-                              "--slavedelay cannot be used with replication.replSetName");
-            }
-            else if (params.count("only")) {
-                return Status(ErrorCodes::BadValue,
-                              "--only cannot be used with replication.replSetName");
-            }
             replSettings.replSet = params["replication.replSetName"].as<string>().c_str();
         }
         if (params.count("replication.replSet")) {
-            if (params.count("slavedelay")) {
-                return Status(ErrorCodes::BadValue, "--slavedelay cannot be used with --replSet");
-            }
-            else if (params.count("only")) {
-                return Status(ErrorCodes::BadValue, "--only cannot be used with --replSet");
-            }
             /* seed list of hosts for the repl set */
             replSettings.replSet = params["replication.replSet"].as<string>().c_str();
         }
