@@ -36,7 +36,10 @@ namespace mongo {
 
     BtreeKeyGenerator::BtreeKeyGenerator(vector<const char*> fieldNames, vector<BSONElement> fixed, 
                                          bool isSparse)
-        : _fieldNames(fieldNames), _isSparse(isSparse), _fixed(fixed) {
+        : _isSparse(isSparse), _fixed(fixed) {
+
+        for ( size_t i = 0; i < fieldNames.size(); i++ )
+            _fieldNames.push_back( fieldNames[i] );
 
         BSONObjBuilder nullKeyBuilder;
         for (size_t i = 0; i < fieldNames.size(); ++i) {
@@ -52,7 +55,10 @@ namespace mongo {
 
     void BtreeKeyGenerator::getKeys(const BSONObj &obj, BSONObjSet *keys) const {
         // These are mutated as part of the getKeys call.  :|
-        vector<const char*> fieldNames(_fieldNames);
+        vector<const char*> fieldNames;
+        for ( size_t i = 0; i < _fieldNames.size(); i++ )
+            fieldNames.push_back( _fieldNames[i].c_str() );
+
         vector<BSONElement> fixed(_fixed);
         getKeysImpl(fieldNames, fixed, obj, keys);
         if (keys->empty() && ! _isSparse) {

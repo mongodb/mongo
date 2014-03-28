@@ -35,6 +35,7 @@
 #include "mongo/db/structure/catalog/namespace_details-inl.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_pregen.h"
 #include "mongo/util/debug_util.h"
 
 #include "mongo/db/structure/catalog/index_details.h" // XXX
@@ -55,6 +56,8 @@ namespace mongo {
         _keysComputed = false;
         // query settings is not affected by info cache reset.
         // index filters should persist throughout life of collection
+
+        GeneratorHolder::getInstance()->reset( _collection );
     }
 
     void CollectionInfoCache::computeIndexKeys() {

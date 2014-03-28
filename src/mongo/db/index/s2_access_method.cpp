@@ -31,13 +31,18 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geoquery.h"
+#include "mongo/db/geo/s2.h"
 #include "mongo/db/geo/s2common.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_key_generator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+
+#include "third_party/s2/s2cell.h"
+#include "third_party/s2/s2regioncoverer.h"
 
 namespace mongo {
 
@@ -50,6 +55,8 @@ namespace mongo {
 
         ExpressionParams::parse2dsphereParams(descriptor->infoObj(),
                                               &_params);
+
+        _keyGenerator.reset( new S2KeyGenerator( descriptor->keyPattern(), _params ) );
 
         int geoFields = 0;
 
@@ -101,7 +108,7 @@ namespace mongo {
     }
 
     void S2AccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        ExpressionKeysPrivate::getS2Keys(obj, _descriptor->keyPattern(), _params, keys);
+        return _keyGenerator->getKeys( obj, keys );
     }
 
 }  // namespace mongo

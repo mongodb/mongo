@@ -36,20 +36,15 @@
 
 namespace mongo {
 
-    class FTSAccessMethod : public BtreeBasedAccessMethod {
+    class FTSKeyGenerator : public KeyGenerator {
     public:
-        FTSAccessMethod(IndexCatalogEntry* btreeState );
-        virtual ~FTSAccessMethod() { }
+        FTSKeyGenerator( const BSONObj& infoObj );
+        virtual ~FTSKeyGenerator(){}
 
-        const fts::FTSSpec& getSpec() const { return _ftsSpec; }
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
-        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
     private:
-        // Implemented:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
-
         fts::FTSSpec _ftsSpec;
-        shared_ptr<KeyGenerator> _keyGenerator;
     };
 
 } // namespace mongo

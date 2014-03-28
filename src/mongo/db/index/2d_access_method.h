@@ -30,6 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/jsobj.h"
 
@@ -72,6 +73,7 @@ namespace mongo {
         TwoDAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~TwoDAccessMethod() { }
 
+        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
     private:
         friend class TwoDIndexCursor;
         friend class twod_internal::GeoPoint;
@@ -104,6 +106,8 @@ namespace mongo {
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         TwoDIndexingParams _params;
+
+        shared_ptr<TwoDKeyGenerator> _keyGenerator;
     };
 
 }  // namespace mongo

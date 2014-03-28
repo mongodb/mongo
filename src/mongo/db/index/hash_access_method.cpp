@@ -28,9 +28,9 @@
 
 #include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/hash_access_method.h"
+#include "mongo/db/index/hash_key_generator.h"
 
 namespace mongo {
 
@@ -50,10 +50,15 @@ namespace mongo {
                                           &_seed,
                                           &_hashVersion,
                                           &_hashedField);
+
+        _keyGenerator.reset( new HashKeyGenerator( _hashedField,
+                                                   _seed,
+                                                   _hashVersion,
+                                                   _descriptor->isSparse() ) );
     }
 
     void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        ExpressionKeysPrivate::getHashKeys(obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), keys);
+        _keyGenerator->getKeys( obj, keys );
     }
 
 }  // namespace mongo

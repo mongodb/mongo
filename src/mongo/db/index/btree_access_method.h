@@ -57,11 +57,13 @@ namespace mongo {
         BtreeAccessMethod(IndexCatalogEntry* btreeState );
         virtual ~BtreeAccessMethod() { }
 
+        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         // Our keys differ for V0 and V1.
-        scoped_ptr<BtreeKeyGenerator> _keyGenerator;
+        // this is shared so that we can pass it off
+        shared_ptr<BtreeKeyGenerator> _keyGenerator;
     };
 
 }  // namespace mongo

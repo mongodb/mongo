@@ -30,9 +30,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/hash.h"
-#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/haystack_access_method_internal.h"
+#include "mongo/db/index/haystack_key_generator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
@@ -51,10 +51,12 @@ namespace mongo {
 
         uassert(16773, "no geo field specified", _geoField.size());
         uassert(16774, "no non-geo fields specified", _otherFields.size());
+
+        _keyGenerator.reset( new HaystackKeyGenerator( _geoField, _otherFields, _bucketSize ) );
     }
 
     void HaystackAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
+        _keyGenerator->getKeys( obj, keys );
     }
 
     void HaystackAccessMethod::searchCommand(const BSONObj& nearObj, double maxDistance,
@@ -67,8 +69,8 @@ namespace mongo {
         int x, y;
         {
             BSONObjIterator i(nearObj);
-            x = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
-            y = ExpressionKeysPrivate::hashHaystackElement(i.next(), _bucketSize);
+            x = HaystackKeyGenerator::hashHaystackElement(i.next(), _bucketSize);
+            y = HaystackKeyGenerator::hashHaystackElement(i.next(), _bucketSize);
         }
         int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
@@ -79,7 +81,7 @@ namespace mongo {
         for (int a = -scale; a <= scale && !hopper.limitReached(); ++a) {
             for (int b = -scale; b <= scale && !hopper.limitReached(); ++b) {
                 BSONObjBuilder bb;
-                bb.append("", ExpressionKeysPrivate::makeHaystackString(x + a, y + b));
+                bb.append("", HaystackKeyGenerator::makeHaystackString(x + a, y + b));
 
                 for (unsigned i = 0; i < _otherFields.size(); i++) {
                     // See if the non-geo field we're indexing on is in the provided search term.

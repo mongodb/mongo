@@ -801,7 +801,8 @@ namespace mongo {
         return ok;
     }
 
-    void checkAndInsert(Client::Context& ctx, const char *ns, /*modifies*/BSONObj& js) {
+    void checkAndInsert(Client::Context& ctx, const char *ns, /*modifies*/BSONObj& js,
+                        PregeneratedKeys* preGen ) {
         if ( nsToCollectionSubstring( ns ) == "system.indexes" ) {
             string targetNS = js["ns"].String();
             uassertStatusOK( userAllowedWriteNS( targetNS ) );
@@ -841,7 +842,7 @@ namespace mongo {
             verify( collection );
         }
 
-        StatusWith<DiskLoc> status = collection->insertDocument( js, true );
+        StatusWith<DiskLoc> status = collection->insertDocument( js, true, preGen );
         uassertStatusOK( status.getStatus() );
         logOp("i", ns, js);
     }
@@ -850,7 +851,7 @@ namespace mongo {
         size_t i;
         for (i=0; i<objs.size(); i++){
             try {
-                checkAndInsert(ctx, ns, objs[i]);
+                checkAndInsert(ctx, ns, objs[i], NULL);
                 getDur().commitIfNeeded();
             } catch (const UserException&) {
                 if (!keepGoing || i == objs.size()-1){
@@ -890,25 +891,45 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
+        PregeneratedKeys tempHack;
+        if ( multi.size() == 1 ) {
+            StatusWith<BSONObj> fixed = fixDocumentForInsert( multi[0] );
+            uassertStatusOK( fixed.getStatus() );
+            if ( !fixed.getValue().isEmpty() )
+                multi[0] = fixed.getValue();
+
+            bool hasEntry = GeneratorHolder::getInstance()->prepare( ns, multi[0], &tempHack );
+            if ( !hasEntry ) {
+                // lets load!
+                Client::ReadContext ctx(ns);
+                Database* db = ctx.ctx().db();
+                Collection * c = db->getCollection( ns );
+                if ( c ) {
+                    GeneratorHolder::getInstance()->reset( c );
+                }
+            }
+        }
+
         PageFaultRetryableSection s;
         while ( true ) {
             try {
                 Lock::DBWrite lk(ns);
-                
+
                 // CONCURRENCY TODO: is being read locked in big log sufficient here?
                 // writelock is used to synchronize stepdowns w/ writes
                 uassert( 10058 , "not master", isMasterNs(ns) );
-                
+
                 if ( handlePossibleShardedMessage( m , 0 ) )
                     return;
-                
+
                 Client::Context ctx(ns);
-                
+
                 if (multi.size() > 1) {
                     const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
                     insertMulti(ctx, keepGoing, ns, multi, op);
-                } else {
-                    checkAndInsert(ctx, ns, multi[0]);
+                }
+                else {
+                    checkAndInsert(ctx, ns, multi[0], &tempHack);
                     globalOpCounters.incInsertInWriteLock(1);
                     op.debug().ninserted = 1;
                 }

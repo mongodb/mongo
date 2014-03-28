@@ -26,16 +26,20 @@
 *    it in the license file.
 */
 
+#include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/fts_key_generator.h"
 
 namespace mongo {
 
     FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState)
-        : BtreeBasedAccessMethod(btreeState), _ftsSpec(btreeState->descriptor()->infoObj()) { }
+        : BtreeBasedAccessMethod(btreeState),
+          _ftsSpec(btreeState->descriptor()->infoObj()),
+          _keyGenerator( new FTSKeyGenerator(btreeState->descriptor()->infoObj() ) ) {
+    }
 
     void FTSAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        ExpressionKeysPrivate::getFTSKeys(obj, _ftsSpec, keys);
+        _keyGenerator->getKeys( obj, keys );
     }
 
 }  // namespace mongo

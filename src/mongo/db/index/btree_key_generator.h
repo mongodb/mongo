@@ -31,6 +31,7 @@
 #include <vector>
 #include <set>
 #include "mongo/db/jsobj.h"
+#include "mongo/db/index/key_generator.h"
 
 namespace mongo {
 
@@ -38,7 +39,7 @@ namespace mongo {
      * Internal class used by BtreeAccessMethod to generate keys for indexed documents.
      * This class is meant to be kept under the index access layer.
      */
-    class BtreeKeyGenerator {
+    class BtreeKeyGenerator : public KeyGenerator {
     public:
         BtreeKeyGenerator(vector<const char*> fieldNames, vector<BSONElement> fixed, bool isSparse);
         virtual ~BtreeKeyGenerator() { }
@@ -49,7 +50,7 @@ namespace mongo {
 
     protected:
         // These are used by the getKeysImpl(s) below.
-        vector<const char*> _fieldNames;
+        vector<string> _fieldNames;
         bool _isSparse;
         BSONObj _nullKey; // a full key with all fields null
         BSONObj _nullObj;     // only used for _nullElt

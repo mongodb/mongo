@@ -28,13 +28,14 @@
 
 #include "mongo/db/index/external_key_generator.h"
 
-#include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/geo/s2common.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/btree_key_generator.h"
-#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/fts_key_generator.h"
+#include "mongo/db/index/hash_key_generator.h"
+#include "mongo/db/index/haystack_key_generator.h"
+#include "mongo/db/index/s2_key_generator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -51,30 +52,34 @@ namespace {
         if (IndexNames::GEO_2D == type) {
             TwoDIndexingParams params;
             ExpressionParams::parseTwoDParams(infoObj, &params);
-            ExpressionKeysPrivate::get2DKeys(doc, params, keys, NULL);
+            TwoDKeyGenerator gen( params );
+            gen.getKeys( doc, keys );
         }
         else if (IndexNames::GEO_HAYSTACK == type) {
             string geoField;
             vector<string> otherFields;
             double bucketSize;
             ExpressionParams::parseHaystackParams(infoObj, &geoField, &otherFields, &bucketSize);
-            ExpressionKeysPrivate::getHaystackKeys(doc, geoField, otherFields, bucketSize, keys);
+            HaystackKeyGenerator gen( geoField, otherFields, bucketSize );
+            gen.getKeys( doc, keys );
         }
         else if (IndexNames::GEO_2DSPHERE == type) {
             S2IndexingParams params;
             ExpressionParams::parse2dsphereParams(infoObj, &params);
-            ExpressionKeysPrivate::getS2Keys(doc, keyPattern, params, keys);
+            S2KeyGenerator gen( keyPattern, params );
+            gen.getKeys( doc, keys );
         }
         else if (IndexNames::TEXT == type) {
-            fts::FTSSpec spec(infoObj);
-            ExpressionKeysPrivate::getFTSKeys(doc, spec, keys);
+            FTSKeyGenerator gen(infoObj);
+            gen.getKeys( doc, keys );
         }
         else if (IndexNames::HASHED == type) {
             HashSeed seed;
             int version;
             string field;
             ExpressionParams::parseHashParams(infoObj, &seed, &version, &field);
-            ExpressionKeysPrivate::getHashKeys(doc, field, seed, version, infoObj["sparse"].trueValue(), keys);
+            HashKeyGenerator gen( field, seed, version, infoObj["sparse"].trueValue() );
+            gen.getKeys( doc, keys );
         }
         else {
             invariant(IndexNames::BTREE == type);

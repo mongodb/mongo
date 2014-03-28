@@ -56,18 +56,27 @@ namespace mongo {
     }
 
     // Find the keys for obj, put them in the tree pointing to loc
-    Status BtreeBasedAccessMethod::insert(const BSONObj& obj, const DiskLoc& loc,
-            const InsertDeleteOptions& options, int64_t* numInserted) {
+    Status BtreeBasedAccessMethod::insert(const BSONObj& obj,
+                                          const DiskLoc& loc,
+                                          const InsertDeleteOptions& options,
+                                          int64_t* numInserted,
+                                          const PregeneratedKeysOnIndex* prepared ) {
+
+        const BSONObjSet* keysToUse = NULL;
+
+        BSONObjSet myOwnedKeys;
+
+        if ( prepared && prepared->generator->getId() == getKeyGenerator()->getId() ) {
+            keysToUse = &prepared->keys;
+        }
+        else {
+            getKeys(obj, &myOwnedKeys);
+            keysToUse = &myOwnedKeys;
+        }
 
         *numInserted = 0;
 
-        BSONObjSet keys;
-        // Delegate to the subclass.
-        getKeys(obj, &keys);
-
-        Status ret = Status::OK();
-
-        for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+        for (BSONObjSet::const_iterator i = keysToUse->begin(); i != keysToUse->end(); ++i) {
             try {
                 _interface->bt_insert(_btreeState,
                                       _btreeState->head(),
@@ -76,23 +85,26 @@ namespace mongo {
                                       options.dupsAllowed,
                                       true);
                 ++*numInserted;
-            } catch (AssertionException& e) {
+            }
+            catch (AssertionException& e) {
                 if (10287 == e.getCode() && !_btreeState->isReady()) {
                     // This is the duplicate key exception.  We ignore it for some reason in BG
                     // indexing.
                     DEV log() << "info: key already in index during bg indexing (ok)\n";
-                } else if (!options.dupsAllowed) {
+                }
+                else if (!options.dupsAllowed) {
                     // Assuming it's a duplicate key exception.  Clean up any inserted keys.
-                    for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
+                    for (BSONObjSet::const_iterator j = keysToUse->begin(); j != i; ++j) {
                         removeOneKey(*j, loc);
                     }
                     *numInserted = 0;
                     return Status(ErrorCodes::DuplicateKey, e.what(), e.getCode());
-                } else {
+                }
+                else {
                     problem() << " caught assertion addKeysToIndex "
                               << _descriptor->indexNamespace()
                               << obj["_id"] << endl;
-                    ret = Status(ErrorCodes::InternalError, e.what(), e.getCode());
+                    return Status(ErrorCodes::InternalError, e.what(), e.getCode());
                 }
             }
         }
@@ -101,7 +113,7 @@ namespace mongo {
             _btreeState->setMultikey();
         }
 
-        return ret;
+        return Status::OK();
     }
 
     bool BtreeBasedAccessMethod::removeOneKey(const BSONObj& key, const DiskLoc& loc) {
@@ -194,7 +206,10 @@ namespace mongo {
     Status BtreeBasedAccessMethod::touch(const BSONObj& obj) {
         BSONObjSet keys;
         getKeys(obj, &keys);
+        return touch( keys );
+    }
 
+    Status BtreeBasedAccessMethod::touch(const BSONObjSet& keys) {
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
             int unusedPos;
             bool unusedFound;
@@ -317,10 +332,15 @@ namespace mongo {
 
         ~BtreeBulk() {}
 
+        virtual shared_ptr<KeyGenerator> getKeyGenerator() const {
+            invariant( false );
+        }
+
         virtual Status insert(const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
-                              int64_t* numInserted) {
+                              int64_t* numInserted,
+                              const PregeneratedKeysOnIndex* pregen ) {
             BSONObjSet keys;
             _real->getKeys(obj, &keys);
             _phase1.addKeys(keys, loc, false);
@@ -368,6 +388,10 @@ namespace mongo {
         }
 
         virtual Status touch(const BSONObj& obj) {
+            return _notAllowed();
+        }
+
+        virtual Status touch(const BSONObjSet& obj) {
             return _notAllowed();
         }
 

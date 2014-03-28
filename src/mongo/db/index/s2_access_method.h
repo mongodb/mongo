@@ -54,10 +54,12 @@ namespace mongo {
          */
         static BSONObj fixSpec(const BSONObj& specObj);
 
+        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         S2IndexingParams _params;
+        shared_ptr<KeyGenerator> _keyGenerator;
     };
 
 }  // namespace mongo

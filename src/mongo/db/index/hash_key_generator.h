@@ -28,28 +28,33 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/status.h"
-#include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/btree_based_access_method.h"
+#include "mongo/db/hasher.h"  // For HashSeed.
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/key_generator.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class FTSAccessMethod : public BtreeBasedAccessMethod {
+    class HashKeyGenerator : public KeyGenerator {
     public:
-        FTSAccessMethod(IndexCatalogEntry* btreeState );
-        virtual ~FTSAccessMethod() { }
+        HashKeyGenerator( const std::string& hashedField,
+                          HashSeed seed,
+                          int hashVersion,
+                          bool isSparse );
+        virtual ~HashKeyGenerator() {}
 
-        const fts::FTSSpec& getSpec() const { return _ftsSpec; }
+        virtual void getKeys( const BSONObj& obj, BSONObjSet* keys ) const;
 
-        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
+        static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
+
     private:
-        // Implemented:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
-
-        fts::FTSSpec _ftsSpec;
-        shared_ptr<KeyGenerator> _keyGenerator;
+        std::string _hashedField;
+        HashSeed _seed;
+        int _hashVersion;
+        bool _isSparse;
     };
 
-} // namespace mongo
+}  // namespace mongo

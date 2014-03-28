@@ -29,27 +29,37 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class FTSAccessMethod : public BtreeBasedAccessMethod {
+    class HaystackKeyGenerator : public KeyGenerator {
     public:
-        FTSAccessMethod(IndexCatalogEntry* btreeState );
-        virtual ~FTSAccessMethod() { }
+        HaystackKeyGenerator( const std::string& geoField,
+                              const std::vector<std::string>& otherFields,
+                              double bucketSize );
+        virtual ~HaystackKeyGenerator() {}
 
-        const fts::FTSSpec& getSpec() const { return _ftsSpec; }
+        virtual void getKeys( const BSONObj& obj, BSONObjSet* keys ) const;
 
-        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
+        /**
+         * Returns a hash of a BSON element.
+         * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
+         */
+        static int hashHaystackElement(const BSONElement& e, double bucketSize);
+
+        /**
+         * Joins two strings using underscore as separator.
+         * Used by getHaystackKeys and HaystackAccessMethod::searchCommand.
+         */
+        static std::string makeHaystackString(int hashedX, int hashedY);
+
     private:
-        // Implemented:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
-
-        fts::FTSSpec _ftsSpec;
-        shared_ptr<KeyGenerator> _keyGenerator;
+        std::string _geoField;
+        std::vector<std::string> _otherFields;
+        double _bucketSize;
     };
 
-} // namespace mongo
+}  // namespace mongo

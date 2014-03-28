@@ -13,8 +13,9 @@ function profileCursor() {
 }
 
 function lastOp() {
-    p = profileCursor().sort( { $natural:-1 } ).next();
-//    printjson( p );
+    var c = profileCursor().sort( { $natural:-1 } );
+    var p = c.next();
+    //printjson( p );
     return p;
 }
 
@@ -48,8 +49,11 @@ try {
                   [ "keyUpdates", 0 ],
                   [ "nreturned", 0 ],
                   [ "responseLength", 20 ] ] );
-    
-    t.save( {} );
+
+    db.eval( function(){ print( "-----xxx----" ); } );
+
+    x = t.save( {} );
+    x = t.save( {} );
 
     // check write lock stats are set
     o = lastOp();
@@ -71,11 +75,11 @@ try {
 
     t.save( {} );
     t.save( {} );
-    t.find().skip( 1 ).limit( 4 ).itcount();
-    checkLastOp( [ [ "ntoreturn", 4 ],
+    t.find().skip( 1 ).limit( 5 ).itcount();
+    checkLastOp( [ [ "ntoreturn", 5 ],
                   [ "ntoskip", 1 ],
-                  [ "nscanned", 3 ],
-                  [ "nreturned", 2 ] ] );
+                  [ "nscanned", 4 ],
+                  [ "nreturned", 3 ] ] );
 
     t.find().batchSize( 2 ).next();
     o = lastOp();

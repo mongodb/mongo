@@ -29,27 +29,28 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/geo/s2common.h"
 #include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class FTSAccessMethod : public BtreeBasedAccessMethod {
+    class IndexCursor;
+    struct S2IndexingParams;
+
+    class S2KeyGenerator : public KeyGenerator {
     public:
-        FTSAccessMethod(IndexCatalogEntry* btreeState );
-        virtual ~FTSAccessMethod() { }
+        S2KeyGenerator( const BSONObj& keyPattern, const S2IndexingParams& params );
 
-        const fts::FTSSpec& getSpec() const { return _ftsSpec; }
+        virtual ~S2KeyGenerator(){}
 
-        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
+
     private:
-        // Implemented:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        BSONObj _keyPattern;
+        S2IndexingParams _params;
 
-        fts::FTSSpec _ftsSpec;
-        shared_ptr<KeyGenerator> _keyGenerator;
     };
 
-} // namespace mongo
+}  // namespace mongo

@@ -612,6 +612,7 @@ namespace mongo {
 
     static void singleInsert( const BSONObj& docToInsert,
                               Collection* collection,
+                              const PregeneratedKeys* pregen,
                               WriteOpResult* result );
 
     static void singleCreateIndex( const BSONObj& indexDesc,
@@ -683,6 +684,9 @@ namespace mongo {
         // correspondence with elements of the "request", and "currIndex" is used to
         // index both.
         std::vector<StatusWith<BSONObj> > normalizedInserts;
+
+        // We generate these outside of any locks
+        std::vector<PregeneratedKeys> pregeneratedKeys;
 
     private:
         bool _lockAndCheckImpl(WriteOpResult* result);
@@ -758,7 +762,8 @@ namespace mongo {
 
     // Goes over the request and preprocesses normalized versions of all the inserts in the request
     static void normalizeInserts( const BatchedCommandRequest& request,
-                                  vector<StatusWith<BSONObj> >* normalizedInserts ) {
+                                  vector<StatusWith<BSONObj> >* normalizedInserts,
+                                  vector<PregeneratedKeys>* pregen ) {
 
         normalizedInserts->reserve(request.sizeWriteOps());
         for ( size_t i = 0; i < request.sizeWriteOps(); ++i ) {
@@ -767,6 +772,30 @@ namespace mongo {
             normalizedInserts->push_back( normalInsert );
             if ( request.getOrdered() && !normalInsert.isOK() )
                 break;
+
+            if ( !normalInsert.getValue().isEmpty() )
+                insertDoc = normalInsert.getValue();
+
+            pregen->push_back( PregeneratedKeys() );
+            bool hasEntry = GeneratorHolder::getInstance()->prepare( request.getTargetingNS(),
+                                                                     insertDoc,
+                                                                     &pregen->back() );
+
+            if ( !hasEntry && i == 0 ) {
+                string ns = request.getTargetingNS();
+                try {
+                    Client::ReadContext ctx(ns);
+                    Database* db = ctx.ctx().db();
+                    Collection * c = db->getCollection( ns );
+                    if ( c ) {
+                        GeneratorHolder::getInstance()->reset( c );
+                    }
+                }
+                catch ( DBException& e ) {
+                    log() << "normalizeInserts failde to pregen keys: " << e;
+                }
+            }
+
         }
     }
 
@@ -793,7 +822,7 @@ namespace mongo {
         // further insertOne calls, and stop the batch.  As a result, the only expected source of
         // such exceptions are interruptions.
         ExecInsertsState state(&request);
-        normalizeInserts(request, &state.normalizedInserts);
+        normalizeInserts(request, &state.normalizedInserts, &state.pregeneratedKeys);
         for (state.currIndex = 0;
              state.currIndex < state.request->sizeWriteOps();
              ++state.currIndex) {
@@ -965,7 +994,10 @@ namespace mongo {
                 }
 
                 if (!state->request->isInsertIndexRequest()) {
-                    singleInsert(insertDoc, state->getCollection(), result);
+                    const PregeneratedKeys* pregen = NULL;
+                    if ( state->pregeneratedKeys.size() > state->currIndex )
+                        pregen = &state->pregeneratedKeys[state->currIndex];
+                    singleInsert(insertDoc, state->getCollection(), pregen, result);
                 }
                 else {
                     singleCreateIndex(insertDoc, state->getCollection(), result);
@@ -1029,13 +1061,14 @@ namespace mongo {
      */
     static void singleInsert( const BSONObj& docToInsert,
                               Collection* collection,
+                              const PregeneratedKeys* pregen,
                               WriteOpResult* result ) {
 
         const string& insertNS = collection->ns().ns();
 
         Lock::assertWriteLocked( insertNS );
 
-        StatusWith<DiskLoc> status = collection->insertDocument( docToInsert, true );
+        StatusWith<DiskLoc> status = collection->insertDocument( docToInsert, true, pregen );
 
         if ( !status.isOK() ) {
             result->setError(toWriteError(status.getStatus()));

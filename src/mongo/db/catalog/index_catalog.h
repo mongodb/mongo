@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/index_pregen.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_map.h"
@@ -113,6 +114,8 @@ namespace mongo {
 
             // returns the access method for the last return IndexDescriptor
             IndexAccessMethod* accessMethod( IndexDescriptor* desc );
+
+            IndexCatalogEntry* entry( IndexDescriptor* desc );
         private:
             IndexIterator( const IndexCatalog* cat, bool includeUnfinishedIndexes );
 
@@ -235,8 +238,14 @@ namespace mongo {
 
         // ----- data modifiers ------
 
+        /**
+         * TODO: document
+         */
+        void touch( const PregeneratedKeys* preGen ) const;
+
         // this throws for now
-        void indexRecord( const BSONObj& obj, const DiskLoc &loc );
+        void indexRecord( const BSONObj& obj, const DiskLoc &loc,
+                          const PregeneratedKeys* preGen = NULL );
 
         void unindexRecord( const BSONObj& obj, const DiskLoc& loc, bool noWarn );
 
@@ -244,7 +253,7 @@ namespace mongo {
          * checks all unique indexes and checks for conflicts
          * should not throw
          */
-        Status checkNoIndexConflicts( const BSONObj& obj );
+        Status checkNoIndexConflicts( const BSONObj& obj, const PregeneratedKeys* preGen );
 
         // ------- temp internal -------
 
@@ -285,7 +294,10 @@ namespace mongo {
         // meaning we shouldn't modify catalog
         Status _checkUnfinished() const;
 
-        Status _indexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc );
+        Status _indexRecord( IndexCatalogEntry* index,
+                             const BSONObj& obj, const DiskLoc &loc,
+                             const PregeneratedKeysOnIndex* pregen );
+
         Status _unindexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc,
                                bool logIfError );
 

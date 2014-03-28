@@ -26,38 +26,45 @@
 *    it in the license file.
 */
 
-#include "mongo/db/index/2d_access_method.h"
-
-#include <string>
-#include <vector>
-
-#include "mongo/db/geo/core.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/index/2d_common.h"
+#include "mongo/db/structure/btree/btree.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/index/hash_access_method.h"
+#include "mongo/db/index/hash_key_generator.h"
 
 namespace mongo {
 
-    TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState)
-        : BtreeBasedAccessMethod(btreeState) {
-
-        const IndexDescriptor* descriptor = btreeState->descriptor();
-
-        ExpressionParams::parseTwoDParams(descriptor->infoObj(), &_params);
-
-        _keyGenerator.reset( new TwoDKeyGenerator( _params ) );
+    HashKeyGenerator::HashKeyGenerator( const std::string& hashedField,
+                                        HashSeed seed,
+                                        int hashVersion,
+                                        bool isSparse )
+        : _hashedField( hashedField ),
+          _seed( seed ),
+          _hashVersion( hashVersion ),
+          _isSparse( isSparse ) {
     }
 
-    /** Finds the key objects to put in an index */
-    void TwoDAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        _keyGenerator->getKeys( obj, keys );
+    void HashKeyGenerator::getKeys( const BSONObj& obj, BSONObjSet* keys ) const {
+        const char* cstr = _hashedField.c_str();
+        BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);
+        uassert(16766, "Error: hashed indexes do not currently support array values",
+                fieldVal.type() != Array );
+
+        if (!fieldVal.eoo()) {
+            BSONObj key = BSON( "" << makeSingleHashKey(fieldVal, _seed, _hashVersion));
+            keys->insert(key);
+        }
+        else if (!_isSparse) {
+            BSONObj nullObj = BSON("" << BSONNULL);
+            keys->insert(BSON("" << makeSingleHashKey(nullObj.firstElement(), _seed, _hashVersion)));
+        }
+
     }
 
-    /** Finds all locations in a geo-indexed object */
-    void TwoDAccessMethod::getKeys(const BSONObj& obj, vector<BSONObj>& locs) const {
-        _keyGenerator->getKeys( obj, NULL, &locs );
+    long long int HashKeyGenerator::makeSingleHashKey(const BSONElement& e, HashSeed seed, int v) {
+        massert(16767, "Only HashVersion 0 has been defined" , v == 0 );
+        return BSONElementHasher::hash64(e, seed);
     }
+
 
 }  // namespace mongo

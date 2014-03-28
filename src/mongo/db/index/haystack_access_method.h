@@ -58,6 +58,7 @@ namespace mongo {
         HaystackAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~HaystackAccessMethod() { }
 
+        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
     protected:
         friend class GeoHaystackSearchCommand;
         void searchCommand(const BSONObj& nearObj, double maxDistance, const BSONObj& search,
@@ -69,6 +70,8 @@ namespace mongo {
         string _geoField;
         vector<string> _otherFields;
         double _bucketSize;
+
+        shared_ptr<KeyGenerator> _keyGenerator;
     };
 
 }  // namespace mongo

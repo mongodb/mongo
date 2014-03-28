@@ -157,7 +157,8 @@ namespace mongo {
          * this does NOT modify the doc before inserting
          * i.e. will not add an _id field for documents that are missing it
          */
-        StatusWith<DiskLoc> insertDocument( const BSONObj& doc, bool enforceQuota );
+        StatusWith<DiskLoc> insertDocument( const BSONObj& doc, bool enforceQuota,
+                                            const PregeneratedKeys* preGen = NULL );
 
         StatusWith<DiskLoc> insertDocument( const DocWriter* doc, bool enforceQuota );
 
@@ -213,7 +214,8 @@ namespace mongo {
          *  - adjust padding
          */
         StatusWith<DiskLoc> _insertDocument( const BSONObj& doc,
-                                             bool enforceQuota );
+                                             bool enforceQuota,
+                                             const PregeneratedKeys* preGen );
 
         void _compactExtent(const DiskLoc diskloc, int extentNumber,
                             MultiIndexBlock& indexesToInsertTo,

@@ -168,7 +168,9 @@ namespace mongo {
         return StatusWith<DiskLoc>( loc );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
+    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert,
+                                                    bool enforceQuota,
+                                                    const PregeneratedKeys* preGen ) {
         if ( _indexCatalog.findIdIndex() ) {
             if ( docToInsert["_id"].eoo() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
@@ -179,12 +181,12 @@ namespace mongo {
 
         if ( _details->isCapped() ) {
             // TOOD: old god not done
-            Status ret = _indexCatalog.checkNoIndexConflicts( docToInsert );
+            Status ret = _indexCatalog.checkNoIndexConflicts( docToInsert, preGen );
             if ( !ret.isOK() )
                 return StatusWith<DiskLoc>( ret );
         }
 
-        StatusWith<DiskLoc> status = _insertDocument( docToInsert, enforceQuota );
+        StatusWith<DiskLoc> status = _insertDocument( docToInsert, enforceQuota, preGen );
         if ( status.isOK() ) {
             _details->paddingFits();
         }
@@ -214,11 +216,16 @@ namespace mongo {
 
 
     StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert,
-                                                     bool enforceQuota ) {
+                                                     bool enforceQuota,
+                                                     const PregeneratedKeys* preGen ) {
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
+
+        if ( preGen ) {
+            _indexCatalog.touch( preGen );
+        }
 
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( docToInsert.objdata(),
                                                               docToInsert.objsize(),
@@ -229,7 +236,7 @@ namespace mongo {
         _infoCache.notifyOfWriteOp();
 
         try {
-            _indexCatalog.indexRecord( docToInsert, loc.getValue() );
+            _indexCatalog.indexRecord( docToInsert, loc.getValue(), preGen );
         }
         catch ( AssertionException& e ) {
             if ( _details->isCapped() ) {
@@ -348,7 +355,7 @@ namespace mongo {
                     debug->nmoved += 1;
             }
 
-            StatusWith<DiskLoc> loc = _insertDocument( objNew, enforceQuota );
+            StatusWith<DiskLoc> loc = _insertDocument( objNew, enforceQuota, NULL );
 
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location

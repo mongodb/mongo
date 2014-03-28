@@ -31,12 +31,16 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/key_generator.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
     class UpdateTicket;
+    class InsertTicket;
+
     struct InsertDeleteOptions;
+    struct PregeneratedKeysOnIndex;
 
     /**
      * An IndexAccessMethod is the interface through which all the mutation, lookup, and
@@ -61,15 +65,20 @@ namespace mongo {
          * 'loc') into the index.  'obj' is the object at the location 'loc'.  If not NULL,
          * 'numInserted' will be set to the number of keys added to the index for the document.  If
          * there is more than one key for 'obj', either all keys will be inserted or none will.
-         * 
-         * The behavior of the insertion can be specified through 'options'.  
+         *
+         * The behavior of the insertion can be specified through 'options'.
+         *
+         * prepared: if you generated keys before, you can pass the generator you used
+         * and the keys you got.  If the generator matches, the keys are used.  Otherwise we
+         * generate our own keys and you do not have to do anything.
          */
         virtual Status insert(const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
-                              int64_t* numInserted) = 0;
+                              int64_t* numInserted,
+                              const PregeneratedKeysOnIndex* prepared = NULL ) = 0;
 
-        /** 
+        /**
          * Analogous to above, but remove the records instead of inserting them.  If not NULL,
          * numDeleted will be set to the number of keys removed from the index for the document.
          */
@@ -129,6 +138,14 @@ namespace mongo {
         virtual Status touch(const BSONObj& obj) = 0;
 
         /**
+         * Try to page-in the pages that contain the keys.
+         * This can be used to speed up future accesses to an index by trying to ensure the
+         * appropriate pages are not swapped out.
+         * See prefetch.cpp.
+         */
+        virtual Status touch(const BSONObjSet& keys) = 0;
+
+        /**
          * Walk the entire index, checking the internal structure for consistency.
          * Set numKeys to the number of keys in the index.
          *
@@ -169,6 +186,12 @@ namespace mongo {
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
                                    std::set<DiskLoc>* dups ) = 0;
+
+        /**
+         * this returns a shared_ptr so that someone can get all the generators in a lock,
+         * then unlock, generate keys, and then re-lock and use those keys
+         */
+        virtual shared_ptr<KeyGenerator> getKeyGenerator() const = 0;
     };
 
     /**

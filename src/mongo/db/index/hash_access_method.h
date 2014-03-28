@@ -53,6 +53,7 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual shared_ptr<KeyGenerator> getKeyGenerator() const { return _keyGenerator; }
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
@@ -66,6 +67,8 @@ namespace mongo {
         int _hashVersion;
 
         BSONObj _missingKey;
+
+        shared_ptr<KeyGenerator> _keyGenerator;
     };
 
 }  // namespace mongo

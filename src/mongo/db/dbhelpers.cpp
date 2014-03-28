@@ -469,6 +469,7 @@ namespace mongo {
         if ( !collection ) return Status( ErrorCodes::NamespaceNotFound, ns );
 
         // Require single key
+
         IndexDescriptor *idx =
             collection->getIndexCatalog()->findIndexByPrefix( range.keyPattern, true );
 

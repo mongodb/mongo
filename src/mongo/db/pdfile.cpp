@@ -188,6 +188,8 @@ namespace mongo {
 
         audit::logDropDatabase( currentClient.get(), db );
 
+        GeneratorHolder::getInstance()->droppedDatabase( db );
+
         // Not sure we need this here, so removed.  If we do, we need to move it down
         // within other calls both (1) as they could be called from elsewhere and
         // (2) to keep the lock order right - groupcommitmutex must be locked before

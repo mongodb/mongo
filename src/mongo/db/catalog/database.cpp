@@ -396,6 +396,8 @@ namespace mongo {
 
         audit::logDropCollection( currentClient.get(), fullns );
 
+        GeneratorHolder::getInstance()->dropped( fullns.toString() );
+
         try {
             Status s = collection->getIndexCatalog()->dropAllIndexes( true );
             if ( !s.isOK() ) {
@@ -420,6 +422,8 @@ namespace mongo {
         Status s = _dropNS( fullns );
 
         _clearCollectionCache( fullns ); // we want to do this always
+
+        GeneratorHolder::getInstance()->dropped( fullns.toString() );
 
         if ( !s.isOK() )
             return s;

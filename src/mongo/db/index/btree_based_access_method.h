@@ -64,7 +64,8 @@ namespace mongo {
         virtual Status insert(const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
-                              int64_t* numInserted);
+                              int64_t* numInserted,
+                              const PregeneratedKeysOnIndex* prepared = NULL ) ;
 
         virtual Status remove(const BSONObj& obj,
                               const DiskLoc& loc,
@@ -90,6 +91,8 @@ namespace mongo {
                                    std::set<DiskLoc>* dups );
 
         virtual Status touch(const BSONObj& obj);
+
+        virtual Status touch( const BSONObjSet& keys );
 
         virtual Status validate(int64_t* numKeys);
 

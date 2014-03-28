@@ -5,8 +5,13 @@ Import("env")
 env.Library(
         target='key_generator',
         source=[
+            '2d_key_generator.cpp',
             'btree_key_generator.cpp',
-            'expression_keys_private.cpp',
+            'fts_key_generator.cpp',
+            'hash_key_generator.cpp',
+            'haystack_key_generator.cpp',
+            'key_generator.cpp',
+            's2_key_generator.cpp',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/bson',
