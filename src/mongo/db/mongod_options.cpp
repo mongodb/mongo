@@ -332,16 +332,16 @@ namespace mongo {
 
         // Sharding Options
 
-        sharding_options.addOptionChaining("sharding.configsvr", "configsvr", moe::Switch,
+        sharding_options.addOptionChaining("configsvr", "configsvr", moe::Switch,
                 "declare this is a config db of a cluster; default port 27019; "
                 "default dir /data/configdb")
                                           .setSources(moe::SourceAllLegacy)
-                                          .incompatibleWith("sharding.clusterRole");
+                                          .incompatibleWith("shardsvr");
 
-        sharding_options.addOptionChaining("sharding.shardsvr", "shardsvr", moe::Switch,
+        sharding_options.addOptionChaining("shardsvr", "shardsvr", moe::Switch,
                 "declare this is a shard db of a cluster; default port 27018")
                                           .setSources(moe::SourceAllLegacy)
-                                          .incompatibleWith("sharding.clusterRole");
+                                          .incompatibleWith("configsvr");
 
         sharding_options.addOptionChaining("sharding.clusterRole", "", moe::String,
                 "Choose what role this mongod has in a sharded cluster.  Possible values are:\n"
@@ -350,8 +350,6 @@ namespace mongo {
                 "    \"shardsvr\": Start this node as a shard server.  Starts on port 27018 by "
                 "default.")
                                           .setSources(moe::SourceYAMLConfig)
-                                          .incompatibleWith("sharding.configsvr")
-                                          .incompatibleWith("sharding.shardsvr")
                                           .format("(:?configsvr)|(:?shardsvr)",
                                                   "(configsvr/shardsvr)");
 
@@ -685,6 +683,30 @@ namespace mongo {
             }
         }
 
+        // "sharding.clusterRole" comes from the config file, so override it if "configsvr" or
+        // "shardsvr" are set since those come from the command line.
+        if (params->count("configsvr")) {
+            Status ret = params->set("sharding.clusterRole", moe::Value(std::string("configsvr")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("configsvr");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("shardsvr")) {
+            Status ret = params->set("sharding.clusterRole", moe::Value(std::string("shardsvr")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("shardsvr");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+
         return Status::OK();
     }
 
@@ -937,16 +959,6 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "--cacheSize option not currently supported");
         }
         if (!params.count("net.port")) {
-            if( params.count("sharding.configsvr") ) {
-                serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
-            }
-            if( params.count("sharding.shardsvr") ) {
-                if( params.count("sharding.configsvr") ) {
-                    return Status(ErrorCodes::BadValue,
-                                  "can't do --shardsvr and --configsvr at the same time");
-                }
-                serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
-            }
             if (params.count("sharding.clusterRole")) {
                 std::string clusterRole = params["sharding.clusterRole"].as<std::string>();
                 if (clusterRole == "configsvr") {
@@ -968,9 +980,8 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, "bad --port number");
             }
         }
-        if (params.count("sharding.configsvr") ||
-            (params.count("sharding.clusterRole") &&
-             params["sharding.clusterRole"].as<std::string>() == "configsvr")) {
+        if (params.count("sharding.clusterRole") &&
+            params["sharding.clusterRole"].as<std::string>() == "configsvr") {
             serverGlobalParams.configsvr = true;
             storageGlobalParams.smallfiles = true; // config server implies small files
             if (replSettings.usingReplSets() || replSettings.master || replSettings.slave) {
