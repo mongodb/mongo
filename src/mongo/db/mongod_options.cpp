@@ -649,6 +649,8 @@ namespace mongo {
             }
         }
 
+        // "storage.preallocDataFiles" comes from the config file, so override it if "noprealloc" is
+        // set since that comes from the command line.
         if (params->count("noprealloc")) {
             Status ret = params->set("storage.preallocDataFiles", moe::Value(false));
             if (!ret.isOK()) {
@@ -733,6 +735,19 @@ namespace mongo {
                 return ret;
             }
             ret = params->remove("profile");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "storage.indexBuildRetry" comes from the config file, so override it if
+        // "noIndexBuildRetry" is set since that comes from the command line.
+        if (params->count("noIndexBuildRetry")) {
+            Status ret = params->set("storage.indexBuildRetry", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noIndexBuildRetry");
             if (!ret.isOK()) {
                 return ret;
             }
@@ -970,10 +985,8 @@ namespace mongo {
                 params["replication.secondaryIndexPrefetch"].as<std::string>();
         }
 
-        if (params.count("noIndexBuildRetry") ||
-            (params.count("storage.indexBuildRetry") &&
-             !params["storage.indexBuildRetry"].as<bool>())) {
-            serverGlobalParams.indexBuildRetry = false;
+        if (params.count("storage.indexBuildRetry")) {
+            serverGlobalParams.indexBuildRetry = params["storage.indexBuildRetry"].as<bool>();
         }
 
         if (params.count("only")) {
