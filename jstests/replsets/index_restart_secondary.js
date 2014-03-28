@@ -4,7 +4,12 @@
  * index build restarts after secondary restarts
  */
 
-var replTest = new ReplSetTest({ name: 'fgIndex', nodes: 3 });
+var replTest = new ReplSetTest({
+    name: 'fgIndex',
+    nodes: 3,
+    oplogSize: 100, // This test inserts enough data to wrap the default 40MB oplog.
+});
+
 var nodes = replTest.nodeList();
 
 // We need an arbiter to ensure that the primary doesn't step down when we restart the secondary
