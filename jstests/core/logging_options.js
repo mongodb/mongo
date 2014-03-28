@@ -6,6 +6,7 @@ function removeOptionsAddedByFramework(getCmdLineOptsResult) {
     delete getCmdLineOptsResult.parsed.storage
     delete getCmdLineOptsResult.parsed.net
     delete getCmdLineOptsResult.parsed.fastsync
+    delete getCmdLineOptsResult.parsed.security
     return getCmdLineOptsResult;
 }
 
@@ -28,6 +29,7 @@ function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
     MongoRunner.stopMongod(mongod.port);
 }
 
+// Verbosity testing
 jsTest.log("Testing \"verbose\" command line option with no args");
 var expectedResult = {
     "parsed" : {
@@ -91,10 +93,35 @@ expectedResult = {
 };
 testGetCmdLineOpts({ config : "jstests/libs/config_files/set_verbosity.json" }, expectedResult);
 
-jsTest.log("Testing with no explicit verbosity setting");
+
+
+// Log output testing
+var baseDir = MongoRunner.dataPath + baseName;
+var logDir = MongoRunner.dataPath + baseName + "/logs/";
+
+// ensure log directory exists
+assert(mkdir(baseDir));
+assert(mkdir(logDir));
+
+jsTest.log("Testing \"logpath\" command line option");
+var expectedResult = {
+    "parsed" : {
+        "systemLog" : {
+            "destination" : "file",
+            "path" : logDir + "/mylog.log"
+        }
+    }
+};
+testGetCmdLineOpts({ logpath : logDir + "/mylog.log" }, expectedResult);
+
+
+
+jsTest.log("Testing with no explicit logging setting");
 expectedResult = {
     "parsed" : { }
 };
 testGetCmdLineOpts({}, expectedResult);
+
+resetDbpath(baseDir);
 
 print(baseName + " succeeded.");

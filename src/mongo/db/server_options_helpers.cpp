@@ -499,6 +499,29 @@ namespace {
             }
         }
 
+        if (params->count("logpath")) {
+            std::string logpath;
+            Status ret = params->get("logpath", &logpath);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            if (logpath.empty()) {
+                return Status(ErrorCodes::BadValue, "logpath cannot be empty if supplied");
+            }
+            ret = params->set("systemLog.destination", moe::Value(std::string("file")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->set("systemLog.path", moe::Value(logpath));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("logpath");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
         return Status::OK();
     }
 
@@ -683,13 +706,6 @@ namespace {
                               "Can only use systemLog.path if systemLog.destination is to a file");
             }
 
-        }
-
-        if (params.count("logpath")) {
-            serverGlobalParams.logpath = params["logpath"].as<string>();
-            if (serverGlobalParams.logpath.empty()) {
-                return Status(ErrorCodes::BadValue, "logpath cannot be empty if supplied");
-            }
         }
 
         serverGlobalParams.logWithSyslog = params.count("systemLog.syslog");
