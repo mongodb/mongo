@@ -10,7 +10,7 @@ function removeOptionsAddedByFramework(getCmdLineOptsResult) {
     return getCmdLineOptsResult;
 }
 
-function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
+function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
 
     // Start mongod with options
     var mongod = MongoRunner.runMongod(mongoRunnerConfig);
@@ -29,6 +29,36 @@ function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
     MongoRunner.stopMongod(mongod.port);
 }
 
+function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
+
+    // Start mongod with options
+    var mongod = MongoRunner.runMongod();
+
+    // Add configdb option
+    mongoRunnerConfig['configdb'] = mongod.host;
+
+    // Start mongos connected to mongod
+    var mongos = MongoRunner.runMongos(mongoRunnerConfig);
+
+    // Get the parsed options
+    var getCmdLineOptsResult = mongos.adminCommand("getCmdLineOpts");
+    printjson(getCmdLineOptsResult);
+
+    // Remove options added by the test framework
+    getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
+
+    // Remove the configdb option
+    delete getCmdLineOptsResult.parsed.sharding.configDB;
+
+    // Make sure the options are equal to what we expect
+    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
+
+    // Cleanup
+    MongoRunner.stopMongod(mongod.port);
+    MongoRunner.stopMongos(mongos.port);
+}
+
+
 // Move Paranoia
 jsTest.log("Testing \"moveParanoia\" command line option");
 var expectedResult = {
@@ -38,7 +68,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ moveParanoia : "" }, expectedResult);
+testGetCmdLineOptsMongod({ moveParanoia : "" }, expectedResult);
 
 jsTest.log("Testing \"noMoveParanoia\" command line option");
 expectedResult = {
@@ -48,7 +78,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ noMoveParanoia : "" }, expectedResult);
+testGetCmdLineOptsMongod({ noMoveParanoia : "" }, expectedResult);
 
 jsTest.log("Testing \"sharding.archiveMovedChunks\" config file option");
 expectedResult = {
@@ -59,7 +89,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_paranoia.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_paranoia.json" }, expectedResult);
 
 
 
@@ -72,7 +102,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ configsvr : "" }, expectedResult);
+testGetCmdLineOptsMongod({ configsvr : "" }, expectedResult);
 
 jsTest.log("Testing \"shardsvr\" command line option");
 expectedResult = {
@@ -82,7 +112,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ shardsvr : "" }, expectedResult);
+testGetCmdLineOptsMongod({ shardsvr : "" }, expectedResult);
 
 jsTest.log("Testing \"sharding.clusterRole\" config file option");
 expectedResult = {
@@ -93,13 +123,32 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ config : "jstests/libs/config_files/set_shardingrole.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/set_shardingrole.json" }, expectedResult);
 
-jsTest.log("Testing with no explicit sharding option setting");
-expectedResult = {
-    "parsed" : { }
+
+
+// Auto Splitting
+jsTest.log("Testing \"noAutoSplit\" command line option");
+var expectedResult = {
+    "parsed" : {
+        "sharding" : {
+            "autoSplit" : false
+        }
+    }
 };
-testGetCmdLineOpts({}, expectedResult);
+testGetCmdLineOptsMongos({ noAutoSplit : "" }, expectedResult);
+
+jsTest.log("Testing \"sharding.autoSplit\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/enable_autosplit.json",
+        "sharding" : {
+            "autoSplit" : true
+        }
+    }
+};
+testGetCmdLineOptsMongos({ config : "jstests/libs/config_files/enable_autosplit.json" },
+                         expectedResult);
 
 
 

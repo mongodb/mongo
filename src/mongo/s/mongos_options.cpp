@@ -176,6 +176,19 @@ namespace mongo {
         }
 #endif
 
+        // "sharding.autoSplit" comes from the config file, so override it if "noAutoSplit" is set
+        // since that comes from the command line.
+        if (params->count("noAutoSplit")) {
+            Status ret = params->set("sharding.autoSplit", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noAutoSplit");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
         return Status::OK();
     }
 
@@ -225,12 +238,11 @@ namespace mongo {
             // This option currently has no effect for mongos
         }
 
-        // --noAutoSplit is on the command line, while sharding.autoSplit is in the JSON config.
-        // Disable auto splitting if either one specifies that we should.
-        if (params.count("noAutoSplit") ||
-            (params.count("sharding.autoSplit") && !params["sharding.autoSplit"].as<bool>())) {
-            warning() << "running with auto-splitting disabled" << endl;
-            Chunk::ShouldAutoSplit = false;
+        if (params.count("sharding.autoSplit")) {
+            Chunk::ShouldAutoSplit = params["sharding.autoSplit"].as<bool>();
+            if (Chunk::ShouldAutoSplit == false) {
+                warning() << "running with auto-splitting disabled" << endl;
+            }
         }
 
         if ( ! params.count( "sharding.configDB" ) ) {
