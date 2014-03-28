@@ -125,21 +125,27 @@ namespace mongo {
         /**
          * Splits this chunk at a non-specificed split key to be chosen by the mongod holding this chunk.
          *
-         * @param force if set to true, will split the chunk regardless if the split is really necessary size wise
-         *              if set to false, will only split if the chunk has reached the currently desired maximum size
+         * @param atMedian if set to true, will split the chunk at the middle regardless if
+         *      the split is really necessary size wise. If set to false, will only split if
+         *      the chunk has reached the currently desired maximum size. Setting to false also
+         *      has the effect of splitting the chunk such that the resulting chunks will never
+         *      be greater than the current chunk size setting.
          * @param res the object containing details about the split execution
-         * @return splitPoint if found a key and split successfully, else empty BSONObj
+         * @param resultingSplits the number of resulting split points. Set to NULL to ignore.
+         *
+         * @throws UserException
          */
-        BSONObj singleSplit( bool force , BSONObj& res ) const;
+        Status split( bool atMedian, size_t* resultingSplits ) const;
 
         /**
          * Splits this chunk at the given key (or keys)
          *
          * @param splitPoints the vector of keys that should be used to divide this chunk
          * @param res the object containing details about the split execution
-         * @return if the split was successful
+         *
+         * @throws UserException
          */
-        bool multiSplit( const  vector<BSONObj>& splitPoints , BSONObj& res ) const;
+        Status multiSplit( const vector<BSONObj>& splitPoints ) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
@@ -257,6 +263,14 @@ namespace mongo {
          * will return empty object if have none
          */
         BSONObj _getExtremeKey( int sort ) const;
+
+        /**
+         * Determines the appropriate split points for this chunk.
+         *
+         * @param atMedian perform a single split at the middle of this chunk.
+         * @param splitPoints out parameter containing the chosen split points. Can be empty.
+         */
+        void determineSplitPoints(bool atMedian, std::vector<BSONObj>* splitPoints) const;
 
         /** initializes _dataWritten with a random value so that a mongos restart wouldn't cause delay in splitting */
         static int mkDataWritten();

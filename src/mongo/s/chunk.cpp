@@ -211,33 +211,29 @@ namespace mongo {
         conn.done();
     }
 
-    BSONObj Chunk::singleSplit( bool force , BSONObj& res ) const {
-        vector<BSONObj> splitPoint;
-
+    void Chunk::determineSplitPoints(bool atMedian, std::vector<BSONObj>* splitPoints) const {
         // if splitting is not obligatory we may return early if there are not enough data
         // we cap the number of objects that would fall in the first half (before the split point)
         // the rationale is we'll find a split point without traversing all the data
-        if ( ! force ) {
-            vector<BSONObj> candidates;
-            const int maxPoints = 2;
-            pickSplitVector( candidates , getManager()->getCurrentDesiredChunkSize() , maxPoints , MaxObjectPerChunk );
-            if ( candidates.size() <= 1 ) {
-                // no split points means there isn't enough data to split on
-                // 1 split point means we have between half the chunk size to full chunk size
-                // so we shouldn't split
-                LOG(1) << "chunk not full enough to trigger auto-split " << ( candidates.size() == 0 ? "no split entry" : candidates[0].toString() ) << endl;
-                return BSONObj();
-            }
-
-            splitPoint.push_back( candidates.front() );
-
-        }
-        else {
-            // if forcing a split, use the chunk's median key
+        if ( atMedian ) {
             BSONObj medianKey;
             pickMedianKey( medianKey );
             if ( ! medianKey.isEmpty() )
-                splitPoint.push_back( medianKey );
+                splitPoints->push_back( medianKey );
+        }
+        else {
+            pickSplitVector( *splitPoints, Chunk::MaxChunkSize, 0, MaxObjectPerChunk );
+
+            if ( splitPoints->size() <= 1 ) {
+                // no split points means there isn't enough data to split on
+                // 1 split point means we have between half the chunk size to full chunk size
+                // so we shouldn't split
+                splitPoints->clear();
+            }
+        }
+
+        if (splitPoints->empty()) {
+            return;
         }
 
         // We assume that if the chunk being split is the first (or last) one on the collection,
@@ -249,36 +245,67 @@ namespace mongo {
         // use that better method to determine whether to apply heuristic here.
         if ( ! skey().isSpecial() ){
             if ( minIsInf() ) {
-                splitPoint.clear();
                 BSONObj key = _getExtremeKey( 1 );
                 if ( ! key.isEmpty() ) {
-                    splitPoint.push_back( key );
+                    (*splitPoints)[0] = key.getOwned();
                 }
             }
             else if ( maxIsInf() ) {
-                splitPoint.clear();
                 BSONObj key = _getExtremeKey( -1 );
                 if ( ! key.isEmpty() ) {
-                    splitPoint.push_back( key );
+                    splitPoints->pop_back();
+                    splitPoints->push_back( key );
                 }
             }
         }
-
-        // Normally, we'd have a sound split point here if the chunk is not empty. It's also a good place to
-        // sanity check.
-        if ( splitPoint.empty() || _min == splitPoint.front() || _max == splitPoint.front() ) {
-            log() << "want to split chunk, but can't find split point chunk " << toString()
-                  << " got: " << ( splitPoint.empty() ? "<empty>" : splitPoint.front().toString() ) << endl;
-            return BSONObj();
-        }
-        
-        if (multiSplit( splitPoint , res ))
-            return splitPoint.front();
-        else
-            return BSONObj();
     }
 
-    bool Chunk::multiSplit( const vector<BSONObj>& m , BSONObj& res ) const {
+    Status Chunk::split( bool atMedian, size_t* resultingSplits ) const {
+        size_t dummy;
+        if (resultingSplits == NULL) {
+            resultingSplits = &dummy;
+        }
+
+        vector<BSONObj> splitPoints;
+        determineSplitPoints( atMedian, &splitPoints );
+
+        if (splitPoints.empty()) {
+            string msg;
+            if (atMedian) {
+                msg = "cannot find median in chunk, possibly empty";
+            }
+            else {
+                msg = "chunk not full enough to trigger auto-split";
+            }
+
+            LOG(1) << msg << endl;
+            return Status(ErrorCodes::CannotSplit, msg);
+        }
+
+        // Normally, we'd have a sound split point here if the chunk is not empty.
+        // It's also a good place to sanity check.
+        if ( _min == splitPoints.front() ) {
+            string msg(str::stream() << "not splitting chunk " << toString()
+                                     << ", split point " << splitPoints.front()
+                                     << " is exactly on chunk bounds");
+            log() << msg << endl;
+            return Status(ErrorCodes::CannotSplit, msg);
+        }
+
+        if ( _max == splitPoints.back() ) {
+            string msg(str::stream() << "not splitting chunk " << toString()
+                                     << ", split point " << splitPoints.back()
+                                     << " is exactly on chunk bounds");
+            log() << msg << endl;
+            return Status(ErrorCodes::CannotSplit, msg);
+        }
+
+        Status status = multiSplit( splitPoints );
+        *resultingSplits = splitPoints.size();
+        return status;
+    }
+
+    Status Chunk::multiSplit( const vector<BSONObj>& m ) const {
         const size_t maxSplitPoints = 8192;
 
         uassert( 10165 , "can't split as shard doesn't have a manager" , _manager );
@@ -299,14 +326,17 @@ namespace mongo {
         cmd.append( "configdb" , configServer.modelServer() );
         BSONObj cmdObj = cmd.obj();
 
+        BSONObj res;
         if ( ! conn->runCommand( "admin" , cmdObj , res )) {
-            warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
+            string msg(str::stream() << "splitChunk failed - cmd: "
+                                     << cmdObj << " result: " << res);
+            warning() << msg << endl;
             conn.done();
 
             // Mark the minor version for *eventual* reload
             _manager->markMinorForReload( this->_lastmod );
 
-            return false;
+            return Status(ErrorCodes::SplitFailed, msg);
         }
 
         conn.done();
@@ -314,7 +344,7 @@ namespace mongo {
         // force reload of config
         _manager->reload();
 
-        return true;
+        return Status::OK();
     }
 
     bool Chunk::moveAndCommit(const Shard& to,
@@ -398,9 +428,11 @@ namespace mongo {
             LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
 
             BSONObj res;
-            BSONObj splitPoint = singleSplit( false /* does not force a split if not enough data */ , res );
-            if ( splitPoint.isEmpty() ) {
-                // singleSplit would have issued a message if we got here
+            size_t splitCount = 0;
+            Status status = split( false /* does not force a split if not enough data */,
+                                   &splitCount );
+            if ( !status.isOK() ) {
+                // split would have issued a message if we got here
                 _dataWritten = 0; // this means there wasn't enough data to split, so don't want to try again until considerable more data
                 return false;
             }
@@ -414,8 +446,10 @@ namespace mongo {
 
             bool shouldBalance = grid.shouldBalance( _manager->getns() );
 
-            log() << "autosplitted " << _manager->getns() << " shard: " << toString()
-                  << " on: " << splitPoint << " (splitThreshold " << splitThreshold << ")"
+            log() << "autosplitted " << _manager->getns()
+                  << " shard: " << toString()
+                  << " into " << (splitCount + 1)
+                  << " (splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be useful when debugging
 #endif

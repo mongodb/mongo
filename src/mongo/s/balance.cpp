@@ -115,11 +115,10 @@ namespace mongo {
 
                     log() << "forcing a split because migrate failed for size reasons" << endl;
 
-                    res = BSONObj();
-                    c->singleSplit( true , res );
-                    log() << "forced split results: " << res << endl;
+                    Status status = c->split( true /* atMedian */, NULL );
+                    log() << "forced split results: " << status << endl;
 
-                    if ( ! res["ok"].trueValue() ) {
+                    if ( !status.isOK() ) {
                         log() << "marking chunk as jumbo: " << c->toString() << endl;
                         c->markAsJumbo();
                         // we increment moveCount so we do another round right away
@@ -367,12 +366,12 @@ namespace mongo {
                 vector<BSONObj> splitPoints;
                 splitPoints.push_back( min );
 
-                BSONObj res;
-                if ( !c->multiSplit( splitPoints, res ) ) {
-                    error() << "split failed: " << res << endl;
+                Status status = c->multiSplit( splitPoints );
+                if ( !status.isOK() ) {
+                    error() << "split failed: " << status << endl;
                 }
                 else {
-                    LOG(1) << "split worked: " << res << endl;
+                    LOG(1) << "split worked" << endl;
                 }
                 break;
             }

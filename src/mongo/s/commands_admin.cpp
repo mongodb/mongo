@@ -793,12 +793,12 @@ namespace mongo {
                         if ( i == allSplits.size() ||
                                 ! currentChunk->containsPoint( allSplits[i] ) ) {
                             if ( ! subSplits.empty() ){
-                                BSONObj splitResult;
-                                if ( ! currentChunk->multiSplit( subSplits , splitResult ) ){
+                                Status status = currentChunk->multiSplit( subSplits );
+                                if ( !status.isOK() ){
                                     warning().stream()
                                         << "Couldn't split chunk " << currentChunk
                                         << " while sharding collection " << ns << ". Reason: "
-                                        << splitResult << endl;
+                                        << status << endl;
                                 }
                                 subSplits.clear();
                             }
@@ -997,10 +997,14 @@ namespace mongo {
                       << " on shard " << chunk->getShard().getName() << endl;
 
                 BSONObj res;
-                bool worked;
                 if ( middle.isEmpty() ) {
-                    BSONObj ret = chunk->singleSplit( true /* force a split even if not enough data */ , res );
-                    worked = !ret.isEmpty();
+                    Status status = chunk->split( true /* force a split even if not enough data */,
+                                                  NULL );
+                    if ( !status.isOK() ) {
+                        errmsg = "split failed";
+                        result.append( "cause", status.toString() );
+                        return false;
+                    }
                 }
                 else {
                     // sanity check if the key provided is a valid split point
@@ -1016,13 +1020,13 @@ namespace mongo {
 
                     vector<BSONObj> splitPoints;
                     splitPoints.push_back( middle );
-                    worked = chunk->multiSplit( splitPoints , res );
-                }
+                    Status status = chunk->multiSplit( splitPoints );
 
-                if ( !worked ) {
-                    errmsg = "split failed";
-                    result.append( "cause" , res );
-                    return false;
+                    if ( !status.isOK() ) {
+                        errmsg = "split failed";
+                        result.append( "cause", status.toString() );
+                        return false;
+                    }
                 }
 
                 return true;
