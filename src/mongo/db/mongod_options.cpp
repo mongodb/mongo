@@ -355,15 +355,25 @@ namespace mongo {
                                           .format("(:?configsvr)|(:?shardsvr)",
                                                   "(configsvr/shardsvr)");
 
-        sharding_options.addOptionChaining("sharding.noMoveParanoia", "noMoveParanoia", moe::Switch,
+        sharding_options.addOptionChaining("noMoveParanoia", "noMoveParanoia", moe::Switch,
                 "turn off paranoid saving of data for the moveChunk command; default")
                                           .hidden()
-                                          .setSources(moe::SourceAllLegacy);
+                                          .setSources(moe::SourceAllLegacy)
+                                          .incompatibleWith("moveParanoia");
 
-        sharding_options.addOptionChaining("sharding.archiveMovedChunks", "moveParanoia",
+        sharding_options.addOptionChaining("moveParanoia", "moveParanoia",
                 moe::Switch, "turn on paranoid saving of data during the moveChunk command "
                 "(used for internal system diagnostics)")
-                                          .hidden();
+                                          .hidden()
+                                          .setSources(moe::SourceAllLegacy)
+                                          .incompatibleWith("noMoveParanoia");
+
+        sharding_options.addOptionChaining("sharding.archiveMovedChunks", "",
+                moe::Bool, "config file option to turn on paranoid saving of data during the "
+                "moveChunk command (used for internal system diagnostics)")
+                                          .hidden()
+                                          .setSources(moe::SourceYAMLConfig);
+
 
         options->addSection(general_options);
 #if defined(_WIN32)
@@ -647,6 +657,29 @@ namespace mongo {
                 return ret;
             }
             ret = params->remove("noprealloc");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "sharding.archiveMovedChunks" comes from the config file, so override it if
+        // "noMoveParanoia" or "moveParanoia" are set since those come from the command line.
+        if (params->count("noMoveParanoia")) {
+            Status ret = params->set("sharding.archiveMovedChunks", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noMoveParanoia");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("moveParanoia")) {
+            Status ret = params->set("sharding.archiveMovedChunks", moe::Value(true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("moveParanoia");
             if (!ret.isOK()) {
                 return ret;
             }
@@ -984,16 +1017,9 @@ namespace mongo {
             enableIPv6();
         }
 
-        if (params.count("sharding.noMoveParanoia") && params.count("sharding.archiveMovedChunks")) {
-            return Status(ErrorCodes::BadValue,
-                          "The moveParanoia and noMoveParanoia flags cannot both be set");
+        if (params.count("sharding.archiveMovedChunks")) {
+            serverGlobalParams.moveParanoia = params["sharding.archiveMovedChunks"].as<bool>();
         }
-
-        if (params.count("sharding.noMoveParanoia"))
-            serverGlobalParams.moveParanoia = false;
-
-        if (params.count("sharding.archiveMovedChunks"))
-            serverGlobalParams.moveParanoia = true;
 
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
             return Status(ErrorCodes::BadValue,

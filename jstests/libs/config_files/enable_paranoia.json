@@ -1,0 +1,5 @@
+{
+    "sharding" : {
+        "archiveMovedChunks" : true
+    }
+}
