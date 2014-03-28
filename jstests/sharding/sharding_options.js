@@ -29,6 +29,7 @@ function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
     MongoRunner.stopMongod(mongod.port);
 }
 
+// Move Paranoia
 jsTest.log("Testing \"moveParanoia\" command line option");
 var expectedResult = {
     "parsed" : {
@@ -59,6 +60,40 @@ expectedResult = {
     }
 };
 testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_paranoia.json" }, expectedResult);
+
+
+
+// Sharding Role
+jsTest.log("Testing \"configsvr\" command line option");
+var expectedResult = {
+    "parsed" : {
+        "sharding" : {
+            "clusterRole" : "configsvr"
+        }
+    }
+};
+testGetCmdLineOpts({ configsvr : "" }, expectedResult);
+
+jsTest.log("Testing \"shardsvr\" command line option");
+expectedResult = {
+    "parsed" : {
+        "sharding" : {
+            "clusterRole" : "shardsvr"
+        }
+    }
+};
+testGetCmdLineOpts({ shardsvr : "" }, expectedResult);
+
+jsTest.log("Testing \"sharding.clusterRole\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/set_shardingrole.json",
+        "sharding" : {
+            "clusterRole" : "configsvr"
+        }
+    }
+};
+testGetCmdLineOpts({ config : "jstests/libs/config_files/set_shardingrole.json" }, expectedResult);
 
 jsTest.log("Testing with no explicit sharding option setting");
 expectedResult = {
