@@ -175,7 +175,7 @@ __wt_txn_read_skip(
     WT_SESSION_IMPL *session, WT_UPDATE *upd, uint64_t *max_txn, int *skipp)
 {
 	WT_UPDATE *first_upd;
-        uint64_t txnid;
+	uint64_t txnid;
 
 	/*
 	 * Track the largest transaction ID on this page.  We store this in the
