@@ -438,7 +438,7 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var config  = cfg || this.getReplSetConfig();
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
-    var timeout = timeout || 30000;
+    var timeout = timeout || 60000;
     cmd[cmdKey] = config;
     printjson(cmd);
 
