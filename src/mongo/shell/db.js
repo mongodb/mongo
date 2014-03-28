@@ -1005,6 +1005,10 @@ DB.prototype._createUser = function(userObj, writeConcern) {
 }
 
 function _hashPassword(username, password) {
+    if (typeof password != 'string') {
+        throw Error("User passwords must be of type string. Was given password with type: " +
+                    typeof(password));
+    }
     return hex_md5(username + ":mongo:" + password);
 }
 
