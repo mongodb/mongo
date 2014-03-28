@@ -67,6 +67,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         // Make sure the log level didn't change since we didn't specify any verbose options
@@ -92,6 +94,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         int verbosity = 1;
@@ -118,6 +122,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         int verbosity = 4;
@@ -144,6 +150,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         int verbosity = 0;
@@ -170,7 +178,7 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-        ASSERT_NOT_OK(::mongo::storeServerOptions(environment, argv));
+        ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
     }
 
     TEST(Verbosity, INIConfigString) {
@@ -194,6 +202,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         int verbosity = 4;
@@ -222,7 +232,7 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
-        ASSERT_NOT_OK(::mongo::storeServerOptions(environment, argv));
+        ASSERT_NOT_OK(::mongo::validateServerOptions(environment));
     }
 
     TEST(Verbosity, INIConfigEmptyString) {
@@ -246,6 +256,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         int verbosity = 0;
@@ -274,6 +286,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         int verbosity = 4;
@@ -304,6 +318,8 @@ namespace {
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
 
+        ASSERT_OK(::mongo::validateServerOptions(environment));
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment));
         ASSERT_OK(::mongo::storeServerOptions(environment, argv));
 
         int verbosity = 3;
