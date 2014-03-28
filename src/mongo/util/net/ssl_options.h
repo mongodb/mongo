@@ -76,5 +76,11 @@ namespace mongo {
 
     Status storeSSLServerOptions(const moe::Environment& params);
 
+    /**
+     * Canonicalize SSL options for the given environment that have different representations with
+     * the same logical meaning
+     */
+    Status canonicalizeSSLServerOptions(moe::Environment* params);
+
     Status storeSSLClientOptions(const moe::Environment& params);
 }
