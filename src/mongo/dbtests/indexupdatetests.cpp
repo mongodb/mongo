@@ -333,6 +333,8 @@ namespace IndexUpdateTests {
             // The call is interrupted because mayInterrupt == true.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
             ASSERT_NOT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is not listed in the index catalog because the index build failed.
             ASSERT( !coll->getIndexCatalog()->findIndexByName( "a_1" ) );
         }
@@ -360,6 +362,8 @@ namespace IndexUpdateTests {
             // The call is not interrupted because mayInterrupt == false.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
             ASSERT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in the index catalog because the index build completed.
             ASSERT( coll->getIndexCatalog()->findIndexByName( "a_1" ) );
         }
@@ -392,6 +396,8 @@ namespace IndexUpdateTests {
             // The call is interrupted because mayInterrupt == true.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
             ASSERT_NOT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is not listed in the index catalog because the index build failed.
             ASSERT( !coll->getIndexCatalog()->findIndexByName( "_id_" ) );
         }
@@ -424,6 +430,8 @@ namespace IndexUpdateTests {
             // The call is not interrupted because mayInterrupt == false.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
             ASSERT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in the index catalog because the index build succeeded.
             ASSERT( coll->getIndexCatalog()->findIndexByName( "_id_" ) );
         }
@@ -445,6 +453,8 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             // The call is not interrupted.
             _client.ensureIndex( _ns, BSON( "a" << 1 ) );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in system.indexes because the index build completed.
             ASSERT_EQUALS( 1U,
                            _client.count( "unittests.system.indexes",
@@ -467,6 +477,8 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             // The call is not interrupted.
             Helpers::ensureIndex( _ns, BSON( "a" << 1 ), false, "a_1" );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in system.indexes because the index build completed.
             ASSERT_EQUALS( 1U,
                            _client.count( "unittests.system.indexes",
