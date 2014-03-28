@@ -559,6 +559,13 @@ namespace mongo {
             return ret;
         }
 
+#ifdef MONGO_SSL
+        ret = canonicalizeSSLServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+#endif
+
         // "storage.journal.enabled" comes from the config file, so override it if any of "journal",
         // "nojournal", "dur", and "nodur" are set, since those come from the command line.
         if (params->count("nodur") || params->count("nojournal")) {

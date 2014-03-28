@@ -169,6 +169,13 @@ namespace mongo {
             return ret;
         }
 
+#ifdef MONGO_SSL
+        ret = canonicalizeSSLServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+#endif
+
         return Status::OK();
     }
 
