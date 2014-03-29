@@ -1083,10 +1083,11 @@ __slvg_col_build_internal(
 
 	for (refp =
 	    page->pg_intl_index->index, i = 0; i < ss->pages_next; ++i) {
-		ref = *refp++;
-
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
+
+		ref = *refp++;
+		ref->page = NULL;
 
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		WT_ERR(__wt_strndup(
@@ -1094,10 +1095,9 @@ __slvg_col_build_internal(
 		addr->size = trk->addr.size;
 		addr->type =
 		    trk->ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
-
-		ref->page = NULL;
 		ref->addr = addr;
 		addr = NULL;
+
 		ref->key.recno = trk->col_start;
 		ref->state = WT_REF_DISK;
 
@@ -1668,10 +1668,11 @@ __slvg_row_build_internal(
 
 	for (refp =
 	    page->pg_intl_index->index, i = 0; i < ss->pages_next; ++i) {
-		ref = *refp++;
-
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
+
+		ref = *refp++;
+		ref->page = NULL;
 
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		WT_ERR(__wt_strndup(
@@ -1679,10 +1680,9 @@ __slvg_row_build_internal(
 		addr->size = trk->addr.size;
 		addr->type =
 		    trk->ovfl_cnt == 0 ? WT_ADDR_LEAF_NO : WT_ADDR_LEAF;
-
-		ref->page = NULL;
 		ref->addr = addr;
 		addr = NULL;
+
 		__wt_ref_key_clear(ref);
 		ref->state = WT_REF_DISK;
 
