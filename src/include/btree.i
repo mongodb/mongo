@@ -253,9 +253,9 @@ retry:	home = ref->home;
 
 	/*
 	 * If we don't find our reference, the page split into a new level and
-	 * our parent pointer references the wrong page.  After internal pages
-	 * deepen, any in-memory references for that page are updated with new
-	 * parent pointers, yield the processor, wait for the update.
+	 * our home pointer references the wrong page.  After internal pages
+	 * deepen, their WT_REF structures are updated with new home pointers,
+	 * yield the processor, wait for the update.
 	 */
 	__wt_yield();
 	goto retry;
