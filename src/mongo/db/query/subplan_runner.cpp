@@ -175,6 +175,7 @@ namespace mongo {
         for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {
             const IndexEntry& ie = _plannerParams.indices[i];
             indexMap[ie.keyPattern] = i;
+            QLOG() << "Subplanner: index " << i << " is " << ie.toString() << endl;
         }
 
         for (size_t i = 0; i < theOr->numChildren(); ++i) {
@@ -185,7 +186,7 @@ namespace mongo {
                                                                 orChild,
                                                                 &orChildCQ);
             if (!childCQStatus.isOK()) {
-                QLOG() << "Can't canonicalize subchild " << orChild->toString();
+                QLOG() << "Subplanner: Can't canonicalize subchild " << orChild->toString();
                 return false;
             }
 
@@ -197,16 +198,18 @@ namespace mongo {
 
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from 
             // considering any plan that's a collscan.
+            QLOG() << "Subplanner: planning child " << i << " of " << theOr->numChildren();
             Status status = QueryPlanner::plan(*safeOrChildCQ, _plannerParams, &solutions);
 
             if (!status.isOK()) {
-                QLOG() << "Can't plan for subchild " << orChildCQ->toString();
+                QLOG() << "Subplanner: Can't plan for subchild " << orChildCQ->toString();
                 return false;
             }
+            QLOG() << "Subplanner: got " << solutions.size() << " solutions";
 
             if (0 == solutions.size()) {
                 // If one child doesn't have an indexed solution, bail out.
-                QLOG() << "No solutions for subchild " << orChildCQ->toString();
+                QLOG() << "Subplanner: No solutions for subchild " << orChildCQ->toString();
                 return false;
             }
             else if (1 == solutions.size()) {
@@ -215,12 +218,13 @@ namespace mongo {
                 // We want a well-formed *indexed* solution.
                 if (NULL == autoSoln->cacheData.get()) {
                     // For example, we don't cache things for 2d indices.
-                    QLOG() << "No cache data for subchild " << orChildCQ->toString();
+                    QLOG() << "Subplanner: No cache data for subchild " << orChildCQ->toString();
                     return false;
                 }
 
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != autoSoln->cacheData->solnType) {
-                    QLOG() << "No indexed cache data for subchild " << orChildCQ->toString();
+                    QLOG() << "Subplanner: No indexed cache data for subchild "
+                           << orChildCQ->toString();
                     return false;
                 }
 
@@ -229,7 +233,8 @@ namespace mongo {
                     orChild, autoSoln->cacheData->tree.get(), indexMap);
 
                 if (!tagStatus.isOK()) {
-                    QLOG() << "Failed to extract indices from subchild" << orChildCQ->toString();
+                    QLOG() << "Subplanner: Failed to extract indices from subchild"
+                           << orChildCQ->toString();
                     return false;
                 }
 
@@ -259,24 +264,28 @@ namespace mongo {
                 size_t bestPlan;
                 BSONObj errorObj;
                 if (!mpr->pickBestPlan(&bestPlan, &errorObj)) {
-                    QLOG() << "Failed to pick best plan for subchild " << orChildCQ->toString()
+                    QLOG() << "Subplanner: Failed to pick best plan for subchild "
+                           << orChildCQ->toString()
                            << " error obj is " << errorObj.toString();
                     return false;
                 }
 
                 // pickBestPlan can yield.  Make sure we're not dead any which way.
                 if (_killed) {
-                    QLOG() << "Killed while picking best plan for subchild "
+                    QLOG() << "Subplanner: Killed while picking best plan for subchild "
                            << orChildCQ->toString();
                     return false;
                 }
 
+                QuerySolution* bestSoln = solutions[bestPlan];
+
                 // Add the index assignments to our original query.
                 Status tagStatus = QueryPlanner::tagAccordingToCache(
-                    orChild, solutions[bestPlan]->cacheData->tree.get(), indexMap);
+                    orChild, bestSoln->cacheData->tree.get(), indexMap);
 
                 if (!tagStatus.isOK()) {
-                    QLOG() << "Failed to extract indices from subchild" << orChildCQ->toString();
+                    QLOG() << "Subplanner: Failed to extract indices from subchild"
+                           << orChildCQ->toString();
                     return false;
                 }
 
@@ -292,9 +301,11 @@ namespace mongo {
             *_query, theOr.release(), false, _plannerParams.indices);
 
         if (NULL == solnRoot) {
-            QLOG() << "Failed to build indexed data path for subplanned query";
+            QLOG() << "Subplanner: Failed to build indexed data path for subplanned query\n";
             return false;
         }
+
+        QLOG() << "Subplanner: fully tagged tree is " << solnRoot->toString();
 
         // Takes ownership of 'solnRoot'
         QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(*_query,
@@ -302,7 +313,7 @@ namespace mongo {
                                                                       solnRoot);
 
         if (NULL == soln) {
-            QLOG() << "Failed analyze subplanned query";
+            QLOG() << "Subplanner: Failed to analyze subplanned query";
             return false;
         }
 
@@ -310,6 +321,8 @@ namespace mongo {
         SolutionCacheData* scd = new SolutionCacheData();
         scd->tree.reset(cacheData.release());
         soln->cacheData.reset(scd);
+
+        QLOG() << "Subplanner: Composite solution is " << soln->toString() << endl;
 
         // We use one of these even if there is one plan.  We do this so that the entry is cached
         // with stats obtained in the same fashion as a competitive ranking would have obtained
