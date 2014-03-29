@@ -92,7 +92,6 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	 */
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
-
 		/*
 		 * There are two reasons to load an empty tree rather than a
 		 * checkpoint: either there is no checkpoint (the file is
