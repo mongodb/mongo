@@ -24,12 +24,11 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 	WT_PAGE *page;
 	uint64_t read_gen;
 
-	page = entry->ref->page;
-
 	/* Never prioritize empty slots. */
-	if (page == NULL)
+	if (entry->ref == NULL)
 		return (UINT64_MAX);
 
+	page = entry->ref->page;
 	read_gen = page->read_gen + entry->btree->evict_priority;
 
 	/*
