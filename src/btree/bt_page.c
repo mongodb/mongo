@@ -21,8 +21,7 @@ static int  __inmem_row_leaf_entries(
  *	read it from the disk and build an in-memory version.
  */
 int
-__wt_page_in_func(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, uint32_t flags
+__wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -44,7 +43,7 @@ __wt_page_in_func(
 			 * Make sure there is space in the cache.
 			 */
 			WT_RET(__wt_cache_full_check(session));
-			WT_RET(__wt_cache_read(session, parent, ref));
+			WT_RET(__wt_cache_read(session, ref));
 			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);
 			continue;
@@ -76,8 +75,7 @@ __wt_page_in_func(
 				break;
 
 			page = ref->page;
-			WT_ASSERT(session,
-			    page != NULL && !WT_PAGE_IS_ROOT(page));
+			WT_ASSERT(session, page != NULL);
 
 			/*
 			 * Force evict pages that are too big.  Only do this
@@ -89,7 +87,7 @@ __wt_page_in_func(
 			    force_attempts < 10 &&
 			    __wt_eviction_force_check(session, page)) {
 				++force_attempts;
-				WT_RET(__wt_page_release(session, page));
+				WT_RET(__wt_page_release(session, ref));
 				break;
 			}
 
@@ -237,8 +235,7 @@ err:			if (page->pg_intl_index != NULL) {
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *parent_ref,
+__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *parent_ref,
     WT_PAGE_HEADER *dsk, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
@@ -329,9 +326,16 @@ __wt_page_inmem(
 	/* Update the page's in-memory size and the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
 
-	/* Link the new page into the parent. */
-	if (parent_ref != NULL)
-		WT_LINK_PAGE(parent, parent_ref, page);
+	/* Link the new internal page to the parent. */
+	if (parent_ref != NULL) {
+		switch (page->type) {
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_ROW_INT:
+			page->pg_intl_parent_ref = parent_ref;
+			break;
+		}
+		parent_ref->page = page;
+	}
 
 	*pagep = page;
 	return (0);
@@ -381,6 +385,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	refp = page->pg_intl_index->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp++;
+		ref->home = page;
 
 		__wt_cell_unpack(cell, unpack);
 		ref->addr = cell;
@@ -512,6 +517,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	refp = page->pg_intl_index->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp;
+		ref->home = page;
 
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {

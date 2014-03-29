@@ -18,6 +18,22 @@ static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
 static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 
 /*
+ * __wt_ref_out --
+ *	Discard an in-memory page, freeing all memory associated with it.
+ */
+void
+__wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	/*
+	 * A version of the page-out function that allows us to make additional
+	 * diagnostic checks.
+	 */
+	WT_ASSERT(session, S2BT(session)->evict_page != ref);
+
+	__wt_page_out(session, &ref->page);
+}
+
+/*
  * __wt_page_out --
  *	Discard an in-memory page, freeing all memory associated with it.
  */
@@ -27,20 +43,16 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	WT_PAGE *page;
 
 	/*
-	 * When a page is discarded, it's been disconnected from its parent and
-	 * its parent's WT_REF structure may now point to a different page.  Do
-	 * our best to catch races.
+	 * Kill our caller's reference, do our best to catch races.
 	 */
 	page = *pagep;
 	*pagep = NULL;
-	page->parent = NULL;
 
 	/*
 	 * We should never discard a dirty page, the file's current eviction
 	 * point or a page queued for LRU eviction.
 	 */
 	WT_ASSERT(session, !__wt_page_is_modified(page));
-	WT_ASSERT(session, S2BT(session)->evict_page != page);
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
 #ifdef HAVE_DIAGNOSTIC
@@ -239,7 +251,7 @@ __wt_free_ref_index(WT_SESSION_IMPL *session,
 				ref->page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, ref->page);
 			}
-			__wt_page_out(session, &ref->page);
+			__wt_ref_out(session, ref);
 		}
 		__free_ref(session, page, pindex->index[i]);
 	}

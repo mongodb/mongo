@@ -50,8 +50,7 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
  *	If deleting a range, try to delete the page without instantiating it.
  */
 static inline int
-__tree_walk_delete(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *skipp)
+__tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 {
 	WT_DECL_RET;
 
@@ -82,7 +81,7 @@ __tree_walk_delete(
 	 * we could probably still fast-delete the page, I doubt it's a common
 	 * enough case to make it worth the effort.
 	 */
-	if (__wt_off_page(page, ref->addr))
+	if (__wt_off_page(ref->home, ref->addr))
 		goto err;
 
 	/*
@@ -105,8 +104,8 @@ __tree_walk_delete(
 	 * future reconciliation of the child leaf page that will dirty it as
 	 * we write the tree.
 	 */
-	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	WT_ERR(__wt_page_modify_init(session, ref->home));
+	__wt_page_modify_set(session, ref->home);
 
 	*skipp = 1;
 
@@ -160,15 +159,15 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
  *	Move to the next/previous page in the tree.
  */
 int
-__wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
+__wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *couple, *page;
+	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
-	WT_REF *ref;
-	uint32_t slot;
+	WT_REF *couple, *ref;
 	int descending, prev, skip;
+	uint32_t slot;
 
 	btree = S2BT(session);
 	descending = 0;
@@ -218,12 +217,13 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	 * here.  We check when discarding pages that we're not discarding that
 	 * page, so this clear must be done before the page is released.
 	 */
-	couple = page = *pagep;
-	*pagep = NULL;
+	couple = ref = *refp;
+	*refp = NULL;
 
 	/* If no page is active, begin a walk from the start of the tree. */
-	if (page == NULL) {
-		if ((page = btree->root_page) == NULL)
+	if (ref == NULL) {
+		ref = &btree->root_page;
+		if (ref->page == NULL)
 			return (0);
 		goto descend;
 	}
@@ -232,35 +232,31 @@ ascend:	/*
 	 * If the active page was the root, we've reached the walk's end.
 	 * Release any hazard-pointer we're holding.
 	 */
-	if (WT_PAGE_IS_ROOT(page))
+	if (__wt_ref_is_root(ref))
 		return (__wt_page_release(session, couple));
 
-	/*
-	 * Figure out the current slot in the parent page's WT_REF array and
-	 * switch to the parent.
-	 */
-	WT_RET(__wt_page_refp(session, page, &pindex, &slot));
-	page = page->parent;
+	/* Figure out the current slot in the WT_REF array. */
+	__wt_page_refp(ref, &pindex, &slot);
 
 	if (0) {
 restart:	/*
-		 * The page we're moving to might have split, in which case use
-		 * the last page we held to locate the cursor in the newly split
-		 * tree.
+		 * The page we're moving to might have split, in which case find
+		 * the last position we held.
+		 *
+		 * If we were starting a tree walk, begin again.
 		 *
 		 * If we were in the process of descending, repeat the descent.
 		 * If we were moving within a single level of the tree, repeat
 		 * the last move.
-		 *
-		 * If we don't have a place to stand, we must have been starting
-		 * a tree walk, begin again.
 		 */
-		if (couple == NULL) {
-			if ((page = btree->root_page) == NULL)
+		ref = couple;
+		if (ref == &btree->root_page) {
+			ref = &btree->root_page;
+			if (ref->page == NULL)
 				return (0);
 			goto descend;
 		}
-		WT_RET(__wt_page_refp(session, couple, &pindex, &slot));
+		__wt_page_refp(ref, &pindex, &slot);
 		if (descending)
 			goto descend;
 	}
@@ -273,6 +269,8 @@ restart:	/*
 		 */
 		if ((prev && slot == 0) ||
 		    (!prev && slot == pindex->entries - 1)) {
+			ref = ref->home->pg_intl_parent_ref;
+
 			/* Optionally skip internal pages. */
 			if (LF_ISSET(WT_READ_SKIP_INTL))
 				goto ascend;
@@ -283,31 +281,26 @@ restart:	/*
 			 * otherwise, swap our hazard pointer for the page we'll
 			 * return.
 			 */
-			if (WT_PAGE_IS_ROOT(page))
+			if (__wt_ref_is_root(ref))
 				WT_RET(__wt_page_release(session, couple));
 			else {
 				/*
-				 * Find the parent page's slot in its parent
-				 * page's WT_REF array, hazard pointer couple
-				 * to the parent.
+				 * Find the reference to our parent page then
+				 * swap our child hazard pointer for the parent.
 				 *
-				 * It's hard if this page-swap call can return
-				 * restart: we'd need to add code to the restart
-				 * handler to deal with ascent.  It can't happen
-				 * because we're holding a hazard pointer on the
-				 * child page, so it can't split.
+				 * XXXKEITH
+				 * Can this page-swap return restart?
 				 */
-				ref = __wt_page_ref(session, page);
-				ret = __wt_page_swap(
-				    session, couple, page, ref, flags);
-				if (ret != 0)
-					page = NULL;
-				if (ret == WT_NOTFOUND)
-					ret =
-					    __wt_page_release(session, couple);
+				__wt_page_refp(ref, &pindex, &slot);
+				if ((ret = __wt_page_swap(
+				    session, couple, ref, flags)) != 0) {
+					WT_TRET(
+					    __wt_page_release(session, couple));
+					WT_RET(ret);
+				}
 			}
 
-			*pagep = page;
+			*refp = ref;
 			return (ret);
 		}
 
@@ -333,7 +326,7 @@ restart:	/*
 				 * without instantiating it.
 				 */
 				WT_RET(__tree_walk_delete(
-				    session, page, ref, &skip));
+				    session, ref, &skip));
 				if (skip)
 					break;
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
@@ -355,7 +348,7 @@ restart:	/*
 				 */
 				if (ref->state == WT_REF_DISK) {
 					WT_RET(__wt_compact_page_skip(
-					    session, page, ref, &skip));
+					    session, ref, &skip));
 					if (skip)
 						break;
 				}
@@ -369,7 +362,7 @@ restart:	/*
 					break;
 			}
 
-			ret = __wt_page_swap(session, couple, page, ref, flags);
+			ret = __wt_page_swap(session, couple, ref, flags);
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
 				break;
@@ -383,16 +376,17 @@ restart:	/*
 			 * internal page's children, else return (or optionally
 			 * skip), the leaf page.
 			 */
-			couple = page = ref->page;
+descend:		couple = ref;
+			page = ref->page;
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT) {
-descend:			pindex = page->pg_intl_index;
+				pindex = page->pg_intl_index;
 				slot = prev ? pindex->entries - 1 : 0;
 				descending = 1;
 			} else if (LF_ISSET(WT_READ_SKIP_LEAF))
 				goto ascend;
 			else {
-				*pagep = page;
+				*refp = ref;
 				return (0);
 			}
 		}

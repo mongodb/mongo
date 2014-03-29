@@ -25,7 +25,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	btree = S2BT(session);
 
-	page = cbt->page;
+	page = cbt->ref->page;
 	cursor = &cbt->iface;
 
 	switch (page->type) {

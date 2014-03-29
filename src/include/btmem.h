@@ -370,6 +370,7 @@ struct __wt_page {
 		 */
 		struct {
 			uint64_t recno;		/* Starting recno */
+			WT_REF	*parent_ref;	/* Parent reference */
 
 			struct __wt_page_index {
 				uint32_t entries;
@@ -380,6 +381,7 @@ struct __wt_page {
 #define	pg_intl_recno		u.intl.recno
 #undef	pg_intl_index
 #define	pg_intl_index		u.intl.index
+#define	pg_intl_parent_ref	u.intl.parent_ref
 #define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
@@ -489,15 +491,6 @@ struct __wt_page {
 
 	uint64_t memory_footprint;	/* Memory attached to the page */
 
-	/*
-	 * The page's parent: a link to the physical parent page, and a hint
-	 * offset for the matching parent page's WT_REF structure.
-	 */
-#define	WT_PAGE_IS_ROOT(page)						\
-	((page)->parent == NULL)
-	WT_PAGE	*parent;		/* Page's parent */
-	uint32_t ref_hint;		/* Page's WT_REF hint */
-
 #define	WT_PAGE_IS_INTERNAL(page)					\
 	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
 #define	WT_PAGE_INVALID		0	/* Invalid page */
@@ -597,7 +590,15 @@ enum __wt_page_state {
  * it's OK to dereference the pointer to the page.
  */
 struct __wt_ref {
-	WT_PAGE *page;			/* In-memory page */
+	/*
+	 * The page, and page's parent (a link to the physical parent page, and
+	 * a hint for the matching page index slot).
+	 */
+	WT_PAGE	*home;			/* Reference's location */
+	WT_PAGE *page;			/* Page */
+	uint32_t ref_hint;		/* Page index hint */
+
+	volatile WT_PAGE_STATE state;	/* Page state */
 
 	/*
 	 * Address: on-page cell if read from backing block, off-page WT_ADDR
@@ -616,25 +617,12 @@ struct __wt_ref {
 	} key;
 
 	uint64_t txnid;			/* Transaction ID */
-
-	volatile WT_PAGE_STATE state;	/* Page state */
-
-	uint32_t unused;
 };
 /*
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure
  * the compiler hasn't inserted padding which would break the world.
  */
-#define	WT_REF_SIZE	40
-
-/*
- * WT_LINK_PAGE --
- * Link a child page into a reference in its parent.
- */
-#define	WT_LINK_PAGE(ppage, ref, cpage) do {				\
-	(cpage)->parent = (ppage);					\
-	(ref)->page = (cpage);						\
-} while (0)
+#define	WT_REF_SIZE	48
 
 /*
  * WT_ROW --

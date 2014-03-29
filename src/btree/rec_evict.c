@@ -8,29 +8,25 @@
 #include "wt_internal.h"
 
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
-static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_discard_tree(WT_SESSION_IMPL *, WT_REF *, int, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_REF *);
-static int  __rec_page_dirty_update(
-    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int);
-static int  __rec_review(
-    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int *);
-static void __rec_root_update(WT_SESSION_IMPL *);
+static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
+static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, int, int, int *);
 
 /*
  * __wt_rec_evict --
  *	Reconciliation plus eviction.
  */
 int
-__wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE **pagep, int exclusive)
+__wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *parent_ref;
 	int istree;
 
-	page = *pagep;
+	page = ref->page;
 	istree = 0;
 
 	WT_VERBOSE_RET(session, evict,
@@ -43,13 +39,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE **pagep, int exclusive)
 	 * we're done.  We have to make this check for clean pages, too: while
 	 * unlikely eviction would choose an internal page with children, it's
 	 * not disallowed anywhere.
-	 *
-	 * Note that parent_ref may be NULL in some cases (e.g., for root pages
-	 * or during salvage).  That's OK if exclusive is set: we won't check
-	 * hazard pointers in that case.
 	 */
-	parent_ref = __wt_page_ref(session, page);
-	WT_ERR(__rec_review(session, parent_ref, page, exclusive, 1, &istree));
+	WT_ERR(__rec_review(session, ref, exclusive, 1, &istree));
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
@@ -64,36 +55,31 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE **pagep, int exclusive)
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_internal);
 	}
 
-	/*
-	 * Update the parent and discard the page.
-	 */
-	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
-		WT_ASSERT(session,
-		    exclusive || parent_ref->state == WT_REF_LOCKED);
+	/* Discard any subtree rooted in this page. */
+	if (istree)
+		__rec_discard_tree(session, ref, exclusive, 1);
 
-		if (WT_PAGE_IS_ROOT(page))
-			__rec_root_update(session);
+	/* Update the reference and discard the page. */
+	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
+		WT_ASSERT(session, exclusive || ref->state == WT_REF_LOCKED);
+
+		if (__wt_ref_is_root(ref))
+			__wt_ref_out(session, ref);
 		else
-			__rec_page_clean_update(session, parent_ref);
+			__rec_page_clean_update(session, ref);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_clean);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_clean);
 	} else {
-		if (WT_PAGE_IS_ROOT(page))
-			__rec_root_update(session);
+		if (__wt_ref_is_root(ref))
+			__wt_ref_out(session, ref);
 		else
-			WT_ERR(__rec_page_dirty_update(
-			    session, parent_ref, page, exclusive));
+			WT_ERR(
+			    __rec_page_dirty_update(session, ref, exclusive));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
 	}
-
-	/* Discard the page or tree rooted in this page. */
-	if (istree)
-		__rec_discard_tree(session, page, exclusive);
-	else
-		__wt_page_out(session, pagep);
 
 	if (0) {
 err:		/*
@@ -112,33 +98,20 @@ err:		/*
 }
 
 /*
- * __rec_root_update --
- *	Update a root page's reference on eviction (clean or dirty).
- */
-static void
-__rec_root_update(WT_SESSION_IMPL *session)
-{
-	S2BT(session)->root_page = NULL;
-}
-
-/*
  * __rec_page_clean_update --
  *	Update a clean page's reference on eviction.
  */
 static void
-__rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *parent_ref)
+__rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	/*
-	 * Update the WT_REF structure in the parent.  If the page has an
-	 * address, it's a disk page; if it has no address, it must be a
-	 * deleted page that was re-instantiated (for example, by searching)
-	 * and never written.
+	 * Discard the page and update the reference structure; if the page has
+	 * an address, it's a disk page; if it has no address, it's a deleted
+	 * page re-instantiated (for example, by searching) and never written.
 	 */
-	parent_ref->page = NULL;
-	WT_PUBLISH(parent_ref->state,
-	    parent_ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
-
-	WT_UNUSED(session);
+	__wt_ref_out(session, ref);
+	WT_PUBLISH(ref->state,
+	    ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
 }
 
 /*
@@ -146,19 +119,18 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *parent_ref)
  *	Update a dirty page's reference on eviction.
  */
 static int
-__rec_page_dirty_update(
-    WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page, int exclusive)
+__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_ADDR *addr;
 	WT_PAGE_MODIFY *mod;
 
-	mod = page->modify;
+	mod = ref->page->modify;
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
-		if (parent_ref->addr != NULL &&
-		    __wt_off_page(page->parent, parent_ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)parent_ref->addr)->addr);
-			__wt_free(session, parent_ref->addr);
+		if (ref->addr != NULL &&
+		    __wt_off_page(ref->home, ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+			__wt_free(session, ref->addr);
 		}
 
 		/*
@@ -173,19 +145,20 @@ __rec_page_dirty_update(
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		parent_ref->page = NULL;
-		parent_ref->addr = NULL;
-		parent_ref->txnid = WT_TXN_NONE;
-		WT_PUBLISH(parent_ref->state, WT_REF_DELETED);
+		__wt_ref_out(session, ref);
+		ref->addr = NULL;
+		ref->txnid = WT_TXN_NONE;
+		WT_PUBLISH(ref->state, WT_REF_DELETED);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
-		WT_RET(__wt_split_evict(session, parent_ref, page, exclusive));
+		/* Split the page in memory. */
+		WT_RET(__wt_split_evict(session, ref, exclusive));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
-		if (parent_ref->addr != NULL &&
-		    __wt_off_page(page->parent, parent_ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)parent_ref->addr)->addr);
-			__wt_free(session, parent_ref->addr);
+		if (ref->addr != NULL &&
+		    __wt_off_page(ref->home, ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+			__wt_free(session, ref->addr);
 		}
 
 		/*
@@ -199,9 +172,9 @@ __rec_page_dirty_update(
 		mod->mod_replace.addr = NULL;
 		mod->mod_replace.size = 0;
 
-		parent_ref->page = NULL;
-		parent_ref->addr = addr;
-		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
+		__wt_ref_out(session, ref);
+		ref->addr = addr;
+		WT_PUBLISH(ref->state, WT_REF_DISK);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -215,25 +188,27 @@ __rec_page_dirty_update(
  * then the page itself.
  */
 static void
-__rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
+__rec_discard_tree(
+    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int top)
 {
-	WT_REF *ref;
+	WT_REF *child;
 
-	switch (page->type) {
+	switch (ref->page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
-		WT_INTL_FOREACH_BEGIN(page, ref) {
-			if (ref->state == WT_REF_DISK ||
-			    ref->state == WT_REF_DELETED)
+		WT_INTL_FOREACH_BEGIN(ref->page, child) {
+			if (child->state == WT_REF_DISK ||
+			    child->state == WT_REF_DELETED)
 				continue;
 			WT_ASSERT(session,
-			    exclusive || ref->state == WT_REF_LOCKED);
-			__rec_discard_tree(session, ref->page, exclusive);
+			    exclusive || child->state == WT_REF_LOCKED);
+			__rec_discard_tree(session, child, exclusive, 0);
 		} WT_INTL_FOREACH_END;
 		/* FALLTHROUGH */
 	default:
-		__wt_page_out(session, &page);
+		if (!top)
+			__wt_ref_out(session, ref);
 		break;
 	}
 }
@@ -244,14 +219,17 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  *	for conditions that would block its eviction.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE *page, int exclusive, int top, int *istree)
+__rec_review(
+    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int top, int *istree)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
+	WT_REF *child;
 	uint32_t flags;
 
 	btree = S2BT(session);
+	page = ref->page;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -267,7 +245,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		 * assume a non-NULL reference on the queue is pointing at
 		 * valid memory.
 		 */
-		__wt_evict_list_clear_page(session, page);
+		__wt_evict_list_clear_page(session, ref);
 	}
 
 	/*
@@ -276,8 +254,8 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * pages after we've written them.
 	 */
 	if (WT_PAGE_IS_INTERNAL(page))
-		WT_INTL_FOREACH_BEGIN(page, ref) {
-			switch (ref->state) {
+		WT_INTL_FOREACH_BEGIN(page, child) {
+			switch (child->state) {
 			case WT_REF_DISK:		/* On-disk */
 			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
@@ -288,8 +266,8 @@ __rec_review(WT_SESSION_IMPL *session,
 				 * page.
 				 */
 				*istree = 1;
-				WT_RET(__rec_review(session,
-				    ref, ref->page, exclusive, 0, istree));
+				WT_RET(__rec_review(
+				    session, child, exclusive, 0, istree));
 				break;
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
@@ -384,7 +362,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
 		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
-		WT_RET(__wt_rec_write(session, page, NULL, flags));
+		WT_RET(__wt_rec_write(session, ref, NULL, flags));
 	} else {
 		/*
 		 * If the page was ever modified, make sure all of the updates

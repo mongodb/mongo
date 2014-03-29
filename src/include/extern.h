@@ -236,8 +236,7 @@ extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
 extern int __wt_compact(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_compact_page_skip( WT_SESSION_IMPL *session,
-    WT_PAGE *parent,
+extern int __wt_compact_page_skip(WT_SESSION_IMPL *session,
     WT_REF *ref,
     int *skipp);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
@@ -281,15 +280,16 @@ extern int __wt_debug_tree(WT_SESSION_IMPL *session,
 extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
+extern void __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_free_ref_index(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_PAGE_INDEX *pindex_arg,
     int free_pages);
-extern void __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
-extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
+extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
 extern int __wt_evict_file(WT_SESSION_IMPL *session, int syncop);
@@ -301,10 +301,7 @@ extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     size_t addr_size);
-extern int __wt_btree_new_leaf_page( WT_SESSION_IMPL *session,
-    WT_PAGE *parent,
-    WT_REF *ref,
-    WT_PAGE **pagep);
+extern int __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_btree_evictable(WT_SESSION_IMPL *session, int on);
 extern uint32_t __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session);
@@ -322,12 +319,12 @@ extern int __wt_bt_write(WT_SESSION_IMPL *session,
 extern const char *__wt_page_type_string(u_int type);
 extern const char *__wt_cell_type_string(uint8_t type);
 extern const char *__wt_page_addr_string(WT_SESSION_IMPL *session,
-    WT_ITEM *buf,
-    WT_PAGE *page);
+    WT_REF *ref,
+    WT_ITEM *buf);
 extern const char *__wt_addr_string(WT_SESSION_IMPL *session,
-    WT_ITEM *buf,
     const uint8_t *addr,
-    size_t addr_size);
+    size_t addr_size,
+    WT_ITEM *buf);
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_CELL_UNPACK *unpack,
@@ -338,8 +335,7 @@ extern int __wt_ovfl_cache(WT_SESSION_IMPL *session,
     WT_CELL_UNPACK *vpack);
 extern int __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell);
 extern int
-__wt_page_in_func(
- WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, uint32_t flags
+__wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
  , const char *file, int line
 #endif
@@ -350,15 +346,12 @@ extern int __wt_page_alloc(WT_SESSION_IMPL *session,
     uint32_t alloc_entries,
     int alloc_refs,
     WT_PAGE **pagep);
-extern int __wt_page_inmem( WT_SESSION_IMPL *session,
-    WT_PAGE *parent,
+extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_REF *parent_ref,
     WT_PAGE_HEADER *dsk,
     uint32_t flags,
     WT_PAGE **pagep);
-extern int __wt_cache_read(WT_SESSION_IMPL *session,
-    WT_PAGE *parent,
-    WT_REF *ref);
+extern int __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
@@ -379,7 +372,7 @@ extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     WT_ITEM *buf);
 extern void __wt_tree_walk_delete_rollback(WT_REF *ref);
 extern int __wt_tree_walk(WT_SESSION_IMPL *session,
-    WT_PAGE **pagep,
+    WT_REF **refp,
     uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
@@ -389,19 +382,16 @@ extern int __wt_col_modify(WT_SESSION_IMPL *session,
     int is_remove);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     uint64_t recno,
-    WT_PAGE *leaf_page,
+    WT_REF *leaf_page,
     WT_CURSOR_BTREE *cbt);
-extern int __wt_rec_evict(WT_SESSION_IMPL *session,
-    WT_PAGE **pagep,
-    int exclusive);
+extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_PAGE *orig,
     WT_MULTI *multi,
     WT_REF **refp,
     size_t *incrp);
-extern int __wt_split_evict( WT_SESSION_IMPL *session,
-    WT_REF *parent_ref,
-    WT_PAGE *page,
+extern int __wt_split_evict(WT_SESSION_IMPL *session,
+    WT_REF *ref,
     int exclusive);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
@@ -434,7 +424,7 @@ extern void __wt_ovfl_txnc_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
+    WT_REF *ref,
     WT_SALVAGE_COOKIE *salvage,
     uint32_t flags);
 extern int __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk);
@@ -489,7 +479,7 @@ extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key,
-    WT_PAGE *leaf_page,
+    WT_REF *leaf_page,
     WT_CURSOR_BTREE *cbt);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,

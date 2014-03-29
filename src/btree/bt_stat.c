@@ -22,7 +22,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_DSRC_STATS *stats;
-	WT_PAGE *page;
+	WT_REF *next_walk;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -41,9 +41,10 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	if (!cst->stat_all)
 		return (0);
 
-	page = NULL;
-	while ((ret = __wt_tree_walk(session, &page, 0)) == 0 && page != NULL)
-		WT_RET(__stat_page(session, page, stats));
+	next_walk = NULL;
+	while ((ret =
+	    __wt_tree_walk(session, &next_walk, 0)) == 0 && next_walk != NULL)
+		WT_RET(__stat_page(session, next_walk->page, stats));
 	return (ret == WT_NOTFOUND ? 0 : ret);
 }
 

@@ -20,7 +20,8 @@ struct __rec_kv;		typedef struct __rec_kv WT_KV;
  *	Information tracking a single page reconciliation.
  */
 typedef struct {
-	WT_PAGE *page;			/* Page being reconciled */
+	WT_REF  *ref;			/* Page being reconciled */
+	WT_PAGE *page;
 	uint32_t flags;			/* Caller's configuration */
 
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
@@ -287,7 +288,7 @@ static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *,
 static int  __rec_cell_build_val(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, uint64_t);
 static int  __rec_child_deleted(
-		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *, WT_REF *, int *);
+		WT_SESSION_IMPL *, WT_RECONCILE *, WT_REF *, int *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_col_fix_slvg(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
@@ -313,7 +314,7 @@ static int  __rec_split_row_promote(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_ITEM *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, int);
-static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, void *);
+static int  __rec_write_init(WT_SESSION_IMPL *, WT_REF *, uint32_t, void *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_write_wrapup_err(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -330,15 +331,17 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  */
 int
 __wt_rec_write(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
+    WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
 	int locked;
 
 	conn = S2C(session);
+	page = ref->page;
 	mod = page->modify;
 
 	/* We're shouldn't get called with a clean page, that's an error. */
@@ -359,7 +362,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	mod->disk_snap_min = session->txn.snap_min;
 
 	/* Initialize the reconciliation structure for each new run. */
-	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
+	WT_RET(__rec_write_init(session, ref, flags, &session->reconcile));
 	r = session->reconcile;
 
 	/*
@@ -419,7 +422,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * Root pages are special, splits have to be done, we can't put it off
 	 * as the parent's problem any more.
 	 */
-	if (WT_PAGE_IS_ROOT(page))
+	if (__wt_ref_is_root(ref))
 		return (__rec_root_write(session, page, flags));
 
 	/*
@@ -428,8 +431,8 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	WT_RET(__wt_page_modify_init(session, page->parent));
-	__wt_page_only_modify_set(session, page->parent);
+	WT_RET(__wt_page_modify_init(session, ref->home));
+	__wt_page_only_modify_set(session, ref->home);
 	return (0);
 }
 
@@ -443,6 +446,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_DECL_RET;
 	WT_PAGE *next;
 	WT_PAGE_MODIFY *mod;
+	WT_REF fake_ref;
 	uint32_t i;
 
 	mod = page->modify;
@@ -495,7 +499,13 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	WT_ERR(__wt_page_modify_init(session, next));
 	__wt_page_only_modify_set(session, next);
-	return (__wt_rec_write(session, next, NULL, flags));
+
+	/*
+	 * Fake up a reference structure, and write the next root page.
+	 */
+	WT_CLEAR(fake_ref);
+	fake_ref.page = next;
+	return (__wt_rec_write(session, &fake_ref, NULL, flags));
 
 err:	__wt_page_out(session, &next);
 	return (ret);
@@ -507,12 +517,14 @@ err:	__wt_page_out(session, &next);
  */
 static int
 __rec_write_init(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, void *reconcilep)
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, void *reconcilep)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 	WT_RECONCILE *r;
 
 	btree = S2BT(session);
+	page = ref->page;
 
 	if ((r = *(WT_RECONCILE **)reconcilep) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
@@ -529,6 +541,7 @@ __rec_write_init(
 	}
 
 	/* Remember the configuration. */
+	r->ref = ref;
 	r->page = page;
 	r->flags = flags;
 
@@ -548,7 +561,7 @@ __rec_write_init(
 	r->raw_compression =
 	    btree->compressor != NULL &&
 	    btree->compressor->compress_raw != NULL &&
-	    page->type != WT_PAGE_COL_FIX &&
+	    r->page->type != WT_PAGE_COL_FIX &&
 	    btree->dictionary == 0 &&
 	    btree->prefix_compression == 0;
 
@@ -884,15 +897,15 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
  * hazard pointer we're holding on child pages.
  */
 #undef	CHILD_RELEASE
-#define	CHILD_RELEASE(session, hazard, child) do {			\
+#define	CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
 		hazard = 0;						\
-		WT_TRET(__wt_page_release(session, child));		\
+		WT_TRET(__wt_page_release(session, ref));		\
 	}								\
 } while (0)
 #undef	CHILD_RELEASE_ERR
-#define	CHILD_RELEASE_ERR(session, hazard, child) do {			\
-	CHILD_RELEASE(session, hazard, child);				\
+#define	CHILD_RELEASE_ERR(session, hazard, ref) do {			\
+	CHILD_RELEASE(session, hazard, ref);				\
 	WT_ERR(ret);							\
 } while (0)
 
@@ -902,7 +915,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
  */
 static int
 __rec_child_modify(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *hazardp, int *statep)
+    WT_RECONCILE *r, WT_REF *ref, int *hazardp, int *statep)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
@@ -947,7 +960,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret =
-			    __rec_child_deleted(session, r, page, ref, statep);
+			    __rec_child_deleted(session, r, ref, statep);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			goto done;
 
@@ -993,7 +1006,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * underlying page split?  If it can, we need to think
 			 * more about checkpoints in the context of page splits.
 			 */
-			if ((ret = __wt_page_in(session, page, ref,
+			if ((ret = __wt_page_in(session, ref,
 			    WT_READ_CACHE |
 			    WT_READ_NO_GEN | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
 				ret = 0;
@@ -1048,7 +1061,7 @@ in_memory:
 		*statep = WT_CHILD_MODIFIED;
 	else if (ref->addr == NULL) {
 		*statep = WT_CHILD_IGNORE;
-		CHILD_RELEASE(session, *hazardp, ref->page);
+		CHILD_RELEASE(session, *hazardp, ref);
 	}
 
 done:	WT_HAVE_DIAGNOSTIC_YIELD;
@@ -1060,8 +1073,8 @@ done:	WT_HAVE_DIAGNOSTIC_YIELD;
  *	Handle pages with leaf pages in the WT_REF_DELETED state.
  */
 static int
-__rec_child_deleted(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
+__rec_child_deleted(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, int *statep)
 {
 	WT_BM *bm;
 	size_t addr_size;
@@ -1126,11 +1139,10 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	if (ref->addr != NULL &&
 	    (ref->txnid == WT_TXN_NONE ||
 	    __wt_txn_visible_all(session, ref->txnid))) {
-		WT_RET(
-		    __wt_ref_info(session, page, ref, &addr, &addr_size, NULL));
+		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		WT_RET(bm->free(bm, session, addr, addr_size));
 
-		if (__wt_off_page(page, ref->addr)) {
+		if (__wt_off_page(ref->home, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
@@ -1455,7 +1467,7 @@ __rec_is_checkpoint(WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	 * we don't do checkpoint writes here; clear the boundary information as
 	 * a reminder and create the checkpoint during wrapup.
 	 */
-	if (bnd == &r->bnd[0] && WT_PAGE_IS_ROOT(r->page)) {
+	if (bnd == &r->bnd[0] && __wt_ref_is_root(r->ref)) {
 		bnd->addr.addr = NULL;
 		bnd->addr.size = 0;
 		bnd->addr.type = 0;
@@ -2498,14 +2510,16 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_RECONCILE *r;
+	WT_REF *ref;
 	WT_SESSION_IMPL *session;
 	uint64_t recno;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = S2BT(session);
+	ref = cbulk->ref;
 	page = cbulk->leaf;
 
-	WT_RET(__rec_write_init(session, page, 0, &cbulk->reconcile));
+	WT_RET(__rec_write_init(session, ref, 0, &cbulk->reconcile));
 	r = cbulk->reconcile;
 	r->bulk_load = 1;
 
@@ -2533,7 +2547,6 @@ int
 __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
-	WT_PAGE *page;
 	WT_RECONCILE *r;
 	WT_SESSION_IMPL *session;
 
@@ -2557,14 +2570,12 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	page = cbulk->leaf;
-
 	WT_RET(__rec_split_finish(session, r));
-	WT_RET(__rec_write_wrapup(session, r, page));
+	WT_RET(__rec_write_wrapup(session, r, r->page));
 
 	/* Mark the page's parent dirty. */
-	WT_RET(__wt_page_modify_init(session, page->parent));
-	__wt_page_modify_set(session, page->parent);
+	WT_RET(__wt_page_modify_init(session, r->ref->home));
+	__wt_page_modify_set(session, r->ref->home);
 
 	__rec_destroy(session, &cbulk->reconcile);
 
@@ -2810,8 +2821,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
-		WT_ERR(
-		    __rec_child_modify(session, r, page, ref, &hazard, &state));
+		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
 		addr = NULL;
 		child = ref->page;
 		if (state != 0) {
@@ -2831,11 +2841,11 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * name space.  The exceptions are pages created
 				 * when the tree is created, and never filled.
 				 */
-				CHILD_RELEASE_ERR(session, hazard, child);
+				CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_MULTIBLOCK:
 				WT_ERR(__rec_col_merge(session, r, child));
-				CHILD_RELEASE_ERR(session, hazard, child);
+				CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_REPLACE:
 				addr = &child->modify->mod_replace;
@@ -2864,7 +2874,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		} else
 			__rec_cell_build_addr(r, addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
-		CHILD_RELEASE_ERR(session, hazard, child);
+		CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -2880,7 +2890,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
 
-err:	CHILD_RELEASE(session, hazard, child);
+err:	CHILD_RELEASE(session, hazard, ref);
 	return (ret);
 }
 
@@ -3607,8 +3617,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
 		}
 
-		WT_ERR(
-		    __rec_child_modify(session, r, page, ref, &hazard, &state));
+		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
 		addr = ref->addr;
 		child = ref->page;
 		vtype = 0;
@@ -3625,7 +3634,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (onpage_ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
 				WT_ERR(__wt_ovfl_discard_add(
 				    session, page, kpack->cell));
-			CHILD_RELEASE_ERR(session, hazard, child);
+			CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
 		}
 
@@ -3652,7 +3661,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				    kpack->raw != WT_CELL_KEY_OVFL_RM)
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
-				CHILD_RELEASE_ERR(session, hazard, child);
+				CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_MULTIBLOCK:
 				/*
@@ -3670,7 +3679,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					    session, page, kpack->cell));
 
 				WT_ERR(__rec_row_merge(session, r, child));
-				CHILD_RELEASE_ERR(session, hazard, child);
+				CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_REPLACE:
 				/*
@@ -3702,7 +3711,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				vtype = vpack->raw;
 		}
 		__rec_cell_build_addr(r, p, size, vtype, 0);
-		CHILD_RELEASE_ERR(session, hazard, child);
+		CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
 		 * If the key is an overflow key, check to see if the backing
@@ -3761,7 +3770,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
 
-err:	CHILD_RELEASE(session, hazard, child);
+err:	CHILD_RELEASE(session, hazard, ref);
 	return (ret);
 }
 
@@ -4326,6 +4335,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	btree = S2BT(session);
 	bm = btree->bm;
 	mod = page->modify;
+	ref = r->ref;
 
 	/*
 	 * This page may have previously been reconciled, and that information
@@ -4343,19 +4353,17 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * The exception is root pages are never tracked or free'd, they
 		 * are checkpoints, and must be explicitly dropped.
 		 */
-		if (WT_PAGE_IS_ROOT(page))
+		if (__wt_ref_is_root(ref))
 			break;
-
-		ref = __wt_page_ref(session, page);
 		if (ref->addr != NULL) {
 			/*
 			 * Free the page and clear the address (so we don't free
 			 * it twice).
 			 */
-			WT_RET(__wt_ref_info(session,
-			    page->parent, ref, &addr, &addr_size, NULL));
+			WT_RET(__wt_ref_info(
+			    session, ref, &addr, &addr_size, NULL));
 			WT_RET(bm->free(bm, session, addr, addr_size));
-			if (__wt_off_page(page->parent, ref->addr)) {
+			if (__wt_off_page(ref->home, ref->addr)) {
 				__wt_free(
 				    session, ((WT_ADDR *)ref->addr)->addr);
 				__wt_free(session, ref->addr);
@@ -4378,7 +4386,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * The exception is root pages are never tracked or free'd, they
 		 * are checkpoints, and must be explicitly dropped.
 		 */
-		if (!WT_PAGE_IS_ROOT(page))
+		if (!__wt_ref_is_root(ref))
 			WT_RET(bm->free(bm, session,
 			    mod->mod_replace.addr, mod->mod_replace.size));
 
@@ -4405,7 +4413,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
 		/* If this is the root page, we need to create a sync point. */
-		if (WT_PAGE_IS_ROOT(page))
+		ref = r->ref;
+		if (__wt_ref_is_root(ref))
 			WT_RET(
 			    bm->checkpoint(bm, session, NULL, btree->ckpt, 0));
 
@@ -4612,11 +4621,11 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	mod = page->modify;
 
 	/* We never set the first page's key, grab it from the original page. */
-	if (WT_PAGE_IS_ROOT(page))
+	ref = r->ref;
+	if (__wt_ref_is_root(ref))
 		WT_RET(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
-		ref = __wt_page_ref(session, page);
-		__wt_ref_key(page->parent, ref, &p, &size);
+		__wt_ref_key(ref->home, ref, &p, &size);
 		WT_RET(__wt_buf_set(session, &r->bnd[0].key, p, size));
 	}
 

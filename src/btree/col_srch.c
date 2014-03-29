@@ -13,7 +13,7 @@
  */
 int
 __wt_col_search(WT_SESSION_IMPL *session,
-    uint64_t recno, WT_PAGE *leaf_page, WT_CURSOR_BTREE *cbt)
+    uint64_t recno, WT_REF *leaf_page, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -22,7 +22,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
-	WT_REF *ref;
+	WT_REF *child, *parent;
 	uint32_t base, indx, limit;
 	int depth;
 
@@ -35,40 +35,42 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	 * page, not a full tree.
 	 */
 	if (leaf_page != NULL) {
-		page = leaf_page;
+		child = leaf_page;
 		goto leaf_only;
 	}
 
 restart:
 	/* Search the internal pages of the tree. */
-	ref = NULL;
-	for (depth = 2,
-	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
-		WT_ASSERT(session,
-		    ref == NULL || ref->key.recno == page->pg_intl_recno);
+	parent = child = &btree->root_page;
+	for (depth = 2;; ++depth) {
+		page = parent->page;
+		if (page->type != WT_PAGE_COL_INT)
+			break;
 
-		/* Fast path appends. */
+		WT_ASSERT(session, parent->key.recno == page->pg_intl_recno);
+
 		pindex = page->pg_intl_index;
 		base = pindex->entries;
-		ref = pindex->index[base - 1];
-		if (recno >= ref->key.recno)
+		child = pindex->index[base - 1];
+
+		/* Fast path appends. */
+		if (recno >= child->key.recno)
 			goto descend;
 
 		/* Binary search of internal pages. */
-		for (base = 0, ref = NULL,
-		    limit = pindex->entries - 1;
-		    limit != 0; limit >>= 1) {
+		for (base = 0,
+		    limit = pindex->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			ref = pindex->index[indx];
+			child = pindex->index[indx];
 
-			if (recno == ref->key.recno)
+			if (recno == child->key.recno)
 				break;
-			if (recno < ref->key.recno)
+			if (recno < child->key.recno)
 				continue;
 			base = indx + 1;
 			--limit;
 		}
-descend:	WT_ASSERT(session, ref != NULL);
+descend:	WT_ASSERT(session, child != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.
@@ -77,14 +79,14 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != ref->key.recno) {
+		if (recno != child->key.recno) {
 			/*
 			 * We don't have to correct for base == 0 because the
 			 * only way for base to be 0 is if recno is the page's
 			 * starting recno.
 			 */
 			WT_ASSERT(session, base > 0);
-			ref = pindex->index[base - 1];
+			child = pindex->index[base - 1];
 		}
 
 		/*
@@ -92,8 +94,8 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * while we're waiting for it, restart the search, otherwise
 		 * return on error.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref, 0)) == 0) {
-			page = ref->page;
+		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+			parent = child;
 			continue;
 		}
 		/*
@@ -102,7 +104,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * it and restart the search from the top of the tree.
 		 */
 		if (ret == WT_RESTART &&
-		    (ret = __wt_page_release(session, page)) == 0)
+		    (ret = __wt_page_release(session, parent)) == 0)
 			goto restart;
 		return (ret);
 	}
@@ -112,9 +114,10 @@ descend:	WT_ASSERT(session, ref != NULL);
 		btree->maximum_depth = depth;
 
 leaf_only:
-	cbt->page = page;
+	cbt->ref = child;
 	cbt->recno = recno;
 	cbt->compare = 0;
+	page = child->page;
 
 	/*
 	 * Search the leaf page.  We do not check in the search path for a

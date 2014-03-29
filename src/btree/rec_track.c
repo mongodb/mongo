@@ -46,7 +46,7 @@ __ovfl_discard_verbose(
 	    tag == NULL ? "" : tag,
 	    tag == NULL ? "" : ": ",
 	    page,
-	    __wt_addr_string(session, tmp, unpack->data, unpack->size));
+	    __wt_addr_string(session, unpack->data, unpack->size, tmp));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -181,7 +181,7 @@ __ovfl_reuse_verbose(WT_SESSION_IMPL *session,
 	    tag == NULL ? "" : ": ",
 	    page,
 	    __wt_addr_string(
-		session, tmp, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size),
+		session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size, tmp),
 	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) ? "inuse" : "",
 	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) &&
 	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? ", " : "",
@@ -575,7 +575,7 @@ __ovfl_txnc_verbose(WT_SESSION_IMPL *session,
 	    tag == NULL ? "" : ": ",
 	    page,
 	    __wt_addr_string(
-		session, tmp, WT_OVFL_TXNC_ADDR(txnc), txnc->addr_size),
+		session, WT_OVFL_TXNC_ADDR(txnc), txnc->addr_size, tmp),
 	    txnc->current,
 	    WT_MIN(txnc->value_size, 40), (char *)WT_OVFL_TXNC_VALUE(txnc));
 
