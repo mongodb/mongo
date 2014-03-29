@@ -561,7 +561,7 @@ __rec_write_init(
 	r->raw_compression =
 	    btree->compressor != NULL &&
 	    btree->compressor->compress_raw != NULL &&
-	    r->page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_FIX &&
 	    btree->dictionary == 0 &&
 	    btree->prefix_compression == 0;
 
