@@ -344,6 +344,7 @@ namespace mongo {
         if (internalQueryPlanOrChildrenIndependently
             && SubplanRunner::canUseSubplanRunner(*canonicalQuery)) {
 
+            QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
             LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
             *out = new SubplanRunner(collection, plannerParams, canonicalQuery.release());
             return Status::OK();
