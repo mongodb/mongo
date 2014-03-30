@@ -508,6 +508,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
     WT_PAGE *orig, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
+	WT_IKEY *ikey;
 	WT_REF *ref;
 	size_t incr;
 
@@ -524,11 +525,10 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
 
 	if (multi->skip == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &addr));
+		*addr = multi->addr;
+		multi->addr.addr = NULL;
+
 		ref->addr = addr;
-		addr->size = multi->addr.size;
-		addr->type = multi->addr.type;
-		WT_RET(__wt_strndup(session,
-		    multi->addr.addr, addr->size, &addr->addr));
 		incr += sizeof(WT_ADDR) + addr->size;
 		ref->state = WT_REF_DISK;
 	} else {
@@ -539,10 +539,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
 	switch (orig->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__wt_strndup(session,
-		    multi->key.ikey, multi->key.ikey->size + sizeof(WT_IKEY),
-		    &ref->key.ikey));
-		incr += sizeof(WT_IKEY) + multi->key.ikey->size;
+		ikey = multi->key.ikey;
+		multi->key.ikey = NULL;
+
+		ref->key.ikey = ikey;
+		incr += sizeof(WT_IKEY) + ikey->size;
 		break;
 	default:
 		ref->key.recno = multi->key.recno;
