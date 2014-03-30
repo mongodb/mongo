@@ -1117,8 +1117,7 @@ __slvg_col_build_internal(
 		++ref;
 	}
 
-	WT_CLEAR(ss->root_ref);
-	ss->root_ref.page = page;
+	__wt_root_ref_init(&ss->root_ref, page, 1);
 
 	if (0) {
 err:		if (addr != NULL)
@@ -1705,8 +1704,7 @@ __slvg_row_build_internal(
 		++ref;
 	}
 
-	WT_CLEAR(ss->root_ref);
-	ss->root_ref.page = page;
+	__wt_root_ref_init(&ss->root_ref, page, 0);
 
 	if (0) {
 err:		if (addr != NULL)
@@ -1823,8 +1821,8 @@ __slvg_row_build_leaf(
 	 */
 	rip = page->pg_row_d + skip_start;
 	WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
-	WT_ERR(__wt_row_ikey_incr(
-	    session, ref->home, 0, key->data, key->size, &ref->key.ikey));
+	WT_ERR(__wt_row_ikey_incr(session,
+	    (WT_PAGE *)ref->home, 0, key->data, key->size, &ref->key.ikey));
 
 	/*
 	 * Discard backing overflow pages for any items being discarded that

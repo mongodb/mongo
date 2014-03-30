@@ -218,15 +218,13 @@ static inline void
 __wt_page_refp(WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE_INDEX *pindex;
-	WT_PAGE *home;
 	uint32_t i;
 
 	/*
 	 * Copy the parent page's index value: the page can split at any time,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
-retry:	home = ref->home;
-	pindex = *pindexp = home->pg_intl_index;
+retry:	pindex = ref->home->pg_intl_index;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
@@ -242,11 +240,13 @@ retry:	home = ref->home;
 	 */
 	for (i = ref->ref_hint; i < pindex->entries; ++i)
 		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
 			*slotp = ref->ref_hint = i;
 			return;
 		}
 	for (i = 0; i < pindex->entries; ++i)
 		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
 			*slotp = ref->ref_hint = i;
 			return;
 		}
@@ -254,8 +254,8 @@ retry:	home = ref->home;
 	/*
 	 * If we don't find our reference, the page split into a new level and
 	 * our home pointer references the wrong page.  After internal pages
-	 * deepen, their WT_REF structures are updated with new home pointers,
-	 * yield the processor, wait for the update.
+	 * deepen, their reference structure home value are updated; yield and
+	 * wait for that to happen.
 	 */
 	__wt_yield();
 	goto retry;
@@ -595,7 +595,7 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 		*sizep = 0;
 		if (typep != NULL)
 			*typep = 0;
-	} else if (__wt_off_page(ref->home, addr)) {
+	} else if (__wt_off_page((WT_PAGE *)ref->home, addr)) {
 		*addrp = addr->addr;
 		*sizep = addr->size;
 		if (typep != NULL)

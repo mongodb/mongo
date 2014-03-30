@@ -185,7 +185,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_REF **alloc_refp;
-	WT_REF **child_refp, **parent_refp, *ref;
+	WT_REF *child_ref, **child_refp, *parent_ref, **parent_refp, *ref;
 	size_t child_incr, parent_decr, parent_incr, size;
 	uint32_t children, chunk, i, j, remain, slots;
 	int panic;
@@ -267,10 +267,12 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		ref->txnid = WT_TXN_NONE;
 		ref->state = WT_REF_MEM;
 
-		/* Initialize the child page, mark it dirty. */
+		/* Initialize the child page. */
 		if (parent->type == WT_PAGE_COL_INT)
 			child->pg_intl_recno = (*parent_refp)->key.recno;
-		child->type = parent->type;
+		child->pg_intl_parent_ref = ref;
+
+		/* Mark it dirty. */
 		WT_ERR(__wt_page_modify_init(session, child));
 		__wt_page_only_modify_set(session, child);
 
@@ -349,22 +351,47 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 #endif
 
 	/*
-	 * The WT_REF structures that we moved now reference the wrong parent
-	 * page, and we have to fix that up.  The problem is revealed when a
-	 * thread of control attempts to find a page's WT_REF structure, does
-	 * a search of the parent page's index, and fails to find its WT_REF
-	 * structure, as the parent page no longer references it.  When that
-	 * failure happens, the thread waits for the page's parent reference
-	 * to be updated, which we do here: walk the children and fix them up.
+	 * The moved reference structures now reference the wrong parent page,
+	 * and we have to fix that up.  The problem is revealed when a thread
+	 * of control searches for a page's reference structure slot, and fails
+	 * to find it because the page it's searching no longer references it.
+	 * When that failure happens, the thread waits for the reference's home
+	 * page to be updated, which we do here: walk the children and fix them
+	 * up.
 	 */
-	WT_INTL_FOREACH_BEGIN(parent, ref) {
-		ref->home = parent;
-	} WT_INTL_FOREACH_END;
+	pindex = parent->pg_intl_index;
+	for (parent_refp = pindex->index + SPLIT_CORRECT_1,
+	    i = pindex->entries - SPLIT_CORRECT_1; i > 0; ++parent_refp, --i) {
+		parent_ref = *parent_refp;
+		if (parent_ref->state != WT_REF_MEM)
+			continue;
+		WT_ASSERT(session, parent_ref->home == parent);
+
+		child = parent_ref->page;
+		if (child->type != WT_PAGE_ROW_INT &&
+		    child->type != WT_PAGE_COL_INT)
+			continue;
+#ifdef HAVE_DIAGNOSTIC
+		__split_verify_intl_key_order(session, child);
+#endif
+		WT_INTL_FOREACH_BEGIN(child, child_ref) {
+			/*
+			 * The page's parent reference may not be wrong, as we
+			 * opened up access from the top of the tree already,
+			 * pages may have been read in since then.  Check and
+			 * only update pages that reference the original page,
+			 * they must be wrong.
+			 */
+			if (child_ref->home == parent) {
+				child_ref->home = child;
+				child_ref->ref_hint = 0;
+			}
+		} WT_INTL_FOREACH_END;
+	}
 
 	/*
-	 * Push out the changes: not required for correctness, but we don't
-	 * want threads spinning on incorrect page parent references longer
-	 * than necessary.
+	 * Push out the changes: not required for correctness, but don't let
+	 * threads spin on incorrect page references longer than necessary.
 	 */
 	WT_FULL_BARRIER();
 
@@ -416,7 +443,6 @@ __split_inmem_build(
 	 */
 	WT_RET(__wt_page_inmem(
 	    session, ref, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &page));
-	ref->page = page;
 
 	/*
 	 * Clear the disk image and link the page into the passed-in WT_REF to
@@ -559,7 +585,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	parent_decr = parent_incr = 0;
 	complete = 0;
 
-	parent = ref->home;
+	parent = (WT_PAGE *)ref->home;
 	child = ref->page;
 	mod = child->modify;
 

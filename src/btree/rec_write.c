@@ -335,7 +335,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_PAGE *page;
+	WT_PAGE *page, *parent;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
 	int locked;
@@ -431,8 +431,9 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	WT_RET(__wt_page_modify_init(session, ref->home));
-	__wt_page_only_modify_set(session, ref->home);
+	parent = (WT_PAGE *)ref->home;
+	WT_RET(__wt_page_modify_init(session, parent));
+	__wt_page_only_modify_set(session, parent);
 	return (0);
 }
 
@@ -503,8 +504,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/*
 	 * Fake up a reference structure, and write the next root page.
 	 */
-	WT_CLEAR(fake_ref);
-	fake_ref.page = next;
+	__wt_root_ref_init(&fake_ref, next, page->type == WT_PAGE_COL_INT);
 	return (__wt_rec_write(session, &fake_ref, NULL, flags));
 
 err:	__wt_page_out(session, &next);
@@ -1142,7 +1142,7 @@ __rec_child_deleted(
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		WT_RET(bm->free(bm, session, addr, addr_size));
 
-		if (__wt_off_page(ref->home, ref->addr)) {
+		if (__wt_off_page((WT_PAGE *)ref->home, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
@@ -2547,6 +2547,7 @@ int
 __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
+	WT_PAGE *parent;
 	WT_RECONCILE *r;
 	WT_SESSION_IMPL *session;
 
@@ -2574,8 +2575,9 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	WT_RET(__rec_write_wrapup(session, r, r->page));
 
 	/* Mark the page's parent dirty. */
-	WT_RET(__wt_page_modify_init(session, r->ref->home));
-	__wt_page_modify_set(session, r->ref->home);
+	parent = (WT_PAGE *)r->ref->home;
+	WT_RET(__wt_page_modify_init(session, parent));
+	__wt_page_modify_set(session, parent);
 
 	__rec_destroy(session, &cbulk->reconcile);
 
@@ -4363,7 +4365,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_ref_info(
 			    session, ref, &addr, &addr_size, NULL));
 			WT_RET(bm->free(bm, session, addr, addr_size));
-			if (__wt_off_page(ref->home, ref->addr)) {
+			if (__wt_off_page((WT_PAGE *)ref->home, ref->addr)) {
 				__wt_free(
 				    session, ((WT_ADDR *)ref->addr)->addr);
 				__wt_free(session, ref->addr);
@@ -4625,7 +4627,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	if (__wt_ref_is_root(ref))
 		WT_RET(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
-		__wt_ref_key(ref->home, ref, &p, &size);
+		__wt_ref_key((WT_PAGE *)ref->home, ref, &p, &size);
 		WT_RET(__wt_buf_set(session, &r->bnd[0].key, p, size));
 	}
 

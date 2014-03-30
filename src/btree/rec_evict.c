@@ -122,13 +122,16 @@ static int
 __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_ADDR *addr;
+	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
 
+	parent = (WT_PAGE *)ref->home;
 	mod = ref->page->modify;
+
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		if (ref->addr != NULL &&
-		    __wt_off_page(ref->home, ref->addr)) {
+		    __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
@@ -156,7 +159,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		if (ref->addr != NULL &&
-		    __wt_off_page(ref->home, ref->addr)) {
+		    __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}

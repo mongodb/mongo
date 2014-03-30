@@ -235,7 +235,7 @@ err:			if (page->pg_intl_index != NULL) {
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *parent_ref,
+__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
     WT_PAGE_HEADER *dsk, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
@@ -327,14 +327,14 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *parent_ref,
 	__wt_cache_page_inmem_incr(session, page, size);
 
 	/* Link the new internal page to the parent. */
-	if (parent_ref != NULL) {
+	if (ref != NULL) {
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			page->pg_intl_parent_ref = parent_ref;
+			page->pg_intl_parent_ref = ref;
 			break;
 		}
-		parent_ref->page = page;
+		ref->page = page;
 	}
 
 	*pagep = page;

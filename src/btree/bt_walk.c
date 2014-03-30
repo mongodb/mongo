@@ -52,9 +52,12 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
 static inline int
 __tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 {
+	WT_PAGE *parent;
 	WT_DECL_RET;
 
 	*skipp = 0;
+
+	parent = (WT_PAGE *)ref->home;
 
 	/*
 	 * If the page is already instantiated in-memory, other threads may be
@@ -81,7 +84,7 @@ __tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * we could probably still fast-delete the page, I doubt it's a common
 	 * enough case to make it worth the effort.
 	 */
-	if (__wt_off_page(ref->home, ref->addr))
+	if (__wt_off_page(parent, ref->addr))
 		goto err;
 
 	/*
@@ -104,8 +107,8 @@ __tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * future reconciliation of the child leaf page that will dirty it as
 	 * we write the tree.
 	 */
-	WT_ERR(__wt_page_modify_init(session, ref->home));
-	__wt_page_modify_set(session, ref->home);
+	WT_ERR(__wt_page_modify_init(session, parent));
+	__wt_page_modify_set(session, parent);
 
 	*skipp = 1;
 

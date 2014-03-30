@@ -298,6 +298,7 @@ extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
 extern void __wt_cache_dump(WT_SESSION_IMPL *session);
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
+extern void __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     size_t addr_size);
@@ -347,7 +348,7 @@ extern int __wt_page_alloc(WT_SESSION_IMPL *session,
     int alloc_refs,
     WT_PAGE **pagep);
 extern int __wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_REF *parent_ref,
+    WT_REF *ref,
     WT_PAGE_HEADER *dsk,
     uint32_t flags,
     WT_PAGE **pagep);

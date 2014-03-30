@@ -590,13 +590,15 @@ enum __wt_page_state {
  * it's OK to dereference the pointer to the page.
  */
 struct __wt_ref {
-	/*
-	 * The page, and page's parent (a link to the physical parent page, and
-	 * a hint for the matching page index slot).
-	 */
-	WT_PAGE	*home;			/* Reference's location */
 	WT_PAGE *page;			/* Page */
-	uint32_t ref_hint;		/* Page index hint */
+
+	/*
+	 * When the tree deepens as a result of a split, the home page value
+	 * changes.  Don't cache it, we need to see that change when looking
+	 * up our slot in the page's index structure.
+	 */
+	volatile WT_PAGE *home;		/* Reference page */
+	uint32_t ref_hint;		/* Reference page index hint */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
 
