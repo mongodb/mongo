@@ -11,7 +11,6 @@ static void __free_page_modify(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
-static void __free_ref(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *);
 static void __free_skip_array(WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t);
 static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
@@ -167,7 +166,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __free_page_int --
- *	Discard a WT_PAGE_ROW_INT page.
+ *	Discard a WT_PAGE_COL_INT or WT_PAGE_ROW_INT page.
  */
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -177,12 +176,28 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __free_ref --
- *	Discard the contents of a WT_REF structure.
+ *	Discard the contents of a WT_REF structure (optionally including the
+ * pages it references).
  */
 static void
-__free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
+__free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int free_pages)
 {
 	WT_IKEY *ikey;
+
+	/*
+	 * Optionally free the referenced pages.  (The path to free referenced
+	 * page is used for error cleanup, no instantiated and then discarded
+	 * page should have WT_REF entries with real pages.  The page may have
+	 * been marked dirty as well; page discard checks for that, so we mark
+	 * it clean explicitly.)
+	 */
+	if (free_pages && ref->page != NULL) {
+		if (ref->page->modify != NULL) {
+			ref->page->modify->write_gen = 0;
+			__wt_cache_dirty_decr(session, ref->page);
+		}
+		__wt_page_out(session, &ref->page);
+	}
 
 	/* Free any key allocation. */
 	switch (page->type) {
@@ -200,51 +215,25 @@ __free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 		__wt_free(session, ref->addr);
 	}
 
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * Races sometimes appear as accessing a WT_REF structure that has
-	 * been discarded; make sure nobody uses this information again.
-	 */
-	memset(ref, WT_DEBUG_BYTE, sizeof(*ref));
-#endif
+	__wt_overwrite_and_free_len(session, ref, sizeof(*ref));
 }
 
 /*
  * __wt_free_ref_index --
- *	Discard a page index, the WT_REF's it references, and optionally, any
- * pages.
+ *	Discard a page index and it's references.
  */
 void
 __wt_free_ref_index(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_PAGE_INDEX *pindex_arg, int free_pages)
+    WT_PAGE *page, WT_PAGE_INDEX *pindex, int free_pages)
 {
-	WT_PAGE_INDEX *pindex;
-	WT_REF *ref;
 	uint32_t i;
 
-	if (pindex_arg == NULL)
+	if (pindex == NULL)
 		return;
 
-	/*
-	 * Optionally free the referenced pages.  (The path to free referenced
-	 * page is used for error cleanup, no instantiated and then discarded
-	 * page should have WT_REF entries with real pages.  The page may have
-	 * been marked dirty as well; page discard checks for that, so we mark
-	 * it clean explicitly.)
-	 */
-	for (pindex = pindex_arg, i = 0; i < pindex->entries; ++i) {
-		ref = pindex->index[i];
-		if (free_pages && ref != NULL && ref->page != NULL) {
-			if (ref->page->modify != NULL) {
-				ref->page->modify->write_gen = 0;
-				__wt_cache_dirty_decr(session, ref->page);
-			}
-			__wt_page_out(session, &ref->page);
-		}
-		__free_ref(session, page, ref);
-		__wt_free(session, pindex->index[i]);
-	}
-	__wt_free(session, pindex_arg);
+	for (i = 0; i < pindex->entries; ++i)
+		__free_ref(session, page, pindex->index[i], free_pages);
+	__wt_free(session, pindex);
 }
 
 /*
