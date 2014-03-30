@@ -508,7 +508,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
     WT_PAGE *orig, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
-	WT_IKEY *ikey;
 	WT_REF *ref;
 	size_t incr;
 
@@ -525,25 +524,22 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
 
 	if (multi->skip == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &addr));
-		*addr = multi->addr;
-		multi->addr.addr = NULL;
-
 		ref->addr = addr;
+		addr->size = multi->addr.size;
+		addr->type = multi->addr.type;
+		WT_RET(__wt_strndup(session,
+		    multi->addr.addr, addr->size, &addr->addr));
 		incr += sizeof(WT_ADDR) + addr->size;
-		ref->state = WT_REF_DISK;
-	} else {
+	} else
 		WT_RET(__split_inmem_build(session, orig, ref, multi));
-		ref->state = WT_REF_MEM;
-	}
 
 	switch (orig->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		ikey = multi->key.ikey;
-		multi->key.ikey = NULL;
-
-		ref->key.ikey = ikey;
-		incr += sizeof(WT_IKEY) + ikey->size;
+		WT_RET(__wt_strndup(session,
+		    multi->key.ikey, multi->key.ikey->size + sizeof(WT_IKEY),
+		    &ref->key.ikey));
+		incr += sizeof(WT_IKEY) + multi->key.ikey->size;
 		break;
 	default:
 		ref->key.recno = multi->key.recno;
@@ -551,6 +547,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
 	}
 
 	ref->txnid = WT_TXN_NONE;
+	ref->state = multi->skip == NULL ? WT_REF_DISK : WT_REF_MEM;
 
 	/*
 	 * If our caller wants to track the memory allocations, we have a return
