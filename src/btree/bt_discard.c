@@ -241,7 +241,8 @@ __wt_free_ref_index(WT_SESSION_IMPL *session,
 			}
 			__wt_page_out(session, &ref->page);
 		}
-		__free_ref(session, page, pindex->index[i]);
+		__free_ref(session, page, ref);
+		__wt_free(session, pindex->index[i]);
 	}
 	__wt_free(session, pindex_arg);
 }
