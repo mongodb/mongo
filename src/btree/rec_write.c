@@ -488,7 +488,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	for (i = 0; i < mod->mod_multi_entries; ++i)
-		WT_ERR(__wt_multi_to_ref(session, next,
+		WT_ERR(__wt_multi_to_ref(session, NULL, next,
 		    &mod->mod_multi[i], &next->pg_intl_index->index[i], NULL));
 
 	/*

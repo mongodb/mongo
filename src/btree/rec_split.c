@@ -416,6 +416,7 @@ __split_inmem_build(
 	 */
 	WT_RET(__wt_page_inmem(
 	    session, ref, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &page));
+	ref->page = page;
 
 	/*
 	 * Clear the disk image and link the page into the passed-in WT_REF to
@@ -477,7 +478,7 @@ __split_inmem_build(
  *	Move a multi-block list into an array of WT_REF structures.
  */
 int
-__wt_multi_to_ref(WT_SESSION_IMPL *session,
+__wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
     WT_PAGE *orig, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
@@ -493,7 +494,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_calloc_def(session, 1, refp));
 	}
 	ref = *refp;
-	ref->home = orig;
+	ref->home = parent;
 
 	if (multi->skip == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &addr));
@@ -503,8 +504,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_strndup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
 		incr += sizeof(WT_ADDR) + addr->size;
-	} else
+		ref->state = WT_REF_DISK;
+	} else {
 		WT_RET(__split_inmem_build(session, orig, ref, multi));
+		ref->state = WT_REF_MEM;
+	}
 
 	switch (orig->type) {
 	case WT_PAGE_ROW_INT:
@@ -520,7 +524,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	}
 
 	ref->txnid = WT_TXN_NONE;
-	ref->state = multi->skip == NULL ? WT_REF_DISK : WT_REF_MEM;
 
 	/*
 	 * If our caller wants to track the memory allocations, we have a return
@@ -591,8 +594,8 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
 		if (pindex->index[i] == ref)
 			for (j = 0; j < split_entries; ++j)
-				WT_ERR(__wt_multi_to_ref(session, child,
-				    &mod->mod_multi[j],
+				WT_ERR(__wt_multi_to_ref(session, parent,
+				    child, &mod->mod_multi[j],
 				    alloc_refp++, &parent_incr));
 		else
 			*alloc_refp++ = pindex->index[i];

@@ -386,6 +386,7 @@ extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *parent,
     WT_PAGE *orig,
     WT_MULTI *multi,
     WT_REF **refp,
