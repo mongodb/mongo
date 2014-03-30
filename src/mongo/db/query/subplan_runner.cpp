@@ -279,6 +279,12 @@ namespace mongo {
 
                 QuerySolution* bestSoln = solutions[bestPlan];
 
+                if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
+                    QLOG() << "Subplanner: No indexed cache data for subchild "
+                           << orChildCQ->toString();
+                    return false;
+                }
+
                 // Add the index assignments to our original query.
                 Status tagStatus = QueryPlanner::tagAccordingToCache(
                     orChild, bestSoln->cacheData->tree.get(), indexMap);
