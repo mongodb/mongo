@@ -234,8 +234,6 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          */
         void cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive);
-        /** Remove all documents from the capped collection */
-        void emptyCappedCollection(const char *ns);
 
         /* when a background index build is in progress, we don't count the index in nIndexes until
            complete, yet need to still use it in _indexRecord() - thus we use this function for that.

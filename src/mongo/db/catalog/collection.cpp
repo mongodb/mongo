@@ -460,4 +460,45 @@ namespace mongo {
         return _details->dataSize();
     }
 
+    /**
+     * order will be:
+     * 1) store index specs
+     * 2) drop indexes
+     * 3) truncate record store
+     * 4) re-write indexes
+     */
+    Status Collection::truncate() {
+        massert( 17431, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
+
+        // 1) store index specs
+        vector<BSONObj> indexSpecs;
+        {
+            IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( false );
+            while ( ii.more() ) {
+                const IndexDescriptor* idx = ii.next();
+                indexSpecs.push_back( idx->infoObj().getOwned() );
+            }
+        }
+
+        // 2) drop indexes
+        Status status = _indexCatalog.dropAllIndexes( true );
+        if ( !status.isOK() )
+            return status;
+        _cursorCache.invalidateAll( false );
+        _infoCache.reset();
+
+        // 3) truncate record store
+        status = _recordStore->truncate();
+        if ( !status.isOK() )
+            return status;
+
+        // 4) re-create indexes
+        for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
+            status = _indexCatalog.createIndex( indexSpecs[i], false );
+            if ( !status.isOK() )
+                return status;
+        }
+
+        return Status::OK();
+    }
 }

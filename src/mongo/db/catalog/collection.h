@@ -182,6 +182,12 @@ namespace mongo {
 
         StatusWith<CompactStats> compact( const CompactOptions* options );
 
+        /**
+         * removes all documents as fast as possible
+         * indexes before and after will be the same
+         * as will other characteristics
+         */
+        Status truncate();
         // -----------
 
 

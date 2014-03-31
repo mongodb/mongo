@@ -261,7 +261,7 @@ namespace {
         if (cmdName == "dropIndexes" || cmdName == "deleteIndexes") {
             return Status::OK();
         }
-        if ((cmdName == "collMod" || cmdName == "emptyCappedCollection") &&
+        if ((cmdName == "collMod" || cmdName == "emptycapped") &&
             cmdObj.firstElement().str() != rolesCollectionNamespace.coll()) {
 
             // We don't care about these if they're not on the roles collection.

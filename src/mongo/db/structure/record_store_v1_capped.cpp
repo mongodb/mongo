@@ -70,4 +70,44 @@ namespace mongo {
                                     "no space in capped collection" );
     }
 
+    Status CappedRecordStoreV1::truncate() {
+        // Get a writeable reference to 'this' and reset all pertinent
+        // attributes.
+        NamespaceDetails* t = _details->writingWithoutExtra();
+
+        t->cappedLastDelRecLastExtent() = DiskLoc();
+        t->cappedListOfAllDeletedRecords() = DiskLoc();
+
+        // preserve firstExtent/lastExtent
+        t->_capExtent = t->_firstExtent;
+        t->_stats.datasize = t->_stats.nrecords = 0;
+        // lastExtentSize preserve
+        // nIndexes preserve 0
+        // capped preserve true
+        // max preserve
+        t->_paddingFactor = 1.0;
+        t->_systemFlags = 0;
+        t->_capFirstNewRecord = DiskLoc();
+        t->_capFirstNewRecord.setInvalid();
+        t->cappedLastDelRecLastExtent().setInvalid();
+        // dataFileVersion preserve
+        // indexFileVersion preserve
+        t->_multiKeyIndexBits = 0;
+        t->_reservedA = 0;
+        t->_extraOffset = 0;
+        // indexBuildInProgress preserve 0
+        memset(t->_reserved, 0, sizeof(t->_reserved));
+
+        // Reset all existing extents and recreate the deleted list.
+        for( DiskLoc ext = t->_firstExtent; !ext.isNull(); ext = ext.ext()->xnext ) {
+            DiskLoc prev = ext.ext()->xprev;
+            DiskLoc next = ext.ext()->xnext;
+            DiskLoc empty = ext.ext()->reuse( _ns, true );
+            ext.ext()->xprev.writing() = prev;
+            ext.ext()->xnext.writing() = next;
+            _details->addDeletedRec( empty.drec(), empty );
+        }
+
+        return Status::OK();
+    }
 }

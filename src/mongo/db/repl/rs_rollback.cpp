@@ -529,7 +529,7 @@ namespace mongo {
                                     catch(DBException& e) {
                                         if( e.getCode() == 13415 ) {
                                             // hack: need to just make cappedTruncate do this...
-                                            nsd->emptyCappedCollection(d.ns);
+                                            uassertStatusOK( collection->truncate() );
                                         }
                                         else {
                                             throw;

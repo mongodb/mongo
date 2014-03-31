@@ -45,6 +45,7 @@ namespace mongo {
 
         virtual ~SimpleRecordStoreV1();
 
+        virtual Status truncate();
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 

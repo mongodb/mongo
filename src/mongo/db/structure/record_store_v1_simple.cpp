@@ -237,4 +237,8 @@ namespace mongo {
         return StatusWith<DiskLoc>( ErrorCodes::InternalError, "cannot allocate space" );
     }
 
+    Status SimpleRecordStoreV1::truncate() {
+        return Status( ErrorCodes::InternalError,
+                       "SimpleRecordStoreV1::truncate not implemented" );
+    }
 }

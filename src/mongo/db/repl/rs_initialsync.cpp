@@ -133,7 +133,7 @@ namespace mongo {
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;
-        collection->details()->emptyCappedCollection(rsoplog);
+        uassertStatusOK( collection->truncate() );
     }
 
     bool Member::syncable() const {

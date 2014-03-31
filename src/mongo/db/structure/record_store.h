@@ -48,6 +48,8 @@ namespace mongo {
         RecordStore( const StringData& ns );
         virtual ~RecordStore();
 
+        // CRUD related
+
         virtual Record* recordFor( const DiskLoc& loc ) const = 0;
 
         virtual void deleteRecord( const DiskLoc& dl ) = 0;
@@ -55,6 +57,13 @@ namespace mongo {
         virtual StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax ) = 0;
 
         virtual StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax ) = 0;
+
+        // higher level
+
+        /**
+         * removes all Records
+         */
+        virtual Status truncate() = 0;
 
         // TODO: this makes me sad, it shouldn't be in the interface
         // do not use this anymore

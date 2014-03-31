@@ -1,4 +1,4 @@
-// Test NamespaceDetails::emptyCappedCollection via 'emptycapped' command
+// Test capped collection truncate via 'emptycapped' command
 
 Random.setRandomSeed();
 

@@ -191,7 +191,9 @@ namespace mongo {
 
             std::vector<BSONObj> indexes = stopIndexBuilds(cc().database(), cmdObj);
 
-            collection->details()->emptyCappedCollection( nss.ns().c_str() );
+            Status status = collection->truncate();
+            if ( !status.isOK() )
+                return appendCommandStatus( result, status );
 
             IndexBuilder::restoreIndexes(indexes);
 
