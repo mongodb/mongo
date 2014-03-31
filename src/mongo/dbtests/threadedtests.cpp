@@ -844,7 +844,7 @@ namespace ThreadedTests {
             if( x == 1 ) { 
                 LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1" << endl;
                 rwlock_shared lk(m);
-                sleepmillis(300);
+                sleepmillis(400);
                 LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
             }
             if( x == 2 ) {
@@ -885,7 +885,7 @@ namespace ThreadedTests {
                 LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
                 m.lock_r();
                 LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1            got" << endl;
-                sleepmillis(300);
+                sleepmillis(400);
                 m.unlock_r();
                 LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1 unlock_r()" << endl;
             }
