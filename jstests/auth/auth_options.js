@@ -32,7 +32,7 @@ jsTest.log("Testing \"auth\" command line option");
 var expectedResult = {
     "parsed" : {
         "security" : {
-            "authentication" : "required"
+            "authorization" : "enabled"
         }
     }
 };
@@ -42,18 +42,18 @@ jsTest.log("Testing \"noauth\" command line option");
 expectedResult = {
     "parsed" : {
         "security" : {
-            "authentication" : "optional"
+            "authorization" : "disabled"
         }
     }
 };
 testGetCmdLineOpts({ noauth : "" }, expectedResult);
 
-jsTest.log("Testing \"security.authentication\" config file option");
+jsTest.log("Testing \"security.authorization\" config file option");
 expectedResult = {
     "parsed" : {
         "config" : "jstests/libs/config_files/enable_auth.json",
         "security" : {
-            "authentication" : "required"
+            "authorization" : "enabled"
         }
     }
 };
