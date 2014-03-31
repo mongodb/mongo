@@ -8,6 +8,27 @@
 #include "wt_internal.h"
 
 /*
+ * __async_flush_wait --
+ *	Wait for the final worker to finish flushing.
+ *	Assumes it is called with spinlock held and returns it locked.
+ */
+static int
+__async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async, int *locked)
+{
+	WT_DECL_RET;
+
+	while (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSHING)) {
+		__wt_spin_unlock(session, &async->opsq_lock);
+		*locked= 0;
+		WT_ERR_TIMEDOUT_OK(
+		    __wt_cond_wait(session, async->flush_cond, 10000));
+		__wt_spin_lock(session, &async->opsq_lock);
+		*locked= 1;
+	}
+err:	return (ret);
+}
+
+/*
  * __async_worker_op --
  *	A worker thread handles an individual op.
  */
@@ -119,18 +140,8 @@ __wt_async_worker(void *arg)
 				 */
 				fprintf(stderr, "Worker %p flush checkin %d\n",
 				    pthread_self(), async->flush_count);
-				/* XXX Need to create __async_flush_wait() */
-				while (FLD_ISSET(
-				    async->opsq_flush, WT_ASYNC_FLUSHING)) {
-					__wt_spin_unlock(
-					    session, &async->opsq_lock);
-					locked = 0;
-					WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
-					    session, async->flush_cond, 10000));
-					__wt_spin_lock(
-					    session, &async->opsq_lock);
-					locked = 1;
-				}
+				WT_ERR(__async_flush_wait(
+				    session, async, &locked));
 			}
 		}
 		/*
@@ -167,23 +178,14 @@ __wt_async_worker(void *arg)
 			    pthread_self(), async->flush_count);
 			FLD_SET(async->opsq_flush, WT_ASYNC_FLUSHING);
 			async->flush_count = 1;
+			WT_ERR(__async_flush_wait(session, async, &locked));
 		}
 		/*
-		 * Unlock after getting op and possibly setting up flush.
+		 * Release the lock before performing the op.
 		 */
 		__wt_spin_unlock(session, &async->opsq_lock);
 		locked = 0;
-		/*
-		 * Now this worker performs the op without the lock.
-		 * If we're the flush initiator, that means waiting for
-		 * other workers to check in.  Otherwise do the operation
-		 * and call the user's callback and free the op.
-		 */
-		if (op == &async->flush_op) {
-			WT_ASSERT(session, FLD_ISSET(async->opsq_flush,
-			    WT_ASYNC_FLUSH_IN_PROGRESS));
-			/* XXX Need to create __async_flush_wait() */
-		} else {
+		if (op != &async->flush_op) {
 			fprintf(stderr, "Worker %p got optype %d\n",
 			    pthread_self(), op->optype);
 			/*
