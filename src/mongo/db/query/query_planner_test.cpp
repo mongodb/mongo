@@ -2893,6 +2893,38 @@ namespace {
                                         " 'a.e.d':[['MinKey','MaxKey',true,true]]}}}}}");
     }
 
+    // SERVER-13422: check that we plan $elemMatch object correctly with
+    // index intersection.
+    TEST_F(QueryPlannerTest, ElemMatchIndexIntersection) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
+        addIndex(BSON("shortId" << 1));
+        // true means multikey
+        addIndex(BSON("a.b.startDate" << 1), true);
+        addIndex(BSON("a.b.endDate" << 1), true);
+
+        runQuery(fromjson("{shortId: 3, 'a.b': {$elemMatch: {startDate: {$lte: 3},"
+                                                            "endDate: {$gt: 6}}}}"));
+
+        assertNumSolutions(6U);
+
+        // 3 single index solutions.
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {shortId: 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.startDate': 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.endDate': 1}}}}}");
+
+        // 3 index intersection solutions. The last one has to intersect two
+        // predicates within the $elemMatch object.
+        assertSolutionExists("{fetch: {node: {andHash: {nodes: ["
+                                "{ixscan: {pattern: {shortId: 1}}},"
+                                "{ixscan: {pattern: {'a.b.startDate': 1}}}]}}}}");
+        assertSolutionExists("{fetch: {node: {andHash: {nodes: ["
+                                "{ixscan: {pattern: {shortId: 1}}},"
+                                "{ixscan: {pattern: {'a.b.endDate': 1}}}]}}}}");
+        assertSolutionExists("{fetch: {node: {andHash: {nodes: ["
+                                "{ixscan: {pattern: {'a.b.startDate': 1}}},"
+                                "{ixscan: {pattern: {'a.b.endDate': 1}}}]}}}}");
+    }
+
     //
     // QueryPlannerParams option tests
     //

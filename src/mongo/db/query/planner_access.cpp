@@ -567,12 +567,12 @@ namespace mongo {
                         invariant(NULL != emChild->getTag());
                         IndexTag* innerTag = static_cast<IndexTag*>(emChild->getTag());
 
-                        if (NULL != currentScan.get() && (currentIndexNumber == ixtag->index) &&
+                        if (NULL != currentScan.get() && (currentIndexNumber == innerTag->index) &&
                             shouldMergeWithLeaf(emChild, indices[currentIndexNumber], innerTag->pos,
                                                 currentScan.get(), root->matchType())) {
                             // The child uses the same index we're currently building a scan for.  Merge
                             // the bounds and filters.
-                            verify(currentIndexNumber == ixtag->index);
+                            verify(currentIndexNumber == innerTag->index);
 
                             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
                             mergeWithLeafNode(emChild, indices[currentIndexNumber], innerTag->pos, &tightness,
@@ -597,7 +597,7 @@ namespace mongo {
                                 verify(IndexTag::kNoIndex == currentIndexNumber);
                             }
 
-                            currentIndexNumber = ixtag->index;
+                            currentIndexNumber = innerTag->index;
 
                             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
                             currentScan.reset(makeLeafNode(query, indices[currentIndexNumber], innerTag->pos,
