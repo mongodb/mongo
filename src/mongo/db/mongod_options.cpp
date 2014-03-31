@@ -635,7 +635,7 @@ namespace mongo {
             }
         }
 
-        // "security.authentication" comes from the config file, so override it if "noauth" or
+        // "security.authorization" comes from the config file, so override it if "noauth" or
         // "auth" are set since those come from the command line.
         if (params->count("noauth")) {
             Status ret = params->set("security.authorization",
