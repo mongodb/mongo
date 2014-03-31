@@ -595,7 +595,15 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * memory inside of the lock and may want to invest effort in making the
 	 * locked period shorter.
 	 */
-	WT_PAGE_LOCK(session, parent);
+	for (;;) {
+		F_CAS_ATOMIC(parent, WT_PAGE_SPLITTING, ret);
+		if (ret == 0)
+			break;
+		else if (ret == EBUSY)
+			__wt_yield();
+		else
+			return (ret);
+	}
 
 	pindex = parent->pg_intl_index;
 	parent_entries = pindex->entries;
@@ -734,7 +742,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	if (!exclusive && __split_should_deepen(session, parent))
 		ret = __split_deepen(session, parent);
 
-err:	WT_PAGE_UNLOCK(session, parent);
+err:	F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 
 	/*
 	 * A note on error handling: in the case of evicting a page that has
