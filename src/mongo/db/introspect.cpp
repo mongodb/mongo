@@ -132,9 +132,11 @@ namespace {
         BufBuilder profileBufBuilder(1024);
 
         try {
+            // NOTE: It's kind of weird that we lock the op's namespace, but have to for now since
+            // we're sometimes inside the lock already
             Lock::DBWrite lk( currentOp.getNS() );
             if (dbHolder()._isLoaded(nsToDatabase(currentOp.getNS()), storageGlobalParams.dbpath)) {
-                Client::Context cx(currentOp.getNS(), storageGlobalParams.dbpath);
+                Client::Context cx(currentOp.getNS(), storageGlobalParams.dbpath, false);
                 _profile(c, currentOp, profileBufBuilder);
             }
             else {
