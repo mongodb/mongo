@@ -586,10 +586,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	parent_decr = parent_incr = 0;
 	complete = 0;
 
-	parent = ref->home;
-	child = ref->page;
-	mod = child->modify;
-
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
 	 * page because we need to single-thread sizing/growing the page index.
@@ -599,14 +595,22 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * locked period shorter.
 	 */
 	for (;;) {
+		parent = ref->home;
 		F_CAS_ATOMIC(parent, WT_PAGE_SPLITTING, ret);
-		if (ret == 0)
+		if (ret == 0) {
+			if (parent != ref->home) {
+				F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+				continue;
+			}
 			break;
-		else if (ret == EBUSY)
+		} else if (ret == EBUSY)
 			__wt_yield();
 		else
 			return (ret);
 	}
+
+	child = ref->page;
+	mod = child->modify;
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
