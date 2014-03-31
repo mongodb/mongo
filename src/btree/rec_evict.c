@@ -125,7 +125,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
 
-	parent = (WT_PAGE *)ref->home;
+	parent = ref->home;
 	mod = ref->page->modify;
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {

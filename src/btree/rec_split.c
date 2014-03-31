@@ -583,7 +583,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	parent_decr = parent_incr = 0;
 	complete = 0;
 
-	parent = (WT_PAGE *)ref->home;
+	parent = ref->home;
 	child = ref->page;
 	mod = child->modify;
 

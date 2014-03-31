@@ -57,7 +57,7 @@ __tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 
 	*skipp = 0;
 
-	parent = (WT_PAGE *)ref->home;
+	parent = ref->home;
 
 	/*
 	 * If the page is already instantiated in-memory, other threads may be

@@ -431,7 +431,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	parent = (WT_PAGE *)ref->home;
+	parent = ref->home;
 	WT_RET(__wt_page_modify_init(session, parent));
 	__wt_page_only_modify_set(session, parent);
 	return (0);
@@ -1142,7 +1142,7 @@ __rec_child_deleted(
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		WT_RET(bm->free(bm, session, addr, addr_size));
 
-		if (__wt_off_page((WT_PAGE *)ref->home, ref->addr)) {
+		if (__wt_off_page(ref->home, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
@@ -2575,7 +2575,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	WT_RET(__rec_write_wrapup(session, r, r->page));
 
 	/* Mark the page's parent dirty. */
-	parent = (WT_PAGE *)r->ref->home;
+	parent = r->ref->home;
 	WT_RET(__wt_page_modify_init(session, parent));
 	__wt_page_modify_set(session, parent);
 
@@ -4365,7 +4365,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_ref_info(
 			    session, ref, &addr, &addr_size, NULL));
 			WT_RET(bm->free(bm, session, addr, addr_size));
-			if (__wt_off_page((WT_PAGE *)ref->home, ref->addr)) {
+			if (__wt_off_page(ref->home, ref->addr)) {
 				__wt_free(
 				    session, ((WT_ADDR *)ref->addr)->addr);
 				__wt_free(session, ref->addr);
@@ -4627,7 +4627,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	if (__wt_ref_is_root(ref))
 		WT_RET(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
-		__wt_ref_key((WT_PAGE *)ref->home, ref, &p, &size);
+		__wt_ref_key(ref->home, ref, &p, &size);
 		WT_RET(__wt_buf_set(session, &r->bnd[0].key, p, size));
 	}
 
