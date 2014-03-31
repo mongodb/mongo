@@ -42,17 +42,9 @@ namespace mongo {
         }
 
         BSONElement jEl = obj["j"];
-        if ( !jEl.eoo() && !jEl.isNumber() && jEl.type() != Bool ) {
-            return Status( ErrorCodes::FailedToParse, "j must be numeric or a boolean value" );
-        }
-
         const bool j = jEl.trueValue();
 
         BSONElement fsyncEl = obj["fsync"];
-        if ( !fsyncEl.eoo() && !fsyncEl.isNumber() && fsyncEl.type() != Bool ) {
-            return Status( ErrorCodes::FailedToParse, "fsync must be numeric or a boolean value" );
-        }
-
         const bool fsync = fsyncEl.trueValue();
 
         if ( j && fsync )
