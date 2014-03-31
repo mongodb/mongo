@@ -150,6 +150,7 @@ namespace mongo {
         if (hasConnection()) {
             return true;
         }
+        log() << "replset setting syncSourceFeedback to " << hostName << rsLog;
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
         if (!_connection->connect(hostName.c_str(), errmsg) ||
