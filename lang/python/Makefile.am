@@ -1,6 +1,5 @@
-AM_CPPFLAGS = -I$(abs_top_builddir)
-
 PYSRC = $(top_srcdir)/lang/python
+PY_INCLUDE_DIRS = $(top_srcdir)
 if DEBUG
 PY_SETUP_DEBUG = -g
 endif
@@ -14,11 +13,11 @@ $(PYSRC)/wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(PYSRC)/wir
 	    mv wiredtiger.py wiredtiger/__init__.py)
 
 _wiredtiger.so: $(top_builddir)/libwiredtiger.la $(PYSRC)/wiredtiger_wrap.c
-	$(PYTHON) $(PYSRC)/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG)
+	$(PYTHON) $(PYSRC)/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG) -I $(PY_INCLUDE_DIRS)
 
 install-exec-local:
 	$(PYTHON) $(PYSRC)/setup.py build_py -d build
-	$(PYTHON) $(PYSRC)/setup.py build_ext -b build -t . -f $(PY_SETUP_DEBUG)
+	$(PYTHON) $(PYSRC)/setup.py build_ext -b build -t . -f $(PY_SETUP_DEBUG) -I $(PY_INCLUDE_DIRS)
 	$(PYTHON) $(PYSRC)/setup.py install_lib -b build --skip-build $(PYTHON_INSTALL_ARG)
 
 clean-local:
