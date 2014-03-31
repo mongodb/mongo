@@ -19,11 +19,6 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	if (F_ISSET(cache, WT_EVICT_CACHE_FULL)) {
-		*fullp = 100;
-		return (0);
-	}
-
 	/*
 	 * If we're over the maximum cache, shut out reads (which include page
 	 * allocations) until we evict to back under the maximum cache.
