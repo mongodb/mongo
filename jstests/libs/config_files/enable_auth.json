@@ -1,5 +1,5 @@
 {
     "security" : {
-        "authentication" : "required"
+        "authorization" : "enabled"
     }
 }
