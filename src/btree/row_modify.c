@@ -26,7 +26,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	int logged;
 
 	ins = NULL;
-	page = cbt->page;
+	page = cbt->ref->page;
 	logged = 0;
 
 	/* This code expects a remove to have a NULL value. */

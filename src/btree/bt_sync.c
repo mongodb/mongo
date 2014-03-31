@@ -18,7 +18,7 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 	WT_PAGE *page;
 
 	btree = S2BT(session);
-	page = btree->root_page;
+	page = btree->root_page.page;
 
 	/* Dirty the root page to ensure a write. */
 	WT_RET(__wt_page_modify_init(session, page));

@@ -31,7 +31,8 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 		    "bulk-load is only possible for newly created trees");
 
 	/* Set a reference to the empty leaf page. */
-	cbulk->leaf = btree->root_page->pg_intl_index->index[0]->page;
+	cbulk->ref = btree->root_page.page->pg_intl_index->index[0];
+	cbulk->leaf = btree->root_page.page->pg_intl_index->index[0]->page;
 
 	WT_RET(__wt_rec_bulk_init(cbulk));
 

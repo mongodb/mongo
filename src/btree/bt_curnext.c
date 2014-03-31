@@ -75,19 +75,21 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BTREE *btree;
 	WT_ITEM *val;
+	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
+	page = cbt->ref->page;
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_fix_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_fix_last_recno(page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, cbt->page->pg_fix_recno);
+		__cursor_set_recno(cbt, page->pg_fix_recno);
 		goto new_page;
 	}
 
@@ -98,14 +100,14 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 new_page:
 	/* Check any insert list for a matching record. */
-	cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
+	cbt->ins_head = WT_COL_UPDATE_SINGLE(page);
 	cbt->ins = __col_insert_search(
 	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
 	if (cbt->ins != NULL && cbt->recno != WT_INSERT_RECNO(cbt->ins))
 		cbt->ins = NULL;
 	upd = cbt->ins == NULL ? NULL : __wt_txn_read(session, cbt->ins->upd);
 	if (upd == NULL) {
-		cbt->v = __bit_getv_recno(cbt->page, cbt->recno, btree->bitcnt);
+		cbt->v = __bit_getv_recno(page, cbt->recno, btree->bitcnt);
 		val->data = &cbt->v;
 	} else
 		val->data = WT_UPDATE_DATA(upd);
@@ -159,18 +161,20 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
 	WT_ITEM *val;
+	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	page = cbt->ref->page;
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
 	if (newpage) {
-		cbt->last_standard_recno = __col_var_last_recno(cbt->page);
+		cbt->last_standard_recno = __col_var_last_recno(page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, cbt->page->pg_var_recno);
+		__cursor_set_recno(cbt, page->pg_var_recno);
 		goto new_page;
 	}
 
@@ -181,12 +185,12 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 		__cursor_set_recno(cbt, cbt->recno + 1);
 
 new_page:	/* Find the matching WT_COL slot. */
-		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
+		if ((cip = __col_var_search(page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
-		cbt->slot = WT_COL_SLOT(cbt->page, cip);
+		cbt->slot = WT_COL_SLOT(page, cip);
 
 		/* Check any insert list for a matching record. */
-		cbt->ins_head = WT_COL_UPDATE_SLOT(cbt->page, cbt->slot);
+		cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
 		cbt->ins = __col_insert_search_match(cbt->ins_head, cbt->recno);
 		upd = cbt->ins == NULL ?
 		    NULL : __wt_txn_read(session, cbt->ins->upd);
@@ -207,13 +211,13 @@ new_page:	/* Find the matching WT_COL slot. */
 		 * information.
 		 */
 		if (cbt->cip_saved != cip) {
-			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
+			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
 			if (unpack.type == WT_CELL_DEL)
 				continue;
 			WT_RET(__wt_page_cell_data_ref(
-			    session, cbt->page, &unpack, &cbt->tmp));
+			    session, page, &unpack, &cbt->tmp));
 
 			cbt->cip_saved = cip;
 		}
@@ -233,13 +237,15 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
+	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	page = cbt->ref->page;
 	key = &cbt->iface.key;
 	val = &cbt->iface.value;
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/*
 	 * For row-store pages, we need a single item that tells us the part
@@ -253,7 +259,7 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 	 * New page configuration.
 	 */
 	if (newpage) {
-		cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
+		cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 		cbt->row_iteration_slot = 1;
 		goto new_insert;
@@ -281,8 +287,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		}
 
 		/* Check for the end of the page. */
-		if (cbt->row_iteration_slot >=
-		    cbt->page->pg_row_entries * 2 + 1)
+		if (cbt->row_iteration_slot >= page->pg_row_entries * 2 + 1)
 			return (WT_NOTFOUND);
 		++cbt->row_iteration_slot;
 
@@ -292,7 +297,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		 */
 		if (cbt->row_iteration_slot & 0x01) {
 			cbt->ins_head = WT_ROW_INSERT_SLOT(
-			    cbt->page, cbt->row_iteration_slot / 2 - 1);
+			    page, cbt->row_iteration_slot / 2 - 1);
 			cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 			goto new_insert;
 		}
@@ -300,8 +305,8 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins = NULL;
 
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
-		rip = &cbt->page->pg_row_d[cbt->slot];
-		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
+		rip = &page->pg_row_d[cbt->slot];
+		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
@@ -332,8 +337,9 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 	 * If we don't have a search page, then we're done, we're starting at
 	 * the beginning or end of the tree, not as a result of a search.
 	 */
-	if ((page = cbt->page) == NULL)
+	if (cbt->ref == NULL)
 		return;
+	page = cbt->ref->page;
 
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		/*
@@ -399,13 +405,12 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 	if (!F_ISSET(cbt, WT_CBT_ITERATE_NEXT))
 		__wt_btcur_iterate_setup(cbt, 1);
 
-	page = cbt->page;
-
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
+	page = cbt->ref == NULL ? NULL : cbt->ref->page;
 	for (newpage = 0;; newpage = 1) {
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
 			switch (page->type) {
@@ -450,13 +455,12 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 			}
 		}
 
-		cbt->page = NULL;
-		WT_ERR(__wt_tree_walk(session, &page, flags));
-		WT_ERR_TEST(page == NULL, WT_NOTFOUND);
+		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
+		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
+		page = cbt->ref->page;
 		WT_ASSERT(session,
 		    page->type != WT_PAGE_COL_INT &&
 		    page->type != WT_PAGE_ROW_INT);
-		cbt->page = page;
 	}
 
 err:	if (ret != 0)

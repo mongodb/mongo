@@ -83,7 +83,7 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 
 	btree = cbt->btree;
 	ins = cbt->ins;
-	page = cbt->page;
+	page = cbt->ref->page;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/* If we found an insert list entry with a visible update, use it. */
@@ -621,7 +621,7 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 			return (1);
 		break;
 	case BTREE_ROW:
-		if (a->page != b->page)
+		if (a->ref != b->ref)
 			return (0);
 		if (a->ins != NULL || b->ins != NULL) {
 			if (a->ins == b->ins)

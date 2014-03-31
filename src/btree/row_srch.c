@@ -114,14 +114,14 @@ __wt_search_insert(WT_SESSION_IMPL *session,
  */
 int
 __wt_row_search(WT_SESSION_IMPL *session,
-    WT_ITEM *srch_key, WT_PAGE *leaf_page, WT_CURSOR_BTREE *cbt)
+    WT_ITEM *srch_key, WT_REF *leaf_page, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
-	WT_REF *ref;
+	WT_REF *child, *parent;
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
 	uint32_t base, indx, limit;
@@ -152,26 +152,31 @@ restart:
 	 * page, not a full tree.
 	 */
 	if (leaf_page != NULL) {
-		page = leaf_page;
+		child = leaf_page;
 		goto leaf_only;
 	}
 
 	/* Search the internal pages of the tree. */
 	cmp = -1;
-	for (depth = 2,
-	    page = btree->root_page; page->type == WT_PAGE_ROW_INT; ++depth) {
+	parent = child = &btree->root_page;
+	for (depth = 2;; ++depth) {
+		page = parent->page;
+		if (page->type != WT_PAGE_ROW_INT)
+			break;
+
+		pindex = page->pg_intl_index;
+		base = pindex->entries;
+		child = pindex->index[base - 1];
+
 		/*
 		 * Fast-path internal pages with one child, a common case for
 		 * the root page in new trees.
 		 */
-		pindex = page->pg_intl_index;
-		base = pindex->entries;
-		ref = pindex->index[base - 1];
 		if (base == 1)
 			goto descend;
 
 		/* Fast-path appends. */
-		__wt_ref_key(page, ref, &item->data, &item->size);
+		__wt_ref_key(page, child, &item->data, &item->size);
 		WT_ERR(
 		    WT_LEX_CMP(session, btree->collator, srch_key, item, cmp));
 		if (cmp >= 0)
@@ -182,13 +187,11 @@ restart:
 		 * without application-specified collation.
 		 */
 		base = 0;
-		ref = NULL;
 		limit = pindex->entries - 1;
-
 		if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = pindex->index[indx];
+				child = pindex->index[indx];
 
 				/*
 				 * If about to compare an application key with
@@ -200,7 +203,7 @@ restart:
 				 */
 				if (indx != 0) {
 					__wt_ref_key(page,
-					    ref, &item->data, &item->size);
+					    child, &item->data, &item->size);
 					match = WT_MIN(skiplow, skiphigh);
 					cmp = __wt_lex_compare_skip(
 					    srch_key, item, &match);
@@ -225,11 +228,11 @@ restart:
 			 * before base.
 			 */
 			if (cmp != 0)
-				ref = pindex->index[base - 1];
+				child = pindex->index[base - 1];
 		} else {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = pindex->index[indx];
+				child = pindex->index[indx];
 				/*
 				 * If about to compare an application key with
 				 * the 0th index on an internal page, pretend
@@ -240,7 +243,7 @@ restart:
 				 */
 				if (indx != 0) {
 					__wt_ref_key(page,
-					    ref, &item->data, &item->size);
+					    child, &item->data, &item->size);
 					WT_ERR(WT_LEX_CMP_SKIP(
 					    session, btree->collator,
 					    srch_key, item, cmp, &match));
@@ -262,9 +265,9 @@ restart:
 			 * before base.
 			 */
 			if (cmp != 0)
-				ref = pindex->index[base - 1];
+				child = pindex->index[base - 1];
 		}
-descend:	WT_ASSERT(session, ref != NULL);
+descend:	WT_ASSERT(session, child != NULL);
 
 		/*
 		 * Swap the parent page for the child page; if the page splits
@@ -272,8 +275,8 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * return on error, the swap call ensures we're holding nothing
 		 * on failure.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref, 0)) == 0) {
-			page = ref->page;
+		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+			parent = child;
 			continue;
 		}
 		/*
@@ -282,7 +285,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * it and restart the search from the top of the tree.
 		 */
 		if (ret == WT_RESTART &&
-		    (ret = __wt_page_release(session, page)) == 0)
+		    (ret = __wt_page_release(session, parent)) == 0)
 			goto restart;
 		return (ret);
 	}
@@ -292,6 +295,8 @@ descend:	WT_ASSERT(session, ref != NULL);
 		btree->maximum_depth = depth;
 
 leaf_only:
+	page = child->page;
+
 	/*
 	 * Binary search of the leaf page.  There are two versions (a default
 	 * loop and an application-specified collation loop), because moving
@@ -362,7 +367,7 @@ leaf_only:
 	if (cmp == 0) {
 		WT_ASSERT(session, rip != NULL);
 		cbt->compare = 0;
-		cbt->page = page;
+		cbt->ref = child;
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}
@@ -405,11 +410,11 @@ leaf_only:
 	 * Search the insert list for a match; __wt_search_insert sets the
 	 * return insert information appropriately.
 	 */
-	cbt->page = page;
+	cbt->ref = child;
 	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
 	return (0);
 
-err:	WT_TRET(__wt_page_release(session, page));
+err:	WT_TRET(__wt_page_release(session, child));
 	return (ret);
 }
 
@@ -425,24 +430,29 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_INSERT *p, *t;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
-	WT_REF *ref;
-
-	__cursor_search_clear(cbt);
+	WT_REF *child, *parent;
 
 	btree = S2BT(session);
 
+	__cursor_search_clear(cbt);
+
 restart:
 	/* Walk the internal pages of the tree. */
-	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
+	parent = child = &btree->root_page;
+	for (;;) {
+		page = parent->page;
+		if (page->type != WT_PAGE_ROW_INT)
+			break;
+
 		pindex = page->pg_intl_index;
-		ref = pindex->index[__wt_random() % pindex->entries];
+		child = pindex->index[__wt_random() % pindex->entries];
 
 		/*
 		 * Swap the parent page for the child page; return on error,
 		 * the swap function ensures we're holding nothing on failure.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref, 0)) == 0) {
-			page = ref->page;
+		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+			parent = child;
 			continue;
 		}
 		/*
@@ -451,7 +461,7 @@ restart:
 		 * it and restart the search from the top of the tree.
 		 */
 		if (ret == WT_RESTART &&
-		    (ret = __wt_page_release(session, page)) == 0)
+		    (ret = __wt_page_release(session, parent)) == 0)
 			goto restart;
 		return (ret);
 	}
@@ -465,10 +475,10 @@ restart:
 		 * or a tree with just one big page, that's not going to work,
 		 * check for that.
 		 */
-		cbt->page = page;
+		cbt->ref = child;
 		cbt->compare = 0;
 		cbt->slot =
-		    btree->root_page->pg_intl_index->entries < 2 ?
+		    btree->root_page.page->pg_intl_index->entries < 2 ?
 		    __wt_random() % page->pg_row_entries : 0;
 		return (0);
 	}
@@ -487,12 +497,12 @@ restart:
 			break;
 		t = WT_SKIP_NEXT(t);
 	}
-	cbt->page = page;
+	cbt->ref = child;
 	cbt->compare = 0;
 	cbt->ins = t;
 
 	return (0);
 
-err:	WT_TRET(__wt_page_release(session, page));
+err:	WT_TRET(__wt_page_release(session, child));
 	return (ret);
 }

@@ -80,7 +80,7 @@ struct __wt_cursor_btree {
 	 * also return the relationship of the search key to the found key and
 	 * a write-generation for the leaf page.
 	 */
-	WT_PAGE	  *page;		/* Current page */
+	WT_REF	  *ref;			/* Current page */
 	uint32_t   slot;		/* WT_COL/WT_ROW 0-based slot */
 
 	WT_INSERT_HEAD	*ins_head;	/* Insert chain head */
@@ -169,7 +169,8 @@ struct __wt_cursor_btree {
 struct __wt_cursor_bulk {
 	WT_CURSOR_BTREE cbt;
 
-	WT_PAGE *leaf;				/* The leaf page */
+	WT_REF	*ref;				/* The leaf page */
+	WT_PAGE *leaf;
 
 	/*
 	 * Variable-length column store compares values during bulk load as

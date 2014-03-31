@@ -133,18 +133,18 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_ITEM *next, _next, *last, _last, *tmp;
-	WT_REF *ref;
+	WT_REF *child;
 	uint64_t recno;
-	int skip_first, cmp;
+	int cmp, first;
 
 	btree = S2BT(session);
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		recno = 0;
-		WT_INTL_FOREACH_BEGIN(page, ref) {
-			WT_ASSERT(session, ref->key.recno > recno);
-			recno = ref->key.recno;
+		WT_INTL_FOREACH_BEGIN(page, child) {
+			WT_ASSERT(session, child->key.recno > recno);
+			recno = child->key.recno;
 		} WT_INTL_FOREACH_END;
 		break;
 	case WT_PAGE_ROW_INT:
@@ -152,13 +152,13 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_CLEAR(_next);
 		last = &_last;
 		WT_CLEAR(_last);
-		skip_first = WT_PAGE_IS_ROOT(page);
 
-		WT_INTL_FOREACH_BEGIN(page, ref) {
-			__wt_ref_key(page, ref, &next->data, &next->size);
+		first = 1;
+		WT_INTL_FOREACH_BEGIN(page, child) {
+			__wt_ref_key(page, child, &next->data, &next->size);
 			if (last->size == 0) {
-				if (skip_first)
-					skip_first = 0;
+				if (first)
+					first = 0;
 				else {
 					(void)WT_LEX_CMP(session,
 					    btree->collator, last, next, cmp);
@@ -254,6 +254,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * of the page's key.
 		 */
 		ref = *alloc_refp++;
+		ref->home = parent;
 		ref->page = child;
 		ref->addr = NULL;
 		if (parent->type == WT_PAGE_ROW_INT) {
@@ -266,12 +267,12 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		ref->txnid = WT_TXN_NONE;
 		ref->state = WT_REF_MEM;
 
-		/* Initialize the child page, mark it dirty. */
+		/* Initialize the child page. */
 		if (parent->type == WT_PAGE_COL_INT)
 			child->pg_intl_recno = (*parent_refp)->key.recno;
-		child->parent = parent;
-		child->ref_hint = i + SPLIT_CORRECT_1;
-		child->type = parent->type;
+		child->pg_intl_parent_ref = ref;
+
+		/* Mark it dirty. */
 		WT_ERR(__wt_page_modify_init(session, child));
 		__wt_page_only_modify_set(session, child);
 
@@ -350,13 +351,13 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 #endif
 
 	/*
-	 * Children of the newly created pages now reference the wrong parent
-	 * page, and we have to fix that up.  The problem is revealed when a
-	 * thread of control attempts to find a page's WT_REF structure, does
-	 * a search of the parent page's index, and fails to find its WT_REF
-	 * structure, as the parent page no longer references it.  When that
-	 * failure happens, the thread waits for the page's parent reference
-	 * to be updated, which we do here: walk the children and fix them up.
+	 * The moved reference structures now reference the wrong parent page,
+	 * and we have to fix that up.  The problem is revealed when a thread
+	 * of control searches for a page's reference structure slot, and fails
+	 * to find it because the page it's searching no longer references it.
+	 * When that failure happens, the thread waits for the reference's home
+	 * page to be updated, which we do here: walk the children and fix them
+	 * up.
 	 */
 	pindex = parent->pg_intl_index;
 	for (parent_refp = pindex->index + SPLIT_CORRECT_1,
@@ -364,29 +365,16 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		parent_ref = *parent_refp;
 		if (parent_ref->state != WT_REF_MEM)
 			continue;
+		WT_ASSERT(session, parent_ref->home == parent);
+
 		child = parent_ref->page;
 		if (child->type != WT_PAGE_ROW_INT &&
 		    child->type != WT_PAGE_COL_INT)
 			continue;
-		WT_ASSERT(session, child->parent == parent);
 #ifdef HAVE_DIAGNOSTIC
 		__split_verify_intl_key_order(session, child);
 #endif
 		WT_INTL_FOREACH_BEGIN(child, child_ref) {
-			/*
-			 * For each in-memory page the child references, get a
-			 * hazard pointer for the page so it can't be evicted
-			 * out from under us, and update its parent reference
-			 * as necessary.  If we don't find the page, eviction
-			 * got it first, but that's OK too.
-			 */
-			if ((ret = __wt_page_in(session,
-			    child, child_ref, WT_READ_CACHE)) == WT_NOTFOUND) {
-				ret = 0;
-				continue;
-			}
-			WT_ERR(ret);
-
 			/*
 			 * The page's parent reference may not be wrong, as we
 			 * opened up access from the top of the tree already,
@@ -394,18 +382,16 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			 * only update pages that reference the original page,
 			 * they must be wrong.
 			 */
-			if (child_ref->page->parent == parent) {
-				child_ref->page->parent = child;
-				child_ref->page->ref_hint = 0;
+			if (child_ref->home == parent) {
+				child_ref->home = child;
+				child_ref->ref_hint = 0;
 			}
-			WT_ERR(__wt_page_release(session, child_ref->page));
 		} WT_INTL_FOREACH_END;
 	}
 
 	/*
-	 * Push out the changes: not required for correctness, but we don't
-	 * want threads spinning on incorrect page parent references longer
-	 * than necessary.
+	 * Push out the changes: not required for correctness, but don't let
+	 * threads spin on incorrect page references longer than necessary.
 	 */
 	WT_FULL_BARRIER();
 
@@ -455,8 +441,8 @@ __split_inmem_build(
 	 * re-created as an in-memory page, then we apply the unresolved updates
 	 * to that page.
 	 */
-	WT_RET(__wt_page_inmem(session,
-	    NULL, NULL, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &page));
+	WT_RET(__wt_page_inmem(
+	    session, ref, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &page));
 
 	/*
 	 * Clear the disk image and link the page into the passed-in WT_REF to
@@ -465,7 +451,6 @@ __split_inmem_build(
 	 * allocated page on error, when discarding the allocated WT_REF.
 	 */
 	multi->skip_dsk = NULL;
-	WT_LINK_PAGE(orig->parent, ref, page);
 
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip) {
@@ -484,7 +469,7 @@ __split_inmem_build(
 			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
-			WT_RET(__wt_col_search(session, recno, page, &cbt));
+			WT_RET(__wt_col_search(session, recno, ref, &cbt));
 
 			/* Apply the modification. */
 			WT_RET(__wt_col_modify(
@@ -501,7 +486,7 @@ __split_inmem_build(
 			}
 
 			/* Search the page. */
-			WT_RET(__wt_row_search(session, &key, page, &cbt));
+			WT_RET(__wt_row_search(session, &key, ref, &cbt));
 
 			/* Apply the modification. */
 			WT_RET(__wt_row_modify(
@@ -519,7 +504,7 @@ __split_inmem_build(
  *	Move a multi-block list into an array of WT_REF structures.
  */
 int
-__wt_multi_to_ref(WT_SESSION_IMPL *session,
+__wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
     WT_PAGE *orig, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
@@ -535,6 +520,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		WT_RET(__wt_calloc_def(session, 1, refp));
 	}
 	ref = *refp;
+	ref->home = parent;
 
 	if (multi->skip == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &addr));
@@ -577,14 +563,13 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
  *	Resolve a page split, inserting new information into the parent.
  */
 int
-__wt_split_evict(
-    WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page, int exclusive)
+__wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_PAGE *parent;
+	WT_PAGE *parent, *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
 	WT_REF **alloc_refp;
@@ -598,8 +583,9 @@ __wt_split_evict(
 	parent_decr = parent_incr = 0;
 	complete = 0;
 
-	mod = page->modify;
-	parent = page->parent;
+	parent = (WT_PAGE *)ref->home;
+	child = ref->page;
+	mod = child->modify;
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -620,7 +606,7 @@ __wt_split_evict(
 	WT_VERBOSE_ERR(session, split,
 	    "%p: %s split into parent %p %" PRIu32 " -> %" PRIu32
 	    " (%" PRIu32 ")",
-	    page, __wt_page_type_string(page->type), parent, parent_entries,
+	    child, __wt_page_type_string(child->type), parent, parent_entries,
 	    result_entries, result_entries - parent_entries);
 
 	/* Allocate and initialize a new page index array for the parent. */
@@ -630,10 +616,10 @@ __wt_split_evict(
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
-		if (pindex->index[i] == parent_ref)
+		if (pindex->index[i] == ref)
 			for (j = 0; j < split_entries; ++j)
-				WT_ERR(__wt_multi_to_ref(session, page,
-				    &mod->mod_multi[j],
+				WT_ERR(__wt_multi_to_ref(session, parent,
+				    child, &mod->mod_multi[j],
 				    alloc_refp++, &parent_incr));
 		else
 			*alloc_refp++ = pindex->index[i];
@@ -656,16 +642,17 @@ __wt_split_evict(
 	 * those threads and causing them to re-calculate their position based
 	 * on the updated parent page's index.
 	 */
-	WT_PUBLISH(parent_ref->state, WT_REF_SPLIT);
+	WT_PUBLISH(ref->state, WT_REF_SPLIT);
 
 	/*
 	 * Pages with unresolved changes are not marked clean by reconciliation;
-	 * mark the page clean now so it will be discarded.
+	 * mark the page clean, and discard it.
 	 */
-	if (__wt_page_is_modified(page)) {
+	if (__wt_page_is_modified(child)) {
 		 mod->write_gen = 0;
-		 __wt_cache_dirty_decr(session, page);
+		 __wt_cache_dirty_decr(session, child);
 	}
+	__wt_ref_out(session, ref);
 
 	/*
 	 * A note on error handling: failures before we swapped the new page
@@ -687,7 +674,7 @@ __wt_split_evict(
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_ERR(__wt_session_fotxn_add(session, pindex, size));
-	WT_ERR(__wt_session_fotxn_add(session, parent_ref, sizeof(WT_REF)));
+	WT_ERR(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
 	parent_decr += size + sizeof(WT_REF);
 
 	/* Adjust the parent's memory footprint. */
@@ -718,7 +705,7 @@ __wt_split_evict(
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		ikey = __wt_ref_key_instantiated(parent_ref);
+		ikey = __wt_ref_key_instantiated(ref);
 		if (ikey != NULL && ikey->cell_offset != 0) {
 			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
@@ -761,7 +748,7 @@ err:	WT_PAGE_UNLOCK(session, parent);
 	 * common code paths, and unwinding those changes will be difficult.
 	 * For now, leak the memory by not discarding the instantiated pages.
 	 */
-	__wt_free_ref_index(session, page, alloc_index, 0);
+	__wt_free_ref_index(session, NULL, alloc_index, 0);
 
 	/*
 	 * A note on error handling: if we completed the split, return success,

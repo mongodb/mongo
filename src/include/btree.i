@@ -6,6 +6,16 @@
  */
 
 /*
+ * __wt_ref_is_root --
+ *	Return if the page reference is for the root page.
+ */
+static inline int
+__wt_ref_is_root(WT_REF *ref)
+{
+	return (ref->home == NULL ? 1 : 0);
+}
+
+/*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */
@@ -202,28 +212,19 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 
 /*
  * __wt_page_refp --
- *      Return the offset of the parent's index referencing the page's WT_REF
- * structure.
+ *      Return the page's index and slot for a reference.
  */
-static inline int
-__wt_page_refp(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+static inline void
+__wt_page_refp(WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE_INDEX *pindex;
-	WT_PAGE *parent;
 	uint32_t i;
-
-	/* The root page has no WT_REF structure. */
-	WT_ASSERT(session, !WT_PAGE_IS_ROOT(page));
-	if (WT_PAGE_IS_ROOT(page))
-		return (EINVAL);
 
 	/*
 	 * Copy the parent page's index value: the page can split at any time,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
-retry:	parent = page->parent;
-	pindex = *pindexp = parent->pg_intl_index;
+retry:	pindex = ref->home->pg_intl_index;
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
@@ -237,42 +238,27 @@ retry:	parent = page->parent;
 	 * only happen in cases where we've deepened the tree and we're going to
 	 * yield the processor anyway.)
 	 */
-	for (i = page->ref_hint; i < pindex->entries; ++i)
-		if (pindex->index[i]->page == page) {
-			*slotp = page->ref_hint = i;
-			return (0);
+	for (i = ref->ref_hint; i < pindex->entries; ++i)
+		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
+			*slotp = ref->ref_hint = i;
+			return;
 		}
 	for (i = 0; i < pindex->entries; ++i)
-		if (pindex->index[i]->page == page) {
-			*slotp = page->ref_hint = i;
-			return (0);
+		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
+			*slotp = ref->ref_hint = i;
+			return;
 		}
 
 	/*
-	 * If we don't find our reference, the parent page split and our parent
-	 * pointer references the wrong page.  After internal page splits, any
-	 * in-memory children are updated with their new parent pointer, so we
-	 * wait on that update.  Yield the processor and try again.
+	 * If we don't find our reference, the page split into a new level and
+	 * our home pointer references the wrong page.  After internal pages
+	 * deepen, their reference structure home value are updated; yield and
+	 * wait for that to happen.
 	 */
 	__wt_yield();
 	goto retry;
-}
-
-/*
- * __wt_page_ref --
- *      Return a pointer to the page's WT_REF structure.
- */
-static inline WT_REF *
-__wt_page_ref(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_PAGE_INDEX *pindex;
-	uint32_t slot;
-
-	if (WT_PAGE_IS_ROOT(page))
-		return (NULL);
-
-	return (__wt_page_refp(
-	    session, page, &pindex, &slot) == 0 ? pindex->index[slot] : NULL);
 }
 
 /*
@@ -543,7 +529,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 	 */
 	if (cbt->ins == NULL) {
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
-		page = cbt->page;
+		page = cbt->ref->page;
 		rip = &page->u.row.d[cbt->slot];
 		WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
 	} else {
@@ -588,7 +574,7 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip)
  *	Return the addr/size and type triplet for a reference.
  */
 static inline int
-__wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
+__wt_ref_info(WT_SESSION_IMPL *session,
     WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
@@ -609,7 +595,7 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 		*sizep = 0;
 		if (typep != NULL)
 			*typep = 0;
-	} else if (__wt_off_page(page, addr)) {
+	} else if (__wt_off_page((WT_PAGE *)ref->home, addr)) {
 		*addrp = addr->addr;
 		*sizep = addr->size;
 		if (typep != NULL)
@@ -640,11 +626,11 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
  *	Release a reference to a page.
  */
 static inline int
-__wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_DECL_RET;
 	WT_BTREE *btree;
-	WT_REF *ref;
+	WT_DECL_RET;
+	WT_PAGE *page;
 	int locked;
 
 	btree = S2BT(session);
@@ -653,8 +639,9 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Discard our hazard pointer.  Ignore pages we don't have and the root
 	 * page, which sticks in memory, regardless.
 	 */
-	if (page == NULL || WT_PAGE_IS_ROOT(page))
+	if (ref == NULL || __wt_ref_is_root(ref))
 		return (0);
+	page = ref->page;
 
 	/* Attempt to evict pages with the special "oldest" read generation. */
 	if (page->read_gen != WT_READGEN_OLDEST ||
@@ -667,14 +654,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * reference without first locking the page, it could be evicted in
 	 * between.
 	 */
-	ref = __wt_page_ref(session, page);
 	locked = WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED);
 	WT_TRET(__wt_hazard_clear(session, page));
 	if (!locked)
 		return (ret);
 
 	(void)WT_ATOMIC_ADD(btree->evict_busy, 1);
-	if ((ret = __wt_evict_page(session, &page)) == 0)
+	if ((ret = __wt_evict_page(session, ref)) == 0)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 	else {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
@@ -692,8 +678,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
  * coupling up/down the tree.
  */
 static inline int
-__wt_page_swap_func(WT_SESSION_IMPL *session, WT_PAGE *held,
-    WT_PAGE *parent, WT_REF *ref, uint32_t flags
+__wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
+    WT_REF *want, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -706,10 +692,10 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_PAGE *held,
 	 * This function is here to simplify the error handling during hazard
 	 * pointer coupling so we never leave a hazard pointer dangling.  The
 	 * assumption is we're holding a hazard pointer on "held", and want to
-	 * acquire a hazard pointer on the page referenced by a parent/ref
-	 * pair, releasing the hazard pointer on page "held" when we're done.
+	 * acquire a hazard pointer on "want", releasing the hazard pointer on
+	 * "held" when we're done.
 	 */
-	ret = __wt_page_in_func(session, parent, ref, flags
+	ret = __wt_page_in_func(session, want, flags
 #ifdef HAVE_DIAGNOSTIC
 	    , file, line
 #endif
@@ -732,7 +718,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_PAGE *held,
 	 * the acquired page too, keeping it is never useful.
 	 */
 	if (acquired && ret != 0)
-		WT_TRET(__wt_page_release(session, ref->page));
+		WT_TRET(__wt_page_release(session, want));
 	return (ret);
 }
 
@@ -838,7 +824,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	WT_REF *first;
 
 	btree = S2BT(session);
-	root = btree->root_page;
+	root = btree->root_page.page;
 
 	if (root == NULL)
 		return (0);
