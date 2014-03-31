@@ -411,7 +411,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	/*
 	 * Clean up the boundary structures: some workloads result in millions
 	 * of these structures, and if associated with some random session that
-	 * got roped into doing forced eviction, it won't be discarded for the
+	 * got roped into doing forced eviction, they won't be discarded for the
 	 * life of the session.
 	 */
 	__rec_bnd_cleanup(session, r, 0);
@@ -821,24 +821,36 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		r->max_txn = max_txn;
 
 	/*
-	 * If not evicting, or evicting and all updates are globally visible,
-	 * we're done.
+	 * If all updates are globally visible, the page can be marked clean and
+	 * we're done, regardless of whether we're evicting or checkpointing.
 	 */
-	if (!F_ISSET(r, WT_EVICTION_LOCKED) ||
-	    __wt_txn_visible_all(session, max_txn))
+	if (__wt_txn_visible_all(session, max_txn))
 		return (0);
 
 	/*
-	 * If evicting without all updates being globally visible, and we can't
-	 * save and restore the list of updates, the page can't be evicted.
+	 * If not all updates are globally visible, the page cannot be marked
+	 * clean.
+	 */
+	r->leave_dirty = 1;
+
+	/*
+	 * If not all updates are globally visible and checkpointing: continue,
+	 * we'll write what we can.
+	 */
+	if (!F_ISSET(r, WT_EVICTION_LOCKED))
+		return (0);
+
+	/*
+	 * If not all updates are globally visible and evicting: if we aren't
+	 * able to save/restore the not-yet-visible updates, the page can't be
+	 * evicted.
 	 */
 	if (!F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
 
 	/*
-	 * If evicting without all updates being globally visible, and we can
-	 * save and restore the list of updates on a newly instantiated page,
-	 * do so.
+	 * Evicting a page with not-yet-visible updates: save and restore the
+	 * list of updates on a newly instantiated page.
 	 *
 	 * The order of the updates on the list matters so we can't move only
 	 * the unresolved updates, we have to move the entire update list.
@@ -885,10 +897,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		upd->next = upd_ovfl;
 	}
 
-	WT_RET(__rec_skip_update_save(session, r, ins, rip));
-
-	r->leave_dirty = 1;
-	return (0);
+	return (__rec_skip_update_save(session, r, ins, rip));
 }
 
 /*

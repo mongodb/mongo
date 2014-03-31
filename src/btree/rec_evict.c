@@ -366,6 +366,10 @@ __rec_review(
 		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, ref, NULL, flags));
+
+		WT_ASSERT(session,
+		    !__wt_page_is_modified(page) ||
+		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));
 	} else {
 		/*
 		 * If the page was ever modified, make sure all of the updates
