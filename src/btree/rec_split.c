@@ -593,6 +593,10 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * actual split into the parent has to be serialized.  Note we allocate
 	 * memory inside of the lock and may want to invest effort in making the
 	 * locked period shorter.
+	 *
+	 * We could race with another thread deepening our parent.  To deal
+	 * with that, read the parent pointer each time we try to lock it, and
+	 * check that it's still correct after it is locked.
 	 */
 	for (;;) {
 		parent = ref->home;
