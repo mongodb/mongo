@@ -15,6 +15,8 @@ __wt_ref_is_root(WT_REF *ref)
 	return (ref->home == NULL ? 1 : 0);
 }
 
+static inline WT_HAZARD *__wt_page_hazard_check(WT_SESSION_IMPL *, WT_PAGE *);
+
 /*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
@@ -631,7 +633,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked;
+	int locked, tries;
 
 	btree = S2BT(session);
 
@@ -659,6 +661,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (!locked)
 		return (ret);
 
+	/* Stall application threads as if the cache is full. */
+	F_SET(S2C(session)->cache, WT_EVICT_CACHE_FULL);
+
+	for (tries = 0; tries < 1000 &&
+	    __wt_page_hazard_check(session, page) != NULL; tries++)
+		__wt_sleep(0, 1000);
+
 	(void)WT_ATOMIC_ADD(btree->evict_busy, 1);
 	if ((ret = __wt_evict_page(session, ref)) == 0)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
@@ -668,6 +677,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref)
 			ret = 0;
 	}
 	(void)WT_ATOMIC_SUB(btree->evict_busy, 1);
+	F_CLR(S2C(session)->cache, WT_EVICT_CACHE_FULL);
 
 	return (ret);
 }
