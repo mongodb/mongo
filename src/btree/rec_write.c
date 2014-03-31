@@ -370,10 +370,10 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * if compaction is running, lock the page down.
 	 */
 	locked = 0;
-	if (conn->compact_in_memory_pass)
+	if (conn->compact_in_memory_pass) {
 		locked = 1;
-	if (locked)
 		WT_PAGE_LOCK(session, page);
+	}
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -1045,9 +1045,10 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * in this state within an evicted page's subtree would
 			 * have caused eviction to fail.
 			 *
-			 * We should never be here during checkpoint, internal
-			 * pages are locked during checkpoint reconciliation,
-			 * and that lock is acquired when splitting a page.
+			 * We should never be here during checkpoint, dirty page
+			 * eviction is shutout during checkpoint, all splits in
+			 * process will have completed before we walk any pages
+			 * for checkpoint.
 			 */
 			WT_ASSERT(session, ref->state != WT_REF_SPLIT);
 			/* FALLTHROUGH */
