@@ -150,7 +150,7 @@ namespace mongo {
         if (hasConnection()) {
             return true;
         }
-        _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
+        _connection.reset(new DBClientConnection(false, 0, replSettings.oplogtimeout));
         string errmsg;
         if (!_connection->connect(hostName.c_str(), errmsg) ||
             (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
