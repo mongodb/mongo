@@ -554,6 +554,7 @@ extern int __wt_conn_remove_compressor( WT_CONNECTION_IMPL *conn,
     WT_NAMED_COMPRESSOR *ncomp);
 extern int __wt_conn_remove_data_source( WT_CONNECTION_IMPL *conn,
     WT_NAMED_DATA_SOURCE *ndsrc);
+extern void __wt_async_stats_update(WT_SESSION_IMPL *session);
 extern int __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_async_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_async_flush(WT_CONNECTION_IMPL *conn);

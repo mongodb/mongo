@@ -33,7 +33,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 	 */
 	for (found = 0, i = save_i; i < conn->async_size; i++) {
 		op = &async->async_ops[i];
-		if (FLD_ISSET(op->state, WT_ASYNCOP_FREE)) {
+		if (op->state == WT_ASYNCOP_FREE) {
 			found = 1;
 			break;
 		}
@@ -44,7 +44,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 	if (!found) {
 		for (i = 0; i < save_i; i++) {
 			op = &async->async_ops[i];
-			if (FLD_ISSET(op->state, WT_ASYNCOP_FREE)) {
+			if (op->state == WT_ASYNCOP_FREE) {
 				found = 1;
 				break;
 			}
@@ -59,7 +59,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 	 * Start the next search at the next entry after this one.
 	 * Set the state of this op handle as READY for the user to use.
 	 */
-	FLD_SET(op->state, WT_ASYNCOP_READY);
+	op->state = WT_ASYNCOP_READY;
 	op->unique_id = async->op_id++;
 	async->ops_index = (i + 1) % conn->async_size;
 	*opp = op;
@@ -99,6 +99,26 @@ __async_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 }
 
 /*
+ * __wt_async_stats_update --
+ *	Update the async stats for return to the application.
+ */
+void
+__wt_async_stats_update(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_ASYNC *async;
+	WT_CONNECTION_STATS *stats;
+
+	conn = S2C(session);
+	async = conn->async;
+	if (async == NULL)
+		return;
+	stats = &conn->stats;
+	WT_STAT_SET(stats, async_cur_queue, async->cur_queue);
+	WT_STAT_SET(stats, async_max_queue, async->max_queue);
+}
+
+/*
  * __wt_async_create --
  *	Start the async subsystem and worker threads.
  */
@@ -125,6 +145,7 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_ASYNC), &conn->async));
 	async = conn->async;
+	STAILQ_INIT(&async->opqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
 	WT_RET(__wt_spin_init(session, &async->opsq_lock, "ops queue"));
 	WT_RET(__wt_cond_alloc(session, "async op", 0, &async->ops_cond));
@@ -141,13 +162,15 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		WT_RET(__wt_open_session(
 		    conn, 1, NULL, NULL, &async->worker_sessions[i]));
 		async->worker_sessions[i]->name = "async-worker";
+	}
+	for (i = 0; i < conn->async_workers; i++) {
 		/*
 		 * Start the threads.
 		 */
 		WT_RET(__wt_thread_create(session, &async->worker_tids[i],
 		    __wt_async_worker, async->worker_sessions[i]));
 	}
-
+	__wt_async_stats_update(session);
 	return (0);
 }
 
@@ -169,6 +192,7 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (!conn->async_cfg)
 		return (0);
+
 	for (i = 0; i < conn->async_workers; i++)
 		if (async->worker_tids[i] != 0) {
 			WT_TRET(__wt_cond_signal(session, async->ops_cond));
@@ -234,6 +258,9 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	fprintf(stderr, "Async flush: set in progress\n");
 	FLD_SET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS);
 	async->flush_count = 0;
+	WT_ASSERT(conn->default_session,
+	    async->flush_op.state == WT_ASYNCOP_FREE);
+	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_ERR(__wt_async_op_enqueue(conn, &async->flush_op, 1));
 	fprintf(stderr, "Async flush: enqueued op, wait for complete\n");
 	while (!FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_COMPLETE)) {
@@ -246,6 +273,7 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	 * Flush is done.  Clear the flags.
 	 */
 	fprintf(stderr, "Async flush: complete.  clear flags\n");
+	async->flush_op.state = WT_ASYNCOP_FREE;
 	FLD_CLR(async->opsq_flush,
 	   (WT_ASYNC_FLUSH_COMPLETE | WT_ASYNC_FLUSH_IN_PROGRESS));
 err:	__wt_spin_unlock(session, &async->opsq_lock);

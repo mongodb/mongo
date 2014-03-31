@@ -15,6 +15,13 @@ typedef enum {
 	WT_AOP_UPDATE	/*!< Set the value of an existing key */
 } WT_ASYNC_OPTYPE;
 
+typedef enum {
+	WT_ASYNCOP_ENQUEUED,	/* Enqueued on the work queue */
+	WT_ASYNCOP_FREE,	/* Able to be allocated to user */
+	WT_ASYNCOP_READY,	/* Allocated and ready for user to use */
+	WT_ASYNCOP_WORKING	/* Operation in progress by worker */
+} WT_ASYNC_STATE;
+
 #define	O2C(op)	((WT_CONNECTION_IMPL *)(op)->iface.connection)
 #define	O2S(op)								\
     (((WT_CONNECTION_IMPL *)(op)->iface.connection)->default_session)
@@ -30,15 +37,7 @@ struct __wt_async_op_impl {
 	uint64_t uri_hash;
 	uint64_t cfg_hash;
 
-	/*
-	 * !!!
-	 * Explicit representations of structures from queue.h.
-	 * TAILQ_ENTRY(wt_async_op) q;
-	 */
-	struct {
-		WT_ASYNC_OP_IMPL *tqe_next;
-		WT_ASYNC_OP_IMPL **tqe_prev;
-	} q;				/* Linked list of WT_ASYNC_OPS. */
+	STAILQ_ENTRY(__wt_async_op_impl) q;
 
 	uint64_t recno;			/* Record number, normal and raw mode */
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
@@ -52,11 +51,7 @@ struct __wt_async_op_impl {
 	uint32_t	internal_id;	/* Array position id. */
 	uint64_t	unique_id;	/* Unique identifier. */
 
-#define	WT_ASYNCOP_ENQUEUED	0x0001
-#define	WT_ASYNCOP_FREE		0x0002
-#define	WT_ASYNCOP_READY	0x0004
-#define	WT_ASYNCOP_WORKING	0x0008
-	uint32_t	state;		/* Op state */
+	WT_ASYNC_STATE	state;		/* Op state */
 	WT_ASYNC_OPTYPE	optype;		/* Operation type */
 
 #define	WT_ASYNCOP_DATA_SOURCE	0x0001
@@ -77,22 +72,27 @@ struct __wt_async_op_impl {
  */
 struct __wt_async {
 #define	WT_ASYNC_MAX_OPS	4096
+	/*
+	 * Ops array protected by the ops_lock.
+	 */
+	WT_SPINLOCK		 ops_lock;      /* Locked: ops array */
 	WT_ASYNC_OP_IMPL	 async_ops[WT_ASYNC_MAX_OPS];
 					/* Async ops */
 #define	OPS_INVALID_INDEX	0xffffffff
 	uint32_t		 ops_index;	/* Active slot index */
 	uint64_t		 op_id;
 	/*
-	 * Synchronization resources
+	 * Everything relating to the work queue and flushing is
+	 * protected by the opsq_lock.
 	 */
-	WT_SPINLOCK		 ops_lock;      /* Locked: ops array */
 	WT_SPINLOCK		 opsq_lock;	/* Locked: work queue */
-	SLIST_HEAD(__wt_async_lh, __wt_async_op) oplh;
+	STAILQ_HEAD(__wt_async_qh, __wt_async_op_impl) opqh;
+	int			 cur_queue;	/* Currently enqueued */
+	int			 max_queue;	/* Maximum enqueued */
 #define	WT_ASYNC_FLUSH_COMPLETE		0x0001	/* Notify flush caller */
 #define	WT_ASYNC_FLUSH_IN_PROGRESS	0x0002	/* Prevent more callers */
 #define	WT_ASYNC_FLUSHING		0x0004	/* Notify workers */
 	uint32_t		 opsq_flush;	/* Queue flush op */
-
 	/* Notify any waiting threads when work is enqueued. */
 	WT_CONDVAR		*ops_cond;
 	/* Notify any waiting threads when flushing is done. */

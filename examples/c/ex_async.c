@@ -46,6 +46,8 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	int t_ret;
 
 	(void)cb;
+	fprintf(stderr, "CALLBACK: %p ID %" PRIu64 " error %d\n",
+	    pthread_self(), op->get_id(op), ret);
 	t_ret = 0;
 	if (ret != 0) {
 		/*! [Get identifier] */
@@ -55,6 +57,9 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (1);
 	}
 	if (op->get_id(op) == search_id) {
+		fprintf(stderr, "CALLBACK: search %" PRIu64 " error %d\n", op->get_id(op), ret);
+
+#if 0
 		/*! [Get the op's string key] */
 		t_ret = op->get_key(op, &key);
 		/*! [Get the op's string key] */
@@ -62,6 +67,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		t_ret = op->get_value(op, &value);
 		/*! [Get the op's string value] */
 		printf("Got record: %s : %s\n", key, value);
+#endif
 	}
 	return (t_ret);
 }

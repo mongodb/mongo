@@ -17,7 +17,7 @@ __async_get_key(WT_ASYNC_OP *asyncop, ...)
 	WT_ASYNC_OP_IMPL *op;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	fprintf(stderr, "async_get_key: called id %d uniq %d\n",
+	fprintf(stderr, "async_get_key: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
 	return (0);
 }
@@ -32,7 +32,7 @@ __async_get_value(WT_ASYNC_OP *asyncop, ...)
 	WT_ASYNC_OP_IMPL *op;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	fprintf(stderr, "async_get_value: called id %d uniq %d\n",
+	fprintf(stderr, "async_get_value: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
 	return (0);
 }
@@ -47,7 +47,7 @@ __async_set_key(WT_ASYNC_OP *asyncop, ...)
 	WT_ASYNC_OP_IMPL *op;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	fprintf(stderr, "async_set_key: called id %d uniq %d\n",
+	fprintf(stderr, "async_set_key: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
 	return;
 }
@@ -62,9 +62,20 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 	WT_ASYNC_OP_IMPL *op;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	fprintf(stderr, "async_set_value: called id %d uniq %d\n",
+	fprintf(stderr, "async_set_value: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
 	return;
+}
+
+/*
+ * __async_op_wrap --
+ *	Common wrapper for all async operations.
+ */
+static int
+__async_op_wrap(WT_ASYNC_OP_IMPL *op, WT_ASYNC_OPTYPE type)
+{
+	op->optype = type;
+	return (__wt_async_op_enqueue(O2C(op), op, 0));
 }
 
 /*
@@ -78,9 +89,9 @@ __async_search(WT_ASYNC_OP *asyncop)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_search);
-	fprintf(stderr, "async_search: called id %d uniq %d\n",
+	fprintf(stderr, "async_search: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	return (0);
+	return (__async_op_wrap(op, WT_AOP_SEARCH));
 }
 
 /*
@@ -95,9 +106,9 @@ __async_insert(WT_ASYNC_OP *asyncop)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_insert);
-	fprintf(stderr, "async_insert: called id %d uniq %d\n",
+	fprintf(stderr, "async_insert: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	return (0);
+	return (__async_op_wrap(op, WT_AOP_INSERT));
 }
 
 /*
@@ -112,7 +123,7 @@ __async_update(WT_ASYNC_OP *asyncop)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_update);
 	fprintf(stderr, "async_update: called\n");
-	return (0);
+	return (__async_op_wrap(op, WT_AOP_UPDATE));
 }
 
 /*
@@ -127,7 +138,7 @@ __async_remove(WT_ASYNC_OP *asyncop)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_remove);
 	fprintf(stderr, "async_remove: called\n");
-	return (0);
+	return (__async_op_wrap(op, WT_AOP_REMOVE));
 }
 
 /*
@@ -181,21 +192,26 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
 {
 	WT_ASYNC *async;
 	WT_DECL_RET;
-	uint32_t i;
 
 	async = conn->async;
 	if (!locked)
 		__wt_spin_lock(conn->default_session, &async->opsq_lock);
 	/*
-	 * Enqueue op
+	 * Enqueue op at the tail of the work queue.
 	 */
+	WT_ASSERT(conn->default_session, op->state == WT_ASYNCOP_READY);
+	STAILQ_INSERT_TAIL(&async->opqh, op, q);
+	fprintf(stderr, "Enqueue op %d %" PRIu64 "\n", op->internal_id, op->unique_id);
+	op->state = WT_ASYNCOP_ENQUEUED;
+	if (++async->cur_queue > async->max_queue)
+		async->max_queue = async->cur_queue;
 	/*
 	 * Signal the worker threads something is on the queue.
 	 */
 	__wt_spin_unlock(conn->default_session, &async->opsq_lock);
 	WT_ERR(__wt_cond_signal(conn->default_session, async->ops_cond));
 	/*
-	 * Relock it if we need to for the caller.
+	 * Lock again if we need to for the caller.
 	 */
 err:
 	if (locked)

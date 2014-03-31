@@ -8,6 +8,58 @@
 #include "wt_internal.h"
 
 /*
+ * __async_worker_op --
+ *	A worker thread handles an individual op.
+ */
+static int
+__async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
+{
+	WT_ASYNC *async;
+	WT_ASYNC_OP *asyncop;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	int cb_ret, t_ret;
+
+	conn = S2C(session);
+	async = conn->async;
+	asyncop = (WT_ASYNC_OP *)op;
+
+	ret = 0;
+	/*
+	 * XXX need to get txn cfg.
+	 */
+	WT_RET(__wt_txn_begin(session, NULL));
+	WT_ASSERT(session, op->state == WT_ASYNCOP_WORKING);
+	/*
+	 * Perform op.
+	 *	Hash config and uri.  Find/create cursor.
+	 *	Perform op.
+	 */
+	fprintf(stderr, "Worker %p op %d txn %" PRIu64 "\n",
+	    pthread_self(), op->optype, session->txn.id);
+	if (op->cb != NULL && op->cb->notify != NULL) {
+		cb_ret = op->cb->notify(op->cb, asyncop, ret, 0);
+	}
+	if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0) {
+		/*
+		 * XXX need to get txn cfg.
+		 */
+		WT_TRET(__wt_txn_commit(session, NULL));
+	} else {
+		/*
+		 * XXX need to get txn cfg.
+		 */
+		WT_TRET(__wt_txn_rollback(session, NULL));
+	}
+	/*
+	 * After the callback returns, release the op back to
+	 * the free pool.
+	 */
+	op->state = WT_ASYNCOP_FREE;
+	return (ret);
+}
+
+/*
  * __async_worker --
  *	The async worker threads.
  */
@@ -28,7 +80,6 @@ __wt_async_worker(void *arg)
 	locked = 0;
 	fprintf(stderr, "Async worker %p started\n",pthread_self());
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
-		/* Wait until the next event. */
 		__wt_spin_lock(session, &async->opsq_lock);
 		locked = 1;
 		fprintf(stderr, "Async worker %p check flushing 0x%x\n",
@@ -68,6 +119,7 @@ __wt_async_worker(void *arg)
 				 */
 				fprintf(stderr, "Worker %p flush checkin %d\n",
 				    pthread_self(), async->flush_count);
+				/* XXX Need to create __async_flush_wait() */
 				while (FLD_ISSET(
 				    async->opsq_flush, WT_ASYNC_FLUSHING)) {
 					__wt_spin_unlock(
@@ -82,11 +134,31 @@ __wt_async_worker(void *arg)
 			}
 		}
 		/*
-		 * Dequeue op.  We get here with the opqs lock held.
+		 * Dequeue op.  We get here with the opsq lock held.
+		 * Remove from the head of the queue.
 		 */
-		op = &async->flush_op;
-		if (op == &async->flush_op &&
-		    FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS)) {
+		op = STAILQ_FIRST(&async->opqh);
+		if (op == NULL) {
+			__wt_spin_unlock(session, &async->opsq_lock);
+			locked = 0;
+			fprintf(stderr, "Worker %p no work now.\n",
+			    pthread_self());
+			goto wait_for_work;
+		}
+
+		/*
+		 * There is work to do.
+		 */
+		STAILQ_REMOVE_HEAD(&async->opqh, q);
+		WT_ASSERT(session, async->cur_queue > 0);
+		--async->cur_queue;
+		WT_ASSERT(session, op->state == WT_ASYNCOP_ENQUEUED);
+		op->state = WT_ASYNCOP_WORKING;
+		fprintf(stderr, "Worker %p got op %d %" PRIu64 "\n",
+		    pthread_self(), op->internal_id, op->unique_id);
+		if (op == &async->flush_op) {
+			WT_ASSERT(session, FLD_ISSET(async->opsq_flush,
+			    WT_ASYNC_FLUSH_IN_PROGRESS));
 			/*
 			 * We're the worker to take the flush op off the queue.
 			 * Set the flushing flag and set count to 1.
@@ -96,8 +168,33 @@ __wt_async_worker(void *arg)
 			FLD_SET(async->opsq_flush, WT_ASYNC_FLUSHING);
 			async->flush_count = 1;
 		}
+		/*
+		 * Unlock after getting op and possibly setting up flush.
+		 */
 		__wt_spin_unlock(session, &async->opsq_lock);
 		locked = 0;
+		/*
+		 * Now this worker performs the op without the lock.
+		 * If we're the flush initiator, that means waiting for
+		 * other workers to check in.  Otherwise do the operation
+		 * and call the user's callback and free the op.
+		 */
+		if (op == &async->flush_op) {
+			WT_ASSERT(session, FLD_ISSET(async->opsq_flush,
+			    WT_ASYNC_FLUSH_IN_PROGRESS));
+			/* XXX Need to create __async_flush_wait() */
+		} else {
+			fprintf(stderr, "Worker %p got optype %d\n",
+			    pthread_self(), op->optype);
+			/*
+			 * Perform op now.
+			 */
+			(void)__async_worker_op(session, op);
+		}
+
+wait_for_work:
+		WT_ASSERT(session, locked == 0);
+		/* Wait until the next event. */
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, async->ops_cond, 100000));
 	}
