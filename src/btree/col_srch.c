@@ -49,7 +49,7 @@ restart:
 
 		WT_ASSERT(session, parent->key.recno == page->pg_intl_recno);
 
-		pindex = page->pg_intl_index;
+		pindex = WT_INTL_INDEX_COPY(page);
 		base = pindex->entries;
 		child = pindex->index[base - 1];
 

@@ -55,6 +55,8 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 static int
 __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 {
+	WT_PAGE_INDEX *pindex;
+
 	/*
 	 * All internal pages and overflow pages are trivial, all we track is
 	 * a count of the page type.
@@ -66,8 +68,8 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 		break;
 	case WT_PAGE_COL_INT:
 		WT_STAT_INCR(stats, btree_column_internal);
-		WT_STAT_INCRV(
-		    stats, btree_entries, page->pg_intl_index->entries);
+		pindex = WT_INTL_INDEX_COPY(page);
+		WT_STAT_INCRV(stats, btree_entries, pindex->entries);
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_RET(__stat_page_col_var(page, stats));
@@ -77,8 +79,8 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS *stats)
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_STAT_INCR(stats, btree_row_internal);
-		WT_STAT_INCRV(
-		    stats, btree_entries, page->pg_intl_index->entries);
+		pindex = WT_INTL_INDEX_COPY(page);
+		WT_STAT_INCRV(stats, btree_entries, pindex->entries);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__stat_page_row_leaf(page, stats));

@@ -224,7 +224,7 @@ __wt_page_refp(WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 	 * Copy the parent page's index value: the page can split at any time,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
-retry:	pindex = ref->home->pg_intl_index;
+retry:	pindex = WT_INTL_INDEX_COPY(ref->home);
 
 	/*
 	 * Use the page's WT_REF hint: unless the page has split it should point
@@ -829,7 +829,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	if (root == NULL)
 		return (0);
 
-	pindex = root->pg_intl_index;
+	pindex = WT_INTL_INDEX_COPY(root);
 	first = pindex->index[0];
 	if ((child = first->page) == NULL)
 		return (0);

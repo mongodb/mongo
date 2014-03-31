@@ -518,6 +518,7 @@ __debug_page(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 static int
 __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 {
+	WT_PAGE_INDEX *pindex;
 	WT_PAGE_MODIFY *mod;
 	WT_SESSION_IMPL *session;
 	uint32_t entries;
@@ -530,7 +531,8 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		__dmsg(ds, " recno %" PRIu64, page->pg_intl_recno);
-		entries = page->pg_intl_index->entries;
+		pindex = WT_INTL_INDEX_COPY(page);
+		entries = pindex->entries;
 		break;
 	case WT_PAGE_COL_FIX:
 		__dmsg(ds, " recno %" PRIu64, page->pg_fix_recno);
@@ -541,7 +543,8 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		entries = page->pg_var_entries;
 		break;
 	case WT_PAGE_ROW_INT:
-		entries = page->pg_intl_index->entries;
+		pindex = WT_INTL_INDEX_COPY(page);
+		entries = pindex->entries;
 		break;
 	case WT_PAGE_ROW_LEAF:
 		entries = page->pg_row_entries;

@@ -446,6 +446,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_DECL_RET;
 	WT_PAGE *next;
+	WT_PAGE_INDEX *pindex;
 	WT_PAGE_MODIFY *mod;
 	WT_REF fake_ref;
 	uint32_t i;
@@ -488,9 +489,10 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
+	pindex = WT_INTL_INDEX_COPY(next);
 	for (i = 0; i < mod->mod_multi_entries; ++i)
-		WT_ERR(__wt_multi_to_ref(session, NULL, next,
-		    &mod->mod_multi[i], &next->pg_intl_index->index[i], NULL));
+		WT_ERR(__wt_multi_to_ref(session, NULL,
+		    next, &mod->mod_multi[i], &pindex->index[i], NULL));
 
 	/*
 	 * We maintain a list of pages written for the root in order to free the

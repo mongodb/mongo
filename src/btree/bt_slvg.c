@@ -1069,6 +1069,7 @@ __slvg_col_build_internal(
 	WT_ADDR *addr;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref, **refp;
 	WT_TRACK *trk;
 	uint32_t i;
@@ -1080,8 +1081,8 @@ __slvg_col_build_internal(
 	    __wt_page_alloc(session, WT_PAGE_COL_INT, 1, leaf_cnt, 1, &page));
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (refp =
-	    page->pg_intl_index->index, i = 0; i < ss->pages_next; ++i) {
+	pindex = WT_INTL_INDEX_COPY(page);
+	for (refp = pindex->index, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
@@ -1653,6 +1654,7 @@ __slvg_row_build_internal(
 	WT_ADDR *addr;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref, **refp;
 	WT_TRACK *trk;
 	uint32_t i;
@@ -1664,8 +1666,8 @@ __slvg_row_build_internal(
 	    __wt_page_alloc(session, WT_PAGE_ROW_INT, 0, leaf_cnt, 1, &page));
 	WT_ERR(__slvg_modify_init(session, page));
 
-	for (refp =
-	    page->pg_intl_index->index, i = 0; i < ss->pages_next; ++i) {
+	pindex = WT_INTL_INDEX_COPY(page);
+	for (refp = pindex->index, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 

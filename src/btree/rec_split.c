@@ -22,6 +22,8 @@ static u_int __split_deepen_per_child = 1000;
 static int
 __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_PAGE_INDEX *pindex;
+
 	/*
 	 * Splits are based on either the number of child pages that will be
 	 * created by the split (splitting an internal page that will be slow
@@ -31,7 +33,8 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 *
 	 * Paranoia: don't try and split if we don't have anything to split.
 	 */
-	if (page->pg_intl_index->entries < 50)
+	pindex = WT_INTL_INDEX_COPY(page);
+	if (pindex->entries < 50)
 		return (0);
 
 	/*
@@ -46,7 +49,7 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Split to deepen the tree if the split will result in at least N
 	 * children in the newly created intermediate layer.
 	 */
-	if (page->pg_intl_index->entries >
+	if (pindex->entries >
 	    (__split_deepen_per_child * __split_deepen_min_child))
 		return (1);
 
@@ -183,7 +186,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 {
 	WT_DECL_RET;
 	WT_PAGE *child;
-	WT_PAGE_INDEX *alloc_index, *pindex;
+	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex;
 	WT_REF **alloc_refp;
 	WT_REF *child_ref, **child_refp, *parent_ref, **parent_refp, *ref;
 	size_t child_incr, parent_decr, parent_incr, size;
@@ -195,7 +198,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	parent_incr = parent_decr = 0;
 	panic = 0;
 
-	pindex = parent->pg_intl_index;
+	pindex = WT_INTL_INDEX_COPY(parent);
 	children = pindex->entries / __split_deepen_per_child;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
@@ -286,8 +289,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * to change.
 		 */
 		child_incr = 0;
-		for (child_refp =
-		    child->pg_intl_index->index, j = 0; j < slots; ++j) {
+		child_pindex = WT_INTL_INDEX_COPY(child);
+		for (child_refp = child_pindex->index, j = 0; j < slots; ++j) {
 			WT_ERR(__split_ref_instantiate(session,
 			    parent, *parent_refp, &parent_decr, &child_incr));
 			*child_refp++ = *parent_refp++;
@@ -342,7 +345,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * footprint.  From now on we've modified the parent page, attention
 	 * needs to be paid.
 	 */
-	WT_PUBLISH(parent->pg_intl_index, alloc_index);
+	WT_INTL_INDEX_SET(parent, alloc_index);
 	alloc_index = NULL;
 	panic = 1;
 
@@ -359,7 +362,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * page to be updated, which we do here: walk the children and fix them
 	 * up.
 	 */
-	pindex = parent->pg_intl_index;
+	pindex = WT_INTL_INDEX_COPY(parent);
 	for (parent_refp = pindex->index + SPLIT_CORRECT_1,
 	    i = pindex->entries - SPLIT_CORRECT_1; i > 0; ++parent_refp, --i) {
 		parent_ref = *parent_refp;
@@ -605,7 +608,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			return (ret);
 	}
 
-	pindex = parent->pg_intl_index;
+	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
 	split_entries = mod->mod_multi_entries;
 	result_entries = (parent_entries - 1) + split_entries;
@@ -636,7 +639,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * Update the parent page's index: this update makes the split visible
 	 * to threads descending the tree.
 	 */
-	WT_PUBLISH(parent->pg_intl_index, alloc_index);
+	WT_INTL_INDEX_SET(parent, alloc_index);
 	alloc_index = NULL;
 
 #ifdef HAVE_DIAGNOSTIC

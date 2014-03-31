@@ -383,7 +383,7 @@ descend:		couple = ref;
 			page = ref->page;
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT) {
-				pindex = page->pg_intl_index;
+				pindex = WT_INTL_INDEX_COPY(page);
 				slot = prev ? pindex->entries - 1 : 0;
 				descending = 1;
 			} else if (LF_ISSET(WT_READ_SKIP_LEAF))

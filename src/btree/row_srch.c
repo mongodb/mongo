@@ -164,7 +164,7 @@ restart:
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
-		pindex = page->pg_intl_index;
+		pindex = WT_INTL_INDEX_COPY(page);
 		base = pindex->entries;
 		child = pindex->index[base - 1];
 
@@ -444,7 +444,7 @@ restart:
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
-		pindex = page->pg_intl_index;
+		pindex = WT_INTL_INDEX_COPY(page);
 		child = pindex->index[__wt_random() % pindex->entries];
 
 		/*
@@ -477,8 +477,8 @@ restart:
 		 */
 		cbt->ref = child;
 		cbt->compare = 0;
-		cbt->slot =
-		    btree->root_page.page->pg_intl_index->entries < 2 ?
+		pindex = WT_INTL_INDEX_COPY(btree->root_page.page);
+		cbt->slot = pindex->entries < 2 ?
 		    __wt_random() % page->pg_row_entries : 0;
 		return (0);
 	}

@@ -188,23 +188,21 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
 		    &p));
 		size +=
 		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *);
-		page->pg_intl_index = p;
-		page->pg_intl_index->index =
-		    (WT_REF **)((WT_PAGE_INDEX *)p + 1);
-		page->pg_intl_index->entries = alloc_entries;
+		pindex = p;
+		pindex->index = (WT_REF **)((WT_PAGE_INDEX *)p + 1);
+		pindex->entries = alloc_entries;
+		WT_INTL_INDEX_SET(page, pindex);
 		if (alloc_refs)
-			for (pindex = page->pg_intl_index, i = 0;
-			    i < page->pg_intl_index->entries; ++i) {
+			for (i = 0; i < pindex->entries; ++i) {
 				WT_ERR(__wt_calloc_def(
 				    session, 1, &pindex->index[i]));
 				size += sizeof(WT_REF);
 			}
 		if (0) {
-err:			if (page->pg_intl_index != NULL) {
-				for (pindex = page->pg_intl_index, i = 0;
-				    i < page->pg_intl_index->entries; ++i)
+err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
+				for (i = 0; i < pindex->entries; ++i)
 					__wt_free(session, pindex->index[i]);
-				__wt_free(session, page->pg_intl_index);
+				__wt_free(session, pindex);
 			}
 			__wt_free(session, page);
 			return (ret);
@@ -371,6 +369,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_HEADER *dsk;
+	WT_PAGE_INDEX *pindex;
 	WT_REF **refp, *ref;
 	uint32_t i;
 
@@ -382,7 +381,8 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Walk the page, building references: the page contains value items.
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
-	refp = page->pg_intl_index->index;
+	pindex = WT_INTL_INDEX_COPY(page);
+	refp = pindex->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp++;
 		ref->home = page;
@@ -500,6 +500,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_DECL_ITEM(current);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref, **refp;
 	uint32_t i;
 
@@ -514,7 +515,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 * location cookie pairs.  Keys are on-page/overflow items and location
 	 * cookies are WT_CELL_ADDR_XXX items.
 	 */
-	refp = page->pg_intl_index->index;
+	pindex = WT_INTL_INDEX_COPY(page);
+	refp = pindex->index;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp;
 		ref->home = page;

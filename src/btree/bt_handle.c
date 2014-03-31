@@ -389,6 +389,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *root, *leaf;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 
 	btree = S2BT(session);
@@ -422,7 +423,9 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		WT_ERR(
 		    __wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, 1, &root));
 		root->pg_intl_parent_ref = &btree->root_page;
-		ref = root->pg_intl_index->index[0];
+
+		pindex = WT_INTL_INDEX_COPY(root);
+		ref = pindex->index[0];
 		ref->home = root;
 		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
 		ref->page = leaf;
@@ -434,7 +437,9 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		WT_ERR(
 		    __wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, 1, &root));
 		root->pg_intl_parent_ref = &btree->root_page;
-		ref = root->pg_intl_index->index[0];
+
+		pindex = WT_INTL_INDEX_COPY(root);
+		ref = pindex->index[0];
 		ref->home = root;
 		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
 		ref->page = leaf;

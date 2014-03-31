@@ -362,11 +362,13 @@ struct __wt_page {
 		 * because the array reference is updated atomically, but code
 		 * reading the fields multiple times would be a very bad idea.
 		 * Specifically, do not do this:
-		 *	WT_REF **refp = page->pg_intl_index->index;
-		 *	uint32_t entries = page->pg_intl_index->entries;
+		 *	WT_REF **refp = page->u.intl__index->index;
+		 *	uint32_t entries = page->u.intl__index->entries;
 		 *
 		 * The field is declared volatile (so the compiler knows not to
-		 * read it multiple times).
+		 * read it multiple times), and we obscure the field name and
+		 * use a copy macro in all references to the field (so the code
+		 * doesn't read it multiple times).
 		 */
 		struct {
 			uint64_t recno;		/* Starting recno */
@@ -375,18 +377,21 @@ struct __wt_page {
 			struct __wt_page_index {
 				uint32_t entries;
 				WT_REF	**index;
-			} * volatile index;	/* Collated children */
+			} * volatile __index;	/* Collated children */
 		} intl;
 #undef	pg_intl_recno
-#define	pg_intl_recno		u.intl.recno
-#undef	pg_intl_index
-#define	pg_intl_index		u.intl.index
-#define	pg_intl_parent_ref	u.intl.parent_ref
+#define	pg_intl_recno			u.intl.recno
+#define	pg_intl_parent_ref		u.intl.parent_ref
+#define	WT_INTL_INDEX_COPY(page)	((page)->u.intl.__index)
+#define	WT_INTL_INDEX_SET(page, v) do {					\
+	WT_WRITE_BARRIER();						\
+	((page)->u.intl.__index) = (v);					\
+} while (0)
 #define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
 	uint32_t __entries;						\
-	for (__pindex = (page)->pg_intl_index,				\
+	for (__pindex = WT_INTL_INDEX_COPY(page),			\
 	    __refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
