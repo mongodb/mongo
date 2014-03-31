@@ -42,7 +42,7 @@ namespace mongo {
         SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
                               _syncTarget(NULL),
                               _oplogReader(new OplogReader()),
-                              _supportsUpdater(false),
+                              _supportsUpdater(true),
                               _positionChanged(false),
                               _handshakeNeeded(false) {}
 
