@@ -207,6 +207,17 @@ namespace mongo {
             return _request->getDeleteRequest()->getDeletesAt( _itemIndex );
         }
 
+        BSONObj toBSON() const {
+            switch ( getOpType() ) {
+            case BatchedCommandRequest::BatchType_Insert:
+                return getDocument();
+            case BatchedCommandRequest::BatchType_Update:
+                return getUpdate()->toBSON();
+            default:
+                return getDelete()->toBSON();
+            }
+        }
+
     private:
 
         const BatchedCommandRequest* _request;

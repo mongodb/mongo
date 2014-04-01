@@ -119,9 +119,21 @@ namespace mongo {
             return targetQuery( deleteDoc.getQuery(), endpoints );
         }
 
-        Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const {
+        Status targetCollection( std::vector<ShardEndpoint*>* endpoints ) const {
             // TODO: XXX
             // No-op
+            return Status::OK();
+        }
+
+        Status targetAllShards( std::vector<ShardEndpoint*>* endpoints ) const {
+            const std::vector<MockRange*>& ranges = getRanges();
+            for ( std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
+                ++it ) {
+
+                const MockRange* range = *it;
+                endpoints->push_back( new ShardEndpoint( range->endpoint ) );
+            }
+
             return Status::OK();
         }
 
