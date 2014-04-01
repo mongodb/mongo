@@ -710,6 +710,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 			__wt_free(session, bnd->addr.addr);
 			bnd->addr.size = 0;
 			bnd->addr.type = 0;
+			bnd->addr.reuse = 0;
 			bnd->cksum = 0;
 			__wt_free(session, bnd->dsk);
 			__wt_free(session, bnd->skip);
@@ -2371,7 +2372,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 			F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
 	}
 
-	/* Set the page type for the parent. */
+	/* Initialize the address (set the page type for the parent). */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
 		bnd->addr.type = WT_ADDR_LEAF_NO;
@@ -2494,11 +2495,9 @@ skip_check_complete:
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
 			    multi->cksum == bnd->cksum) {
-				WT_RET(__wt_strndup(session,
-				    multi->addr.addr, multi->addr.size,
-				    &bnd->addr.addr));
-				bnd->addr.size = (uint8_t)multi->addr.size;
-				multi->reuse = 1;
+				multi->addr.reuse = 1;
+				bnd->addr = multi->addr;
+
 				WT_STAT_FAST_DATA_INCR(session, rec_page_match);
 				return (0);
 			}
@@ -4291,20 +4290,28 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * A page that split is being reconciled for the second, or subsequent
-	 * time; discard underlying block space used in the last reconciliation.
+	 * time; discard underlying block space used in the last reconciliation
+	 * that is not being reused for this reconciliation.
 	 */
 	for (multi = mod->mod_multi,
 	    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-		if (multi->skip == NULL && !multi->reuse) {
-			WT_RET(bm->free(
-			    bm, session, multi->addr.addr, multi->addr.size));
-			__wt_free(session, multi->addr.addr);
-		}
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			__wt_free(session, mod->mod_multi[i].key.ikey);
+			__wt_free(session, multi->key.ikey);
 			break;
+		}
+		if (multi->skip == NULL) {
+			if (multi->addr.reuse)
+				multi->addr.addr = NULL;
+			else {
+				WT_RET(bm->free(bm, session,
+				    multi->addr.addr, multi->addr.size));
+				__wt_free(session, multi->addr.addr);
+			}
+		} else {
+			__wt_free(session, multi->skip);
+			__wt_free(session, multi->skip_dsk);
 		}
 	}
 	__wt_free(session, mod->mod_multi);
@@ -4605,14 +4612,19 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/*
 	 * On error, discard pages we've written, they're unreferenced by the
 	 * tree.  This is not a question of correctness, we're avoiding block
-	 * leaks.
+	 * leaks.  Don't discard pages that are marked for reuse, they were
+	 * part of previous reconciliations.
 	 */
 	WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
 		if (bnd->addr.addr != NULL) {
-			WT_TRET(bm->free(
-			    bm, session, bnd->addr.addr, bnd->addr.size));
-			__wt_free(session, bnd->addr.addr);
+			if (bnd->addr.reuse)
+				bnd->addr.addr = NULL;
+			else {
+				WT_TRET(bm->free(bm, session,
+				    bnd->addr.addr, bnd->addr.size));
+				__wt_free(session, bnd->addr.addr);
+			}
 		}
 	return (ret);
 }
@@ -4654,11 +4666,10 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		if (bnd->skip == NULL) {
 			multi->addr = bnd->addr;
-			bnd->addr.addr = NULL;
-
+			multi->addr.reuse = 0;
 			multi->size = bnd->size;
 			multi->cksum = bnd->cksum;
-			multi->reuse = 0;
+			bnd->addr.addr = NULL;
 		} else {
 			multi->skip = bnd->skip;
 			multi->skip_entries = bnd->skip_next;
@@ -4696,11 +4707,10 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		if (bnd->skip == NULL) {
 			multi->addr = bnd->addr;
-			bnd->addr.addr = NULL;
-
+			multi->addr.reuse = 0;
 			multi->size = bnd->size;
 			multi->cksum = bnd->cksum;
-			multi->reuse = 0;
+			bnd->addr.addr = NULL;
 		} else {
 			multi->skip = bnd->skip;
 			multi->skip_entries = bnd->skip_next;

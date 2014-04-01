@@ -218,6 +218,33 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
+ * __wt_debug_offset_blind --
+ *	Read and dump a disk page in debugging mode, using a file offset.
+ */
+int
+__wt_debug_offset_blind(
+    WT_SESSION_IMPL *session, off_t offset, const char *ofile)
+{
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+
+	/*
+	 * This routine depends on the default block manager's view of files,
+	 * where an address consists of a file offset, length, and checksum.
+	 * This is for debugging only.  Other block managers might not see a
+	 * file or address the same way, that's why there's no block manager
+	 * method.
+	 */
+	WT_RET(__wt_scr_alloc(session, 1024, &buf));
+	WT_ERR(__wt_block_read_off_blind(
+	    session, S2BT(session)->bm->block, buf, offset));
+	ret = __wt_debug_disk(session, buf->mem, ofile);
+
+err:	__wt_scr_free(&buf);
+	return (ret);
+}
+
+/*
  * __wt_debug_offset --
  *	Read and dump a disk page in debugging mode, using a file
  * offset/size/checksum triplet.
