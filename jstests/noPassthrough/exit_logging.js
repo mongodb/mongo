@@ -19,24 +19,43 @@
     function makeRegExMatchFn(pattern) {
         return function (text) {
             if (!pattern.test(text)) {
+                print("--- LOG CONTENTS ---");
                 print(text);
+                print("--- END LOG CONTENTS ---");
                 doassert("Log contents did not match " + pattern);
             }
         }
     }
 
-    function testShutdownLogging(crashFn, matchFn) {
+    function testShutdownLogging(launcher, crashFn, matchFn) {
         var logFileName = MongoRunner.dataPath + "mongod.log";
-        var opts = { logpath: logFileName, nojournal: "" };
-        var conn = MongoRunner.runMongod(opts);
+        var opts = { logpath: logFileName };
+        var conn = launcher.start(opts);
         try {
             crashFn(conn);
         }
         finally {
-            MongoRunner.stopMongod(conn);
+            launcher.stop(conn);
         }
         var logContents = cat(logFileName);
         matchFn(logContents);
+    }
+
+    function runAllTests(launcher) {
+        testShutdownLogging(
+            launcher,
+            function (conn) { conn.getDB('admin').shutdownServer() },
+            makeRegExMatchFn(/shutdown command received[\s\S]*dbexit:/));
+
+        testShutdownLogging(
+            launcher,
+            makeShutdownByCrashFn('fault'),
+            makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/));
+
+        testShutdownLogging(
+            launcher,
+            makeShutdownByCrashFn('abort'),
+            makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/));
     }
 
     if (_isWindows()) {
@@ -44,16 +63,37 @@
         return;
     }
 
-    testShutdownLogging(
-        function (conn) { conn.getDB('admin').shutdownServer() },
-        makeRegExMatchFn(/shutdown command received[\s\S]*dbexit: really exiting now/));
+    (function testMongod() {
+        print("********************\nTesting exit logging in mongod\n********************");
 
-    testShutdownLogging(
-        makeShutdownByCrashFn('fault'),
-        makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/));
+        runAllTests({
+            start: function (opts) {
+                var actualOpts = { nojournal: "" };
+                Object.extend(actualOpts, opts);
+                return MongoRunner.runMongod(actualOpts);
+            },
+            stop: MongoRunner.stopMongod
+        });
+    }());
 
-    testShutdownLogging(
-        makeShutdownByCrashFn('abort'),
-        makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/));
+    (function testMongos() {
+        print("********************\nTesting exit logging in mongos\n********************");
+
+        var st = new ShardingTest({
+            shards: 1,
+            other: { shardOptions: { nojournal: "" } }
+        });
+        var mongosLauncher = {
+            start: function (opts) {
+                var actualOpts = { configdb: st._configNames[0] }
+                Object.extend(actualOpts, opts);
+                return MongoRunner.runMongos(actualOpts);
+            },
+
+            stop: MongoRunner.stopMongos
+        };
+
+        runAllTests(mongosLauncher);
+    }());
 
 }());
