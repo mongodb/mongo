@@ -159,6 +159,10 @@ extern int __wt_bm_read(WT_BM *bm,
     WT_ITEM *buf,
     const uint8_t *addr,
     size_t addr_size);
+extern int __wt_block_read_off_blind( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_ITEM *buf,
+    off_t offset);
 extern int __wt_block_read_off(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
@@ -173,6 +177,9 @@ extern int __wt_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max);
 extern int __wt_block_ext_discard(WT_SESSION_IMPL *session, u_int max);
 extern int __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_offset_invalid(WT_BLOCK *block,
+    off_t offset,
+    uint32_t size);
 extern int __wt_block_salvage_next(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint8_t *addr,
@@ -259,6 +266,9 @@ extern int __wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v);
 extern int __wt_debug_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     size_t addr_size,
+    const char *ofile);
+extern int __wt_debug_offset_blind( WT_SESSION_IMPL *session,
+    off_t offset,
     const char *ofile);
 extern int __wt_debug_offset(WT_SESSION_IMPL *session,
     off_t offset,

@@ -19,9 +19,9 @@ typedef struct {
 
 	uint64_t fcnt;				/* Progress counter */
 
-	int	 dump_address;
-	int	 dump_pages;
-	int	 dump_blocks;
+	int dump_address;			/* Debugging hooks */
+	int dump_pages;
+	int dump_blocks;
 
 	WT_ITEM *tmp1;				/* Temporary buffer */
 	WT_ITEM *tmp2;				/* Temporary buffer */
@@ -29,6 +29,7 @@ typedef struct {
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int  __verify_config(WT_SESSION_IMPL *, const char *[], WT_VSTUFF *);
+static int  __verify_config_offsets(WT_SESSION_IMPL *, const char *[], int *);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, size_t, WT_VSTUFF *);
 static int  __verify_overflow_cell(
@@ -53,7 +54,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_VSTUFF *vs, _vstuff;
 	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
-	int bm_start;
+	int bm_start, quit;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -69,6 +70,11 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Check configuration strings. */
 	WT_ERR(__verify_config(session, cfg, vs));
+
+	/* Optionally dump specific block offsets. */
+	WT_ERR(__verify_config_offsets(session, cfg, &quit));
+	if (quit)
+		goto done;
 
 	/* Get a list of the checkpoints for this file. */
 	WT_ERR(
@@ -127,6 +133,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(ret);
 	}
 
+done:
 err:	/* Inform the underlying block manager we're done. */
 	if (bm_start)
 		WT_TRET(bm->verify_end(bm, session));
@@ -149,44 +156,64 @@ err:	/* Inform the underlying block manager we're done. */
 
 /*
  * __verify_config --
- *	Verification supports dumping pages in various formats.
+ *	Debugging: verification supports dumping pages in various formats.
  */
 static int
 __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
 
-	ret = __wt_config_gets(session, cfg, "dump_address", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (ret == 0 && cval.val != 0)
-		vs->dump_address = 1;
+	WT_RET(__wt_config_gets(session, cfg, "dump_address", &cval));
+	vs->dump_address = cval.val != 0;
 
-	ret = __wt_config_gets(session, cfg, "dump_blocks", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (ret == 0 && cval.val != 0)
-		vs->dump_blocks = 1;
+	WT_RET(__wt_config_gets(session, cfg, "dump_blocks", &cval));
+	vs->dump_blocks = cval.val != 0;
 
-	ret = __wt_config_gets(session, cfg, "dump_pages", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (ret == 0 && cval.val != 0)
-		vs->dump_pages = 1;
+	WT_RET(__wt_config_gets(session, cfg, "dump_pages", &cval));
+	vs->dump_pages = cval.val != 0;
 
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * We use the verification code to do debugging dumps because if we're
-	 * dumping in debugging mode, we want to confirm the page is OK before
-	 * walking it.
-	 */
-#else
+#if !defined(HAVE_DIAGNOSTIC)
 	if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
 		WT_RET_MSG(session, ENOTSUP,
 		    "the WiredTiger library was not built in diagnostic mode");
 #endif
 	return (0);
+}
+
+/*
+ * __verify_config_offsets --
+ *	Debugging: optionally dump specific blocks from the file.
+ */
+static int
+__verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
+{
+	WT_CONFIG list;
+	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_RET;
+	u_long offset;
+
+	*quitp = 0;
+
+	WT_RET(__wt_config_gets(session, cfg, "dump_offsets", &cval));
+	WT_RET(__wt_config_subinit(session, &list, &cval));
+	while ((ret = __wt_config_next(&list, &k, &v)) == 0) {
+		/*
+		 * Quit after dumping the requested blocks.  (That's hopefully
+		 * what the user wanted, all of this stuff is just hooked into
+		 * verify because that's where we "dump blocks" for debugging.)
+		 */
+		*quitp = 1;
+		if (v.len != 0 || sscanf(k.str, "%lu", &offset) != 1)
+			WT_RET_MSG(session, EINVAL,
+			    "unexpected dump offset format");
+#if !defined(HAVE_DIAGNOSTIC)
+		WT_RET_MSG(session, ENOTSUP,
+		    "the WiredTiger library was not built in diagnostic mode");
+#else
+		WT_TRET(__wt_debug_offset_blind(session, (off_t)offset, NULL));
+#endif
+	}
+	return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*

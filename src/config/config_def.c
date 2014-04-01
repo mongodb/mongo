@@ -209,6 +209,7 @@ static const WT_CONFIG_CHECK confchk_session_salvage[] = {
 static const WT_CONFIG_CHECK confchk_session_verify[] = {
 	{ "dump_address", "boolean", NULL, NULL},
 	{ "dump_blocks", "boolean", NULL, NULL},
+	{ "dump_offsets", "list", NULL, NULL},
 	{ "dump_pages", "boolean", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -418,7 +419,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "session.verify",
-	  "dump_address=0,dump_blocks=0,dump_pages=0",
+	  "dump_address=0,dump_blocks=0,dump_offsets=,dump_pages=0",
 	  confchk_session_verify
 	},
 	{ "table.meta",

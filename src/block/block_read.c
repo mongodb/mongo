@@ -136,6 +136,43 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	return (0);
 }
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_block_read_off_blind --
+ *	Read the block at an offset, try to figure out what it looks like,
+ * debugging only.
+ */
+int
+__wt_block_read_off_blind(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, off_t offset)
+{
+	WT_BLOCK_HEADER *blk;
+	uint32_t cksum, size;
+
+	/*
+	 * Make sure the buffer is large enough for the header and read the
+	 * the first allocation-size block.
+	 */
+	WT_RET(__wt_buf_init(session, buf, block->allocsize));
+	WT_RET(__wt_read(
+	    session, block->fh, offset, (size_t)block->allocsize, buf->mem));
+	blk = WT_BLOCK_HEADER_REF(buf->mem);
+
+	/*
+	 * Copy out the size and checksum (we're about to re-use the buffer),
+	 * and if the size isn't insane, read the rest of the block.
+	 */
+	size = blk->disk_size;
+	cksum = blk->cksum;
+	if (__wt_block_offset_invalid(block, offset, size))
+		WT_RET_MSG(session, EINVAL,
+		    "block at offset %" PRIuMAX " cannot be a valid block, no "
+		    "read attempted",
+		    (uintmax_t)offset);
+	return (__wt_block_read_off(session, block, buf, offset, size, cksum));
+}
+#endif
+
 /*
  * __wt_block_read_off --
  *	Read an addr/size pair referenced block into a buffer.
