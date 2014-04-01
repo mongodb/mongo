@@ -45,7 +45,7 @@
 %}
 
 %{
-#include "../src/include/wt_internal.h"
+#include "src/include/wt_internal.h"
 
 /*
  * Closed handle checking:
