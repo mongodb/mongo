@@ -79,7 +79,6 @@
 #include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/signal_win32.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
@@ -180,119 +179,6 @@ namespace mongo {
         }
     };
 
-    void sighandler(int sig) {
-        dbexit(EXIT_CLEAN, (string("received signal ") + BSONObjBuilder::numStr(sig)).c_str());
-    }
-
-    void abruptQuit(int x) {
-        severe() << "Got signal: " << x << " (" << strsignal( x ) << ").";
-        printStackTrace(severe().stream() << "Backtrace: \n");
-        ::_exit(EXIT_ABRUPT);
-    }
-
-    // this gets called when new fails to allocate memory
-    void my_new_handler() {
-        printStackTrace(severe().stream() << "out of memory, printing stack and exiting:\n");
-        ::_exit(EXIT_ABRUPT);
-    }
-
-#ifndef _WIN32
-    sigset_t asyncSignals;
-
-    void signalProcessingThread() {
-        while (true) {
-            int actualSignal = 0;
-            int status = sigwait( &asyncSignals, &actualSignal );
-            fassert(16779, status == 0);
-            switch (actualSignal) {
-            case SIGUSR1:
-                // log rotate signal
-                fassert(16780, rotateLogs());
-                logProcessDetailsForLogRotate();
-                break;
-            default:
-                // no one else should be here
-                fassertFailed(16778);
-                break;
-            }
-        }
-    }
-
-    void startSignalProcessingThread() {
-        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
-        boost::thread it( signalProcessingThread );
-    }
-#else
-
-    void eventProcessingThread() {
-        std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
-
-        HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
-        if (event == NULL) {
-            warning() << "eventProcessingThread CreateEvent failed: "
-                << errnoWithDescription();
-            return;
-        }
-
-        ON_BLOCK_EXIT(CloseHandle, event);
-
-        int returnCode = WaitForSingleObject(event, INFINITE);
-        if (returnCode != WAIT_OBJECT_0) {
-            if (returnCode == WAIT_FAILED) {
-                warning() << "eventProcessingThread WaitForSingleObject failed: "
-                    << errnoWithDescription();
-                return;
-            }
-            else {
-                warning() << "eventProcessingThread WaitForSingleObject failed: "
-                    << errnoWithDescription(returnCode);
-                return;
-            }
-        }
-
-        Client::initThread("eventTerminate");
-        log() << "shutdown event signaled, will terminate after current cmd ends";
-        exitCleanly(EXIT_CLEAN);
-    }
-
-    void startSignalProcessingThread() {
-        boost::thread it(eventProcessingThread);
-    }
-#endif  // not _WIN32
-
-    void setupSignalHandlers() {
-        setupSIGTRAPforGDB();
-        setupCoreSignals();
-
-        signal(SIGTERM, sighandler);
-        signal(SIGINT, sighandler);
-#if defined(SIGXCPU)
-        signal(SIGXCPU, sighandler);
-#endif
-
-#if defined(SIGQUIT)
-        signal( SIGQUIT , abruptQuit );
-#endif
-        signal( SIGSEGV , abruptQuit );
-        signal( SIGABRT , abruptQuit );
-        signal( SIGFPE , abruptQuit );
-#if defined(SIGBUS)
-        signal( SIGBUS , abruptQuit );
-#endif
-#if defined(SIGPIPE)
-        signal( SIGPIPE , SIG_IGN );
-#endif
-
-#ifndef _WIN32
-        sigemptyset( &asyncSignals );
-        sigaddset( &asyncSignals, SIGUSR1 );
-#endif
-
-        startSignalProcessingThread();
-
-        setWindowsUnhandledExceptionFilter();
-        set_new_handler( my_new_handler );
-    }
 
     void init() {
         serverID.init();
@@ -323,7 +209,6 @@ namespace mongo {
 using namespace mongo;
 
 static bool runMongosServer( bool doUpgrade ) {
-    setupSignalHandlers();
     setThreadName( "mongosMain" );
     printShardingVersionInfo( false );
 
@@ -432,6 +317,8 @@ static int _main() {
     if (!initializeServerGlobalState())
         return EXIT_FAILURE;
 
+    startSignalProcessingThread();
+
     // we either have a setting where all processes are in localhost or none are
     for (std::vector<std::string>::const_iterator it = mongosGlobalParams.configdbs.begin();
          it != mongosGlobalParams.configdbs.end(); ++it) {
@@ -499,6 +386,8 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     static StaticObserver staticObserver;
     if (argc < 1)
         return EXIT_FAILURE;
+
+    setupSignalHandlers();
 
     mongosCommand = argv[0];
 

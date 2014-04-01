@@ -46,7 +46,6 @@ env.Library('foundation',
               'util/file.cpp',
               'util/log.cpp',
               'util/platform_init.cpp',
-              'util/signal_handlers.cpp',
               'util/text.cpp',
               'util/time_support.cpp',
               'util/timer.cpp',
@@ -900,6 +899,7 @@ mongodAndMongosFiles = [
     "db/initialize_server_global_state.cpp",
     "db/server_extra_log_context.cpp",
     "db/dbwebserver.cpp",
+    "util/signal_handlers.cpp",
     ]
 env.Library("mongodandmongos", mongodAndMongosFiles,
             LIBDEPS=["message_server_port"])

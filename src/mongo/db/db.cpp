@@ -88,7 +88,7 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/signal_win32.h"
+#include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
@@ -108,8 +108,6 @@ namespace mongo {
     extern int diagLogging;
     extern int lockFile;
 
-    static void setupSignalHandlers();
-    static void startSignalProcessingThread();
     void exitCleanly( ExitCode code );
 
 #ifdef _WIN32
@@ -934,8 +932,34 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType,
 }
 #endif
 
+#if defined(_WIN32)
+namespace mongo {
+    // the hook for mongoAbort
+    extern void (*reportEventToSystem)(const char *msg);
+    static void reportEventToSystemImpl(const char *msg) {
+        static ::HANDLE hEventLog = RegisterEventSource( NULL, TEXT("mongod") );
+        if( hEventLog ) {
+            std::wstring s = toNativeString(msg);
+            LPCTSTR txt = s.c_str();
+            BOOL ok = ReportEvent(
+              hEventLog, EVENTLOG_ERROR_TYPE,
+              0, 0, NULL,
+              1,
+              0,
+              &txt,
+              0);
+            wassert(ok);
+        }
+    }
+} // namespace mongo
+#endif  // if defined(_WIN32)
+
 static int mongoDbMain(int argc, char* argv[], char **envp) {
     static StaticObserver staticObserver;
+
+#if defined(_WIN32)
+    mongo::reportEventToSystem = &mongo::reportEventToSystemImpl;
+#endif
 
     getcurns = ourgetns;
 
@@ -987,246 +1011,3 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     dbexit(EXIT_CLEAN);
     return 0;
 }
-
-namespace mongo {
-
-    string getDbContext();
-
-#undef out
-
-
-#if !defined(_WIN32)
-
-} // namespace mongo
-
-#include <signal.h>
-#include <string.h>
-
-namespace mongo {
-
-    void abruptQuit(int signalNum) {
-        {
-            logger::LogstreamBuilder logBuilder(logger::globalLogDomain(),
-                                                getThreadName(),
-                                                logger::LogSeverity::Severe());
-            logBuilder.stream() <<
-                "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\nBacktrace:";
-            printStackTrace(logBuilder.stream());
-        }
-
-        // Don't go through normal shutdown procedure. It may make things worse.
-        ::_exit(EXIT_ABRUPT);
-    }
-
-    void abruptQuitWithAddrSignal( int signalNum, siginfo_t *siginfo, void * ) {
-        {
-            logger::LogstreamBuilder logBuilder(logger::globalLogDomain(),
-                                                getThreadName(),
-                                                logger::LogSeverity::Severe());
-
-            std::ostream& oss = logBuilder.stream();
-            oss << "Invalid";
-            if ( signalNum == SIGSEGV || signalNum == SIGBUS ) {
-                oss << " access";
-            } else {
-                oss << " operation";
-            }
-            oss << " at address: " << siginfo->si_addr;
-        }
-        abruptQuit( signalNum );
-    }
-
-    sigset_t asyncSignals;
-    // The signals in asyncSignals will be processed by this thread only, in order to
-    // ensure the db and log mutexes aren't held.
-    void signalProcessingThread() {
-        while (true) {
-            int actualSignal = 0;
-            int status = sigwait( &asyncSignals, &actualSignal );
-            fassert(16781, status == 0);
-            switch (actualSignal) {
-            case SIGUSR1:
-                // log rotate signal
-                fassert(16782, rotateLogs());
-                logProcessDetailsForLogRotate();
-                break;
-            case SIGQUIT:
-                log() << "Received SIGQUIT; terminating.";
-                _exit(EXIT_ABRUPT);
-            default:
-                // interrupt/terminate signal
-                Client::initThread( "signalProcessingThread" );
-                log() << "got signal " << actualSignal << " (" << strsignal( actualSignal )
-                      << "), will terminate after current cmd ends" << endl;
-                exitCleanly( EXIT_CLEAN );
-                break;
-            }
-        }
-    }
-
-    // this will be called in certain c++ error cases, for example if there are two active
-    // exceptions
-    void myterminate() {
-        printStackTrace(severe().stream()
-                        << "terminate() called, printing stack (if implemented for platform):\n");
-        ::abort();
-    }
-
-    // this gets called when new fails to allocate memory
-    void my_new_handler() {
-        printStackTrace(severe().stream() << "out of memory, printing stack and exiting:\n");
-        ::_exit(EXIT_ABRUPT);
-    }
-
-    void setupSignals_ignoreHelper( int signal ) {}
-
-    void setupSignalHandlers() {
-        setupCoreSignals();
-
-        struct sigaction addrSignals;
-        memset( &addrSignals, 0, sizeof( struct sigaction ) );
-        addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
-        sigemptyset( &addrSignals.sa_mask );
-        addrSignals.sa_flags = SA_SIGINFO;
-
-        verify( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
-        verify( sigaction(SIGBUS, &addrSignals, 0) == 0 );
-        verify( sigaction(SIGILL, &addrSignals, 0) == 0 );
-        verify( sigaction(SIGFPE, &addrSignals, 0) == 0 );
-
-        verify( signal(SIGABRT, abruptQuit) != SIG_ERR );
-        verify( signal(SIGPIPE, SIG_IGN) != SIG_ERR );
-
-        setupSIGTRAPforGDB();
-
-        // asyncSignals is a global variable listing the signals that should be handled by the
-        // interrupt thread, once it is started via startSignalProcessingThread().
-        sigemptyset( &asyncSignals );
-        sigaddset( &asyncSignals, SIGHUP );
-        sigaddset( &asyncSignals, SIGINT );
-        sigaddset( &asyncSignals, SIGTERM );
-        sigaddset( &asyncSignals, SIGQUIT );
-        sigaddset( &asyncSignals, SIGUSR1 );
-        sigaddset( &asyncSignals, SIGXCPU );
-
-        set_terminate( myterminate );
-        set_new_handler( my_new_handler );
-    }
-
-    void startSignalProcessingThread() {
-        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
-        boost::thread it( signalProcessingThread );
-    }
-
-#else   // WIN32
-    void consoleTerminate( const char* controlCodeName ) {
-        Client::initThread( "consoleTerminate" );
-        log() << "got " << controlCodeName << ", will terminate after current cmd ends" << endl;
-        exitCleanly( EXIT_KILL );
-    }
-
-    BOOL WINAPI CtrlHandler( DWORD fdwCtrlType ) {
-
-        switch( fdwCtrlType ) {
-
-        case CTRL_C_EVENT:
-            log() << "Ctrl-C signal";
-            consoleTerminate( "CTRL_C_EVENT" );
-            return TRUE ;
-
-        case CTRL_CLOSE_EVENT:
-            log() << "CTRL_CLOSE_EVENT signal";
-            consoleTerminate( "CTRL_CLOSE_EVENT" );
-            return TRUE ;
-
-        case CTRL_BREAK_EVENT:
-            log() << "CTRL_BREAK_EVENT signal";
-            consoleTerminate( "CTRL_BREAK_EVENT" );
-            return TRUE;
-
-        case CTRL_LOGOFF_EVENT:
-            // only sent to services, and only in pre-Vista Windows; FALSE means ignore
-            return FALSE;
-
-        case CTRL_SHUTDOWN_EVENT:
-            log() << "CTRL_SHUTDOWN_EVENT signal";
-            consoleTerminate( "CTRL_SHUTDOWN_EVENT" );
-            return TRUE;
-
-        default:
-            return FALSE;
-        }
-    }
-
-    // called by mongoAbort()
-    extern void (*reportEventToSystem)(const char *msg);
-    void reportEventToSystemImpl(const char *msg) {
-        static ::HANDLE hEventLog = RegisterEventSource( NULL, TEXT("mongod") );
-        if( hEventLog ) {
-            std::wstring s = toNativeString(msg);
-            LPCTSTR txt = s.c_str();
-            BOOL ok = ReportEvent(
-              hEventLog, EVENTLOG_ERROR_TYPE,
-              0, 0, NULL,
-              1,
-              0,
-              &txt,
-              0);
-            wassert(ok);
-        }
-    }
-
-    void myPurecallHandler() {
-        printStackTrace();
-        mongoAbort("pure virtual");
-    }
-
-    void setupSignalHandlers() {
-        reportEventToSystem = reportEventToSystemImpl;
-        setWindowsUnhandledExceptionFilter();
-        massert(10297,
-                "Couldn't register Windows Ctrl-C handler",
-                SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
-        _set_purecall_handler( myPurecallHandler );
-    }
-
-    void eventProcessingThread() {
-        std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
-
-        HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
-        if (event == NULL) {
-            warning() << "eventProcessingThread CreateEvent failed: "
-                << errnoWithDescription();
-            return;
-        }
-
-        ON_BLOCK_EXIT(CloseHandle, event);
-
-        int returnCode = WaitForSingleObject(event, INFINITE);
-        if (returnCode != WAIT_OBJECT_0) {
-            if (returnCode == WAIT_FAILED) {
-                warning() << "eventProcessingThread WaitForSingleObject failed: "
-                    << errnoWithDescription();
-                return;
-            }
-            else {
-                warning() << "eventProcessingThread WaitForSingleObject failed: "
-                    << errnoWithDescription(returnCode);
-                return;
-            }
-        }
-
-        Client::initThread("eventTerminate");
-        log() << "shutdown event signaled, will terminate after current cmd ends";
-        exitCleanly(EXIT_CLEAN);
-    }
-
-    void startSignalProcessingThread() {
-        if (Command::testCommandsEnabled) {
-            boost::thread it(eventProcessingThread);
-        }
-    }
-
-#endif  // if !defined(_WIN32)
-
-} // namespace mongo
