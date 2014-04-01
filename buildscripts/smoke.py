@@ -398,7 +398,7 @@ def skipTest(path):
     parentPath = os.path.dirname(path)
     parentDir = os.path.basename(parentPath)
     if small_oplog: # For tests running in parallel
-        if basename in ["cursor8.js", "indexh.js", "dropdb.js", 
+        if basename in ["cursor8.js", "indexh.js", "dropdb.js", "dropdb_race.js", 
                         "connections_opened.js", "opcounters.js", "dbadmin.js"]:
             return True
     if use_ssl:
