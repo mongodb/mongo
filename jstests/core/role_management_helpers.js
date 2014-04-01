@@ -123,15 +123,15 @@ function assertHasPrivilege(privilegeArray, privilege) {
 
      // Test dropRole
      db.dropRole('roleC');
-     assert.throws(function() {db.getRole('roleC')});
+     assert.eq(null, db.getRole('roleC'));
      roleObj = db.getRole("roleB", {showPrivileges: true});
      assert.eq(0, roleObj.privileges.length);
      assert.eq(0, roleObj.roles.length);
 
      // Test dropAllRoles
      db.dropAllRoles();
-     assert.throws(function() {db.getRole('roleA')});
-     assert.throws(function() {db.getRole('roleB')});
-     assert.throws(function() {db.getRole('roleC')});
+     assert.eq(null, db.getRole('roleA'));
+     assert.eq(null, db.getRole('roleB'));
+     assert.eq(null, db.getRole('roleC'));
 
 }(db));
