@@ -129,7 +129,7 @@ rstest.nodes.forEach(function (node) {
 // Verify that dropping roles propagates.
 rstest.getMaster().getDB("db1").dropRole("r2", { w: 2});
 rstest.nodes.forEach(function (node) {
-    assert.throws(function() { node.getDB("db1").getRole("r2") }, [], node);
+    assert.eq(null, node.getDB("db1").getRole("r2"));
     var role = node.getDB("db1").getRole("r3");
     assert.eq(1, role.roles.length, node);
     assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);

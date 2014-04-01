@@ -65,7 +65,7 @@ function assertHasRole(rolesArray, roleName, roleDB) {
 
      // Test dropUser
      db.dropUser('andy');
-     assert.throws(function() {printjson(db.getUser('andy'));});
+     assert.eq(null, db.getUser('andy'));
 
      // Test dropAllUsers
      db.dropAllUsers()

@@ -1261,7 +1261,7 @@ DB.prototype.getUser = function(username, args) {
     }
 
     if (res.users.length == 0) {
-        throw Error("User " + username + "@" + db.getName() + " not found");
+        return null;
     }
     return res.users[0];
 }
@@ -1388,7 +1388,7 @@ DB.prototype.getRole = function(rolename, args) {
     }
 
     if (res.roles.length == 0) {
-        throw Error("Role " + rolename + "@" + db.getName() + " not found");
+        return null;
     }
     return res.roles[0];
 }
