@@ -688,13 +688,43 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	/*
 	 * We can't free the previous page index, or the page's original WT_REF
-	 * structure, there may be threads using them.  Add both to the session
-	 * discard list, to be freed once we know it's safe.
+	 * structure and instantiated key, there may be threads using them. Add
+	 * them to the session discard list, to be freed once we know it's safe.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_ERR(__wt_session_fotxn_add(session, pindex, size));
+	parent_decr += size;
 	WT_ERR(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
-	parent_decr += size + sizeof(WT_REF);
+	parent_decr += sizeof(WT_REF);
+
+	/*
+	 * The key for the original page may be an onpage overflow key, and we
+	 * just lost track of it as the parent's index no longer references the
+	 * WT_REF pointing to it.  Discard it now, including the backing blocks.
+	 *
+	 * XXXKEITH
+	 * I think the overflow handling part of this code goes away if we stop
+	 * re-writing overflow blocks backing row-store keys in reconciliation,
+	 * which simplifies the error handling here.  Right now, if this call
+	 * fails (very unlikely, but technically possible), we leak underlying
+	 * file blocks.
+	 */
+	switch (parent->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
+			break;
+		if (ikey->cell_offset != 0) {
+			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
+			__wt_cell_unpack(cell, kpack);
+			if (kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
+				WT_ERR(__wt_ovfl_discard(session, cell));
+		}
+		size = sizeof(WT_IKEY) + ikey->size;
+		WT_ERR(__wt_session_fotxn_add(session, ikey, size));
+		parent_decr += size;
+		break;
+	}
 
 	/* Adjust the parent's memory footprint. */
 	if (parent_incr > parent_decr) {
@@ -709,30 +739,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	if (parent_decr != 0)
 		__wt_cache_page_inmem_decr(session, parent, parent_decr);
-
-	/*
-	 * The key for the original page may be an onpage overflow key, and we
-	 * just lost track of it as the parent's index no longer references the
-	 * WT_REF pointing to it.  Discard it now, including the backing blocks.
-	 *
-	 * XXXKEITH
-	 * I think this code goes away when we stop re-writing overflow blocks
-	 * backing row-store keys in reconciliation, which simplifies the error
-	 * handling here.  Right now, if this call fails (very unlikely, but
-	 * technically possible), we could leak underlying file blocks.
-	 */
-	switch (parent->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		ikey = __wt_ref_key_instantiated(ref);
-		if (ikey != NULL && ikey->cell_offset != 0) {
-			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
-			__wt_cell_unpack(cell, kpack);
-			if (kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
-				WT_ERR(__wt_ovfl_discard(session, cell));
-		}
-		break;
-	}
 
 	/*
 	 * Simple page splits trickle up the tree, that is, as leaf pages grow
