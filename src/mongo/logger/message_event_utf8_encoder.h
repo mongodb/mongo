@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include <string>
+#include <iosfwd>
 
 #include "mongo/logger/encoder.h"
 #include "mongo/logger/message_event.h"
@@ -29,7 +29,7 @@ namespace logger {
      */
     class MessageEventDetailsEncoder : public Encoder<MessageEventEphemeral> {
     public:
-        typedef std::string (*DateFormatter)(Date_t);
+        typedef void (*DateFormatter)(std::ostream&, Date_t);
 
         /**
          * Sets the date formatter function for all instances of MessageEventDetailsEncoder.

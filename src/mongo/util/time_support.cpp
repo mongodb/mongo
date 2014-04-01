@@ -110,21 +110,29 @@ namespace mongo {
         return buf;
     }
 
-    static inline std::string _dateToISOString(Date_t date, bool local) {
-        const int bufSize = 32;
-        char buf[bufSize];
+namespace {
+    struct DateStringBuffer {
+        static const int dataCapacity = 64;
+        char data[dataCapacity];
+        int size;
+    };
+
+    void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
+        static const int bufSize = DateStringBuffer::dataCapacity;
+        char* const buf = result->data;
         struct tm t;
         time_t_to_Struct(date.toTimeT(), &t, local);
         int pos = strftime(buf, bufSize, MONGO_ISO_DATE_FMT_NO_TZ, &t);
-        fassert(16981, 0 < pos);
+        dassert(0 < pos);
         char* cur = buf + pos;
         int bufRemaining = bufSize - pos;
         pos = snprintf(cur, bufRemaining, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
-        fassert(16982, bufRemaining > pos && pos > 0);
+        dassert(bufRemaining > pos && pos > 0);
         cur += pos;
         bufRemaining -= pos;
         if (local) {
-            fassert(16983, bufRemaining >= 6);
+            static const int localTzSubstrLen = 5;
+            dassert(bufRemaining >= localTzSubstrLen + 1);
 #ifdef _WIN32
             // NOTE(schwerin): The value stored by _get_timezone is the value one adds to local time
             // to get UTC.  This is opposite of the ISO-8601 meaning of the timezone offset.
@@ -138,29 +146,74 @@ namespace mongo {
             const long tzOffsetSeconds = msTimeZone* (tzIsWestOfUTC ? 1 : -1);
             const long tzOffsetHoursPart = tzOffsetSeconds / 3600;
             const long tzOffsetMinutesPart = (tzOffsetSeconds / 60) % 60;
-            snprintf(cur, 6, "%c%02ld%02ld",
+            snprintf(cur, localTzSubstrLen + 1, "%c%02ld%02ld",
                      tzIsWestOfUTC ? '-' : '+',
                      tzOffsetHoursPart,
                      tzOffsetMinutesPart);
 #else
             strftime(cur, bufRemaining, "%z", &t);
 #endif
+            cur += localTzSubstrLen;
         }
         else {
-            fassert(16984, bufRemaining >= 2);
+            dassert(bufRemaining >= 2);
             *cur = 'Z';
             ++cur;
-            *cur = '\0';
         }
-        return buf;
+        result->size = cur - buf;
+        dassert(result->size < DateStringBuffer::dataCapacity);
     }
 
+    void _dateToCtimeString(Date_t date, DateStringBuffer* result) {
+        static const size_t ctimeSubstrLen = 19;
+        static const size_t millisSubstrLen = 4;
+        time_t t = date.toTimeT();
+#if defined(_WIN32)
+        ctime_s(result->data, sizeof(result->data), &t);
+#else
+        ctime_r(&t, result->data);
+#endif
+        char* milliSecStr = result->data + ctimeSubstrLen;
+        snprintf(milliSecStr, millisSubstrLen + 1, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
+        result->size = ctimeSubstrLen + millisSubstrLen;
+    }
+}  // namespace
+
     std::string dateToISOStringUTC(Date_t date) {
-        return _dateToISOString(date, false);
+        DateStringBuffer buf;
+        _dateToISOString(date, false, &buf);
+        return std::string(buf.data, buf.size);
     }
 
     std::string dateToISOStringLocal(Date_t date) {
-        return _dateToISOString(date, true);
+        DateStringBuffer buf;
+        _dateToISOString(date, true, &buf);
+        return std::string(buf.data, buf.size);
+    }
+
+    std::string dateToCtimeString(Date_t date) {
+        DateStringBuffer buf;
+        _dateToCtimeString(date, &buf);
+        return std::string(buf.data, buf.size);
+    }
+
+    void outputDateAsISOStringUTC(std::ostream& os, Date_t date) {
+        DateStringBuffer buf;
+        _dateToISOString(date, false, &buf);
+        os << StringData(buf.data, buf.size);
+    }
+
+    void outputDateAsISOStringLocal(std::ostream& os, Date_t date) {
+        DateStringBuffer buf;
+        _dateToISOString(date, true, &buf);
+        os << StringData(buf.data, buf.size);
+
+    }
+
+    void outputDateAsCtime(std::ostream& os, Date_t date) {
+        DateStringBuffer buf;
+        _dateToCtimeString(date, &buf);
+        os << StringData(buf.data, buf.size);
     }
 
 namespace {
@@ -627,19 +680,6 @@ namespace {
         verify((long long)millis >= 0); // TODO when millis is signed, delete 
         verify(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
         return millis / 1000;
-    }
-
-    std::string dateToCtimeString(Date_t date) {
-        time_t t = date.toTimeT();
-        char buf[64];
-#if defined(_WIN32)
-        ctime_s(buf, sizeof(buf), &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        char* milliSecStr = buf + 19;
-        snprintf(milliSecStr, 5, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
-        return buf;
     }
 
     boost::gregorian::date currentDate() {

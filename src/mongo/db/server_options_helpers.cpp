@@ -670,13 +670,13 @@ namespace {
             using logger::MessageEventDetailsEncoder;
             std::string formatterName = params["systemLog.timeStampFormat"].as<string>();
             if (formatterName == "ctime") {
-                MessageEventDetailsEncoder::setDateFormatter(dateToCtimeString);
+                MessageEventDetailsEncoder::setDateFormatter(outputDateAsCtime);
             }
             else if (formatterName == "iso8601-utc") {
-                MessageEventDetailsEncoder::setDateFormatter(dateToISOStringUTC);
+                MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringUTC);
             }
             else if (formatterName == "iso8601-local") {
-                MessageEventDetailsEncoder::setDateFormatter(dateToISOStringLocal);
+                MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringLocal);
             }
             else {
                 StringBuilder sb;
