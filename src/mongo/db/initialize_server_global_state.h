@@ -51,6 +51,4 @@ namespace mongo {
      */
     void signalForkSuccess();
 
-    void setupCoreSignals();
-
 }  // namespace mongo

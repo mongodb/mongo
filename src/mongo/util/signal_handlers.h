@@ -32,4 +32,19 @@
 
 namespace mongo {
 
+    /**
+     * Sets up handlers for signals and other events like terminate and new_handler.
+     *
+     * This must be called very early in main, before runGlobalInitializers().
+     */
+    void setupSignalHandlers();
+
+    /**
+     * Starts the thread to handle asynchronous signals.
+     *
+     * This must be the first thread started from the main thread. Call this immediately after
+     * initializeServerGlobalState().
+     */
+    void startSignalProcessingThread();
+
 } // namespace mongo

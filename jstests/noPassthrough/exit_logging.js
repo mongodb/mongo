@@ -18,8 +18,10 @@
 
     function makeRegExMatchFn(pattern) {
         return function (text) {
-            assert(pattern.test(text),
-                   "Log contents did not match " + pattern);
+            if (!pattern.test(text)) {
+                print(text);
+                doassert("Log contents did not match " + pattern);
+            }
         }
     }
 
@@ -42,16 +44,16 @@
         return;
     }
 
-    // testShutdownLogging(
-    //     function (conn) { conn.getDB('admin').shutdownServer() },
-    //     makeRegExMatchFn(/shutdown command received[\s\S]*dbexit: really exiting now/));
+    testShutdownLogging(
+        function (conn) { conn.getDB('admin').shutdownServer() },
+        makeRegExMatchFn(/shutdown command received[\s\S]*dbexit: really exiting now/));
 
     testShutdownLogging(
         makeShutdownByCrashFn('fault'),
-        makeRegExMatchFn(/Invalid access at address[\s\S]*abruptQuitWithAddrSignal/));
+        makeRegExMatchFn(/Invalid access at address[\s\S]*printStackTrace/));
 
     testShutdownLogging(
         makeShutdownByCrashFn('abort'),
-        makeRegExMatchFn(/Got signal[\s\S]*abruptQuit[^W]/));
+        makeRegExMatchFn(/Got signal[\s\S]*printStackTrace/));
 
 }());

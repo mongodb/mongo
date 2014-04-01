@@ -331,10 +331,11 @@ namespace mongo {
         return ok;
     }
 
+    // Mongod on win32 defines a value for this function. In all other executables it is NULL.
     void (*reportEventToSystem)(const char *msg) = 0;
 
-    void mongoAbort(const char *msg) { 
-        if( reportEventToSystem ) 
+    void mongoAbort(const char *msg) {
+        if( reportEventToSystem )
             reportEventToSystem(msg);
         severe() << msg;
         ::abort();
