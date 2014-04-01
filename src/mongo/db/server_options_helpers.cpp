@@ -165,7 +165,7 @@ namespace {
         options->addOptionChaining("logpath", "logpath", moe::String,
                 "log file to send write to instead of stdout - has to be a file, not directory")
                                   .setSources(moe::SourceAllLegacy)
-                                  .incompatibleWith("systemLog.syslog");
+                                  .incompatibleWith("syslog");
 
         options->addOptionChaining("systemLog.path", "", moe::String,
                 "log file to send writes to if logging to a file - has to be a file, not directory")
@@ -176,11 +176,10 @@ namespace {
                 "Destination of system log output.  (syslog/file)")
                                   .setSources(moe::SourceYAMLConfig)
                                   .hidden()
-                                  .requires("systemLog.path")
                                   .format("(:?syslog)|(:?file)", "(syslog/file)");
 
 #ifndef _WIN32
-        options->addOptionChaining("systemLog.syslog", "syslog", moe::Switch,
+        options->addOptionChaining("syslog", "syslog", moe::Switch,
                 "log to system's syslog facility instead of file or stdout")
                                   .incompatibleWith("systemLog.logpath")
                                   .setSources(moe::SourceAllLegacy);
@@ -522,6 +521,19 @@ namespace {
             }
         }
 
+        // "systemLog.destination" comes from the config file, so override it if "syslog" is set
+        // since that comes from the command line.
+        if (params->count("syslog")) {
+            Status ret = params->set("systemLog.destination", moe::Value(std::string("syslog")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("syslog");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
         return Status::OK();
     }
 
@@ -691,7 +703,7 @@ namespace {
                                   "Can only use systemLog.path if systemLog.destination is to a "
                                   "file");
                 }
-                // syslog facility is set independently of these options
+                serverGlobalParams.logWithSyslog = true;
             }
             else {
                 StringBuilder sb;
@@ -707,8 +719,6 @@ namespace {
             }
 
         }
-
-        serverGlobalParams.logWithSyslog = params.count("systemLog.syslog");
 
 #ifndef _WIN32
         if (params.count("systemLog.syslogFacility")) {
