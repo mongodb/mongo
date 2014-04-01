@@ -94,7 +94,7 @@ namespace mongo {
         sharding_options.addOptionChaining("net.ipv6", "ipv6", moe::Switch,
                 "enable IPv6 support (disabled by default)");
 
-        sharding_options.addOptionChaining("net.jsonp", "jsonp", moe::Switch,
+        sharding_options.addOptionChaining("net.http.JSONPEnabled", "jsonp", moe::Switch,
                 "allow JSONP access via http (has security implications)")
                                          .setSources(moe::SourceAllLegacy);
 
@@ -230,7 +230,7 @@ namespace mongo {
             enableIPv6();
         }
 
-        if ( params.count( "net.jsonp" ) ) {
+        if (params.count("net.http.JSONPEnabled")) {
             serverGlobalParams.jsonp = true;
         }
 
