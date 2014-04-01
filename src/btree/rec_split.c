@@ -526,6 +526,12 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
 	ref->home = parent;
 
 	if (multi->skip == NULL) {
+		/*
+		 * Copy the address: we could simply take the buffer, but that
+		 * would complicate error handling, freeing the reference array
+		 * would have to avoid freeing the memory, and it's not worth
+		 * the confusion.
+		 */
 		WT_RET(__wt_calloc_def(session, 1, &addr));
 		ref->addr = addr;
 		addr->size = multi->addr.size;
