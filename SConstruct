@@ -1366,6 +1366,9 @@ def doConfigure(myenv):
     if solaris or conf.CheckDeclaration('clock_gettime', includes='#include <time.h>'):
         conf.CheckLib('rt')
 
+    if linux:
+        conf.CheckLib('dl')
+
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>') and

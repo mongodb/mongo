@@ -34,6 +34,9 @@
 #include <DbgHelp.h>
 #include "mongo/util/assert_util.h"
 #else
+
+#include <dlfcn.h>
+
 #include "mongo/platform/backtrace.h"
 #endif
 
@@ -303,25 +306,36 @@ namespace mongo {
         int addressCount = backtrace(addresses, maxBackTraceFrames);
         if (addressCount == 0) {
             const int err = errno;
-            os << "Unable to collect backtrace addresses (" << errnoWithDescription(err) << ")"
-               << std::endl;
+            os << "Unable to collect backtrace addresses (errno: " <<
+                err << ' ' << strerror(err) << ')' << std::endl;
             return;
         }
-        for (int i = 0; i < addressCount; i++)
-            os << std::hex << addresses[i] << std::dec << ' ';
+        os << std::hex;
+        for (int i = 0; i < addressCount; ++i)
+            os << addresses[i] << ' ';
         os << std::endl;
 
-        char** backtraceStrings = backtrace_symbols(addresses, addressCount);
-        if (backtraceStrings == NULL) {
-            const int err = errno;
-            os << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
-               << std::endl;
-            return;
+        for (int i = 0; i < addressCount; ++i) {
+            os << ' ';
+            Dl_info dlinfo;
+            if (dladdr(addresses[i], &dlinfo)) {
+                os << dlinfo.dli_fname << '(';
+                if (dlinfo.dli_sname) {
+                    const uintptr_t offset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_saddr);
+                    os << dlinfo.dli_sname << "+0x" << offset;
+                }
+                else {
+                    const uintptr_t offset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_fbase);
+                    os << "+0x" << offset;
+                }
+                os << ')';
+            }
+            else {
+                os << "???";
+            }
+            os << " [" << addresses[i] << ']' << std::endl;
         }
-        for (int i = 0; i < addressCount; i++)
-            os << ' ' << backtraceStrings[i] << '\n';
-        os.flush();
-        free(backtraceStrings);
+        os << std::dec;
     }
 }
 
