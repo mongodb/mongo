@@ -813,10 +813,17 @@ namespace mongo {
                 msgasserted( 13593 , ss.str() );
             }
 
-            // install chunk metadata with knowledge about newly split chunks in this shard's state
+            //
+            // Install chunk metadata with knowledge about newly split chunks in this shard's state
+            //
+
             splitKeys.pop_back(); // 'max' was used as sentinel
             maxVersion.incMinor();
-            shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
+            
+            {
+                Lock::DBWrite writeLk( ns );
+                shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
+            }
 
             //
             // 5. logChanges
