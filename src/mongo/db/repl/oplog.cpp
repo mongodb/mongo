@@ -418,25 +418,26 @@ namespace mongo {
         }
 
         /* create an oplog collection, if it doesn't yet exist. */
-        double sz;
-        if (replSettings.oplogSize != 0)
-            sz = (double)replSettings.oplogSize;
+        long long sz = 0;
+        if ( replSettings.oplogSize != 0 ) {
+            sz = replSettings.oplogSize;
+        }
         else {
             /* not specified. pick a default size */
-            sz = 50.0 * 1024 * 1024;
+            sz = 50LL * 1024LL * 1024LL;
             if ( sizeof(int *) >= 8 ) {
 #if defined(__APPLE__)
                 // typically these are desktops (dev machines), so keep it smallish
                 sz = (256-64) * 1024 * 1024;
 #else
-                sz = 990.0 * 1024 * 1024;
-                intmax_t free =
+                sz = 990LL * 1024 * 1024;
+                double free =
                     File::freeSpace(storageGlobalParams.dbpath); //-1 if call not supported.
-                double fivePct = free * 0.05;
+                long long fivePct = static_cast<long long>( free * 0.05 );
                 if ( fivePct > sz )
                     sz = fivePct;
                 // we use 5% of free space up to 50GB (1TB free)
-                double upperBound = 50.0 * 1024 * 1024 * 1024;
+                static long long upperBound = 50LL * 1024 * 1024 * 1024;
                 if (fivePct > upperBound)
                     sz = upperBound;
 #endif
