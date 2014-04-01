@@ -79,6 +79,8 @@ namespace mongo {
                 _me = b.obj();
                 Helpers::putSingleton("local.me", _me);
             }
+            // _me is used outside of a read lock, so we must copy it out of the mmap
+            _me = _me.getOwned();
         }
     }
 
