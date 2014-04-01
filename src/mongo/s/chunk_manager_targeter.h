@@ -73,7 +73,9 @@ namespace mongo {
         Status targetDelete( const BatchedDeleteDocument& deleteDoc,
                              std::vector<ShardEndpoint*>* endpoints ) const;
 
-        Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const;
+        Status targetCollection( std::vector<ShardEndpoint*>* endpoints ) const;
+
+        Status targetAllShards( std::vector<ShardEndpoint*>* endpoints ) const;
 
         void noteStaleResponse( const ShardEndpoint& endpoint, const BSONObj& staleInfo );
 

@@ -89,6 +89,10 @@ namespace mongo {
     void BatchWriteExec::executeBatch( const BatchedCommandRequest& clientRequest,
                                        BatchedCommandResponse* clientResponse ) {
 
+        LOG( 4 ) << "starting execution of write batch of size "
+                 << static_cast<int>( clientRequest.sizeWriteOps() )
+                 << " for " << clientRequest.getNS() << endl;
+
         BatchWriteOp batchOp;
         batchOp.initClientRequest( &clientRequest );
 
@@ -184,6 +188,10 @@ namespace mongo {
                         // cancel and retarget the batch
                         WriteErrorDetail error;
                         buildErrorFrom( resolveStatus, &error );
+
+                        LOG( 4 ) << "unable to send write batch to " << shardHost.toString()
+                                 << causedBy( resolveStatus.toString() ) << endl;
+
                         batchOp.noteBatchError( *nextBatch, error );
 
                         // We're done with this batch
@@ -209,6 +217,9 @@ namespace mongo {
                     // command to a database with the collection name in the request.
                     NamespaceString nss( request.getNS() );
                     request.setNS( nss.coll() );
+
+                    LOG( 4 ) << "sending write batch to " << shardHost.toString() << ": "
+                             << request.toString() << endl;
 
                     _dispatcher->addCommand( shardHost, nss.db(), request );
 
@@ -245,6 +256,9 @@ namespace mongo {
 
                         TrackedErrors trackedErrors;
                         trackedErrors.startTracking( ErrorCodes::StaleShardVersion );
+
+                        LOG( 4 ) << "write results received from " << shardHost.toString() << ": "
+                                 << response.toString() << endl;
 
                         // Dispatch was ok, note response
                         batchOp.noteBatchResponse( *batch, response, &trackedErrors );
@@ -283,6 +297,10 @@ namespace mongo {
                         WriteErrorDetail error;
                         buildErrorFrom( Status( ErrorCodes::RemoteResultsUnavailable, msg.str() ),
                                         &error );
+
+                        LOG( 4 ) << "unable to receive write results from " << shardHost.toString()
+                                 << causedBy( dispatchStatus.toString() ) << endl;
+
                         batchOp.noteBatchError( *batch, error );
                     }
                 }
@@ -341,6 +359,13 @@ namespace mongo {
         }
 
         batchOp.buildClientResponse( clientResponse );
+
+        LOG( 4 ) << "finished execution of write batch"
+                 << ( clientResponse->isErrDetailsSet() ? " with write errors" : "")
+                 << ( clientResponse->isErrDetailsSet() &&
+                      clientResponse->isWriteConcernErrorSet() ? " and" : "" )
+                 << ( clientResponse->isWriteConcernErrorSet() ? " with write concern error" : "" )
+                 << " for " << clientRequest.getNS() << endl;
     }
 
     const BatchWriteExecStats& BatchWriteExec::getStats() {
