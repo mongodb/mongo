@@ -1002,7 +1002,17 @@ namespace mongo {
                                 indexSizes[temp.fieldName()] += temp.numberLong();
                             }
                         }
+                        // no longer used since 2.2
                         else if ( str::equals( e.fieldName() , "flags" ) ) {
+                            if ( ! result.hasField( e.fieldName() ) )
+                                result.append( e );
+                        }
+                        // flags broken out in 2.4+
+                        else if ( str::equals( e.fieldName() , "systemFlags" ) ) {
+                            if ( ! result.hasField( e.fieldName() ) )
+                                result.append( e );
+                        }
+                        else if ( str::equals( e.fieldName() , "userFlags" ) ) {
                             if ( ! result.hasField( e.fieldName() ) )
                                 result.append( e );
                         }
