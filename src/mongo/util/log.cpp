@@ -38,7 +38,6 @@ using namespace std;
 // TODO: Extra log context appending, and re-enable log_user_*.js
 // TODO: Eliminate cout/cerr.
 // TODO: LogIndent (for mongodump).
-// TODO: Eliminate rawOut.
 
 namespace mongo {
 
@@ -114,41 +113,6 @@ namespace mongo {
         s << strerror(x);
 #endif
         return s.str();
-    }
-
-    namespace {
-        bool rawOutToStderr = false;
-    } // namespace
-
-    void setRawOutToStderr() {
-        rawOutToStderr = true;
-    }
-
-    /*
-     * NOTE(schwerin): Called from signal handlers; should not be taking locks or allocating
-     * memory.
-     */
-    void rawOut(const StringData &s) {
-        // Can't use STDxxx_FILENO macros since they don't exist on windows.
-        const int fd = rawOutToStderr
-                        ? 2 // STDERR_FILENO
-                        : 1 // STDOUT_FILENO
-                        ;
-
-        const char* ptr = s.rawData();
-        size_t bytesRemaining = s.size();
-        while (bytesRemaining) {
-#ifdef _WIN32
-            int ret = _write(fd, ptr, bytesRemaining);
-#else
-            ssize_t ret = write(fd, ptr, bytesRemaining);
-#endif
-            if (ret < 0)
-                return; // Nothing to do. Can't even log since that is what is failing.
-
-            ptr += ret;
-            bytesRemaining -= ret;
-        }
     }
 
     void logContext(const char *errmsg) {

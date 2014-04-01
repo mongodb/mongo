@@ -186,8 +186,7 @@ namespace mongo {
 
     // this gets called when new fails to allocate memory
     void my_new_handler() {
-        rawOut( "out of memory, printing stack and exiting:" );
-        printStackTrace();
+        printStackTrace(severe().stream() << "out of memory, printing stack and exiting:\n");
         ::_exit(EXIT_ABRUPT);
     }
 

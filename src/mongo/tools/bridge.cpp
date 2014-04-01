@@ -144,8 +144,7 @@ void cleanup( int sig ) {
 }
 #if !defined(_WIN32)
 void myterminate() {
-    rawOut( "bridge terminate() called, printing stack:" );
-    printStackTrace();
+    printStackTrace(severe().stream() << "bridge terminate() called, printing stack:\n");
     ::abort();
 }
 

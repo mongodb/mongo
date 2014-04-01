@@ -1067,15 +1067,14 @@ namespace mongo {
     // this will be called in certain c++ error cases, for example if there are two active
     // exceptions
     void myterminate() {
-        rawOut( "terminate() called, printing stack (if implemented for platform):" );
-        printStackTrace();
+        printStackTrace(severe().stream()
+                        << "terminate() called, printing stack (if implemented for platform):\n");
         ::abort();
     }
 
     // this gets called when new fails to allocate memory
     void my_new_handler() {
-        rawOut( "out of memory, printing stack and exiting:" );
-        printStackTrace();
+        printStackTrace(severe().stream() << "out of memory, printing stack and exiting:\n");
         ::_exit(EXIT_ABRUPT);
     }
 
@@ -1131,17 +1130,17 @@ namespace mongo {
         switch( fdwCtrlType ) {
 
         case CTRL_C_EVENT:
-            rawOut( "Ctrl-C signal" );
+            log() << "Ctrl-C signal";
             consoleTerminate( "CTRL_C_EVENT" );
             return TRUE ;
 
         case CTRL_CLOSE_EVENT:
-            rawOut( "CTRL_CLOSE_EVENT signal" );
+            log() << "CTRL_CLOSE_EVENT signal";
             consoleTerminate( "CTRL_CLOSE_EVENT" );
             return TRUE ;
 
         case CTRL_BREAK_EVENT:
-            rawOut( "CTRL_BREAK_EVENT signal" );
+            log() << "CTRL_BREAK_EVENT signal";
             consoleTerminate( "CTRL_BREAK_EVENT" );
             return TRUE;
 
@@ -1150,7 +1149,7 @@ namespace mongo {
             return FALSE;
 
         case CTRL_SHUTDOWN_EVENT:
-            rawOut( "CTRL_SHUTDOWN_EVENT signal" );
+            log() << "CTRL_SHUTDOWN_EVENT signal";
             consoleTerminate( "CTRL_SHUTDOWN_EVENT" );
             return TRUE;
 

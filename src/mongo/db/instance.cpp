@@ -1054,22 +1054,6 @@ namespace {
         return numExitCalls > 0;
     }
 
-    void tryToOutputFatal( const string& s ) {
-        try {
-            rawOut( s );
-            return;
-        }
-        catch ( ... ) {}
-
-        try {
-            cerr << s << endl;
-            return;
-        }
-        catch ( ... ) {}
-
-        // uh - oh, not sure there is anything else we can do...
-    }
-
     static void shutdownServer() {
 
         log() << "shutdown: going to close listening sockets..." << endl;
@@ -1166,25 +1150,19 @@ namespace {
                     // this means something horrible has happened
                     ::_exit( rc );
                 }
-                stringstream ss;
-                ss << "dbexit: " << why << "; exiting immediately";
-                tryToOutputFatal( ss.str() );
+                log() << "dbexit: " << why << "; exiting immediately";
                 if ( c ) c->shutdown();
                 ::_exit( rc );
             }
         }
 
-        {
-            stringstream ss;
-            ss << "dbexit: " << why;
-            tryToOutputFatal( ss.str() );
-        }
+        log() << "dbexit: " << why;
 
         try {
             shutdownServer(); // gracefully shutdown instance
         }
         catch ( ... ) {
-            tryToOutputFatal( "shutdown failed with exception" );
+            severe() << "shutdown failed with exception";
         }
 
 #if defined(_DEBUG)
@@ -1207,7 +1185,7 @@ namespace {
             return;
         }
 #endif
-        tryToOutputFatal( "dbexit: really exiting now\n" );
+        log() << "dbexit: really exiting now";
         if ( c ) c->shutdown();
         ::_exit(rc);
     }

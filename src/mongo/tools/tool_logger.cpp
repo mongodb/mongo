@@ -89,8 +89,6 @@ MONGO_INITIALIZER_GENERAL(ToolLogRedirection,
         logger::globalLogDomain()->attachAppender(MessageLogDomain::AppenderAutoPtr(
                     new ConsoleAppender<MessageEventEphemeral, ErrorConsole>(
                         new MessageEventDetailsEncoder)));
-
-        setRawOutToStderr();
     }
 
     // Only put an appender on our informational messages if we did not use --quiet
