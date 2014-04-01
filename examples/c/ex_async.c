@@ -35,6 +35,7 @@
 
 const char *home = NULL;
 const char *uri = "table:async";
+const char *uri2 = "table:async2";
 uint64_t search_id;
 int global_error = 0;
 
@@ -78,7 +79,7 @@ static WT_ASYNC_CALLBACK cb = { cb_asyncop };
 int main(void)
 {
 	/*! [example connection] */
-	WT_ASYNC_OP *op, *opget;
+	WT_ASYNC_OP *op, *op2, *opget;
 	WT_CONNECTION *wt_conn;
 	WT_SESSION *session;
 	int i, ret;
@@ -97,22 +98,28 @@ int main(void)
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri,
 	    "key_format=S,value_format=S");
+	ret = session->create(session, uri2,
+	    "key_format=S,value_format=S");
 	/*! [example table create] */
 
 	for (i = 0; i < 10; i++) {
 		/*! [Allocate a handle] */
 		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
+		ret = wt_conn->async_new_op(wt_conn, uri2, NULL, &cb, &op2);
 		/*! [Allocate a handle] */
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
 		/*! [Set the op's string key] */
 		op->set_key(op, k);
+		op2->set_key(op2, k);
 		/*! [Set the op's string key] */
 		/*! [Set the op's string value] */
 		op->set_value(op, v);
+		op2->set_value(op2, v);
 		/*! [Set the op's string value] */
 		/*! [example insert] */
 		ret = op->insert(op);
+		ret = op2->insert(op2);
 		/*! [example insert] */
 	}
 
