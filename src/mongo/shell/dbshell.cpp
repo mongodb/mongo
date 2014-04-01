@@ -225,13 +225,8 @@ char * strsignal(int sig){
 #endif
 
 void quitAbruptly( int sig ) {
-    ostringstream ossSig;
-    ossSig << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: " << endl;
-    mongo::rawOut( ossSig.str() );
-
-    ostringstream ossBt;
-    mongo::printStackTrace( ossBt );
-    mongo::rawOut( ossBt.str() );
+    log() << "mongo got signal " << sig << " (" << strsignal( sig ) << "), stack trace: ";
+    mongo::printStackTrace();
 
     mongo::shell_utils::KillMongoProgramInstances();
     ::_exit( 14 );
@@ -240,8 +235,7 @@ void quitAbruptly( int sig ) {
 // this will be called in certain c++ error cases, for example if there are two active
 // exceptions
 void myterminate() {
-    mongo::rawOut( "terminate() called in shell, printing stack:" );
-    mongo::printStackTrace();
+    mongo::printStackTrace(severe().stream() << "terminate() called in shell, printing stack:\n");
     ::_exit( 14 );
 }
 
