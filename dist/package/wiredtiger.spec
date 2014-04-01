@@ -27,7 +27,10 @@ WiredTiger is a library that can be accessed via C, Python and Java APIs.
 
 
 %build
-%configure --enable-java
+%configure --enable-java --enable-bzip2 --enable-snappy --enable-zlib
+# Stop the build setting up an rpath
+sed -i 's|^hardcode_libdir_flag_spec=.*|hardcode_libdir_flag_spec=""|g' libtool
+sed -i 's|^runpath_var=LD_RUN_PATH|runpath_var=DIE_RPATH_DIE|g' libtool
 make %{?_smp_mflags}
 
 
