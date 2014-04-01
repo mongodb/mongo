@@ -1004,38 +1004,36 @@ namespace mongo {
 
 namespace mongo {
 
-    void abruptQuit(int x) {
-        ostringstream ossSig;
-        ossSig << "Got signal: " << x << " (" << strsignal( x ) << ")." << endl;
-        rawOut( ossSig.str() );
-
-        /*
-        ostringstream ossOp;
-        ossOp << "Last op: " << currentOp.infoNoauth() << endl;
-        rawOut( ossOp.str() );
-        */
-
-        ostringstream oss;
-        oss << "Backtrace:" << endl;
-        printStackTrace( oss );
-        rawOut( oss.str() );
+    void abruptQuit(int signalNum) {
+        {
+            logger::LogstreamBuilder logBuilder(logger::globalLogDomain(),
+                                                getThreadName(),
+                                                logger::LogSeverity::Severe());
+            logBuilder.stream() <<
+                "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\nBacktrace:";
+            printStackTrace(logBuilder.stream());
+        }
 
         // Don't go through normal shutdown procedure. It may make things worse.
         ::_exit(EXIT_ABRUPT);
-
     }
 
-    void abruptQuitWithAddrSignal( int signal, siginfo_t *siginfo, void * ) {
-        ostringstream oss;
-        oss << "Invalid";
-        if ( signal == SIGSEGV || signal == SIGBUS ) {
-            oss << " access";
-        } else {
-            oss << " operation";
+    void abruptQuitWithAddrSignal( int signalNum, siginfo_t *siginfo, void * ) {
+        {
+            logger::LogstreamBuilder logBuilder(logger::globalLogDomain(),
+                                                getThreadName(),
+                                                logger::LogSeverity::Severe());
+
+            std::ostream& oss = logBuilder.stream();
+            oss << "Invalid";
+            if ( signalNum == SIGSEGV || signalNum == SIGBUS ) {
+                oss << " access";
+            } else {
+                oss << " operation";
+            }
+            oss << " at address: " << siginfo->si_addr;
         }
-        oss << " at address: " << siginfo->si_addr << " from thread: " << getThreadName() << endl;
-        rawOut( oss.str() );
-        abruptQuit( signal );
+        abruptQuit( signalNum );
     }
 
     sigset_t asyncSignals;
@@ -1052,6 +1050,9 @@ namespace mongo {
                 fassert(16782, rotateLogs());
                 logProcessDetailsForLogRotate();
                 break;
+            case SIGQUIT:
+                log() << "Received SIGQUIT; terminating.";
+                _exit(EXIT_ABRUPT);
             default:
                 // interrupt/terminate signal
                 Client::initThread( "signalProcessingThread" );
@@ -1095,7 +1096,6 @@ namespace mongo {
         verify( sigaction(SIGFPE, &addrSignals, 0) == 0 );
 
         verify( signal(SIGABRT, abruptQuit) != SIG_ERR );
-        verify( signal(SIGQUIT, abruptQuit) != SIG_ERR );
         verify( signal(SIGPIPE, SIG_IGN) != SIG_ERR );
 
         setupSIGTRAPforGDB();
@@ -1106,6 +1106,7 @@ namespace mongo {
         sigaddset( &asyncSignals, SIGHUP );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
+        sigaddset( &asyncSignals, SIGQUIT );
         sigaddset( &asyncSignals, SIGUSR1 );
         sigaddset( &asyncSignals, SIGXCPU );
 
