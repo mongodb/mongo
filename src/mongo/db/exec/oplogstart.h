@@ -80,7 +80,7 @@ namespace mongo {
         bool isBackwardsScanning() { return _backwardsScanning; }
     private:
         // Copied verbatim.
-        static DiskLoc prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec);
+        static DiskLoc prevExtentFirstLoc(const NamespaceDetails* nsd, const DiskLoc& rec);
 
         StageState workBackwardsScan(WorkingSetID* out);
 
@@ -107,7 +107,7 @@ namespace mongo {
         // Our final state: done.
         bool _done;
 
-        NamespaceDetails* _nsd;
+        const NamespaceDetails* _nsd;
 
         // We only go backwards via a collscan for a few seconds.
         Timer _timer;

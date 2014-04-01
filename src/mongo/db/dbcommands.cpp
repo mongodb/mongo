@@ -1072,7 +1072,7 @@ namespace mongo {
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , collection->getIndexCatalog()->numIndexesReady() );
 
-            NamespaceDetails* nsd = collection->details();
+            const NamespaceDetails* nsd = collection->details();
             result.append( "lastExtentSize" , nsd->lastExtentSize() / scale );
             result.append( "paddingFactor" , nsd->paddingFactor() );
             result.append( "systemFlags" , nsd->systemFlags() );
@@ -1123,7 +1123,7 @@ namespace mongo {
                 return false;
             }
 
-            NamespaceDetails* nsd = coll->details();
+            NamespaceDetails* nsd = coll->detailsWritable();
 
             bool ok = true;
 

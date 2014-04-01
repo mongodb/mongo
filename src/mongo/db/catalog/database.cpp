@@ -691,7 +691,7 @@ namespace mongo {
         Collection* collection = getCollection( ns );
         massert( 17400, "_namespaceIndex.add_ns failed?", collection );
 
-        NamespaceDetails* nsd = collection->details();
+        NamespaceDetails* nsd = collection->detailsWritable();
 
         // allocation strategy set explicitly in flags or by server-wide default
         if ( !options.capped ) {

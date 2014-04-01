@@ -68,13 +68,6 @@ namespace mongo {
          */
         static BSONObj getMissingField(Collection* collection, const BSONObj& infoObj);
 
-        /**
-         * Perform any post-build steps for this index.
-         *
-         * This is a no-op unless the index is a FTS index.  In that case, we set the flag for using
-         * power of 2 sizes for space allocation.
-         */
-        static void postBuildHook(Collection* collection, const BSONObj& keyPattern );
     };
 
 }  // namespace mongo

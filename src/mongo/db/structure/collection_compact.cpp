@@ -230,16 +230,15 @@ namespace mongo {
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
                                              "cannot compact when indexes in progress" );
 
-        NamespaceDetails* d = details();
-
         // this is a big job, so might as well make things tidy before we start just to be nice.
         getDur().commitIfNeeded();
 
         list<DiskLoc> extents;
-        for( DiskLoc extLocation = d->firstExtent();
+        for( DiskLoc extLocation = _details->firstExtent();
              !extLocation.isNull();
-             extLocation = getExtentManager()->getExtent( extLocation )->xnext )
+             extLocation = getExtentManager()->getExtent( extLocation )->xnext ) {
             extents.push_back( extLocation );
+        }
         log() << "compact " << extents.size() << " extents";
 
         // same data, but might perform a little different after compact?
@@ -266,10 +265,10 @@ namespace mongo {
         }
 
         log() << "compact orphan deleted lists" << endl;
-        d->orphanDeletedList();
+        _details->orphanDeletedList();
 
         // Start over from scratch with our extent sizing and growth
-        d->setLastExtentSize( 0 );
+        _details->setLastExtentSize( 0 );
 
         // before dropping indexes, at least make sure we can allocate one extent!
         // this will allocate an extent and add to free list
@@ -296,7 +295,7 @@ namespace mongo {
 
         // reset data size and record counts to 0 for this namespace
         // as we're about to tally them up again for each new extent
-        d->setStats( 0, 0 );
+        _details->setStats( 0, 0 );
 
         ProgressMeterHolder pm(cc().curop()->setMessage("compact extent",
                                                         "Extent Compacting Progress",
@@ -308,7 +307,7 @@ namespace mongo {
             pm.hit();
         }
 
-        invariant( getExtentManager()->getExtent( d->firstExtent() )->xprev.isNull() );
+        invariant( getExtentManager()->getExtent( _details->firstExtent() )->xprev.isNull() );
 
         // indexes will do their own progress meter
         pm.finished();

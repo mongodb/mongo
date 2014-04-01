@@ -725,7 +725,7 @@ namespace mongo {
                     // Broadcast the mutation so that query results stay correct.
                     collection->cursorCache()->invalidateDocument(loc, INVALIDATION_MUTATION);
 
-                    collection->details()->paddingFits();
+                    collection->detailsWritable()->paddingFits();
 
                     // All updates were in place. Apply them via durability and writing pointer.
                     mutablebson::DamageVector::const_iterator where = damages.begin();

@@ -186,7 +186,7 @@ namespace mongo {
     }
 
     // static
-    DiskLoc OplogStart::prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec ) {
+    DiskLoc OplogStart::prevExtentFirstLoc(const NamespaceDetails* nsd, const DiskLoc& rec ) {
         Extent *e = rec.rec()->myExtent( rec );
         if (nsd->capLooped() ) {
             while( true ) {

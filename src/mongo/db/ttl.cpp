@@ -119,7 +119,7 @@ namespace mongo {
                         continue;
                     }
 
-                    NamespaceDetails* nsd = collection->details();
+                    NamespaceDetails* nsd = collection->detailsWritable();
                     if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
                         // TODO: wish there was a cleaner way to do this
                         nsd->syncUserFlags( ns );

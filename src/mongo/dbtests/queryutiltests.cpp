@@ -1599,7 +1599,7 @@ namespace QueryUtilTests {
             Client::Context* ctx() { return &_ctx; }
             Database* db() { return _ctx.db(); }
             Collection* collection() { return db()->getCollection( ns() ); }
-            NamespaceDetails *nsd() { return collection()->details(); }
+            NamespaceDetails *nsd() { return collection()->detailsWritable(); }
 
             int indexno( const BSONObj &key ) {
                 stringstream ss;

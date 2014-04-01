@@ -92,7 +92,7 @@ namespace mongo {
     }
 
     void IndexCatalogEntry::setHead( DiskLoc newHead ) {
-        NamespaceDetails* nsd = _collection->details();
+        NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         IndexDetails& id = nsd->idx( idxNo );
         id.head.writing() = newHead;
@@ -102,7 +102,7 @@ namespace mongo {
     void IndexCatalogEntry::setMultikey() {
         if ( isMultikey() )
             return;
-        NamespaceDetails* nsd = _collection->details();
+        NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         if ( nsd->setIndexIsMultikey( idxNo, true ) ) {
             LOG(1) << _collection->ns().ns() << ": clearing plan cache - index "
@@ -119,13 +119,13 @@ namespace mongo {
     }
 
     DiskLoc IndexCatalogEntry::_catalogHead() const {
-        NamespaceDetails* nsd = _collection->details();
+        const NamespaceDetails* nsd = _collection->details();
         int idxNo = _indexNo();
         return nsd->idx( idxNo ).head;
     }
 
     bool IndexCatalogEntry::_catalogIsMultikey() const {
-        NamespaceDetails* nsd = _collection->details();
+        const NamespaceDetails* nsd = _collection->details();
         int idxNo = _indexNo();
         return nsd->isMultikey( idxNo );
     }

@@ -115,7 +115,7 @@ namespace mongo {
 
         bool ok() const { return _magic == 1357924; }
 
-        NamespaceDetails* details() { return _details; } // TODO: remove
+        NamespaceDetails* detailsWritable() { return _details; } // TODO: remove
         const NamespaceDetails* details() const { return _details; }
 
         CollectionInfoCache* infoCache() { return &_infoCache; }

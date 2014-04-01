@@ -342,6 +342,13 @@ namespace mongo {
             int idxNo = _details->_catalogFindIndexByName( idxName, true );
             invariant( idxNo < numIndexesReady() );
 
+            // some special cases stuff
+            if ( pluginName == IndexNames::TEXT ) {
+                if ( _details->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes) ) {
+                    _details->syncUserFlags( _collection->ns().ns() );
+                }
+            }
+
             return Status::OK();
         }
         catch ( const AssertionException& exc ) {
@@ -413,7 +420,7 @@ namespace mongo {
             return systemIndexesEntry.getStatus();
 
         // 2) collection's NamespaceDetails
-        IndexDetails& indexDetails = _collection->details()->getNextIndexDetails( _collection );
+        IndexDetails& indexDetails = _collection->detailsWritable()->getNextIndexDetails( _collection );
 
         try {
             getDur().writingDiskLoc( indexDetails.info ) = systemIndexesEntry.getValue();
@@ -427,7 +434,7 @@ namespace mongo {
 
         int before = _collection->details()->_indexBuildsInProgress;
         try {
-            getDur().writingInt( _collection->details()->_indexBuildsInProgress ) += 1;
+            getDur().writingInt( _collection->detailsWritable()->_indexBuildsInProgress ) += 1;
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
@@ -513,7 +520,7 @@ namespace mongo {
 
         fassert( 17207, _catalog->_collection->ok() );
 
-        NamespaceDetails* nsd = _collection->details();
+        NamespaceDetails* nsd = _collection->detailsWritable();
 
         int idxNo = nsd->_catalogFindIndexByName( _indexName, true );
         fassert( 17202, idxNo >= 0 );
@@ -542,10 +549,7 @@ namespace mongo {
 
         entry->setIsReady( true );
 
-        IndexLegacy::postBuildHook( _catalog->_collection,
-                                    _catalog->findIndexByName( _indexName )->keyPattern() );
     }
-
 
 
     Status IndexCatalog::_isSpecOk( const BSONObj& spec ) const {

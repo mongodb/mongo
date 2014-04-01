@@ -99,7 +99,7 @@ namespace mongo {
             const bool full = cmdObj["full"].trueValue();
             const bool scanData = full || cmdObj["scandata"].trueValue();
 
-            NamespaceDetails* nsd = collection->details();
+            const NamespaceDetails* nsd = collection->details();
 
             bool valid = true;
             BSONArrayBuilder errors; // explanation(s) for why valid = false

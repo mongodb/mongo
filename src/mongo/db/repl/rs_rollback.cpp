@@ -520,7 +520,7 @@ namespace mongo {
                                 DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
                                 if( Listener::getElapsedTimeMillis() - start > 200 )
                                     log() << "replSet warning roll back slow no _id index for " << d.ns << " perhaps?" << rsLog;
-                                NamespaceDetails* nsd = collection->details();
+                                NamespaceDetails* nsd = collection->detailsWritable();
                                 //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
                                 if( !loc.isNull() ) {
                                     try {
@@ -606,7 +606,7 @@ namespace mongo {
         // clean up oplog
         LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
         // todo: fatal error if this throws?
-        oplogCollection->details()->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
+        oplogCollection->detailsWritable()->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 
         Status status = getGlobalAuthorizationManager()->initialize();
         if (!status.isOK()) {

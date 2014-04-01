@@ -1080,7 +1080,7 @@ namespace NamespaceTests {
                 Collection* c = collection();
                 if ( !c )
                     return NULL;
-                return c->details()->writingWithExtra();
+                return c->detailsWritable()->writingWithExtra();
             }
             Database* db() const {
                 return _context.db();
@@ -1649,7 +1649,7 @@ namespace NamespaceTests {
                 }
                 ASSERT( nRecords() < N );
 
-                NamespaceDetails*nsd = collection()->details();
+                NamespaceDetails* nsd = collection()->detailsWritable();
 
                 DiskLoc last, first;
                 {
@@ -1763,7 +1763,7 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                NamespaceDetails *nsd = collection()->details();
+                NamespaceDetails *nsd = collection()->detailsWritable();
 
                 // Set 2 & 54 as multikey
                 nsd->setIndexIsMultikey(2, true);
