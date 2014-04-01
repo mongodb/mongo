@@ -55,6 +55,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/server.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/lruishmap.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/processinfo.h"
@@ -288,7 +290,20 @@ namespace mongo {
 
     } listCommandsCmd;
 
+    namespace {
+        MONGO_FP_DECLARE(crashOnShutdown);
+
+        int* volatile illegalAddress;
+    }  // namespace
+
     bool CmdShutdown::shutdownHelper() {
+        MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
+            const std::string crashHow = crashBlock.getData()["how"].str();
+            if (crashHow == "fault") {
+                ++*illegalAddress;
+            }
+            ::abort();
+        }
         Client * c = currentClient.get();
         if ( c ) {
             c->shutdown();
