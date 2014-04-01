@@ -105,6 +105,7 @@ static void
 __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_INSERT_HEAD *append;
+	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
 	uint32_t i;
 
@@ -113,20 +114,17 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_MULTIBLOCK:
 		/* Free list of replacement blocks. */
-		if (mod->mod_multi == NULL)
-			break;
-		for (i = 0; i < mod->mod_multi_entries; ++i) {
+		for (multi = mod->mod_multi,
+		    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
 			switch (page->type) {
 			case WT_PAGE_ROW_INT:
 			case WT_PAGE_ROW_LEAF:
-				__wt_free(session, mod->mod_multi[i].key.ikey);
+				__wt_free(session, multi->key.ikey);
 				break;
 			}
-
-			__wt_free(session, mod->mod_multi[i].skip);
-			__wt_free(session, mod->mod_multi[i].skip_dsk);
-
-			__wt_free(session, mod->mod_multi[i].addr.addr);
+			__wt_free(session, multi->skip);
+			__wt_free(session, multi->skip_dsk);
+			__wt_free(session, multi->addr.addr);
 		}
 		__wt_free(session, mod->mod_multi);
 		break;

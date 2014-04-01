@@ -85,6 +85,16 @@ struct __wt_addr {
 #define	WT_ADDR_LEAF	2		/* Leaf page */
 #define	WT_ADDR_LEAF_NO	3		/* Leaf page, no overflow */
 	uint8_t  type;
+
+	/*
+	 * If an address is both as an address for the previous and the current
+	 * multi-block reconciliations, that is, a block we're writing matches
+	 * the block written the last time, it will appear in both the current
+	 * boundary points as well as the page modification's list of previous
+	 * blocks.  The reuse flag is how we know that's happening so the block
+	 * is treated correctly (not free'd on error, for example).
+	 */
+	uint8_t	 reuse;
 };
 
 /*
@@ -232,7 +242,6 @@ struct __wt_page_modify {
 		WT_ADDR	 addr;
 		uint32_t size;
 		uint32_t cksum;
-		uint8_t	 reuse;
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
 	} m;
