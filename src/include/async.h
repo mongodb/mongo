@@ -34,8 +34,8 @@ struct __wt_async_op_impl {
 
 	const char *uri;
 	const char *config;
-	uint64_t uri_hash;
-	uint64_t cfg_hash;
+	uint64_t	cfg_hash;		/* Config hash */
+	uint64_t	uri_hash;		/* URI hash */
 
 	STAILQ_ENTRY(__wt_async_op_impl) q;
 
@@ -67,6 +67,7 @@ struct __wt_async_op_impl {
 #define	WT_ASYNCOP_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
 	uint32_t flags;
 };
+
 /*
  * Definition of the async subsystem.
  */
@@ -109,9 +110,22 @@ struct __wt_async {
 };
 
 /*
- * WT_ASYNC_WORKER_ARGS --
+ * WT_ASYNC_CURSOR --
+ *	Async container for a cursor.
+ */
+struct __wt_async_cursor {
+	STAILQ_ENTRY(__wt_async_cursor) q;	/* Worker cache */
+	uint64_t	cfg_hash;		/* Config hash */
+	uint64_t	uri_hash;		/* URI hash */
+	WT_CURSOR	*c;			/* WT cursor */
+};
+
+/*
+ * WT_ASYNC_WORKER_STATE --
  *	State for an async worker thread.
  */
-struct __wt_async_worker_args {
-	u_int id;
+struct __wt_async_worker_state {
+	uint32_t	id;
+	STAILQ_HEAD(__wt_cursor_qh, __wt_async_cursor)	cursorqh;
+	uint32_t	num_cursors;
 };

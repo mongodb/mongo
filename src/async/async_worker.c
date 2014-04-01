@@ -29,17 +29,73 @@ err:	return (ret);
 }
 
 /*
+ * __async_worker_cursor --
+ *	Return a cursor for the worker thread to use for its op.
+ *	The worker thread caches cursors.  So first search for one
+ *	with the same config/uri signature.  Otherwise open a new
+ *	cursor.
+ */
+static int
+__async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
+    WT_ASYNC_WORKER_STATE *worker, WT_CURSOR **cursorp)
+{
+	WT_ASYNC *async;
+	WT_ASYNC_CURSOR *ac;
+	WT_CONNECTION_IMPL *conn;
+	WT_CURSOR *c;
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+
+	conn = S2C(session);
+	async = conn->async;
+	wt_session = (WT_SESSION *)session;
+
+	*cursorp = NULL;
+	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
+		if (op->cfg_hash == ac->cfg_hash &&
+		    op->uri_hash == ac->uri_hash) {
+			fprintf(stderr, "Worker %p REUSE cursor uri %s\n",
+			    pthread_self(), op->uri);
+			*cursorp = ac->c;
+			return (0);
+		}
+	}
+	/*
+	 * We didn't find one in our cache.  Open one and cache it.
+	 * Insert it at the head expecting LRU usage.
+	 */
+	WT_RET(__wt_calloc_def(session, 1, &ac));
+	WT_ERR(wt_session->open_cursor(
+	    wt_session, op->uri, NULL, op->config, &c));
+	ac->cfg_hash = op->cfg_hash;
+	ac->uri_hash = op->uri_hash;
+	ac->c = c;
+	fprintf(stderr, "Worker %p allocate cursor uri %s\n",
+	    pthread_self(), op->uri);
+	STAILQ_INSERT_HEAD(&worker->cursorqh, ac, q);
+	worker->num_cursors++;
+	*cursorp = c;
+	return (0);
+
+err:
+	__wt_free(session, ac);
+	return (ret);
+}
+
+/*
  * __async_worker_op --
  *	A worker thread handles an individual op.
  */
 static int
-__async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
+__async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
+    WT_ASYNC_WORKER_STATE *worker)
 {
 	WT_ASYNC *async;
 	WT_ASYNC_OP *asyncop;
 	WT_CONNECTION_IMPL *conn;
+	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int cb_ret, t_ret;
+	int cb_ret;
 
 	conn = S2C(session);
 	async = conn->async;
@@ -56,6 +112,8 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 	 *	Hash config and uri.  Find/create cursor.
 	 *	Perform op.
 	 */
+	WT_RET(__async_worker_cursor(session, op, worker, &cursor));
+
 	fprintf(stderr, "Worker %p op %d txn %" PRIu64 "\n",
 	    pthread_self(), op->optype, session->txn.id);
 	if (op->cb != NULL && op->cb->notify != NULL) {
@@ -77,6 +135,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 	 * the free pool.
 	 */
 	op->state = WT_ASYNCOP_FREE;
+	cursor->reset(cursor);
 	return (ret);
 }
 
@@ -88,7 +147,9 @@ void *
 __wt_async_worker(void *arg)
 {
 	WT_ASYNC *async;
+	WT_ASYNC_CURSOR *ac, *acnext;
 	WT_ASYNC_OP_IMPL *op;
+	WT_ASYNC_WORKER_STATE worker;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -100,6 +161,8 @@ __wt_async_worker(void *arg)
 
 	locked = 0;
 	fprintf(stderr, "Async worker %p started\n",pthread_self());
+	worker.num_cursors = 0;
+	STAILQ_INIT(&worker.cursorqh);
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		__wt_spin_lock(session, &async->opsq_lock);
 		locked = 1;
@@ -191,7 +254,7 @@ __wt_async_worker(void *arg)
 			/*
 			 * Perform op now.
 			 */
-			(void)__async_worker_op(session, op);
+			(void)__async_worker_op(session, op, &worker);
 		}
 
 wait_for_work:
@@ -205,6 +268,17 @@ wait_for_work:
 err:		__wt_err(session, ret, "async worker error");
 		if (locked)
 			__wt_spin_unlock(session, &async->opsq_lock);
+	}
+	/*
+	 * Worker thread cleanup, close our cached cursors and
+	 * free all the WT_ASYNC_CURSOR structures.
+	 */
+	ac = STAILQ_FIRST(&worker.cursorqh);
+	while (ac != NULL) {
+		acnext = STAILQ_NEXT(ac, q);
+		WT_TRET(ac->c->close(ac->c));
+		__wt_free(session, ac);
+		ac = acnext;
 	}
 	return (NULL);
 }
