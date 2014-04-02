@@ -103,14 +103,17 @@ doTest = function (signal) {
       verifyReplication("slave 1", slaves[1].getDB(testDB).baz);
     }
     catch(e) {
-      print("ERROR: " + e);
-      print("Master oplog findOne:");
-      printjson(master.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
-      print("Slave 0 oplog findOne:");
-      printjson(slaves[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
-      print("Slave 1 oplog findOne:");
-      printjson(slaves[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
-      // TODO: SERVER-13203
+      var errstr = "ERROR: " + e;
+      errstr += "\nMaster oplog findOne:\n";
+      errstr += tojson(
+                    master.getDB("local").oplog.rs.find().sort({"$natural":-1}).limit(1).next());
+      errstr += "\nSlave 0 oplog findOne:\n";
+      errstr += tojson(
+                    slaves[0].getDB("local").oplog.rs.find().sort({"$natural":-1}).limit(1).next());
+      errstr += "\nSlave 1 oplog findOne:\n";
+      errstr += tojson(
+                    slaves[1].getDB("local").oplog.rs.find().sort({"$natural":-1}).limit(1).next());
+      assert(false, errstr);
     }
 
     replTest.stopSet(signal);
