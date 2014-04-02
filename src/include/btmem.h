@@ -612,7 +612,7 @@ struct __wt_ref {
 	 * changes.  Don't cache it, we need to see that change when looking
 	 * up our slot in the page's index structure.
 	 */
-	WT_PAGE * volatile home;		/* Reference page */
+	WT_PAGE * volatile home;	/* Reference page */
 	uint32_t ref_hint;		/* Reference page index hint */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
