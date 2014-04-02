@@ -740,6 +740,15 @@ namespace mongo {
             for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it ) {
                 BSONObj endKey = *it;
 
+                if ( endKey.woCompare( startKey ) == 0) {
+                    errmsg = str::stream() << "split on the lower bound of chunk "
+                                           << "[" << min << ", " << max << ")"
+                                           << " is not allowed";
+
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
                 // splits only update the 'minor' portion of version
                 myVersion.incMinor();
 

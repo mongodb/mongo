@@ -130,6 +130,8 @@ namespace mongo {
             return NULL;
         }
 
+        invariant( chunk.getMin().woCompare(chunk.getMax()) < 0 );
+
         // Check that there isn't any chunk on the interval to be added.
         if ( rangeMapOverlaps( _chunksMap, chunk.getMin(), chunk.getMax() ) ) {
 
@@ -337,7 +339,7 @@ namespace mongo {
         for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end();
                 ++it ) {
             BSONObj split = *it;
-            dassert(split.woCompare(startKey) > 0);
+            invariant(split.woCompare(startKey) > 0);
             metadata->_chunksMap[startKey] = split.getOwned();
             metadata->_chunksMap.insert( make_pair( split.getOwned(), chunk.getMax().getOwned() ));
             metadata->_shardVersion.incMinor();
