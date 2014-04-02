@@ -102,6 +102,8 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			WT_ERR(cursor->remove(cursor));
 			break;
 		case WT_AOP_SEARCH:
+			fprintf(stderr, "Worker %p search %s\n",
+			    (void *)pthread_self(), (char *)cursor->key.data);
 			WT_ERR(cursor->search(cursor));
 			/*
 			 * Get the value from the cursor and put it into
@@ -149,18 +151,18 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 */
 	ret = __async_worker_execop(session, op, cursor);
 	fprintf(stderr, "Worker %p op %d id %" PRIu64 " txn %" PRIu64 " %s\n",
-	    pthread_self(), op->optype, op->unique_id,
+	    (void *)pthread_self(), op->optype, op->unique_id,
 	    session->txn.id, (char *)op->key.data);
 	if (op->cb != NULL && op->cb->notify != NULL) {
 		cb_ret = op->cb->notify(op->cb, asyncop, ret, 0);
 	}
 	if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0) {
 		fprintf(stderr, "Worker %p op %d commit txn %" PRIu64 "\n",
-		    pthread_self(), op->optype, session->txn.id);
+		    (void *)pthread_self(), op->optype, session->txn.id);
 		WT_TRET(__wt_txn_commit(session, NULL));
 	} else {
 		fprintf(stderr, "Worker %p op %d rollback txn %" PRIu64 "\n",
-		    pthread_self(), op->optype, session->txn.id);
+		    (void *)pthread_self(), op->optype, session->txn.id);
 		WT_TRET(__wt_txn_rollback(session, NULL));
 	}
 	/*
@@ -194,7 +196,7 @@ __wt_async_worker(void *arg)
 	async = conn->async;
 
 	locked = 0;
-	fprintf(stderr, "Async worker %p started\n",pthread_self());
+	fprintf(stderr, "Async worker %p started\n",(void *)pthread_self());
 	worker.num_cursors = 0;
 	STAILQ_INIT(&worker.cursorqh);
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {

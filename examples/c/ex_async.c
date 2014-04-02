@@ -137,9 +137,9 @@ retry:
 	/*! [flush] */
 
 	ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &opget);
-	snprintf(k, sizeof(k), "key1");
-	key.data = k;
-	key.size = sizeof(k);
+	snprintf(k[0], sizeof(k[0]), "key1");
+	key.data = k[0];
+	key.size = sizeof(k[0]);
 	opget->set_key(opget, &key);
 	search_id = opget->get_id(opget);
 	opget->search(opget);
