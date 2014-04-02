@@ -826,9 +826,13 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	btree = S2BT(session);
 	root = btree->root_page.page;
 
-	/* Check for a non-existent tree, or a tree that cannot be evicted. */
-	if (root == NULL || F_ISSET(btree, WT_BTREE_NO_EVICTION))
+	/* Check for a non-existent tree. */
+	if (root == NULL)
 		return (0);
+
+	/* A tree that can be evicted always requires a switch. */
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (1);
 
 	/* Check for a tree with a single leaf page. */
 	pindex = WT_INTL_INDEX_COPY(root);
