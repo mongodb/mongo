@@ -30,6 +30,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <wiredtiger.h>
 
@@ -47,8 +48,6 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	int t_ret;
 
 	(void)cb;
-	fprintf(stderr, "CALLBACK: %p ID %" PRIu64 " error %d\n",
-	    pthread_self(), op->get_id(op), ret);
 	t_ret = 0;
 	if (ret != 0) {
 		/*! [Get identifier] */
@@ -58,9 +57,6 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (1);
 	}
 	if (op->get_id(op) == search_id) {
-		fprintf(stderr, "CALLBACK: search %" PRIu64 " error %d\n",
-		    op->get_id(op), ret);
-
 		/*! [Get the op's string key] */
 		t_ret = op->get_key(op, &k);
 		key = k.data;
@@ -106,10 +102,13 @@ int main(void)
 	for (i = 0; i < MAX_KEYS; i++) {
 		/*! [Allocate a handle] */
 		op = NULL;
-		fprintf(stderr, "Iter %d: Alloc table 1\n",i);
 retry:
 		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
 		if (ret != 0) {
+			/*
+			 * If we used up all the ops, pause and retry to
+			 * give the workers a chance to process them.
+			 */
 			fprintf(stderr, "Iter %d: table 1 ret %d\n",i,ret);
 			sleep(1);
 			goto retry;

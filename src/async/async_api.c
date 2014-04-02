@@ -172,7 +172,7 @@ __async_set_key(WT_ASYNC_OP *asyncop, ...)
 	ASYNCOP_API_CALL(O2C(op), session, set_key);
 	va_start(ap, asyncop);
 	__async_set_keyv(op, op->flags, ap);
-	fprintf(stderr, "SET_KEY: id %d uniq %" PRIu64 " key %s\n",
+	fprintf(stderr, "async_set_key: id %d uniq %" PRIu64 " key %s\n",
 	    op->internal_id, op->unique_id, (char *)op->key.data);
 	va_end(ap);
 	if (0) {
@@ -231,8 +231,6 @@ __async_search(WT_ASYNC_OP *asyncop)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, search);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_search);
-	fprintf(stderr, "async_search: called id %d uniq %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
 	WT_ERR(__async_op_wrap(op, WT_AOP_SEARCH));
 err:	API_END(session);
 	return (ret);
@@ -253,8 +251,6 @@ __async_insert(WT_ASYNC_OP *asyncop)
 	ASYNCOP_API_CALL(O2C(op), session, insert);
 
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_insert);
-	fprintf(stderr, "async_insert: called id %d uniq %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
 	WT_ERR(__async_op_wrap(op, WT_AOP_INSERT));
 err:	API_END(session);
 	return (ret);
@@ -274,7 +270,6 @@ __async_update(WT_ASYNC_OP *asyncop)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, update);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_update);
-	fprintf(stderr, "async_update: called\n");
 	WT_ERR(__async_op_wrap(op, WT_AOP_UPDATE));
 err:	API_END(session);
 	return (ret);
@@ -294,7 +289,6 @@ __async_remove(WT_ASYNC_OP *asyncop)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, remove);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_remove);
-	fprintf(stderr, "async_remove: called\n");
 	WT_ERR(__async_op_wrap(op, WT_AOP_REMOVE));
 err:	API_END(session);
 	return (ret);

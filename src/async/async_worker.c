@@ -102,8 +102,6 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			WT_ERR(cursor->remove(cursor));
 			break;
 		case WT_AOP_SEARCH:
-			fprintf(stderr, "Worker %p search %s\n",
-			    (void *)pthread_self(), (char *)cursor->key.data);
 			WT_ERR(cursor->search(cursor));
 			/*
 			 * Get the value from the cursor and put it into
@@ -118,7 +116,6 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			    op->optype);
 	}
 err:
-	fprintf(stderr, "EXECOP: returning %d\n",ret);
 	return (ret);
 }
 
@@ -196,7 +193,6 @@ __wt_async_worker(void *arg)
 	async = conn->async;
 
 	locked = 0;
-	fprintf(stderr, "Async worker %p started\n",(void *)pthread_self());
 	worker.num_cursors = 0;
 	STAILQ_INIT(&worker.cursorqh);
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
