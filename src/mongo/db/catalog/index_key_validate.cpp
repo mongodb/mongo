@@ -55,9 +55,8 @@ namespace mongo {
         while ( it.more() ) {
             BSONElement keyElement = it.next();
 
-            if ( !keyElement.isNumber() && keyElement.type() != String ) {
-                return Status(code, "Index keys must have numeric type or string type.");
-            }
+            if( keyElement.type() == Object || keyElement.type() == Array )
+                return Status(code, "Index keys cannot be Objects or Arrays.");
 
             if ( keyElement.type() == String && pluginName != keyElement.str() ) {
                 return Status(code, "Can't use more than one index plugin for a single index.");
