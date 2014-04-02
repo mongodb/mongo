@@ -39,7 +39,6 @@ static int
 __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
     WT_ASYNC_WORKER_STATE *worker, WT_CURSOR **cursorp)
 {
-	WT_ASYNC *async;
 	WT_ASYNC_CURSOR *ac;
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *c;
@@ -47,7 +46,6 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	WT_SESSION *wt_session;
 
 	conn = S2C(session);
-	async = conn->async;
 	wt_session = (WT_SESSION *)session;
 
 	*cursorp = NULL;
