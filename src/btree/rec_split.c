@@ -507,7 +507,7 @@ __split_inmem_build(
  *	Move a multi-block list into an array of WT_REF structures.
  */
 int
-__wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
+__wt_multi_to_ref(WT_SESSION_IMPL *session,
     WT_PAGE *orig, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
@@ -523,7 +523,9 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *parent,
 		WT_RET(__wt_calloc_def(session, 1, refp));
 	}
 	ref = *refp;
-	ref->home = parent;
+
+	/* Any parent reference must be filled in by our caller. */
+	ref->home = NULL;
 
 	if (multi->skip == NULL) {
 		/*
@@ -581,16 +583,30 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *parent, *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
-	WT_REF **alloc_refp;
+	WT_REF **alloc_refp, **ref_tmp;
 	size_t size;
 	uint64_t parent_decr, parent_incr;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
-	int complete;
+	int complete, locked;
 
 	kpack = &_kpack;
 	alloc_index = NULL;
+	ref_tmp = NULL;
 	parent_decr = parent_incr = 0;
-	complete = 0;
+	complete = locked = 0;
+
+	child = ref->page;
+	mod = child->modify;
+
+	/*
+	 * Convert the split page's multiblock reconciliation information into
+	 * an array of page reference structures.
+	 */
+	split_entries = mod->mod_multi_entries;
+	WT_RET(__wt_calloc_def(session, split_entries, &ref_tmp));
+	for (i = 0; i < split_entries; ++i)
+		WT_ERR(__wt_multi_to_ref(session,
+		    child, &mod->mod_multi[i], &ref_tmp[i], &parent_incr));
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -616,25 +632,19 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		} else if (ret == EBUSY)
 			__wt_yield();
 		else
-			return (ret);
+			WT_ERR(ret);
 	}
-
-	child = ref->page;
-	mod = child->modify;
+	locked = 1;
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
-	split_entries = mod->mod_multi_entries;
 	result_entries = (parent_entries - 1) + split_entries;
 
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
-	WT_VERBOSE_ERR(session, split,
-	    "%p: %s split into parent %p %" PRIu32 " -> %" PRIu32
-	    " (%" PRIu32 ")",
-	    child, __wt_page_type_string(child->type), parent, parent_entries,
-	    result_entries, result_entries - parent_entries);
-
-	/* Allocate and initialize a new page index array for the parent. */
+	/*
+	 * Allocate and initialize a new page index array for the parent, then
+	 * copy references from the original index array, plus references from
+	 * the newly created split array, into place.
+	 */
 	size = sizeof(WT_PAGE_INDEX) + result_entries * sizeof(WT_REF *);
 	parent_incr += size;
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
@@ -642,12 +652,20 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
 		if (pindex->index[i] == ref)
-			for (j = 0; j < split_entries; ++j)
-				WT_ERR(__wt_multi_to_ref(session, parent,
-				    child, &mod->mod_multi[j],
-				    alloc_refp++, &parent_incr));
+			for (j = 0; j < split_entries; ++j) {
+				ref_tmp[j]->home = parent;
+				*alloc_refp++ = ref_tmp[j];
+
+				/*
+				 * Clear the split reference as it moves to the
+				 * allocated page index, so it never appears on
+				 * both after an error.
+				 */
+				ref_tmp[j] = NULL;
+			}
 		else
 			*alloc_refp++ = pindex->index[i];
+	__wt_free(session, ref_tmp);
 
 	/*
 	 * Update the parent page's index: this update makes the split visible
@@ -655,10 +673,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 */
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	alloc_index = NULL;
-
-#ifdef HAVE_DIAGNOSTIC
-	__split_verify_intl_key_order(session, parent);
-#endif
 
 	/*
 	 * Reset the page's original WT_REF field to split.  Threads cursoring
@@ -670,16 +684,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PUBLISH(ref->state, WT_REF_SPLIT);
 
 	/*
-	 * Pages with unresolved changes are not marked clean by reconciliation;
-	 * mark the page clean, and discard it.
-	 */
-	if (__wt_page_is_modified(child)) {
-		 mod->write_gen = 0;
-		 __wt_cache_dirty_decr(session, child);
-	}
-	__wt_ref_out(session, ref);
-
-	/*
 	 * A note on error handling: failures before we swapped the new page
 	 * index into the parent can be resolved by simply freeing allocated
 	 * memory because the original page is unchanged, we can continue to
@@ -688,20 +692,9 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * Failures after we swap the new page index into the parent are also
 	 * relatively benign because the split is OK and complete and the page
 	 * is reset so it will be discarded by eviction.  For that reason, we
-	 * ignore further errors unless there's a panic.
+	 * mostly ignore further errors unless there's a panic.
 	 */
 	complete = 1;
-
-	/*
-	 * We can't free the previous page index, or the page's original WT_REF
-	 * structure and instantiated key, there may be threads using them. Add
-	 * them to the session discard list, to be freed once we know it's safe.
-	 */
-	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_ERR(__wt_session_fotxn_add(session, pindex, size));
-	parent_decr += size;
-	WT_ERR(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
-	parent_decr += sizeof(WT_REF);
 
 	/*
 	 * The key for the original page may be an onpage overflow key, and we
@@ -724,16 +717,34 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
 			if (kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
-				WT_ERR(__wt_ovfl_discard(session, cell));
+				WT_TRET(__wt_ovfl_discard(session, cell));
 		}
-		size = sizeof(WT_IKEY) + ikey->size;
-		WT_ERR(__wt_session_fotxn_add(session, ikey, size));
-		parent_decr += size;
 		break;
 	}
 
+	/*
+	 * We can't free the previous page index, or the page's original WT_REF
+	 * structure and instantiated key, there may be threads using them. Add
+	 * them to the session discard list, to be freed once we know it's safe.
+	 */
+	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
+	parent_decr += size;
+	WT_TRET(__wt_session_fotxn_add(session, pindex, size));
+	switch (parent->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
+			break;
+		size = sizeof(WT_IKEY) + ikey->size;
+		parent_decr += size;
+		WT_TRET(__wt_session_fotxn_add(session, ikey, size));
+		break;
+	}
+	WT_TRET(__wt_session_fotxn_add(session, ref, sizeof(WT_REF)));
+	parent_decr += sizeof(WT_REF);
+
 	/* Adjust the parent's memory footprint. */
-	if (parent_incr > parent_decr) {
+	if (parent_incr >= parent_decr) {
 		parent_incr -= parent_decr;
 		parent_decr = 0;
 	}
@@ -746,6 +757,13 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	if (parent_decr != 0)
 		__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
+	WT_VERBOSE_ERR(session, split,
+	    "%p: %s split into parent %p %" PRIu32 " -> %" PRIu32
+	    " (%" PRIu32 ")",
+	    child, __wt_page_type_string(child->type), parent, parent_entries,
+	    result_entries, result_entries - parent_entries);
+
 	/*
 	 * Simple page splits trickle up the tree, that is, as leaf pages grow
 	 * large enough and are evicted, they'll split into their parent.  And,
@@ -754,18 +772,36 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * the tree will permanently deepen as multiple root pages are written.
 	 *	However, this only helps if first, the pages are evicted (and
 	 * we resist evicting internal pages for obvious reasons), and second,
-	 * if the tree is closed and re-opened from a disk image, which is a
-	 * rare event.
+	 * if the tree is closed and re-opened from a disk image, which may be
+	 * a rare event.
 	 *	To avoid the case of internal pages becoming too large when they
 	 * aren't being evicted, check internal pages each time a leaf page is
-	 * split into them.  If they're big enough, deepen the tree that point.
-	 *	Do the check here because we've just split into a parent page
-	 * and we're already holding the page locked.
+	 * split into them.  If it's big enough, deepen the tree at that point.
+	 *	Do the check here because we've just grown the parent page and
+	 * are holding it locked.
 	 */
-	if (!exclusive && __split_should_deepen(session, parent))
+	if (ret == 0 && !exclusive && __split_should_deepen(session, parent))
 		ret = __split_deepen(session, parent);
 
-err:	F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+err:	if (locked)
+		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+
+	/*
+	 * Discard the child; test for split completion instead of errors, there
+	 * might be a relatively innocuous error, and if we split the parent, we
+	 * want to discard the child.
+	 */
+	if (complete) {
+		/*
+		 * Pages with unresolved changes are not marked clean during
+		 * reconciliation, do it now.
+		 */
+		if (__wt_page_is_modified(child)) {
+			 mod->write_gen = 0;
+			 __wt_cache_dirty_decr(session, child);
+		}
+		__wt_ref_out(session, ref);
+	}
 
 	/*
 	 * A note on error handling: in the case of evicting a page that has
@@ -780,10 +816,21 @@ err:	F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 	 * For now, leak the memory by not discarding the instantiated pages.
 	 */
 	__wt_free_ref_index(session, NULL, alloc_index, 0);
+	if (ref_tmp != NULL) {
+		for (i = 0; i < split_entries; ++i)
+			__wt_free_ref(session, child, ref_tmp[i], 0);
+		__wt_free(session, ref_tmp);
+	}
 
 	/*
 	 * A note on error handling: if we completed the split, return success,
 	 * nothing really bad can have happened.
 	 */
-	return (ret == WT_PANIC || !complete ? ret : 0);
+	if (complete && ret != WT_PANIC)
+		ret = 0;
+
+#ifdef HAVE_DIAGNOSTIC
+	__split_verify_intl_key_order(session, parent);
+#endif
+	return (ret);
 }

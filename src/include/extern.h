@@ -292,6 +292,10 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
     const char *ofile);
 extern void __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
+extern void __wt_free_ref( WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_REF *ref,
+    int free_pages);
 extern void __wt_free_ref_index(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_PAGE_INDEX *pindex,
@@ -397,7 +401,6 @@ extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *parent,
     WT_PAGE *orig,
     WT_MULTI *multi,
     WT_REF **refp,
