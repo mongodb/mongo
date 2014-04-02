@@ -826,19 +826,21 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	btree = S2BT(session);
 	root = btree->root_page.page;
 
-	if (root == NULL)
+	/* Check for a non-existent tree, or a tree that cannot be evicted. */
+	if (root == NULL || F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
+	/* Check for a tree with a single leaf page. */
 	pindex = WT_INTL_INDEX_COPY(root);
+	if (pindex->entries != 1)		/* > 1 child page, switch */
+		return (1);
+
 	first = pindex->index[0];
-	if ((child = first->page) == NULL)
+	if (first->state != WT_REF_MEM)		/* no child page, ignore */
 		return (0);
 
-	/* Make sure this is a simple tree, or LSM should switch. */
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    pindex->entries != 1 ||
-	    first->state != WT_REF_MEM ||
-	    child->type != WT_PAGE_ROW_LEAF)
+	child = first->page;
+	if (child->type != WT_PAGE_ROW_LEAF)	/* not a single leaf page */
 		return (1);
 
 	return (child->memory_footprint > maxsize);
