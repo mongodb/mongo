@@ -2243,6 +2243,43 @@ namespace {
                                  "a: [['MinKey',1,true,false], [1,'MaxKey',false,true]]}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, NEOnMultikeyIndex) {
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+        runQuery(fromjson("{a: {$ne: 3}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$ne:3}}, node: {ixscan: {pattern: {a:1}, "
+                                 "bounds: {a: [['MinKey',3,true,false],"
+                                              "[3,'MaxKey',false,true]]}}}}}");
+    }
+
+    // In general, a negated $nin can make use of an index.
+    TEST_F(QueryPlannerTest, NinUsesMultikeyIndex) {
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+        runQuery(fromjson("{a: {$nin: [4, 10]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$nin:[4,10]}}, node: {ixscan: {pattern: {a:1}, "
+                                "bounds: {a: [['MinKey',4,true,false],"
+                                             "[4,10,false,false],"
+                                             "[10,'MaxKey',false,true]]}}}}}");
+    }
+
+    // But it can't if the $nin contains a regex because regex bounds can't
+    // be complemented.
+    TEST_F(QueryPlannerTest, NinCantUseMultikeyIndex) {
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+        runQuery(fromjson("{a: {$nin: [4, /foobar/]}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
     //
     // 2D geo negation
     // The filter b != 1 is embedded in the geoNear2d node.

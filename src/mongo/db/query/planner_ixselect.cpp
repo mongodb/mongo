@@ -163,31 +163,30 @@ namespace mongo {
             // There are restrictions on when we can use the index if
             // the expression is a NOT.
             if (exprtype == MatchExpression::NOT) {
-                // Don't allow indexed NOT on special index types
-                // such as geo or text indices.
+                // Don't allow indexed NOT on special index types such as geo or text indices.
                 if (INDEX_BTREE != index.type) {
                     return false;
                 }
 
-                // Prevent negated preds from using sparse or
-                // multikey indices. We do so for sparse indices because
-                // we will fail to return the documents which do not contain
-                // the indexed fields.
-                //
-                // We avoid multikey indices because of the semantics of
-                // negations on multikey fields. For example, with multikey
-                // index {a:1}, the document {a: [1,2,3]} does *not* match
-                // the query {a: {$ne: 3}}. We'd mess this up if we used
-                // an index scan over [MinKey, 3) and (3, MaxKey] without
-                // a filter.
-                if (index.sparse || index.multikey) {
+                // Prevent negated preds from using sparse indices. Doing so would cause us to
+                // miss documents which do not contain the indexed fields.
+                if (index.sparse) {
                     return false;
                 }
+
                 // Can't index negations of MOD or REGEX
                 MatchExpression::MatchType childtype = node->getChild(0)->matchType();
                 if (MatchExpression::REGEX == childtype ||
                     MatchExpression::MOD == childtype) {
                     return false;
+                }
+
+                // If it's a negated $in, it can't have any REGEX's inside.
+                if (MatchExpression::MATCH_IN == childtype) {
+                    InMatchExpression* ime = static_cast<InMatchExpression*>(node->getChild(0));
+                    if (ime->getData().numRegexes() != 0) {
+                        return false;
+                    }
                 }
             }
 
