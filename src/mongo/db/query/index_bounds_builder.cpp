@@ -274,6 +274,15 @@ namespace mongo {
                 // bounds of the NOT's child and then complement them.
                 translate(expr->getChild(0), elt, index, oilOut, tightnessOut);
                 oilOut->complement();
+
+                // If the index is multikey, it doesn't matter what the tightness
+                // of the child is, we must return INEXACT_FETCH. Consider a multikey
+                // index on 'a' with document {a: [1, 2, 3]} and query {a: {$ne: 3}}.
+                // If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then
+                // we would erroneously return the document!
+                if (index.multikey) {
+                    *tightnessOut = INEXACT_FETCH;
+                }
             }
             else {
                 // TODO: In the future we shouldn't need this. We handle this case for the time
