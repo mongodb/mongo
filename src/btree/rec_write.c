@@ -4605,15 +4605,30 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BM *bm;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
+	WT_MULTI *multi;
+	WT_PAGE_MODIFY *mod;
 	uint32_t i;
 
 	bm = S2BT(session)->bm;
+	mod = page->modify;
 
 	/*
-	 * On error, discard pages we've written, they're unreferenced by the
+	 * Clear the address-reused flag from the multiblock reconciliation
+	 * information (otherwise we might think the backing block is being
+	 * reused on a subsequent reconciliation where we want to free it).
+	 */
+	if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_MULTIBLOCK)
+		for (multi = mod->mod_multi,
+		    i = 0; i < mod->mod_multi_entries; ++multi, ++i)
+			multi->addr.reuse = 0;
+
+	/*
+	 * On error, discard blocks we've written, they're unreferenced by the
 	 * tree.  This is not a question of correctness, we're avoiding block
-	 * leaks.  Don't discard pages that are marked for reuse, they were
-	 * part of previous reconciliations.
+	 * leaks.
+	 *
+	 * Don't discard backing blocks marked for reuse, they remain part of
+	 * a previous reconciliation.
 	 */
 	WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
@@ -4626,6 +4641,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				__wt_free(session, bnd->addr.addr);
 			}
 		}
+
 	return (ret);
 }
 
