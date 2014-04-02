@@ -22,19 +22,42 @@ st.printShardingStatus();
 
 jsTest.log("Testing failed migrations...");
 
+var version = null;
+var failVersion = null;
+
 assert.commandWorked(
     st.shard0.getDB("admin").runCommand({
-        configureFailPoint : 'failMigrationConfigWritePrepare', mode : 'alwaysOn' }));
+        configureFailPoint : 'failMigrationCommit', mode : 'alwaysOn' }));
 
-var version = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
+version = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
 
 assert.commandFailed( admin.runCommand({ moveChunk : coll + "",
                                          find : { _id : 0 },
                                          to : shards[1]._id }) );
 
-var failVersion = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
+failVersion = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
+
+assert.commandWorked(
+    st.shard0.getDB("admin").runCommand({
+        configureFailPoint : 'failMigrationCommit', mode : 'off' }));
+
+assert.commandWorked(
+    st.shard0.getDB("admin").runCommand({
+        configureFailPoint : 'failMigrationConfigWritePrepare', mode : 'alwaysOn' }));
+
+version = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
+
+assert.commandFailed( admin.runCommand({ moveChunk : coll + "",
+                                         find : { _id : 0 },
+                                         to : shards[1]._id }) );
+
+failVersion = st.shard0.getDB("admin").runCommand({ getShardVersion : coll.toString() });
 
 assert.eq(version.global, failVersion.global);
+
+assert.commandWorked(
+    st.shard0.getDB("admin").runCommand({
+        configureFailPoint : 'failMigrationConfigWritePrepare', mode : 'off' }));
 
 jsTest.log( "DONE!" );
 
