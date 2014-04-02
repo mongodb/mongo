@@ -88,6 +88,9 @@ using namespace std;
 
 namespace mongo {
 
+    MONGO_FP_DECLARE(failMigrationCommit);
+    MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
+
     Tee* migrateLog = RamLog::get("migrate");
 
     class MoveTimingHelper {
@@ -1046,9 +1049,9 @@ namespace mongo {
 
             // 3.
 
-            CollectionMetadataPtr collMetadata = shardingState.getCollectionMetadata( ns );
-            verify( collMetadata != NULL );
-            BSONObj shardKeyPattern = collMetadata->getKeyPattern();
+            const CollectionMetadataPtr origCollMetadata( shardingState.getCollectionMetadata( ns ) );
+            verify( origCollMetadata != NULL );
+            BSONObj shardKeyPattern = origCollMetadata->getKeyPattern();
             if ( shardKeyPattern.isEmpty() ){
                 errmsg = "no shard key found";
                 return false;
@@ -1255,7 +1258,7 @@ namespace mongo {
                     ok = false;
                 }
 
-                if ( !ok ) {
+                if ( !ok || MONGO_FAIL_POINT(failMigrationCommit) ) {
                     log() << "moveChunk migrate commit not accepted by TO-shard: " << res
                           << " resetting shard version to: " << startingVersion << migrateLog;
                     {
@@ -1266,7 +1269,7 @@ namespace mongo {
 
                         // revert the chunk manager back to the state before "forgetting" about the
                         // chunk
-                        shardingState.undoDonateChunk( ns, collMetadata );
+                        shardingState.undoDonateChunk( ns, origCollMetadata );
                     }
                     log() << "Shard version successfully reset to clean up failed migration"
                           << endl;
@@ -1321,13 +1324,14 @@ namespace mongo {
                 // if we have chunks left on the FROM shard, update the version of one of them as
                 // well.  we can figure that out by grabbing the metadata installed on 5.a
 
-                collMetadata = shardingState.getCollectionMetadata( ns );
-                if( collMetadata->getNumChunks() > 0 ) {
+                const CollectionMetadataPtr bumpedCollMetadata( shardingState.getCollectionMetadata( ns ) );
+                if( bumpedCollMetadata->getNumChunks() > 0 ) {
 
                     // get another chunk on that shard
                     ChunkType bumpChunk;
-                    bool result = collMetadata->getNextChunk( collMetadata->getMinKey(),
-                                                              &bumpChunk );
+                    bool result = 
+                        bumpedCollMetadata->getNextChunk( bumpedCollMetadata->getMinKey(),
+                                                          &bumpChunk );
                     BSONObj bumpMin = bumpChunk.getMin();
                     BSONObj bumpMax = bumpChunk.getMax();
 
@@ -1391,6 +1395,13 @@ namespace mongo {
                 ok = false;
                 BSONObj cmdResult;
                 try {
+                    
+                    // For testing migration failures
+                    if ( MONGO_FAIL_POINT(failMigrationConfigWritePrepare) ) {
+                        throw DBException( "mock migration failure before config write",
+                                           PrepareConfigsFailedCode );
+                    }
+
                     ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
                     ok = conn->runCommand( "config" , cmd , cmdResult );
                     conn.done();
@@ -1421,7 +1432,7 @@ namespace mongo {
 
                         // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
-                        shardingState.undoDonateChunk( ns, collMetadata );
+                        shardingState.undoDonateChunk( ns, origCollMetadata );
                     }
 
                     log() << "Shard version successfully reset to clean up failed migration" << endl;
