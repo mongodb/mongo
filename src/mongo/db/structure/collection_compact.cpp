@@ -255,9 +255,8 @@ namespace mongo {
                 if (!keyStatus.isOK()) {
                     return StatusWith<CompactStats>(
                         ErrorCodes::CannotCreateIndex,
-                        str::stream() << "Cannot rebuild index " << spec << ": "
-                                      << keyStatus.reason()
-                                      << " For more info see"
+                        str::stream() << "Cannot compact collection due to invalid index "
+                                      << spec << ": " << keyStatus.reason() << " For more info see"
                                       << " http://dochub.mongodb.org/core/index-validation");
                 }
                 indexSpecs.push_back(spec);
