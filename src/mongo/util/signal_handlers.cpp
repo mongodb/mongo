@@ -85,27 +85,84 @@ namespace mongo {
 
 namespace {
 
+    // This should only be used with MallocFreeOSteam
+    class MallocFreeStreambuf : public std::streambuf {
+        MONGO_DISALLOW_COPYING(MallocFreeStreambuf);
+    public:
+        MallocFreeStreambuf() {
+            setp(_buffer, _buffer + maxLogLineSize);
+        }
+
+        StringData str() const { return StringData(pbase(), pptr() - pbase()); }
+        void rewind() { setp(pbase(), epptr()); }
+
+    private:
+        static const size_t maxLogLineSize = 16*1000;
+        char _buffer[maxLogLineSize];
+    };
+
+    class MallocFreeOStream : public std::ostream {
+        MONGO_DISALLOW_COPYING(MallocFreeOStream);
+    public:
+        MallocFreeOStream() : ostream(&_buf) {}
+
+        StringData str() const { return _buf.str(); }
+        void rewind() { _buf.rewind(); }
+    private:
+        MallocFreeStreambuf _buf;
+    };
+
+    MallocFreeOStream mallocFreeOStream;
+
+    // This guards mallocFreeOStream. While locking a pthread_mutex isn't guaranteed to be
+    // signal-safe, this file does it anyway. The assumption is that the main safety risk to locking
+    // a mutex is that you could deadlock with yourself. That risk is protected against by only
+    // locking the mutex in fatal functions that log then exit. There is a remaining risk that one
+    // of these functions recurses (possible if logging segfaults while handing a segfault). This is
+    // currently acceptable because if things are that broken, there is little we can do about it.
+    //
+    // If in the future, we decide to be more strict about posix signal safety, we could switch to
+    // an atomic test-and-set loop, possibly with a mechanism for detecting signals raised while
+    // handling other signals.
+    boost::mutex streamMutex;
+
+    // must hold streamMutex to call
+    void writeMallocFreeStreamToLog() {
+        logger::globalLogDomain()->append(
+            logger::MessageEventEphemeral(curTimeMillis64(),
+                                          logger::LogSeverity::Severe(),
+                                          getThreadName(),
+                                          mallocFreeOStream.str()));
+        mallocFreeOStream.rewind();
+    }
+
+    // must hold streamMutex to call
+    void printSignalAndBacktrace(int signalNum) {
+        mallocFreeOStream << "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\n";
+        printStackTrace(mallocFreeOStream);
+        writeMallocFreeStreamToLog();
+    }
+
     // this will be called in certain c++ error cases, for example if there are two active
     // exceptions
     void myTerminate() {
-        printStackTrace(severe().stream()
-                        << "terminate() called, printing stack (if implemented for platform):\n");
+        boost::mutex::scoped_lock lk(streamMutex);
+        printStackTrace(mallocFreeOStream << "terminate() called.\n");
+        writeMallocFreeStreamToLog();
         ::_exit(EXIT_ABRUPT);
     }
 
     // this gets called when new fails to allocate memory
     void myNewHandler() {
-        printStackTrace(severe().stream() << "out of memory, printing stack and exiting:\n");
+        boost::mutex::scoped_lock lk(streamMutex);
+        printStackTrace(mallocFreeOStream << "out of memory.\n");
+        writeMallocFreeStreamToLog();
         ::_exit(EXIT_ABRUPT);
     }
 
     void abruptQuit(int signalNum) {
-        {
-            LogstreamBuilder logBuilder = severe();
-            logBuilder <<
-                "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\nBacktrace:";
-            printStackTrace(logBuilder.stream());
-        }
+        boost::mutex::scoped_lock lk(streamMutex);
+        printSignalAndBacktrace(signalNum);
 
         // Don't go through normal shutdown procedure. It may make things worse.
         ::_exit(EXIT_ABRUPT);
@@ -186,22 +243,23 @@ namespace {
 #else
 
     void abruptQuitWithAddrSignal( int signalNum, siginfo_t *siginfo, void * ) {
-        {
-            LogstreamBuilder logBuilder = severe();
+        boost::mutex::scoped_lock lk(streamMutex);
 
-            logBuilder << "Invalid";
-            if ( signalNum == SIGSEGV || signalNum == SIGBUS ) {
-                logBuilder << " access";
-            } else {
-                logBuilder << " operation";
-            }
-            logBuilder << " at address: " << siginfo->si_addr;
-        }
-        abruptQuit( signalNum );
+        const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
+        mallocFreeOStream << "Invalid " << action << " at address: " << siginfo->si_addr;
+
+        // Writing out message to log separate from the stack trace so at least that much gets
+        // logged. This is important because we may get here by jumping to an invalid address which
+        // could cause unwinding the stack to break.
+        writeMallocFreeStreamToLog();
+
+        printSignalAndBacktrace(signalNum);
+        ::_exit(EXIT_ABRUPT);
     }
 
     // The signals in asyncSignals will be processed by this thread only, in order to
-    // ensure the db and log mutexes aren't held.
+    // ensure the db and log mutexes aren't held. Because this is run in a different thread, it does
+    // not need to be safe to call in signal context.
     sigset_t asyncSignals;
     void signalProcessingThread() {
         Client::initThread( "signalProcessingThread" );
