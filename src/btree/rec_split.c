@@ -524,7 +524,13 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	}
 	ref = *refp;
 
-	/* Any parent reference must be filled in by our caller. */
+	/*
+	 * Any parent reference must be filled in by our caller; the primary
+	 * use of this function is when splitting into a parent page, and we
+	 * aren't holding any locks here that would allow us to know which
+	 * parent we'll eventually split into, if the tree is simultaneously
+	 * being deepened.
+	 */
 	ref->home = NULL;
 
 	if (multi->skip == NULL) {
