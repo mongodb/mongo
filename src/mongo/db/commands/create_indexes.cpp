@@ -131,7 +131,10 @@ namespace mongo {
                 // We first take a read lock to see if we need to do anything
                 // as many calls are ensureIndex (and hence no-ops), this is good so its a shared
                 // lock for common calls. We only take write lock if needed.
-                Client::ReadContext readContext( ns );
+                // Note: createIndexes command does not currently respect shard versioning.
+                Client::ReadContext readContext( ns,
+                                                 storageGlobalParams.dbpath,
+                                                 false /* doVersion */ );
                 const Collection* collection = readContext.ctx().db()->getCollection( ns.ns() );
                 if ( collection ) {
                     for ( size_t i = 0; i < specs.size(); i++ ) {
@@ -160,7 +163,10 @@ namespace mongo {
             }
 
             // now we know we have to create index(es)
-            Client::WriteContext writeContext( ns.ns() );
+            // Note: createIndexes command does not currently respect shard versioning.
+            Client::WriteContext writeContext( ns.ns(),
+                                               storageGlobalParams.dbpath,
+                                               false /* doVersion */ );
             Database* db = writeContext.ctx().db();
 
             Collection* collection = db->getCollection( ns.ns() );

@@ -268,12 +268,14 @@ namespace mongo {
     /** "read lock, and set my context, all in one operation" 
      *  This handles (if not recursively locked) opening an unopened database.
      */
-    Client::ReadContext::ReadContext(const string& ns, const std::string& path) {
+    Client::ReadContext::ReadContext(const string& ns,
+                                     const std::string& path,
+                                     bool doVersion) {
         {
             lk.reset( new Lock::DBRead(ns) );
             Database *db = dbHolder().get(ns, path);
             if( db ) {
-                c.reset( new Context(path, ns, db) );
+                c.reset( new Context(path, ns, db, doVersion) );
                 return;
             }
         }
@@ -284,17 +286,17 @@ namespace mongo {
             if( Lock::isW() ) { 
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                c.reset(new Context(ns, path));
+                c.reset(new Context(ns, path, doVersion));
             }
             else if( !Lock::nested() ) { 
                 lk.reset(0);
                 {
                     Lock::GlobalWrite w;
-                    Context c(ns, path);
+                    Context c(ns, path, doVersion);
                 }
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
                 lk.reset( new Lock::DBRead(ns) );
-                c.reset(new Context(ns, path));
+                c.reset(new Context(ns, path, doVersion));
             }
             else { 
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
@@ -306,9 +308,9 @@ namespace mongo {
         //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
 
-    Client::WriteContext::WriteContext(const string& ns, const std::string& path)
+    Client::WriteContext::WriteContext(const string& ns, const std::string& path, bool doVersion)
         : _lk( ns ) ,
-          _c(ns, path) {
+          _c(ns, path, doVersion) {
     }
 
 
@@ -332,12 +334,12 @@ namespace mongo {
     }
 
     // invoked from ReadContext
-    Client::Context::Context(const string& path, const string& ns, Database *db) :
+    Client::Context::Context(const string& path, const string& ns, Database *db, bool doVersion) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
         _path( path ), 
         _justCreated(false),
-        _doVersion( true ),
+        _doVersion( doVersion ),
         _ns( ns ), 
         _db(db)
     {

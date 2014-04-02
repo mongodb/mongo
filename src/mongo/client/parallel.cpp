@@ -1538,8 +1538,19 @@ namespace mongo {
     // ---- Future -----
     // -----------------
 
-    Future::CommandResult::CommandResult( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn )
-        :_server(server) ,_db(db) , _options(options), _cmd(cmd) ,_conn(conn) ,_done(false)
+    Future::CommandResult::CommandResult( const string& server,
+                                          const string& db,
+                                          const BSONObj& cmd,
+                                          int options,
+                                          DBClientBase * conn,
+                                          bool useShardedConn ):
+                _server(server),
+                _db(db),
+                _options(options),
+                _cmd(cmd),
+                _conn(conn),
+                _useShardConn(useShardedConn),
+                _done(false)
     {
         init();
     }
@@ -1547,7 +1558,12 @@ namespace mongo {
     void Future::CommandResult::init(){
         try {
             if ( ! _conn ){
-                _connHolder.reset( new ScopedDbConnection( _server ) );
+                if ( _useShardConn) {
+                    _connHolder.reset( new ShardConnection( _server, "" ));
+                }
+                else {
+                    _connHolder.reset( new ScopedDbConnection( _server ) );
+                }
                 _conn = _connHolder->get();
             }
 
@@ -1641,8 +1657,19 @@ namespace mongo {
         return _ok;
     }
 
-    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn ) {
-        shared_ptr<Future::CommandResult> res (new Future::CommandResult( server , db , cmd , options , conn  ));
+    shared_ptr<Future::CommandResult> Future::spawnCommand( const string& server,
+                                                            const string& db,
+                                                            const BSONObj& cmd,
+                                                            int options,
+                                                            DBClientBase * conn,
+                                                            bool useShardConn ) {
+        shared_ptr<Future::CommandResult> res (
+                new Future::CommandResult( server,
+                                           db,
+                                           cmd,
+                                           options,
+                                           conn,
+                                           useShardConn));
         return res;
     }
 

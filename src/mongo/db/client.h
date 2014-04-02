@@ -161,7 +161,9 @@ namespace mongo {
          */
         class ReadContext : boost::noncopyable { 
         public:
-            ReadContext(const std::string& ns, const std::string& path=storageGlobalParams.dbpath);
+            ReadContext(const std::string& ns,
+                        const std::string& path=storageGlobalParams.dbpath,
+                        bool doVersion = true);
             Context& ctx() { return *c.get(); }
         private:
             scoped_ptr<Lock::DBRead> lk;
@@ -175,7 +177,7 @@ namespace mongo {
         public:
             /** this is probably what you want */
             Context(const string& ns, const std::string& path=storageGlobalParams.dbpath,
-                    bool doVersion=true);
+                    bool doVersion = true);
 
             /** note: this does not call finishInit -- i.e., does not call 
                       shardVersionOk() for example. 
@@ -184,7 +186,7 @@ namespace mongo {
             Context(const std::string& ns , Database * db);
 
             // used by ReadContext
-            Context(const string& path, const string& ns, Database *db);
+            Context(const string& path, const string& ns, Database *db, bool doVersion = true);
 
             ~Context();
             Client* getClient() const { return _client; }
@@ -232,7 +234,9 @@ namespace mongo {
 
         class WriteContext : boost::noncopyable {
         public:
-            WriteContext(const string& ns, const std::string& path=storageGlobalParams.dbpath);
+            WriteContext(const string& ns,
+                         const std::string& path=storageGlobalParams.dbpath,
+                         bool doVersion = true);
             Context& ctx() { return _c; }
         private:
             Lock::DBWrite _lk;

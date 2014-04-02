@@ -156,14 +156,18 @@ namespace mongo {
 
         class RunOnAllShardsCommand : public Command {
         public:
-            RunOnAllShardsCommand(const char* n, const char* oldname=NULL) : Command(n, false, oldname) {}
+            RunOnAllShardsCommand(const char* n,
+                                  const char* oldname=NULL,
+                                  bool useShardConn = false):
+                                      Command(n, false, oldname),
+                                      _useShardConn(useShardConn) {
+            }
 
             virtual bool slaveOk() const { return true; }
             virtual bool adminOnly() const { return false; }
 
             // all grid commands are designed not to lock
             virtual LockType locktype() const { return NONE; }
-
 
             // default impl uses all shards for DB
             virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
@@ -190,7 +194,12 @@ namespace mongo {
 
                 list< shared_ptr<Future::CommandResult> > futures;
                 for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj, 0 ) );
+                    futures.push_back( Future::spawnCommand( i->getConnString(),
+                                                             dbName,
+                                                             cmdObj,
+                                                             0,
+                                                             NULL,
+                                                             _useShardConn ));
                 }
 
                 vector<BSONObj> results;
@@ -266,11 +275,17 @@ namespace mongo {
                 return true;
             }
 
+        private:
+            bool _useShardConn; // use ShardConnection as opposed to ScopedDbConnection
         };
 
         class AllShardsCollectionCommand : public RunOnAllShardsCommand {
         public:
-            AllShardsCollectionCommand(const char* n, const char* oldname=NULL) : RunOnAllShardsCommand(n, oldname) {}
+            AllShardsCollectionCommand(const char* n,
+                                       const char* oldname = NULL,
+                                       bool useShardConn = false):
+                                           RunOnAllShardsCommand(n, oldname, useShardConn) {
+            }
 
             virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
                 string fullns = dbName + '.' + cmdObj.firstElement().valuestrsafe();
@@ -323,7 +338,13 @@ namespace mongo {
 
         class CreateIndexesCmd : public AllShardsCollectionCommand {
         public:
-            CreateIndexesCmd() :  AllShardsCollectionCommand("createIndexes") {}
+            CreateIndexesCmd():
+                AllShardsCollectionCommand("createIndexes",
+                                           NULL, /* oldName */
+                                           true /* use ShardConnection */) {
+                // createIndexes command should use ShardConnection so the getLastError would
+                // be able to properly enforce the write concern (via the saveGLEStats callback).
+            }
 
             /**
              * the createIndexes command doesn't require the 'ns' field to be populated
