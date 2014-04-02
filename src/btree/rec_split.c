@@ -701,16 +701,13 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	complete = 1;
 
 	/*
-	 * The key for the original page may be an onpage overflow key, and we
-	 * just lost track of it as the parent's index no longer references the
-	 * WT_REF pointing to it.  Discard it now, including the backing blocks.
-	 *
-	 * XXXKEITH
-	 * I think the overflow handling part of this code goes away if we stop
-	 * re-writing overflow blocks backing row-store keys in reconciliation,
-	 * which simplifies the error handling here.  Right now, if this call
-	 * fails (very unlikely, but technically possible), we leak underlying
-	 * file blocks.
+	 * The previous parent page's key for this child page may have been an
+	 * on-page overflow key.  In that case, if the key hasn't been deleted,
+	 * delete it now, including its backing blocks.  We are exchanging the
+	 * WT_REF that referenced it for the split page WT_REFs and their keys,
+	 * and there's no longer any reference to it.  Done after completing the
+	 * split (if we failed, we'd leak the underlying blocks, but the parent
+	 * page would be unaffected).
 	 */
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
