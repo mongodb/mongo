@@ -37,8 +37,6 @@ namespace mongo {
     template <class Version>
     class BtreeInterfaceImpl : public BtreeInterface {
     public:
-        // typedef typename BucketBasics<Version>::VersionNode VersionNode;
-
         virtual ~BtreeInterfaceImpl() { }
 
         const BtreeBucket<Version>* getHeadBucket( const IndexCatalogEntry* entry ) const {

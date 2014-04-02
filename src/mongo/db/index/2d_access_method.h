@@ -94,7 +94,6 @@ namespace mongo {
 
         friend class twod_internal::TwoDGeoNearRunner;
 
-        BtreeInterface* getInterface() { return _interface; }
         const IndexDescriptor* getDescriptor() { return _descriptor; }
         TwoDIndexingParams& getParams() { return _params; }
 

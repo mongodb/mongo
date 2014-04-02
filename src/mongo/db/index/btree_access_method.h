@@ -39,7 +39,6 @@
 
 namespace mongo {
 
-    class BtreeInterface;
     class IndexCursor;
     class IndexDescriptor;
 

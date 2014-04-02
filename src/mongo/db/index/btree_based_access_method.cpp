@@ -41,9 +41,11 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pdfile_private.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/structure/btree/btreebuilder.h"
+#include "mongo/db/structure/btree/btree_interface.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
@@ -53,11 +55,21 @@ namespace mongo {
 
         verify(0 == _descriptor->version() || 1 == _descriptor->version());
         _interface = BtreeInterface::interfaces[_descriptor->version()];
+
+        _newInterface.reset(transition::BtreeInterface::getInterface(btreeState->headManager(),
+                                                                     btreeState->recordStore(),
+                                                                     btreeState->ordering(),
+                                                                     _descriptor->version()));
     }
 
+    // This is currently in btree.cpp.  Once that file is retired it'll move here.
+    extern bool failIndexKeyTooLong;
+
     // Find the keys for obj, put them in the tree pointing to loc
-    Status BtreeBasedAccessMethod::insert(const BSONObj& obj, const DiskLoc& loc,
-            const InsertDeleteOptions& options, int64_t* numInserted) {
+    Status BtreeBasedAccessMethod::insert(const BSONObj& obj,
+                                          const DiskLoc& loc,
+                                          const InsertDeleteOptions& options,
+                                          int64_t* numInserted) {
 
         *numInserted = 0;
 
@@ -66,35 +78,44 @@ namespace mongo {
         getKeys(obj, &keys);
 
         Status ret = Status::OK();
-
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            try {
-                _interface->bt_insert(_btreeState,
-                                      _btreeState->head(),
-                                      loc,
-                                      *i,
-                                      options.dupsAllowed,
-                                      true);
+            Status status = _newInterface->insert(*i, loc, options.dupsAllowed);
+
+            // Everything's OK, carry on.
+            if (status.isOK()) {
                 ++*numInserted;
-            } catch (AssertionException& e) {
-                if (10287 == e.getCode() && !_btreeState->isReady()) {
-                    // This is the duplicate key exception.  We ignore it for some reason in BG
-                    // indexing.
-                    DEV log() << "info: key already in index during bg indexing (ok)\n";
-                } else if (!options.dupsAllowed) {
-                    // Assuming it's a duplicate key exception.  Clean up any inserted keys.
-                    for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
-                        removeOneKey(*j, loc);
-                    }
-                    *numInserted = 0;
-                    return Status(ErrorCodes::DuplicateKey, e.what(), e.getCode());
-                } else {
-                    problem() << " caught assertion addKeysToIndex "
-                              << _descriptor->indexNamespace()
-                              << obj["_id"] << endl;
-                    ret = Status(ErrorCodes::InternalError, e.what(), e.getCode());
+                continue;
+            }
+
+            // Error cases.
+
+            if (ErrorCodes::KeyTooLong == status.code()) {
+                // Ignore this error if we're on a secondary.
+                if (!isMaster(NULL)) {
+                    continue;
+                }
+
+                // The user set a parameter to ignore key too long errors.
+                if (!failIndexKeyTooLong) {
+                    continue;
                 }
             }
+
+            if (ErrorCodes::UniqueIndexViolation == status.code()) {
+                // We ignore it for some reason in BG indexing.
+                if (!_btreeState->isReady()) {
+                    DEV log() << "info: key already in index during bg indexing (ok)\n";
+                    continue;
+                }
+            }
+
+            // Clean up after ourselves.
+            for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
+                removeOneKey(*j, loc);
+                *numInserted = 0;
+            }
+
+            return status;
         }
 
         if (*numInserted > 1) {
@@ -108,10 +129,7 @@ namespace mongo {
         bool ret = false;
 
         try {
-            ret = _interface->unindex(_btreeState,
-                                      _btreeState->head(),
-                                      key,
-                                      loc);
+            ret = _newInterface->unindex(key, loc);
         } catch (AssertionException& e) {
             problem() << "Assertion failure: _unindex failed "
                 << _descriptor->indexNamespace() << endl;
@@ -195,17 +213,9 @@ namespace mongo {
         BSONObjSet keys;
         getKeys(obj, &keys);
 
+        transition::BtreeInterface::BtreeLocation loc;
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            int unusedPos;
-            bool unusedFound;
-            DiskLoc unusedDiskLoc;
-            _interface->locate(_btreeState,
-                               _btreeState->head(),
-                               *i,
-                               unusedPos,
-                               unusedFound,
-                               unusedDiskLoc,
-                               1);
+            _newInterface->locate(*i, DiskLoc(), 1, &loc);
         }
 
         return Status::OK();
@@ -230,15 +240,18 @@ namespace mongo {
 
 
     Status BtreeBasedAccessMethod::validate(int64_t* numKeys) {
-        *numKeys = _interface->fullValidate(_btreeState,
-                                            _btreeState->head(),
-                                            _descriptor->keyPattern());
+        // XXX: long long vs int64_t
+        long long keys;
+        _newInterface->fullValidate(&keys);
+        *numKeys = keys;
         return Status::OK();
     }
 
-    Status BtreeBasedAccessMethod::validateUpdate(
-        const BSONObj &from, const BSONObj &to, const DiskLoc &record,
-        const InsertDeleteOptions &options, UpdateTicket* status) {
+    Status BtreeBasedAccessMethod::validateUpdate(const BSONObj &from,
+                                                  const BSONObj &to,
+                                                  const DiskLoc &record,
+                                                  const InsertDeleteOptions &options,
+                                                  UpdateTicket* status) {
 
         BtreeBasedPrivateUpdateData *data = new BtreeBasedPrivateUpdateData();
         status->_indexSpecificUpdateData.reset(data);
@@ -257,14 +270,10 @@ namespace mongo {
 
         if (checkForDups) {
             for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
-                if (_interface->wouldCreateDup(_btreeState,
-                                               _btreeState->head(),
-                                               **i, record)) {
+                Status check = _newInterface->dupKeyCheck(**i, record);
+                if (!check.isOK()) {
                     status->_isValid = false;
-                    return Status(ErrorCodes::DuplicateKey,
-                                  _interface->dupKeyError(_btreeState,
-                                                          _btreeState->head(),
-                                                          **i));
+                    return check;
                 }
             }
         }
@@ -287,19 +296,11 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < data->added.size(); ++i) {
-            _interface->bt_insert(_btreeState,
-                                  _btreeState->head(),
-                                  data->loc,
-                                  *data->added[i],
-                                  data->dupsAllowed,
-                                  true);
+            _newInterface->insert(*data->added[i], data->loc, data->dupsAllowed);
         }
 
         for (size_t i = 0; i < data->removed.size(); ++i) {
-            _interface->unindex(_btreeState,
-                                _btreeState->head(),
-                                *data->removed[i],
-                                data->loc);
+            _newInterface->unindex(*data->removed[i], data->loc);
         }
 
         *numUpdated = data->added.size();
@@ -511,10 +512,9 @@ namespace mongo {
     }
 
     IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk() {
-
-        if ( _interface->nKeys( _btreeState,
-                                _btreeState->head() ) > 0 )
+        if (!_newInterface->isEmpty()) {
             return NULL;
+        }
 
         auto_ptr<BtreeBulk> bulk( new BtreeBulk( this ) );
         bulk->_phase1.sortCmp.reset( getComparison( _descriptor->version(),
@@ -530,8 +530,7 @@ namespace mongo {
                                                bool mayInterrupt,
                                                set<DiskLoc>* dupsToDrop ) {
 
-        if ( _interface->nKeys( _btreeState,
-                                _btreeState->head() ) > 0 ) {
+        if (!_newInterface->isEmpty()) {
             return Status( ErrorCodes::InternalError, "trying to commit, but has data already" );
         }
 

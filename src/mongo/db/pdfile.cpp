@@ -51,7 +51,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
-#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands/server_status.h"

@@ -33,8 +33,27 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/head_manager.h"
 
 namespace mongo {
+
+    class HeadManagerImpl : public HeadManager {
+    public:
+        HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) { }
+        virtual ~HeadManagerImpl() { }
+
+        const DiskLoc& getHead() const {
+            return _catalogEntry->head();
+        }
+
+        void setHead(const DiskLoc& newHead) {
+            _catalogEntry->setHead(newHead);
+        }
+
+    private:
+        // Not owned here.
+        IndexCatalogEntry* _catalogEntry;
+    };
 
     IndexCatalogEntry::IndexCatalogEntry( Collection* collection,
                                           IndexDescriptor* descriptor,
@@ -43,7 +62,7 @@ namespace mongo {
           _descriptor( descriptor ),
           _recordStore( recordstore ),
           _accessMethod( NULL ),
-          _forcedBtreeIndex( NULL ),
+          _headManager(new HeadManagerImpl(this)),
           _ordering( Ordering::make( descriptor->keyPattern() ) ),
           _isReady( false ) {
         _descriptor->_cachedEntry = this;
@@ -52,11 +71,9 @@ namespace mongo {
     IndexCatalogEntry::~IndexCatalogEntry() {
         _descriptor->_cachedEntry = NULL; // defensive
 
-        delete _forcedBtreeIndex;
+        delete _headManager;
         delete _accessMethod;
-
         delete _recordStore;
-
         delete _descriptor;
     }
 
@@ -187,4 +204,4 @@ namespace mongo {
         return false;
     }
 
-}
+}  // namespace mongo
