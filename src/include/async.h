@@ -57,12 +57,12 @@ struct __wt_async_op_impl {
 #define	WT_ASYNCOP_DUMP_PRINT	0x0004
 #define	WT_ASYNCOP_KEY_EXT	0x0008	/* Key points out of the tree. */
 #define	WT_ASYNCOP_KEY_INT	0x0010	/* Key points into the tree. */
-#define	WT_ASYNCOP_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
+#define	WT_ASYNCOP_KEY_SET	(WT_ASYNCOP_KEY_EXT | WT_ASYNCOP_KEY_INT)
 #define	WT_ASYNCOP_OVERWRITE	0x0020
 #define	WT_ASYNCOP_RAW		0x0040
 #define	WT_ASYNCOP_VALUE_EXT	0x0080	/* Value points out of the tree. */
 #define	WT_ASYNCOP_VALUE_INT	0x0100	/* Value points into the tree. */
-#define	WT_ASYNCOP_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
+#define	WT_ASYNCOP_VALUE_SET	(WT_ASYNCOP_VALUE_EXT | WT_ASYNCOP_VALUE_INT)
 	uint32_t flags;
 };
 

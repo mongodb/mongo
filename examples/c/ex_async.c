@@ -36,13 +36,14 @@
 const char *home = NULL;
 const char *uri = "table:async";
 const char *uri2 = "table:async2";
-uint64_t search_id;
+uint64_t search_id = -1;
 int global_error = 0;
 
 /*! [example callback implementation] */
 static int
 cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 {
+	WT_ITEM k, v;
 	const char *key, *value;
 	int t_ret;
 
@@ -61,15 +62,15 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		fprintf(stderr, "CALLBACK: search %" PRIu64 " error %d\n",
 		    op->get_id(op), ret);
 
-#if 0
 		/*! [Get the op's string key] */
-		t_ret = op->get_key(op, &key);
+		t_ret = op->get_key(op, &k);
+		key = k.data;
 		/*! [Get the op's string key] */
 		/*! [Get the op's string value] */
-		t_ret = op->get_value(op, &value);
+		t_ret = op->get_value(op, &v);
+		value = v.data;
 		/*! [Get the op's string value] */
 		printf("Got record: %s : %s\n", key, value);
-#endif
 	}
 	return (t_ret);
 }
@@ -82,6 +83,7 @@ int main(void)
 	/*! [example connection] */
 	WT_ASYNC_OP *op, *op2, *opget;
 	WT_CONNECTION *wt_conn;
+	WT_ITEM key, value;
 	WT_SESSION *session;
 	int i, ret;
 	char k[16], v[16];
@@ -125,12 +127,16 @@ retry2:
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
 		/*! [Set the op's string key] */
-		op->set_key(op, k);
-		op2->set_key(op2, k);
+		key.data = k;
+		key.size = sizeof(k);
+		value.data = v;
+		value.size = sizeof(v);
+		op->set_key(op, &key);
+		op2->set_key(op2, &key);
 		/*! [Set the op's string key] */
 		/*! [Set the op's string value] */
-		op->set_value(op, v);
-		op2->set_value(op2, v);
+		op->set_value(op, &value);
+		op2->set_value(op2, &value);
 		/*! [Set the op's string value] */
 		/*! [example insert] */
 		ret = op->insert(op);
@@ -143,9 +149,14 @@ retry2:
 	/*! [flush] */
 
 	ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &opget);
-	opget->set_key(opget, "key1");
+	snprintf(k, sizeof(k), "key1");
+	key.data = k;
+	key.size = sizeof(k);
+	opget->set_key(opget, &key);
 	search_id = opget->get_id(opget);
 	opget->search(opget);
+
+	wt_conn->async_flush(wt_conn);
 
 	/*! [example close] */
 	ret = wt_conn->close(wt_conn, NULL);
