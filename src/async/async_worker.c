@@ -54,8 +54,6 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
 		if (op->cfg_hash == ac->cfg_hash &&
 		    op->uri_hash == ac->uri_hash) {
-			fprintf(stderr, "Worker %p REUSE cursor uri %s\n",
-			    pthread_self(), op->uri);
 			*cursorp = ac->c;
 			return (0);
 		}
@@ -70,8 +68,6 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	ac->cfg_hash = op->cfg_hash;
 	ac->uri_hash = op->uri_hash;
 	ac->c = c;
-	fprintf(stderr, "Worker %p allocate cursor uri %s\n",
-	    pthread_self(), op->uri);
 	STAILQ_INSERT_HEAD(&worker->cursorqh, ac, q);
 	worker->num_cursors++;
 	*cursorp = c;
@@ -144,9 +140,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	asyncop = (WT_ASYNC_OP *)op;
 
 	ret = 0;
-	/*
-	 * XXX need to get txn cfg.
-	 */
+
 	WT_RET(__wt_txn_begin(session, NULL));
 	WT_ASSERT(session, op->state == WT_ASYNCOP_WORKING);
 	WT_RET(__async_worker_cursor(session, op, worker, &cursor));
@@ -154,20 +148,19 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * Perform op.
 	 */
 	ret = __async_worker_execop(session, op, cursor);
-	fprintf(stderr, "Worker %p op %d txn %" PRIu64 "\n",
-	    pthread_self(), op->optype, session->txn.id);
+	fprintf(stderr, "Worker %p op %d id %" PRIu64 " txn %" PRIu64 " %s\n",
+	    pthread_self(), op->optype, op->unique_id,
+	    session->txn.id, (char *)op->key.data);
 	if (op->cb != NULL && op->cb->notify != NULL) {
 		cb_ret = op->cb->notify(op->cb, asyncop, ret, 0);
 	}
 	if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0) {
-		/*
-		 * XXX need to get txn cfg.
-		 */
+		fprintf(stderr, "Worker %p op %d commit txn %" PRIu64 "\n",
+		    pthread_self(), op->optype, session->txn.id);
 		WT_TRET(__wt_txn_commit(session, NULL));
 	} else {
-		/*
-		 * XXX need to get txn cfg.
-		 */
+		fprintf(stderr, "Worker %p op %d rollback txn %" PRIu64 "\n",
+		    pthread_self(), op->optype, session->txn.id);
 		WT_TRET(__wt_txn_rollback(session, NULL));
 	}
 	/*
@@ -176,8 +169,6 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 */
 	ret = 0;
 	op->state = WT_ASYNCOP_FREE;
-	fprintf(stderr, "STATE FREE %d %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
 	cursor->reset(cursor);
 	return (ret);
 }
@@ -209,8 +200,6 @@ __wt_async_worker(void *arg)
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		__wt_spin_lock(session, &async->opsq_lock);
 		locked = 1;
-		fprintf(stderr, "Async worker %p check flushing 0x%x\n",
-		    pthread_self(), async->opsq_flush);
 		if (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSHING)) {
 			/*
 			 * Worker flushing going on.  Last worker to the party
@@ -226,15 +215,11 @@ __wt_async_worker(void *arg)
 				 * Set the complete flag so that the
 				 * caller can return to the application.
 				 */
-				fprintf(stderr, "Worker %p complete flush\n",
-				    pthread_self());
 				FLD_SET(async->opsq_flush,
 				    WT_ASYNC_FLUSH_COMPLETE);
 				FLD_CLR(async->opsq_flush, WT_ASYNC_FLUSHING);
 				__wt_spin_unlock(session, &async->opsq_lock);
 				locked = 0;
-				fprintf(stderr, "Worker %p signal flush\n",
-				    pthread_self());
 				WT_ERR(__wt_cond_signal(session,
 				    async->flush_cond));
 				__wt_spin_lock(session, &async->opsq_lock);
@@ -244,8 +229,6 @@ __wt_async_worker(void *arg)
 				 * We need to wait for the last worker to
 				 * signal the condition.
 				 */
-				fprintf(stderr, "Worker %p flush checkin %d\n",
-				    pthread_self(), async->flush_count);
 				WT_ERR(__async_flush_wait(
 				    session, async, &locked));
 			}
@@ -258,8 +241,6 @@ __wt_async_worker(void *arg)
 		if (op == NULL) {
 			__wt_spin_unlock(session, &async->opsq_lock);
 			locked = 0;
-			fprintf(stderr, "Worker %p no work now.\n",
-			    pthread_self());
 			goto wait_for_work;
 		}
 
@@ -271,10 +252,6 @@ __wt_async_worker(void *arg)
 		--async->cur_queue;
 		WT_ASSERT(session, op->state == WT_ASYNCOP_ENQUEUED);
 		op->state = WT_ASYNCOP_WORKING;
-		fprintf(stderr, "STATE WORKING %d %" PRIu64 "\n",
-		    op->internal_id, op->unique_id);
-		fprintf(stderr, "Worker %p got op %d %" PRIu64 "\n",
-		    pthread_self(), op->internal_id, op->unique_id);
 		if (op == &async->flush_op) {
 			WT_ASSERT(session, FLD_ISSET(async->opsq_flush,
 			    WT_ASYNC_FLUSH_IN_PROGRESS));
@@ -282,8 +259,6 @@ __wt_async_worker(void *arg)
 			 * We're the worker to take the flush op off the queue.
 			 * Set the flushing flag and set count to 1.
 			 */
-			fprintf(stderr, "Worker %p start flush %d\n",
-			    pthread_self(), async->flush_count);
 			FLD_SET(async->opsq_flush, WT_ASYNC_FLUSHING);
 			async->flush_count = 1;
 			WT_ERR(__async_flush_wait(session, async, &locked));
@@ -293,14 +268,8 @@ __wt_async_worker(void *arg)
 		 */
 		__wt_spin_unlock(session, &async->opsq_lock);
 		locked = 0;
-		if (op != &async->flush_op) {
-			fprintf(stderr, "Worker %p got optype %d\n",
-			    pthread_self(), op->optype);
-			/*
-			 * Perform op now.
-			 */
+		if (op != &async->flush_op)
 			(void)__async_worker_op(session, op, &worker);
-		}
 
 wait_for_work:
 		WT_ASSERT(session, locked == 0);

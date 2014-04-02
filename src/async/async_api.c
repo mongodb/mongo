@@ -172,8 +172,8 @@ __async_set_key(WT_ASYNC_OP *asyncop, ...)
 	ASYNCOP_API_CALL(O2C(op), session, set_key);
 	va_start(ap, asyncop);
 	__async_set_keyv(op, op->flags, ap);
-	fprintf(stderr, "async_set_key: called id %d uniq %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
+	fprintf(stderr, "SET_KEY: id %d uniq %" PRIu64 " key %s\n",
+	    op->internal_id, op->unique_id, (char *)op->key.data);
 	va_end(ap);
 	if (0) {
 err:		op->saved_err = ret;
@@ -334,8 +334,6 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	op->iface.connection = (WT_CONNECTION *)conn;
 	op->internal_id = id;
 	op->state = WT_ASYNCOP_FREE;
-	fprintf(stderr, "STATE FREE %d %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
 	return (0);
 }
 
@@ -359,8 +357,6 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
 	WT_ASSERT(conn->default_session, op->state == WT_ASYNCOP_READY);
 	STAILQ_INSERT_TAIL(&async->opqh, op, q);
 	op->state = WT_ASYNCOP_ENQUEUED;
-	fprintf(stderr, "STATE ENQUEUE %d %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
 	if (++async->cur_queue > async->max_queue)
 		async->max_queue = async->cur_queue;
 	/*

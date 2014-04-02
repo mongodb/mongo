@@ -35,7 +35,6 @@
 
 const char *home = NULL;
 const char *uri = "table:async";
-const char *uri2 = "table:async2";
 uint64_t search_id = -1;
 int global_error = 0;
 
@@ -77,16 +76,17 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 
 static WT_ASYNC_CALLBACK cb = { cb_asyncop };
 /*! [example callback implementation] */
+#define	MAX_KEYS	15
 
 int main(void)
 {
 	/*! [example connection] */
-	WT_ASYNC_OP *op, *op2, *opget;
+	WT_ASYNC_OP *op, *opget;
 	WT_CONNECTION *wt_conn;
 	WT_ITEM key, value;
 	WT_SESSION *session;
 	int i, ret;
-	char k[16], v[16];
+	char k[MAX_KEYS][16], v[MAX_KEYS][16];
 
 	if ((ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=100MB,async=(enabled=true,ops_max=10,threads=2)",
@@ -101,46 +101,34 @@ int main(void)
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri,
 	    "key_format=S,value_format=S");
-	ret = session->create(session, uri2,
-	    "key_format=S,value_format=S");
 	/*! [example table create] */
 
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < MAX_KEYS; i++) {
 		/*! [Allocate a handle] */
-		op = op2 = NULL;
+		op = NULL;
 		fprintf(stderr, "Iter %d: Alloc table 1\n",i);
-retry1:
+retry:
 		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
 		if (ret != 0) {
 			fprintf(stderr, "Iter %d: table 1 ret %d\n",i,ret);
 			sleep(1);
-			goto retry1;
-		}
-retry2:
-		ret = wt_conn->async_new_op(wt_conn, uri2, NULL, &cb, &op2);
-		if (ret != 0) {
-			fprintf(stderr, "Iter %d: table 2 ret %d\n",i,ret);
-			sleep(1);
-			goto retry2;
+			goto retry;
 		}
 		/*! [Allocate a handle] */
-		snprintf(k, sizeof(k), "key%d", i);
-		snprintf(v, sizeof(v), "value%d", i);
+		snprintf(k[i], sizeof(k), "key%d", i);
+		snprintf(v[i], sizeof(v), "value%d", i);
 		/*! [Set the op's string key] */
-		key.data = k;
-		key.size = sizeof(k);
-		value.data = v;
-		value.size = sizeof(v);
+		key.data = k[i];
+		key.size = sizeof(k[i]);
+		value.data = v[i];
+		value.size = sizeof(v[i]);
 		op->set_key(op, &key);
-		op2->set_key(op2, &key);
 		/*! [Set the op's string key] */
 		/*! [Set the op's string value] */
 		op->set_value(op, &value);
-		op2->set_value(op2, &value);
 		/*! [Set the op's string value] */
 		/*! [example insert] */
 		ret = op->insert(op);
-		ret = op2->insert(op2);
 		/*! [example insert] */
 	}
 
