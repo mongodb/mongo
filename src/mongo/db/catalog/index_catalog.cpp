@@ -121,6 +121,9 @@ namespace mongo {
         }
 
         _magic = INDEX_CATALOG_INIT;
+
+        GeneratorHolder::getInstance()->reset( _collection );
+
         return Status::OK();
     }
 

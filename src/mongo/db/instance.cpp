@@ -899,16 +899,7 @@ namespace mongo {
             if ( !fixed.getValue().isEmpty() )
                 multi[0] = fixed.getValue();
 
-            bool hasEntry = GeneratorHolder::getInstance()->prepare( ns, multi[0], &tempHack );
-            if ( !hasEntry ) {
-                // lets load!
-                Client::ReadContext ctx(ns);
-                Database* db = ctx.ctx().db();
-                Collection * c = db->getCollection( ns );
-                if ( c ) {
-                    GeneratorHolder::getInstance()->reset( c );
-                }
-            }
+            GeneratorHolder::getInstance()->prepare( ns, multi[0], &tempHack );
         }
 
         PageFaultRetryableSection s;

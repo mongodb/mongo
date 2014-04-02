@@ -777,25 +777,9 @@ namespace mongo {
                 insertDoc = normalInsert.getValue();
 
             pregen->push_back( PregeneratedKeys() );
-            bool hasEntry = GeneratorHolder::getInstance()->prepare( request.getTargetingNS(),
-                                                                     insertDoc,
-                                                                     &pregen->back() );
-
-            if ( !hasEntry && i == 0 ) {
-                string ns = request.getTargetingNS();
-                try {
-                    Client::ReadContext ctx(ns);
-                    Database* db = ctx.ctx().db();
-                    Collection * c = db->getCollection( ns );
-                    if ( c ) {
-                        GeneratorHolder::getInstance()->reset( c );
-                    }
-                }
-                catch ( DBException& e ) {
-                    log() << "normalizeInserts failde to pregen keys: " << e;
-                }
-            }
-
+            GeneratorHolder::getInstance()->prepare( request.getTargetingNS(),
+                                                     insertDoc,
+                                                     &pregen->back() );
         }
     }
 
