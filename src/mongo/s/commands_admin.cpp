@@ -790,7 +790,8 @@ namespace mongo {
                     ChunkPtr currentChunk = chunkManager->findIntersectingChunk( allSplits[0] );
                     vector<BSONObj> subSplits;
                     for ( unsigned i = 0 ; i <= allSplits.size(); i++){
-                        if ( i == allSplits.size() || ! currentChunk->containsPoint( allSplits[i] ) ) {
+                        if ( i == allSplits.size() ||
+                                ! currentChunk->containsPoint( allSplits[i] ) ) {
                             if ( ! subSplits.empty() ){
                                 BSONObj splitResult;
                                 if ( ! currentChunk->multiSplit( subSplits , splitResult ) ){
@@ -804,7 +805,13 @@ namespace mongo {
                             if ( i < allSplits.size() )
                                 currentChunk = chunkManager->findIntersectingChunk( allSplits[i] );
                         } else {
-                            subSplits.push_back( allSplits[i] );
+                            BSONObj splitPoint(allSplits[i]);
+                            if ( currentChunk->getMin().woCompare( splitPoint ) == 0 ) {
+                                // Do not split on the boundaries.
+                                continue;
+                            }
+
+                            subSplits.push_back( splitPoint );
                         }
                     }
 
