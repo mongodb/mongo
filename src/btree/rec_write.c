@@ -4066,7 +4066,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 * If the key is an overflow key that hasn't been removed, use
 		 * the original backing blocks.
 		 */
-		onpage_ovfl = kpack->ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM;
+		onpage_ovfl = kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
 		if (onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
