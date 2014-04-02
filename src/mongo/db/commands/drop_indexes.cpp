@@ -227,8 +227,7 @@ namespace mongo {
                 const Status keyStatus = validateKeyPattern(key);
                 if (!keyStatus.isOK()) {
                     errmsg = str::stream()
-                        << "Cannot compact collection due to invalid index " << spec << ": "
-                        << keyStatus.reason()
+                        << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
                         << " For more info see http://dochub.mongodb.org/core/index-validation";
                     return false;
                 }
