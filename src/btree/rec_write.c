@@ -491,7 +491,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	pindex = WT_INTL_INDEX_COPY(next);
 	for (i = 0; i < mod->mod_multi_entries; ++i)
-		WT_ERR(__wt_multi_to_ref(session, NULL,
+		WT_ERR(__wt_multi_to_ref(session,
 		    next, &mod->mod_multi[i], &pindex->index[i], NULL));
 
 	/*
@@ -4066,7 +4066,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 * If the key is an overflow key that hasn't been removed, use
 		 * the original backing blocks.
 		 */
-		onpage_ovfl = kpack->ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM;
+		onpage_ovfl = kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
 		if (onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);

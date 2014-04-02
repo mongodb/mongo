@@ -185,14 +185,18 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __free_ref --
+ * __wt_free_ref --
  *	Discard the contents of a WT_REF structure (optionally including the
  * pages it references).
  */
-static void
-__free_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int free_pages)
+void
+__wt_free_ref(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int free_pages)
 {
 	WT_IKEY *ikey;
+
+	if (ref == NULL)
+		return;
 
 	/*
 	 * Optionally free the referenced pages.  (The path to free referenced
@@ -242,7 +246,7 @@ __wt_free_ref_index(WT_SESSION_IMPL *session,
 		return;
 
 	for (i = 0; i < pindex->entries; ++i)
-		__free_ref(session, page, pindex->index[i], free_pages);
+		__wt_free_ref(session, page, pindex->index[i], free_pages);
 	__wt_free(session, pindex);
 }
 

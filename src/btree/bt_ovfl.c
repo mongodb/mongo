@@ -244,7 +244,7 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
 	 * finishes after successfully writing a page.
 	 *
 	 * Keys must have already been instantiated and value objects must have
-	 * already been cached (if they're can still potentially be read by any
+	 * already been cached (if they might potentially still be read by any
 	 * running transaction).
 	 *
 	 * Acquire the overflow lock to avoid racing with a thread reading the
