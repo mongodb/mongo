@@ -674,6 +674,10 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	alloc_index = NULL;
 
+#ifdef HAVE_DIAGNOSTIC
+	__split_verify_intl_key_order(session, parent);
+#endif
+
 	/*
 	 * Reset the page's original WT_REF field to split.  Threads cursoring
 	 * through the tree were blocked because that WT_REF state was set to
@@ -826,11 +830,5 @@ err:	if (locked)
 	 * A note on error handling: if we completed the split, return success,
 	 * nothing really bad can have happened.
 	 */
-	if (complete && ret != WT_PANIC)
-		ret = 0;
-
-#ifdef HAVE_DIAGNOSTIC
-	__split_verify_intl_key_order(session, parent);
-#endif
-	return (ret);
+	return (ret == WT_PANIC || !complete ? ret : 0);
 }
