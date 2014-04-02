@@ -51,6 +51,8 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 		}
 	}
 	if (!found) {
+		fprintf(stderr, "ALLOC: ENOMEM %d %" PRIu64 "\n",
+		    op->internal_id, op->unique_id);
 		ret = ENOMEM;
 		WT_STAT_FAST_CONN_INCR(session, async_full);
 		goto err;
@@ -61,6 +63,8 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 	 */
 	op->state = WT_ASYNCOP_READY;
 	op->unique_id = async->op_id++;
+	fprintf(stderr, "STATE: READY %d %" PRIu64 "\n",
+	    op->internal_id, op->unique_id);
 	async->ops_index = (i + 1) % conn->async_size;
 	*opp = op;
 err:	__wt_spin_unlock(session, &async->ops_lock);

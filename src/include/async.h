@@ -7,9 +7,7 @@
 
 /*! Asynchronous operation types. */
 typedef enum {
-	WT_AOP_FLUSH,	/*!< Flush the operation queue */
 	WT_AOP_INSERT,	/*!< Insert if key is not in the data source */
-	WT_AOP_PUT,	/*!< Set the value for a key (unconditional) */
 	WT_AOP_REMOVE,	/*!< Remove a key from the data source */
 	WT_AOP_SEARCH,	/*!< Search and return key/value pair */
 	WT_AOP_UPDATE	/*!< Set the value of an existing key */

@@ -8,18 +8,77 @@
 #include "wt_internal.h"
 
 /*
- * __async_get_key --
+ * __async_get_keyv --
  *	WT_ASYNC_OP->get_key implementation for op handles.
+ */
+static int
+__async_get_keyv(WT_ASYNC_OP_IMPL *op, uint32_t flags, va_list ap)
+{
+	WT_UNUSED(op);
+	WT_UNUSED(flags);
+	WT_UNUSED(ap);
+	return (0);
+}
+
+/*
+ * __async_set_keyv --
+ *	WT_ASYNC_OP->set_key implementation for op handles.
+ */
+static void
+__async_set_keyv(WT_ASYNC_OP_IMPL *op, uint32_t flags, va_list ap)
+{
+	WT_UNUSED(op);
+	WT_UNUSED(flags);
+	WT_UNUSED(ap);
+}
+
+/*
+ * __async_get_valuev --
+ *	WT_ASYNC_OP->get_value implementation for op handles.
+ */
+static int
+__async_get_valuev(WT_ASYNC_OP_IMPL *op, uint32_t flags, va_list ap)
+{
+	WT_UNUSED(op);
+	WT_UNUSED(flags);
+	WT_UNUSED(ap);
+	return (0);
+}
+
+/*
+ * __async_set_valuev --
+ *	WT_ASYNC_OP->set_value implementation for op handles.
+ */
+static void
+__async_set_valuev(WT_ASYNC_OP_IMPL *op, uint32_t flags, va_list ap)
+{
+	WT_UNUSED(op);
+	WT_UNUSED(flags);
+	WT_UNUSED(ap);
+}
+
+/*
+ * __async_get_key --
+ *	WT_ASYNC_OP->set_value implementation for op handles.
  */
 static int
 __async_get_key(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	va_list ap;
 
+	ASYNCOP_API_CALL(O2C(op), session, get_key);
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	va_start(ap, asyncop);
 	fprintf(stderr, "async_get_key: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	return (0);
+	ret = __async_get_keyv(op, op->flags, ap);
+	va_end(ap);
+	API_END(session);
+err:
+	return (ret);
 }
 
 /*
@@ -30,10 +89,18 @@ static int
 __async_get_value(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	va_list ap;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, get_value);
+	va_start(ap, asyncop);
 	fprintf(stderr, "async_get_value: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
+	va_end(ap);
+	API_END(session);
+err:
 	return (0);
 }
 
@@ -45,11 +112,21 @@ static void
 __async_set_key(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	va_list ap;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, set_key);
+	va_start(ap, asyncop);
+	__async_set_keyv(op, op->flags, ap);
 	fprintf(stderr, "async_set_key: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	return;
+	va_end(ap);
+	if (0) {
+err:		op->saved_err = ret;
+	}
+	API_END(session);
 }
 
 /*
@@ -60,11 +137,20 @@ static void
 __async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	va_list ap;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, set_value);
+	va_start(ap, asyncop);
 	fprintf(stderr, "async_set_value: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	return;
+	va_end(ap);
+	if (0) {
+err:		op->saved_err = ret;
+	}
+	API_END(session);
 }
 
 /*
@@ -86,12 +172,17 @@ static int
 __async_search(WT_ASYNC_OP *asyncop)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, search);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_search);
 	fprintf(stderr, "async_search: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	return (__async_op_wrap(op, WT_AOP_SEARCH));
+	WT_ERR(__async_op_wrap(op, WT_AOP_SEARCH));
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -102,13 +193,18 @@ static int
 __async_insert(WT_ASYNC_OP *asyncop)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, insert);
 
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_insert);
 	fprintf(stderr, "async_insert: called id %d uniq %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	return (__async_op_wrap(op, WT_AOP_INSERT));
+	WT_ERR(__async_op_wrap(op, WT_AOP_INSERT));
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -119,11 +215,16 @@ static int
 __async_update(WT_ASYNC_OP *asyncop)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, update);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_update);
 	fprintf(stderr, "async_update: called\n");
-	return (__async_op_wrap(op, WT_AOP_UPDATE));
+	WT_ERR(__async_op_wrap(op, WT_AOP_UPDATE));
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -134,11 +235,16 @@ static int
 __async_remove(WT_ASYNC_OP *asyncop)
 {
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, remove);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_remove);
 	fprintf(stderr, "async_remove: called\n");
-	return (__async_op_wrap(op, WT_AOP_REMOVE));
+	WT_ERR(__async_op_wrap(op, WT_AOP_REMOVE));
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -148,11 +254,7 @@ __async_remove(WT_ASYNC_OP *asyncop)
 static uint64_t
 __async_get_id(WT_ASYNC_OP *asyncop)
 {
-	WT_ASYNC_OP_IMPL *op;
-
-	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	fprintf(stderr, "async_get_id: returning %" PRIu64 "\n", op->unique_id);
-	return (op->unique_id);
+	return (((WT_ASYNC_OP_IMPL *)asyncop)->unique_id);
 }
 
 /*
@@ -179,6 +281,8 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	op->iface.connection = (WT_CONNECTION *)conn;
 	op->internal_id = id;
 	op->state = WT_ASYNCOP_FREE;
+	fprintf(stderr, "STATE FREE %d %" PRIu64 "\n",
+	    op->internal_id, op->unique_id);
 	return (0);
 }
 
@@ -201,8 +305,9 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
 	 */
 	WT_ASSERT(conn->default_session, op->state == WT_ASYNCOP_READY);
 	STAILQ_INSERT_TAIL(&async->opqh, op, q);
-	fprintf(stderr, "Enqueue op %d %" PRIu64 "\n", op->internal_id, op->unique_id);
 	op->state = WT_ASYNCOP_ENQUEUED;
+	fprintf(stderr, "STATE ENQUEUE %d %" PRIu64 "\n",
+	    op->internal_id, op->unique_id);
 	if (++async->cur_queue > async->max_queue)
 		async->max_queue = async->cur_queue;
 	/*

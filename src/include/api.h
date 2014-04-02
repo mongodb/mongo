@@ -113,3 +113,7 @@
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\
 	TXN_API_END(s, ret)
+
+#define	ASYNCOP_API_CALL(conn, s, n)					\
+	s = (conn)->default_session;					\
+	API_CALL_NOCONF(s, asyncop, n, NULL, NULL)

@@ -58,7 +58,8 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (1);
 	}
 	if (op->get_id(op) == search_id) {
-		fprintf(stderr, "CALLBACK: search %" PRIu64 " error %d\n", op->get_id(op), ret);
+		fprintf(stderr, "CALLBACK: search %" PRIu64 " error %d\n",
+		    op->get_id(op), ret);
 
 #if 0
 		/*! [Get the op's string key] */
@@ -104,8 +105,22 @@ int main(void)
 
 	for (i = 0; i < 10; i++) {
 		/*! [Allocate a handle] */
+		op = op2 = NULL;
+		fprintf(stderr, "Iter %d: Alloc table 1\n",i);
+retry1:
 		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
+		if (ret != 0) {
+			fprintf(stderr, "Iter %d: table 1 ret %d\n",i,ret);
+			sleep(1);
+			goto retry1;
+		}
+retry2:
 		ret = wt_conn->async_new_op(wt_conn, uri2, NULL, &cb, &op2);
+		if (ret != 0) {
+			fprintf(stderr, "Iter %d: table 2 ret %d\n",i,ret);
+			sleep(1);
+			goto retry2;
+		}
 		/*! [Allocate a handle] */
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
