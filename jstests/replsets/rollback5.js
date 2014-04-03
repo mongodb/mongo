@@ -8,7 +8,7 @@ var nodes = replTest.nodeList();
 var conns = replTest.startSet();
 var r = replTest.initiate({ "_id": "rollback5",
                             "members": [
-                                { "_id": 0, "host": nodes[0] },
+                                { "_id": 0, "host": nodes[0], priority: 3 },
                                 { "_id": 1, "host": nodes[1] },
                                 { "_id": 2, "host": nodes[2], arbiterOnly: true}]
                           });
