@@ -56,6 +56,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 		WT_ASSERT(session,
 		    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
 		    !__wt_txn_visible_all(session, txn_state->snap_min));
+		WT_ASSERT(session, !F_ISSET(&session->txn, TXN_PINNED));
 		txn_state->snap_min = WT_TXN_NONE;
 	}
 }

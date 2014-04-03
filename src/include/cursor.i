@@ -74,8 +74,10 @@ __cursor_leave(WT_SESSION_IMPL *session)
 	 * snapshot we're holding for read committed isolation.
 	 */
 	WT_ASSERT(session, session->ncursors > 0);
-	if (--session->ncursors == 0)
+	if (--session->ncursors == 0) {
+		F_CLR(&session->txn, TXN_PINNED);
 		__wt_txn_read_last(session);
+	}
 
 	return (0);
 }
@@ -140,6 +142,7 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
 		WT_RET(__curfile_enter(cbt));
 	__wt_txn_cursor_op(session);
+	F_SET(&session->txn, TXN_PINNED);
 	return (0);
 }
 

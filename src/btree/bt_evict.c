@@ -692,7 +692,8 @@ err:	/* On error, clear any left-over tree walk. */
 
 	if (txn_state != NULL)
 		txn_state->snap_min = WT_TXN_NONE;
-	else if (txn->isolation == TXN_ISO_READ_COMMITTED)
+	else if (txn->isolation == TXN_ISO_READ_COMMITTED &&
+	    !F_ISSET(txn, TXN_PINNED))
 		__wt_txn_release_snapshot(session);
 
 	if (WT_VERBOSE_ISSET(session, checkpoint)) {

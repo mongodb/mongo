@@ -130,6 +130,7 @@ struct __wt_txn {
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
 #define	TXN_OLDEST	0x04
-#define	TXN_RUNNING	0x08
+#define	TXN_PINNED	0x08
+#define	TXN_RUNNING	0x10
 	uint32_t flags;
 };
