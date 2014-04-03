@@ -282,6 +282,7 @@ class IterableCursor:
 %enddef
 
 SELFHELPER(struct __wt_connection, connection)
+SELFHELPER(struct __wt_async_op, asyncop)
 SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
 
@@ -718,7 +719,13 @@ typedef int int_void;
 %ignore __wt_cursor::key_format;
 %ignore __wt_cursor::value_format;
 %immutable __wt_session::connection;
+%immutable __wt_async_op::connection;
+%immutable __wt_async_op::uri;
+%immutable __wt_async_op::config;
+%ignore __wt_async_op::key_format;
+%ignore __wt_async_op::value_format;
 
+%ignore __wt_async_callback;
 %ignore __wt_collator;
 %ignore __wt_compressor;
 %ignore __wt_config_item;
@@ -744,6 +751,7 @@ typedef int int_void;
 /* Convert 'int *' to output args for wiredtiger_version */
 %apply int *OUTPUT { int * };
 
+%rename(Asyncop) __wt_async_op;
 %rename(Cursor) __wt_cursor;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
