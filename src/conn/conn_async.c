@@ -323,7 +323,6 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
     const char *config, const char *cfg[], WT_ASYNC_CALLBACK *cb,
     WT_ASYNC_OP_IMPL **opp)
 {
-	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -331,7 +330,6 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 	if (!conn->async_cfg)
 		return (0);
 
-	async = conn->async;
 	session = conn->default_session;
 	*opp = NULL;
 
