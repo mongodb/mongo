@@ -141,7 +141,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	ret = __async_worker_execop(session, op, cursor);
 	if (op->cb != NULL && op->cb->notify != NULL)
 		cb_ret = op->cb->notify(op->cb, asyncop, ret, 0);
-	
+
 	/*
 	 * If the operation succeeded and the user callback returned
 	 * zero then commit.  Otherwise rollback.
@@ -221,7 +221,7 @@ __wt_async_worker(void *arg)
 			}
 		}
 		/*
-		 * Dequeue op.  We get here with the opsq lock held.
+		 * Get next op.  We get here with the opsq lock held.
 		 * Remove from the head of the queue.
 		 */
 		op = STAILQ_FIRST(&async->opqh);

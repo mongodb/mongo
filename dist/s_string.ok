@@ -463,6 +463,7 @@ eventv
 evictable
 evictserver
 exactp
+execop
 extern
 extlist
 extlists
@@ -691,6 +692,7 @@ onpage
 oo
 opendir
 openfile
+opsq
 optype
 os
 ovfl
@@ -924,6 +926,7 @@ util
 uu
 va
 valuep
+valuev
 vanishingly
 variable's
 vcell

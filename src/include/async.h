@@ -14,7 +14,7 @@ typedef enum {
 } WT_ASYNC_OPTYPE;
 
 typedef enum {
-	WT_ASYNCOP_ENQUEUED,	/* Enqueued on the work queue */
+	WT_ASYNCOP_ENQUEUED,	/* Placed on the work queue */
 	WT_ASYNCOP_FREE,	/* Able to be allocated to user */
 	WT_ASYNCOP_READY,	/* Allocated and ready for user to use */
 	WT_ASYNCOP_WORKING	/* Operation in progress by worker */

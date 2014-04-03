@@ -119,7 +119,7 @@ __async_get_key(WT_ASYNC_OP *asyncop, ...)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, get_key);
 	va_start(ap, asyncop);
-	fprintf(stderr, "async_get_key: called id %d uniq %" PRIu64 "\n",
+	fprintf(stderr, "async_get_key: called id %d unique %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
 	ret = __async_get_keyv(asyncop, asyncop->flags, ap);
 	va_end(ap);
@@ -143,7 +143,7 @@ __async_get_value(WT_ASYNC_OP *asyncop, ...)
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, get_value);
 	va_start(ap, asyncop);
-	fprintf(stderr, "async_get_value: called id %d uniq %" PRIu64 "\n",
+	fprintf(stderr, "async_get_value: called id %d unique %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
 	ret = __async_get_valuev(asyncop, asyncop->flags, ap);
 	va_end(ap);
@@ -168,7 +168,7 @@ __async_set_key(WT_ASYNC_OP *asyncop, ...)
 	ASYNCOP_API_CALL(O2C(op), session, set_key);
 	va_start(ap, asyncop);
 	__async_set_keyv(asyncop, asyncop->flags, ap);
-	fprintf(stderr, "async_set_key: id %d uniq %" PRIu64 " key %s\n",
+	fprintf(stderr, "async_set_key: id %d unique %" PRIu64 " key %s\n",
 	    op->internal_id, op->unique_id, (char *)asyncop->key.data);
 	va_end(ap);
 	if (0) {
@@ -193,7 +193,7 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 	ASYNCOP_API_CALL(O2C(op), session, set_value);
 	va_start(ap, asyncop);
 	__async_set_valuev(asyncop, asyncop->flags, ap);
-	fprintf(stderr, "async_set_value: called id %d uniq %" PRIu64 "\n",
+	fprintf(stderr, "async_set_value: called id %d unique %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
 	va_end(ap);
 	if (0) {

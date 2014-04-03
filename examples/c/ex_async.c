@@ -109,7 +109,7 @@ retry:
 			 * If we used up all the ops, pause and retry to
 			 * give the workers a chance to process them.
 			 */
-			fprintf(stderr, "Iter %d: table 1 ret %d\n",i,ret);
+			fprintf(stderr, "Iteration %d: table 1 ret %d\n",i,ret);
 			sleep(1);
 			goto retry;
 		}
