@@ -977,7 +977,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	    ret = __wt_tree_walk(session, &btree->evict_ref, walk_flags),
 	    ++pages_walked) {
 		if (btree->evict_ref == NULL) {
-			ret = 0;
 			/*
 			 * Take care with terminating this loop.
 			 *
@@ -1076,6 +1075,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		WT_VERBOSE_RET(session, evictserver,
 		    "select: %p, size %" PRIu64, page, page->memory_footprint);
 	}
+
+	/* If the walk was interrupted by a locked page, that's okay. */
+	if (ret == WT_NOTFOUND)
+		ret = 0;
 
 	*slotp += (u_int)(evict - start);
 	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, pages_walked);
