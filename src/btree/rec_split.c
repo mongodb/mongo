@@ -12,8 +12,8 @@
  * any real understanding of what might be useful to surface to applications.
  */
 static u_int __split_deepen_max_internal_image = 100;
-static u_int __split_deepen_min_child = 200;
-static u_int __split_deepen_per_child = 1000;
+static u_int __split_deepen_min_child = 100;
+static u_int __split_deepen_per_child = 100;
 
 /*
  * __split_should_deepen --
@@ -30,30 +30,26 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * to search), or by the memory footprint of the parent page (avoiding
 	 * an internal page that will eat up all of the cache and put eviction
 	 * pressure on the system).
-	 *
-	 * Paranoia: don't try and split if we don't have anything to split.
 	 */
 	pindex = WT_INTL_INDEX_COPY(page);
-	if (pindex->entries < 50)
+
+	/*
+	 * Don't deepen the tree if the page's memory footprint is less than N
+	 * times the maximum internal page size chunk in the backing file.
+	 */
+	if (page->memory_footprint <
+	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage)
 		return (0);
 
 	/*
-	 * Split to deepen the tree if the page's memory footprint is N times
-	 * the maximum internal page size chunk in the backing file.
-	 */
-	if (page->memory_footprint >
-	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage)
-		return (1);
-
-	/*
-	 * Split to deepen the tree if the split will result in at least N
+	 * Don't deepen the tree unless the split will result in at least N
 	 * children in the newly created intermediate layer.
 	 */
-	if (pindex->entries >
+	if (pindex->entries <
 	    (__split_deepen_per_child * __split_deepen_min_child))
-		return (1);
+		return (0);
 
-	return (0);
+	return (1);
 }
 
 /*
