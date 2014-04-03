@@ -95,6 +95,8 @@ __async_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	WT_RET(__wt_config_gets(session, cfg, "async.threads", &cval));
 	conn->async_workers = cval.val;
+	/* Sanity check that api_data.py is in sync with async.h */
+	WT_ASSERT(session, conn->async_workers <= WT_ASYNC_MAX_WORKERS);
 
 	ret = 0;
 	return (ret);

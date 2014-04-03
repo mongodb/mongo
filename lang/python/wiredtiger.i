@@ -337,10 +337,19 @@ COMPARE_OK(__wt_cursor::search_near)
 %exception __wt_connection::search_near;
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;
+%exception __wt_async_op::_set_key;
+%exception __wt_async_op::_set_value;
 %exception __wt_cursor::_set_key;
 %exception __wt_cursor::_set_value;
 %exception wiredtiger_strerror;
 %exception wiredtiger_version;
+
+/* WT_ASYNC_OP customization. */
+/* First, replace the varargs get / set methods with Python equivalents. */
+%ignore __wt_async_op::get_key;
+%ignore __wt_async_op::get_value;
+%ignore __wt_async_op::set_key;
+%ignore __wt_async_op::set_value;
 
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
@@ -374,6 +383,141 @@ typedef int int_void;
 %}
 typedef int int_void;
 %typemap(out) int_void { $result = VOID_Object; }
+
+%extend __wt_async_op {
+	/* Get / set keys and values */
+	void _set_key(char *data, int size) {
+		WT_ITEM k;
+		k.data = data;
+		k.size = (uint32_t)size;
+		$self->set_key($self, &k);
+	}
+
+	int_void _set_recno(uint64_t recno) {
+		WT_ITEM k;
+		uint8_t recno_buf[20];
+		size_t size;
+		int ret;
+		if ((ret = wiredtiger_struct_size(NULL,
+		    &size, "r", recno)) != 0 ||
+		    (ret = wiredtiger_struct_pack(NULL,
+		    recno_buf, sizeof (recno_buf), "r", recno)) != 0)
+			return (ret);
+
+		k.data = recno_buf;
+		k.size = (uint32_t)size;
+		$self->set_key($self, &k);
+		return (ret);
+	}
+
+	void _set_value(char *data, int size) {
+		WT_ITEM v;
+		v.data = data;
+		v.size = (uint32_t)size;
+		$self->set_value($self, &v);
+	}
+
+	/* Don't return values, just throw exceptions on failure. */
+	int_void _get_key(char **datap, int *sizep) {
+		WT_ITEM k;
+		int ret = $self->get_key($self, &k);
+		if (ret == 0) {
+			*datap = (char *)k.data;
+			*sizep = (int)k.size;
+		}
+		return (ret);
+	}
+
+	int_void _get_recno(uint64_t *recnop) {
+		WT_ITEM k;
+		int ret = $self->get_key($self, &k);
+		if (ret == 0)
+			ret = wiredtiger_struct_unpack(NULL,
+			    k.data, k.size, "q", recnop);
+		return (ret);
+	}
+
+	int_void _get_value(char **datap, int *sizep) {
+		WT_ITEM v;
+		int ret = $self->get_value($self, &v);
+		if (ret == 0) {
+			*datap = (char *)v.data;
+			*sizep = (int)v.size;
+		}
+		return (ret);
+	}
+
+	int _freecb() {
+		return (cursorFreeHandler($self));
+	}
+
+%pythoncode %{
+	def get_key(self):
+		'''get_key(self) -> object
+		
+		@copydoc WT_ASYNC_OP::get_key
+		Returns only the first column.'''
+		k = self.get_keys()
+		if len(k) == 1:
+			return k[0]
+		return k
+
+	def get_keys(self):
+		'''get_keys(self) -> (object, ...)
+		
+		@copydoc WT_ASYNC_OP::get_key'''
+		if self.is_column:
+			return [self._get_recno(),]
+		else:
+			return unpack(self.key_format, self._get_key())
+
+	def get_value(self):
+		'''get_value(self) -> object
+		
+		@copydoc WT_ASYNC_OP::get_value
+		Returns only the first column.'''
+		v = self.get_values()
+		if len(v) == 1:
+			return v[0]
+		return v
+
+	def get_values(self):
+		'''get_values(self) -> (object, ...)
+		
+		@copydoc WT_ASYNC_OP::get_value'''
+		return unpack(self.value_format, self._get_value())
+
+	def set_key(self, *args):
+		'''set_key(self) -> None
+		
+		@copydoc WT_ASYNC_OP::set_key'''
+		if len(args) == 1 and type(args[0]) == tuple:
+			args = args[0]
+		if self.is_column:
+			self._set_recno(long(args[0]))
+		else:
+			# Keep the Python string pinned
+			self._key = pack(self.key_format, *args)
+			self._set_key(self._key)
+
+	def set_value(self, *args):
+		'''set_value(self) -> None
+		
+		@copydoc WT_ASYNC_OP::set_value'''
+		if len(args) == 1 and type(args[0]) == tuple:
+			args = args[0]
+		# Keep the Python string pinned
+		self._value = pack(self.value_format, *args)
+		self._set_value(self._value)
+
+	def __getitem__(self, key):
+		'''Python convenience for searching'''
+		self.set_key(key)
+		if self.search() != 0:
+			raise KeyError
+		return self.get_value()
+%}
+};
 
 %extend __wt_cursor {
 	/* Get / set keys and values */
