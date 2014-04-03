@@ -130,32 +130,29 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	asyncop = (WT_ASYNC_OP *)op;
 
 	ret = 0;
+	cb_ret = 0;
 
 	WT_RET(__wt_txn_begin(session, NULL));
 	WT_ASSERT(session, op->state == WT_ASYNCOP_WORKING);
 	WT_RET(__async_worker_cursor(session, op, worker, &cursor));
 	/*
-	 * Perform op.
+	 * Perform op and invoke the callback.
 	 */
 	ret = __async_worker_execop(session, op, cursor);
-	fprintf(stderr, "Worker %p op %d id %" PRIu64 " txn %" PRIu64 " %s\n",
-	    (void *)pthread_self(), op->optype, op->unique_id,
-	    session->txn.id, (char *)asyncop->key.data);
-	if (op->cb != NULL && op->cb->notify != NULL) {
+	if (op->cb != NULL && op->cb->notify != NULL)
 		cb_ret = op->cb->notify(op->cb, asyncop, ret, 0);
-	}
-	if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0) {
-		fprintf(stderr, "Worker %p op %d commit txn %" PRIu64 "\n",
-		    (void *)pthread_self(), op->optype, session->txn.id);
-		WT_TRET(__wt_txn_commit(session, NULL));
-	} else {
-		fprintf(stderr, "Worker %p op %d rollback txn %" PRIu64 "\n",
-		    (void *)pthread_self(), op->optype, session->txn.id);
-		WT_TRET(__wt_txn_rollback(session, NULL));
-	}
+	
 	/*
-	 * After the callback returns, release the op back to
-	 * the free pool.
+	 * If the operation succeeded and the user callback returned
+	 * zero then commit.  Otherwise rollback.
+	 */
+	if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0)
+		WT_TRET(__wt_txn_commit(session, NULL));
+	else
+		WT_TRET(__wt_txn_rollback(session, NULL));
+	/*
+	 * After the callback returns, and the transaction resolved released
+	 * the op back to the free pool and reset our cached cursor.
 	 */
 	ret = 0;
 	op->state = WT_ASYNCOP_FREE;
