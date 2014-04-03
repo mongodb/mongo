@@ -847,6 +847,11 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	if (first->state != WT_REF_MEM)		/* no child page, ignore */
 		return (0);
 
+	/*
+	 * We're reaching down into the page without a hazard pointer, but
+	 * that's OK because we know that no-eviction is set and so the page
+	 * cannot disappear.
+	 */
 	child = first->page;
 	if (child->type != WT_PAGE_ROW_LEAF)	/* not a single leaf page */
 		return (1);

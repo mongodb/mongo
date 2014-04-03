@@ -288,11 +288,16 @@ restart:	/*
 				WT_RET(__wt_page_release(session, couple));
 			else {
 				/*
-				 * Find the reference to our parent page then
+				 * Locate the reference to our parent page then
 				 * swap our child hazard pointer for the parent.
-				 *
-				 * XXXKEITH
-				 * Can this page-swap return restart?
+				 * We don't handle a restart return because it
+				 * would require additional complexity in the
+				 * restart code (ascent code somewhat like the
+				 * descent code already there), and it's not a
+				 * possible return: we're moving to the parent
+				 * of the current child, not another child of
+				 * the same parent, there's no way our parent
+				 * split.
 				 */
 				__wt_page_refp(session, ref, &pindex, &slot);
 				if ((ret = __wt_page_swap(

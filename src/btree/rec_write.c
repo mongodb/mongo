@@ -866,20 +866,40 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	*updp = NULL;
 
 	/*
-	 * Handle the case were we can't write the original on-page key/value
-	 * pair because it's a removed overflow item.
+	 * Handle the case were we don't want to write an original on-page value
+	 * item to disk because it's been updated or removed.
 	 *
 	 * Here's the deal: an overflow value was updated or removed and its
-	 * backing blocks freed.  There was a transaction in the system that
-	 * might still read the value, so a copy was cached in the page's
-	 * reconciliation tracking memory, and the on-page cell was set to
-	 * WT_CELL_VALUE_OVFL_RM.  Eviction then chose the page and we're
-	 * splitting it up in order to push parts of it out of memory.
+	 * backing blocks freed.  If any transaction in the system might still
+	 * read the value, a copy was cached in page reconciliation tracking
+	 * memory, and the page cell set to WT_CELL_VALUE_OVFL_RM.  Eviction
+	 * then chose the page and we're splitting it up in order to push parts
+	 * of it out of memory.
 	 *
-	 * If there was any globally visible update in the list, the value may
-	 * be gone from the cache (and regardless, we don't need the value).
-	 * If there's no globally visible update in the list, we better find
-	 * the value in the cache.
+	 * We could write the original on-page value item to disk... if we had
+	 * a copy.  The cache may not have a copy (a globally visible update
+	 * would have kept a value from ever being cached), or an update that
+	 * subsequent became globally visible could cause a cached value to be
+	 * discarded.  Either way, once there's a globally visible update, we
+	 * may not have the value.
+	 *
+	 * Fortunately, if there's a globally visible update we don't care about
+	 * the original version, so we simply ignore it, no transaction can ever
+	 * try and read it.  If there isn't a globally visible update, there had
+	 * better be a cached value.
+	 *
+	 * In the latter case, we could write the value out to disk, but (1) we
+	 * are planning on re-instantiating this page in memory, it isn't going
+	 * to disk, and (2) the value item is eventually going to be discarded,
+	 * that seems like a waste of a write.  Instead, find the cached value
+	 * and append it to the update list we're saving for later restoration.
+	 *
+	 * Why don't we do something similar for overflow keys that have been
+	 * removed (keys can't be updated, so that's not a problem).  Glad you
+	 * asked: we could, and because keys can never be removed from a page
+	 * it's pretty easy to find them.  We don't bother with keys for two
+	 * reasons: overflow keys are relatively rare, and we don't have any
+	 * way to pass them through to the function re-instantiating the page.
 	 */
 	if (vpack != NULL && vpack->raw == WT_CELL_VALUE_OVFL_RM &&
 	    !__wt_txn_visible_all(session, min_txn)) {

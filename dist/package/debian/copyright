@@ -1,0 +1,26 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: wiredtiger
+Source: <http://www.wiredtiger.com>
+
+Files: *
+Copyright: (c) 2008-2014 WiredTiger, Inc.
+License:
+ This program is free software: you can redistribute it and/or modify it under
+ the terms of either version 2 or version 3 of the GNU General Public License
+ as published by the Free Software Foundation.
+ .
+ On Debian GNU/Linux systems, the complete text of the GNU General
+ Public License can be found in `/usr/share/common-licenses/GPL-2' and
+ `/usr/share/common-licenses/GPL-3'.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT
+ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ details.
+ .
+ For a license to use the WiredTiger software under conditions other than those
+ described by the GNU General Public License, or for technical support for this
+ software, contact WiredTiger, Inc. at info@wiredtiger.com.
+ .
+ For further information, see the licensing section in the documentation.
+
