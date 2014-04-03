@@ -923,7 +923,8 @@ namespace mongo {
             if (!_collection) {
                 result->setError(
                         toWriteError(Status(ErrorCodes::InternalError,
-                                            "could not create collection " + request->getNS())));
+                                            "could not create collection " +
+                                            request->getTargetingNS())));
                 return false;
             }
         }
