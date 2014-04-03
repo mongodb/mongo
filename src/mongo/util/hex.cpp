@@ -50,5 +50,7 @@ namespace mongo {
     template<> std::string integerToHex<unsigned int>(unsigned int val) { 
         return integerToHexDef(val); }
     template<> std::string integerToHex<long>(long val) { return integerToHexDef(val); }
+    template<> std::string integerToHex<unsigned long>(unsigned long val) { return integerToHexDef(val); }
     template<> std::string integerToHex<long long>(long long val) { return integerToHexDef(val); }
+    template<> std::string integerToHex<unsigned long long>(unsigned long long val) { return integerToHexDef(val); }
 }

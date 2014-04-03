@@ -17,30 +17,19 @@
 
 #include "mongo/util/stacktrace.h"
 
-#include <cstdlib>
-#include <iostream>
-#include <string>
-#include <map>
-#include <vector>
-
-#include "mongo/util/log.h"
-#include "mongo/util/concurrency/mutex.h"
-
-#ifdef _WIN32
+#include <DbgHelp.h>
 #include <boost/filesystem/operations.hpp>
 #include <boost/smart_ptr/scoped_array.hpp>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
 #include <sstream>
-#include <stdio.h>
-#include <DbgHelp.h>
+#include <string>
+#include <vector>
+
 #include "mongo/util/assert_util.h"
-#else
-
-#include <dlfcn.h>
-
-#include "mongo/platform/backtrace.h"
-#endif
-
-#if defined(_WIN32)
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -289,54 +278,3 @@ namespace mongo {
     }
 
 }
-#else
-
-namespace mongo {
-    static const int maxBackTraceFrames = 20;
-
-    /**
-     * Print a stack backtrace for the current thread to the specified ostream.
-     * 
-     * @param os    ostream& to receive printed stack backtrace
-     */
-    void printStackTrace( std::ostream& os ) {
-
-        void* addresses[maxBackTraceFrames];
-
-        int addressCount = backtrace(addresses, maxBackTraceFrames);
-        if (addressCount == 0) {
-            const int err = errno;
-            os << "Unable to collect backtrace addresses (errno: " <<
-                err << ' ' << strerror(err) << ')' << std::endl;
-            return;
-        }
-        os << std::hex;
-        for (int i = 0; i < addressCount; ++i)
-            os << addresses[i] << ' ';
-        os << std::endl;
-
-        for (int i = 0; i < addressCount; ++i) {
-            os << ' ';
-            Dl_info dlinfo;
-            if (dladdr(addresses[i], &dlinfo)) {
-                os << dlinfo.dli_fname << '(';
-                if (dlinfo.dli_sname) {
-                    const uintptr_t offset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_saddr);
-                    os << dlinfo.dli_sname << "+0x" << offset;
-                }
-                else {
-                    const uintptr_t offset = uintptr_t(addresses[i]) - uintptr_t(dlinfo.dli_fbase);
-                    os << "+0x" << offset;
-                }
-                os << ')';
-            }
-            else {
-                os << "???";
-            }
-            os << " [" << addresses[i] << ']' << std::endl;
-        }
-        os << std::dec;
-    }
-}
-
-#endif

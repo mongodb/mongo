@@ -771,7 +771,7 @@ if nix:
         env["CXX"] = "distcc " + env["CXX"]
 
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
-    env.Append( CCFLAGS=["-fPIC",
+    env.Append( CCFLAGS=["-fPIE",
                          "-fno-strict-aliasing",
                          "-ggdb",
                          "-pthread",
@@ -787,7 +787,7 @@ if nix:
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
-    env.Append( LINKFLAGS=["-fPIC", "-pthread"] )
+    env.Append( LINKFLAGS=["-fPIE", "-pthread"] )
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
@@ -1494,8 +1494,6 @@ def doConfigure(myenv):
     if posix_system:
         conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
         conf.CheckLib('rt')
-
-    if linux:
         conf.CheckLib('dl')
 
     if (conf.CheckCXXHeader( "execinfo.h" ) and

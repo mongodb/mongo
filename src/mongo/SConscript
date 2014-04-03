@@ -699,7 +699,12 @@ env.CppUnitTest('diskloc_test', 'db/diskloc_test.cpp', LIBDEPS=[])
 
 env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.cpp', LIBDEPS=[])
 
-env.Library('stacktrace', 'util/stacktrace.cpp')
+env.Library('stacktrace',
+            'util/stacktrace_${OS_FAMILY}.cpp',
+            LIBDEPS=['bson',
+                     'stringutils',
+                     'version',
+                     '$BUILD_DIR/mongo/base/base'])
 
 serverOnlyFiles += mmapFiles
 
