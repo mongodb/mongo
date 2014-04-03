@@ -893,13 +893,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * to disk, and (2) the value item is eventually going to be discarded,
 	 * that seems like a waste of a write.  Instead, find the cached value
 	 * and append it to the update list we're saving for later restoration.
-	 *
-	 * Why don't we do something similar for overflow keys that have been
-	 * removed (keys can't be updated, so that's not a problem).  Glad you
-	 * asked: we could, and because keys can never be removed from a page
-	 * it's pretty easy to find them.  We don't bother with keys for two
-	 * reasons: overflow keys are relatively rare, and we don't have any
-	 * way to pass them through to the function re-instantiating the page.
 	 */
 	if (vpack != NULL && vpack->raw == WT_CELL_VALUE_OVFL_RM &&
 	    !__wt_txn_visible_all(session, min_txn)) {
@@ -3977,29 +3970,48 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				dictionary = 1;
 			} else if (vpack->raw == WT_CELL_VALUE_OVFL_RM) {
 				/*
-				 * If doing update save and restore, there's an
-				 * update that's not globally visible, and the
-				 * underlying value is a removed overflow value,
-				 * we end up here.
+				 * If doing update save and restore in service
+				 * of eviction, there's an update that's not
+				 * globally visible, and the underlying value
+				 * is a removed overflow value, we end up here.
 				 *
 				 * When the update save/restore code noticed the
 				 * removed overflow value, it appended a copy of
 				 * the cached, original overflow value to the
-				 * update list being saved (ensuring the on-page
+				 * update list being saved (ensuring any on-page
 				 * item will never be accessed after the page is
 				 * re-instantiated), then returned a NULL update
 				 * to us.
 				 *
-				 * Assert the case: if we remove an underlying
-				 * overflow object, checkpoint reconciliation
-				 * should never see it again, there should be a
-				 * visible update in the way.
-				 *
-				 * Write a placeholder record.
+				 * Assert the case.
 				 */
 				WT_ASSERT(session,
 				    F_ISSET(r, WT_SKIP_UPDATE_RESTORE));
 
+				/*
+				 * If the key is also a removed overflow item,
+				 * don't write anything at all.
+				 *
+				 * We don't have to write anything because the
+				 * code re-instantiating the page gets the key
+				 * to match the saved list of updates from the
+				 * original page.  By not putting the key on
+				 * the page, we'll move the key/value set from
+				 * a row-store leaf page slot to an insert list,
+				 * but that shouldn't matter.
+				 *
+				 * The reason we bother with the test is because
+				 * overflows are expensive to write.  It's hard
+				 * to imagine a real workload where this test is
+				 * worth the effort, but it's a simple test.
+				 */
+				if (kpack->raw == WT_CELL_KEY_OVFL_RM)
+					goto leaf_insert;
+
+				/*
+				 * The on-page value will never be accessed,
+				 * write a placeholder record.
+				 */
 				WT_ERR(__rec_cell_build_val(
 				    session, r, "@", 1, (uint64_t)0));
 			} else {
