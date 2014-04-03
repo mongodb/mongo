@@ -74,6 +74,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_REF *ref;
+	WT_TXN_STATE *txn_state;
 	int skip;
 
 	WT_UNUSED(cfg);
@@ -122,8 +123,19 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Start compaction. */
 	WT_RET(bm->compact_start(bm, session));
 
+	/*
+	 * Walking the tree requires that we pin a transaction to look at index
+	 * structures.
+	 */
+	txn_state = WT_SESSION_TXN_STATE(session);
+	if (txn_state->snap_min != WT_TXN_NONE)
+		txn_state = NULL;
+
 	/* Walk the tree. */
 	for (ref = NULL;;) {
+		if (txn_state != NULL)
+			txn_state->snap_min = conn->txn_global.oldest_id;
+
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the
 		 * read generation of pages already in memory, and if a page is
@@ -148,6 +160,9 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 err:	if (ref != NULL)
 		WT_TRET(__wt_page_release(session, ref));
+
+	if (txn_state != NULL)
+		txn_state->snap_min = WT_TXN_NONE;
 
 	WT_TRET(bm->compact_end(bm, session));
 

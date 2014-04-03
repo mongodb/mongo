@@ -368,6 +368,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_iso;
+	WT_TXN_STATE *txn_state;
 
 	/*
 	 * We have to take care when evicting pages not to write a change that:
@@ -383,6 +384,12 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	saved_iso = txn->isolation;
 	txn->isolation = TXN_ISO_EVICTION;
 
+	txn_state = WT_SESSION_TXN_STATE(session);
+	if (txn_state->snap_min == WT_TXN_NONE)
+		txn_state->snap_min = S2C(session)->txn_global.oldest_id;
+	else
+		txn_state = NULL;
+
 	/*
 	 * Sanity check: if a transaction is running, its updates should not
 	 * be visible to eviction.
@@ -392,6 +399,9 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	ret = __wt_rec_evict(session, ref, 0);
 	txn->isolation = saved_iso;
+
+	if (txn_state != NULL)
+		txn_state->snap_min = WT_TXN_NONE;
 	return (ret);
 }
 
@@ -472,6 +482,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
+	WT_TXN_STATE *txn_state;
 	int eviction_enabled;
 
 	btree = S2BT(session);
@@ -487,9 +498,15 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	/* Make sure the oldest transaction ID is up-to-date. */
 	__wt_txn_update_oldest(session);
 
+	txn_state = WT_SESSION_TXN_STATE(session);
+	if (txn_state->snap_min == WT_TXN_NONE)
+		txn_state->snap_min = S2C(session)->txn_global.last_running;
+	else
+		txn_state = NULL;
+
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
-	WT_RET(__wt_tree_walk(
+	WT_ERR(__wt_tree_walk(
 	    session, &next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
 	while ((ref = next_ref) != NULL) {
 		page = ref->page;
@@ -561,6 +578,9 @@ err:		/* On error, clear any left-over tree walk. */
 			WT_TRET(__wt_page_release(session, next_ref));
 	}
 
+	if (txn_state != NULL)
+		txn_state->snap_min = WT_TXN_NONE;
+
 	if (eviction_enabled)
 		__wt_evict_file_exclusive_off(session);
 
@@ -579,6 +599,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_PAGE *page;
 	WT_REF *walk_page;
 	WT_TXN *txn;
+	WT_TXN_STATE *txn_state;
 	uint32_t flags;
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
@@ -588,10 +609,16 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	walk_page = NULL;
 	txn = &session->txn;
 
+	txn_state = WT_SESSION_TXN_STATE(session);
+	if (txn_state->snap_min == WT_TXN_NONE)
+		txn_state->snap_min = S2C(session)->txn_global.last_running;
+	else
+		txn_state = NULL;
+
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
 	if (WT_VERBOSE_ISSET(session, checkpoint))
-		WT_RET(__wt_epoch(session, &start));
+		WT_ERR(__wt_epoch(session, &start));
 
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
@@ -615,8 +642,6 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 				++leaf_pages;
 				ret =
 				    __wt_rec_write(session, walk_page, NULL, 0);
-				if (txn->isolation == TXN_ISO_READ_COMMITTED)
-					__wt_txn_release_snapshot(session);
 				WT_ERR(ret);
 			}
 		}
@@ -664,6 +689,11 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 err:	/* On error, clear any left-over tree walk. */
 	if (walk_page != NULL)
 		WT_TRET(__wt_page_release(session, walk_page));
+
+	if (txn_state != NULL)
+		txn_state->snap_min = WT_TXN_NONE;
+	else if (txn->isolation == TXN_ISO_READ_COMMITTED)
+		__wt_txn_release_snapshot(session);
 
 	if (WT_VERBOSE_ISSET(session, checkpoint)) {
 		WT_RET(__wt_epoch(session, &end));
@@ -796,6 +826,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	WT_TXN_STATE *txn_state;
 	u_int max_entries, old_slot, retries, slot;
 
 	conn = S2C(session);
@@ -812,6 +843,8 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	 * we may never start evicting again.
 	 */
 	__wt_txn_update_oldest(session);
+	txn_state = WT_SESSION_TXN_STATE(session);
+	txn_state->snap_min = conn->txn_global.last_running;
 
 	/*
 	 * Set the starting slot in the queue and the maximum pages added
@@ -915,6 +948,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 	__wt_spin_unlock(session, &conn->dhandle_lock);
 
 	*entriesp = slot;
+	txn_state->snap_min = WT_TXN_NONE;
 	return (ret);
 }
 

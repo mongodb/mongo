@@ -25,7 +25,16 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	for (i = 0, fotxn = session->fotxn;
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
 		if (fotxn->p == NULL) {
-			fotxn->txnid = S2C(session)->txn_global.current;
+			/*
+			 * Add some slop so that adding multiple items doesn't
+			 * immediately cause earlier ones to be freed.
+			 */
+			WT_ASSERT(session,
+			    WT_SESSION_TXN_STATE(session)->snap_min !=
+			    WT_TXN_NONE);
+			fotxn->txnid = S2C(session)->txn_global.current + 1;
+			WT_ASSERT(session,
+			    !__wt_txn_visible_all(session, fotxn->txnid));
 			fotxn->p = p;
 			fotxn->len = len;
 			break;
@@ -49,7 +58,6 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
     WT_SESSION_IMPL *session, int connection_close)
 {
 	WT_FOTXN *fotxn;
-	uint64_t oldest_id;
 	size_t i;
 
 	/*
@@ -58,18 +66,12 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
 	 * arguments: session_safe is still linked to the WT_CONNECTION and
 	 * can be safely used for calls to other WiredTiger functions, while
 	 * session is the WT_SESSION_IMPL we're cleaning up.
-	 *
-	 * Get the oldest transaction ID not yet visible to a running
-	 * transaction.
 	 */
-	oldest_id = connection_close ?
-	    WT_TXN_NONE : S2C(session_safe)->txn_global.oldest_id;
-
 	for (i = 0, fotxn = session->fotxn;
 	    session->fotxn_cnt > 0 &&
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
-		if (fotxn->p != NULL &&
-		    (connection_close || TXNID_LT(fotxn->txnid, oldest_id))) {
+		if (fotxn->p != NULL && (connection_close ||
+		    __wt_txn_visible_all(session_safe, fotxn->txnid))) {
 			--session->fotxn_cnt;
 
 			/*

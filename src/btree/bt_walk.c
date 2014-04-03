@@ -239,7 +239,7 @@ ascend:	/*
 		return (__wt_page_release(session, couple));
 
 	/* Figure out the current slot in the WT_REF array. */
-	__wt_page_refp(ref, &pindex, &slot);
+	__wt_page_refp(session, ref, &pindex, &slot);
 
 	if (0) {
 restart:	/*
@@ -259,7 +259,7 @@ restart:	/*
 				return (0);
 			goto descend;
 		}
-		__wt_page_refp(ref, &pindex, &slot);
+		__wt_page_refp(session, ref, &pindex, &slot);
 		if (descending)
 			goto descend;
 	}
@@ -294,7 +294,7 @@ restart:	/*
 				 * XXXKEITH
 				 * Can this page-swap return restart?
 				 */
-				__wt_page_refp(ref, &pindex, &slot);
+				__wt_page_refp(session, ref, &pindex, &slot);
 				if ((ret = __wt_page_swap(
 				    session, couple, ref, flags)) != 0) {
 					WT_TRET(
