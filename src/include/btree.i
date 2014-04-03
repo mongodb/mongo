@@ -824,7 +824,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	WT_REF *first;
 
 	btree = S2BT(session);
-	root = btree->root_page.page;
+	root = btree->root.page;
 
 	/* Check for a non-existent tree. */
 	if (root == NULL)

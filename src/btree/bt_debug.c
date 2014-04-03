@@ -421,7 +421,7 @@ __wt_debug_tree_shape(
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
 	if (page == NULL)
-		page = S2BT(session)->root_page.page;
+		page = S2BT(session)->root.page;
 
 	__debug_tree_shape_worker(ds, page, 0);
 
@@ -489,7 +489,7 @@ __debug_tree(
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
 	if (page == NULL)
-		page = S2BT(session)->root_page.page;
+		page = S2BT(session)->root.page;
 
 	ret = __debug_page(ds, page, flags);
 

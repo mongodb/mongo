@@ -120,9 +120,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 				    __wt_addr_string(session,
 				    root_addr, root_addr_size, vs->tmp1),
 				    __wt_page_type_string(
-				    btree->root_page.page->type)));
+				    btree->root.page->type)));
 #endif
-			ret = __verify_tree(session, &btree->root_page, vs);
+			ret = __verify_tree(session, &btree->root, vs);
 
 			WT_TRET(__wt_bt_cache_op(
 			    session, NULL, WT_SYNC_DISCARD_NOWRITE));

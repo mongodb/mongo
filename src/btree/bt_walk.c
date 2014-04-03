@@ -225,7 +225,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags)
 
 	/* If no page is active, begin a walk from the start of the tree. */
 	if (ref == NULL) {
-		ref = &btree->root_page;
+		ref = &btree->root;
 		if (ref->page == NULL)
 			return (0);
 		goto descend;
@@ -253,8 +253,8 @@ restart:	/*
 		 * the last move.
 		 */
 		ref = couple;
-		if (ref == &btree->root_page) {
-			ref = &btree->root_page;
+		if (ref == &btree->root) {
+			ref = &btree->root;
 			if (ref->page == NULL)
 				return (0);
 			goto descend;

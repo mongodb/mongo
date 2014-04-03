@@ -371,7 +371,7 @@ __wt_btree_tree_open(
 	    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
 
 	/* Finish initializing the root, root reference links. */
-	__wt_root_ref_init(&btree->root_page, page, btree->type != BTREE_ROW);
+	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);
 
 	if (0) {
 err:		__wt_buf_free(session, &dsk);
@@ -422,7 +422,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	case BTREE_COL_VAR:
 		WT_ERR(
 		    __wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, 1, &root));
-		root->pg_intl_parent_ref = &btree->root_page;
+		root->pg_intl_parent_ref = &btree->root;
 
 		pindex = WT_INTL_INDEX_COPY(root);
 		ref = pindex->index[0];
@@ -436,7 +436,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	case BTREE_ROW:
 		WT_ERR(
 		    __wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, 1, &root));
-		root->pg_intl_parent_ref = &btree->root_page;
+		root->pg_intl_parent_ref = &btree->root;
 
 		pindex = WT_INTL_INDEX_COPY(root);
 		ref = pindex->index[0];
@@ -488,7 +488,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	}
 
 	/* Finish initializing the root, root reference links. */
-	__wt_root_ref_init(&btree->root_page, root, btree->type != BTREE_ROW);
+	__wt_root_ref_init(&btree->root, root, btree->type != BTREE_ROW);
 
 	return (0);
 
@@ -558,7 +558,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 	bm = btree->bm;
 
 	/* Pre-load the second-level internal pages. */
-	WT_INTL_FOREACH_BEGIN(btree->root_page.page, ref) {
+	WT_INTL_FOREACH_BEGIN(btree->root.page, ref) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr != NULL)
 			WT_RET(bm->preload(bm, session, addr, addr_size));

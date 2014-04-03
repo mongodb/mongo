@@ -41,7 +41,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 
 restart:
 	/* Search the internal pages of the tree. */
-	parent = child = &btree->root_page;
+	parent = child = &btree->root;
 	for (depth = 2;; ++depth) {
 		page = parent->page;
 		if (page->type != WT_PAGE_COL_INT)

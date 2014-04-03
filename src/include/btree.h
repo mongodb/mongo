@@ -102,7 +102,7 @@ struct __wt_btree {
 
 	uint64_t last_recno;		/* Column-store last record number */
 
-	WT_REF root_page;		/* Root page */
+	WT_REF root;			/* Root page reference */
 	int modified;			/* If the tree ever modified */
 	int bulk_load_ok;		/* Bulk-load is a possibility */
 
@@ -111,7 +111,7 @@ struct __wt_btree {
 
 	uint64_t write_gen;		/* Write generation */
 
-	WT_REF  *evict_page;		/* Eviction thread's location */
+	WT_REF  *evict_ref;		/* Eviction thread's location */
 	uint64_t evict_priority;	/* Relative priority of cached pages */
 	u_int    evict_walk_period;	/* Skip this many LRU walks */
 	u_int    evict_walk_skips;	/* Number of walks skipped */
