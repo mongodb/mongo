@@ -36,14 +36,6 @@ struct __wt_async_op_impl {
 	uint64_t	uri_hash;		/* URI hash */
 
 	STAILQ_ENTRY(__wt_async_op_impl) q;
-
-	uint64_t recno;			/* Record number, normal and raw mode */
-	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
-
-	void	*lang_private;		/* Language specific private storage */
-
-	WT_ITEM key, value;
-	int saved_err;			/* Saved error in set_{key,value}. */
 	WT_ASYNC_CALLBACK	*cb;
 
 	uint32_t	internal_id;	/* Array position id. */
@@ -51,19 +43,6 @@ struct __wt_async_op_impl {
 
 	WT_ASYNC_STATE	state;		/* Op state */
 	WT_ASYNC_OPTYPE	optype;		/* Operation type */
-
-#define	WT_ASYNCOP_DATA_SOURCE	0x0001
-#define	WT_ASYNCOP_DUMP_HEX	0x0002
-#define	WT_ASYNCOP_DUMP_PRINT	0x0004
-#define	WT_ASYNCOP_KEY_EXT	0x0008	/* Key points out of the tree. */
-#define	WT_ASYNCOP_KEY_INT	0x0010	/* Key points into the tree. */
-#define	WT_ASYNCOP_KEY_SET	(WT_ASYNCOP_KEY_EXT | WT_ASYNCOP_KEY_INT)
-#define	WT_ASYNCOP_OVERWRITE	0x0020
-#define	WT_ASYNCOP_RAW		0x0040
-#define	WT_ASYNCOP_VALUE_EXT	0x0080	/* Value points out of the tree. */
-#define	WT_ASYNCOP_VALUE_INT	0x0100	/* Value points into the tree. */
-#define	WT_ASYNCOP_VALUE_SET	(WT_ASYNCOP_VALUE_EXT | WT_ASYNCOP_VALUE_INT)
-	uint32_t flags;
 };
 
 /*

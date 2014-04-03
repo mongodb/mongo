@@ -357,7 +357,6 @@ struct __wt_async_op {
 	 * the specified key exists, ::WT_NOTFOUND is returned.
 	 */
 	int __F(remove)(WT_ASYNC_OP *op);
-	/*! @} */
 
 	/*!
 	 * Get the unique identifier for this operation.
@@ -372,6 +371,28 @@ struct __wt_async_op {
 	uint64_t __F(get_id)(WT_ASYNC_OP *op);
 
 	/*! @} */
+
+	/*
+	 * Protected fields, only to be used by cursor implementations.
+	 */
+#if !defined(SWIG) && !defined(DOXYGEN)
+	uint64_t recno;			/* Record number, normal and raw mode */
+	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
+
+	void	*lang_private;		/* Language specific private storage */
+
+	WT_ITEM key, value;
+	int saved_err;			/* Saved error in set_{key,value}. */
+
+#define	WT_ASYNCOP_APPEND	0x0001
+#define	WT_ASYNCOP_KEY_EXT	0x0002	/* Key points out of the tree. */
+#define	WT_ASYNCOP_KEY_SET	(WT_ASYNCOP_KEY_EXT)
+#define	WT_ASYNCOP_OVERWRITE	0x0004
+#define	WT_ASYNCOP_RAW		0x0008
+#define	WT_ASYNCOP_VALUE_EXT	0x0010	/* Value points out of the tree. */
+#define	WT_ASYNCOP_VALUE_SET	(WT_ASYNCOP_VALUE_EXT)
+	uint32_t flags;
+#endif
 };
 
 /*!

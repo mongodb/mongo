@@ -131,7 +131,7 @@ retry:
 		/*! [example insert] */
 	}
 
-	ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &opget);
+	ret = wt_conn->async_new_op(wt_conn, uri, "raw", &cb, &opget);
 	snprintf(k[0], sizeof(k[0]), "key1");
 	key.data = k[0];
 	key.size = sizeof(k[0]);

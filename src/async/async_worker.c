@@ -40,14 +40,11 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
     WT_ASYNC_WORKER_STATE *worker, WT_CURSOR **cursorp)
 {
 	WT_ASYNC_CURSOR *ac;
-	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 
-	conn = S2C(session);
 	wt_session = (WT_SESSION *)session;
-
 	*cursorp = NULL;
 	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
 		if (op->cfg_hash == ac->cfg_hash &&
@@ -61,8 +58,8 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * Insert it at the head expecting LRU usage.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &ac));
-	/* "raw" should be op->config. */
-	WT_ERR(wt_session->open_cursor(wt_session, op->uri, NULL, "raw", &c));
+	WT_ERR(wt_session->open_cursor(
+	    wt_session, op->uri, NULL, op->config, &c));
 	ac->cfg_hash = op->cfg_hash;
 	ac->uri_hash = op->uri_hash;
 	ac->c = c;
@@ -88,9 +85,10 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	WT_DECL_RET;
 	WT_ITEM val;
 
-	__wt_cursor_set_raw_key(cursor, &op->key);
+	asyncop = (WT_ASYNC_OP *)op;
+	__wt_cursor_set_raw_key(cursor, &asyncop->key);
 	if (op->optype != WT_AOP_SEARCH)
-		__wt_cursor_set_raw_value(cursor, &op->value);
+		__wt_cursor_set_raw_value(cursor, &asyncop->value);
 	switch (op->optype) {
 		case WT_AOP_INSERT:
 		case WT_AOP_UPDATE:
@@ -106,7 +104,6 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			 * the op for op->get_value.
 			 */
 			__wt_cursor_get_raw_value(cursor, &val);
-			asyncop = (WT_ASYNC_OP *)op;
 			asyncop->set_value(asyncop, &val);
 			break;
 		default:
@@ -125,15 +122,11 @@ static int
 __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
     WT_ASYNC_WORKER_STATE *worker)
 {
-	WT_ASYNC *async;
 	WT_ASYNC_OP *asyncop;
-	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int cb_ret;
 
-	conn = S2C(session);
-	async = conn->async;
 	asyncop = (WT_ASYNC_OP *)op;
 
 	ret = 0;
@@ -147,7 +140,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	ret = __async_worker_execop(session, op, cursor);
 	fprintf(stderr, "Worker %p op %d id %" PRIu64 " txn %" PRIu64 " %s\n",
 	    (void *)pthread_self(), op->optype, op->unique_id,
-	    session->txn.id, (char *)op->key.data);
+	    session->txn.id, (char *)asyncop->key.data);
 	if (op->cb != NULL && op->cb->notify != NULL) {
 		cb_ret = op->cb->notify(op->cb, asyncop, ret, 0);
 	}
@@ -166,6 +159,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 */
 	ret = 0;
 	op->state = WT_ASYNCOP_FREE;
+	F_CLR(asyncop, WT_ASYNCOP_KEY_SET | WT_ASYNCOP_VALUE_SET);
 	cursor->reset(cursor);
 	return (ret);
 }

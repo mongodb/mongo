@@ -471,8 +471,7 @@ __conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, async_new_op, config, cfg);
-	WT_UNUSED(cfg);
-	WT_ERR(__wt_async_new_op(conn, uri, config, callback, &op));
+	WT_ERR(__wt_async_new_op(conn, uri, config, cfg, callback, &op));
 
 	*asyncopp = &op->iface;
 

@@ -283,12 +283,44 @@ err:	__wt_spin_unlock(session, &async->opsq_lock);
 }
 
 /*
+ * __async_runtime_config --
+ *	Configure runtime fields at allocation.
+ */
+static int
+__async_runtime_config(WT_ASYNC_OP_IMPL *op, const char *cfg[])
+{
+	WT_ASYNC_OP *asyncop;
+	WT_CONFIG_ITEM cval;
+	WT_SESSION_IMPL *session;
+
+	session = O2S(op);
+	asyncop = (WT_ASYNC_OP *)op;
+	WT_RET(__wt_config_gets_def(session, cfg, "append", 1, &cval));
+	if (cval.val)
+		F_SET(asyncop, WT_ASYNCOP_APPEND);
+	else
+		F_CLR(asyncop, WT_ASYNCOP_APPEND);
+	WT_RET(__wt_config_gets_def(session, cfg, "overwrite", 1, &cval));
+	if (cval.val)
+		F_SET(asyncop, WT_ASYNCOP_OVERWRITE);
+	else
+		F_CLR(asyncop, WT_ASYNCOP_OVERWRITE);
+	WT_RET(__wt_config_gets_def(session, cfg, "raw", 1, &cval));
+	if (cval.val)
+		F_SET(asyncop, WT_ASYNCOP_RAW);
+	else
+		F_CLR(asyncop, WT_ASYNCOP_RAW);
+	return (0);
+
+}
+
+/*
  * __wt_async_new_op --
  *	Implementation of the WT_CONN->async_new_op method.
  */
 int
 __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
-    const char *config, WT_ASYNC_CALLBACK *cb,
+    const char *config, const char *cfg[], WT_ASYNC_CALLBACK *cb,
     WT_ASYNC_OP_IMPL **opp)
 {
 	WT_ASYNC *async;
@@ -304,6 +336,7 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 	*opp = NULL;
 
 	WT_ERR(__async_new_op_alloc(conn, &op));
+	WT_ERR(__async_runtime_config(op, cfg));
 	WT_ERR(__wt_strdup(session, uri, &op->uri));
 	WT_ERR(__wt_strdup(session, config, &op->config));
 	if (uri != NULL)
