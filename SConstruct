@@ -666,7 +666,6 @@ elif linux:
 
     if force32:
         env.Append( EXTRALIBPATH=["/usr/lib32"] )
-        env.Append( CCFLAGS=["-mmmx"] )
 
     if static:
         env.Append( LINKFLAGS=" -static " )
@@ -1066,6 +1065,41 @@ def doConfigure(myenv):
         win_version_min = win_version_min_choices[win_version_min]
         env.Append( CPPDEFINES=[("_WIN32_WINNT", "0x" + win_version_min[0])] )
         env.Append( CPPDEFINES=[("NTDDI_VERSION", "0x" + win_version_min[0] + win_version_min[1])] )
+
+    if using_gcc() or using_clang():
+
+        # If we are using GCC or clang to target 32 or x86, set the ISA minimum to 'nocona',
+        # and the tuning to 'generic'. The choice of 'nocona' is selected because it
+        #  -- includes MMX extenions which we need for tcmalloc on 32-bit
+        #  -- can target 32 bit
+        #  -- is at the time of this writing a widely-deployed 10 year old microarchitecture
+        #  -- is available as a target architecture from GCC 4.0+
+        # However, we only want to select an ISA, not the nocona specific scheduling, so we
+        # select the generic tuning. For installations where hardware and system compiler rev are
+        # contemporaries, the generic scheduling should be appropriate for a wide range of
+        # deployed hardware.
+
+        def CheckForx86(context):
+            # See http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
+            test_body = """
+            #if defined(__i386) || defined(_M_IX86)
+            /* x86 32-bit */
+            #else
+            #error not 32-bit x86
+            #endif
+            """
+            context.Message('Checking if target architecture is 32-bit x86...')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+            context.Result(ret)
+            return ret
+
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckForx86' : CheckForx86,
+        })
+
+        if conf.CheckForx86():
+            myenv.Append( CCFLAGS=['-march=nocona', '-mtune=generic'] )
+        conf.Finish()
 
     # Enable PCH if we are on using gcc or clang and the 'Gch' tool is enabled. Otherwise,
     # remove any pre-compiled header since the compiler may try to use it if it exists.
