@@ -17,6 +17,13 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	WT_FOTXN *fotxn;
 	size_t i;
 
+	/*
+	 * Make sure the current thread has a transaction pinned so that
+	 * we don't immediately free the memory we are stashing.
+	 */
+	WT_ASSERT(session,
+	    WT_SESSION_TXN_STATE(session)->snap_min != WT_TXN_NONE);
+
 	/* Grow the list as necessary. */
 	WT_RET(__wt_realloc_def(session,
 	    &session->fotxn_size, session->fotxn_cnt + 1, &session->fotxn));
@@ -25,13 +32,6 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	for (i = 0, fotxn = session->fotxn;
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
 		if (fotxn->p == NULL) {
-			/*
-			 * Add some slop so that adding multiple items doesn't
-			 * immediately cause earlier ones to be freed.
-			 */
-			WT_ASSERT(session,
-			    WT_SESSION_TXN_STATE(session)->snap_min !=
-			    WT_TXN_NONE);
 			fotxn->txnid = S2C(session)->txn_global.current + 1;
 			WT_ASSERT(session,
 			    !__wt_txn_visible_all(session, fotxn->txnid));

@@ -299,10 +299,8 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
 	    !F_ISSET(txn, TXN_RUNNING) &&
-	    TXNID_LT(txn_state->snap_min, txn_global->last_running)) {
+	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
-		F_SET(&session->txn, TXN_PINNED);
-	}
 }
 
 /*
