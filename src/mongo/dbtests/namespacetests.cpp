@@ -1649,8 +1649,6 @@ namespace NamespaceTests {
                 }
                 ASSERT( nRecords() < N );
 
-                NamespaceDetails* nsd = collection()->detailsWritable();
-
                 DiskLoc last, first;
                 {
                     auto_ptr<Runner> runner(
@@ -1666,8 +1664,8 @@ namespace NamespaceTests {
                     ASSERT( first != last ) ;
                 }
 
-                nsd->cappedTruncateAfter(ns(), truncAt, false);
-                ASSERT_EQUALS( nsd->numRecords() , 28 );
+                collection()->temp_cappedTruncateAfter(truncAt, false);
+                ASSERT_EQUALS( collection()->numRecords() , 28u );
 
                 {
                     DiskLoc loc;

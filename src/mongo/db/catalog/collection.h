@@ -188,6 +188,16 @@ namespace mongo {
          * as will other characteristics
          */
         Status truncate();
+
+        /**
+         * Truncate documents newer than the document at 'end' from the capped
+         * collection.  The collection cannot be completely emptied using this
+         * function.  An assertion will be thrown if that is attempted.
+         * @param inclusive - Truncate 'end' as well iff true
+         * XXX: this will go away soon, just needed to move for now
+         */
+        void temp_cappedTruncateAfter( DiskLoc end, bool inclusive );
+
         // -----------
 
 

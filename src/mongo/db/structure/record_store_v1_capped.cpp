@@ -110,4 +110,8 @@ namespace mongo {
 
         return Status::OK();
     }
+
+    void CappedRecordStoreV1::temp_cappedTruncateAfter( DiskLoc end, bool inclusive ) {
+        _details->cappedTruncateAfter( _ns.c_str(), end, inclusive );
+    }
 }

@@ -501,4 +501,10 @@ namespace mongo {
 
         return Status::OK();
     }
+
+    void Collection::temp_cappedTruncateAfter( DiskLoc end, bool inclusive) {
+        invariant( isCapped() );
+        ((CappedRecordStoreV1*)_recordStore.get())->temp_cappedTruncateAfter( end, inclusive );
+    }
+
 }

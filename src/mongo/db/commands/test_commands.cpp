@@ -153,7 +153,7 @@ namespace mongo {
                 Runner::RunnerState state = runner->getNext(NULL, &end);
                 massert( 13418, "captrunc invalid n", Runner::RUNNER_ADVANCED == state);
             }
-            collection->detailsWritable()->cappedTruncateAfter( nss.ns().c_str(), end, inc );
+            collection->temp_cappedTruncateAfter( end, inc );
             return true;
         }
     };
