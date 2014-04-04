@@ -162,9 +162,9 @@ if test "$wt_cv_docs_exist" = "no"; then
 fi
 
 if test "$wt_cv_docs_exist" = "yes" -o "$DOXYGEN" = "doxygen" ; then
-	MAN1_PAGES="docs/man/man1/wt.1"
+	MAN1_PAGES="$srcdir/docs/man/man1/wt.1"
 	AC_SUBST(MAN1_PAGES)
-	MAN3_PAGES="docs/man/man3/wiredtiger.3"
+	MAN3_PAGES="$srcdir/docs/man/man3/wiredtiger.3"
 	AC_SUBST(MAN3_PAGES)
 fi
 
