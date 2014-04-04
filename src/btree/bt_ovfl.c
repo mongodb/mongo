@@ -59,12 +59,7 @@ __wt_ovfl_read(WT_SESSION_IMPL *session,
 	 * the on-page cell type will have been reset to WT_CELL_VALUE_OVFL_RM
 	 * and we will be passed a page so we can look-aside into the cache of
 	 * such values.
-	 */
-	if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
-	    return (
-		__wt_ovfl_txnc_search(page, unpack->data, unpack->size, store));
-
-	/*
+	 *
 	 * Acquire the overflow lock, and retest the on-page cell's value inside
 	 * the lock.
 	 */
