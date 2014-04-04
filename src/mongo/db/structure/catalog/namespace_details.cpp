@@ -161,51 +161,6 @@ namespace mongo {
         return allocationSize;
     }
 
-    /** allocate space for a new record from deleted lists.
-        @param lenToAlloc is WITH header
-        @return null diskloc if no room - allocate a new extent then
-    */
-    DiskLoc NamespaceDetails::alloc(Collection* collection, const StringData& ns, int lenToAlloc) {
-        // if we are capped, collection must be non-NULL
-        invariant( isCapped() );
-        invariant( collection );
-
-        {
-            // align very slightly.
-            lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
-        }
-
-        DiskLoc loc = cappedAlloc(collection, ns, lenToAlloc);
-        if ( loc.isNull() )
-            return loc;
-
-        DeletedRecord *r = loc.drec();
-        //r = getDur().writing(r);
-
-        /* note we want to grab from the front so our next pointers on disk tend
-        to go in a forward direction which is important for performance. */
-        int regionlen = r->lengthWithHeaders();
-        verify( r->extentOfs() < loc.getOfs() );
-
-        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << endl;
-
-        int left = regionlen - lenToAlloc;
-
-        /* split off some for further use. */
-        getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
-        DiskLoc newDelLoc = loc;
-        newDelLoc.inc(lenToAlloc);
-        DeletedRecord* newDel = newDelLoc.drec();
-        DeletedRecord* newDelW = getDur().writing(newDel);
-        newDelW->extentOfs() = r->extentOfs();
-        newDelW->lengthWithHeaders() = left;
-        newDelW->nextDeleted().Null();
-
-        addDeletedRec(newDel, newDelLoc);
-
-        return loc;
-    }
-
     DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
         for (DiskLoc i = startExtent.isNull() ? _firstExtent : startExtent;
                 !i.isNull(); i = i.ext()->xnext ) {

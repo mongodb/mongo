@@ -17,7 +17,6 @@ t.insert( { x : 1 } );
 
 var res = t.insert( { x : 2 , bigString : bigString } );
 assert.writeError( res );
-assert.eq( 16328, res.getWriteError().code, res.getWriteError().toString() );
 
 assert.eq( 1 , t.count() ); // make sure small doc didn't get deleted
 assert.eq( 1 , t.findOne().x );

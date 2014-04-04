@@ -61,13 +61,130 @@ namespace mongo {
     CappedRecordStoreV1::~CappedRecordStoreV1() {
     }
 
-    StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord( int lengthWithHeaders, int quotaMax ) {
-        DiskLoc loc = _details->alloc( _collection, _ns, lengthWithHeaders );
-        if ( !loc.isNull() )
-            return StatusWith<DiskLoc>( loc );
+    StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord( int lenToAlloc, int quotaMax ) {
+        {
+            // align very slightly.
+            lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+        }
 
-        return StatusWith<DiskLoc>( ErrorCodes::InternalError,
-                                    "no space in capped collection" );
+        if ( lenToAlloc > _details->theCapExtent()->length ) {
+            // the extent check is a way to try and improve performance
+            // since we have to iterate all the extents (for now) to get
+            // storage size
+            if ( lenToAlloc > _collection->storageSize() ) {
+                return StatusWith<DiskLoc>( ErrorCodes::BadValue,
+                                            str::stream() << "document is larger than capped size "
+                                            << lenToAlloc << " > " << _collection->storageSize(),
+                                            16328 );
+            }
+
+        }
+        DiskLoc loc;
+        { // do allocation
+
+            // signal done allocating new extents.
+            if ( !_details->cappedLastDelRecLastExtent().isValid() )
+                getDur().writingDiskLoc( _details->cappedLastDelRecLastExtent() ) = DiskLoc();
+
+            verify( lenToAlloc < 400000000 );
+            int passes = 0;
+            int maxPasses = ( lenToAlloc / 30 ) + 2; // 30 is about the smallest entry that could go in the oplog
+            if ( maxPasses < 5000 ) {
+                // this is for bacwards safety since 5000 was the old value
+                maxPasses = 5000;
+            }
+
+            // delete records until we have room and the max # objects limit achieved.
+
+            /* this fails on a rename -- that is ok but must keep commented out */
+            //verify( theCapExtent()->ns == ns );
+
+            _details->theCapExtent()->assertOk();
+            DiskLoc firstEmptyExtent;
+            while ( 1 ) {
+                if ( _details->_stats.nrecords < _details->maxCappedDocs() ) {
+                    loc = _details->__capAlloc( lenToAlloc );
+                    if ( !loc.isNull() )
+                        break;
+                }
+
+                // If on first iteration through extents, don't delete anything.
+                if ( !_details->_capFirstNewRecord.isValid() ) {
+                    _details->advanceCapExtent( _ns );
+
+                    if ( _details->_capExtent != _details->_firstExtent )
+                        _details->_capFirstNewRecord.writing().setInvalid();
+                    // else signal done with first iteration through extents.
+                    continue;
+                }
+
+                if ( !_details->_capFirstNewRecord.isNull() &&
+                     _details->theCapExtent()->firstRecord == _details->_capFirstNewRecord ) {
+                    // We've deleted all records that were allocated on the previous
+                    // iteration through this extent.
+                    _details->advanceCapExtent( _ns );
+                    continue;
+                }
+
+                if ( _details->theCapExtent()->firstRecord.isNull() ) {
+                    if ( firstEmptyExtent.isNull() )
+                        firstEmptyExtent = _details->_capExtent;
+                    _details->advanceCapExtent( _ns );
+                    if ( firstEmptyExtent == _details->_capExtent ) {
+                        _details->maybeComplain( _ns, lenToAlloc );
+                        return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                                    "no space in capped collection" );
+                    }
+                    continue;
+                }
+
+                DiskLoc fr = _details->theCapExtent()->firstRecord;
+                _collection->deleteDocument( fr, true );
+                _details->compact();
+                if( ++passes > maxPasses ) {
+                    StringBuilder sb;
+                    sb << "passes >= maxPasses in NamespaceDetails::cappedAlloc: ns: " << _ns
+                       << ", lenToAlloc: " << lenToAlloc
+                       << ", maxPasses: " << maxPasses
+                       << ", _maxDocsInCapped: " << _details->_maxDocsInCapped
+                       << ", nrecords: " << _details->_stats.nrecords
+                       << ", datasize: " << _details->_stats.datasize;
+
+                    return StatusWith<DiskLoc>( ErrorCodes::InternalError, sb.str() );
+                }
+            }
+
+            // Remember first record allocated on this iteration through capExtent.
+            if ( _details->_capFirstNewRecord.isValid() && _details->_capFirstNewRecord.isNull() )
+                getDur().writingDiskLoc(_details->_capFirstNewRecord) = loc;
+        }
+
+        invariant( !loc.isNull() );
+
+        // possibly slice up if we've allocated too much space
+
+        DeletedRecord *r = loc.drec();
+
+        /* note we want to grab from the front so our next pointers on disk tend
+        to go in a forward direction which is important for performance. */
+        int regionlen = r->lengthWithHeaders();
+        invariant( r->extentOfs() < loc.getOfs() );
+
+        int left = regionlen - lenToAlloc;
+
+        /* split off some for further use. */
+        getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
+        DiskLoc newDelLoc = loc;
+        newDelLoc.inc(lenToAlloc);
+        DeletedRecord* newDel = newDelLoc.drec();
+        DeletedRecord* newDelW = getDur().writing(newDel);
+        newDelW->extentOfs() = r->extentOfs();
+        newDelW->lengthWithHeaders() = left;
+        newDelW->nextDeleted().Null();
+
+        _details->addDeletedRec(newDel, newDelLoc);
+
+        return StatusWith<DiskLoc>( loc );
     }
 
     Status CappedRecordStoreV1::truncate() {

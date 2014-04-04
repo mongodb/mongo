@@ -175,7 +175,6 @@ namespace mongo {
         Extent *theCapExtent() const { return _capExtent.ext(); }
         void advanceCapExtent( const StringData& ns );
         DiskLoc __capAlloc(int len);
-        DiskLoc cappedAlloc(Collection* collection, const StringData& ns, int len);
         DiskLoc &cappedFirstDeletedInCurExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
 
@@ -378,12 +377,6 @@ namespace mongo {
          */
         static int quantizePowerOf2AllocationSpace(int allocSize);
 
-        /** allocate space for a new record from deleted lists.
-            @param lenToAlloc is WITH header
-            @return null diskloc if no room - allocate a new extent then
-        */
-    private:
-        DiskLoc alloc(Collection* collection, const StringData& ns, int lenToAlloc);
     public:
 
         /* add a given record to the deleted chains for this NS */
