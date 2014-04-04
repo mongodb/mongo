@@ -327,8 +327,6 @@ struct __wt_page_modify {
 
 #define	WT_PAGE_LOCK(s, p)						\
 	__wt_spin_lock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
-#define	WT_PAGE_TRYLOCK(s, p, idp)					\
-	__wt_spin_trylock((s), &S2C(s)->page_lock[(p)->modify->page_lock], idp)
 #define	WT_PAGE_UNLOCK(s, p)						\
 	__wt_spin_unlock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
 	uint8_t page_lock;    /* Page's spinlock */
