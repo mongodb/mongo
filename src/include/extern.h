@@ -306,8 +306,6 @@ extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
-extern int __wt_evict_file(WT_SESSION_IMPL *session, int syncop);
-extern int __wt_sync_file(WT_SESSION_IMPL *session, int syncop);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
 extern void __wt_cache_dump(WT_SESSION_IMPL *session);
 extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[]);
