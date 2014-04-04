@@ -695,17 +695,9 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_TXNC **e, **head, *txnc;
 	size_t decr;
-	uint64_t oldest_id;
 	int i;
 
 	head = page->modify->ovfl_track->ovfl_txnc;
-
-	/*
-	 * Get the oldest transaction ID not yet visible to a running
-	 * transaction.  Do this before doing anything else, avoiding any race
-	 * with transactions ending while we examine values.
-	 */
-	oldest_id = S2C(session)->txn_global.oldest_id;
 
 	/*
 	 * Discard any transaction-cache records with transaction IDs earlier
@@ -716,7 +708,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
 		for (e = &head[i]; *e != NULL;) {
-			if (TXNID_LE(oldest_id, (*e)->current)) {
+			if (!__wt_txn_visible_all(session, (*e)->current)) {
 				e = &(*e)->next[i];
 				continue;
 			}
@@ -726,7 +718,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Second, discard any no longer needed transaction-cache records. */
 	decr = 0;
 	for (e = &head[0]; (txnc = *e) != NULL;) {
-		if (TXNID_LE(oldest_id, (*e)->current)) {
+		if (!__wt_txn_visible_all(session, txnc->current)) {
 			e = &(*e)->next[0];
 			continue;
 		}
