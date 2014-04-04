@@ -128,11 +128,11 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If there are WT_UPDATE structures to review, we're evicting pages,
-	 * and no other thread holds the page's spinlock, discard obsolete
-	 * WT_UPDATE structures.  Serialization is needed so only one thread
-	 * does the obsolete check at a time, and also to protect updates from
-	 * disappearing under reconciliation.
+	 * If there are subsequent WT_UPDATE structures, we're evicting pages
+	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
+	 * structures.  Serialization is needed so only one thread does the
+	 * obsolete check at a time, and to protect updates from disappearing
+	 * under reconciliation.
 	 */
 	if (upd->next != NULL &&
 	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
