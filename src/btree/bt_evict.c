@@ -575,15 +575,15 @@ err:		/* On error, clear any left-over tree walk. */
 int
 __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 {
+	struct timespec end, start;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *walk_page;
 	WT_TXN *txn;
-	uint32_t flags;
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
-	struct timespec end, start;
+	uint32_t flags;
 
 	btree = S2BT(session);
 	walk_page = NULL;
@@ -660,16 +660,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	/* On error, clear any left-over tree walk. */
-	if (walk_page != NULL)
-		WT_TRET(__wt_page_release(session, walk_page));
-
-	if (txn->isolation == TXN_ISO_READ_COMMITTED &&
-	    session->ncursors == 0)
-		__wt_txn_release_snapshot(session);
-
 	if (WT_VERBOSE_ISSET(session, checkpoint)) {
-		WT_RET(__wt_epoch(session, &end));
+		WT_ERR(__wt_epoch(session, &end));
 		WT_VERBOSE_ERR(session, checkpoint,
 		    "__wt_sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
@@ -680,6 +672,14 @@ err:	/* On error, clear any left-over tree walk. */
 		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
 		    WT_TIMEDIFF(end, start) / WT_MILLION);
 	}
+
+err:	/* On error, clear any left-over tree walk. */
+	if (walk_page != NULL)
+		WT_TRET(__wt_page_release(session, walk_page));
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED && session->ncursors == 0)
+		__wt_txn_release_snapshot(session);
+
 	if (btree->checkpointing) {
 		/*
 		 * Clear the checkpoint flag and push the change; not required,
