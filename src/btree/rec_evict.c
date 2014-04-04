@@ -380,14 +380,9 @@ __rec_review(
 		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, ref, NULL, flags));
-
-		/*
-		 * If not all of the changes on the page were written, we
-		 * can't evict.
-		 */
-		if (__wt_page_is_modified(page) &&
-		    !F_ISSET(page->modify, WT_PM_REC_MULTIBLOCK))
-			return (EBUSY);
+		WT_ASSERT(session,
+		    !__wt_page_is_modified(page) ||
+		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));
 	} else {
 		/*
 		 * If the page was ever modified, make sure all of the updates
