@@ -19,20 +19,22 @@ replTest.awaitReplication();
 
 // stepdown should fail since there is no-one to elect within 10 secs
 testDB.adminCommand({replSetStepDown:5});
-assert(new Mongo(firstPrimary).getDB("a").isMaster().ismaster, "not master")
+assert(master.getDB("a").isMaster().ismaster, "not master")
 
 // step down the primary asyncronously so it doesn't kill this test
-var command = "tojson(db.adminCommand({replSetStepDown:1000, force:true}));"
-// set db so startParallelShell works
-db = testDB;
-var waitfunc = startParallelShell(command);
-sleep(100) // startParallelShell doesn't block
+var wait = startParallelShell("db.adminCommand({replSetStepDown:1000, force:true})", master.port);
+wait();
 
 // check that the old primary is no longer master
 assert.soon( function() {
-    var isMaster = new Mongo(firstPrimary).getDB("a").isMaster();
-    printjson(isMaster);
-    return !(isMaster.ismaster);
+    try {
+        var isMaster = master.getDB("a").isMaster();
+        printjson(isMaster);
+        return !(isMaster.ismaster);
+    } catch (e) {
+        return false;
+    }
   }, "they shouldn't be master, but are")
+
 // stop
 replTest.stopSet();
