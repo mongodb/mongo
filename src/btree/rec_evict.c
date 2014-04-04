@@ -24,6 +24,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
+	WT_TXN_STATE *txn_state;
 	int istree;
 
 	page = ref->page;
@@ -31,6 +32,16 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
+
+	/*
+	 * Pin the oldest transaction ID: eviction looks at page structures
+	 * that are freed when no transaction in the system needs them.
+	 */
+	txn_state = WT_SESSION_TXN_STATE(session);
+	if (txn_state->snap_min == WT_TXN_NONE)
+		txn_state->snap_min = S2C(session)->txn_global.oldest_id;
+	else
+		txn_state = NULL;
 
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
@@ -93,6 +104,9 @@ err:		/*
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
 	session->excl_next = 0;
+
+	if (txn_state != NULL)
+		txn_state->snap_min = WT_TXN_NONE;
 
 	return (ret);
 }
@@ -366,7 +380,6 @@ __rec_review(
 		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, ref, NULL, flags));
-
 		WT_ASSERT(session,
 		    !__wt_page_is_modified(page) ||
 		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));

@@ -318,13 +318,13 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 
 		btree = dhandle->handle;
 		session->dhandle = dhandle;
-		if ((ref = btree->evict_page) != NULL) {
+		if ((ref = btree->evict_ref) != NULL) {
 			/*
-			 * Clear evict_page first, in case releasing it forces
+			 * Clear evict_ref first, in case releasing it forces
 			 * eviction (we check that we never try to evict the
 			 * current eviction walk point.
 			 */
-			btree->evict_page = NULL;
+			btree->evict_ref = NULL;
 			WT_TRET(__wt_page_release(session, ref));
 		}
 		session->dhandle = NULL;
@@ -349,7 +349,7 @@ __evict_tree_walk_clear(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
-	while (btree->evict_page != NULL) {
+	while (btree->evict_ref != NULL) {
 		F_SET(cache, WT_EVICT_CLEAR_WALKS);
 		WT_RET(__wt_cond_wait(
 		    session, cache->evict_waiter_cond, 100000));
@@ -392,6 +392,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	ret = __wt_rec_evict(session, ref, 0);
 	txn->isolation = saved_iso;
+
 	return (ret);
 }
 
@@ -456,7 +457,7 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 
-	WT_ASSERT(session, btree->evict_page == NULL);
+	WT_ASSERT(session, btree->evict_ref == NULL);
 
 	F_CLR(btree, WT_BTREE_NO_EVICTION);
 }
@@ -489,7 +490,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
-	WT_RET(__wt_tree_walk(
+	WT_ERR(__wt_tree_walk(
 	    session, &next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
 	while ((ref = next_ref) != NULL) {
 		page = ref->page;
@@ -591,7 +592,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
 	if (WT_VERBOSE_ISSET(session, checkpoint))
-		WT_RET(__wt_epoch(session, &start));
+		WT_ERR(__wt_epoch(session, &start));
 
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
@@ -615,8 +616,6 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 				++leaf_pages;
 				ret =
 				    __wt_rec_write(session, walk_page, NULL, 0);
-				if (txn->isolation == TXN_ISO_READ_COMMITTED)
-					__wt_txn_release_snapshot(session);
 				WT_ERR(ret);
 			}
 		}
@@ -664,6 +663,10 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 err:	/* On error, clear any left-over tree walk. */
 	if (walk_page != NULL)
 		WT_TRET(__wt_page_release(session, walk_page));
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED &&
+	    session->ncursors == 0)
+		__wt_txn_release_snapshot(session);
 
 	if (WT_VERBOSE_ISSET(session, checkpoint)) {
 		WT_RET(__wt_epoch(session, &end));
@@ -852,7 +855,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		 * to evict, anyway.
 		 */
 		btree = dhandle->handle;
-		if (btree->root_page.page == NULL ||
+		if (btree->root.page == NULL ||
 		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 		    btree->bulk_load_ok)
 			continue;
@@ -974,10 +977,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	 */
 	for (evict = start, pages_walked = 0, internal_pages = restarts = 0;
 	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
-	    ret = __wt_tree_walk(session, &btree->evict_page, walk_flags),
+	    ret = __wt_tree_walk(session, &btree->evict_ref, walk_flags),
 	    ++pages_walked) {
-		if (btree->evict_page == NULL) {
-			ret = 0;
+		if (btree->evict_ref == NULL) {
 			/*
 			 * Take care with terminating this loop.
 			 *
@@ -991,9 +993,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		}
 
 		/* Ignore root pages entirely. */
-		if (__wt_ref_is_root(btree->evict_page))
+		if (__wt_ref_is_root(btree->evict_ref))
 			continue;
-		page = btree->evict_page->page;
+		page = btree->evict_ref->page;
 
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
@@ -1070,12 +1072,16 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 			continue;
 
 		WT_ASSERT(session, evict->ref == NULL);
-		__evict_init_candidate(session, evict, btree->evict_page);
+		__evict_init_candidate(session, evict, btree->evict_ref);
 		++evict;
 
 		WT_VERBOSE_RET(session, evictserver,
 		    "select: %p, size %" PRIu64, page, page->memory_footprint);
 	}
+
+	/* If the walk was interrupted by a locked page, that's okay. */
+	if (ret == WT_NOTFOUND)
+		ret = 0;
 
 	*slotp += (u_int)(evict - start);
 	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, pages_walked);
@@ -1247,7 +1253,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 			continue;
 
 		btree = dhandle->handle;
-		if (btree->root_page.page == NULL ||
+		if (btree->root.page == NULL ||
 		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 		    btree->bulk_load_ok)
 			continue;

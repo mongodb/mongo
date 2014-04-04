@@ -17,6 +17,13 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	WT_FOTXN *fotxn;
 	size_t i;
 
+	/*
+	 * Make sure the current thread has a transaction pinned so that
+	 * we don't immediately free the memory we are stashing.
+	 */
+	WT_ASSERT(session,
+	    WT_SESSION_TXN_STATE(session)->snap_min != WT_TXN_NONE);
+
 	/* Grow the list as necessary. */
 	WT_RET(__wt_realloc_def(session,
 	    &session->fotxn_size, session->fotxn_cnt + 1, &session->fotxn));
@@ -25,7 +32,9 @@ __wt_session_fotxn_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	for (i = 0, fotxn = session->fotxn;
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
 		if (fotxn->p == NULL) {
-			fotxn->txnid = S2C(session)->txn_global.current;
+			fotxn->txnid = S2C(session)->txn_global.current + 1;
+			WT_ASSERT(session,
+			    !__wt_txn_visible_all(session, fotxn->txnid));
 			fotxn->p = p;
 			fotxn->len = len;
 			break;
@@ -49,7 +58,6 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
     WT_SESSION_IMPL *session, int connection_close)
 {
 	WT_FOTXN *fotxn;
-	uint64_t oldest_id;
 	size_t i;
 
 	/*
@@ -58,18 +66,12 @@ __wt_session_fotxn_discard(WT_SESSION_IMPL *session_safe,
 	 * arguments: session_safe is still linked to the WT_CONNECTION and
 	 * can be safely used for calls to other WiredTiger functions, while
 	 * session is the WT_SESSION_IMPL we're cleaning up.
-	 *
-	 * Get the oldest transaction ID not yet visible to a running
-	 * transaction.
 	 */
-	oldest_id = connection_close ?
-	    WT_TXN_NONE : S2C(session_safe)->txn_global.oldest_id;
-
 	for (i = 0, fotxn = session->fotxn;
 	    session->fotxn_cnt > 0 &&
 	    i < session->fotxn_size / sizeof(session->fotxn[0]);  ++i, ++fotxn)
-		if (fotxn->p != NULL &&
-		    (connection_close || TXNID_LT(fotxn->txnid, oldest_id))) {
+		if (fotxn->p != NULL && (connection_close ||
+		    __wt_txn_visible_all(session_safe, fotxn->txnid))) {
 			--session->fotxn_cnt;
 
 			/*

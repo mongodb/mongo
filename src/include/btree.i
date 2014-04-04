@@ -215,10 +215,14 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
  *      Return the page's index and slot for a reference.
  */
 static inline void
-__wt_page_refp(WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+__wt_page_refp(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
 	WT_PAGE_INDEX *pindex;
 	uint32_t i;
+
+	WT_ASSERT(session,
+	    WT_SESSION_TXN_STATE(session)->snap_min != WT_TXN_NONE);
 
 	/*
 	 * Copy the parent page's index value: the page can split at any time,
@@ -824,7 +828,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 	WT_REF *first;
 
 	btree = S2BT(session);
-	root = btree->root_page.page;
+	root = btree->root.page;
 
 	/* Check for a non-existent tree. */
 	if (root == NULL)

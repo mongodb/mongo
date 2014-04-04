@@ -27,7 +27,7 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * A version of the page-out function that allows us to make additional
 	 * diagnostic checks.
 	 */
-	WT_ASSERT(session, S2BT(session)->evict_page != ref);
+	WT_ASSERT(session, S2BT(session)->evict_ref != ref);
 
 	__wt_page_out(session, &ref->page);
 }

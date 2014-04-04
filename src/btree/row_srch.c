@@ -158,7 +158,7 @@ restart:
 
 	/* Search the internal pages of the tree. */
 	cmp = -1;
-	parent = child = &btree->root_page;
+	parent = child = &btree->root;
 	for (depth = 2;; ++depth) {
 		page = parent->page;
 		if (page->type != WT_PAGE_ROW_INT)
@@ -438,7 +438,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 restart:
 	/* Walk the internal pages of the tree. */
-	parent = child = &btree->root_page;
+	parent = child = &btree->root;
 	for (;;) {
 		page = parent->page;
 		if (page->type != WT_PAGE_ROW_INT)
@@ -477,7 +477,7 @@ restart:
 		 */
 		cbt->ref = child;
 		cbt->compare = 0;
-		pindex = WT_INTL_INDEX_COPY(btree->root_page.page);
+		pindex = WT_INTL_INDEX_COPY(btree->root.page);
 		cbt->slot = pindex->entries < 2 ?
 		    __wt_random() % page->pg_row_entries : 0;
 		return (0);
