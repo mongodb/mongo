@@ -93,7 +93,8 @@ namespace mongo {
             set in PREPLOGBUFFER, it is NOT set immediately on write intent declaration.
             reset to false in REMAPPRIVATEVIEW
         */
-        bool& willNeedRemap() { return _willNeedRemap; }
+        bool willNeedRemap() { return _willNeedRemap; }
+        void setWillNeedRemap() { _willNeedRemap = true; }
 
         void remapThePrivateView();
 

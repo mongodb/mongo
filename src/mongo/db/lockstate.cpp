@@ -235,7 +235,7 @@ namespace mongo {
             return Lock::nestableLockStat( _whichNestable );
 
         if ( _otherCount && _otherLock )
-            return &_otherLock->stats;
+            return &_otherLock->getStats();
         
         if ( isRW() ) 
             return Lock::globalLockStat();

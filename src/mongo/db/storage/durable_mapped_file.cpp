@@ -49,6 +49,8 @@ namespace mongo {
     void DurableMappedFile::remapThePrivateView() {
         verify(storageGlobalParams.dur);
 
+        _willNeedRemap = false;
+
         // todo 1.9 : it turns out we require that we always remap to the same address.
         // so the remove / add isn't necessary and can be removed?
         void *old = _view_private;

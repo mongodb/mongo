@@ -235,7 +235,7 @@ namespace ThreadedTests {
                                 "bar6", "bar7", "bar8", "bar9", "bar10" };
                             Lock::DBWrite w(dbnames[q]);
                             {
-                                Lock::DBWrite::UpgradeToExclusive wToX;
+                                Lock::UpgradeGlobalLockToExclusive wToX;
                                 if (wToX.gotUpgrade()) {
                                     ++wToXSuccessfulUpgradeCount;
                                 }

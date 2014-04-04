@@ -32,13 +32,11 @@
 
 #include "mutex.h"
 
-#if defined(RWLOCK_TEST)
-namespace mongo { 
-    typedef RWLockBase1 RWLockBase;
-}
-#elif defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
+#if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
 
-// windows slimreaderwriter version.  newer windows versions only
+// Windows slimreaderwriter version. Newer windows versions only. Under contention this is slower
+// than boost::shared_mutex, but see https://jira.mongodb.org/browse/SERVER-2327 for why it cannot 
+// be used.
 
 namespace mongo {
     unsigned long long curTimeMicros64();
@@ -92,71 +90,7 @@ namespace mongo {
     };
 }
 
-#elif( BOOST_VERSION < 103500 ) 
-
-# if !defined(BOOST_VERSION)
-#  error BOOST_VERSION is not defined 
-# endif
-# if defined(_WIN32)
-#  error need boost >= 1.35 for windows
-# endif
-
-// pthreads version
-
-# include <pthread.h>
-# include <errno.h>
-
-namespace mongo { 
-    class RWLockBase : boost::noncopyable {
-        friend class SimpleRWLock;
-        pthread_rwlock_t _lock;
-        static void check( int x ) {
-            verify( x == 0 );
-        }        
-    protected:
-        ~RWLockBase() {
-            if ( ! StaticObserver::_destroyingStatics ) {
-                wassert( pthread_rwlock_destroy( &_lock ) == 0 ); // wassert as don't want to throw from a destructor
-            }
-        }
-        RWLockBase() {
-            check( pthread_rwlock_init( &_lock , 0 ) );
-        }
-        void lock() { check( pthread_rwlock_wrlock( &_lock ) ); }
-        void unlock() { check( pthread_rwlock_unlock( &_lock ) ); }
-        void lock_shared() { check( pthread_rwlock_rdlock( &_lock ) ); }
-        void unlock_shared() { check( pthread_rwlock_unlock( &_lock ) ); }
-        bool lock_shared_try( int millis ) { return _try( millis , false ); }
-        bool lock_try( int millis = 0 ) { return _try( millis , true ); }
-        bool _try( int millis , bool write ) {
-            while ( true ) {
-                int x = write ?
-                        pthread_rwlock_trywrlock( &_lock ) :
-                        pthread_rwlock_tryrdlock( &_lock );
-                if ( x <= 0 )
-                    return true;
-                if ( millis-- <= 0 )
-                    return false;
-                if ( x == EBUSY ) {
-                    sleepmillis(1);
-                    continue;
-                }
-                check(x);
-            }
-            return false;
-        }
-        // no upgradable for this impl
-        void lockAsUpgradable() { lock(); }
-        void unlockFromUpgradable() { unlock(); }
-        void upgrade() { }
-    public:
-        const char * implType() const { return "posix"; }
-    };
-}
-
 #else
-
-// Boost version
 
 # if defined(_WIN32)
 #  include "shared_mutex_win.hpp"

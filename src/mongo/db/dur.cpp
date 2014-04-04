@@ -314,7 +314,7 @@ namespace mongo {
 
                     LOG(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
                            << endl;
-                    Lock::DBWrite::UpgradeToExclusive ex;
+                    Lock::UpgradeGlobalLockToExclusive ex;
                     if (ex.gotUpgrade()) {
                         commitNow();
                     }
@@ -552,7 +552,6 @@ namespace mongo {
                     DurableMappedFile *mmf = (DurableMappedFile*) *i;
                     verify(mmf);
                     if( mmf->willNeedRemap() ) {
-                        mmf->willNeedRemap() = false;
                         mmf->remapThePrivateView();
                     }
                     i++;
