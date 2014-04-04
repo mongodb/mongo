@@ -191,21 +191,14 @@ namespace mongo {
             BSONObj currObj;
             int results = 0;
             while ((results < numWanted) && Runner::RUNNER_ADVANCED == runner->getNext(&currObj, NULL)) {
-                // cout << "result is " << currObj.toString() << endl;
 
+                // Come up with the correct distance.
                 double dist = currObj["$dis"].number() * distanceMultiplier;
-                // cout << std::setprecision(10) << "HK GEON mul'd dist is " << dist << " raw dist is " << currObj["$dis"].number() << endl;
                 totalDistance += dist;
                 if (dist > farthestDist) { farthestDist = dist; }
 
-                BSONObjBuilder oneResultBuilder(
-                    resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
-                oneResultBuilder.append("dis", dist);
-                if (includeLocs) {
-                    oneResultBuilder.appendAs(currObj["$pt"], "loc");
-                }
-
-                // strip out '$dis' and '$pt' and the rest gets added as 'obj'.
+                // Strip out '$dis' and '$pt' from the result obj.  The rest gets added as 'obj'
+                // in the command result.
                 BSONObjIterator resIt(currObj);
                 BSONObjBuilder resBob;
                 while (resIt.more()) {
@@ -215,7 +208,23 @@ namespace mongo {
                         resBob.append(elt);
                     }
                 }
-                oneResultBuilder.append("obj", resBob.obj());
+                BSONObj resObj = resBob.obj();
+
+                // Don't make a too-big result object.
+                if (resultBuilder.len() + resObj.objsize()> BSONObjMaxUserSize) {
+                    warning() << "Too many geoNear results for query " << rewritten.toString()
+                              << ", truncating output.";
+                    break;
+                }
+
+                // Add the next result to the result builder.
+                BSONObjBuilder oneResultBuilder(
+                    resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
+                oneResultBuilder.append("dis", dist);
+                if (includeLocs) {
+                    oneResultBuilder.appendAs(currObj["$pt"], "loc");
+                }
+                oneResultBuilder.append("obj", resObj);
                 oneResultBuilder.done();
                 ++results;
             }
