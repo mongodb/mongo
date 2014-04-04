@@ -149,6 +149,24 @@ namespace mongo {
 
         invariant( save == _entries.find( descriptor ) );
         invariant( save == _entries.find( descriptor->indexName() ) );
+
+        // check index to see if wants us to do special things
+
+        { // power of 2
+            bool requirePowerOf2 = false;
+            if ( IndexNames::findPluginName( descriptor->keyPattern() ) == IndexNames::TEXT )
+                requirePowerOf2 = true;
+
+            if ( descriptor->getInfoElement("expireAfterSeconds").isNumber() )
+                requirePowerOf2 = true;
+
+            if ( requirePowerOf2 ) {
+                if ( _details->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes) ) {
+                    _details->syncUserFlags( _collection->ns().ns() );
+                }
+            }
+        }
+
         return save;
     }
 
@@ -341,13 +359,6 @@ namespace mongo {
             // sanity check
             int idxNo = _details->_catalogFindIndexByName( idxName, true );
             invariant( idxNo < numIndexesReady() );
-
-            // some special cases stuff
-            if ( pluginName == IndexNames::TEXT ) {
-                if ( _details->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes) ) {
-                    _details->syncUserFlags( _collection->ns().ns() );
-                }
-            }
 
             return Status::OK();
         }

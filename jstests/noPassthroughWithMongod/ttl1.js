@@ -22,7 +22,7 @@ assertEntryMatches = function(array, regex) {
 // Part 1
 var t = db.ttl1;
 t.drop();
-
+t.runCommand( "create", { flags : 0 } );
 var now = (new Date()).getTime();
 
 for (i=0; i<24; i++) {
@@ -50,10 +50,13 @@ var log = db.adminCommand({getLog: "global"}).log;
 var msg = RegExp("ttl indexes require the expireAfterSeconds" +
                  " field to be numeric but received a type of:");
 assertEntryMatches(log, msg);
-// Part 2
-t.ensureIndex( { x : 1 } , { expireAfterSeconds : 20000 } );
 
-assert.soon( 
+// Part 2
+assert.eq( 0, t.stats().userFlags );
+t.ensureIndex( { x : 1 } , { expireAfterSeconds : 20000 } );
+assert.eq( 1, t.stats().userFlags );
+
+assert.soon(
     function() {
         return t.count() < 30;
     }, "TTL index on x didn't delete" , 70 * 1000

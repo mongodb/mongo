@@ -67,7 +67,9 @@ namespace mongo {
         
         void doTTLForDB( const string& dbName ) {
 
-            bool isMaster = isMasterNs( dbName.c_str() );
+            if ( !isMasterNs( dbName.c_str() ) )
+                return;
+
             vector<BSONObj> indexes;
             {
                 auto_ptr<DBClientCursor> cursor =
@@ -119,15 +121,10 @@ namespace mongo {
                         continue;
                     }
 
-                    NamespaceDetails* nsd = collection->detailsWritable();
-                    if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
-                        // TODO: wish there was a cleaner way to do this
-                        nsd->syncUserFlags( ns );
-                    }
-
-                    // only do deletes if on master
-                    if ( ! isMaster ) {
-                        continue;
+                    if ( !isMasterNs( dbName.c_str() ) ) {
+                        // we've stepped down since we started this function,
+                        // so we should stop working as we only do deletes on the primary
+                        break;
                     }
 
                     if ( collection->getIndexCatalog()->findIndexByKeyPattern( key ) == NULL ) {
