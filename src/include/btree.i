@@ -231,16 +231,18 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 retry:	pindex = WT_INTL_INDEX_COPY(ref->home);
 
 	/*
-	 * Use the page's WT_REF hint: unless the page has split it should point
-	 * to the correct location.  (It's not an error for a hint to be wrong,
-	 * we usually don't initialize it when a page is first linked into the
-	 * tree, it just means the first retrieval is slower.)  If the page has
-	 * split, we'd expect the hint to point earlier in the array than the
-	 * page's actual WT_REF, so the first loop is from the hint to the end
-	 * of the list and the second loop is from the start of the array to the
-	 * end of the array.  (The second loop overlaps the first, but that will
-	 * only happen in cases where we've deepened the tree and we're going to
-	 * yield the processor anyway.)
+	 * Use the page's reference hint: it should be correct unless the page
+	 * split before our slot.  If the page splits after our slot, the hint
+	 * will point earlier in the array than our actual slot, so the first
+	 * loop is from the hint to the end of the list, and the second loop
+	 * is from the start of the list to the end of the list.  (The second
+	 * loop overlaps the first, but that only happen in cases where we've
+	 * deepened the tree and aren't going to find our slot at all, that's
+	 * not worth optimizing.)
+	 *
+	 * It's not an error for the reference hint to be wrong, it just means
+	 * the first retrieval (which sets the hint for subsequent retrievals),
+	 * is slower.
 	 */
 	for (i = ref->ref_hint; i < pindex->entries; ++i)
 		if (pindex->index[i]->page == ref->page) {
