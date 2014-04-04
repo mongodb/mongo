@@ -1098,6 +1098,7 @@ __wt_block_extlist_read(
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	off_t off, size;
+	int (*func)(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 	const uint8_t *p;
 
 	/* If there isn't a list, we're done. */
@@ -1119,6 +1120,12 @@ __wt_block_extlist_read(
 	WT_EXTLIST_READ(p, size);
 	if (off != WT_BLOCK_EXTLIST_MAGIC || size != 0)
 		goto corrupted;
+
+	/*
+	 * If we're not creating both offset and size skiplists, use the simpler
+	 * append API, otherwise do a full merge.
+	 */
+	func = el->track_size == 0 ? __block_append : __block_merge;
 	for (;;) {
 		WT_EXTLIST_READ(p, off);
 		WT_EXTLIST_READ(p, size);
@@ -1142,14 +1149,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    el->name,
 			    (intmax_t)off, (intmax_t)(off + size));
 
-		/*
-		 * We could insert instead of merge, because ranges shouldn't
-		 * overlap, but merge knows how to allocate WT_EXT structures,
-		 * and a little paranoia is a good thing (if we corrupted the
-		 * list and crashed, and rolled back to a corrupted checkpoint,
-		 * this might save us?)
-		 */
-		WT_ERR(__block_merge(session, el, off, size));
+		WT_ERR(func(session, el, off, size));
 	}
 
 	if (WT_VERBOSE_ISSET(session, block))
