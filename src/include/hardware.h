@@ -160,9 +160,11 @@ static inline void WT_WRITE_BARRIER(void) { return; }
 #if defined(_lint)
 #define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & ((uint32_t)(mask)))
 #define	F_SET_ATOMIC(p, mask)	((p)->flags_atomic |= ((uint32_t)(mask)))
-#define	F_CAS_ATOMIC(p, mask)	F_SET_ATOMIC(p, mask)
+#define	F_CAS_ATOMIC(p, mask, ret)	F_SET_ATOMIC(p, mask)
 #define	F_CLR_ATOMIC(p, mask)	((p)->flags_atomic &= ~((uint32_t)(mask)))
+
 #else
+
 #define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint32_t)(mask))
 
 #define	F_SET_ATOMIC(p, mask)	do {					\
