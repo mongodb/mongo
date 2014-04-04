@@ -368,12 +368,21 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	/*
 	 * The compaction process looks at the page's modification information;
 	 * if compaction is running, lock the page down.
+	 *
+	 * Otherwise, flip on the scanning flag: obsolete updates cannot be
+	 * freed while reconciliation is in progress.
 	 */
 	locked = 0;
 	if (conn->compact_in_memory_pass) {
 		locked = 1;
 		WT_PAGE_LOCK(session, page);
-	}
+	} else
+		for (;;) {
+			F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+			if (ret == 0)
+				break;
+			__wt_yield();
+		}
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -407,6 +416,8 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	/* Release the page lock if we're holding one. */
 	if (locked)
 		WT_PAGE_UNLOCK(session, page);
+	else
+		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
 
 	/*
 	 * Clean up the boundary structures: some workloads result in millions
