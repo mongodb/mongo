@@ -10,8 +10,8 @@
 static int __ckpt_process(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __ckpt_string(
 	WT_SESSION_IMPL *, WT_BLOCK *, const uint8_t *, WT_ITEM *);
-static int __ckpt_update(WT_SESSION_IMPL *,
-	WT_BLOCK *, WT_CKPT *, WT_BLOCK_CKPT *, uint64_t, int);
+static int __ckpt_update(
+	WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *, WT_BLOCK_CKPT *, int);
 
 /*
  * __wt_block_ckpt_init --
@@ -537,7 +537,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 		if (F_ISSET(ckpt, WT_CKPT_UPDATE)) {
 			WT_ASSERT(session, !F_ISSET(ckpt, WT_CKPT_ADD));
 			WT_ERR(__ckpt_update(
-			    session, block, ckpt, ckpt->bpriv, 0, 0));
+			    session, block, ckpt, ckpt->bpriv, 0));
 		}
 
 live_update:
@@ -549,10 +549,10 @@ live_update:
 	/* Update the final, added checkpoint based on the live system. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		if (F_ISSET(ckpt, WT_CKPT_ADD)) {
-			WT_ERR(__ckpt_update(
-			    session, block, ckpt, ci, ckpt_size, 1));
 
 			/*
+			 * Set the checkpoint size for the live system.
+			 *
 			 * !!!
 			 * Our caller wants the final checkpoint size.  Setting
 			 * the size here violates layering, but the alternative
@@ -560,7 +560,8 @@ live_update:
 			 * cookie into its components, and that's a fair amount
 			 * of work.
 			 */
-			ckpt->ckpt_size = ci->ckpt_size;
+			ckpt->ckpt_size = ci->ckpt_size = ckpt_size;
+			WT_ERR(__ckpt_update(session, block, ckpt, ci, 1));
 		}
 
 	/*
@@ -623,9 +624,8 @@ err:	if (locked)
  *	Update a checkpoint.
  */
 static int
-__ckpt_update(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt,
-    WT_BLOCK_CKPT *ci, uint64_t ckpt_size, int is_live)
+__ckpt_update(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_CKPT *ckpt, WT_BLOCK_CKPT *ci, int is_live)
 {
 	WT_EXTLIST *alloc;
 	WT_DECL_ITEM(tmp);
@@ -693,10 +693,6 @@ __ckpt_update(
 	 */
 	if (is_live)
 		ci->file_size = block->fh->size;
-
-	/* Set the checkpoint size for the live system. */
-	if (is_live)
-		ci->ckpt_size = ckpt_size;
 
 	/*
 	 * Copy the checkpoint information into the checkpoint array's address
