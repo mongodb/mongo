@@ -105,7 +105,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		    "__sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of internal\n\t"
-		    "Took: %" PRIu64 "ms\n",
+		    "Took: %" PRIu64 "ms",
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
 		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
