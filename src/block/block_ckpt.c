@@ -299,6 +299,39 @@ __ckpt_extlist_fblocks(
 	    session, &block->live.ckpt_avail, el->offset, el->size));
 }
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __ckpt_verify --
+ *	Diagnostic code, confirm we get what we expect in the checkpoint array.
+ */
+static int
+__ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
+{
+	WT_CKPT *ckpt;
+
+	/*
+	 * Fast check that we're seeing what we expect to see: some number of
+	 * checkpoints to add, delete or ignore, terminated by a new checkpoint.
+	 */
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		switch (ckpt->flags) {
+		case 0:
+		case WT_CKPT_DELETE:
+		case WT_CKPT_FAKE:
+		case WT_CKPT_UPDATE:
+			break;
+		case WT_CKPT_ADD:
+			if (ckpt[1].name == NULL)
+				break;
+			/* FALLTHROUGH */
+		default:
+			return (
+			    __wt_illegal_value(session, "checkpoint array"));
+		}
+	return (0);
+}
+#endif
+
 /*
  * __ckpt_process --
  *	Process the list of checkpoints.
@@ -317,6 +350,10 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	ci = &block->live;
 	etmp[0].name = etmp[1].name = NULL;
 	locked = 0;
+
+#ifdef HAVE_DIAGNOSTIC
+	WT_RET(__ckpt_verify(session, ckptbase));
+#endif
 
 	/*
 	 * Checkpoints are a two-step process: first, write a new checkpoint to
@@ -534,22 +571,17 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 
 	/* Update checkpoints marked for update. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
-		if (F_ISSET(ckpt, WT_CKPT_UPDATE)) {
-			WT_ASSERT(session, !F_ISSET(ckpt, WT_CKPT_ADD));
+		if (F_ISSET(ckpt, WT_CKPT_UPDATE))
 			WT_ERR(__ckpt_update(
 			    session, block, ckpt, ckpt->bpriv, 0));
-		}
 
 live_update:
-	ci = &block->live;
-
 	/* Truncate the file if that's possible. */
 	WT_ERR(__wt_block_extlist_truncate(session, block, &ci->avail));
 
 	/* Update the final, added checkpoint based on the live system. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		if (F_ISSET(ckpt, WT_CKPT_ADD)) {
-
 			/*
 			 * Set the checkpoint size for the live system.
 			 *
@@ -561,6 +593,7 @@ live_update:
 			 * of work.
 			 */
 			ckpt->ckpt_size = ci->ckpt_size = ckpt_size;
+
 			WT_ERR(__ckpt_update(session, block, ckpt, ci, 1));
 		}
 
