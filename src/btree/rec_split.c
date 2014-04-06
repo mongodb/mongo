@@ -586,8 +586,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
 	WT_REF **alloc_refp, **ref_tmp;
-	size_t size;
-	uint64_t parent_decr, parent_incr;
+	size_t parent_decr, parent_incr, size;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, locked;
 
