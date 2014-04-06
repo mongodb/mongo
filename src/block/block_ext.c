@@ -1304,6 +1304,8 @@ __wt_block_extlist_init(WT_SESSION_IMPL *session,
 {
 	char buf[128];
 
+	memset(el, 0, sizeof(*el));
+
 	(void)snprintf(buf, sizeof(buf), "%s.%s",
 	    name == NULL ? "" : name, extname == NULL ? "" : extname);
 	WT_RET(__wt_strdup(session, buf, &el->name));

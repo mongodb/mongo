@@ -310,10 +310,12 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	WT_CKPT *ckpt, *next_ckpt;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	WT_EXTLIST etmp[2];
 	uint64_t ckpt_size;
 	int deleting, locked;
 
 	ci = &block->live;
+	etmp[0].name = etmp[1].name = NULL;
 	locked = 0;
 
 	/*
@@ -563,12 +565,14 @@ live_update:
 
 	/*
 	 * Reset the live system's alloc and discard extent lists, leave the
-	 * avail list alone.
+	 * avail list alone.  This includes freeing a lot of extents, so do it
+	 * outside of the system's lock by copying and resetting the original,
+	 * then doing the work later.
 	 */
-	__wt_block_extlist_free(session, &ci->alloc);
+	etmp[0] = ci->alloc;
 	WT_ERR(__wt_block_extlist_init(
 	    session, &ci->alloc, "live", "alloc", 0));
-	__wt_block_extlist_free(session, &ci->discard);
+	etmp[1] = ci->discard;
 	WT_ERR(__wt_block_extlist_init(
 	    session, &ci->discard, "live", "discard", 0));
 
@@ -590,6 +594,7 @@ live_update:
 		WT_ERR(WT_ERROR);
 	}
 #endif
+
 	block->ckpt_inprogress = 1;
 
 err:	if (locked)
@@ -599,6 +604,15 @@ err:	if (locked)
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		if ((ci = ckpt->bpriv) != NULL)
 			__wt_block_ckpt_destroy(session, ci);
+
+	/*
+	 * Discard the allocation and discard extents from the previous live
+	 * system.
+	 */
+	if (etmp[0].name != NULL)
+		__wt_block_extlist_free(session, &etmp[0]);
+	if (etmp[1].name != NULL)
+		__wt_block_extlist_free(session, &etmp[1]);
 
 	__wt_scr_free(&tmp);
 	return (ret);
