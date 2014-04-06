@@ -269,13 +269,7 @@ namespace mongo {
     ClientCursorPin::ClientCursorPin( const Collection* collection, long long cursorid )
         : _cursor( NULL ) {
         cursorStatsOpenPinned.increment();
-        _cursor = collection->cursorCache()->find( cursorid );
-        if ( _cursor ) {
-            uassert( 12051,
-                     "clientcursor already in use? driver problem?",
-                     _cursor->_pinValue < 100 );
-            _cursor->_pinValue += 100;
-        }
+        _cursor = collection->cursorCache()->find( cursorid, true );
     }
 
     ClientCursorPin::~ClientCursorPin() {
@@ -287,14 +281,16 @@ namespace mongo {
         if ( !_cursor )
             return;
 
-        invariant( _cursor->_pinValue >= 100 );
-        _cursor->_pinValue -= 100;
+        invariant( _cursor->pinValue() >= 100 );
 
         if ( _cursor->collection() == NULL ) {
             // the ClientCursor was killed while we had it
             // therefore its our responsibility to kill it
             delete _cursor;
             _cursor = NULL; // defensive
+        }
+        else {
+            _cursor->collection()->cursorCache()->unpin( _cursor );
         }
     }
 

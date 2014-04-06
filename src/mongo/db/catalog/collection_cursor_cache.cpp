@@ -192,12 +192,7 @@ namespace mongo {
             return false;
         Client::Context context( ns, db );
         Collection* collection = db->getCollection( ns );
-        ClientCursor* cursor = NULL;
-        if ( collection ) {
-            cursor = collection->cursorCache()->find( id );
-        }
-
-        if ( !cursor ) {
+        if ( !collection ) {
             if ( checkAuth )
                 audit::logKillCursorsAuthzCheck( currentClient.get(),
                                                  nss,
@@ -205,21 +200,8 @@ namespace mongo {
                                                  ErrorCodes::CursorNotFound );
             return false;
         }
-        
-        if ( checkAuth )
-            audit::logKillCursorsAuthzCheck( currentClient.get(),
-                                             nss,
-                                             id,
-                                             ErrorCodes::OK );
 
-        massert( 16089,
-                 str::stream() << "Cannot kill active cursor " << id,
-                 cursor->pinValue() < 100 );
-
-        cursor->kill();
-        collection->cursorCache()->deregisterCursor( cursor );
-        delete cursor;
-        return true;
+        return collection->cursorCache()->eraseCursor( id, checkAuth );
     }
 
     std::size_t GlobalCursorIdCache::timeoutCursors( unsigned millisSinceLastCall ) {
@@ -279,15 +261,15 @@ namespace mongo {
 
 
     CollectionCursorCache::CollectionCursorCache( const StringData& ns )
-        : _ns( ns.toString() ),
+        : _nss( ns ),
           _mutex( "CollectionCursorCache" ) {
-        _collectionCacheRuntimeId = _globalCursorIdCache.created( _ns );
+        _collectionCacheRuntimeId = _globalCursorIdCache.created( _nss.ns() );
         _random.reset( new PseudoRandom( _globalCursorIdCache.nextSeed() ) );
     }
 
     CollectionCursorCache::~CollectionCursorCache() {
         invalidateAll( true );
-        _globalCursorIdCache.destroyed( _collectionCacheRuntimeId, _ns );
+        _globalCursorIdCache.destroyed( _collectionCacheRuntimeId, _nss.ns() );
     }
 
     void CollectionCursorCache::invalidateAll( bool collectionGoingAway ) {
@@ -415,12 +397,28 @@ namespace mongo {
         _nonCachedRunners.erase( runner );
     }
 
-    ClientCursor* CollectionCursorCache::find( CursorId id ) {
+    ClientCursor* CollectionCursorCache::find( CursorId id, bool pin ) {
         SimpleMutex::scoped_lock lk( _mutex );
         CursorMap::const_iterator it = _cursors.find( id );
         if ( it == _cursors.end() )
             return NULL;
-        return it->second;
+
+        ClientCursor* cursor = it->second;
+        if ( pin ) {
+            uassert( 12051,
+                     "clientcursor already in use? driver problem?",
+                     cursor->_pinValue < 100 );
+            cursor->_pinValue += 100;
+        }
+
+        return cursor;
+    }
+
+    void CollectionCursorCache::unpin( ClientCursor* cursor ) {
+        SimpleMutex::scoped_lock lk( _mutex );
+
+        invariant( cursor->_pinValue >= 100 );
+        cursor->_pinValue -= 100;
     }
 
     void CollectionCursorCache::getCursorIds( std::set<CursorId>* openCursors ) {
@@ -458,6 +456,38 @@ namespace mongo {
     void CollectionCursorCache::deregisterCursor( ClientCursor* cc ) {
         SimpleMutex::scoped_lock lk( _mutex );
         _deregisterCursor_inlock( cc );
+    }
+
+    bool CollectionCursorCache::eraseCursor( CursorId id, bool checkAuth ) {
+
+        SimpleMutex::scoped_lock lk( _mutex );
+
+        CursorMap::iterator it = _cursors.find( id );
+        if ( it == _cursors.end() ) {
+            if ( checkAuth )
+                audit::logKillCursorsAuthzCheck( currentClient.get(),
+                                                 _nss,
+                                                 id,
+                                                 ErrorCodes::CursorNotFound );
+            return false;
+        }
+
+        ClientCursor* cursor = it->second;
+
+        if ( checkAuth )
+            audit::logKillCursorsAuthzCheck( currentClient.get(),
+                                             _nss,
+                                             id,
+                                             ErrorCodes::OK );
+
+        massert( 16089,
+                 str::stream() << "Cannot kill active cursor " << id,
+                 cursor->pinValue() < 100 );
+
+        cursor->kill();
+        _deregisterCursor_inlock( cursor );
+        delete cursor;
+        return true;
     }
 
     void CollectionCursorCache::_deregisterCursor_inlock( ClientCursor* cc ) {

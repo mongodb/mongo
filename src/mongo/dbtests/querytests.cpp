@@ -341,7 +341,7 @@ namespace QueryTests {
             {
                 Client::ReadContext ctx( ns );
                 ASSERT( 1 == ctx.ctx().db()->getCollection( ns )->cursorCache()->numCursors() );
-                ASSERT( ctx.ctx().db()->getCollection( ns )->cursorCache()->find( cursorId ) );
+                ASSERT( ctx.ctx().db()->getCollection( ns )->cursorCache()->find( cursorId, false ) );
             }
 
             // Check that the cursor can be iterated until all documents are returned.
