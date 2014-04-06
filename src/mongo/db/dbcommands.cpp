@@ -164,11 +164,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
         }
 
-        // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase, and that 
-        // may need a global lock.
-        virtual bool lockGlobally() const { return true; }
-
-        virtual LockType locktype() const { return WRITE; }
+        virtual LockType locktype() const { return NONE; }
 
         virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
@@ -201,14 +197,28 @@ namespace mongo {
                 return false;
             }
             BSONElement e = cmdObj.firstElement();
-            log() << "dropDatabase " << dbname << " starting" << endl;
             int p = (int) e.number();
-            if ( p != 1 )
+            if ( p != 1 ) {
+                errmsg = "have to pass 1 as db parameter";
                 return false;
-            stopIndexBuilds(cc().database(), cmdObj);
-            dropDatabase(dbname);
+            }
+
+            {
+
+                // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase,
+                // and that may need a global lock.
+                Lock::GlobalWrite lk;
+
+                log() << "dropDatabase " << dbname << " starting" << endl;
+
+                Client::Context context(dbname);
+                stopIndexBuilds(context.db(), cmdObj);
+                dropDatabase(dbname);
+
+                log() << "dropDatabase " << dbname << " finished";
+            }
+
             result.append( "dropped" , dbname );
-            log() << "dropDatabase " << dbname << " finished" << endl;
             return true;
         }
     } cmdDropDatabase;
@@ -225,9 +235,7 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "repair database.  also compacts. note: slow.";
         }
-        virtual LockType locktype() const { return WRITE; }
-        // SERVER-4328 todo don't lock globally. currently syncDataAndTruncateJournal is being called within, and that requires a global lock i believe.
-        virtual bool lockGlobally() const { return true; }
+        virtual LockType locktype() const { return NONE; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -262,15 +270,18 @@ namespace mongo {
 
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
-            log() << "repairDatabase " << dbname << endl;
-            int p = (int) e.number();
-
-            if ( p != 1 ) {
+            if ( e.numberInt() != 1 ) {
                 errmsg = "bad option";
                 return false;
             }
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(cc().database(), cmdObj);
+            // SERVER-4328 todo don't lock globally. currently syncDataAndTruncateJournal is being
+            // called within, and that requires a global lock i believe.
+            Lock::GlobalWrite lk;
+            Client::Context context( dbname );
+
+            log() << "repairDatabase " << dbname;
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(context.db(), cmdObj);
 
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
