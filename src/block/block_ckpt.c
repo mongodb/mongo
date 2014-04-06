@@ -317,6 +317,7 @@ __ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
 		switch (ckpt->flags) {
 		case 0:
 		case WT_CKPT_DELETE:
+		case WT_CKPT_DELETE | WT_CKPT_FAKE:
 		case WT_CKPT_FAKE:
 		case WT_CKPT_UPDATE:
 			break;
