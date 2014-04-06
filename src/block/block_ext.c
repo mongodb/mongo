@@ -1123,7 +1123,13 @@ __wt_block_extlist_read(
 
 	/*
 	 * If we're not creating both offset and size skiplists, use the simpler
-	 * append API, otherwise do a full merge.
+	 * append API, otherwise do a full merge.  There are two reasons for the
+	 * test: first, checkpoint "available" lists are NOT sorted (checkpoints
+	 * write two separate lists, both of which are sorted but they're not
+	 * merged).  Second, the "available" list is sorted by size as well as
+	 * by offset, and the fast-path append code doesn't support that, it's
+	 * limited to offset.  The test of "track size" is short-hand for "are
+	 * we reading the "available" list.
 	 */
 	func = el->track_size == 0 ? __block_append : __block_merge;
 	for (;;) {

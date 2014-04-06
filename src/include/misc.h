@@ -83,7 +83,7 @@
  * resulting bug is a mother to find -- make sure we get it right, don't make
  * the caller remember to put the & operator on the pointer.
  */
-#define	__wt_free(session, p)		__wt_free_int(session, &(p))
+#define	__wt_free(session, p)		__wt_free_int(session, (void *)&(p))
 #ifdef HAVE_DIAGNOSTIC
 #define	__wt_overwrite_and_free(session, p) do {			\
 	memset(p, WT_DEBUG_BYTE, sizeof(*(p)));				\
@@ -189,15 +189,15 @@
 #ifdef HAVE_DIAGNOSTIC
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp, __FILE__, __LINE__)
-#define	__wt_page_in(session, parent, ref, flags)			\
-	__wt_page_in_func(session, parent, ref, flags, __FILE__, __LINE__)
-#define	__wt_page_swap(session, out, in, inref, flags)			\
-	__wt_page_swap_func(session, out, in, inref, flags, __FILE__, __LINE__)
+#define	__wt_page_in(session, ref, flags)				\
+	__wt_page_in_func(session, ref, flags, __FILE__, __LINE__)
+#define	__wt_page_swap(session, held, want, flags)			\
+	__wt_page_swap_func(session, held, want, flags, __FILE__, __LINE__)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
-#define	__wt_page_in(session, parent, ref, flags)			\
-	__wt_page_in_func(session, parent, ref, flags)
-#define	__wt_page_swap(session, out, in, inref, flags)			\
-	__wt_page_swap_func(session, out, in, inref, flags)
+#define	__wt_page_in(session, ref, flags)				\
+	__wt_page_in_func(session, ref, flags)
+#define	__wt_page_swap(session, held, want, flags)			\
+	__wt_page_swap_func(session, held, want, flags)
 #endif
