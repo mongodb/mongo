@@ -17,6 +17,7 @@ int
 __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 {
 	WT_BTREE *btree;
+	WT_PAGE_INDEX *pindex;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
@@ -31,7 +32,9 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 		    "bulk-load is only possible for newly created trees");
 
 	/* Set a reference to the empty leaf page. */
-	cbulk->leaf = btree->root_page->u.intl.t->page;
+	pindex = WT_INTL_INDEX_COPY(btree->root.page);
+	cbulk->ref = pindex->index[0];
+	cbulk->leaf = cbulk->ref->page;
 
 	WT_RET(__wt_rec_bulk_init(cbulk));
 

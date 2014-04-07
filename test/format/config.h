@@ -103,6 +103,10 @@ static CONFIG c[] = {
 	  "size of the cache in MB",
 	  0x0, 0x0, 1, 100, 1024, &g.c_cache, NULL },
 
+	{ "checkpoints",
+	  "if periodic checkpoints are done",			/* 95% */
+	  0x0, C_BOOL, 95, 0, 0, &g.c_checkpoints, NULL },
+
 	{ "checksum",
 	  "type of checksums (on | off | uncompressed)",
 	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_checksum },
@@ -169,7 +173,7 @@ static CONFIG c[] = {
 
 	{ "key_max",
 	  "maximum size of keys",
-	  C_ROW, 0x0, 64, 128, MEGABYTE(10), &g.c_key_max, NULL },
+	  C_ROW, 0x0, 20, 128, MEGABYTE(10), &g.c_key_max, NULL },
 
 	{ "key_min",
 	  "minimum size of keys",

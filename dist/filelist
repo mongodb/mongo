@@ -44,7 +44,6 @@ src/btree/bt_walk.c
 src/btree/col_modify.c
 src/btree/col_srch.c
 src/btree/rec_evict.c
-src/btree/rec_merge.c
 src/btree/rec_split.c
 src/btree/rec_track.c
 src/btree/rec_write.c
@@ -134,6 +133,7 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
+src/session/session_misc.c
 src/session/session_salvage.c
 src/support/cksum.c
 src/support/err.c
@@ -148,7 +148,6 @@ src/support/mutex.c
 src/support/pow.c
 src/support/rand.c
 src/support/scratch.c
-src/support/sess_dump.c
 src/support/stat.c
 src/txn/txn.c
 src/txn/txn_ckpt.c

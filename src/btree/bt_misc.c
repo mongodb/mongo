@@ -65,6 +65,8 @@ __wt_cell_type_string(uint8_t type)
 		return ("key/short");
 	case WT_CELL_KEY_SHORT_PFX:
 		return ("key/short,pfx");
+	case WT_CELL_KEY_OVFL_RM:
+		return ("key/ovfl,rm");
 	case WT_CELL_VALUE:
 		return ("value");
 	case WT_CELL_VALUE_COPY:
@@ -87,20 +89,19 @@ __wt_cell_type_string(uint8_t type)
  * nul-terminated representation of that address.
  */
 const char *
-__wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
+__wt_page_addr_string(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *buf)
 {
 	size_t addr_size;
 	const uint8_t *addr;
 
-	if (WT_PAGE_IS_ROOT(page)) {
+	if (__wt_ref_is_root(ref)) {
 		buf->data = "[Root]";
 		buf->size = strlen("[Root]");
 		return (buf->data);
 	}
 
-	(void)__wt_ref_info(
-	    session, page->parent, page->ref, &addr, &addr_size, NULL);
-	return (__wt_addr_string(session, buf, addr, addr_size));
+	(void)__wt_ref_info(session, ref, &addr, &addr_size, NULL);
+	return (__wt_addr_string(session, addr, addr_size, buf));
 }
 
 /*
@@ -110,7 +111,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
  */
 const char *
 __wt_addr_string(WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
+    const uint8_t *addr, size_t addr_size, WT_ITEM *buf)
 {
 	WT_BM *bm;
 

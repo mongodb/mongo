@@ -109,5 +109,5 @@ lprintf(const CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 
 	/* Never attempt to continue if we got a panic from WiredTiger. */
 	if (err == WT_PANIC)
-		exit(1);
+		abort();
 }

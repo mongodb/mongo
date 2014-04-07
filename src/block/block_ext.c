@@ -880,8 +880,30 @@ int
 __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 {
 	WT_EXT *ext;
+	WT_EXTLIST tmp;
+	u_int i;
 
 	WT_VERBOSE_RET(session, block, "merging %s into %s", a->name, b->name);
+
+	/*
+	 * Sometimes the list we are merging is much bigger than the other: if
+	 * so, swap the lists around to reduce the amount of work we need to do
+	 * during the merge.  The size lists have to match as well, so this is
+	 * only possible if both lists are tracking sizes, or neither are.
+	 */
+	if (a->track_size == b->track_size && a->entries > b->entries) {
+		tmp = *a;
+		a->bytes = b->bytes;
+		b->bytes = tmp.bytes;
+		a->entries = b->entries;
+		b->entries = tmp.entries;
+		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
+			a->off[i] = b->off[i];
+			b->off[i] = tmp.off[i];
+			a->sz[i] = b->sz[i];
+			b->sz[i] = tmp.sz[i];
+		}
+	}
 
 	WT_EXT_FOREACH(ext, a->off)
 		WT_RET(__block_merge(session, b, ext->off, ext->size));
@@ -1076,6 +1098,7 @@ __wt_block_extlist_read(
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	off_t off, size;
+	int (*func)(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 	const uint8_t *p;
 
 	/* If there isn't a list, we're done. */
@@ -1097,6 +1120,18 @@ __wt_block_extlist_read(
 	WT_EXTLIST_READ(p, size);
 	if (off != WT_BLOCK_EXTLIST_MAGIC || size != 0)
 		goto corrupted;
+
+	/*
+	 * If we're not creating both offset and size skiplists, use the simpler
+	 * append API, otherwise do a full merge.  There are two reasons for the
+	 * test: first, checkpoint "available" lists are NOT sorted (checkpoints
+	 * write two separate lists, both of which are sorted but they're not
+	 * merged).  Second, the "available" list is sorted by size as well as
+	 * by offset, and the fast-path append code doesn't support that, it's
+	 * limited to offset.  The test of "track size" is short-hand for "are
+	 * we reading the "available" list.
+	 */
+	func = el->track_size == 0 ? __block_append : __block_merge;
 	for (;;) {
 		WT_EXTLIST_READ(p, off);
 		WT_EXTLIST_READ(p, size);
@@ -1120,14 +1155,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    el->name,
 			    (intmax_t)off, (intmax_t)(off + size));
 
-		/*
-		 * We could insert instead of merge, because ranges shouldn't
-		 * overlap, but merge knows how to allocate WT_EXT structures,
-		 * and a little paranoia is a good thing (if we corrupted the
-		 * list and crashed, and rolled back to a corrupted checkpoint,
-		 * this might save us?)
-		 */
-		WT_ERR(__block_merge(session, el, off, size));
+		WT_ERR(func(session, el, off, size));
 	}
 
 	if (WT_VERBOSE_ISSET(session, block))
@@ -1275,6 +1303,8 @@ __wt_block_extlist_init(WT_SESSION_IMPL *session,
     WT_EXTLIST *el, const char *name, const char *extname, int track_size)
 {
 	char buf[128];
+
+	memset(el, 0, sizeof(*el));
 
 	(void)snprintf(buf, sizeof(buf), "%s.%s",
 	    name == NULL ? "" : name, extname == NULL ? "" : extname);

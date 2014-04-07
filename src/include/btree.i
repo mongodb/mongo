@@ -6,6 +6,16 @@
  */
 
 /*
+ * __wt_ref_is_root --
+ *	Return if the page reference is for the root page.
+ */
+static inline int
+__wt_ref_is_root(WT_REF *ref)
+{
+	return (ref->home == NULL ? 1 : 0);
+}
+
+/*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */
@@ -201,6 +211,63 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_page_refp --
+ *      Return the page's index and slot for a reference.
+ */
+static inline void
+__wt_page_refp(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
+{
+	WT_PAGE_INDEX *pindex;
+	uint32_t i;
+
+	WT_ASSERT(session,
+	    WT_SESSION_TXN_STATE(session)->snap_min != WT_TXN_NONE);
+
+	/*
+	 * Copy the parent page's index value: the page can split at any time,
+	 * but the index's value is always valid, even if it's not up-to-date.
+	 */
+retry:	pindex = WT_INTL_INDEX_COPY(ref->home);
+
+	/*
+	 * Use the page's reference hint: it should be correct unless the page
+	 * split before our slot.  If the page splits after our slot, the hint
+	 * will point earlier in the array than our actual slot, so the first
+	 * loop is from the hint to the end of the list, and the second loop
+	 * is from the start of the list to the end of the list.  (The second
+	 * loop overlaps the first, but that only happen in cases where we've
+	 * deepened the tree and aren't going to find our slot at all, that's
+	 * not worth optimizing.)
+	 *
+	 * It's not an error for the reference hint to be wrong, it just means
+	 * the first retrieval (which sets the hint for subsequent retrievals),
+	 * is slower.
+	 */
+	for (i = ref->ref_hint; i < pindex->entries; ++i)
+		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
+			*slotp = ref->ref_hint = i;
+			return;
+		}
+	for (i = 0; i < pindex->entries; ++i)
+		if (pindex->index[i]->page == ref->page) {
+			*pindexp = pindex;
+			*slotp = ref->ref_hint = i;
+			return;
+		}
+
+	/*
+	 * If we don't find our reference, the page split into a new level and
+	 * our home pointer references the wrong page.  After internal pages
+	 * deepen, their reference structure home value are updated; yield and
+	 * wait for that to happen.
+	 */
+	__wt_yield();
+	goto retry;
+}
+
+/*
  * __wt_page_modify_init --
  *	A page is about to be modified, allocate the modification structure.
  */
@@ -276,7 +343,7 @@ static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/*
-	 * Mark the tree dirty (even if the page is already marked dirty, newly
+	 * Mark the tree dirty (even if the page is already marked dirty), newly
 	 * created pages to support "empty" files are dirty, but the file isn't
 	 * marked dirty until there's a real change needing to be written. Test
 	 * before setting the dirty flag, it's a hot cache line.
@@ -468,7 +535,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 	 */
 	if (cbt->ins == NULL) {
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
-		page = cbt->page;
+		page = cbt->ref->page;
 		rip = &page->u.row.d[cbt->slot];
 		WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
 	} else {
@@ -513,7 +580,7 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip)
  *	Return the addr/size and type triplet for a reference.
  */
 static inline int
-__wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
+__wt_ref_info(WT_SESSION_IMPL *session,
     WT_REF *ref, const uint8_t **addrp, size_t *sizep, u_int *typep)
 {
 	WT_ADDR *addr;
@@ -534,7 +601,7 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 		*sizep = 0;
 		if (typep != NULL)
 			*typep = 0;
-	} else if (__wt_off_page(page, addr)) {
+	} else if (__wt_off_page(ref->home, addr)) {
 		*addrp = addr->addr;
 		*sizep = addr->size;
 		if (typep != NULL)
@@ -558,6 +625,107 @@ __wt_ref_info(WT_SESSION_IMPL *session, WT_PAGE *page,
 			*typep = unpack->type;
 	}
 	return (0);
+}
+
+/*
+ * __wt_page_release --
+ *	Release a reference to a page.
+ */
+static inline int
+__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_PAGE *page;
+	int locked;
+
+	btree = S2BT(session);
+
+	/*
+	 * Discard our hazard pointer.  Ignore pages we don't have and the root
+	 * page, which sticks in memory, regardless.
+	 */
+	if (ref == NULL || __wt_ref_is_root(ref))
+		return (0);
+	page = ref->page;
+
+	/* Attempt to evict pages with the special "oldest" read generation. */
+	if (page->read_gen != WT_READGEN_OLDEST ||
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    (btree->checkpointing && __wt_page_is_modified(page)))
+		return (__wt_hazard_clear(session, page));
+
+	/*
+	 * Take some care with order of operations: if we release the hazard
+	 * reference without first locking the page, it could be evicted in
+	 * between.
+	 */
+	locked = WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	WT_TRET(__wt_hazard_clear(session, page));
+	if (!locked)
+		return (ret);
+
+	(void)WT_ATOMIC_ADD(btree->evict_busy, 1);
+	if ((ret = __wt_evict_page(session, ref)) == 0)
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+	else {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
+		if (ret == EBUSY)
+			ret = 0;
+	}
+	(void)WT_ATOMIC_SUB(btree->evict_busy, 1);
+
+	return (ret);
+}
+
+/*
+ * __wt_page_swap_func --
+ *	Swap one page's hazard pointer for another one when hazard pointer
+ * coupling up/down the tree.
+ */
+static inline int
+__wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
+    WT_REF *want, uint32_t flags
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    )
+{
+	WT_DECL_RET;
+	int acquired;
+
+	/*
+	 * This function is here to simplify the error handling during hazard
+	 * pointer coupling so we never leave a hazard pointer dangling.  The
+	 * assumption is we're holding a hazard pointer on "held", and want to
+	 * acquire a hazard pointer on "want", releasing the hazard pointer on
+	 * "held" when we're done.
+	 */
+	ret = __wt_page_in_func(session, want, flags
+#ifdef HAVE_DIAGNOSTIC
+	    , file, line
+#endif
+	    );
+
+	/* An expected failure: WT_NOTFOUND when doing a cache-only read. */
+	if (LF_ISSET(WT_READ_CACHE) && ret == WT_NOTFOUND)
+		return (WT_NOTFOUND);
+
+	/* An expected failure: WT_RESTART */
+	if (ret == WT_RESTART)
+		return (WT_RESTART);
+
+	/* Discard the original held page. */
+	acquired = ret == 0;
+	WT_TRET(__wt_page_release(session, held));
+
+	/*
+	 * If there was an error discarding the original held page, discard
+	 * the acquired page too, keeping it is never useful.
+	 */
+	if (acquired && ret != 0)
+		WT_TRET(__wt_page_release(session, want));
+	return (ret);
 }
 
 /*
@@ -592,114 +760,10 @@ __wt_eviction_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page->modify == NULL)
 		return (0);
 
+	/* Trigger eviction on the next page release. */
+	page->read_gen = WT_READGEN_OLDEST;
+
 	return (1);
-}
-
-/*
- * __wt_eviction_force_txn_check --
- *	Check if the current transaction permits forced eviction of a page.
- */
-static inline int
-__wt_eviction_force_txn_check(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_TXN_STATE *txn_state;
-
-	/*
-	 * Only try if there is a chance of success.  If the page has already
-	 * been split and this transaction is already pinning the oldest ID so
-	 * that the page can't be evicted, it has to complete before eviction
-	 * can succeed.
-	 */
-	txn_state = &S2C(session)->txn_global.states[session->id];
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
-	    txn_state->snap_min == WT_TXN_NONE ||
-	    TXNID_LT(page->modify->update_txn, txn_state->snap_min))
-		return (1);
-
-	return (0);
-}
-
-/*
- * __wt_page_release --
- *	Release a reference to a page.
- */
-static inline int
-__wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_DECL_RET;
-
-	/*
-	 * Discard our hazard pointer.  Ignore pages we don't have and the root
-	 * page, which sticks in memory, regardless.
-	 */
-	if (page == NULL || WT_PAGE_IS_ROOT(page))
-		return (0);
-
-	/*
-	 * Try to immediately evict pages if they have the special "oldest"
-	 * read generation and we have some chance of succeeding.
-	 */
-	if (page->read_gen == WT_READGEN_OLDEST &&
-	    !F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION) &&
-	    __wt_eviction_force_txn_check(session, page) &&
-	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
-		if ((ret = __wt_hazard_clear(session, page)) != 0) {
-			page->ref->state = WT_REF_MEM;
-			return (ret);
-		}
-
-		WT_TRET(__wt_evict_page(session, page));
-		if (ret == 0)
-			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-		else
-			WT_STAT_FAST_CONN_INCR(
-			    session, cache_eviction_force_fail);
-		if (ret == EBUSY)
-			ret = 0;
-		return (ret);
-	}
-
-	return (__wt_hazard_clear(session, page));
-}
-
-/*
- * __wt_page_swap_func --
- *	Swap one page's hazard pointer for another one when hazard pointer
- * coupling up/down the tree.
- */
-static inline int
-__wt_page_swap_func(WT_SESSION_IMPL *session,
-    WT_PAGE *out, WT_PAGE *in, WT_REF *inref, uint32_t flags
-#ifdef HAVE_DIAGNOSTIC
-    , const char *file, int line
-#endif
-    )
-{
-	WT_DECL_RET;
-	int acquired;
-
-	/*
-	 * This function is here to simplify the error handling during hazard
-	 * pointer coupling so we never leave a hazard pointer dangling.  The
-	 * assumption is we're holding a hazard pointer on "out", and want to
-	 * read page "in", acquiring a hazard pointer on it, then release page
-	 * "out" and its hazard pointer.
-	 *
-	 * If something fails, discard it all, except in the expected case of
-	 * WT_NOTFOUND when doing a cache-only read.
-	 */
-	ret = __wt_page_in_func(session, in, inref, flags
-#ifdef HAVE_DIAGNOSTIC
-	    , file, line
-#endif
-	    );
-	acquired = ret == 0;
-	if (!(LF_ISSET(WT_READ_CACHE) && ret == WT_NOTFOUND))
-		WT_TRET(__wt_page_release(session, out));
-
-	if (ret != 0 && acquired)
-		WT_TRET(__wt_page_release(session, inref->page));
-	return (ret);
 }
 
 /*
@@ -737,37 +801,6 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_eviction_force --
- *	Forcefully evict a page, if possible.
- */
-static inline int
-__wt_eviction_force(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	/*
-	 * Check if eviction or splitting has a chance of succeeding, otherwise
-	 * stall to give other transactions a chance to complete.
-	 */
-	__wt_txn_update_oldest(session);
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_WAS_SPLIT) ||
-	    __wt_txn_visible_all(session, page->modify->update_txn)) {
-		page->read_gen = WT_READGEN_OLDEST;
-		WT_RET(__wt_page_release(session, page));
-		/*
-		 * Forced eviction can create chains of internal pages before
-		 * the cache is full. Setup the eviction server to look for
-		 * internal page merges after we successfully force evict.
-		 */
-		F_SET(S2C(session)->cache, WT_EVICT_INTERNAL);
-		WT_RET(__wt_evict_server_wake(session));
-	} else {
-		WT_RET(__wt_page_release(session, page));
-		__wt_sleep(0, 10000);
-	}
-
-	return (0);
-}
-
-/*
  * __wt_skip_choose_depth --
  *	Randomly choose a depth for a skiplist insert.
  */
@@ -793,18 +826,36 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;
+	WT_PAGE_INDEX *pindex;
+	WT_REF *first;
 
 	btree = S2BT(session);
-	root = btree->root_page;
+	root = btree->root.page;
 
-	if (root == NULL || (child = root->u.intl.t->page) == NULL)
+	/* Check for a non-existent tree. */
+	if (root == NULL)
 		return (0);
 
-	/* Make sure this is a simple tree, or LSM should switch. */
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    root->entries != 1 ||
-	    root->u.intl.t->state != WT_REF_MEM ||
-	    child->type != WT_PAGE_ROW_LEAF)
+	/* A tree that can be evicted always requires a switch. */
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (1);
+
+	/* Check for a tree with a single leaf page. */
+	pindex = WT_INTL_INDEX_COPY(root);
+	if (pindex->entries != 1)		/* > 1 child page, switch */
+		return (1);
+
+	first = pindex->index[0];
+	if (first->state != WT_REF_MEM)		/* no child page, ignore */
+		return (0);
+
+	/*
+	 * We're reaching down into the page without a hazard pointer, but
+	 * that's OK because we know that no-eviction is set and so the page
+	 * cannot disappear.
+	 */
+	child = first->page;
+	if (child->type != WT_PAGE_ROW_LEAF)	/* not a single leaf page */
 		return (1);
 
 	return (child->memory_footprint > maxsize);
@@ -885,18 +936,3 @@ __wt_lex_compare_skip(
 	((collator) == NULL ?						\
 	(((cmp) = __wt_lex_compare_skip((k1), (k2), matchp)), 0) :	\
 	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
-
-/*
- * __wt_btree_mergeable --
- *	Determines whether the given page is a candidate for merging.
- */
-static inline int
-__wt_btree_mergeable(WT_PAGE *page)
-{
-	if (WT_PAGE_IS_ROOT(page) ||
-	    page->modify == NULL ||
-	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
-		return (0);
-
-	return (!WT_PAGE_IS_ROOT(page->parent));
-}

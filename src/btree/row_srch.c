@@ -37,7 +37,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	    WT_LEX_CMP(session, btree->collator, srch_key, &insert_key, cmp));
 	if (cmp >= 0) {
 		/*
-		 * XXX We may race with another appending thread.
+		 * !!!
+		 * We may race with another appending thread.
 		 *
 		 * To catch that case, rely on the atomic pointer read above
 		 * and set the next stack to NULL here.  If we have raced with
@@ -112,29 +113,30 @@ __wt_search_insert(WT_SESSION_IMPL *session,
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_row_search(WT_SESSION_IMPL *session,
+    WT_ITEM *srch_key, WT_REF *leaf_page, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_ITEM *item, _item, *srch_key;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
-	WT_REF *ref;
+	WT_PAGE_INDEX *pindex;
+	WT_REF *child, *parent;
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
 	uint32_t base, indx, limit;
 	int cmp, depth;
 
-	__cursor_search_clear(cbt);
-	srch_key = &cbt->iface.key;
-
 	btree = S2BT(session);
 	rip = NULL;
+	match = 0;				/* -Wuninitialized */
+
+	__cursor_search_clear(cbt);
 
 	item = &_item;
 	WT_CLEAR_INLINE(WT_ITEM, *item);
 
-	match = 0;				/* -Wuninitialized */
-
+restart:
 	/*
 	 * The row-store search routine uses a different comparison API.
 	 * The assumption is we're comparing more than a few keys with
@@ -145,39 +147,51 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 */
 	skiphigh = skiplow = 0;
 
+	/*
+	 * In the service of eviction splits, we're only searching a single leaf
+	 * page, not a full tree.
+	 */
+	if (leaf_page != NULL) {
+		child = leaf_page;
+		goto leaf_only;
+	}
+
 	/* Search the internal pages of the tree. */
 	cmp = -1;
-	for (depth = 2,
-	    page = btree->root_page; page->type == WT_PAGE_ROW_INT; ++depth) {
+	parent = child = &btree->root;
+	for (depth = 2;; ++depth) {
+		page = parent->page;
+		if (page->type != WT_PAGE_ROW_INT)
+			break;
+
+		pindex = WT_INTL_INDEX_COPY(page);
+		base = pindex->entries;
+		child = pindex->index[base - 1];
+
 		/*
 		 * Fast-path internal pages with one child, a common case for
 		 * the root page in new trees.
 		 */
-		base = page->entries;
-		ref = &page->u.intl.t[base - 1];
 		if (base == 1)
 			goto descend;
 
 		/* Fast-path appends. */
-		__wt_ref_key(page, ref, &item->data, &item->size);
+		__wt_ref_key(page, child, &item->data, &item->size);
 		WT_ERR(
 		    WT_LEX_CMP(session, btree->collator, srch_key, item, cmp));
 		if (cmp >= 0)
 			goto descend;
 
 		/*
-		 * Binary search of internal pages.  There are two versions (a
-		 * default loop and an application-specified collation loop),
-		 * because moving the collation test and error handling inside
-		 * the loop costs about 5%.
+		 * Two versions of the binary search of internal pages: with and
+		 * without application-specified collation.
 		 */
 		base = 0;
-		ref = NULL;
-		limit = page->entries - 1;
-		if (btree->collator == NULL)
+		limit = pindex->entries - 1;
+		if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = page->u.intl.t + indx;
+				child = pindex->index[indx];
 
 				/*
 				 * If about to compare an application key with
@@ -189,12 +203,12 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 				 */
 				if (indx != 0) {
 					__wt_ref_key(page,
-					    ref, &item->data, &item->size);
+					    child, &item->data, &item->size);
 					match = WT_MIN(skiplow, skiphigh);
 					cmp = __wt_lex_compare_skip(
 					    srch_key, item, &match);
 					if (cmp == 0)
-						break;
+						goto descend;
 					if (cmp < 0) {
 						skiphigh = match;
 						continue;
@@ -204,10 +218,21 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 				base = indx + 1;
 				--limit;
 			}
-		else
+			/*
+			 * Reference the slot used for next step down the tree.
+			 *
+			 * Base is the smallest index greater than key and may
+			 * be the (last + 1) index.  (Base cannot be the 0th
+			 * index as the 0th index always sorts less than any
+			 * application key).  The slot for descent is the one
+			 * before base.
+			 */
+			if (cmp != 0)
+				child = pindex->index[base - 1];
+		} else {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
-				ref = page->u.intl.t + indx;
+				child = pindex->index[indx];
 				/*
 				 * If about to compare an application key with
 				 * the 0th index on an internal page, pretend
@@ -218,52 +243,59 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 				 */
 				if (indx != 0) {
 					__wt_ref_key(page,
-					    ref, &item->data, &item->size);
+					    child, &item->data, &item->size);
 					WT_ERR(WT_LEX_CMP_SKIP(
 					    session, btree->collator,
 					    srch_key, item, cmp, &match));
 					if (cmp == 0)
-						break;
+						goto descend;
 					if (cmp < 0)
 						continue;
 				}
 				base = indx + 1;
 				--limit;
 			}
-
-descend:	WT_ASSERT(session, ref != NULL);
+			/*
+			 * Reference the slot used for next step down the tree.
+			 *
+			 * Base is the smallest index greater than key and may
+			 * be the (last + 1) index.  (Base cannot be the 0th
+			 * index as the 0th index always sorts less than any
+			 * application key).  The slot for descent is the one
+			 * before base.
+			 */
+			if (cmp != 0)
+				child = pindex->index[base - 1];
+		}
+descend:	WT_ASSERT(session, child != NULL);
 
 		/*
-		 * Reference the slot used for next step down the tree.
-		 *
-		 * Base is the smallest index greater than key and may be the
-		 * (last + 1) index.  (Base cannot be the 0th index as the 0th
-		 * index always sorts less than any application key).  The slot
-		 * for descent is the one before base.
+		 * Swap the parent page for the child page; if the page splits
+		 * while we're waiting for it, restart the search, otherwise
+		 * return on error, the swap call ensures we're holding nothing
+		 * on failure.
 		 */
-		if (cmp != 0)
-			ref = page->u.intl.t + (base - 1);
-
+		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+			parent = child;
+			continue;
+		}
 		/*
-		 * Swap the parent page for the child page; return on error,
-		 * the swap function ensures we're holding nothing on failure.
-		 *
-		 * !!!
-		 * Don't use WT_RET, we've already used WT_ERR, and the style
-		 * checking code complains if we use WT_RET after a jump to an
-		 * error label.
+		 * Restart is returned if we find a page that's been split; the
+		 * held page isn't discarded when restart is returned, discard
+		 * it and restart the search from the top of the tree.
 		 */
-		if ((ret = __wt_page_swap(session, page, page, ref, 0)) != 0)
-			return (ret);
-		page = ref->page;
+		if (ret == WT_RESTART &&
+		    (ret = __wt_page_release(session, parent)) == 0)
+			goto restart;
+		return (ret);
 	}
 
-	/*
-	 * We want to know how deep the tree gets because excessive depth can
-	 * happen because of how WiredTiger splits.
-	 */
+	/* Track how deep the tree gets. */
 	if (depth > btree->maximum_depth)
 		btree->maximum_depth = depth;
+
+leaf_only:
+	page = child->page;
 
 	/*
 	 * Binary search of the leaf page.  There are two versions (a default
@@ -274,11 +306,11 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 */
 	cmp = -1;
 	base = 0;
-	limit = page->entries;
+	limit = page->pg_row_entries;
 	if (btree->collator == NULL)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->u.row.d + indx;
+			rip = page->pg_row_d + indx;
 
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			match = WT_MIN(skiplow, skiphigh);
@@ -297,7 +329,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	else
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->u.row.d + indx;
+			rip = page->pg_row_d + indx;
 
 			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			WT_ERR(WT_LEX_CMP_SKIP(session,
@@ -335,7 +367,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	if (cmp == 0) {
 		WT_ASSERT(session, rip != NULL);
 		cbt->compare = 0;
-		cbt->page = page;
+		cbt->ref = child;
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}
@@ -349,7 +381,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * it means the application is inserting a key before any key found on
 	 * the page).
 	 */
-	rip = page->u.row.d;
+	rip = page->pg_row_d;
 	if (base == 0)
 		cbt->compare = 1;
 	else {
@@ -378,11 +410,11 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * Search the insert list for a match; __wt_search_insert sets the
 	 * return insert information appropriately.
 	 */
-	cbt->page = page;
+	cbt->ref = child;
 	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
 	return (0);
 
-err:	WT_TRET(__wt_page_release(session, page));
+err:	WT_TRET(__wt_page_release(session, child));
 	return (ret);
 }
 
@@ -397,25 +429,44 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_DECL_RET;
 	WT_INSERT *p, *t;
 	WT_PAGE *page;
-	WT_REF *ref;
-
-	__cursor_search_clear(cbt);
+	WT_PAGE_INDEX *pindex;
+	WT_REF *child, *parent;
 
 	btree = S2BT(session);
 
+	__cursor_search_clear(cbt);
+
+restart:
 	/* Walk the internal pages of the tree. */
-	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
-		ref = page->u.intl.t + __wt_random() % page->entries;
+	parent = child = &btree->root;
+	for (;;) {
+		page = parent->page;
+		if (page->type != WT_PAGE_ROW_INT)
+			break;
+
+		pindex = WT_INTL_INDEX_COPY(page);
+		child = pindex->index[__wt_random() % pindex->entries];
 
 		/*
 		 * Swap the parent page for the child page; return on error,
 		 * the swap function ensures we're holding nothing on failure.
 		 */
-		WT_RET(__wt_page_swap(session, page, page, ref, 0));
-		page = ref->page;
+		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+			parent = child;
+			continue;
+		}
+		/*
+		 * Restart is returned if we find a page that's been split; the
+		 * held page isn't discarded when restart is returned, discard
+		 * it and restart the search from the top of the tree.
+		 */
+		if (ret == WT_RESTART &&
+		    (ret = __wt_page_release(session, parent)) == 0)
+			goto restart;
+		return (ret);
 	}
 
-	if (page->entries != 0) {
+	if (page->pg_row_entries != 0) {
 		/*
 		 * The use case for this call is finding a place to split the
 		 * tree.  Cheat (it's not like this is "random", anyway), and
@@ -424,11 +475,11 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * or a tree with just one big page, that's not going to work,
 		 * check for that.
 		 */
-		cbt->page = page;
+		cbt->ref = child;
 		cbt->compare = 0;
-		cbt->slot =
-		    btree->root_page->entries < 2 ?
-		    __wt_random() % page->entries : 0;
+		pindex = WT_INTL_INDEX_COPY(btree->root.page);
+		cbt->slot = pindex->entries < 2 ?
+		    __wt_random() % page->pg_row_entries : 0;
 		return (0);
 	}
 
@@ -446,12 +497,12 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			break;
 		t = WT_SKIP_NEXT(t);
 	}
-	cbt->page = page;
+	cbt->ref = child;
 	cbt->compare = 0;
 	cbt->ins = t;
 
 	return (0);
 
-err:	WT_TRET(__wt_page_release(session, page));
+err:	WT_TRET(__wt_page_release(session, child));
 	return (ret);
 }

@@ -121,6 +121,7 @@ INIT
 INITIALIZER
 INMEM
 INSERT's
+INTL
 INUSE
 ISSET
 ITEMs
@@ -200,6 +201,7 @@ RCS
 READONLY
 RECNO
 REF's
+REFs
 REQ
 RET
 RLE
@@ -250,6 +252,8 @@ UID
 UIDs
 UINT
 ULINE
+UPD
+UPDATEs
 URI
 URIs
 UTF
@@ -344,6 +348,7 @@ calloc
 catfmt
 cb
 cd
+centric
 cfg
 cfkos
 change's
@@ -392,6 +397,7 @@ curconfig
 curdump
 curfile
 curindex
+cursoring
 cursorp
 curstat
 curtable
@@ -494,6 +500,7 @@ fmterr
 fnv
 foc
 fopen
+fotxn
 fp
 fprintf
 free'd
@@ -639,6 +646,8 @@ mnt
 msg
 msgv
 mtx
+multi
+multiblock
 multicore
 multiprocess
 multisocket
@@ -685,6 +694,7 @@ numSymbols
 numbare
 oc
 offpage
+oindex
 ok
 oldname
 onint
@@ -710,6 +720,7 @@ pre
 prealloc
 preload
 prepended
+prepending
 presize
 primary's
 printf
@@ -744,6 +755,7 @@ recno
 recnos
 recsize
 recurse
+refp
 reinitialization
 req
 rescan

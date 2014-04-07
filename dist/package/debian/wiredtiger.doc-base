@@ -1,0 +1,12 @@
+Document: wiredtiger
+Title: Debian wiredtiger Manual
+Author: WiredTiger, Inc.
+Abstract: WiredTiger is a database storage engine library.
+Section: library
+
+Format: postscript
+Files: /usr/share/doc/wiredtiger/wiredtiger.ps.gz
+
+Format: HTML
+Index: /usr/share/doc/wiredtiger/html/index.html
+Files: /usr/share/doc/wiredtiger/html/*.html

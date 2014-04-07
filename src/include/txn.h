@@ -21,6 +21,8 @@
 #define	TXNID_LT(t1, t2)						\
 	((t1) != (t2) && TXNID_LE(t1, t2))
 
+#define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
+
 struct __wt_txn_state {
 	volatile uint64_t id;
 	volatile uint64_t snap_min;
