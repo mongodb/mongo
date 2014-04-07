@@ -173,6 +173,142 @@ namespace mongo {
             ASSERT_LESS_THAN_OR_EQUALS(obj12.firstElement().numberInt(), 16);
         }
 
+        TEST(BSONTemplateEvaluatorTest, SEQ_INT) {
+
+            boost::scoped_ptr<BsonTemplateEvaluator> t(new BsonTemplateEvaluator());
+            BSONObj seqObj;
+            BSONObj expectedObj;
+
+            // Error if missing 'step'.
+            BSONObjBuilder builder1;
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 0 << "start" << 0 ));
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("seqField" << seqObj), builder1) );
+
+            // Error if missing 'start'.
+            BSONObjBuilder builder2;
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 0 << "step" << 1 ));
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("seqField" << seqObj), builder2) );
+
+            // Error if missing 'seq_iq'.
+            BSONObjBuilder builder3;
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "start" << 0 << "step" << 1 ));
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("seqField" << seqObj), builder3) );
+
+            // Error if 'step' is not a number.
+            BSONObjBuilder builder4;
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 0 << "start" << 0 << "step" << "foo" ));
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("seqField" << seqObj), builder4) );
+
+            // Error if 'start' is not a number.
+            BSONObjBuilder builder5;
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 0 << "start" << true << "step" << 1 ));
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("seqField" << seqObj), builder5) );
+
+            // Error if 'seq_id' is not a number.
+            BSONObjBuilder builder6;
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << BSON("foo" << 1) << "start" << 0 << "step" << 1 ));
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("seqField" << seqObj), builder6) );
+
+            // Error if 'mod' is not a number.
+            BSONObjBuilder builder7;
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 0 << "start" << 0 << "step" << 1 << "mod" << "foo" ));
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("seqField" << seqObj), builder7) );
+
+            // Test an increasing sequence: -4, -2, 0, 2, ...
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 0 << "start" << -4 << "step" << 2 ));
+            for (int i = -4; i <= 2; i += 2) {
+                BSONObjBuilder builder8;
+                ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                               t->evaluate(BSON("seqField" << seqObj), builder8) );
+                expectedObj = BSON("seqField" << i);
+                ASSERT_EQUALS(0, expectedObj.woCompare(builder8.obj()));
+            }
+
+            // Test a decreasing sequence: 5, 0, -5, -10
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 1 << "start" << 5 << "step" << -5 ));
+            for (int i = 5; i >= -10; i -= 5) {
+                BSONObjBuilder builder9;
+                ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                               t->evaluate(BSON("seqField" << seqObj), builder9) );
+                expectedObj = BSON("seqField" << i);
+                ASSERT_EQUALS(0, expectedObj.woCompare(builder9.obj()));
+            }
+
+            // Test multiple sequences in the same document. In order for this to
+            // work the two sequences must have different sequence IDs.
+            //
+            // seq_id 2: 0, 1, 2, 3, ...
+            // seq_id 3: 0, -1, -2, -3, ...
+            BSONObj seqObj1 = BSON( "#SEQ_INT"
+                              << BSON( "seq_id" << 2 << "start" << 0 << "step" << 1 ));
+            BSONObj seqObj2 = BSON( "#SEQ_INT"
+                              << BSON( "seq_id" << 3 << "start" << 0 << "step" << -1 ));
+            BSONObj seqObjFull = BSON( "seqField1" << seqObj1 << "seqField2" << seqObj2 );
+            for (int i = 0; i <= 3; i++) {
+                BSONObjBuilder builder10;
+                ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                               t->evaluate(seqObjFull, builder10));
+                expectedObj = BSON("seqField1" << i << "seqField2" << -i);
+                ASSERT_EQUALS(0, expectedObj.woCompare(builder10.obj()));
+            }
+
+            // Test that the 'unique: true' option correctly puts the ID of the
+            // bson template evaluator into the high order byte of a 64 bit integer.
+            t->setId(9);
+            seqObj1 = BSON( "#SEQ_INT"
+                      << BSON( "seq_id" << 4 << "start" << 8 << "step" << 1 ));
+            seqObj2 = BSON( "#SEQ_INT"
+                      << BSON( "seq_id" << 5 << "start" << 8 << "step" << 1
+                      << "unique" << true ));
+
+            // Without 'unique: true'.
+            BSONObjBuilder builder11;
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                           t->evaluate(BSON("seqField" << seqObj1), builder11) );
+            expectedObj = BSON("seqField" << 8);
+            ASSERT_EQUALS(0, expectedObj.woCompare(builder11.obj()));
+
+            // With 'unique: true'.
+            BSONObjBuilder builder12;
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                           t->evaluate(BSON("seqField" << seqObj2), builder12) );
+            // The template evaluator id of 9 goes in the high-order byte.
+            long long expectedSeqNum = 0x0900000000000008;
+            expectedObj = BSON("seqField" << expectedSeqNum);
+            ASSERT_EQUALS(0, expectedObj.woCompare(builder12.obj()));
+
+            // Test a sequence using "mod": 0, 1, 2, 0, 1
+            seqObj = BSON( "#SEQ_INT"
+                     << BSON( "seq_id" << 6 << "start" << 0 << "step" << 1 << "mod" << 3 ));
+            for (int i = 0; i <= 5; i++) {
+                BSONObjBuilder builder13;
+                ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                               t->evaluate(BSON("seqField" << seqObj), builder13) );
+                expectedObj = BSON("seqField" << (i%3));
+                ASSERT_EQUALS(0, expectedObj.woCompare(builder13.obj()));
+            }
+
+            // Test that you can't set an id if it is more than 7 bits wide.
+            ASSERT_EQUALS(BsonTemplateEvaluator::StatusSuccess, t->setId(127));
+            ASSERT_EQUALS(BsonTemplateEvaluator::StatusOpEvaluationError, t->setId(128));
+        }
+
         TEST(BSONTemplateEvaluatorTest, RAND_STRING) {
 
             BsonTemplateEvaluator *t = new BsonTemplateEvaluator();
@@ -331,6 +467,23 @@ namespace mongo {
             ASSERT_EQUALS(obj5.nFields(), 1);
             expectedObj = BSON("concatField" << "hello[ 1, 10 ]world");
             ASSERT_EQUALS(obj5.equal(expectedObj), true);
+        }
+
+        TEST(BSONTemplateEvaluatorTest, OID) {
+
+            boost::scoped_ptr<BsonTemplateEvaluator> t(new BsonTemplateEvaluator());
+            BSONObj oidObj = BSON( "#OID" << 1 );
+
+            // Error: field must be "_id"
+            BSONObjBuilder builder1;
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("notIdField" << oidObj), builder1) );
+
+            // Success.
+            BSONObjBuilder builder2;
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                           t->evaluate(BSON("_id" << oidObj), builder2) );
+
         }
 
         TEST(BSONTemplateEvaluatorTest, COMBINED_OPERATORS) {

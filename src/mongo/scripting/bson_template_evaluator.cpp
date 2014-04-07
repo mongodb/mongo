@@ -32,17 +32,28 @@
 #include <cstdlib>
 
 #include "mongo/util/map_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     void BsonTemplateEvaluator::initializeEvaluator() {
         addOperator("RAND_INT", &BsonTemplateEvaluator::evalRandInt);
+        addOperator("SEQ_INT", &BsonTemplateEvaluator::evalSeqInt);
         addOperator("RAND_STRING", &BsonTemplateEvaluator::evalRandString);
         addOperator("CONCAT", &BsonTemplateEvaluator::evalConcat);
+        addOperator("OID", &BsonTemplateEvaluator::evalObjId);
     }
 
-    BsonTemplateEvaluator::BsonTemplateEvaluator() {
+    BsonTemplateEvaluator::BsonTemplateEvaluator() : _id(0) {
         initializeEvaluator();
+    }
+
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::setId(size_t id) {
+        if (id >= (1<<7))
+            // The id is too large--doesn't fit inside 7 bits.
+            return StatusOpEvaluationError;
+        this->_id = id;
+        return StatusSuccess;
     }
 
     BsonTemplateEvaluator::~BsonTemplateEvaluator() { }
@@ -94,7 +105,7 @@ namespace mongo {
 
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandInt(BsonTemplateEvaluator* btl,
                                                                      const char* fieldName,
-                                                                     const BSONObj in,
+                                                                     const BSONObj& in,
                                                                      BSONObjBuilder& out) {
         // in = { #RAND_INT: [10, 20] }
         BSONObj range = in.firstElement().embeddedObject();
@@ -114,9 +125,62 @@ namespace mongo {
         return StatusSuccess;
     }
 
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalSeqInt(BsonTemplateEvaluator* btl,
+                                                                    const char* fieldName,
+                                                                    const BSONObj& in,
+                                                                    BSONObjBuilder& out) {
+        // in = { #SEQ_INT: { seq_id: 0, start: 10, step: -2 }
+        BSONObj spec = in.firstElement().embeddedObject();
+        if (spec.nFields() < 3)
+            return StatusOpEvaluationError;
+        if (spec["seq_id"].eoo() || !spec["seq_id"].isNumber())
+            return StatusOpEvaluationError;
+        if (spec["start"].eoo() || !spec["start"].isNumber())
+            return StatusOpEvaluationError;
+        if (spec["step"].eoo() || !spec["step"].isNumber())
+            return StatusOpEvaluationError;
+
+        // If we're here, then we have a well-formed SEQ_INT specification:
+        // seq_id, start, and step fields, which are all numbers.
+
+        int seq_id = spec["seq_id"].numberInt();
+        long long curr_seqval = spec["start"].numberInt();
+
+        // Handle the optional "unique" argument.
+        //
+        // If the test requires us to keep sequences unique between different
+        // worker threads, then put the id number of this evaluator in the
+        // high order byte.
+        if (!spec["unique"].eoo() && spec["unique"].trueValue()) {
+            long long workerid = btl->_id;
+            curr_seqval += (workerid << (64-8));
+        }
+
+        if (btl->_seqIdMap.end() != btl->_seqIdMap.find(seq_id)) {
+            // We already have a sequence value. Add 'step' to get the next value.
+            int step = spec["step"].numberInt();
+            curr_seqval = btl->_seqIdMap[seq_id] + step;
+        }
+
+        // Handle the optional "mod" argument. This should be done after
+        // handling all other options (currently just "unique").
+        if (!spec["mod"].eoo()) {
+            if (!spec["mod"].isNumber())
+                return StatusOpEvaluationError;
+            int modval = spec["mod"].numberInt();
+            curr_seqval = (curr_seqval % modval);
+        }
+
+        // Store the sequence value.
+        btl->_seqIdMap[seq_id] = curr_seqval;
+
+        out.append(fieldName, curr_seqval);
+        return StatusSuccess;
+    }
+
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandString(BsonTemplateEvaluator* btl,
                                                                         const char* fieldName,
-                                                                        const BSONObj in,
+                                                                        const BSONObj& in,
                                                                         BSONObjBuilder& out) {
         // in = { #RAND_STRING: [10] }
         BSONObj range = in.firstElement().embeddedObject();
@@ -145,7 +209,7 @@ namespace mongo {
 
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalConcat(BsonTemplateEvaluator* btl,
                                                                     const char* fieldName,
-                                                                    const BSONObj in,
+                                                                    const BSONObj& in,
                                                                     BSONObjBuilder& out) {
         // in = { #CONCAT: ["hello", " ", "world"] }
         BSONObjBuilder objectBuilder;
@@ -163,6 +227,18 @@ namespace mongo {
                 part.toString(stringBuilder,false);
         }
         out.append(fieldName, stringBuilder.str());
+        return StatusSuccess;
+    }
+
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalObjId(BsonTemplateEvaluator* btl,
+                                                                   const char* fieldName,
+                                                                   const BSONObj& in,
+                                                                   BSONObjBuilder& out) {
+        // in = { #OID: 1 }
+        if (!mongoutils::str::equals(fieldName, "_id"))
+            // Error: must be generating a value for the _id field.
+            return StatusOpEvaluationError;
+        out.genOID();
         return StatusSuccess;
     }
 
