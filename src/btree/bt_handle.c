@@ -251,6 +251,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 			F_CLR(btree, WT_BTREE_NO_EVICTION);
 	}
 
+	/*
+	 * Disable eviction from bulk handles.  Among other things, this saves
+	 * a round trip to the eviction server when completing a bulk load.
+	 */
+	if (F_ISSET(btree, WT_BTREE_BULK))
+		F_SET(btree, WT_BTREE_NO_EVICTION);
+
 	/* Checksums */
 	WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
 	if (WT_STRING_MATCH("on", cval.str, cval.len))
@@ -318,6 +325,25 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 }
 
 /*
+ * __wt_root_ref_init --
+ *	Initialize a tree root reference, and link in the root page.
+ */
+void
+__wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno)
+{
+	memset(root_ref, 0, sizeof(*root_ref));
+
+	root_ref->page = root;
+	root_ref->state = WT_REF_MEM;
+
+	root_ref->key.recno = is_recno ? 1 : 0;
+
+	root_ref->txnid = WT_TXN_NONE;
+
+	root->pg_intl_parent_ref = root_ref;
+}
+
+/*
  * __wt_btree_tree_open --
  *	Read in a tree from disk.
  */
@@ -340,10 +366,12 @@ __wt_btree_tree_open(
 
 	/* Read the page, then build the in-memory version of the page. */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk.mem,
+	WT_ERR(__wt_page_inmem(session, NULL, dsk.mem,
 	    F_ISSET(&dsk, WT_ITEM_MAPPED) ?
 	    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
-	btree->root_page = page;
+
+	/* Finish initializing the root, root reference links. */
+	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);
 
 	if (0) {
 err:		__wt_buf_free(session, &dsk);
@@ -361,6 +389,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *root, *leaf;
+	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 
 	btree = S2BT(session);
@@ -391,18 +420,29 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, &root));
-		root->u.intl.recno = 1;
-		ref = root->u.intl.t;
-		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
+		WT_ERR(
+		    __wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, 1, &root));
+		root->pg_intl_parent_ref = &btree->root;
+
+		pindex = WT_INTL_INDEX_COPY(root);
+		ref = pindex->index[0];
+		ref->home = root;
+		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
+		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
 		ref->key.recno = 1;
 		break;
 	case BTREE_ROW:
-		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 1, &root));
-		ref = root->u.intl.t;
-		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
+		WT_ERR(
+		    __wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, 1, &root));
+		root->pg_intl_parent_ref = &btree->root;
+
+		pindex = WT_INTL_INDEX_COPY(root);
+		ref = pindex->index[0];
+		ref->home = root;
+		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
+		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
 		WT_ERR(__wt_row_ikey_incr(
@@ -410,9 +450,6 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
-	root->entries = 1;
-	root->parent = NULL;
-	root->ref = NULL;
 
 	/*
 	 * Mark the leaf page dirty: we didn't create an entirely valid root
@@ -450,7 +487,8 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		__wt_page_only_modify_set(session, leaf);
 	}
 
-	btree->root_page = root;
+	/* Finish initializing the root, root reference links. */
+	__wt_root_ref_init(&btree->root, root, btree->type != BTREE_ROW);
 
 	return (0);
 
@@ -462,66 +500,31 @@ err:	if (leaf != NULL)
 }
 
 /*
- * __wt_btree_new_modified_page --
- *	Create a new in-memory page could be an internal or leaf page. Setup
- *	the page modify structure.
- */
-int
-__wt_btree_new_modified_page(WT_SESSION_IMPL *session,
-    uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
-{
-	WT_DECL_RET;
-	WT_PAGE *newpage;
-
-	/* Allocate a new page and fill it in. */
-	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
-	newpage->read_gen = WT_READGEN_NOTSET;
-	newpage->entries = entries;
-
-	WT_ERR(__wt_page_modify_init(session, newpage));
-	if (merge)
-		F_SET(newpage->modify, WT_PM_REC_SPLIT_MERGE);
-	else
-		__wt_page_modify_set(session, newpage);
-
-	*pagep = newpage;
-	return (0);
-
-err:	__wt_page_out(session, &newpage);
-	return (ret);
-}
-
-/*
  * __wt_btree_new_leaf_page --
  *	Create an empty leaf page and link it into a reference in its parent.
  */
 int
-__wt_btree_new_leaf_page(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, WT_PAGE **pagep)
+__wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 {
 	WT_BTREE *btree;
-	WT_PAGE *leaf;
 
 	btree = S2BT(session);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_FIX, 0, &leaf));
-		leaf->u.col_fix.recno = 1;
+		WT_RET(
+		    __wt_page_alloc(session, WT_PAGE_COL_FIX, 1, 0, 1, pagep));
 		break;
 	case BTREE_COL_VAR:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_COL_VAR, 0, &leaf));
-		leaf->u.col_var.recno = 1;
+		WT_RET(
+		    __wt_page_alloc(session, WT_PAGE_COL_VAR, 1, 0, 1, pagep));
 		break;
 	case BTREE_ROW:
-		WT_RET(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, &leaf));
+		WT_RET(
+		    __wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 1, pagep));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-	leaf->entries = 0;
-	WT_LINK_PAGE(parent, ref, leaf);
-
-	*pagep = leaf;
 	return (0);
 }
 
@@ -549,19 +552,17 @@ __btree_preload(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_REF *ref;
 	size_t addr_size;
-	uint32_t i;
 	const uint8_t *addr;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 
 	/* Pre-load the second-level internal pages. */
-	WT_REF_FOREACH(btree->root_page, ref, i) {
-		WT_RET(__wt_ref_info(session,
-		    btree->root_page, ref, &addr, &addr_size, NULL));
+	WT_INTL_FOREACH_BEGIN(btree->root.page, ref) {
+		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr != NULL)
 			WT_RET(bm->preload(bm, session, addr, addr_size));
-	}
+	} WT_INTL_FOREACH_END;
 	return (0);
 }
 
@@ -574,16 +575,20 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
+	WT_REF *next_walk;
 
 	btree = S2BT(session);
 
-	page = NULL;
-	WT_RET(__wt_tree_walk(session, &page, WT_READ_PREV));
-	if (page == NULL)
+	next_walk = NULL;
+	WT_RET(__wt_tree_walk(session, &next_walk, WT_READ_PREV));
+	if (next_walk == NULL)
 		return (WT_NOTFOUND);
 
-	btree->last_recno = __col_last_recno(page);
-	return (__wt_page_release(session, page));
+	page = next_walk->page;
+	btree->last_recno = page->type == WT_PAGE_COL_VAR ?
+	    __col_var_last_recno(page) : __col_fix_last_recno(page);
+
+	return (__wt_page_release(session, next_walk));
 }
 
 /*

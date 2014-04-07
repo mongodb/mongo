@@ -25,7 +25,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	btree = S2BT(session);
 
-	page = cbt->page;
+	page = cbt->ref->page;
 	cursor = &cbt->iface;
 
 	switch (page->type) {
@@ -67,10 +67,10 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			cursor->value.size = upd->size;
 			return (0);
 		}
-		cell = WT_COL_PTR(page, &page->u.col_var.d[cbt->slot]);
+		cell = WT_COL_PTR(page, &page->pg_var_d[cbt->slot]);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		rip = &page->u.row.d[cbt->slot];
+		rip = &page->pg_row_d[cbt->slot];
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the key and

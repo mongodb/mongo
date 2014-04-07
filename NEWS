@@ -1,3 +1,17 @@
+WiredTiger release 2.1.2, 2014-03-27
+------------------------------------
+
+The WiredTiger 2.1.2 release contains performance enhancements and bug fixes.
+Significant changes include:
+
+Update the configuration settings for shared_cache to make the distinction
+between cache_size and shared_cache less confusing. See upgrading
+documentation for more information.
+
+Various performance enhancements to improve the performance of checkpoints.
+
+Fix a bug that could cause a hang with small caches under heavy load. [#894]
+
 WiredTiger release 2.1.1, 2014-03-04
 ------------------------------------
 

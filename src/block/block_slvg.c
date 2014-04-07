@@ -69,6 +69,25 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
+ * __wt_block_offset_invalid --
+ *	Return if the block offset is insane.
+ */
+int
+__wt_block_offset_invalid(WT_BLOCK *block, off_t offset, uint32_t size)
+{
+	if (size == 0)				/* < minimum page size */
+		return (1);
+	if (size % block->allocsize != 0)	/* not allocation-size units */
+		return (1);
+	if (size > WT_BTREE_PAGE_SIZE_MAX)	/* > maximum page size */
+		return (1);
+						/* past end-of-file */
+	if (offset + (off_t)size > block->fh->size)
+		return (1);
+	return (0);
+}
+
+/*
  * __wt_block_salvage_next --
  *	Return the address for the next potential block from the file.
  */
@@ -108,16 +127,9 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		blk = WT_BLOCK_HEADER_REF(tmp->mem);
 		block->slvg_off += allocsize;
 
-		/*
-		 * The page can't be more than the min/max page size, or past
-		 * the end of the file.
-		 */
 		size = blk->disk_size;
 		cksum = blk->cksum;
-		if (size == 0 ||
-		    size % allocsize != 0 ||
-		    size > WT_BTREE_PAGE_SIZE_MAX ||
-		    offset + (off_t)size > max)
+		if (__wt_block_offset_invalid(block, offset, size))
 			goto skip;
 
 		/*

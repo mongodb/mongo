@@ -112,6 +112,7 @@ static inline int
 __update_serial_func(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_UPDATE **upd_entry, WT_UPDATE *upd)
 {
+	WT_DECL_RET;
 	WT_UPDATE *obsolete;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
@@ -127,16 +128,20 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If there are WT_UPDATE structures to review, we're evicting pages,
-	 * and no other thread holds the page's spinlock, discard obsolete
-	 * WT_UPDATE structures.  Serialization is needed so only one thread
-	 * does the obsolete check at a time.
+	 * If there are subsequent WT_UPDATE structures, we're evicting pages
+	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
+	 * structures.  Serialization is needed so only one thread does the
+	 * obsolete check at a time, and to protect updates from disappearing
+	 * under reconciliation.
 	 */
 	if (upd->next != NULL &&
-	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE) &&
-	    WT_PAGE_TRYLOCK(session, page, &id) == 0) {
+	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
+		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+		/* If we can't lock it, don't scan, that's okay. */
+		if (ret != 0)
+			return (0);
 		obsolete = __wt_update_obsolete_check(session, upd->next);
-		WT_PAGE_UNLOCK(session, page);
+		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
 		if (obsolete != NULL)
 			__wt_update_obsolete_free(session, page, obsolete);
 	}

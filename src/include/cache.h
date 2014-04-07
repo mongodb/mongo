@@ -19,7 +19,6 @@
 #define	WT_EVICT_PASS_AGGRESSIVE	0x01
 #define	WT_EVICT_PASS_ALL		0x02
 #define	WT_EVICT_PASS_DIRTY		0x04
-#define	WT_EVICT_PASS_INTERNAL		0x08
 
 /*
  * WT_EVICT_ENTRY --
@@ -27,7 +26,7 @@
  */
 struct __wt_evict_entry {
 	WT_BTREE *btree;			/* Enclosing btree object */
-	WT_PAGE	 *page;				/* Page to flush/evict */
+	WT_REF	 *ref;				/* Page to flush/evict */
 };
 
 /*
@@ -99,9 +98,8 @@ struct __wt_cache {
 	 */
 #define	WT_EVICT_ACTIVE		0x01	/* Eviction server is active */
 #define	WT_EVICT_CLEAR_WALKS	0x02	/* Clear eviction walks */
-#define	WT_EVICT_INTERNAL	0x04	/* Check for deep internal trees */
-#define	WT_EVICT_NO_PROGRESS	0x08	/* Check if pages are being evicted */
-#define	WT_EVICT_STUCK		0x10	/* Eviction server is stuck */
+#define	WT_EVICT_NO_PROGRESS	0x04	/* Check if pages are being evicted */
+#define	WT_EVICT_STUCK		0x08	/* Eviction server is stuck */
 	uint32_t flags;
 };
 

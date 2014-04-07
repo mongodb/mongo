@@ -12,17 +12,17 @@ static int __err_cell_type(
 	WT_SESSION_IMPL *, uint32_t, const char *, uint8_t, uint8_t);
 static int __err_eof(WT_SESSION_IMPL *, uint32_t, const char *);
 static int __verify_dsk_chunk(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *, uint32_t);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, uint32_t);
 static int __verify_dsk_col_fix(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
 static int __verify_dsk_col_int(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
 static int __verify_dsk_col_var(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
 static int __verify_dsk_memsize(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *, WT_CELL *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_CELL *);
 static int __verify_dsk_row(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
+	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
 
 #define	WT_ERR_VRFY(session, ...) do {					\
 	if (!(F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK)))		\
@@ -37,20 +37,16 @@ static int __verify_dsk_row(
 } while (0)
 
 /*
- * __wt_verify_dsk --
- *	Verify a single Btree page as read from disk.
+ * __wt_verify_dsk_image --
+ *	Verify a single block as read from disk.
  */
 int
-__wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
+__wt_verify_dsk_image(WT_SESSION_IMPL *session,
+    const char *addr, const WT_PAGE_HEADER *dsk, size_t size)
 {
-	WT_PAGE_HEADER *dsk;
-	size_t size;
-	uint8_t *p, *end;
+	const uint8_t *p, *end;
 	u_int i;
 	uint8_t flags;
-
-	dsk = buf->mem;
-	size = buf->size;
 
 	/* Check the page type. */
 	switch (dsk->type) {
@@ -118,14 +114,20 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 			    "page at %s has non-zero unused page header bytes",
 			    addr);
 
-	/* Any bytes after the data chunk should be nul bytes. */
-	p = (uint8_t *)dsk + dsk->mem_size;
-	end = (uint8_t *)dsk + size;
-	for (; p < end; ++p)
-		if (*p != '\0')
-			WT_RET_VRFY(session,
-			    "%s page at %s has non-zero trailing bytes",
-			    __wt_page_type_string(dsk->type), addr);
+	/*
+	 * Any bytes after the data chunk should be nul bytes; ignore if the
+	 * size is 0, that allows easy checking of disk images where we don't
+	 * have the size.
+	 */
+	if (size != 0) {
+		p = (uint8_t *)dsk + dsk->mem_size;
+		end = (uint8_t *)dsk + size;
+		for (; p < end; ++p)
+			if (*p != '\0')
+				WT_RET_VRFY(session,
+				    "%s page at %s has non-zero trailing bytes",
+				    __wt_page_type_string(dsk->type), addr);
+	}
 
 	/* Verify the items on the page. */
 	switch (dsk->type) {
@@ -147,12 +149,22 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 }
 
 /*
+ * __wt_verify_dsk --
+ *	Verify a single Btree page as read from disk.
+ */
+int
+__wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
+{
+	return (__wt_verify_dsk_image(session, addr, buf->data, buf->size));
+}
+
+/*
  * __verify_dsk_row --
  *	Walk a WT_PAGE_ROW_INT or WT_PAGE_ROW_LEAF disk page and verify it.
  */
 static int
 __verify_dsk_row(
-    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
+    WT_SESSION_IMPL *session, const char *addr, const WT_PAGE_HEADER *dsk)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -435,7 +447,7 @@ err:		if (ret == 0)
  */
 static int
 __verify_dsk_col_int(
-    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
+    WT_SESSION_IMPL *session, const char *addr, const WT_PAGE_HEADER *dsk)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -478,7 +490,7 @@ __verify_dsk_col_int(
  */
 static int
 __verify_dsk_col_fix(
-    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
+    WT_SESSION_IMPL *session, const char *addr, const WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
 	uint32_t datalen;
@@ -495,7 +507,7 @@ __verify_dsk_col_fix(
  */
 static int
 __verify_dsk_col_var(
-    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
+    WT_SESSION_IMPL *session, const char *addr, const WT_PAGE_HEADER *dsk)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -582,7 +594,7 @@ match_err:			WT_RET_VRFY(session,
  */
 static int
 __verify_dsk_memsize(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_HEADER *dsk, WT_CELL *cell)
+    const char *addr, const WT_PAGE_HEADER *dsk, WT_CELL *cell)
 {
 	size_t len;
 
@@ -606,7 +618,7 @@ __verify_dsk_memsize(WT_SESSION_IMPL *session,
  */
 static int
 __verify_dsk_chunk(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_HEADER *dsk, uint32_t datalen)
+    const char *addr, const WT_PAGE_HEADER *dsk, uint32_t datalen)
 {
 	WT_BTREE *btree;
 	uint8_t *p, *end;
@@ -686,6 +698,13 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		if (dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
+	case WT_CELL_KEY_OVFL_RM:
+	case WT_CELL_VALUE_OVFL_RM:
+		/*
+		 * Removed overflow cells are in-memory only, it's an error to
+		 * ever see one on a disk page.
+		 */
+		break;
 	case WT_CELL_VALUE:
 	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
@@ -693,12 +712,6 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		if (dsk_type == WT_PAGE_COL_VAR ||
 		    dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
-		break;
-	case WT_CELL_VALUE_OVFL_RM:
-		/*
-		 * The overflow-value deleted cell is in-memory only, it's an
-		 * error to ever see it on a disk page.
-		 */
 		break;
 	default:
 		break;

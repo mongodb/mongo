@@ -26,6 +26,8 @@ s_dumpcmp: $(srcdir)/s_dumpcmp.sh
 
 backup:
 	rm -rf BACKUP && cp -p -r RUNDIR BACKUP
+refresh:
+	rm -rf RUNDIR && cp -p -r BACKUP RUNDIR
 
 TESTS = smoke.sh
 

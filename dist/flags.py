@@ -41,9 +41,9 @@ flags = {
 		'READ_WONT_NEED',
 	],
 	'rec_write' : [
-		'EVICTION_SERVER_LOCKED',
+		'EVICTION_LOCKED',
 		'SKIP_UPDATE_ERR',
-		'SKIP_UPDATE_QUIT',
+		'SKIP_UPDATE_RESTORE'
 	],
 	'shared_cache' : [
 		'CACHE_POOL_RUN'
@@ -70,6 +70,7 @@ flags = {
 		'VERB_recovery',
 		'VERB_salvage',
 		'VERB_shared_cache',
+		'VERB_split',
 		'VERB_verify',
 		'VERB_version',
 		'VERB_write'

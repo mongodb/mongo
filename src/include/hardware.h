@@ -153,18 +153,37 @@ static inline void WT_WRITE_BARRIER(void) { return; }
 /*
  * Atomic versions of F_ISSET, F_SET and F_CLR.
  * Spin until the new value can be swapped into place.
+ *
+ * The CAS (compare-and-swap) version succeeds with ret == 0 if it can
+ * successfully switch the flags from off to on.
  */
 #if defined(_lint)
 #define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & ((uint32_t)(mask)))
 #define	F_SET_ATOMIC(p, mask)	((p)->flags_atomic |= ((uint32_t)(mask)))
+#define	F_CAS_ATOMIC(p, mask, ret)	F_SET_ATOMIC(p, mask)
 #define	F_CLR_ATOMIC(p, mask)	((p)->flags_atomic &= ~((uint32_t)(mask)))
+
 #else
+
 #define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint32_t)(mask))
 
 #define	F_SET_ATOMIC(p, mask)	do {					\
 	uint32_t __orig;						\
 	do {								\
 		__orig = (p)->flags_atomic;				\
+	} while (!WT_ATOMIC_CAS((p)->flags_atomic,			\
+	    __orig, __orig | (uint32_t)(mask)));			\
+} while (0)
+
+#define	F_CAS_ATOMIC(p, mask, ret)	do {				\
+	uint32_t __orig;						\
+	ret = 0;							\
+	do {								\
+		__orig = (p)->flags_atomic;				\
+		if ((__orig & (uint32_t)(mask)) != 0) {			\
+			ret = EBUSY;					\
+			break;						\
+		}							\
 	} while (!WT_ATOMIC_CAS((p)->flags_atomic,			\
 	    __orig, __orig | (uint32_t)(mask)));			\
 } while (0)

@@ -11,6 +11,7 @@ table_config="internal_page_max=128K,lsm=(bloom_config=(leaf_page_max=8MB),bloom
 icount=15000
 key_sz=40
 value_sz=10000
+max_latency=2000
 populate_threads=1
 report_interval=10
 random_value=true

@@ -24,7 +24,7 @@ static inline void
 __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 {
 	/* Our caller should have released any page held by this cursor. */
-	cbt->page = NULL;
+	cbt->ref = NULL;
 	cbt->slot = UINT32_MAX;			/* Fail big */
 
 	cbt->ins_head = NULL;
@@ -118,8 +118,8 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	 * eviction (e.g., forced eviction of big pages), so it is important to
 	 * do it after releasing our snapshot above.
 	 */
-	WT_RET(__wt_page_release(session, cbt->page));
-	cbt->page = NULL;
+	WT_RET(__wt_page_release(session, cbt->ref));
+	cbt->ref = NULL;
 
 	return (0);
 }
@@ -180,7 +180,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
-	page = cbt->page;
+	page = cbt->ref->page;
 
 	unpack = &_unpack;
 	key_unpacked = 0;
@@ -283,7 +283,8 @@ slow:			WT_RET(__wt_row_leaf_key_work(
 		vb->size = 0;
 	} else {
 		__wt_cell_unpack(cell, unpack);
-		WT_RET(__wt_page_cell_data_ref(session, cbt->page, unpack, vb));
+		WT_RET(__wt_page_cell_data_ref(
+		    session, cbt->ref->page, unpack, vb));
 	}
 
 	return (0);
