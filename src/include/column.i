@@ -110,11 +110,11 @@ __col_insert_search(WT_INSERT_HEAD *inshead,
 }
 
 /*
- * __col_last_recno --
- *	Return the last record number for a column-store page.
+ * __col_var_last_recno --
+ *	Return the last record number for a variable-length column-store page.
  */
 static inline uint64_t
-__col_last_recno(WT_PAGE *page)
+__col_var_last_recno(WT_PAGE *page)
 {
 	WT_COL_RLE *repeat;
 
@@ -122,18 +122,30 @@ __col_last_recno(WT_PAGE *page)
 	 * If there's an append list (the last page), then there may be more
 	 * records on the page.  This function ignores those records, so our
 	 * callers have to handle that explicitly, if they care.
-	 *
-	 * WT_PAGE_COL_FIX pages don't have a repeat array, so this works for
-	 * fixed-length column-stores without any further check.
 	 */
-	if (page->u.col_var.nrepeats == 0)
-		return (page->entries == 0 ? 0 :
-		    page->u.col_var.recno + (page->entries - 1));
+	if (page->pg_var_nrepeats == 0)
+		return (page->pg_var_entries == 0 ? 0 :
+		    page->pg_var_recno + (page->pg_var_entries - 1));
 
-	repeat = &page->u.col_var.repeats[page->u.col_var.nrepeats - 1];
-	return (
-	    (repeat->recno + repeat->rle) - 1 +
-	    (page->entries - (repeat->indx + 1)));
+	repeat = &page->pg_var_repeats[page->pg_var_nrepeats - 1];
+	return ((repeat->recno + repeat->rle) - 1 +
+	    (page->pg_var_entries - (repeat->indx + 1)));
+}
+
+/*
+ * __col_fix_last_recno --
+ *	Return the last record number for a fixed-length column-store page.
+ */
+static inline uint64_t
+__col_fix_last_recno(WT_PAGE *page)
+{
+	/*
+	 * If there's an append list (the last page), then there may be more
+	 * records on the page.  This function ignores those records, so our
+	 * callers have to handle that explicitly, if they care.
+	 */
+	return (page->pg_fix_entries == 0 ? 0 :
+	    page->pg_fix_recno + (page->pg_fix_entries - 1));
 }
 
 /*
@@ -156,14 +168,13 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 	 * slot for this record number, because we know any intervening records
 	 * have repeat counts of 1.
 	 */
-	for (base = 0,
-	    limit = page->u.col_var.nrepeats; limit != 0; limit >>= 1) {
+	for (base = 0, limit = page->pg_var_nrepeats; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 
-		repeat = page->u.col_var.repeats + indx;
+		repeat = page->pg_var_repeats + indx;
 		if (recno >= repeat->recno &&
 		    recno < repeat->recno + repeat->rle)
-			return (page->u.col_var.d + repeat->indx);
+			return (page->pg_var_d + repeat->indx);
 		if (recno < repeat->recno)
 			continue;
 		base = indx + 1;
@@ -176,16 +187,15 @@ __col_var_search(WT_PAGE *page, uint64_t recno)
 	 */
 	if (base == 0) {
 		start_indx = 0;
-		start_recno = page->u.col_var.recno;
+		start_recno = page->pg_var_recno;
 	} else {
-		repeat = page->u.col_var.repeats + (base - 1);
+		repeat = page->pg_var_repeats + (base - 1);
 		start_indx = repeat->indx + 1;
 		start_recno = repeat->recno + repeat->rle;
 	}
 
-	if (recno >= start_recno + (page->entries - start_indx))
+	if (recno >= start_recno + (page->pg_var_entries - start_indx))
 		return (NULL);
 
-	return (page->u.col_var.d +
-	    start_indx + (uint32_t)(recno - start_recno));
+	return (page->pg_var_d + start_indx + (uint32_t)(recno - start_recno));
 }

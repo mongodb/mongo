@@ -48,6 +48,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	int t_ret;
 
 	(void)cb;
+	(void)flags;
 	t_ret = 0;
 	if (ret != 0) {
 		/*! [Get identifier] */

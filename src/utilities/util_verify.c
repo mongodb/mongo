@@ -9,23 +9,45 @@
 
 static int usage(void);
 
+#undef OPT_ARGS
+#undef USAGE_ARGS
+#ifdef HAVE_DIAGNOSTIC
+#define	OPT_ARGS	"d:"
+#define	USAGE_ARGS	\
+	"[-d dump_address | dump_blocks | dump_offsets=#,# | dump_pages] uri"
+#else
+#define	OPT_ARGS	""
+#define	USAGE_ARGS	"uri"
+#endif
+
 int
 util_verify(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
+	size_t size;
 	int ch, dump_address, dump_blocks, dump_pages;
-	char *name, config[128];
+	char *config, *dump_offsets, *name;
 
-	name = NULL;
 	dump_address = dump_blocks = dump_pages = 0;
-	while ((ch = util_getopt(argc, argv, "d:")) != EOF)
+	config = dump_offsets = name = NULL;
+	while ((ch = util_getopt(argc, argv, OPT_ARGS)) != EOF)
 		switch (ch) {
 		case 'd':
 			if (strcmp(util_optarg, "dump_address") == 0)
 				dump_address = 1;
 			else if (strcmp(util_optarg, "dump_blocks") == 0)
 				dump_blocks = 1;
-			else if (strcmp(util_optarg, "dump_pages") == 0)
+			else if (
+			    WT_PREFIX_MATCH(util_optarg, "dump_offsets=")) {
+				if (dump_offsets != NULL) {
+					fprintf(stderr,
+					    "%s: only a single 'dump_offsets' "
+					    "argument supported\n", progname);
+					return (usage());
+				}
+				dump_offsets =
+				    util_optarg + strlen("dump_offsets=");
+			} else if (strcmp(util_optarg, "dump_pages") == 0)
 				dump_pages = 1;
 			else
 				return (usage());
@@ -45,14 +67,26 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 		return (1);
 
 	/* Build the configuration string as necessary. */
-	config[0] = '\0';
-	if (dump_address)
-		(void)strcat(config, "dump_address,");
-	if (dump_blocks)
-		(void)strcat(config, "dump_blocks,");
-	if (dump_pages)
-		(void)strcat(config, "dump_pages,");
-
+	if (dump_address || dump_blocks || dump_offsets != NULL || dump_pages) {
+		size =
+		    strlen("dump_address,") +
+		    strlen("dump_blocks,") +
+		    strlen("dump_pages,") +
+		    strlen("dump_offsets[],") +
+		    (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + 20;
+		if ((config = malloc(size)) == NULL) {
+			ret = util_err(errno, NULL);
+			goto err;
+		}
+		snprintf(config, size,
+		    "%s%s%s%s%s%s",
+		    dump_address ? "dump_address," : "",
+		    dump_blocks ? "dump_blocks," : "",
+		    dump_offsets != NULL ? "dump_offsets=[" : "",
+		    dump_offsets != NULL ? dump_offsets : "",
+		    dump_offsets != NULL ? "]," : "",
+		    dump_pages ? "dump_pages" : "");
+	}
 	if ((ret = session->verify(session, name, config)) != 0) {
 		fprintf(stderr, "%s: verify(%s): %s\n",
 		    progname, name, wiredtiger_strerror(ret));
@@ -67,6 +101,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
+	if (config != NULL)
+		free(config);
 	if (name != NULL)
 		free(name);
 
@@ -78,7 +114,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "verify [-d dump_address | dump_blocks | dump_pages] uri\n",
-	    progname, usage_prefix);
+	    "verify %s\n",
+	    progname, usage_prefix, USAGE_ARGS);
 	return (1);
 }

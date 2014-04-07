@@ -12,10 +12,11 @@
  *	Return if a page needs to be re-written.
  */
 static int
-__compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
+__compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 {
 	WT_BM *bm;
 	WT_DECL_RET;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	size_t addr_size;
 	const uint8_t *addr;
@@ -23,13 +24,14 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 	*skipp = 1;					/* Default skip. */
 
 	bm = S2BT(session)->bm;
+	page = ref->page;
 	mod = page->modify;
 
 	/*
 	 * Ignore the root: it may not have a replacement address, and besides,
 	 * if anything else gets written, so will it.
 	 */
-	if (WT_PAGE_IS_ROOT(page))
+	if (__wt_ref_is_root(ref))
 		return (0);
 
 	/* Ignore currently dirty pages, they will be written regardless. */
@@ -39,11 +41,10 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 	/*
 	 * If the page is clean, test the original addresses.
 	 * If the page is a 1-to-1 replacement, test the replacement addresses.
-	 * Ignore split and empty pages, they get merged into the parent.
+	 * Ignore empty pages, they get merged into the parent.
 	 */
 	if (mod == NULL || F_ISSET(mod, WT_PM_REC_MASK) == 0) {
-		WT_RET(__wt_ref_info(session,
-		    page->parent, page->ref, &addr, &addr_size, NULL));
+		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr == NULL)
 			return (0);
 		WT_RET(
@@ -54,8 +55,8 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_PAGE *page, int *skipp)
 		 * the page is being reconciled, lock the page down.
 		 */
 		WT_PAGE_LOCK(session, page);
-		ret = bm->compact_page_skip(bm,
-		    session, mod->u.replace.addr, mod->u.replace.size, skipp);
+		ret = bm->compact_page_skip(bm, session,
+		    mod->mod_replace.addr, mod->mod_replace.size, skipp);
 		WT_PAGE_UNLOCK(session, page);
 		WT_RET(ret);
 	}
@@ -72,7 +73,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BM *bm;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_PAGE *page;
+	WT_REF *ref;
 	int skip;
 
 	WT_UNUSED(cfg);
@@ -122,31 +123,31 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(bm->compact_start(bm, session));
 
 	/* Walk the tree. */
-	for (page = NULL;;) {
+	for (ref = NULL;;) {
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the
 		 * read generation of pages already in memory, and if a page is
 		 * read, set its generation to a low value so it is evicted
 		 * quickly.
 		 */
-		WT_ERR(__wt_tree_walk(session, &page,
+		WT_ERR(__wt_tree_walk(session, &ref,
 		    WT_READ_COMPACT | WT_READ_NO_GEN | WT_READ_WONT_NEED));
-		if (page == NULL)
+		if (ref == NULL)
 			break;
 
-		WT_ERR(__compact_rewrite(session, page, &skip));
+		WT_ERR(__compact_rewrite(session, ref, &skip));
 		if (skip)
 			continue;
 
 		/* Rewrite the page: mark the page and tree dirty. */
-		WT_ERR(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(session, page);
+		WT_ERR(__wt_page_modify_init(session, ref->page));
+		__wt_page_modify_set(session, ref->page);
 
 		WT_STAT_FAST_DATA_INCR(session, btree_compact_rewrite);
 	}
 
-err:	if (page != NULL)
-		WT_TRET(__wt_page_release(session, page));
+err:	if (ref != NULL)
+		WT_TRET(__wt_page_release(session, ref));
 
 	WT_TRET(bm->compact_end(bm, session));
 
@@ -161,8 +162,7 @@ err:	if (page != NULL)
  *	Return if compaction requires we read this page.
  */
 int
-__wt_compact_page_skip(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int *skipp)
+__wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 {
 	WT_BM *bm;
 	size_t addr_size;
@@ -180,7 +180,7 @@ __wt_compact_page_skip(
 	 * address, the page isn't on disk, but we have to read internal pages
 	 * to walk the tree regardless; throw up our hands and read it.
 	 */
-	WT_RET(__wt_ref_info(session, parent, ref, &addr, &addr_size, &type));
+	WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, &type));
 	if (addr == NULL)
 		return (0);
 

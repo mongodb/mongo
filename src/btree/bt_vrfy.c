@@ -19,9 +19,9 @@ typedef struct {
 
 	uint64_t fcnt;				/* Progress counter */
 
-	int	 dump_address;
-	int	 dump_pages;
-	int	 dump_blocks;
+	int dump_address;			/* Debugging hooks */
+	int dump_pages;
+	int dump_blocks;
 
 	WT_ITEM *tmp1;				/* Temporary buffer */
 	WT_ITEM *tmp2;				/* Temporary buffer */
@@ -29,15 +29,16 @@ typedef struct {
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int  __verify_config(WT_SESSION_IMPL *, const char *[], WT_VSTUFF *);
+static int  __verify_config_offsets(WT_SESSION_IMPL *, const char *[], int *);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, size_t, WT_VSTUFF *);
 static int  __verify_overflow_cell(
-	WT_SESSION_IMPL *, WT_PAGE *, int *, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_REF *, int *, WT_VSTUFF *);
 static int  __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int  __verify_row_leaf_key_order(
-	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
+static int  __verify_tree(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
 
 /*
  * __wt_verify --
@@ -53,7 +54,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_VSTUFF *vs, _vstuff;
 	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
-	int bm_start;
+	int bm_start, quit;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -69,6 +70,11 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Check configuration strings. */
 	WT_ERR(__verify_config(session, cfg, vs));
+
+	/* Optionally dump specific block offsets. */
+	WT_ERR(__verify_config_offsets(session, cfg, &quit));
+	if (quit)
+		goto done;
 
 	/* Get a list of the checkpoints for this file. */
 	WT_ERR(
@@ -111,12 +117,12 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 			if (vs->dump_address ||
 			    vs->dump_blocks || vs->dump_pages)
 				WT_ERR(__wt_msg(session, "Root: %s %s",
-				    __wt_addr_string(session, vs->tmp1,
-				    root_addr, root_addr_size),
+				    __wt_addr_string(session,
+				    root_addr, root_addr_size, vs->tmp1),
 				    __wt_page_type_string(
-				    btree->root_page->type)));
+				    btree->root.page->type)));
 #endif
-			ret = __verify_tree(session, btree->root_page, vs);
+			ret = __verify_tree(session, &btree->root, vs);
 
 			WT_TRET(__wt_bt_cache_op(
 			    session, NULL, WT_SYNC_DISCARD_NOWRITE));
@@ -127,6 +133,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(ret);
 	}
 
+done:
 err:	/* Inform the underlying block manager we're done. */
 	if (bm_start)
 		WT_TRET(bm->verify_end(bm, session));
@@ -149,44 +156,64 @@ err:	/* Inform the underlying block manager we're done. */
 
 /*
  * __verify_config --
- *	Verification supports dumping pages in various formats.
+ *	Debugging: verification supports dumping pages in various formats.
  */
 static int
 __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
 
-	ret = __wt_config_gets(session, cfg, "dump_address", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (ret == 0 && cval.val != 0)
-		vs->dump_address = 1;
+	WT_RET(__wt_config_gets(session, cfg, "dump_address", &cval));
+	vs->dump_address = cval.val != 0;
 
-	ret = __wt_config_gets(session, cfg, "dump_blocks", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (ret == 0 && cval.val != 0)
-		vs->dump_blocks = 1;
+	WT_RET(__wt_config_gets(session, cfg, "dump_blocks", &cval));
+	vs->dump_blocks = cval.val != 0;
 
-	ret = __wt_config_gets(session, cfg, "dump_pages", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (ret == 0 && cval.val != 0)
-		vs->dump_pages = 1;
+	WT_RET(__wt_config_gets(session, cfg, "dump_pages", &cval));
+	vs->dump_pages = cval.val != 0;
 
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * We use the verification code to do debugging dumps because if we're
-	 * dumping in debugging mode, we want to confirm the page is OK before
-	 * walking it.
-	 */
-#else
+#if !defined(HAVE_DIAGNOSTIC)
 	if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
 		WT_RET_MSG(session, ENOTSUP,
 		    "the WiredTiger library was not built in diagnostic mode");
 #endif
 	return (0);
+}
+
+/*
+ * __verify_config_offsets --
+ *	Debugging: optionally dump specific blocks from the file.
+ */
+static int
+__verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
+{
+	WT_CONFIG list;
+	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_RET;
+	u_long offset;
+
+	*quitp = 0;
+
+	WT_RET(__wt_config_gets(session, cfg, "dump_offsets", &cval));
+	WT_RET(__wt_config_subinit(session, &list, &cval));
+	while ((ret = __wt_config_next(&list, &k, &v)) == 0) {
+		/*
+		 * Quit after dumping the requested blocks.  (That's hopefully
+		 * what the user wanted, all of this stuff is just hooked into
+		 * verify because that's where we "dump blocks" for debugging.)
+		 */
+		*quitp = 1;
+		if (v.len != 0 || sscanf(k.str, "%lu", &offset) != 1)
+			WT_RET_MSG(session, EINVAL,
+			    "unexpected dump offset format");
+#if !defined(HAVE_DIAGNOSTIC)
+		WT_RET_MSG(session, ENOTSUP,
+		    "the WiredTiger library was not built in diagnostic mode");
+#else
+		WT_TRET(__wt_debug_offset_blind(session, (off_t)offset, NULL));
+#endif
+	}
+	return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*
@@ -214,29 +241,32 @@ __verify_checkpoint_reset(WT_VSTUFF *vs)
  * in the page and in the tree.
  */
 static int
-__verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
+__verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 {
 	WT_BM *bm;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_DECL_RET;
-	WT_REF *ref;
+	WT_PAGE *page;
+	WT_REF *child_ref;
 	uint64_t recno;
 	uint32_t entry, i;
 	int found;
 
 	bm = S2BT(session)->bm;
+	page = ref->page;
+
 	unpack = &_unpack;
 	WT_CLEAR(*unpack);	/* -Wuninitialized */
 
 	WT_VERBOSE_RET(session, verify, "%s %s",
-	    __wt_page_addr_string(session, vs->tmp1, page),
+	    __wt_page_addr_string(session, ref, vs->tmp1),
 	    __wt_page_type_string(page->type));
 #ifdef HAVE_DIAGNOSTIC
 	if (vs->dump_address)
 		WT_RET(__wt_msg(session, "%s %s",
-		    __wt_page_addr_string(session, vs->tmp1, page),
+		    __wt_page_addr_string(session, ref, vs->tmp1),
 		    __wt_page_type_string(page->type)));
 #endif
 
@@ -280,24 +310,24 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		recno = page->u.col_fix.recno;
+		recno = page->pg_fix_recno;
 		goto recno_chk;
 	case WT_PAGE_COL_INT:
-		recno = page->u.intl.recno;
+		recno = page->pg_intl_recno;
 		goto recno_chk;
 	case WT_PAGE_COL_VAR:
-		recno = page->u.col_var.recno;
+		recno = page->pg_var_recno;
 recno_chk:	if (recno != vs->record_total + 1)
 			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s has a starting record of %" PRIu64
 			    " when the expected starting record is %" PRIu64,
-			    __wt_page_addr_string(session, vs->tmp1, page),
+			    __wt_page_addr_string(session, ref, vs->tmp1),
 			    recno, vs->record_total + 1);
 		break;
 	}
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		vs->record_total += page->entries;
+		vs->record_total += page->pg_fix_entries;
 		break;
 	case WT_PAGE_COL_VAR:
 		recno = 0;
@@ -319,13 +349,13 @@ recno_chk:	if (recno != vs->record_total + 1)
 	 */
 	switch (page->type) {
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__verify_row_leaf_key_order(session, page, vs));
+		WT_RET(__verify_row_leaf_key_order(session, ref, vs));
 		break;
 	}
 
 	/* If it's not the root page, unpack the parent cell. */
-	if (!WT_PAGE_IS_ROOT(page)) {
-		__wt_cell_unpack(page->ref->addr, unpack);
+	if (!__wt_ref_is_root(ref)) {
+		__wt_cell_unpack(ref->addr, unpack);
 
 		/* Compare the parent cell against the page type. */
 		switch (page->type) {
@@ -346,7 +376,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 				    "page at %s, of type %s, is referenced in "
 				    "its parent by a cell of type %s",
 				    __wt_page_addr_string(
-					session, vs->tmp1, page),
+					session, ref, vs->tmp1),
 				    __wt_page_type_string(page->type),
 				    __wt_cell_type_string(unpack->raw));
 			break;
@@ -362,8 +392,8 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__verify_overflow_cell(session, page, &found, vs));
-		if (WT_PAGE_IS_ROOT(page) || page->type == WT_PAGE_ROW_INT)
+		WT_RET(__verify_overflow_cell(session, ref, &found, vs));
+		if (__wt_ref_is_root(ref) || page->type == WT_PAGE_ROW_INT)
 			break;
 
 		/*
@@ -378,7 +408,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s, of type %s and referenced in its "
 			    "parent by a cell of type %s, contains overflow "
 			    "items",
-			    __wt_page_addr_string(session, vs->tmp1, page),
+			    __wt_page_addr_string(session, ref, vs->tmp1),
 			    __wt_page_type_string(page->type),
 			    __wt_cell_type_string(WT_CELL_ADDR_LEAF_NO));
 		break;
@@ -389,14 +419,14 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_REF_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH_BEGIN(page, child_ref) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
 			 * reviewed to this point.
 			 */
 			++entry;
-			if (ref->key.recno != vs->record_total + 1) {
+			if (child_ref->key.recno != vs->record_total + 1) {
 				WT_RET_MSG(session, WT_ERROR,
 				    "the starting record number in entry %"
 				    PRIu32 " of the column internal page at "
@@ -404,26 +434,26 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 				    "starting record number is %" PRIu64,
 				    entry,
 				    __wt_page_addr_string(
-				    session, vs->tmp1, page),
-				    ref->key.recno,
+				    session, child_ref, vs->tmp1),
+				    child_ref->key.recno,
 				    vs->record_total + 1);
 			}
 
 			/* Verify the subtree. */
-			WT_RET(__wt_page_in(session, page, ref, 0));
-			ret = __verify_tree(session, ref->page, vs);
-			WT_TRET(__wt_page_release(session, ref->page));
+			WT_RET(__wt_page_in(session, child_ref, 0));
+			ret = __verify_tree(session, child_ref, vs);
+			WT_TRET(__wt_page_release(session, child_ref));
 			WT_RET(ret);
 
-			__wt_cell_unpack(ref->addr, unpack);
+			__wt_cell_unpack(child_ref->addr, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
-		}
+		} WT_INTL_FOREACH_END;
 		break;
 	case WT_PAGE_ROW_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_REF_FOREACH(page, ref, i) {
+		WT_INTL_FOREACH_BEGIN(page, child_ref) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * key should be larger than the largest key previously
@@ -435,18 +465,18 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 			++entry;
 			if (entry != 1)
 				WT_RET(__verify_row_int_key_order(
-				    session, page, ref, entry, vs));
+				    session, page, child_ref, entry, vs));
 
 			/* Verify the subtree. */
-			WT_RET(__wt_page_in(session, page, ref, 0));
-			ret = __verify_tree(session, ref->page, vs);
-			WT_TRET(__wt_page_release(session, ref->page));
+			WT_RET(__wt_page_in(session, child_ref, 0));
+			ret = __verify_tree(session, child_ref, vs);
+			WT_TRET(__wt_page_release(session, child_ref));
 			WT_RET(ret);
 
-			__wt_cell_unpack(ref->addr, unpack);
+			__wt_cell_unpack(child_ref->addr, unpack);
 			WT_RET(bm->verify_addr(
 			    bm, session, unpack->data, unpack->size));
-		}
+		} WT_INTL_FOREACH_END;
 		break;
 	}
 	return (0);
@@ -459,7 +489,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
  */
 static int
 __verify_row_int_key_order(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_REF *ref, uint32_t entry, WT_VSTUFF *vs)
+    WT_PAGE *parent, WT_REF *ref, uint32_t entry, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_ITEM item;
@@ -470,8 +500,8 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr->size != 0);
 
-	/* Get the current key. */
-	__wt_ref_key(page, ref, &item.data, &item.size);
+	/* Get the parent page's internal key. */
+	__wt_ref_key(parent, ref, &item.data, &item.size);
 
 	/* Compare the key against the largest key we've seen so far. */
 	WT_RET(WT_LEX_CMP(session, btree->collator, &item, vs->max_key, cmp));
@@ -481,12 +511,12 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 		    "sorts before the last key appearing on page %s, earlier "
 		    "in the tree",
 		    entry,
-		    __wt_page_addr_string(session, vs->tmp1, page),
+		    __wt_page_addr_string(session, ref, vs->tmp1),
 		    (char *)vs->max_addr->data);
 
 	/* Update the largest key we've seen to the key just checked. */
 	WT_RET(__wt_buf_set(session, vs->max_key, item.data, item.size));
-	(void)__wt_page_addr_string(session, vs->max_addr, page);
+	(void)__wt_page_addr_string(session, ref, vs->max_addr);
 
 	return (0);
 }
@@ -498,18 +528,20 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
  */
 static int
 __verify_row_leaf_key_order(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
+    WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 	int cmp;
 
 	btree = S2BT(session);
+	page = ref->page;
 
 	/*
 	 * If a tree is empty (just created), it won't have keys; if there
 	 * are no keys, we're done.
 	 */
-	if (page->entries == 0)
+	if (page->pg_row_entries == 0)
 		return (0);
 
 	/*
@@ -519,7 +551,7 @@ __verify_row_leaf_key_order(
 	 */
 	if (vs->max_addr->size != 0) {
 		WT_RET(__wt_row_leaf_key_copy(
-		    session, page, page->u.row.d, vs->tmp1));
+		    session, page, page->pg_row_d, vs->tmp1));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -538,14 +570,14 @@ __verify_row_leaf_key_order(
 			    "the first key on the page at %s sorts equal to or "
 			    "less than a key appearing on the page at %s, "
 			    "earlier in the tree",
-			    __wt_page_addr_string(session, vs->tmp1, page),
+			    __wt_page_addr_string(session, ref, vs->tmp1),
 				(char *)vs->max_addr->data);
 	}
 
 	/* Update the largest key we've seen to the last key on this page. */
-	WT_RET(__wt_row_leaf_key_copy(session,
-	    page, page->u.row.d + (page->entries - 1), vs->max_key));
-	(void)__wt_page_addr_string(session, vs->max_addr, page);
+	WT_RET(__wt_row_leaf_key_copy(session, page,
+	    page->pg_row_d + (page->pg_row_entries - 1), vs->max_key));
+	(void)__wt_page_addr_string(session, ref, vs->max_addr);
 
 	return (0);
 }
@@ -556,7 +588,7 @@ __verify_row_leaf_key_order(
  */
 static int
 __verify_overflow_cell(
-    WT_SESSION_IMPL *session, WT_PAGE *page, int *found, WT_VSTUFF *vs)
+    WT_SESSION_IMPL *session, WT_REF *ref, int *found, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -573,7 +605,7 @@ __verify_overflow_cell(
 	 * If a tree is empty (just created), it won't have a disk image;
 	 * if there is no disk image, we're done.
 	 */
-	if ((dsk = page->dsk) == NULL)
+	if ((dsk = ref->page->dsk) == NULL)
 		return (0);
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
@@ -597,8 +629,8 @@ err:	WT_RET_MSG(session, ret,
 	    "cell %" PRIu32 " on page at %s references an overflow item at %s "
 	    "that failed verification",
 	    cell_num - 1,
-	    __wt_page_addr_string(session, vs->tmp1, page),
-	    __wt_addr_string(session, vs->tmp2, unpack->data, unpack->size));
+	    __wt_page_addr_string(session, ref, vs->tmp1),
+	    __wt_addr_string(session, unpack->data, unpack->size, vs->tmp2));
 }
 
 /*
@@ -626,7 +658,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	if (dsk->type != WT_PAGE_OVFL)
 		WT_RET_MSG(session, WT_ERROR,
 		    "overflow referenced page at %s is not an overflow page",
-		    __wt_addr_string(session, vs->tmp1, addr, addr_size));
+		    __wt_addr_string(session, addr, addr_size, vs->tmp1));
 
 	WT_RET(bm->verify_addr(bm, session, addr, addr_size));
 	return (0);

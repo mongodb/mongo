@@ -183,7 +183,7 @@ ops(void *arg)
 	 * Select the first operation where we'll create sessions and cursors,
 	 * perform checkpoint operations.
 	 */
-	ckpt_op = MMRAND(1, thread_ops);
+	ckpt_op = g.c_checkpoints ? MMRAND(1, thread_ops) : 0;
 	session_op = 0;
 
 	session = NULL;
@@ -248,7 +248,7 @@ ops(void *arg)
 		}
 
 		/* Checkpoint the database. */
-		if (cnt == ckpt_op) {
+		if (cnt == ckpt_op && g.c_checkpoints) {
 			/*
 			 * LSM and data-sources don't support named checkpoints,
 			 * else 25% of the time we name the checkpoint.
