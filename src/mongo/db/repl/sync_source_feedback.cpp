@@ -43,11 +43,12 @@ namespace mongo {
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    void SyncSourceFeedback::associateMember(const BSONObj& id, const int memberId) {
+    void SyncSourceFeedback::associateMember(const BSONObj& id, Member* member) {
+        invariant(member);
         const OID rid = id["_id"].OID();
         boost::unique_lock<boost::mutex> lock(_mtx);
         _handshakeNeeded = true;
-        _members[rid] = theReplSet->getMutableMember(memberId);
+        _members[rid] = member;
         _cond.notify_all();
     }
 

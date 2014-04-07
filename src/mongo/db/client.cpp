@@ -410,7 +410,7 @@ namespace mongo {
         return c->toString();
     }
 
-    void Client::gotHandshake( const BSONObj& o ) {
+    bool Client::gotHandshake( const BSONObj& o ) {
         BSONObjIterator i(o);
 
         {
@@ -427,9 +427,11 @@ namespace mongo {
 
         _handshake = b.obj();
 
-        if (theReplSet && o.hasField("member")) {
-            theReplSet->registerSlave(_remoteId, o["member"].Int());
+        if (!theReplSet || !o.hasField("member")) {
+            return false;
         }
+
+        return theReplSet->registerSlave(_remoteId, o["member"].Int());
     }
 
     bool ClientBasic::hasCurrent() {
