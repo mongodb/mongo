@@ -410,18 +410,23 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 {
 	WT_ASYNC_OP_IMPL *op;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 
 	if (!conn->async_cfg)
 		return (0);
 
-	session = conn->default_session;
 	*opp = NULL;
-
+	op = NULL;
 	WT_ERR(__async_new_op_alloc(conn, uri, config, &op));
 	WT_ERR(__async_runtime_config(op, cfg));
 	op->cb = cb;
 	*opp = op;
+	return (0);
+
 err:
+	/*
+	 * If we get an error after allocating op, set its state to free.
+	 */
+	if (op != NULL)
+		op->state = WT_ASYNCOP_FREE;
 	return (ret);
 }
