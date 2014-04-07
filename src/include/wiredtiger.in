@@ -696,6 +696,10 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u". See @ref cursor_raw for details., a
 	 * boolean flag; default \c false.}
+	 * @config{readonly, only query operations are supported by this cursor.
+	 * An error is returned if a modification is attempted using the cursor.
+	 * The default is false for all cursor types except for metadata
+	 * cursors.., a boolean flag; default \c false.}
 	 * @config{statistics, Specify the statistics to be gathered.  Choosing
 	 * "all" gathers statistics regardless of cost and may include
 	 * traversing on-disk files; "fast" gathers a subset of relatively

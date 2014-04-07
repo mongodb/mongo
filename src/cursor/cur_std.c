@@ -69,7 +69,7 @@ __wt_cursor_config_readonly(WT_CURSOR *cursor, const char *cfg[], int def)
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_RET(__wt_config_gets_def(session, cfg, "readonly", 0, &cval));
+	WT_RET(__wt_config_gets_def(session, cfg, "readonly", def, &cval));
 	if (cval.val != 0) {
 		/* Reset all cursor methods that could modify data. */
 		cursor->insert = __wt_cursor_notsup;

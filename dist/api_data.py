@@ -472,8 +472,9 @@ methods = {
 	    type='boolean'),
 	Config('readonly', 'false', r'''
 	    only query operations are supported by this cursor. An error is
-		returned if a modification is attempted using the cursor.
-		Default is false for all cursor types except for metadata cursors.''',
+	    returned if a modification is attempted using the cursor.  The
+	    default is false for all cursor types except for metadata
+	    cursors.''',
 	    type='boolean'),
 	Config('statistics', '', r'''
 	    Specify the statistics to be gathered.  Choosing "all" gathers

@@ -186,6 +186,7 @@ static const WT_CONFIG_CHECK confchk_session_open_cursor[] = {
 	{ "next_random", "boolean", NULL, NULL},
 	{ "overwrite", "boolean", NULL, NULL},
 	{ "raw", "boolean", NULL, NULL},
+	{ "readonly", "boolean", NULL, NULL},
 	{ "statistics", "list",
 	    "choices=[\"all\",\"fast\",\"clear\"]",
 	    NULL},
@@ -388,7 +389,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "session.open_cursor",
 	  "append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=,raw=0"
-	  ",statistics=,target=",
+	  ",readonly=0,statistics=,target=",
 	  confchk_session_open_cursor
 	},
 	{ "session.reconfigure",

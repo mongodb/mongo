@@ -239,15 +239,14 @@ __curmetadata_insert(WT_CURSOR *cursor)
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char *value;
-
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
 	CURSOR_API_CALL(cursor, session,
 	    insert, ((WT_CURSOR_BTREE *)file_cursor)->btree);
+
+	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	/* TODO: Copy key/value so we know they are NULL terminated */
 	ret =__wt_metadata_insert(session,
@@ -268,15 +267,14 @@ __curmetadata_update(WT_CURSOR *cursor)
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char *value;
-
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
 	CURSOR_API_CALL(cursor, session,
 	    update, ((WT_CURSOR_BTREE *)file_cursor)->btree);
+
+	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	/* TODO: Copy key/value so we know they are NULL terminated */
 	ret = __wt_metadata_update(session,
@@ -297,14 +295,13 @@ __curmetadata_remove(WT_CURSOR *cursor)
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char *value;
-
-	WT_CURSOR_NEEDKEY(cursor);
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
 	CURSOR_API_CALL(cursor, session,
 	    remove, ((WT_CURSOR_BTREE *)file_cursor)->btree);
+
+	WT_CURSOR_NEEDKEY(cursor);
 
 	/* TODO: Copy key so we know it is NULL terminated */
 	ret = __wt_metadata_remove(session, (const char *)cursor->key.data);
@@ -324,7 +321,6 @@ __curmetadata_close(WT_CURSOR *cursor)
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char *value;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
@@ -334,7 +330,8 @@ __curmetadata_close(WT_CURSOR *cursor)
 	ret = file_cursor->close(file_cursor);
 	if (F_ISSET(mdc, WT_MDC_TMP_USED))
 		__wt_buf_free(session, &mdc->tmp_val);
-	__wt_free(session, cursor);
+
+	WT_ERR(__wt_cursor_close(cursor));
 
 err:	API_END(session);
 	return (ret);
@@ -380,8 +377,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 
 	/* Open the file cursor for operations on the regular metadata */
-	WT_ERR(__wt_curfile_open(
-	    session, WT_METADATA_URI, owner, cfg, &mdc->file_cursor));
+	WT_ERR(__wt_metadata_cursor(session, cfg[1], &mdc->file_cursor));
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
