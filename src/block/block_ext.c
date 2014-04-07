@@ -1246,6 +1246,13 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_block_write_off(
 	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1, 1));
 
+	/*
+	 * Remove the allocated blocks from the system's allocation list, extent
+	 * blocks never appear on any allocation list.
+	 */
+	WT_TRET(__wt_block_off_remove_overlap(
+	    session, &block->live.alloc, el->offset, el->size));
+
 	WT_VERBOSE_ERR(session, block,
 	    "%s written %" PRIdMAX "/%" PRIu32,
 	    el->name, (intmax_t)el->offset, el->size);
@@ -1302,13 +1309,15 @@ int
 __wt_block_extlist_init(WT_SESSION_IMPL *session,
     WT_EXTLIST *el, const char *name, const char *extname, int track_size)
 {
-	char buf[128];
+	size_t size;
 
 	memset(el, 0, sizeof(*el));
 
-	(void)snprintf(buf, sizeof(buf), "%s.%s",
+	size = (name == NULL ? 0 : strlen(name)) +
+	    strlen(".") + (extname == NULL ? 0 : strlen(extname) + 1);
+	WT_RET(__wt_calloc_def(session, size, &el->name));
+	(void)snprintf(el->name, size, "%s.%s",
 	    name == NULL ? "" : name, extname == NULL ? "" : extname);
-	WT_RET(__wt_strdup(session, buf, &el->name));
 
 	el->offset = WT_BLOCK_INVALID_OFFSET;
 	el->track_size = track_size;

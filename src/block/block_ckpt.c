@@ -23,6 +23,7 @@ __wt_block_ckpt_init(
 {
 	memset(ci, 0, sizeof(*ci));
 
+	ci->version = WT_BM_CHECKPOINT_VERSION;
 	ci->root_offset = WT_BLOCK_INVALID_OFFSET;
 
 	WT_RET(__wt_block_extlist_init(session, &ci->alloc, name, "alloc", 0));
@@ -209,7 +210,6 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	ci = &block->live;
-	ci->version = WT_BM_CHECKPOINT_VERSION;
 
 	/*
 	 * Write the root page: it's possible for there to be a checkpoint of
@@ -319,7 +319,6 @@ __ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
 		case WT_CKPT_DELETE:
 		case WT_CKPT_DELETE | WT_CKPT_FAKE:
 		case WT_CKPT_FAKE:
-		case WT_CKPT_UPDATE:
 			break;
 		case WT_CKPT_ADD:
 			if (ckpt[1].name == NULL)
@@ -658,7 +657,6 @@ static int
 __ckpt_update(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_CKPT *ckpt, WT_BLOCK_CKPT *ci, int is_live)
 {
-	WT_EXTLIST *alloc;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	uint8_t *endp;
@@ -674,15 +672,8 @@ __ckpt_update(WT_SESSION_IMPL *session,
 	 * write, remove any allocated blocks from the system's allocation
 	 * list, checkpoint extent blocks don't appear on any extent lists.
 	 */
-	alloc = &block->live.alloc;
 	WT_RET(__wt_block_extlist_write(session, block, &ci->alloc, NULL));
-	if (ci->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_off_remove_overlap(session,
-		    alloc, ci->alloc.offset, ci->alloc.size));
 	WT_RET(__wt_block_extlist_write(session, block, &ci->discard, NULL));
-	if (ci->discard.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_off_remove_overlap(session,
-		    alloc, ci->discard.offset, ci->discard.size));
 
 	/*
 	 * We only write an avail list for the live system, other checkpoint's
@@ -696,13 +687,9 @@ __ckpt_update(WT_SESSION_IMPL *session,
 	 * it's not truly available until the new checkpoint locations have been
 	 * saved to the metadata.
 	 */
-	if (is_live) {
+	if (is_live)
 		WT_RET(__wt_block_extlist_write(
 		    session, block, &ci->avail, &ci->ckpt_avail));
-		if (ci->avail.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_RET(__wt_block_off_remove_overlap(session,
-			    alloc, ci->avail.offset, ci->avail.size));
-	}
 
 	/*
 	 * Set the file size for the live system.
