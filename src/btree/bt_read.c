@@ -12,14 +12,15 @@
  *	Instantiate an entirely deleted row-store leaf page.
  */
 static int
-__cache_read_row_deleted(
-    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page)
+__cache_read_row_deleted(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 	WT_UPDATE **upd_array, *upd;
 	uint32_t i;
 
 	btree = S2BT(session);
+	page = ref->page;
 
 	/*
 	 * Give the page a modify structure.
@@ -35,11 +36,11 @@ __cache_read_row_deleted(
 	}
 
 	/* Allocate the update array. */
-	WT_RET(__wt_calloc_def(session, page->entries, &upd_array));
-	page->u.row.upd = upd_array;
+	WT_RET(__wt_calloc_def(session, page->pg_row_entries, &upd_array));
+	page->pg_row_upd = upd_array;
 
 	/* Fill in the update array with deleted items. */
-	for (i = 0; i < page->entries; ++i) {
+	for (i = 0; i < page->pg_row_entries; ++i) {
 		WT_RET(__wt_calloc_def(session, 1, &upd));
 		upd->next = upd_array[i];
 		upd_array[i] = upd;
@@ -49,7 +50,7 @@ __cache_read_row_deleted(
 	}
 
 	__wt_cache_page_inmem_incr(session, page,
-	    page->entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
+	    page->pg_row_entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
 
 	return (0);
 }
@@ -59,7 +60,7 @@ __cache_read_row_deleted(
  *	Read a page from the file.
  */
 int
-__wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
+__wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_DECL_RET;
 	WT_ITEM tmp;
@@ -94,23 +95,24 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	 * Otherwise, there's an address, read the backing disk page and build
 	 * an in-memory version of the page.
 	 */
-	WT_ERR(__wt_ref_info(session, parent, ref, &addr, &addr_size, NULL));
+	WT_ERR(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
-		WT_ERR(__wt_btree_new_leaf_page(session, parent, ref, &page));
+		WT_ERR(__wt_btree_new_leaf_page(session, &page));
+		ref->page = page;
 	} else {
 		/* Read the backing disk page. */
 		WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
 
 		/* Build the in-memory version of the page. */
-		WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem,
+		WT_ERR(__wt_page_inmem(session, ref, tmp.mem,
 		    F_ISSET(&tmp, WT_ITEM_MAPPED) ?
 		    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
 
 		/* If the page was deleted, instantiate that information. */
 		if (previous_state == WT_REF_DELETED)
-			WT_ERR(__cache_read_row_deleted(session, ref, page));
+			WT_ERR(__cache_read_row_deleted(session, ref));
 	}
 
 	WT_VERBOSE_ERR(session, read,
@@ -126,8 +128,8 @@ err:	WT_PUBLISH(ref->state, previous_state);
 	 * it discarded the page, but not the disk image.  Discard the page
 	 * and separately discard the disk image in all cases.
 	 */
-	if (page != NULL)
-		__wt_page_out(session, &page);
+	if (ref->page != NULL)
+		__wt_ref_out(session, ref);
 	__wt_buf_free(session, &tmp);
 
 	return (ret);

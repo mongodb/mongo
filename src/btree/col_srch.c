@@ -12,52 +12,65 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__wt_col_search(WT_SESSION_IMPL *session,
+    uint64_t recno, WT_REF *leaf_page, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
-	WT_REF *ref;
-	uint64_t recno;
+	WT_PAGE_INDEX *pindex;
+	WT_REF *child, *parent;
 	uint32_t base, indx, limit;
 	int depth;
 
+	btree = S2BT(session);
+
 	__cursor_search_clear(cbt);
 
-	recno = cbt->iface.recno;
+	/*
+	 * In the service of eviction splits, we're only searching a single leaf
+	 * page, not a full tree.
+	 */
+	if (leaf_page != NULL) {
+		child = leaf_page;
+		goto leaf_only;
+	}
 
-	btree = S2BT(session);
-	ref = NULL;
-
+restart:
 	/* Search the internal pages of the tree. */
-	for (depth = 2,
-	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
-		WT_ASSERT(session, ref == NULL ||
-		    ref->key.recno == page->u.intl.recno);
+	parent = child = &btree->root;
+	for (depth = 2;; ++depth) {
+		page = parent->page;
+		if (page->type != WT_PAGE_COL_INT)
+			break;
+
+		WT_ASSERT(session, parent->key.recno == page->pg_intl_recno);
+
+		pindex = WT_INTL_INDEX_COPY(page);
+		base = pindex->entries;
+		child = pindex->index[base - 1];
 
 		/* Fast path appends. */
-		base = page->entries;
-		ref = &page->u.intl.t[base - 1];
-		if (recno >= ref->key.recno)
+		if (recno >= child->key.recno)
 			goto descend;
 
 		/* Binary search of internal pages. */
-		for (base = 0, ref = NULL,
-		    limit = page->entries - 1; limit != 0; limit >>= 1) {
+		for (base = 0,
+		    limit = pindex->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			ref = page->u.intl.t + indx;
+			child = pindex->index[indx];
 
-			if (recno == ref->key.recno)
+			if (recno == child->key.recno)
 				break;
-			if (recno < ref->key.recno)
+			if (recno < child->key.recno)
 				continue;
 			base = indx + 1;
 			--limit;
 		}
-
-descend:	WT_ASSERT(session, ref != NULL);
+descend:	WT_ASSERT(session, child != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.
@@ -66,34 +79,45 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != ref->key.recno) {
+		if (recno != child->key.recno) {
 			/*
 			 * We don't have to correct for base == 0 because the
 			 * only way for base to be 0 is if recno is the page's
 			 * starting recno.
 			 */
 			WT_ASSERT(session, base > 0);
-			ref = page->u.intl.t + (base - 1);
+			child = pindex->index[base - 1];
 		}
 
 		/*
-		 * Swap the parent page for the child page; return on error,
-		 * the swap function ensures we're holding nothing on failure.
+		 * Swap the parent page for the child page; if the page splits
+		 * while we're waiting for it, restart the search, otherwise
+		 * return on error.
 		 */
-		WT_RET(__wt_page_swap(session, page, page, ref, 0));
-		page = ref->page;
+		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+			parent = child;
+			continue;
+		}
+		/*
+		 * Restart is returned if we find a page that's been split; the
+		 * held page isn't discarded when restart is returned, discard
+		 * it and restart the search from the top of the tree.
+		 */
+		if (ret == WT_RESTART &&
+		    (ret = __wt_page_release(session, parent)) == 0)
+			goto restart;
+		return (ret);
 	}
 
-	/*
-	 * We want to know how deep the tree gets because excessive depth can
-	 * happen because of how WiredTiger splits.
-	 */
+	/* Track how deep the tree gets. */
 	if (depth > btree->maximum_depth)
 		btree->maximum_depth = depth;
 
-	cbt->page = page;
+leaf_only:
+	cbt->ref = child;
 	cbt->recno = recno;
 	cbt->compare = 0;
+	page = child->page;
 
 	/*
 	 * Search the leaf page.  We do not check in the search path for a
@@ -101,14 +125,14 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * we arrive here with a record that's impossibly large for the page.
 	 */
 	if (page->type == WT_PAGE_COL_FIX) {
-		if (recno >= page->u.col_fix.recno + page->entries) {
-			cbt->recno = page->u.col_fix.recno + page->entries;
+		if (recno >= page->pg_fix_recno + page->pg_fix_entries) {
+			cbt->recno = page->pg_fix_recno + page->pg_fix_entries;
 			goto past_end;
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);
 	} else
 		if ((cip = __col_var_search(page, recno)) == NULL) {
-			cbt->recno = __col_last_recno(page);
+			cbt->recno = __col_var_last_recno(page);
 			goto past_end;
 		} else {
 			cbt->slot = WT_COL_SLOT(page, cip);

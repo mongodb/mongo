@@ -165,6 +165,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * A serious error, we should always find the hazard pointer.  Panic,
 	 * because using a page we didn't have pinned down implies corruption.
 	 */
+	WT_ASSERT(session, 0);
 	WT_PANIC_RETX(session,
 	    "session %p: clear hazard pointer: %p: not found", session, page);
 }

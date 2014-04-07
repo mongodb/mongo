@@ -44,6 +44,30 @@ __session_close_cache(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __session_clear --
+ *	Clear a session structure.
+ */
+static void
+__session_clear(WT_SESSION_IMPL *session)
+{
+	/*
+	 * There's no serialization support around the review of the hazard
+	 * array, which means threads checking for hazard pointers first check
+	 * the active field (which may be 0) and then use the hazard pointer
+	 * (which cannot be NULL).
+	 *
+	 * Additionally, the session structure can include information that
+	 * persists past the session's end-of-life, stored as part of page
+	 * splits.
+	 *
+	 * For these reasons, be careful when clearing the session structure.
+	 */
+	memset(session, 0, WT_SESSION_CLEAR_SIZE(session));
+	session->hazard_size = 0;
+	session->nhazard = 0;
+}
+
+/*
  * __session_close --
  *	WT_SESSION->close method.
  */
@@ -112,18 +136,15 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	__wt_spin_lock(session, &conn->api_lock);
 
 	/*
-	 * Sessions are re-used, clear the structure: this code sets the active
+	 * Sessions are re-used, clear the structure: the clear sets the active
 	 * field to 0, which will exclude the hazard array from review by the
-	 * eviction thread.   Note: there's no serialization support around the
-	 * review of the hazard array, which means threads checking for hazard
-	 * pointers first check the active field (which may be 0) and then use
-	 * the hazard pointer (which cannot be NULL).  For this reason, clear
-	 * the session structure carefully.
+	 * eviction thread.   Because some session fields are accessed by other
+	 * threads, the structure must be cleared carefully.
 	 *
 	 * We don't need to publish here, because regardless of the active field
 	 * being non-zero, the hazard pointer is always valid.
 	 */
-	WT_SESSION_CLEAR(session);
+	__session_clear(session);
 	session = conn->default_session;
 
 	/*

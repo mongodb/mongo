@@ -7,11 +7,37 @@
 
 #include "wt_internal.h"
 
+static int __block_append(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
 static int __block_extlist_dump(
 	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
 static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
+
+/*
+ * __block_off_srch_last --
+ *	Return the last element in the list, along with a stack for appending.
+ */
+static inline WT_EXT *
+__block_off_srch_last(WT_EXT **head, WT_EXT ***stack)
+{
+	WT_EXT **extp, *last;
+	int i;
+
+	last = NULL;				/* The list may be empty */
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, extp = &head[i]; i >= 0;)
+		if (*extp != NULL) {
+			last = *extp;
+			extp = &(*extp)->next[i];
+		} else
+			stack[i--] = extp--;
+	return (last);
+}
 
 /*
  * __block_off_srch --
@@ -128,30 +154,6 @@ __block_off_srch_pair(
 }
 
 /*
- * __block_extlist_last --
- *	Return the last extent in the skiplist.
- */
-static inline WT_EXT *
-__block_extlist_last(WT_EXT **head)
-{
-	WT_EXT *ext, **extp;
-	int i;
-
-	ext = NULL;
-
-	for (i = WT_SKIP_MAXDEPTH - 1, extp = &head[i]; i >= 0;) {
-		if (*extp == NULL) {
-			--i;
-			--extp;
-			continue;
-		}
-		ext = *extp;
-		extp = &(*extp)->next[i];
-	}
-	return (ext);
-}
-
-/*
  * __block_ext_insert --
  *	Insert an extent into an extent list.
  */
@@ -166,32 +168,39 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 	 * If we are inserting a new size onto the size skiplist, we'll need a
 	 * new WT_SIZE structure for that skiplist.
 	 */
-	__block_size_srch(el->sz, ext->size, sstack);
-	szp = *sstack[0];
-	if (szp == NULL || szp->size != ext->size) {
-		WT_RET(__wt_block_size_alloc(session, &szp));
-		szp->size = ext->size;
-		szp->depth = ext->depth;
+	if (el->track_size) {
+		__block_size_srch(el->sz, ext->size, sstack);
+		szp = *sstack[0];
+		if (szp == NULL || szp->size != ext->size) {
+			WT_RET(__wt_block_size_alloc(session, &szp));
+			szp->size = ext->size;
+			szp->depth = ext->depth;
+			for (i = 0; i < ext->depth; ++i) {
+				szp->next[i] = *sstack[i];
+				*sstack[i] = szp;
+			}
+		}
+
+		/*
+		 * Insert the new WT_EXT structure into the size element's
+		 * offset skiplist.
+		 */
+		__block_off_srch(szp->off, ext->off, astack, 1);
 		for (i = 0; i < ext->depth; ++i) {
-			szp->next[i] = *sstack[i];
-			*sstack[i] = szp;
+			ext->next[i + ext->depth] = *astack[i];
+			*astack[i] = ext;
 		}
 	}
+#ifdef HAVE_DIAGNOSTIC
+	if (!el->track_size)
+		for (i = 0; i < ext->depth; ++i)
+			ext->next[i + ext->depth] = NULL;
+#endif
 
 	/* Insert the new WT_EXT structure into the offset skiplist. */
 	__block_off_srch(el->off, ext->off, astack, 0);
 	for (i = 0; i < ext->depth; ++i) {
 		ext->next[i] = *astack[i];
-		*astack[i] = ext;
-	}
-
-	/*
-	 * Insert the new WT_EXT structure into the size element's offset
-	 * skiplist.
-	 */
-	__block_off_srch(szp->off, ext->off, astack, 1);
-	for (i = 0; i < ext->depth; ++i) {
-		ext->next[i + ext->depth] = *astack[i];
 		*astack[i] = ext;
 	}
 
@@ -306,21 +315,32 @@ __block_off_remove(
 	 * Find and remove the record from the size's offset skiplist; if that
 	 * empties the by-size skiplist entry, remove it as well.
 	 */
-	__block_size_srch(el->sz, ext->size, sstack);
-	szp = *sstack[0];
-	if (szp == NULL || szp->size != ext->size)
-		return (EINVAL);
-	__block_off_srch(szp->off, off, astack, 1);
-	ext = *astack[0];
-	if (ext == NULL || ext->off != off)
-		goto corrupt;
-	for (i = 0; i < ext->depth; ++i)
-		*astack[i] = ext->next[i + ext->depth];
-	if (szp->off[0] == NULL) {
-		for (i = 0; i < szp->depth; ++i)
-			*sstack[i] = szp->next[i];
-		__wt_block_size_free(session, szp);
+	if (el->track_size) {
+		__block_size_srch(el->sz, ext->size, sstack);
+		szp = *sstack[0];
+		if (szp == NULL || szp->size != ext->size)
+			return (EINVAL);
+		__block_off_srch(szp->off, off, astack, 1);
+		ext = *astack[0];
+		if (ext == NULL || ext->off != off)
+			goto corrupt;
+		for (i = 0; i < ext->depth; ++i)
+			*astack[i] = ext->next[i + ext->depth];
+		if (szp->off[0] == NULL) {
+			for (i = 0; i < szp->depth; ++i)
+				*sstack[i] = szp->next[i];
+			__wt_block_size_free(session, szp);
+		}
 	}
+#ifdef HAVE_DIAGNOSTIC
+	if (!el->track_size) {
+		int not_null;
+		for (i = 0, not_null = 0; i < ext->depth; ++i)
+			if (ext->next[i + ext->depth] != NULL)
+				not_null = 1;
+		WT_ASSERT(session, not_null == 0);
+	}
+#endif
 
 	--el->entries;
 	el->bytes -= (uint64_t)ext->size;
@@ -407,7 +427,7 @@ __wt_block_off_remove_overlap(
  * __block_extend --
  *	Extend the file to allocate space.
  */
-static int
+static inline int
 __block_extend(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
 {
@@ -458,6 +478,9 @@ __wt_block_alloc(
 	WT_EXT *ext, **estack[WT_SKIP_MAXDEPTH];
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
 
+	/* Assert we're maintaining the by-size skiplist. */
+	WT_ASSERT(session, block->live.avail.track_size != 0);
+
 	WT_STAT_FAST_DATA_INCR(session, block_alloc);
 	if (size % block->allocsize != 0)
 		WT_RET_MSG(session, EINVAL,
@@ -477,17 +500,19 @@ __wt_block_alloc(
 	 *
 	 * If we don't have anything big enough, extend the file.
 	 */
+	if (block->live.avail.bytes < (uint64_t)size)
+		goto append;
 	if (block->allocfirst) {
-		if (!__block_first_srch(block->live.avail.off, size, estack)) {
-			WT_RET(__block_extend(session, block, offp, size));
-			goto done;
-		}
+		if (!__block_first_srch(block->live.avail.off, size, estack))
+			goto append;
 		ext = *estack[0];
 	} else {
 		__block_size_srch(block->live.avail.sz, size, sstack);
 		if ((szp = *sstack[0]) == NULL) {
-			WT_RET(__block_extend(session, block, offp, size));
-			goto done;
+append:			WT_RET(__block_extend(session, block, offp, size));
+			WT_RET(__block_append(
+			    session, &block->live.alloc, *offp, (off_t)size));
+			return (0);
 		}
 
 		/* Take the first record. */
@@ -519,7 +544,7 @@ __wt_block_alloc(
 		__wt_block_ext_free(session, ext);
 	}
 
-done:	/* Add the newly allocated extent to the list of allocations. */
+	/* Add the newly allocated extent to the list of allocations. */
 	WT_RET(__block_merge(session, &block->live.alloc, *offp, (off_t)size));
 	return (0);
 }
@@ -855,11 +880,75 @@ int
 __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 {
 	WT_EXT *ext;
+	WT_EXTLIST tmp;
+	u_int i;
 
 	WT_VERBOSE_RET(session, block, "merging %s into %s", a->name, b->name);
 
+	/*
+	 * Sometimes the list we are merging is much bigger than the other: if
+	 * so, swap the lists around to reduce the amount of work we need to do
+	 * during the merge.  The size lists have to match as well, so this is
+	 * only possible if both lists are tracking sizes, or neither are.
+	 */
+	if (a->track_size == b->track_size && a->entries > b->entries) {
+		tmp = *a;
+		a->bytes = b->bytes;
+		b->bytes = tmp.bytes;
+		a->entries = b->entries;
+		b->entries = tmp.entries;
+		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
+			a->off[i] = b->off[i];
+			b->off[i] = tmp.off[i];
+			a->sz[i] = b->sz[i];
+			b->sz[i] = tmp.sz[i];
+		}
+	}
+
 	WT_EXT_FOREACH(ext, a->off)
 		WT_RET(__block_merge(session, b, ext->off, ext->size));
+
+	return (0);
+}
+
+/*
+ * __block_append --
+ *	Append a new entry to the allocation list.
+ */
+static int
+__block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+{
+	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
+	u_int i;
+
+	WT_ASSERT(session, el->track_size == 0);
+
+	/*
+	 * Identical to __block_merge, when we know the file is being extended,
+	 * that is, the information is either going to be used to extend the
+	 * last object on the list, or become a new object ending the list.
+	 *
+	 * First, get a stack for the last object in the skiplist, then check
+	 * for a simple extension.  If that doesn't work, allocate a new list
+	 * structure, and append it.
+	 */
+	 ext = __block_off_srch_last(el->off, astack);
+	 if (ext != NULL && ext->off + ext->size == off)
+		ext->size += size;
+	else {
+		/* Assert we're appending to the list. */
+		WT_ASSERT(session, ext == NULL || ext->off + ext->size < off);
+
+		WT_RET(__wt_block_ext_alloc(session, &ext));
+		ext->off = off;
+		ext->size = size;
+
+		for (i = 0; i < ext->depth; ++i)
+			 *astack[i] = ext;
+		++el->entries;
+	}
+
+	el->bytes += (uint64_t)size;
 
 	return (0);
 }
@@ -1009,6 +1098,7 @@ __wt_block_extlist_read(
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	off_t off, size;
+	int (*func)(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 	const uint8_t *p;
 
 	/* If there isn't a list, we're done. */
@@ -1030,6 +1120,18 @@ __wt_block_extlist_read(
 	WT_EXTLIST_READ(p, size);
 	if (off != WT_BLOCK_EXTLIST_MAGIC || size != 0)
 		goto corrupted;
+
+	/*
+	 * If we're not creating both offset and size skiplists, use the simpler
+	 * append API, otherwise do a full merge.  There are two reasons for the
+	 * test: first, checkpoint "available" lists are NOT sorted (checkpoints
+	 * write two separate lists, both of which are sorted but they're not
+	 * merged).  Second, the "available" list is sorted by size as well as
+	 * by offset, and the fast-path append code doesn't support that, it's
+	 * limited to offset.  The test of "track size" is short-hand for "are
+	 * we reading the "available" list.
+	 */
+	func = el->track_size == 0 ? __block_append : __block_merge;
 	for (;;) {
 		WT_EXTLIST_READ(p, off);
 		WT_EXTLIST_READ(p, size);
@@ -1053,14 +1155,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    el->name,
 			    (intmax_t)off, (intmax_t)(off + size));
 
-		/*
-		 * We could insert instead of merge, because ranges shouldn't
-		 * overlap, but merge knows how to allocate WT_EXT structures,
-		 * and a little paranoia is a good thing (if we corrupted the
-		 * list and crashed, and rolled back to a corrupted checkpoint,
-		 * this might save us?)
-		 */
-		WT_ERR(__block_merge(session, el, off, size));
+		WT_ERR(func(session, el, off, size));
 	}
 
 	if (WT_VERBOSE_ISSET(session, block))
@@ -1167,7 +1262,7 @@ int
 __wt_block_extlist_truncate(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
-	WT_EXT *ext;
+	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
 	WT_FH *fh;
 	off_t size;
 
@@ -1177,7 +1272,7 @@ __wt_block_extlist_truncate(
 	 * Check if the last available extent is at the end of the file, and if
 	 * so, truncate the file and discard the extent.
 	 */
-	if ((ext = __block_extlist_last(el->off)) == NULL)
+	if ((ext = __block_off_srch_last(el->off, astack)) == NULL)
 		return (0);
 	if (ext->off + ext->size != fh->size)
 		return (0);
@@ -1205,15 +1300,18 @@ __wt_block_extlist_truncate(
  */
 int
 __wt_block_extlist_init(WT_SESSION_IMPL *session,
-    WT_EXTLIST *el, const char *name, const char *extname)
+    WT_EXTLIST *el, const char *name, const char *extname, int track_size)
 {
 	char buf[128];
+
+	memset(el, 0, sizeof(*el));
 
 	(void)snprintf(buf, sizeof(buf), "%s.%s",
 	    name == NULL ? "" : name, extname == NULL ? "" : extname);
 	WT_RET(__wt_strdup(session, buf, &el->name));
 
 	el->offset = WT_BLOCK_INVALID_OFFSET;
+	el->track_size = track_size;
 	return (0);
 }
 

@@ -51,6 +51,7 @@ static const CONFIG default_cfg = {
 	0,				/* checkpoint in progress */
 	0,				/* thread error */
 	0,				/* notify threads to stop */
+	0,				/* in warmup phase */
 	0,				/* total seconds running */
 
 #define	OPT_DEFINE_DEFAULT
@@ -375,18 +376,23 @@ op_err:			lprintf(cfg, ret, 0,
 		}
 
 		/* Gather statistics */
-		if (measure_latency) {
-			if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-				lprintf(cfg, ret, 0, "Get time call failed");
-				goto err;
+		if (!cfg->in_warmup) {
+			if (measure_latency) {
+				if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "Get time call failed");
+					goto err;
+				}
+				++trk->latency_ops;
+				usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+				track_operation(trk, usecs);
 			}
-			++trk->latency_ops;
-			usecs = ns_to_us(WT_TIMEDIFF(stop, start));
-			track_operation(trk, usecs);
+			/* Increment operation count */
+			++trk->ops;
 		}
-		++trk->ops;		/* increment operation counts */
 
-		if (++op == op_end)	/* schedule the next operation */
+		/* Schedule the next operation */
+		if (++op == op_end)
 			op = thread->workload->ops;
 	}
 
@@ -657,12 +663,13 @@ monitor(void *arg)
 	CONFIG *cfg;
 	FILE *fp;
 	size_t len;
-	uint64_t reads, inserts, updates;
+	uint64_t min_thr, reads, inserts, updates;
 	uint64_t cur_reads, cur_inserts, cur_updates;
 	uint64_t last_reads, last_inserts, last_updates;
 	uint32_t read_avg, read_min, read_max;
 	uint32_t insert_avg, insert_min, insert_max;
 	uint32_t update_avg, update_min, update_max;
+	uint32_t latency_max;
 	u_int i;
 	int ret;
 	char buf[64], *path;
@@ -671,6 +678,9 @@ monitor(void *arg)
 	assert(cfg->sample_interval != 0);
 	fp = NULL;
 	path = NULL;
+
+	min_thr = (uint64_t)cfg->min_throughput;
+	latency_max = (uint32_t)ms_to_ns(cfg->max_latency);
 
 	/* Open the logging file. */
 	len = strlen(cfg->monitor_dir) + 100;
@@ -712,6 +722,8 @@ monitor(void *arg)
 		/* If the workers are done, don't bother with a final call. */
 		if (cfg->stop)
 			break;
+		if (cfg->in_warmup)
+			continue;
 
 		if ((ret = __wt_epoch(NULL, &t)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
@@ -727,8 +739,8 @@ monitor(void *arg)
 		latency_insert(cfg, &insert_avg, &insert_min, &insert_max);
 		latency_update(cfg, &update_avg, &update_min, &update_max);
 
-		cur_reads = reads - last_reads;
-		cur_updates = updates - last_updates;
+		cur_reads = (reads - last_reads) / cfg->sample_interval;
+		cur_updates = (updates - last_updates) / cfg->sample_interval;
 		/*
 		 * For now the only item we need to worry about changing is
 		 * inserts when we transition from the populate phase to
@@ -737,7 +749,8 @@ monitor(void *arg)
 		if (inserts < last_inserts)
 			cur_inserts = 0;
 		else
-			cur_inserts = inserts - last_inserts;
+			cur_inserts =
+			    (inserts - last_inserts) / cfg->sample_interval;
 
 		(void)fprintf(fp,
 		    "%s,%" PRIu32
@@ -748,14 +761,29 @@ monitor(void *arg)
 		    ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
 		    "\n",
 		    buf, cfg->totalsec,
-		    cur_reads / cfg->sample_interval,
-		    cur_inserts / cfg->sample_interval,
-		    cur_updates / cfg->sample_interval,
+		    cur_reads, cur_inserts, cur_updates,
 		    cfg->ckpt ? 'Y' : 'N',
 		    read_avg, read_min, read_max,
 		    insert_avg, insert_min, insert_max,
 		    update_avg, update_min, update_max);
 
+		if (latency_max != 0 &&
+		    (read_max > latency_max || insert_max > latency_max ||
+		     update_max > latency_max))
+			lprintf(cfg, WT_PANIC, 0,
+			    "max latency exceeded: threshold %" PRIu32
+			    " read max %" PRIu32 " insert max %" PRIu32
+			    " update max %" PRIu32, latency_max,
+			    read_max, insert_max, update_max);
+		if (min_thr != 0 &&
+		    ((cur_reads != 0 && cur_reads < min_thr) ||
+		    (cur_inserts != 0 && cur_inserts < min_thr) ||
+		    (cur_updates != 0 && cur_updates < min_thr)))
+			lprintf(cfg, WT_PANIC, 0,
+			    "minimum throughput not met: threshold %" PRIu64
+			    " reads %" PRIu64 " inserts %" PRIu64
+			    " updates %" PRIu64, min_thr, cur_reads,
+			    cur_inserts, cur_updates);
 		last_reads = reads;
 		last_inserts = inserts;
 		last_updates = updates;
@@ -944,8 +972,20 @@ execute_populate(CONFIG *cfg)
 		}
 		/*
 		 * We measure how long it takes to compact all tables for this
-		 * workload.
+		 * workload.  We first set the minimum timeout so that we can
+		 * kick off all the compacts.  Then we call compact a second
+		 * time with no timeout to wait for it to finish.  If there
+		 * are multiple tables they can compact in parallel and
+		 * the second call should be a fast no-op.
 		 */
+		for (i = 0; i < cfg->table_count; i++)
+			if ((ret = session->compact(
+			    session, cfg->uris[i], "timeout=1")) != 0 &&
+			    ret != ETIMEDOUT) {
+				lprintf(cfg, ret, 0,
+				     "execute_populate: WT_SESSION.compact");
+				goto err;
+			}
 		for (i = 0; i < cfg->table_count; i++)
 			if ((ret = session->compact(
 			    session, cfg->uris[i], "timeout=0")) != 0) {
@@ -1003,6 +1043,9 @@ execute_workload(CONFIG *cfg)
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 	
+	if (cfg->warmup != 0)
+		cfg->in_warmup = 1;
+
 	/* Allocate memory for the worker threads. */
 	if ((cfg->workers =
 	    calloc((size_t)cfg->workers_cnt, sizeof(CONFIG_THREAD))) == NULL) {
@@ -1028,6 +1071,13 @@ execute_workload(CONFIG *cfg)
 		    cfg, workp, threads, (u_int)workp->threads, worker)) != 0)
 			goto err;
 		threads += workp->threads;
+	}
+
+	if (cfg->warmup != 0) {
+		lprintf(cfg, 0, 1,
+		    "Waiting for warmup duration of %" PRIu32, cfg->warmup);
+		sleep(cfg->warmup);
+		cfg->in_warmup = 0;
 	}
 
 	for (interval = cfg->report_interval, run_time = cfg->run_time,
@@ -1274,11 +1324,11 @@ start_all_runs(CONFIG *cfg)
 			ret = ENOMEM;
 			goto err;
 		}
+		configs[i] = next_cfg;
 		if ((ret = config_assign(next_cfg, cfg)) != 0)
 			goto err;
 
 		/* Setup a unique home directory for each database. */
-		configs[i] = next_cfg;
 		new_home = malloc(home_len + 5);
 		if (new_home == NULL) {
 			ret = ENOMEM;

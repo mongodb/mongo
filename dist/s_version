@@ -4,6 +4,8 @@
 . ../RELEASE
 
 m4dir=../build_posix/aclocal
+rpmspec=./package/wiredtiger.spec
+tmp_file=__tmp
 
 force=no
 while :
@@ -28,10 +30,11 @@ if test "$force" = no -a \
 	fi
 fi
 
+dotted_version=${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}.${WIREDTIGER_VERSION_PATCH}
 echo "Building $m4dir/version.m4"
 cat <<EOF > $m4dir/version.m4
 dnl WiredTiger product version for AC_INIT.  Maintained by dist/s_version
-${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}.${WIREDTIGER_VERSION_PATCH}
+${dotted_version}
 EOF
 
 echo "Building $m4dir/version-set.m4"
@@ -51,3 +54,7 @@ AC_SUBST(VERSION_STRING)
 VERSION_NOPATCH=${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}
 AC_SUBST(VERSION_NOPATCH)
 EOF
+
+echo "Building $rpmspec"
+sed -e "s/Version:	.*/Version:	${dotted_version}/" $rpmspec	\
+        > $tmp_file && mv $tmp_file $rpmspec

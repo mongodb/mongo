@@ -142,7 +142,7 @@ DESTRUCTOR(__wt_session, close)
  */
 %header %{
 
-#include "../src/include/wt_internal.h"
+#include "src/include/wt_internal.h"
 
 /*
  * Closed handle checking:

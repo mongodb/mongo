@@ -97,6 +97,12 @@ DEF_OPT_AS_UINT32(icount, 5000,
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
+DEF_OPT_AS_UINT32(min_throughput, 0,
+    "abort if any throughput measured is less than this amount.  Requires"
+    "sample_interval to be configured")
+DEF_OPT_AS_UINT32(max_latency, 0,
+    "abort if any latency measured exceeds this number of milliseconds."
+    "Requires sample_interval to be configured")
 DEF_OPT_AS_BOOL(pareto, 0, "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "number of operations to group into each transaction in the populate "
@@ -141,6 +147,8 @@ DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
 DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_UINT32(value_sz, 100, "value size")
 DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
+DEF_OPT_AS_UINT32(warmup, 0,
+    "How long to run the workload phase before starting measurements")
 
 #undef DEF_OPT_AS_BOOL
 #undef DEF_OPT_AS_CONFIG_STRING

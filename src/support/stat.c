@@ -57,14 +57,6 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "internal pages evicted";
-	stats->cache_eviction_merge.desc =
-	    "cache: internal page merge operations completed";
-	stats->cache_eviction_merge_fail.desc =
-	    "cache: internal page merge attempts that could not complete";
-	stats->cache_eviction_merge_levels.desc =
-	    "cache: internal levels merged";
-	stats->cache_inmem_split.desc =
-	    "pages split because they were unable to be evicted";
 	stats->cache_overflow_value.desc = "overflow values cached in memory";
 	stats->cache_read.desc = "pages read into cache";
 	stats->cache_read_overflow.desc = "overflow pages read into cache";
@@ -102,6 +94,12 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "queries that could have benefited from a Bloom filter that did not exist";
 	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
 	stats->rec_dictionary.desc = "reconciliation dictionary matches";
+	stats->rec_multiblock_internal.desc =
+	    "reconciliation internal page multi-block writes";
+	stats->rec_multiblock_leaf.desc =
+	    "reconciliation leaf page multi-block writes";
+	stats->rec_multiblock_max.desc =
+	    "reconciliation maximum blocks required for a page";
 	stats->rec_overflow_key_internal.desc =
 	    "reconciliation internal-page overflow keys";
 	stats->rec_overflow_key_leaf.desc =
@@ -109,15 +107,16 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->rec_overflow_value.desc =
 	    "reconciliation overflow values written";
 	stats->rec_page_delete.desc = "reconciliation pages deleted";
-	stats->rec_page_merge.desc = "reconciliation pages merged";
+	stats->rec_page_match.desc = "reconciliation page checksum matches";
 	stats->rec_pages.desc = "page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "page reconciliation calls for eviction";
+	stats->rec_prefix_compression.desc =
+	    "leaf page key bytes discarded using prefix compression";
 	stats->rec_skipped_update.desc =
 	    "reconciliation failed because an update could not be included";
-	stats->rec_split_internal.desc = "reconciliation internal pages split";
-	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
-	stats->rec_split_max.desc = "reconciliation maximum splits for a page";
+	stats->rec_suffix_compression.desc =
+	    "internal page key bytes discarded using suffix compression";
 	stats->session_compact.desc = "object compaction";
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
@@ -169,10 +168,6 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
-	stats->cache_eviction_merge.v = 0;
-	stats->cache_eviction_merge_fail.v = 0;
-	stats->cache_eviction_merge_levels.v = 0;
-	stats->cache_inmem_split.v = 0;
 	stats->cache_overflow_value.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_read_overflow.v = 0;
@@ -203,17 +198,19 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->lsm_lookup_no_bloom.v = 0;
 	stats->lsm_merge_throttle.v = 0;
 	stats->rec_dictionary.v = 0;
+	stats->rec_multiblock_internal.v = 0;
+	stats->rec_multiblock_leaf.v = 0;
+	stats->rec_multiblock_max.v = 0;
 	stats->rec_overflow_key_internal.v = 0;
 	stats->rec_overflow_key_leaf.v = 0;
 	stats->rec_overflow_value.v = 0;
 	stats->rec_page_delete.v = 0;
-	stats->rec_page_merge.v = 0;
+	stats->rec_page_match.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
+	stats->rec_prefix_compression.v = 0;
 	stats->rec_skipped_update.v = 0;
-	stats->rec_split_internal.v = 0;
-	stats->rec_split_leaf.v = 0;
-	stats->rec_split_max.v = 0;
+	stats->rec_suffix_compression.v = 0;
 	stats->session_compact.v = 0;
 	stats->txn_update_conflict.v = 0;
 }
@@ -257,10 +254,6 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->cache_eviction_fail.v += c->cache_eviction_fail.v;
 	p->cache_eviction_hazard.v += c->cache_eviction_hazard.v;
 	p->cache_eviction_internal.v += c->cache_eviction_internal.v;
-	p->cache_eviction_merge.v += c->cache_eviction_merge.v;
-	p->cache_eviction_merge_fail.v += c->cache_eviction_merge_fail.v;
-	p->cache_eviction_merge_levels.v += c->cache_eviction_merge_levels.v;
-	p->cache_inmem_split.v += c->cache_inmem_split.v;
 	p->cache_overflow_value.v += c->cache_overflow_value.v;
 	p->cache_read.v += c->cache_read.v;
 	p->cache_read_overflow.v += c->cache_read_overflow.v;
@@ -291,18 +284,20 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->lsm_lookup_no_bloom.v += c->lsm_lookup_no_bloom.v;
 	p->lsm_merge_throttle.v += c->lsm_merge_throttle.v;
 	p->rec_dictionary.v += c->rec_dictionary.v;
+	p->rec_multiblock_internal.v += c->rec_multiblock_internal.v;
+	p->rec_multiblock_leaf.v += c->rec_multiblock_leaf.v;
+	if (c->rec_multiblock_max.v > p->rec_multiblock_max.v)
+	    p->rec_multiblock_max.v = c->rec_multiblock_max.v;
 	p->rec_overflow_key_internal.v += c->rec_overflow_key_internal.v;
 	p->rec_overflow_key_leaf.v += c->rec_overflow_key_leaf.v;
 	p->rec_overflow_value.v += c->rec_overflow_value.v;
 	p->rec_page_delete.v += c->rec_page_delete.v;
-	p->rec_page_merge.v += c->rec_page_merge.v;
+	p->rec_page_match.v += c->rec_page_match.v;
 	p->rec_pages.v += c->rec_pages.v;
 	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
+	p->rec_prefix_compression.v += c->rec_prefix_compression.v;
 	p->rec_skipped_update.v += c->rec_skipped_update.v;
-	p->rec_split_internal.v += c->rec_split_internal.v;
-	p->rec_split_leaf.v += c->rec_split_leaf.v;
-	if (c->rec_split_max.v > p->rec_split_max.v)
-	    p->rec_split_max.v = c->rec_split_max.v;
+	p->rec_suffix_compression.v += c->rec_suffix_compression.v;
 	p->session_compact.v += c->session_compact.v;
 	p->session_cursor_open.v += c->session_cursor_open.v;
 	p->txn_update_conflict.v += c->txn_update_conflict.v;
@@ -330,6 +325,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_checkpoint.desc =
 	    "cache: checkpoint blocked page eviction";
 	stats->cache_eviction_clean.desc = "cache: unmodified pages evicted";
+	stats->cache_eviction_deepen.desc =
+	    "cache: page split during eviction deepened the tree";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
@@ -340,17 +337,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
-	stats->cache_eviction_merge.desc =
-	    "cache: internal page merge operations completed";
-	stats->cache_eviction_merge_fail.desc =
-	    "cache: internal page merge attempts that could not complete";
-	stats->cache_eviction_merge_levels.desc =
-	    "cache: internal levels merged";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
+	stats->cache_eviction_split.desc =
+	    "cache: pages split during eviction";
 	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
-	stats->cache_inmem_split.desc =
-	    "pages split because they were unable to be evicted";
 	stats->cache_pages_dirty.desc =
 	    "cache: tracked dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
@@ -442,18 +433,16 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_bytes_write.v = 0;
 	stats->cache_eviction_checkpoint.v = 0;
 	stats->cache_eviction_clean.v = 0;
+	stats->cache_eviction_deepen.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_force.v = 0;
 	stats->cache_eviction_force_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
-	stats->cache_eviction_merge.v = 0;
-	stats->cache_eviction_merge_fail.v = 0;
-	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
+	stats->cache_eviction_split.v = 0;
 	stats->cache_eviction_walk.v = 0;
-	stats->cache_inmem_split.v = 0;
 	stats->cache_pages_dirty.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
