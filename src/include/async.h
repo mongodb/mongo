@@ -24,16 +24,25 @@ typedef enum {
 #define	O2S(op)								\
     (((WT_CONNECTION_IMPL *)(op)->iface.connection)->default_session)
 /*
+ * WT_ASYNC_FORMAT --
+ *	The URI/config/format cache.
+ */
+struct __wt_async_format {
+	STAILQ_ENTRY(__wt_async_format) q;
+	const char	*config;
+	uint64_t	cfg_hash;		/* Config hash */
+	const char	*uri;
+	uint64_t	uri_hash;		/* URI hash */
+	const char	*key_format;
+	const char	*value_format;
+};
+
+/*
  * WT_ASYNC_OP_IMPL --
  *	Implementation of the WT_ASYNC_OP.
  */
 struct __wt_async_op_impl {
 	WT_ASYNC_OP	iface;
-
-	const char *uri;
-	const char *config;
-	uint64_t	cfg_hash;		/* Config hash */
-	uint64_t	uri_hash;		/* URI hash */
 
 	STAILQ_ENTRY(__wt_async_op_impl) q;
 	WT_ASYNC_CALLBACK	*cb;
@@ -41,6 +50,7 @@ struct __wt_async_op_impl {
 	uint32_t	internal_id;	/* Array position id. */
 	uint64_t	unique_id;	/* Unique identifier. */
 
+	WT_ASYNC_FORMAT *format;	/* Format structure */
 	WT_ASYNC_STATE	state;		/* Op state */
 	WT_ASYNC_OPTYPE	optype;		/* Operation type */
 };
@@ -64,6 +74,7 @@ struct __wt_async {
 	 * protected by the opsq_lock.
 	 */
 	WT_SPINLOCK		 opsq_lock;	/* Locked: work queue */
+	STAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
 	STAILQ_HEAD(__wt_async_qh, __wt_async_op_impl) opqh;
 	int			 cur_queue;	/* Currently enqueued */
 	int			 max_queue;	/* Maximum enqueued */

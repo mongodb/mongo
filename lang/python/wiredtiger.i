@@ -751,7 +751,7 @@ typedef int int_void;
 /* Convert 'int *' to output args for wiredtiger_version */
 %apply int *OUTPUT { int * };
 
-%rename(Asyncop) __wt_async_op;
+%rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;

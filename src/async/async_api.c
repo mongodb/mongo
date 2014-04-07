@@ -168,7 +168,8 @@ __async_set_key(WT_ASYNC_OP *asyncop, ...)
 	ASYNCOP_API_CALL(O2C(op), session, set_key);
 	va_start(ap, asyncop);
 	__async_set_keyv(asyncop, asyncop->flags, ap);
-	fprintf(stderr, "async_set_key: id %d unique %" PRIu64 " key %s\n",
+	fprintf(stderr, "async_set_key: key_format %s id %d unique %"
+	    PRIu64 " key %s\n", op->iface.key_format,
 	    op->internal_id, op->unique_id, (char *)asyncop->key.data);
 	va_end(ap);
 	if (0) {
@@ -200,6 +201,23 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 err:		asyncop->saved_err = ret;
 	}
 	API_END(session);
+}
+
+/*
+ * __wt_async_set_raw_value --
+ *	Set value via WT_ITEM.
+ */
+void
+__wt_async_set_raw_value(WT_ASYNC_OP *asyncop, WT_ITEM *value)
+{
+	int raw_set;
+
+	raw_set = F_ISSET(asyncop, WT_ASYNCOP_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(asyncop, WT_ASYNCOP_RAW);
+	asyncop->set_value(asyncop, value);
+	if (!raw_set)
+		F_CLR(asyncop, WT_ASYNCOP_RAW);
 }
 
 /*

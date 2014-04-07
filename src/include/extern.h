@@ -1,5 +1,6 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
+extern void __wt_async_set_raw_value(WT_ASYNC_OP *asyncop, WT_ITEM *value);
 extern int __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
     WT_ASYNC_OP_IMPL *op,
     int locked);

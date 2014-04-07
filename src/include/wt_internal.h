@@ -55,6 +55,8 @@ struct __wt_async;
     typedef struct __wt_async WT_ASYNC;
 struct __wt_async_cursor;
     typedef struct __wt_async_cursor WT_ASYNC_CURSOR;
+struct __wt_async_format;
+    typedef struct __wt_async_format WT_ASYNC_FORMAT;
 struct __wt_async_op_impl;
     typedef struct __wt_async_op_impl WT_ASYNC_OP_IMPL;
 struct __wt_async_worker_state;

@@ -46,9 +46,10 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 
 	wt_session = (WT_SESSION *)session;
 	*cursorp = NULL;
+	WT_ASSERT(session, op->format != NULL);
 	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
-		if (op->cfg_hash == ac->cfg_hash &&
-		    op->uri_hash == ac->uri_hash) {
+		if (op->format->cfg_hash == ac->cfg_hash &&
+		    op->format->uri_hash == ac->uri_hash) {
 			*cursorp = ac->c;
 			return (0);
 		}
@@ -59,9 +60,9 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &ac));
 	WT_ERR(wt_session->open_cursor(
-	    wt_session, op->uri, NULL, op->config, &c));
-	ac->cfg_hash = op->cfg_hash;
-	ac->uri_hash = op->uri_hash;
+	    wt_session, op->format->uri, NULL, op->format->config, &c));
+	ac->cfg_hash = op->format->cfg_hash;
+	ac->uri_hash = op->format->uri_hash;
 	ac->c = c;
 	STAILQ_INSERT_HEAD(&worker->cursorqh, ac, q);
 	worker->num_cursors++;
@@ -104,7 +105,7 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			 * the op for op->get_value.
 			 */
 			__wt_cursor_get_raw_value(cursor, &val);
-			asyncop->set_value(asyncop, &val);
+			__wt_async_set_raw_value(asyncop, &val);
 			break;
 		default:
 			WT_ERR_MSG(session, EINVAL, "Unknown async optype %d\n",

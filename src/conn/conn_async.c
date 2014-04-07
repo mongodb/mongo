@@ -8,11 +8,88 @@
 #include "wt_internal.h"
 
 /*
+ * __async_get_format --
+ *	Find or allocate the uri/config/format structure.
+ *	Called with the async opsq lock.
+ */
+static int
+__async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
+    const char *config, WT_ASYNC_OP_IMPL *op)
+{
+	WT_ASYNC *async;
+	WT_ASYNC_FORMAT *af;
+	WT_CURSOR *c;
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *session;
+	uint64_t cfg_hash, uri_hash;
+	int have_cursor;
+
+	session = conn->default_session;
+	wt_session = &session->iface;
+	async = conn->async;
+	op->format = NULL;
+	have_cursor = 0;
+
+	if (uri != NULL)
+		uri_hash = __wt_hash_city64(uri, strlen(uri));
+	else
+		uri_hash = 0;
+	if (config != NULL)
+		cfg_hash = __wt_hash_city64(config, strlen(config));
+	else
+		cfg_hash = 0;
+
+	STAILQ_FOREACH(af, &async->formatqh, q) {
+		if (af->uri_hash == uri_hash && af->cfg_hash == cfg_hash)
+			goto setup;
+	}
+	/*
+	 * We didn't find one in the cache.  Allocate and initialize one.
+	 * Insert it at the head expecting LRU usage.
+	 */
+	WT_RET(__wt_calloc_def(session, 1, &af));
+	WT_ERR(__wt_strdup(session, uri, &af->uri));
+	WT_ERR(__wt_strdup(session, config, &af->config));
+	af->uri_hash = uri_hash;
+	af->cfg_hash = cfg_hash;
+	/*
+	 * Get the key_format and value_format for this URI and store
+	 * it in the structure so that async->set_key/value work.
+	 */
+	WT_ERR(wt_session->open_cursor(wt_session, uri, NULL, NULL, &c));
+	have_cursor = 1;
+	WT_ERR(__wt_strdup(session, c->key_format, &af->key_format));
+	WT_ERR(__wt_strdup(session, c->value_format, &af->value_format));
+	WT_ERR(c->close(c));
+	have_cursor = 0;
+
+	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
+
+setup:
+	op->format = af;
+	op->iface.key_format = af->key_format;
+	op->iface.value_format = af->value_format;
+	return (0);
+
+err:
+	if (have_cursor)
+		c->close(c);
+	__wt_free(session, af->uri);
+	__wt_free(session, af->config);
+	__wt_free(session, af->key_format);
+	__wt_free(session, af->value_format);
+	__wt_free(session, af);
+	return (ret);
+}
+
+/*
  * __async_new_op_alloc --
  *	Find and allocate the next available async op handle.
  */
 static int
-__async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
+__async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
+    const char *config, WT_ASYNC_OP_IMPL **opp)
 {
 	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
@@ -59,6 +136,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL **opp)
 	 * Start the next search at the next entry after this one.
 	 * Set the state of this op handle as READY for the user to use.
 	 */
+	WT_ERR(__async_get_format(conn, uri, config, op));
 	op->state = WT_ASYNCOP_READY;
 	op->unique_id = async->op_id++;
 	async->ops_index = (i + 1) % conn->async_size;
@@ -147,6 +225,7 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_ASYNC), &conn->async));
 	async = conn->async;
+	STAILQ_INIT(&async->formatqh);
 	STAILQ_INIT(&async->opqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
 	WT_RET(__wt_spin_init(session, &async->opsq_lock, "ops queue"));
@@ -184,6 +263,7 @@ int
 __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_ASYNC *async;
+	WT_ASYNC_FORMAT *af, *afnext;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
@@ -212,7 +292,17 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 			WT_TRET(wt_session->close(wt_session, NULL));
 			async->worker_sessions[i] = NULL;
 		}
-
+	/* Free format resources */
+	af = STAILQ_FIRST(&async->formatqh);
+	while (af != NULL) {
+		afnext = STAILQ_NEXT(af, q);
+		__wt_free(session, af->uri);
+		__wt_free(session, af->config);
+		__wt_free(session, af->key_format);
+		__wt_free(session, af->value_format);
+		__wt_free(session, af);
+		af = afnext;
+	}
 	__wt_spin_destroy(session, &async->ops_lock);
 	__wt_spin_destroy(session, &async->opsq_lock);
 	__wt_free(session, conn->async);
@@ -237,7 +327,6 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	async = conn->async;
 	session = conn->default_session;
 	WT_STAT_FAST_CONN_INCR(session, async_flush);
-	fprintf(stderr, "Async flush called\n");
 	/*
 	 * We have to do several things.  First we have to prevent
 	 * other callers from racing with us so that only one
@@ -247,7 +336,6 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	 * clear the flush flags and return.
 	 */
 	__wt_spin_lock(session, &async->opsq_lock);
-	fprintf(stderr, "Async flush locked, check race\n");
 	if (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS))
 		goto err;
 
@@ -257,14 +345,12 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	 * We're also preventing all worker threads from taking
 	 * things off the work queue with the lock.
 	 */
-	fprintf(stderr, "Async flush: set in progress\n");
 	FLD_SET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS);
 	async->flush_count = 0;
 	WT_ASSERT(conn->default_session,
 	    async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_ERR(__wt_async_op_enqueue(conn, &async->flush_op, 1));
-	fprintf(stderr, "Async flush: enqueued op, wait for complete\n");
 	while (!FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_COMPLETE)) {
 		__wt_spin_unlock(session, &async->opsq_lock);
 		WT_ERR_TIMEDOUT_OK(
@@ -274,7 +360,6 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	/*
 	 * Flush is done.  Clear the flags.
 	 */
-	fprintf(stderr, "Async flush: complete.  clear flags\n");
 	async->flush_op.state = WT_ASYNCOP_FREE;
 	FLD_CLR(async->opsq_flush,
 	   (WT_ASYNC_FLUSH_COMPLETE | WT_ASYNC_FLUSH_IN_PROGRESS));
@@ -333,22 +418,10 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 	session = conn->default_session;
 	*opp = NULL;
 
-	WT_ERR(__async_new_op_alloc(conn, &op));
+	WT_ERR(__async_new_op_alloc(conn, uri, config, &op));
 	WT_ERR(__async_runtime_config(op, cfg));
-	WT_ERR(__wt_strdup(session, uri, &op->uri));
-	WT_ERR(__wt_strdup(session, config, &op->config));
-	if (uri != NULL)
-		op->uri_hash = __wt_hash_city64(uri, strlen(uri));
-	else
-		op->uri_hash = 0;
-	if (config != NULL)
-		op->cfg_hash = __wt_hash_city64(config, strlen(config));
-	else
-		op->cfg_hash = 0;
 	op->cb = cb;
-
 	*opp = op;
-
 err:
 	return (ret);
 }
