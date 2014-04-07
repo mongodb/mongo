@@ -103,7 +103,7 @@
       <!-- above is temp - NTDDI etc. should be configurable, not finished yet, this gets us compiling some for now. 
          <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
       -->
-      <DisableSpecificWarnings>4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4290;4355;4800;4267;4244;4351</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>No</MinimalRebuild>
       <WarningLevel>Level3</WarningLevel>
