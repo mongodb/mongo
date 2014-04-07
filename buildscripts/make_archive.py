@@ -31,9 +31,7 @@ import os
 import sys
 import shutil
 import zipfile
-from subprocess import (Popen,
-                        PIPE,
-                        STDOUT)
+from subprocess import (Popen, PIPE, STDOUT)
 
 def main(argv):
     opts = parse_options(argv[1:])
@@ -71,11 +69,12 @@ def make_tar_archive(opts):
         tar_options += "z"
 
     # clean and create a temp directory to copy files to
-    enclosing_archive_directory = "buildarchive"
+    enclosing_archive_directory = os.path.join("build", "archive")
     delete_directory(enclosing_archive_directory)
     os.makedirs(enclosing_archive_directory)
+    output_tarfile = os.path.join(os.getcwd(), opts.output_filename)
 
-    tar_command = ["tar", tar_options, opts.output_filename]
+    tar_command = ["tar", tar_options, output_tarfile]
 
     for input_filename in opts.input_filenames:
         preferred_filename = get_preferred_filename(input_filename, opts.transformations)
@@ -92,10 +91,6 @@ def make_tar_archive(opts):
     run_directory = os.path.join(os.getcwd(), enclosing_archive_directory)
     proc = Popen(tar_command, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=run_directory)
     proc.wait()
-
-    # move the file back to the parent directory
-    current_tarball_location = os.path.join(run_directory, opts.output_filename)
-    shutil.move(current_tarball_location, opts.output_filename)
 
     # delete temp directory
     delete_directory(enclosing_archive_directory)
