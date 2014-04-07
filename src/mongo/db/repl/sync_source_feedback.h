@@ -50,8 +50,8 @@ namespace mongo {
             delete _oplogReader;
         }
 
-        /// Adds an entry to _member for a secondary that has connected to us.
-        void associateMember(const BSONObj& id, const int memberId);
+        /// Adds an entry to _members for a secondary that has connected to us.
+        void associateMember(const BSONObj& id, Member* member);
 
         /// Ensures local.me is populated and populates it if not.
         void ensureMe();
