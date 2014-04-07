@@ -270,7 +270,8 @@ namespace mongo {
 
             // Test that the 'unique: true' option correctly puts the ID of the
             // bson template evaluator into the high order byte of a 64 bit integer.
-            t->setId(9);
+            long long evaluatorId = 9;
+            t->setId(evaluatorId);
             seqObj1 = BSON( "#SEQ_INT"
                       << BSON( "seq_id" << 4 << "start" << 8 << "step" << 1 ));
             seqObj2 = BSON( "#SEQ_INT"
@@ -289,7 +290,7 @@ namespace mongo {
             ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
                            t->evaluate(BSON("seqField" << seqObj2), builder12) );
             // The template evaluator id of 9 goes in the high-order byte.
-            long long expectedSeqNum = 0x0900000000000008;
+            long long expectedSeqNum = (evaluatorId << ((sizeof(long long) - 1) * 8)) + 8;
             expectedObj = BSON("seqField" << expectedSeqNum);
             ASSERT_EQUALS(0, expectedObj.woCompare(builder12.obj()));
 

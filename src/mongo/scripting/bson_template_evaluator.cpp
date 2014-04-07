@@ -153,7 +153,7 @@ namespace mongo {
         // high order byte.
         if (!spec["unique"].eoo() && spec["unique"].trueValue()) {
             long long workerid = btl->_id;
-            curr_seqval += (workerid << (64-8));
+            curr_seqval += (workerid << ((sizeof(long long) - 1) * 8));
         }
 
         if (btl->_seqIdMap.end() != btl->_seqIdMap.find(seq_id)) {
