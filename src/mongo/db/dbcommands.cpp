@@ -1014,6 +1014,25 @@ namespace mongo {
             }
             return totalSize;
         }
+
+        void getIndexStatsForCollection(const string db, const string ns, BSONArrayBuilder *out) {
+            Lock::assertAtLeastReadLocked(ns);
+            Client::Context ctx ( ns );
+
+            Collection* coll = ctx.db()->getCollection( ns );
+            if ( !coll )
+                return;
+
+            IndexCatalog::IndexIterator ii =
+                coll->getIndexCatalog()->getIndexIterator( true /*includeUnfinishedIndexes*/ );
+
+            while ( ii.more() ) {
+                IndexDescriptor* d = ii.next();
+                BSONObjBuilder stats;
+                d->getIndexStats(stats);
+                out->append(stats.obj() );
+            }
+        }
     }
 
     class CollectionStats : public Command {
@@ -1081,6 +1100,10 @@ namespace mongo {
             BSONObjBuilder indexSizes;
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
             result.append("indexSizes", indexSizes.obj());
+
+            BSONArrayBuilder indexStats;
+            getIndexStatsForCollection(dbname, ns, &indexStats);
+            result.append("indexStats", indexStats.arr());
 
             if ( collection->isCapped() ) {
                 result.append( "capped" , collection->isCapped() );

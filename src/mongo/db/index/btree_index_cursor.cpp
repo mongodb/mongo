@@ -58,6 +58,7 @@ namespace mongo {
     BtreeIndexCursor::~BtreeIndexCursor() {
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);
         _activeCursors.erase(this);
+        const_cast<IndexDescriptor*>(_btreeState->descriptor())->updateIndexStats();
     }
 
     bool BtreeIndexCursor::isEOF() const { return _bucket.isNull(); }

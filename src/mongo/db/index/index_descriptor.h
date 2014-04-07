@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 
 #include "mongo/util/stacktrace.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -175,6 +176,15 @@ namespace mongo {
             return ns.toString() + ".$" + name.toString();
         }
 
+        void updateIndexStats() {
+            indexStats._queries.fetchAndAdd(1);
+        }
+
+        void getIndexStats(BSONObjBuilder& stats) const {
+            stats.append("name", indexName());
+            stats.appendNumber("queries", (long long) indexStats._queries.load());
+        }
+
     private:
 
         void _checkOk() const {
@@ -207,6 +217,9 @@ namespace mongo {
         bool _dropDups;
         bool _unique;
         int _version;
+        struct IndexStatistics {
+            AtomicInt64 _queries;
+        } indexStats;
 
         // only used by IndexCatalogEntryContainer to do caching for perf
         // users not allowed to touch, and not part of API

@@ -84,7 +84,11 @@ namespace mongo {
           _killed(false),
           _done(false) { }
 
-    IDHackRunner::~IDHackRunner() { }
+    IDHackRunner::~IDHackRunner() {
+        const IndexCatalog* catalog = _collection->getIndexCatalog();
+        const IndexDescriptor* idDesc = catalog->findIdIndex();
+        const_cast<IndexDescriptor*>(idDesc)->updateIndexStats();
+    }
 
     Runner::RunnerState IDHackRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         if (_killed) { return Runner::RUNNER_DEAD; }
