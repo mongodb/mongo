@@ -45,7 +45,7 @@
  *	An extent list.
  */
 struct __wt_extlist {
-	const char *name;			/* Name */
+	char *name;				/* Name */
 
 	uint64_t bytes;				/* Byte count */
 	uint32_t entries;			/* Entry count */
