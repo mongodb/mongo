@@ -52,8 +52,11 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
 			    upd != NULL; upd = upd->next)
 				if (upd->txnid == ref->txnid)
 					upd->txnid = WT_TXN_ABORTED;
-			return;
-		default:
+			break;
+		case WT_REF_DISK:
+		case WT_REF_LOCKED:
+		case WT_REF_READING:
+		case WT_REF_SPLIT:
 			break;
 		}
 }
