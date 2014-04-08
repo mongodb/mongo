@@ -65,12 +65,18 @@ int
 __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_DECL_RET;
+	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
 	va_list ap;
+	size_t size;
+	const char *fmt;
 
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	ret = __wt_kv_get_keyv(session, cursor, cursor->flags, ap);
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
+		WT_ERR(__wt_kv_not_set(session, 1, cursor->saved_err));
+	WT_KV_GET_KEY(cursor, cursor->flags,
+	    WT_CURSTD_RAW, WT_CURSOR_RAW_OK);
 err:	API_END(session);
 	va_end(ap);
 	return (ret);

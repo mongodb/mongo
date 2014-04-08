@@ -674,10 +674,6 @@ extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_kv_not_set(WT_SESSION_IMPL *session, int key, int saved_err);
-extern int __wt_kv_get_keyv( WT_SESSION_IMPL *session,
-    WT_CURSOR *cursor,
-    uint32_t flags,
-    va_list ap);
 extern void __wt_kv_set_keyv( WT_SESSION_IMPL *session,
     WT_CURSOR *cursor,
     uint32_t flags,
