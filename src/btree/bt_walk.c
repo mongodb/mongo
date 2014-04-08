@@ -56,7 +56,7 @@ __wt_tree_walk_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			    upd != NULL; upd = upd->next)
 				if (upd->txnid == ref->txnid)
 					upd->txnid = WT_TXN_ABORTED;
-			break;
+			return;
 		case WT_REF_SPLIT:
 			/*
 			 * This is possible and it's a really bad thing.
