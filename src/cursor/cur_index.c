@@ -76,7 +76,8 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 	first = NULL;
 
 	/* Point the public cursor to the key in the child. */
-	__wt_cursor_set_raw_key(&cindex->iface, &cindex->child->key);
+	WT_WITH_RAW(&cindex->iface, WT_CURSTD_RAW,
+	    (&cindex->iface)->set_key( &cindex->iface, &cindex->child->key));
 	F_CLR(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	for (i = 0, cp = cindex->cg_cursors;
@@ -203,7 +204,8 @@ __curindex_search(WT_CURSOR *cursor)
 	 * We expect partial matches, but we want the smallest item that
 	 * matches the prefix.  Fail if there is no matching item.
 	 */
-	__wt_cursor_set_raw_key(child, &cursor->key);
+	WT_WITH_RAW(child, WT_CURSTD_RAW,
+	    child->set_key(child, &cursor->key));
 	WT_ERR(child->search_near(child, &exact));
 
 	/*
@@ -245,7 +247,8 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
-	__wt_cursor_set_raw_key(cindex->child, &cursor->key);
+	WT_WITH_RAW(cindex->child, WT_CURSTD_RAW,
+	    cindex->child->set_key(cindex->child, &cursor->key));
 	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
 		ret = __curindex_move(cindex);
 	else

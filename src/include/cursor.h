@@ -297,7 +297,9 @@ struct __wt_cursor_table {
 		F_SET(cursor, WT_CURSTD_KEY_EXT);			\
 	}								\
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
+		WT_ERR(__wt_kv_not_set(					\
+		    (WT_SESSION_IMPL *)cursor->session, 1,		\
+		    cursor->saved_err));				\
 } while (0)
 #define	WT_CURSOR_NEEDVALUE(cursor) do {				\
 	if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {			\
@@ -310,7 +312,9 @@ struct __wt_cursor_table {
 		F_SET(cursor, WT_CURSTD_VALUE_EXT);			\
 	}								\
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
+		WT_ERR(__wt_kv_not_set(					\
+		    (WT_SESSION_IMPL *)cursor->session, 0,		\
+		    cursor->saved_err));				\
 } while (0)
 
 #define	WT_CURSOR_RAW_OK						\

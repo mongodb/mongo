@@ -263,6 +263,7 @@ struct __wt_update;
 #include "dlh.h"
 #include "error.h"
 #include "flags.h"
+#include "kv.h"
 #include "log.h"
 #include "lsm.h"
 #include "meta.h"

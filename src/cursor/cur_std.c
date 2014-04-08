@@ -58,22 +58,6 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 }
 
 /*
- * __wt_cursor_kv_not_set --
- *	Standard error message for key/values not set.
- */
-int
-__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cursor->session;
-
-	WT_RET_MSG(session,
-	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
-	    "requires %s be set", key ? "key" : "value");
-}
-
-/*
  * __wt_cursor_get_key --
  *	WT_CURSOR->get_key default implementation.
  */
@@ -81,10 +65,13 @@ int
 __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(cursor, cursor->flags, ap);
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	ret = __wt_kv_get_keyv(session, cursor, cursor->flags, ap);
+err:	API_END(session);
 	va_end(ap);
 	return (ret);
 }
@@ -96,203 +83,15 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 void
 __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 {
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
 	va_start(ap, cursor);
-	__wt_cursor_set_keyv(cursor, cursor->flags, ap);
-	va_end(ap);
-}
-
-/*
- * __wt_cursor_get_raw_key --
- *	Temporarily force raw mode in a cursor to get a canonical copy of
- * the key.
- */
-int
-__wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
-{
-	WT_DECL_RET;
-	int raw_set;
-
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
-	if (!raw_set)
-		F_SET(cursor, WT_CURSTD_RAW);
-	ret = cursor->get_key(cursor, key);
-	if (!raw_set)
-		F_CLR(cursor, WT_CURSTD_RAW);
-	return (ret);
-}
-
-/*
- * __wt_cursor_set_raw_key --
- *	Temporarily force raw mode in a cursor to set a canonical copy of
- * the key.
- */
-void
-__wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
-{
-	int raw_set;
-
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
-	if (!raw_set)
-		F_SET(cursor, WT_CURSTD_RAW);
-	cursor->set_key(cursor, key);
-	if (!raw_set)
-		F_CLR(cursor, WT_CURSTD_RAW);
-}
-
-/*
- * __wt_cursor_get_raw_value --
- *	Temporarily force raw mode in a cursor to get a canonical copy of
- * the value.
- */
-int
-__wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
-{
-	WT_DECL_RET;
-	int raw_set;
-
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
-	if (!raw_set)
-		F_SET(cursor, WT_CURSTD_RAW);
-	ret = cursor->get_value(cursor, value);
-	if (!raw_set)
-		F_CLR(cursor, WT_CURSTD_RAW);
-	return (ret);
-}
-
-/*
- * __wt_cursor_set_raw_value --
- *	Temporarily force raw mode in a cursor to set a canonical copy of
- * the value.
- */
-void
-__wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
-{
-	int raw_set;
-
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
-	if (!raw_set)
-		F_SET(cursor, WT_CURSTD_RAW);
-	cursor->set_value(cursor, value);
-	if (!raw_set)
-		F_CLR(cursor, WT_CURSTD_RAW);
-}
-
-/*
- * __wt_cursor_get_keyv --
- *	WT_CURSOR->get_key worker function.
- */
-int
-__wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
-{
-	WT_DECL_RET;
-	WT_ITEM *key;
-	WT_SESSION_IMPL *session;
-	size_t size;
-	const char *fmt;
-
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
-
-	if (WT_CURSOR_RECNO(cursor)) {
-		if (LF_ISSET(WT_CURSTD_RAW)) {
-			key = va_arg(ap, WT_ITEM *);
-			key->data = cursor->raw_recno_buf;
-			WT_ERR(__wt_struct_size(
-			    session, &size, "q", cursor->recno));
-			key->size = size;
-			ret = __wt_struct_pack(session, cursor->raw_recno_buf,
-			    sizeof(cursor->raw_recno_buf), "q", cursor->recno);
-		} else
-			*va_arg(ap, uint64_t *) = cursor->recno;
-	} else {
-		fmt = LF_ISSET(WT_CURSOR_RAW_OK) ? "u" : cursor->key_format;
-
-		/* Fast path some common cases. */
-		if (strcmp(fmt, "S") == 0)
-			*va_arg(ap, const char **) = cursor->key.data;
-		else if (strcmp(fmt, "u") == 0) {
-			key = va_arg(ap, WT_ITEM *);
-			key->data = cursor->key.data;
-			key->size = cursor->key.size;
-		} else
-			ret = __wt_struct_unpackv(session,
-			    cursor->key.data, cursor->key.size, fmt, ap);
-	}
-
+	__wt_kv_set_keyv(session, cursor, cursor->flags, ap);
 err:	API_END(session);
-	return (ret);
-}
-
-/*
- * __wt_cursor_set_keyv --
- *	WT_CURSOR->set_key default implementation.
- */
-void
-__wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	WT_ITEM *buf, *item;
-	size_t sz;
-	va_list ap_copy;
-	const char *fmt, *str;
-
-	CURSOR_API_CALL(cursor, session, set_key, NULL);
-	F_CLR(cursor, WT_CURSTD_KEY_SET);
-
-	/* Fast path some common cases: single strings or byte arrays. */
-	if (WT_CURSOR_RECNO(cursor)) {
-		if (LF_ISSET(WT_CURSTD_RAW)) {
-			item = va_arg(ap, WT_ITEM *);
-			WT_ERR(__wt_struct_unpack(session,
-			    item->data, item->size, "q", &cursor->recno));
-		} else
-			cursor->recno = va_arg(ap, uint64_t);
-		if (cursor->recno == 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "Record numbers must be greater than zero");
-		cursor->key.data = &cursor->recno;
-		sz = sizeof(cursor->recno);
-	} else {
-		fmt = cursor->key_format;
-		if (LF_ISSET(WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			sz = item->size;
-			cursor->key.data = item->data;
-		} else if (strcmp(fmt, "S") == 0) {
-			str = va_arg(ap, const char *);
-			sz = strlen(str) + 1;
-			cursor->key.data = (void *)str;
-		} else {
-			buf = &cursor->key;
-
-			va_copy(ap_copy, ap);
-			ret = __wt_struct_sizev(
-			    session, &sz, cursor->key_format, ap_copy);
-			va_end(ap_copy);
-			WT_ERR(ret);
-
-			WT_ERR(__wt_buf_initsize(session, buf, sz));
-			WT_ERR(__wt_struct_packv(
-			    session, buf->mem, sz, cursor->key_format, ap));
-		}
-	}
-	if (sz == 0)
-		WT_ERR_MSG(session, EINVAL, "Empty keys not permitted");
-	else if ((uint32_t)sz != sz)
-		WT_ERR_MSG(session, EINVAL,
-		    "Key size (%" PRIu64 ") out of range", (uint64_t)sz);
-	cursor->saved_err = 0;
-	cursor->key.size = sz;
-	F_SET(cursor, WT_CURSTD_KEY_EXT);
-	if (0) {
-err:		cursor->saved_err = ret;
-	}
-
-	API_END(session);
+	va_end(ap);
 }
 
 /*
@@ -303,36 +102,22 @@ int
 __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_DECL_RET;
-	WT_ITEM *value;
 	WT_SESSION_IMPL *session;
-	const char *fmt;
 	va_list ap;
+	const char *fmt;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
-	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
-
 	va_start(ap, cursor);
+
+	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
+		WT_ERR(__wt_kv_not_set(session, 0, cursor->saved_err));
+
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
+	WT_ERR(__wt_kv_get_value(session, &cursor->value, fmt, ap));
 
-	/* Fast path some common cases: single strings, byte arrays and bits. */
-	if (strcmp(fmt, "S") == 0)
-		*va_arg(ap, const char **) = cursor->value.data;
-	else if (strcmp(fmt, "u") == 0) {
-		value = va_arg(ap, WT_ITEM *);
-		value->data = cursor->value.data;
-		value->size = cursor->value.size;
-	} else if (strcmp(fmt, "t") == 0 ||
-	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0))
-		*va_arg(ap, uint8_t *) = *(uint8_t *)cursor->value.data;
-	else
-		ret = __wt_struct_unpackv(session,
-		    cursor->value.data, cursor->value.size, fmt, ap);
-
-	va_end(ap);
-
-err:	API_END(session);
+err:	va_end(ap);
+	API_END(session);
 	return (ret);
 }
 
@@ -344,50 +129,13 @@ void
 __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 {
 	WT_DECL_RET;
-	WT_ITEM *buf, *item;
 	WT_SESSION_IMPL *session;
-	const char *fmt, *str;
-	size_t sz;
 	va_list ap;
 
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
-	F_CLR(cursor, WT_CURSTD_VALUE_SET);
-
-	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
-
-	/* Fast path some common cases: single strings, byte arrays and bits. */
-	if (strcmp(fmt, "S") == 0) {
-		str = va_arg(ap, const char *);
-		sz = strlen(str) + 1;
-		cursor->value.data = str;
-	} else if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
-		item = va_arg(ap, WT_ITEM *);
-		sz = item->size;
-		cursor->value.data = item->data;
-	} else if (strcmp(fmt, "t") == 0 ||
-	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0)) {
-		sz = 1;
-		buf = &cursor->value;
-		WT_ERR(__wt_buf_initsize(session, buf, sz));
-		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
-	} else {
-		WT_ERR(
-		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
-		va_end(ap);
-		va_start(ap, cursor);
-		buf = &cursor->value;
-		WT_ERR(__wt_buf_initsize(session, buf, sz));
-		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
-		    cursor->value_format, ap));
-	}
-	F_SET(cursor, WT_CURSTD_VALUE_EXT);
-	cursor->value.size = sz;
-
-	if (0) {
-err:		cursor->saved_err = ret;
-	}
-	va_end(ap);
+	__wt_kv_set_value(cursor, ap);
+err:	va_end(ap);
 	API_END(session);
 }
 
@@ -465,6 +213,7 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 int
 __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 {
+	WT_DECL_RET;
 	WT_ITEM key;
 
 	/*
@@ -481,8 +230,10 @@ __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 	 * depend on the subsequent cursor search to clean things up, as search
 	 * is required to copy and/or reference private memory after success.
 	 */
-	WT_RET(__wt_cursor_get_raw_key(to_dup, &key));
-	__wt_cursor_set_raw_key(cursor, &key);
+
+	WT_WITH_RAW(to_dup, WT_CURSTD_RAW, ret = to_dup->get_key(to_dup, &key));
+	WT_RET(ret);
+	WT_WITH_RAW(cursor, WT_CURSTD_RAW, cursor->set_key(cursor, &key));
 
 	/*
 	 * We now have a reference to the raw key, but we don't know anything

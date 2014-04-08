@@ -50,13 +50,16 @@ __wt_curtable_get_key(WT_CURSOR *cursor, ...)
 	WT_CURSOR *primary;
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	primary = *ctable->cg_cursors;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(primary, cursor->flags, ap);
+	CURSOR_API_CALL(primary, session, get_key, NULL);
+	ret = __wt_kv_get_keyv(session, primary, cursor->flags, ap);
+err:	API_END(session);
 	va_end(ap);
 
 	return (ret);
@@ -109,6 +112,8 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR **cp, *primary;
 	WT_CURSOR_TABLE *ctable;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 	u_int i;
 
@@ -117,7 +122,9 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 	primary = *cp++;
 
 	va_start(ap, cursor);
-	__wt_cursor_set_keyv(primary, cursor->flags, ap);
+	CURSOR_API_CALL(primary, session, get_key, NULL);
+	__wt_kv_set_keyv(session, primary, cursor->flags, ap);
+err:	API_END(session);
 	va_end(ap);
 
 	if (!F_ISSET(primary, WT_CURSTD_KEY_SET))
@@ -510,7 +517,9 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 	 */
 	if (ctable->table->nindices > 0) {
 		if (start == NULL) {
-			WT_ERR(__wt_cursor_get_raw_key(wt_stop, &raw));
+			WT_WITH_RAW(wt_stop, WT_CURSTD_RAW,
+			    ret = wt_stop->get_key(wt_stop, &raw));
+			WT_ERR(ret);
 			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
 
 			do {
@@ -520,10 +529,13 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 			} while ((ret = wt_stop->prev(wt_stop)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
 
-			__wt_cursor_set_raw_key(wt_stop, key);
+			WT_WITH_RAW(wt_stop, WT_CURSTD_RAW,
+			    wt_stop->set_key(wt_stop, key));
 			APPLY_CG(stop, search);
 		} else {
-			WT_ERR(__wt_cursor_get_raw_key(wt_start, &raw));
+			WT_WITH_RAW(wt_start, WT_CURSTD_RAW,
+			    ret = wt_start->get_key(wt_start, &raw));
+			WT_ERR(ret);
 			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
 
 			cmp = -1;
@@ -539,7 +551,8 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 			    (ret = wt_start->next(wt_start)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
 
-			__wt_cursor_set_raw_key(wt_start, key);
+			WT_WITH_RAW(wt_start, WT_CURSTD_RAW,
+			    wt_start->set_key(wt_start, key));
 			APPLY_CG(start, search);
 		}
 	}

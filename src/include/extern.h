@@ -1,6 +1,5 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
-extern void __wt_async_set_raw_value(WT_ASYNC_OP *asyncop, WT_ITEM *value);
 extern int __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
     WT_ASYNC_OP_IMPL *op,
     int locked);
@@ -674,6 +673,20 @@ extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_kv_not_set(WT_SESSION_IMPL *session, int key, int saved_err);
+extern int __wt_kv_get_keyv( WT_SESSION_IMPL *session,
+    WT_CURSOR *cursor,
+    uint32_t flags,
+    va_list ap);
+extern void __wt_kv_set_keyv( WT_SESSION_IMPL *session,
+    WT_CURSOR *cursor,
+    uint32_t flags,
+    va_list ap);
+extern int __wt_kv_get_value(WT_SESSION_IMPL *session,
+    WT_ITEM *wtvalue,
+    const char *fmt,
+    va_list ap);
+extern void __wt_kv_set_value(WT_CURSOR *cursor, va_list ap);
 extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session,
     const char *uri,
@@ -686,15 +699,8 @@ extern int __wt_curstat_open(WT_SESSION_IMPL *session,
 extern int __wt_cursor_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_noop(WT_CURSOR *cursor);
 extern void __wt_cursor_set_notsup(WT_CURSOR *cursor);
-extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
-extern int __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key);
-extern void __wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key);
-extern int __wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value);
-extern void __wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value);
-extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
-extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_close(WT_CURSOR *cursor);

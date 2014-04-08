@@ -8,23 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __async_kv_not_set --
- *	Standard error message for op key/values not set.
- */
-static int
-__async_kv_not_set(WT_ASYNC_OP *asyncop, int key)
-{
-	WT_ASYNC_OP_IMPL *op;
-	WT_SESSION_IMPL *session;
-
-	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	session = O2S(op);
-	WT_RET_MSG(session,
-	    asyncop->saved_err == 0 ? EINVAL : asyncop->saved_err,
-	    "requires %s be set", key ? "key" : "value");
-}
-
-/*
  * __async_get_keyv --
  *	WT_ASYNC_OP->get_key implementation for op handles.
  */
@@ -35,7 +18,8 @@ __async_get_keyv(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
 
 	WT_UNUSED(flags);
 	if (!F_ISSET(asyncop, WT_ASYNCOP_KEY_SET))
-		WT_RET(__async_kv_not_set(asyncop, 1));
+		WT_RET(__wt_kv_not_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop), 1, asyncop->saved_err));
 
 	key = va_arg(ap, WT_ITEM *);
 	key->data = asyncop->key.data;
@@ -75,7 +59,8 @@ __async_get_valuev(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
 
 	WT_UNUSED(flags);
 	if (!F_ISSET(asyncop, WT_ASYNCOP_VALUE_SET))
-		WT_RET(__async_kv_not_set(asyncop, 0));
+		WT_RET(__wt_kv_not_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop), 0, asyncop->saved_err));
 
 	value = va_arg(ap, WT_ITEM *);
 	value->data = asyncop->value.data;
@@ -201,23 +186,6 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 err:		asyncop->saved_err = ret;
 	}
 	API_END(session);
-}
-
-/*
- * __wt_async_set_raw_value --
- *	Set value via WT_ITEM.
- */
-void
-__wt_async_set_raw_value(WT_ASYNC_OP *asyncop, WT_ITEM *value)
-{
-	int raw_set;
-
-	raw_set = F_ISSET(asyncop, WT_ASYNCOP_RAW) ? 1 : 0;
-	if (!raw_set)
-		F_SET(asyncop, WT_ASYNCOP_RAW);
-	asyncop->set_value(asyncop, value);
-	if (!raw_set)
-		F_CLR(asyncop, WT_ASYNCOP_RAW);
 }
 
 /*
