@@ -37,7 +37,9 @@ kv_len(uint64_t keyno, uint32_t min, uint32_t max)
 	 * times.  (The configuration can force large key/value minimum sizes,
 	 * where every key/value item will be an overflow.)
 	 */
-	return (MMRAND(min, keyno % 20 == 0 ? max : min + 20));
+	if (keyno % 20 != 0 && max > min + 20)
+		max = min + 20;
+	return (MMRAND(min, max));
 }
 
 void
@@ -124,10 +126,8 @@ val_gen_setup(uint8_t **valp)
 
 	*valp = val;
 
-	if (MMRAND(1, 10) > 8)
-		val_dup_data_len = MMRAND(g.c_value_min, g.c_value_max);
-	else
-		val_dup_data_len = MMRAND(g.c_value_min + 20, g.c_value_max);
+	val_dup_data_len =
+	    kv_len((uint64_t)MMRAND(1, 20), g.c_value_min, g.c_value_max);
 }
 
 void
