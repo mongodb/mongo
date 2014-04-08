@@ -12,7 +12,7 @@
  *	Abort pages that were deleted without being instantiated.
  */
 void
-__wt_tree_walk_delete_rollback(WT_REF *ref)
+__wt_tree_walk_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_PAGE *page;
 	WT_ROW *rip;
@@ -27,6 +27,10 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
 	 */
 	for (;; __wt_yield())
 		switch (ref->state) {
+		case WT_REF_DISK:
+		case WT_REF_LOCKED:
+		case WT_REF_READING:
+			break;
 		case WT_REF_DELETED:
 			if (WT_ATOMIC_CAS(
 			    ref->state, WT_REF_DELETED, WT_REF_DISK))
@@ -53,11 +57,11 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
 				if (upd->txnid == ref->txnid)
 					upd->txnid = WT_TXN_ABORTED;
 			break;
-		case WT_REF_DISK:
-		case WT_REF_LOCKED:
-		case WT_REF_READING:
 		case WT_REF_SPLIT:
-			break;
+			/*
+			 * This is possible and it's a really bad thing.
+			 */
+			WT_ASSERT(session, ref->state != WT_REF_SPLIT);
 		}
 }
 
