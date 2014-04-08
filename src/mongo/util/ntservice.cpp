@@ -88,8 +88,9 @@ namespace {
                 log() << "--install cannot be used with --" << disallowedOptions[badOption] << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
-            if ( ! params.count( "logpath" ) ) {
-                log() << "--install has to be used with --logpath" << endl;
+            if ( !params.count("systemLog.destination") ||
+                 params["systemLog.destination"].as<std::string>() != "file" ) {
+                log() << "--install has to be used with a log file for server output" << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
             installService = true;
@@ -99,8 +100,9 @@ namespace {
                 log() << "--reinstall cannot be used with --" << disallowedOptions[badOption] << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
-            if ( ! params.count( "logpath" ) ) {
-                log() << "--reinstall has to be used with --logpath" << endl;
+            if ( !params.count("systemLog.destination") ||
+                 params["systemLog.destination"].as<std::string>() != "file" ) {
+                log() << "--reinstall has to be used with a log file for server output" << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
             reinstallService = true;
