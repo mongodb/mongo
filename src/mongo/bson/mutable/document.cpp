@@ -2137,7 +2137,7 @@ namespace mutablebson {
         if (current == Element::kOpaqueRepIdx)
             current = const_cast<Impl*>(this)->resolveLeftChild(repIdx);
 
-        // We need write the element, and then walk rightwards.
+        // We need to write the element, and then walk rightwards.
         while (current != Element::kInvalidRepIdx) {
             writeElement(current, builder);
 
@@ -2178,8 +2178,12 @@ namespace mutablebson {
                     break;
                 }
 
-                // We couldn't bulk copy, and our right sibling is opaque. We need to resolve.
-                const_cast<Impl*>(this)->resolveRightSibling(current);
+                // We couldn't bulk copy, and our right sibling is opaque. We need to
+                // resolve. Note that the call to resolve may invalidate 'currentRep', so
+                // rather than falling through and acquiring the index by examining currentRep,
+                // update it with the return value of resolveRightSibling and restart the loop.
+                current = const_cast<Impl*>(this)->resolveRightSibling(current);
+                continue;
             }
 
             current = currentRep.sibling.right;
