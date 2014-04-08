@@ -95,9 +95,9 @@ namespace mongo {
 
     private:
         /**
-         * Initialize the underlying IndexCursor
+         * Initialize the underlying IndexCursor, grab information from the catalog for stats.
          */
-        void initIndexCursor();
+        void initIndexScan();
 
         /** See if the cursor is pointing at or past _endKey, if _endKey is non-empty. */
         void checkEnd();
