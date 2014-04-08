@@ -335,7 +335,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_PAGE *page, *parent;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
 	int locked;
@@ -442,10 +442,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	parent = ref->home;
-	WT_RET(__wt_page_modify_init(session, parent));
-	__wt_page_only_modify_set(session, parent);
-	return (0);
+	return (__wt_page_parent_modify_set(session, ref, 1));
 }
 
 /*
