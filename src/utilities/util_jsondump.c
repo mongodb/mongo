@@ -12,8 +12,7 @@ static int dump_end(void);
 static int dump_forward(WT_CURSOR *cursor, const char *name);
 static int dump_reverse(WT_CURSOR *cursor, const char *name);
 static int dump_separator(void);
-static int dump_table_begin(WT_SESSION *, WT_CURSOR *, const char *,
-    const char *);
+static int dump_table_begin(WT_CURSOR *, const char *, const char *);
 static int dump_table_cg(WT_CURSOR *, const char *, const char *, const char *,
     const char *);
 static int dump_table_config(WT_SESSION *, const char *);
@@ -114,8 +113,7 @@ dump_separator(void)
  *	Ouput the JSON syntax that starts a table, along with its config.
  */
 static int
-dump_table_begin(WT_SESSION *session, WT_CURSOR *cursor, const char *uri,
-    const char *config)
+dump_table_begin(WT_CURSOR *cursor, const char *uri, const char *config)
 {
 	WT_DECL_RET;
 	const char *name;
@@ -265,7 +263,7 @@ dump_table_config(WT_SESSION *session, const char *uri)
 		if ((ret = cursor->search(cursor)) == 0) {
 			if ((ret = cursor->get_value(cursor, &value)) != 0)
 				ret = util_cerr(uri, "get_value", ret);
-			else if (dump_table_begin(session, cursor, uri,
+			else if (dump_table_begin(cursor, uri,
 			    value) != 0)
 				ret = 1;
 		} else if (ret == WT_NOTFOUND)
@@ -292,7 +290,7 @@ dump_table_config(WT_SESSION *session, const char *uri)
 		    connection->get_extension_api(session->connection);
 		if ((ret =
 		    wtext->metadata_search(wtext, session, uri, &value)) == 0) {
-			if (dump_table_begin(session, NULL, uri, value) != 0)
+			if (dump_table_begin(NULL, uri, value) != 0)
 				ret = 1;
 		} else if (ret == WT_NOTFOUND)
 			ret = util_err(0, "%s: No such object exists", uri);
