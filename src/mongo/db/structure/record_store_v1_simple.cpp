@@ -117,7 +117,7 @@ namespace mongo {
                     prev = &_details->_deletedList[b];
                     continue;
                 }
-                DeletedRecord *r = cur.drec();
+                DeletedRecord *r = drec(cur);
                 if ( r->lengthWithHeaders() >= lenToAlloc &&
                      r->lengthWithHeaders() < bestmatchlen ) {
                     bestmatchlen = r->lengthWithHeaders();
@@ -143,7 +143,7 @@ namespace mongo {
             }
 
             // unlink ourself from the deleted list
-            DeletedRecord *bmr = bestmatch.drec();
+            DeletedRecord *bmr = drec(bestmatch);
             *getDur().writing(bestprev) = bmr->nextDeleted();
             bmr->nextDeleted().writing().setInvalid(); // defensive.
             invariant(bmr->extentOfs() < bestmatch.getOfs());
@@ -157,7 +157,7 @@ namespace mongo {
 
         // determine if we should chop up
 
-        DeletedRecord *r = loc.drec();
+        DeletedRecord *r = drec(loc);
 
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
@@ -189,13 +189,13 @@ namespace mongo {
         getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
-        DeletedRecord* newDel = newDelLoc.drec();
+        DeletedRecord* newDel = drec(newDelLoc);
         DeletedRecord* newDelW = getDur().writing(newDel);
         newDelW->extentOfs() = r->extentOfs();
         newDelW->lengthWithHeaders() = left;
         newDelW->nextDeleted().Null();
 
-        addDeletedRec(newDel, newDelLoc);
+        addDeletedRec( newDelLoc );
 
         return loc;
 
@@ -242,7 +242,8 @@ namespace mongo {
                        "SimpleRecordStoreV1::truncate not implemented" );
     }
 
-    void SimpleRecordStoreV1::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
+    void SimpleRecordStoreV1::addDeletedRec( const DiskLoc& dloc ) {
+        DeletedRecord* d = drec( dloc );
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
         {

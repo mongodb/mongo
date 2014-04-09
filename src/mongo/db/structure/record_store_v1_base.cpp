@@ -57,6 +57,16 @@ namespace mongo {
         return _extentManager->recordFor( loc );
     }
 
+    const DeletedRecord* RecordStoreV1Base::deletedRecordFor( const DiskLoc& loc ) const {
+        invariant( loc.a() != -1 );
+        return reinterpret_cast<const DeletedRecord*>( recordFor( loc ) );
+    }
+
+    DeletedRecord* RecordStoreV1Base::drec( const DiskLoc& loc ) const {
+        invariant( loc.a() != -1 );
+        return reinterpret_cast<DeletedRecord*>( recordFor( loc ) );
+    }
+
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( const DocWriter* doc, int quotaMax ) {
         int lenWHdr = doc->documentSize() + Record::HeaderSize;
         if ( doc->addPadding() )
@@ -156,7 +166,7 @@ namespace mongo {
                     unsigned long long *p = reinterpret_cast<unsigned long long *>( todelete->data() );
                     *getDur().writing(p) = 0;
                 }
-                addDeletedRec((DeletedRecord*)todelete, dl);
+                addDeletedRec(dl);
             }
         }
 
@@ -208,7 +218,7 @@ namespace mongo {
 
         _details->setLastExtentSize( e->length );
 
-        addDeletedRec(emptyLoc.drec(), emptyLoc);
+        addDeletedRec(emptyLoc);
     }
 
 }

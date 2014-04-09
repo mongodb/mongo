@@ -87,7 +87,7 @@ namespace mongo {
         // TODO: make private
         DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false );
 
-        // TODO: remove?
+        // TODO(ERH): remove?
         void preallocateAFile() { getFile( numFiles() , 0, true ); }
 
         void flushFiles( bool sync );
@@ -109,6 +109,7 @@ namespace mongo {
 
         /**
          * @param loc - has to be for a specific Record
+         * TODO(ERH): remove this - only RecordStore can do this
          */
         Record* recordFor( const DiskLoc& loc ) const;
 
@@ -134,14 +135,18 @@ namespace mongo {
         // these WILL cross Extent boundaries
         // * @param loc - has to be the DiskLoc for a Record
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getNextRecord( const DiskLoc& loc ) const;
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getPrevRecord( const DiskLoc& loc ) const;
 
         // does NOT traverse extent boundaries
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getNextRecordInExtent( const DiskLoc& loc ) const;
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getPrevRecordInExtent( const DiskLoc& loc ) const;
 
         /**

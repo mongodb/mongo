@@ -184,7 +184,7 @@ namespace mongo {
 
         // possibly slice up if we've allocated too much space
 
-        DeletedRecord *r = loc.drec();
+        DeletedRecord *r = drec( loc );
 
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
@@ -197,13 +197,13 @@ namespace mongo {
         getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
-        DeletedRecord* newDel = newDelLoc.drec();
+        DeletedRecord* newDel = drec( newDelLoc );
         DeletedRecord* newDelW = getDur().writing(newDel);
         newDelW->extentOfs() = r->extentOfs();
         newDelW->lengthWithHeaders() = left;
         newDelW->nextDeleted().Null();
 
-        addDeletedRec(newDel, newDelLoc);
+        addDeletedRec(newDelLoc);
 
         return StatusWith<DiskLoc>( loc );
     }
@@ -243,7 +243,7 @@ namespace mongo {
             DiskLoc empty = ext.ext()->reuse( _ns, true );
             ext.ext()->xprev.writing() = prev;
             ext.ext()->xnext.writing() = next;
-            addDeletedRec( empty.drec(), empty );
+            addDeletedRec( empty );
         }
 
         return Status::OK();
@@ -265,7 +265,7 @@ namespace mongo {
         
         // Pull out capExtent's DRs from deletedList
         DiskLoc i = cappedFirstDeletedInCurExtent();
-        for (; !i.isNull() && inCapExtent( i ); i = i.drec()->nextDeleted() ) {
+        for (; !i.isNull() && inCapExtent( i ); i = deletedRecordFor( i )->nextDeleted() ) {
             DDD( "\t" << i );
             drecs.push_back( i );
         }
@@ -282,23 +282,25 @@ namespace mongo {
             j++;
             if ( j == drecs.end() ) {
                 DDD( "\t compact adddelrec" );
-                addDeletedRec(a.drec(), a);
+                addDeletedRec( a);
                 break;
             }
             DiskLoc b = *j;
-            while ( a.a() == b.a() && a.getOfs() + a.drec()->lengthWithHeaders() == b.getOfs() ) {
+            while ( a.a() == b.a() &&
+                    a.getOfs() + drec( a )->lengthWithHeaders() == b.getOfs() ) {
+
                 // a & b are adjacent.  merge.
-                getDur().writingInt( a.drec()->lengthWithHeaders() ) += b.drec()->lengthWithHeaders();
+                getDur().writingInt( drec(a)->lengthWithHeaders() ) += drec(b)->lengthWithHeaders();
                 j++;
                 if ( j == drecs.end() ) {
                     DDD( "\t compact adddelrec2" );
-                    addDeletedRec(a.drec(), a);
+                    addDeletedRec(a);
                     return;
                 }
                 b = *j;
             }
             DDD( "\t compact adddelrec3" );
-            addDeletedRec(a.drec(), a);
+            addDeletedRec(a);
             a = b;
         }
 
@@ -308,7 +310,7 @@ namespace mongo {
         if ( cappedLastDelRecLastExtent().isNull() )
             return cappedListOfAllDeletedRecords();
         else
-            return cappedLastDelRecLastExtent().drec()->nextDeleted();
+            return drec(cappedLastDelRecLastExtent())->nextDeleted();
     }
 
     void CappedRecordStoreV1::cappedCheckMigrate() {
@@ -322,8 +324,8 @@ namespace mongo {
                 if ( first.isNull() )
                     continue;
                 DiskLoc last = first;
-                for (; !last.drec()->nextDeleted().isNull(); last = last.drec()->nextDeleted() );
-                last.drec()->nextDeleted().writing() = cappedListOfAllDeletedRecords();
+                for (; !drec(last)->nextDeleted().isNull(); last = drec(last)->nextDeleted() );
+                drec(last)->nextDeleted().writing() = cappedListOfAllDeletedRecords();
                 cappedListOfAllDeletedRecords().writing() = first;
                 _details->_deletedList[i].writing() = DiskLoc();
             }
@@ -350,7 +352,7 @@ namespace mongo {
 
     bool CappedRecordStoreV1::nextIsInCapExtent( const DiskLoc &dl ) const {
         invariant( !dl.isNull() );
-        DiskLoc next = dl.drec()->nextDeleted();
+        DiskLoc next = drec(dl)->nextDeleted();
         if ( next.isNull() )
             return false;
         return inCapExtent( next );
@@ -363,7 +365,7 @@ namespace mongo {
             getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
         else {
             DiskLoc i = cappedFirstDeletedInCurExtent();
-            for (; !i.isNull() && nextIsInCapExtent( i ); i = i.drec()->nextDeleted() );
+            for (; !i.isNull() && nextIsInCapExtent( i ); i = drec(i)->nextDeleted() );
             getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = i;
         }
 
@@ -381,10 +383,10 @@ namespace mongo {
         DiskLoc prev = cappedLastDelRecLastExtent();
         DiskLoc i = cappedFirstDeletedInCurExtent();
         DiskLoc ret;
-        for (; !i.isNull() && inCapExtent( i ); prev = i, i = i.drec()->nextDeleted() ) {
+        for (; !i.isNull() && inCapExtent( i ); prev = i, i = drec(i)->nextDeleted() ) {
             // We need to keep at least one DR per extent in cappedListOfAllDeletedRecords(),
             // so make sure there's space to create a DR at the end.
-            if ( i.drec()->lengthWithHeaders() >= len + 24 ) {
+            if ( drec(i)->lengthWithHeaders() >= len + 24 ) {
                 ret = i;
                 break;
             }
@@ -393,11 +395,11 @@ namespace mongo {
         /* unlink ourself from the deleted list */
         if ( !ret.isNull() ) {
             if ( prev.isNull() )
-                cappedListOfAllDeletedRecords().writing() = ret.drec()->nextDeleted();
+                cappedListOfAllDeletedRecords().writing() = drec(ret)->nextDeleted();
             else
-                prev.drec()->nextDeleted().writing() = ret.drec()->nextDeleted();
-            ret.drec()->nextDeleted().writing().setInvalid(); // defensive.
-            invariant( ret.drec()->extentOfs() < ret.getOfs() );
+                drec(prev)->nextDeleted().writing() = drec(ret)->nextDeleted();
+            drec(ret)->nextDeleted().writing().setInvalid(); // defensive.
+            invariant( drec(ret)->extentOfs() < ret.getOfs() );
         }
 
         return ret;
@@ -417,14 +419,14 @@ namespace mongo {
             // cappedLastDelRecLastExtent() to that deleted record.
             DiskLoc i = cappedListOfAllDeletedRecords();
             for( ;
-                 !i.drec()->nextDeleted().isNull() &&
-                     !inCapExtent( i.drec()->nextDeleted() );
-                 i = i.drec()->nextDeleted() );
+                 !drec(i)->nextDeleted().isNull() &&
+                     !inCapExtent( drec(i)->nextDeleted() );
+                 i = drec(i)->nextDeleted() );
             // In our capped storage model, every extent must have at least one
             // deleted record.  Here we check that 'i' is not the last deleted
             // record.  (We expect that there will be deleted records in the new
             // capExtent as well.)
-            invariant( !i.drec()->nextDeleted().isNull() );
+            invariant( !drec(i)->nextDeleted().isNull() );
             cappedLastDelRecLastExtent().writing() = i;
         }
     }
@@ -539,7 +541,9 @@ namespace mongo {
         return _details->_capExtent.ext();
     }
 
-    void CappedRecordStoreV1::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
+    void CappedRecordStoreV1::addDeletedRec( const DiskLoc& dloc ) {
+        DeletedRecord* d = drec( dloc );
+
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
         {
@@ -556,9 +560,9 @@ namespace mongo {
                 getDur().writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
             else {
                 DiskLoc i = cappedListOfAllDeletedRecords();
-                for (; !i.drec()->nextDeleted().isNull(); i = i.drec()->nextDeleted() )
+                for (; !drec(i)->nextDeleted().isNull(); i = drec(i)->nextDeleted() )
                     ;
-                i.drec()->nextDeleted().writing() = dloc;
+                drec(i)->nextDeleted().writing() = dloc;
             }
         }
         else {

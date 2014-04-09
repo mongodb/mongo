@@ -68,6 +68,10 @@ namespace mongo {
         // TODO: this makes me sad, it shouldn't be in the interface
         // do not use this anymore
         virtual void increaseStorageSize( int size, int quotaMax ) = 0;
+
+        // TODO: another sad one
+        virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const = 0;
+
     protected:
         std::string _ns;
     };

@@ -1130,10 +1130,13 @@ namespace NamespaceTests {
                 }
                 ASSERT( !deleted.isNull() );
 
+                const RecordStore* rs = collection()->getRecordStore();
+
                 // Shrink the DeletedRecord's size to newDeletedRecordSize.
-                ASSERT_GREATER_THAN_OR_EQUALS( deleted.drec()->lengthWithHeaders(),
+                ASSERT_GREATER_THAN_OR_EQUALS( rs->deletedRecordFor( deleted )->lengthWithHeaders(),
                                                newDeletedRecordSize );
-                getDur().writingInt( deleted.drec()->lengthWithHeaders() ) = newDeletedRecordSize;
+                DeletedRecord* dr = const_cast<DeletedRecord*>( rs->deletedRecordFor( deleted ) );
+                getDur().writingInt( dr->lengthWithHeaders() ) = newDeletedRecordSize;
 
                 // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
                 // new size.
@@ -1581,15 +1584,18 @@ namespace NamespaceTests {
                 create();
                 cookDeletedList( 344 );
 
+                const RecordStore* rs = collection()->getRecordStore();
+
                 // The returned record is quantized from 300 to 320.
                 StatusWith<DiskLoc> actualLocation = collection()->insertDocument( docForRecordSize(300),
                                                                                    false );
                 ASSERT( actualLocation.isOK() );
-                Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
+                Record* rec = rs->recordFor( actualLocation.getValue() );
                 ASSERT_EQUALS( 320, rec->lengthWithHeaders() );
 
                 // A new 24 byte deleted record is split off.
-                ASSERT_EQUALS( 24, smallestDeletedRecord().drec()->lengthWithHeaders() );
+                ASSERT_EQUALS( 24,
+                               rs->deletedRecordFor(smallestDeletedRecord())->lengthWithHeaders() );
             }
             virtual string spec() const { return "{ flags : 0 }"; }
         };

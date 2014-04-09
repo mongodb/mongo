@@ -529,11 +529,6 @@ namespace mongo {
         return cc().database()->getExtentManager().recordFor( *this );
     }
 
-    DeletedRecord* DiskLoc::drec() const {
-        verify( _a != -1 );
-        return reinterpret_cast<DeletedRecord*>(rec());
-    }
-
     Extent* DiskLoc::ext() const {
         verify( a() != -1 );
         return cc().database()->getExtentManager().getExtent(*this);

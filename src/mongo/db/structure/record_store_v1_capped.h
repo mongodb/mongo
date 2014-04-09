@@ -63,7 +63,7 @@ namespace mongo {
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 
-        virtual void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
+        virtual void addDeletedRec(const DiskLoc& dloc);
 
     private:
         // -- start copy from cap.cpp --

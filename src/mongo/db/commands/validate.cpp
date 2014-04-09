@@ -349,7 +349,7 @@ namespace mongo {
                                 break;
                             }
 
-                            DeletedRecord *d = loc.drec();
+                            const DeletedRecord* d = collection->getRecordStore()->deletedRecordFor(loc);
                             delSize += d->lengthWithHeaders();
                             loc = d->nextDeleted();
                             k++;

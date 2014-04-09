@@ -523,10 +523,10 @@ namespace {
      *
      * @return true on success, false on failure (partial output may still be present)
      */
-    bool analyzeDiskStorage(const NamespaceDetails* nsd, const Extent* ex,
-                                               const AnalyzeParams& params, string& errmsg,
-                                               BSONObjBuilder& result) {
-        bool isCapped = nsd->isCapped();
+    bool analyzeDiskStorage(const Collection* collection, const Extent* ex,
+                            const AnalyzeParams& params, string& errmsg,
+                            BSONObjBuilder& result) {
+        bool isCapped = collection->isCapped();
 
         result.append("extentHeaderBytes", Extent::HeaderSize());
         result.append("recordHeaderBytes", Record::HeaderSize);
@@ -568,9 +568,9 @@ namespace {
 
         if (processingDeletedRecords) {
             for (int bucketNum = 0; bucketNum < mongo::Buckets; bucketNum++) {
-                DiskLoc dl = nsd->deletedListEntry(bucketNum);
+                DiskLoc dl = collection->details()->deletedListEntry(bucketNum);
                 while (!dl.isNull()) {
-                    DeletedRecord* dr = dl.drec();
+                    const DeletedRecord* dr = collection->getRecordStore()->deletedRecordFor(dl);
                     processDeletedRecord(dl, dr, ex, params, bucketNum, sliceData,
                                          deletedRecordsArrayBuilder.get());
                     dl = dr->nextDeleted();
@@ -677,7 +677,7 @@ namespace {
      * @param params analysis parameters, will be updated with computed number of slices or
      *               granularity
      */
-    bool analyzeExtent(const NamespaceDetails* nsd, const Extent* ex, SubCommand subCommand,
+    bool analyzeExtent(const Collection* collection, const Extent* ex, SubCommand subCommand,
                        AnalyzeParams& params, string& errmsg, BSONObjBuilder& outputBuilder) {
 
         params.startOfs = max(0, params.startOfs);
@@ -698,7 +698,7 @@ namespace {
                 (params.granularity * (params.numberOfSlices - 1));
         switch (subCommand) {
             case SUBCMD_DISK_STORAGE:
-                return analyzeDiskStorage(nsd, ex, params, errmsg, outputBuilder);
+                return analyzeDiskStorage(collection, ex, params, errmsg, outputBuilder);
             case SUBCMD_PAGES_IN_RAM:
                 return analyzePagesInRAM(ex, params, errmsg, outputBuilder);
         }
@@ -717,7 +717,7 @@ namespace {
                                       // failure
         bool success = false;
         if (ex != NULL) {
-            success = analyzeExtent(nsd, ex, subCommand, globalParams, errmsg, outputBuilder);
+            success = analyzeExtent(collection, ex, subCommand, globalParams, errmsg, outputBuilder);
         }
         else {
             const DiskLoc dl = nsd->firstExtent();
@@ -743,7 +743,7 @@ namespace {
                                                  // total number of slices across all the
                                                  // extents
                 BSONObjBuilder extentBuilder(extentsArrayBuilder.subobjStart());
-                success = analyzeExtent(nsd, curExtent, subCommand, extentParams, errmsg,
+                success = analyzeExtent(collection, curExtent, subCommand, extentParams, errmsg,
                                         extentBuilder);
                 extentBuilder.doneFast();
             }
