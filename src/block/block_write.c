@@ -200,6 +200,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (!locked)
 		__wt_spin_unlock(session, &block->live_lock);
 #endif
+	WT_RET(ret);
 
 	if ((ret =
 	    __wt_write(session, fh, offset, align_size, buf->mem)) != 0) {
