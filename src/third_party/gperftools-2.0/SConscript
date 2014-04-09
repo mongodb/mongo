@@ -32,10 +32,7 @@ files = [
     'src/stacktrace.cc'
     ]
 
-# Disable debugallocation on darwin per SERVER-11650, this can be reverted
-# when the fix for https://code.google.com/p/gperftools/issues/detail?id=581
-# is available in our vendored gperftools
-if darwin or (not debugBuild):
+if not debugBuild:
     files += ['src/tcmalloc.cc'],
 else:
     files += ['src/debugallocation.cc']
