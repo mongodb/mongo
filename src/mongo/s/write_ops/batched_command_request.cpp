@@ -275,6 +275,51 @@ namespace mongo {
         INVOKE( getMetadata );
     }
 
+    /**
+     * Generates a new request with insert _ids if required.  Otherwise returns NULL.
+     */
+    BatchedCommandRequest* //
+    BatchedCommandRequest::cloneWithIds(const BatchedCommandRequest& origCmdRequest) {
+
+        if (origCmdRequest.getBatchType() != BatchedCommandRequest::BatchType_Insert
+            || origCmdRequest.isInsertIndexRequest())
+            return NULL;
+
+        auto_ptr<BatchedInsertRequest> idRequest;
+        BatchedInsertRequest* origRequest = origCmdRequest.getInsertRequest();
+
+        const vector<BSONObj>& inserts = origRequest->getDocuments();
+
+        size_t i = 0u;
+        for (vector<BSONObj>::const_iterator it = inserts.begin(); it != inserts.end(); ++it, ++i) {
+
+            const BSONObj& insert = *it;
+            BSONObj idInsert;
+
+            if (insert["_id"].eoo()) {
+                BSONObjBuilder idInsertB;
+                idInsertB.append("_id", OID::gen());
+                idInsertB.appendElements(insert);
+                idInsert = idInsertB.obj();
+            }
+
+            if (NULL == idRequest.get() && !idInsert.isEmpty()) {
+                idRequest.reset(new BatchedInsertRequest);
+                origRequest->cloneTo(idRequest.get());
+            }
+
+            if (!idInsert.isEmpty()) {
+                idRequest->setDocumentAt(i, idInsert);
+            }
+        }
+
+        if (NULL == idRequest.get())
+            return NULL;
+
+        // Command request owns idRequest
+        return new BatchedCommandRequest(idRequest.release());
+    }
+
     bool BatchedCommandRequest::containsUpserts( const BSONObj& writeCmdObj ) {
 
         BSONElement updatesEl = writeCmdObj[BatchedUpdateRequest::updates()];

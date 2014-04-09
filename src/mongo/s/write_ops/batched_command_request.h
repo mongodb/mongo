@@ -140,6 +140,16 @@ namespace mongo {
         BatchedRequestMetadata* getMetadata() const;
 
         //
+        // Helpers for batch pre-processing
+        //
+
+        /**
+         * Generates a new request, the same as the old, but with insert _ids if required.
+         * Returns NULL if this is not an insert request or all inserts already have _ids.
+         */
+        static BatchedCommandRequest* cloneWithIds(const BatchedCommandRequest& origCmdRequest);
+
+        //
         // Helpers for auth pre-parsing
         //
 

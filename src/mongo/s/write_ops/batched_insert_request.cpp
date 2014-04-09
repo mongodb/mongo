@@ -239,6 +239,12 @@ namespace mongo {
         return _documents.at(pos);
     }
 
+    void BatchedInsertRequest::setDocumentAt(size_t pos, const BSONObj& doc) {
+        dassert(_isDocumentsSet);
+        dassert(_documents.size() > pos);
+        _documents[pos] = doc;
+    }
+
     void BatchedInsertRequest::setWriteConcern(const BSONObj& writeConcern) {
         _writeConcern = writeConcern.getOwned();
         _isWriteConcernSet = true;
