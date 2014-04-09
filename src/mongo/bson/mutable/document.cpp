@@ -399,8 +399,14 @@ namespace mutablebson {
         // The designated field name for the root element.
         const char kRootFieldName[] = "";
 
-        // How many reps do we cache before we spill to heap. Use a power of two.
+        // How many reps do we cache before we spill to heap. Use a power of two. For debug
+        // builds we make this very small so it is less likely to mask vector invalidation
+        // logic errors. We don't make it zero so that we do execute the fastRep code paths.
+#if defined(_DEBUG)
+        const size_t kFastReps = 2;
+#else
         const size_t kFastReps = 128;
+#endif
 
         // An ElementRep contains the information necessary to locate the data for an Element,
         // and the topology information for how the Element is related to other Elements in the
