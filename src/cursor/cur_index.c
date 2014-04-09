@@ -16,13 +16,10 @@ static int __curindex_json_init(WT_CURSOR *cursor, const char *keyformat,
     const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
 {
 	WT_CURSOR_JSON *json;
-	WT_SESSION_IMPL *session;
 	const char *p, *end;
 	uint32_t keycnt, nkeys;
 
-	session = (WT_SESSION_IMPL *)cursor->session;
 	json = (WT_CURSOR_JSON *)cursor->json_private;
-
 	json->key_names.str = idxconf->str;
 	json->key_names.len = idxconf->len;
 

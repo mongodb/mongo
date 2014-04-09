@@ -687,11 +687,9 @@ static int __curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
     const WT_CONFIG_ITEM *colconf)
 {
 	WT_CURSOR_JSON *json;
-	WT_SESSION_IMPL *session;
 	const char *p, *end, *beginkey;
 	uint32_t nkeys;
 
-	session = (WT_SESSION_IMPL *)cursor->session;
 	json = (WT_CURSOR_JSON *)cursor->json_private;
 
 	beginkey = colconf->str;
