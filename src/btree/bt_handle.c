@@ -338,8 +338,6 @@ __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno)
 
 	root_ref->key.recno = is_recno ? 1 : 0;
 
-	root_ref->txnid = WT_TXN_NONE;
-
 	root->pg_intl_parent_ref = root_ref;
 }
 
