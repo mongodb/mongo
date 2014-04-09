@@ -42,6 +42,12 @@ namespace mongo {
 
     const size_t MaxDatabaseNameLen = 128; // max str len for the db name, including null char
 
+    /** @return true if a client can modify this namespace even though it is under ".system."
+        For example <dbname>.system.users is ok for regular clients to update.
+        @param write used when .system.js
+    */
+    bool legalClientSystemNS( const StringData& ns , bool write );
+
     /* e.g.
        NamespaceString ns("acme.orders");
        cout << ns.coll; // "orders"

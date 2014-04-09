@@ -287,6 +287,7 @@ env.Library('version',
                 '$BUILD_DIR/mongo/base/base'
             ])
 commonFiles = [ "pch.cpp",
+                "db/namespace_string.cpp",
                 "db/structure/catalog/namespace.cpp",
                 "shell/mongo.cpp",
                 "util/intrusive_counter.cpp",

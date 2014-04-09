@@ -42,12 +42,6 @@ namespace mongo {
     class Database;
     class IndexCatalog;
 
-    /** @return true if a client can modify this namespace even though it is under ".system."
-        For example <dbname>.system.users is ok for regular clients to update.
-        @param write used when .system.js
-    */
-    bool legalClientSystemNS( const StringData& ns , bool write );
-
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.
     */
