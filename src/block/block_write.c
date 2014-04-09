@@ -194,7 +194,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (!locked)
 		__wt_spin_unlock(session, &block->live_lock);
 #endif
-	if (fh->extend_len != 0)
+	if (ret == 0 && fh->extend_len != 0)
 		WT_TRET(__block_extend(session, fh, offset, align_size));
 #if !defined(HAVE_FALLOCATE)
 	if (!locked)
