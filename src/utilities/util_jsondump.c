@@ -19,7 +19,6 @@ static int dump_table_cg(WT_CURSOR *, const char *, const char *, const char *,
 static int dump_table_config(WT_SESSION *, const char *);
 static int dump_table_end(void);
 static int dup_json_string(const char *, char **);
-static int print_config(WT_SESSION *, const char *, const char *, const char *);
 static int usage(void);
 
 /*
@@ -343,35 +342,6 @@ dup_json_string(const char *str, char **result)
 	}
 	*q = '\0';
 	return 0;
-}
-
-/*
- * print_config --
- *	Output a key/value URI pair by combining v1 and v2.
- */
-static int
-print_config(WT_SESSION *session,
-    const char *key, const char *v1, const char *v2)
-{
-	WT_DECL_RET;
-	const char *value_ret;
-
-	/*
-	 * The underlying call will ignore v2 if v1 is NULL -- check here and
-	 * swap in that case.
-	 */
-	if (v1 == NULL) {
-		v1 = v2;
-		v2 = NULL;
-	}
-
-	if ((ret = __wt_session_create_strip(session, v1, v2, &value_ret)) != 0)
-		return (util_err(ret, NULL));
-	ret = printf("%s\n%s\n", key, value_ret);
-	free((char *)value_ret);
-	if (ret < 0)
-		return (util_err(EIO, NULL));
-	return (0);
 }
 
 static int
