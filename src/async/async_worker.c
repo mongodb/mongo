@@ -87,11 +87,9 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	WT_ITEM val;
 
 	asyncop = (WT_ASYNC_OP *)op;
-	WT_WITH_RAW(cursor, WT_CURSTD_RAW,
-	    cursor->set_key(cursor, &asyncop->key));
+	__wt_cursor_set_raw_key(cursor, &asyncop->key);
 	if (op->optype != WT_AOP_SEARCH)
-		WT_WITH_RAW(cursor, WT_CURSTD_RAW,
-		    cursor->set_value(cursor, &asyncop->value));
+		__wt_cursor_set_raw_value(cursor, &asyncop->value);
 	switch (op->optype) {
 		case WT_AOP_INSERT:
 		case WT_AOP_UPDATE:
@@ -106,10 +104,8 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			 * Get the value from the cursor and put it into
 			 * the op for op->get_value.
 			 */
-			WT_WITH_RAW(cursor, WT_CURSTD_RAW,
-			    cursor->get_value(cursor, &val));
-			WT_WITH_RAW(asyncop, WT_ASYNCOP_RAW,
-			    asyncop->set_value(asyncop, &val));
+			__wt_cursor_get_raw_value(cursor, &val);
+			__wt_async_set_raw_value(asyncop, &val);
 			break;
 		default:
 			WT_ERR_MSG(session, EINVAL, "Unknown async optype %d\n",

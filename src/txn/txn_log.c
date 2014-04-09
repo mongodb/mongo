@@ -293,7 +293,6 @@ __wt_txn_truncate_log(
     WT_SESSION_IMPL *session, WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_TXN_OP *op;
 
@@ -310,10 +309,7 @@ __wt_txn_truncate_log(
 		if (start != NULL) {
 			op->u.truncate_row.mode = TXN_TRUNC_START;
 			item = &op->u.truncate_row.start;
-			WT_WITH_RAW(&start->iface, WT_CURSTD_RAW,
-			    ret =
-			    (&start->iface)->get_key(&start->iface, item));
-			WT_RET(ret);
+			WT_RET(__wt_cursor_get_raw_key(&start->iface, item));
 			WT_RET(__wt_buf_set(
 			    session, item, item->data, item->size));
 		}
@@ -322,9 +318,7 @@ __wt_txn_truncate_log(
 			    (op->u.truncate_row.mode == TXN_TRUNC_ALL) ?
 			    TXN_TRUNC_STOP : TXN_TRUNC_BOTH;
 			item = &op->u.truncate_row.stop;
-			WT_WITH_RAW(&stop->iface, WT_CURSTD_RAW,
-			    ret = (&stop->iface)->get_key(&stop->iface, item));
-			WT_RET(ret);
+			WT_RET(__wt_cursor_get_raw_key(&stop->iface, item));
 			WT_RET(__wt_buf_set(
 			    session, item, item->data, item->size));
 		}
