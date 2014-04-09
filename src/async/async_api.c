@@ -8,6 +8,26 @@
 #include "wt_internal.h"
 
 /*
+ * __async_get_keyv --
+ *	WT_ASYNC_OP->get_key implementation for op handles.
+ */
+static int
+__async_get_keyv(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
+{
+	WT_ITEM *key;
+
+	WT_UNUSED(flags);
+	if (!F_ISSET(asyncop, WT_ASYNCOP_KEY_SET))
+		WT_RET(__wt_kv_not_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop), 1, asyncop->saved_err));
+
+	key = va_arg(ap, WT_ITEM *);
+	key->data = asyncop->key.data;
+	key->size = asyncop->key.size;
+	return (0);
+}
+
+/*
  * __async_set_keyv --
  *	WT_ASYNC_OP->set_key implementation for op handles.
  */
@@ -26,6 +46,26 @@ __async_set_keyv(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
 		asyncop->saved_err = 0;
 		F_SET(asyncop, WT_ASYNCOP_KEY_EXT);
 	}
+}
+
+/*
+ * __async_get_valuev --
+ *	WT_ASYNC_OP->get_value implementation for op handles.
+ */
+static int
+__async_get_valuev(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
+{
+	WT_ITEM *value;
+
+	WT_UNUSED(flags);
+	if (!F_ISSET(asyncop, WT_ASYNCOP_VALUE_SET))
+		WT_RET(__wt_kv_not_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop), 0, asyncop->saved_err));
+
+	value = va_arg(ap, WT_ITEM *);
+	value->data = asyncop->value.data;
+	value->size = asyncop->value.size;
+	return (0);
 }
 
 /*
@@ -58,23 +98,18 @@ __async_get_key(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_ASYNC_OP_IMPL *op;
 	WT_DECL_RET;
-	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	size_t size;
-	const char *fmt;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, get_key);
 	va_start(ap, asyncop);
 	fprintf(stderr, "async_get_key: called id %d unique %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	if (!F_ISSET(asyncop, WT_ASYNCOP_KEY_SET))
-		WT_ERR(__wt_kv_not_set(session, 1, asyncop->saved_err));
-	WT_KV_GET_KEY(asyncop, asyncop->flags,
-	    WT_ASYNCOP_RAW, WT_ASYNCOP_RAW);
-err:	va_end(ap);
+	ret = __async_get_keyv(asyncop, asyncop->flags, ap);
+	va_end(ap);
 	API_END(session);
+err:
 	return (ret);
 }
 
@@ -89,21 +124,17 @@ __async_get_value(WT_ASYNC_OP *asyncop, ...)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	const char *fmt;
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, get_value);
 	va_start(ap, asyncop);
 	fprintf(stderr, "async_get_value: called id %d unique %" PRIu64 "\n",
 	    op->internal_id, op->unique_id);
-	if (!F_ISSET(asyncop, WT_ASYNCOP_VALUE_SET))
-		WT_ERR(__wt_kv_not_set(session, 0, asyncop->saved_err));
-
-	fmt = F_ISSET(asyncop, WT_ASYNCOP_RAW) ? "u" : asyncop->value_format;
-	WT_ERR(__wt_kv_get_value(session, &asyncop->value, fmt, ap));
-err:	va_end(ap);
+	ret = __async_get_valuev(asyncop, asyncop->flags, ap);
+	va_end(ap);
 	API_END(session);
-	return (ret);
+err:
+	return (0);
 }
 
 /*
