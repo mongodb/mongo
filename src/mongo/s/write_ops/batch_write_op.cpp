@@ -105,6 +105,22 @@ namespace mongo {
         };
 
         typedef std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp> TargetedBatchMap;
+
+        //
+        // Types for tracking batch sizes
+        //
+
+        struct BatchSize {
+
+            BatchSize() :
+                numOps(0), sizeBytes(0) {
+            }
+
+            int numOps;
+            int sizeBytes;
+        };
+
+        typedef std::map<const ShardEndpoint*, BatchSize, EndpointComp> TargetedBatchSizeMap;
     }
 
     static void buildTargetError( const Status& errStatus, WriteErrorDetail* details ) {
@@ -128,19 +144,66 @@ namespace mongo {
         return false;
     }
 
-    // Helper function to cancel all the write ops of targeted batch.
-    static void cancelBatch( const TargetedWriteBatch& targetedBatch,
-                             WriteOp* writeOps,
-                             const WriteErrorDetail& why ) {
-        const vector<TargetedWrite*>& writes = targetedBatch.getWrites();
+    // MAGIC NUMBERS
+    // Before serializing updates/deletes, we don't know how big their fields would be, but we break
+    // batches before serializing.
+    // TODO: Revisit when we revisit command limits in general
+    static const int kEstUpdateOverheadBytes = (BSONObjMaxInternalSize - BSONObjMaxUserSize) / 100;
+    static const int kEstDeleteOverheadBytes = (BSONObjMaxInternalSize - BSONObjMaxUserSize) / 100;
 
-        for ( vector<TargetedWrite*>::const_iterator writeIt = writes.begin();
-            writeIt != writes.end(); ++writeIt ) {
+    static int getWriteSizeBytes(const WriteOp& writeOp) {
 
-            TargetedWrite* write = *writeIt;
-            // NOTE: We may repeatedly cancel a write op here, but that's fast.
-            writeOps[write->writeOpRef.first].cancelWrites( &why );
+        const BatchItemRef& item = writeOp.getWriteItem();
+        BatchedCommandRequest::BatchType batchType = item.getOpType();
+
+        if (batchType == BatchedCommandRequest::BatchType_Insert) {
+            return item.getDocument().objsize();
         }
+        else if (batchType == BatchedCommandRequest::BatchType_Update) {
+            // Note: Be conservative here - it's okay if we send slightly too many batches
+            int estSize = item.getUpdate()->getQuery().objsize()
+                          + item.getUpdate()->getUpdateExpr().objsize() + kEstUpdateOverheadBytes;
+            dassert(estSize >= item.getUpdate()->toBSON().objsize());
+            return estSize;
+        }
+        else {
+            dassert( batchType == BatchedCommandRequest::BatchType_Delete );
+            // Note: Be conservative here - it's okay if we send slightly too many batches
+            int estSize = item.getDelete()->getQuery().objsize() + kEstDeleteOverheadBytes;
+            dassert(estSize >= item.getDelete()->toBSON().objsize());
+            return estSize;
+        }
+    }
+
+    // Helper to determine whether a number of targeted writes require a new targeted batch
+    static bool wouldMakeBatchesTooBig(const vector<TargetedWrite*>& writes,
+                                       int writeSizeBytes,
+                                       const TargetedBatchSizeMap& batchSizes) {
+
+        for (vector<TargetedWrite*>::const_iterator it = writes.begin(); it != writes.end(); ++it) {
+
+            const TargetedWrite* write = *it;
+            TargetedBatchSizeMap::const_iterator seenIt = batchSizes.find(&write->endpoint);
+
+            if (seenIt == batchSizes.end()) {
+                // If this is the first item in the batch, it can't be too big
+                continue;
+            }
+
+            const BatchSize& batchSize = seenIt->second;
+
+            if (batchSize.numOps >= static_cast<int>(BatchedCommandRequest::kMaxWriteBatchSize)) {
+                // Too many items in batch
+                return true;
+            }
+
+            if (batchSize.sizeBytes + writeSizeBytes > BSONObjMaxUserSize) {
+                // Batch would be too big
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Helper function to cancel all the write ops of targeted batches in a map
@@ -215,6 +278,8 @@ namespace mongo {
         const bool ordered = _clientRequest->getOrdered();
 
         TargetedBatchMap batchMap;
+        TargetedBatchSizeMap batchSizes;
+
         int numTargetErrors = 0;
 
         size_t numWriteOps = _clientRequest->sizeWriteOps();
@@ -287,6 +352,17 @@ namespace mongo {
             }
 
             //
+            // If this write will push us over some sort of size limit, stop targeting
+            //
+
+            int writeSizeBytes = getWriteSizeBytes(writeOp);
+            if (wouldMakeBatchesTooBig(writes, writeSizeBytes, batchSizes)) {
+                invariant(!batchMap.empty());
+                writeOp.cancelWrites(NULL);
+                break;
+            }
+
+            //
             // Targeting went ok, add to appropriate TargetedBatch
             //
 
@@ -294,14 +370,22 @@ namespace mongo {
 
                 TargetedWrite* write = *it;
 
-                TargetedBatchMap::iterator seenIt = batchMap.find( &write->endpoint );
-                if ( seenIt == batchMap.end() ) {
+                TargetedBatchMap::iterator batchIt = batchMap.find( &write->endpoint );
+                TargetedBatchSizeMap::iterator batchSizeIt = batchSizes.find( &write->endpoint );
+
+                if ( batchIt == batchMap.end() ) {
                     TargetedWriteBatch* newBatch = new TargetedWriteBatch( write->endpoint );
-                    seenIt = batchMap.insert( make_pair( &newBatch->getEndpoint(), //
-                                                         newBatch ) ).first;
+                    batchIt = batchMap.insert( make_pair( &newBatch->getEndpoint(),
+                                                          newBatch ) ).first;
+                    batchSizeIt = batchSizes.insert(make_pair(&newBatch->getEndpoint(),
+                                                              BatchSize())).first;
                 }
 
-                TargetedWriteBatch* batch = seenIt->second;
+                TargetedWriteBatch* batch = batchIt->second;
+                BatchSize& batchSize = batchSizeIt->second;
+
+                ++batchSize.numOps;
+                batchSize.sizeBytes += writeSizeBytes;
                 batch->addWrite( write );
             }
 

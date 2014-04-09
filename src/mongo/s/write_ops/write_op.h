@@ -100,6 +100,11 @@ namespace mongo {
         ~WriteOp();
 
         /**
+         * Returns the write item for this operation
+         */
+        const BatchItemRef& getWriteItem() const;
+
+        /**
          * Returns the op's current state.
          */
         WriteOpState getWriteState() const;
