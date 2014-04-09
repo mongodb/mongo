@@ -28,19 +28,18 @@
 
 #pragma once
 
-#include "mongo/pch.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/db/structure/catalog/namespace_index.h"
 
 namespace mongo {
 
     class Collection;
-    class IndexCatalogEntry;
     class Database;
     class IndexCatalog;
+    class IndexCatalogEntry;
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.
@@ -383,18 +382,10 @@ namespace mongo {
         friend class SimpleRecordStoreV1;
         friend class CappedRecordStoreV1;
 
-        struct ExtraOld {
-            // note we could use this field for more chaining later, so don't waste it:
-            unsigned long long reserved1;
-            IndexDetails details[NIndexesExtra];
-            unsigned reserved2;
-            unsigned reserved3;
-        };
         /** Update cappedLastDelRecLastExtent() after capExtent changed in cappedTruncateAfter() */
         void cappedTruncateLastDelUpdate();
         BOOST_STATIC_ASSERT( NIndexesMax <= NIndexesBase + NIndexesExtra*2 );
         BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
-        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::ExtraOld) == 496 );
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) == 496 );
     }; // NamespaceDetails
 #pragma pack()
