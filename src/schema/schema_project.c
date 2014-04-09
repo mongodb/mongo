@@ -151,18 +151,36 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
  *	dependent cursors and return them to the application.
  */
 int
-__wt_schema_project_out(WT_SESSION_IMPL *session,
+__wt_schema_project_out(WT_SESSION_IMPL *session, WT_CURSOR *container,
     WT_CURSOR **cp, const char *proj_arg, va_list ap)
 {
+	WT_CONFIG_ITEM name;
 	WT_CURSOR *c;
+	WT_CURSOR_JSON *json;
 	WT_DECL_PACK(pack);
 	WT_DECL_PACK_VALUE(pv);
-	u_long arg;
-	char *proj;
+	WT_ITEM *item;
+	WT_PACK_NAME packname;
+	char *proj, *jbuf;
+	int unpacked;
+	size_t jsize, jbufsize;
 	uint8_t *p, *end;
+	u_long arg;
 
+	item = NULL;
+
+	json = (WT_CURSOR_JSON *)container->json_private;
+	if (json != NULL) {
+		/* Unpacking a json cursor implies a single WT_ITEM arg. */
+		item = va_arg(ap, WT_ITEM *);
+		jbufsize = 0;
+		jbuf = NULL;
+	}
+restart:
 	p = end = NULL;		/* -Wuninitialized */
-
+	unpacked = 0;
+	if (json != NULL)
+		__pack_name_init(session, &json->value_names, 0, &packname);
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
 		arg = strtoul(proj, &proj, 10);
 
@@ -203,10 +221,48 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 				/* Only copy the value out once. */
 				if (*proj != WT_PROJ_NEXT)
 					break;
-				WT_UNPACK_PUT(session, pv, ap);
+				if (json == NULL) {
+					WT_UNPACK_PUT(session, pv, ap);
+					break;
+				}
+				WT_RET(__pack_name_next(&packname, &name));
+				if (jbuf == NULL) {
+					/* JSON: first pass get buffer size. */
+					if (unpacked > 0)
+						jbufsize += 2;
+					jsize = __unpack_put_json(session, &pv,
+					    NULL, 0, &name);
+					jbufsize += jsize;
+				}
+				else {
+					if (unpacked > 0) {
+						strncat(jbuf, ",\n", jbufsize);
+						jbuf += 2;
+						jbufsize -= 2;
+					}
+					jsize = __unpack_put_json(session, &pv,
+					    jbuf, jbufsize, &name);
+					WT_ASSERT(session, jsize <= jbufsize);
+					jbuf += jsize;
+					jbufsize -= jsize;
+				}
+				unpacked++;
 				break;
 			}
 		}
+	}
+	if (json != NULL) {
+		if (jbuf == NULL) {
+			jbufsize++;      /* for trailing null */
+			WT_RET(__wt_realloc(session, NULL, jbufsize,
+			    &json->value_buf));
+			jbuf = json->value_buf;
+			item->data = jbuf;
+			item->size = jbufsize - 1;
+			goto restart;
+		}
+		else
+			WT_ASSERT(session, jbufsize == 1);
 	}
 
 	return (0);

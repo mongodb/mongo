@@ -8,6 +8,46 @@
 #include "wt_internal.h"
 
 /*
+ * __curindex_json_init --
+ *	set json->key_names, json->value_names to comma separated lists
+ *	of column names.
+ */
+static int __curindex_json_init(WT_CURSOR *cursor, const char *keyformat,
+    const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
+{
+	WT_CURSOR_JSON *json;
+	WT_SESSION_IMPL *session;
+	const char *p, *end;
+	uint32_t keycnt, nkeys;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+	json = (WT_CURSOR_JSON *)cursor->json_private;
+
+	json->key_names.str = idxconf->str;
+	json->key_names.len = idxconf->len;
+
+	nkeys = 0;
+	for ( ;*keyformat; keyformat++) {
+		if (!isdigit(*keyformat))
+			nkeys++;
+	}
+
+	p = colconf->str;
+	end = p + colconf->len;
+
+	keycnt = 0;
+	while (p < end && keycnt < nkeys) {
+		if (*p == ',')
+			keycnt++;
+		p++;
+	}
+	json->value_names.str = p;
+	json->value_names.len = end - p;
+
+	return (0);
+}
+
+/*
  * __curindex_get_value --
  *	WT_CURSOR->get_value implementation for index cursors.
  */
@@ -25,7 +65,8 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+	if (F_ISSET(cursor, WT_CURSTD_RAW) &&
+	    !F_ISSET(cursor, WT_CURSTD_JSON)) {
 		ret = __wt_schema_project_merge(session,
 		    cindex->cg_cursors, cindex->value_plan,
 		    cursor->value_format, &cursor->value);
@@ -35,7 +76,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 			item->size = cursor->value.size;
 		}
 	} else
-		ret = __wt_schema_project_out(session,
+		ret = __wt_schema_project_out(session, cursor,
 		    cindex->cg_cursors, cindex->value_plan, ap);
 	va_end(ap);
 
@@ -435,8 +476,12 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	/* Open the column groups needed for this index cursor. */
 	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
-	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
+
+	if (F_ISSET(cursor, WT_CURSTD_JSON)) {
+		WT_ERR(__curindex_json_init(cursor, table->key_format,
+			&idx->colconf, &table->colconf));
+	}
 
 	if (0) {
 err:		WT_TRET(__curindex_close(cursor));

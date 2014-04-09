@@ -86,8 +86,13 @@ from packing import pack, unpack
 	    SWIGTYPE_p___wt_cursor, 0);
 	if (*$1 != NULL) {
 		PY_CALLBACK *pcb;
+		uint32_t json;
 
-		(*$1)->flags |= WT_CURSTD_RAW;
+		json = (*$1)->flags & WT_CURSTD_JSON;
+		if (!json)
+			(*$1)->flags |= WT_CURSTD_RAW;
+		PyObject_SetAttrString($result, "is_json",
+		    PyBool_FromLong(json != 0));
 		PyObject_SetAttrString($result, "is_column",
 		    PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
 		PyObject_SetAttrString($result, "key_format",
@@ -466,7 +471,9 @@ typedef int int_void;
 		'''get_keys(self) -> (object, ...)
 		
 		@copydoc WT_CURSOR::get_key'''
-		if self.is_column:
+		if self.is_json:
+			return [self._get_key()]
+		elif self.is_column:
 			return [self._get_recno(),]
 		else:
 			return unpack(self.key_format, self._get_key())
@@ -485,7 +492,10 @@ typedef int int_void;
 		'''get_values(self) -> (object, ...)
 		
 		@copydoc WT_CURSOR::get_value'''
-		return unpack(self.value_format, self._get_value())
+		if self.is_json:
+			return [self._get_value()]
+		else:
+			return unpack(self.value_format, self._get_value())
 
 	def set_key(self, *args):
 		'''set_key(self) -> None

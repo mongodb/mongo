@@ -37,6 +37,14 @@ typedef struct {
 #define	WT_PACK_INIT    { NULL, NULL, NULL, NULL, 0, WT_PACK_VALUE_INIT }
 #define	WT_DECL_PACK(pack)  WT_PACK pack = WT_PACK_INIT
 
+typedef struct {
+	WT_CONFIG config;
+	char buf[20];
+	int count;
+	int iskey;
+	int genname;
+} WT_PACK_NAME;
+
 static inline int
 __pack_initn(
     WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt, size_t len)
@@ -57,6 +65,41 @@ static inline int
 __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
 {
 	return (__pack_initn(session, pack, fmt, strlen(fmt)));
+}
+
+static inline int
+__pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names,
+    int iskey, WT_PACK_NAME *pn)
+{
+	WT_CLEAR(*pn);
+	pn->iskey = iskey;
+
+	if (names->str != NULL)
+		WT_RET(__wt_config_subinit(session, &pn->config, names));
+	else
+		pn->genname = 1;
+
+	return (0);
+}
+
+static inline int
+__pack_name_next(WT_PACK_NAME *pn, WT_CONFIG_ITEM *name)
+{
+	WT_CONFIG_ITEM ignore;
+
+	if (pn->genname) {
+		snprintf(pn->buf, sizeof(pn->buf),
+		    (pn->iskey ? "key%d" : "value%d"), pn->count);
+		WT_CLEAR(*name);
+		name->str = pn->buf;
+		name->len = strlen(pn->buf);
+		name->type = WT_CONFIG_ITEM_STRING;
+		pn->count++;
+	}
+	else
+		WT_RET(__wt_config_next(&pn->config, name, &ignore));
+
+	return (0);
 }
 
 static inline int
@@ -176,7 +219,6 @@ next:	if (pack->cur == pack->end)
 static inline size_t
 __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 {
-	const char *p, *start, *end;
 	size_t s, pad;
 
 	switch (pv->type) {
@@ -184,22 +226,11 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (pv->size);
 	case 's':
 	case 'S':
-		/*
-		 * XXX if pv->havesize, only want to know if there is a
-		 * '\0' in the first pv->size characters.
-		 */
-		if (pv->type == 's' || pv->havesize) {
-			p = start = (const char *)pv->u.s;
-			end = start + pv->size;
-			while (p < end && *p != '\0')
-				p++;
-			s = (size_t)(p - start);
-			pad = pv->size - s;
-		} else {
-			s = strlen(pv->u.s);
-			pad = 1;
-		}
-		return (s + pad);
+		if (pv->type == 's' || pv->havesize)
+			s = pv->size;
+		else
+			s = strlen(pv->u.s) + 1;
+		return (s);
 	case 'U':
 	case 'u':
 		s = pv->u.item.size;
@@ -230,6 +261,171 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (sizeof (uint64_t));
 	}
 
+	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
+	return ((size_t)-1);
+}
+
+/*
+ * __unpack_json_char --
+ *	Unpack a single character into JSON escaped format.
+ *	Can be called with null buf for sizing.
+ */
+static inline size_t __unpack_json_char(char ch, char *buf, size_t bufsz,
+    int force_unicode)
+{
+	char abbrev;
+	u_char h;
+
+	if (!force_unicode) {
+		if (isprint(ch) && ch != '\\' && ch != '"') {
+			if (bufsz >= 1) {
+				*buf = ch;
+			}
+			return (1);
+		}
+		else {
+			abbrev = '\0';
+			switch (ch) {
+			case '\\':
+			case '"':
+				abbrev = ch;
+				break;
+			case '\f':
+				abbrev = 'f';
+				break;
+			case '\n':
+				abbrev = 'n';
+				break;
+			case '\r':
+				abbrev = 'r';
+				break;
+			case '\t':
+				abbrev = 't';
+				break;
+			}
+			if (abbrev != '\0') {
+				if (bufsz >= 2) {
+					*buf++ = '\\';
+					*buf = abbrev;
+				}
+				return (2);
+			}
+		}
+	}
+	if (bufsz >= 6) {
+		*buf++ = '\\';
+		*buf++ = 'u';
+		*buf++ = '0';
+		*buf++ = '0';
+		h = (((u_char)ch) >> 4) & 0xF;
+		if (h >= 10)
+			*buf++ = 'A' + (h - 10);
+		else
+			*buf++ = '0' + h;
+		h = ((u_char)ch) & 0xF;
+		if (h >= 10)
+			*buf++ = 'A' + (h - 10);
+		else
+			*buf++ = '0' + h;
+	}
+	return (6);
+}
+
+static inline size_t
+__unpack_put_json(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv,
+    char *buf, size_t bufsz, WT_CONFIG_ITEM *name)
+{
+	const char *p, *end;
+	size_t s, n;
+
+	s = snprintf(buf, bufsz, "\"%.*s\" : ", (int)name->len, name->str);
+	if (s <= bufsz) {
+		bufsz -= s;
+		buf += s;
+	}
+	else
+		bufsz = 0;
+
+	switch (pv->type) {
+	case 'x':
+		return (0);
+	case 's':
+	case 'S':
+		/* Account for '"' quote in front and back. */
+		s += 2;
+		p = (const char *)pv->u.s;
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		if (pv->type == 's' || pv->havesize) {
+			end = p + pv->size;
+			for ( ; p < end; p++) {
+				n = __unpack_json_char(*p, buf, bufsz, 0);
+				if (n > bufsz)
+					bufsz = 0;
+				else {
+					bufsz -= n;
+					buf += n;
+				}
+				s += n;
+			}
+		} else
+			for ( ; *p; p++) {
+				n = __unpack_json_char(*p, buf, bufsz, 0);
+				if (n > bufsz)
+					bufsz = 0;
+				else {
+					bufsz -= n;
+					buf += n;
+				}
+				s += n;
+			}
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		return (s);
+	case 'U':
+	case 'u':
+		s += 2;
+		p = (const char *)pv->u.item.data;
+		end = p + pv->u.item.size;
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		for ( ; p < end; p++) {
+			n = __unpack_json_char(*p, buf, bufsz, 1);
+			if (n > bufsz)
+				bufsz = 0;
+			else {
+				bufsz -= n;
+				buf += n;
+			}
+			s += n;
+		}
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		return (s);
+	case 'b':
+	case 'h':
+	case 'i':
+	case 'l':
+	case 'q':
+		return (s + snprintf(buf, bufsz, "%" PRId64, pv->u.i));
+	case 'B':
+	case 't':
+	case 'H':
+	case 'I':
+	case 'L':
+	case 'Q':
+	case 'r':
+	case 'R':
+		return (s + snprintf(buf, bufsz, "%" PRId64, pv->u.u));
+	}
 	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
 	return ((size_t)-1);
 }
@@ -370,12 +566,12 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'b':
 		/* Translate to maintain ordering with the sign bit. */
 		WT_SIZE_CHECK(1, maxlen);
-		pv->u.i = (int8_t)(**pp++ - 0x80);
+		pv->u.i = (int8_t)(*(*pp)++ - 0x80);
 		break;
 	case 'B':
 	case 't':
 		WT_SIZE_CHECK(1, maxlen);
-		pv->u.u = **pp++;
+		pv->u.u = *(*pp)++;
 		break;
 	case 'h':
 	case 'i':
@@ -451,6 +647,105 @@ __unpack_read(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE(session);                                      \
 	}								\
 } while (0)
+
+/*
+ * __wt_struct_json_size --
+ *	Calculate the size of a packed byte string as formatted for JSON.
+ */
+static inline int
+__wt_struct_json_size(WT_SESSION_IMPL *session, const void *buffer,
+    size_t size, const char *fmt, WT_CONFIG_ITEM *names, int iskey,
+    size_t *presult)
+{
+	WT_CONFIG_ITEM name;
+	WT_DECL_PACK_VALUE(pv);
+	WT_DECL_RET;
+	WT_PACK pack;
+	WT_PACK_NAME packname;
+	const uint8_t *p, *end;
+	size_t result;
+	int needcr;
+
+	p = buffer;
+	end = p + size;
+	result = 0;
+	needcr = 0;
+
+	WT_ERR(__pack_name_init(session, names, iskey, &packname));
+	WT_ERR(__pack_init(session, &pack, fmt));
+	while ((ret = __pack_next(&pack, &pv)) == 0) {
+		if (needcr)
+			result += 2;
+		needcr = 1;
+		WT_ERR(__unpack_read(session, &pv, &p, (size_t)(end - p)));
+		WT_ERR(__pack_name_next(&packname, &name));
+		result += __unpack_put_json(session, &pv, NULL, 0, &name);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+
+	/* Be paranoid - __pack_write should never overflow. */
+	WT_ASSERT(session, p <= end);
+
+	*presult = result;
+err:	return (0);
+}
+
+/*
+ * __wt_struct_json_unpackv --
+ *	Unpack a byte string to JSON (va_list version).
+ */
+static inline int
+__wt_struct_json_unpackv(WT_SESSION_IMPL *session,
+    const void *buffer, size_t size, const char *fmt, WT_CONFIG_ITEM *names,
+    char *jbuf, size_t jbufsize, int iskey, va_list ap)
+{
+	WT_CONFIG_ITEM name;
+	WT_DECL_PACK_VALUE(pv);
+	WT_DECL_RET;
+	WT_ITEM *item;
+	WT_PACK pack;
+	WT_PACK_NAME packname;
+	int needcr;
+	size_t jsize;
+	const uint8_t *p, *end;
+
+	p = buffer;
+	end = p + size;
+	needcr = 0;
+
+	/* Unpacking a cursor marked as json implies a single WT_ITEM arg. */
+	item = va_arg(ap, WT_ITEM *);
+	item->data = jbuf;
+	item->size = jbufsize - 1;  /* don't include null */
+
+	WT_ERR(__pack_name_init(session, names, iskey, &packname));
+	WT_ERR(__pack_init(session, &pack, fmt));
+	while ((ret = __pack_next(&pack, &pv)) == 0) {
+		if (needcr) {
+			WT_ASSERT(session, jbufsize >= 3);
+			strncat(jbuf, ",\n", jbufsize);
+			jbuf += 2;
+			jbufsize -= 2;
+		}
+		needcr = 1;
+		WT_ERR(__unpack_read(session, &pv, &p, (size_t)(end - p)));
+		WT_ERR(__pack_name_next(&packname, &name));
+		jsize = __unpack_put_json(session, &pv, jbuf, jbufsize, &name);
+		WT_ASSERT(session, jsize <= jbufsize);
+		jbuf += jsize;
+		jbufsize -= jsize;
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+
+	/* Be paranoid - __unpack_read should never overflow. */
+	WT_ASSERT(session, p <= end);
+
+	WT_ASSERT(session, jbufsize == 1);
+
+err:	return (ret);
+}
 
 /*
  * __wt_struct_packv --

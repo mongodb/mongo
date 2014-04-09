@@ -50,6 +50,7 @@ int	 util_dump(WT_SESSION *, int, char *[]);
 int	 util_err(int, const char *, ...);
 int	 util_flush(WT_SESSION *, const char *);
 int	 util_getopt(int, char * const *, const char *);
+int	 util_jsondump(WT_SESSION *, int, char *[]);
 int	 util_list(WT_SESSION *, int, char *[]);
 int	 util_load(WT_SESSION *, int, char *[]);
 int	 util_loadtext(WT_SESSION *, int, char *[]);

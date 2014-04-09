@@ -45,6 +45,7 @@
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
 	0,				/* recno key */			\
 	{ 0 },				/* recno raw buffer */		\
+	NULL,				/* json_private */		\
 	NULL,				/* lang_private */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
@@ -225,6 +226,13 @@ struct __wt_cursor_index {
 
 	WT_CURSOR *child;
 	WT_CURSOR **cg_cursors;
+};
+
+struct __wt_cursor_json {
+	char	*key_buf;		/* JSON formatted string */
+	char	*value_buf;		/* JSON formatted string */
+	WT_CONFIG_ITEM key_names;	/* Names of key columns */
+	WT_CONFIG_ITEM value_names;	/* Names of value colums */
 };
 
 struct __wt_cursor_stat {

@@ -84,7 +84,7 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(cursor, cursor->flags, ap);
+	ret = __wt_cursor_get_keyv(cursor, cursor, ap);
 	va_end(ap);
 	return (ret);
 }
@@ -180,24 +180,53 @@ __wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value)
 }
 
 /*
+ * __cursor_alloc_unpack_json --
+ *	Allocate space for, and unpack an entry into JSON format.
+ */
+static int
+__cursor_alloc_unpack_json(WT_SESSION_IMPL *session, const void *buffer,
+    size_t size, const char *fmt, WT_CONFIG_ITEM *names,
+    char **json_bufp, int iskey, va_list ap)
+{
+	WT_DECL_RET;
+	size_t needed;
+
+	WT_ERR(__wt_struct_json_size(session, buffer, size, fmt, names,
+	    iskey, &needed));
+	WT_ERR(__wt_realloc(session, NULL, needed + 1, json_bufp));
+	WT_ERR(__wt_struct_json_unpackv(session, buffer, size, fmt, names,
+	    *json_bufp, needed + 1, iskey, ap));
+
+err:	return (ret);
+}
+
+/*
  * __wt_cursor_get_keyv --
  *	WT_CURSOR->get_key worker function.
  */
 int
-__wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
+__wt_cursor_get_keyv(WT_CURSOR *cursor, WT_CURSOR *container, va_list ap)
 {
+	WT_CURSOR_JSON *json;
 	WT_DECL_RET;
 	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
 	size_t size;
 	const char *fmt;
+	uint32_t flags;
 
+	flags = container->flags;
+	json = (WT_CURSOR_JSON *)container->json_private;
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
 
 	if (WT_CURSOR_RECNO(cursor)) {
-		if (LF_ISSET(WT_CURSTD_RAW)) {
+		if (json != NULL) {
+			ret = __cursor_alloc_unpack_json(session,
+			    &cursor->recno, sizeof(cursor->recno), "R",
+			    &json->key_names, &json->key_buf, 1, ap);
+		} else if (LF_ISSET(WT_CURSTD_RAW)) {
 			key = va_arg(ap, WT_ITEM *);
 			key->data = cursor->raw_recno_buf;
 			WT_ERR(__wt_struct_size(
@@ -211,7 +240,11 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		fmt = LF_ISSET(WT_CURSOR_RAW_OK) ? "u" : cursor->key_format;
 
 		/* Fast path some common cases. */
-		if (strcmp(fmt, "S") == 0)
+		if (json != NULL)
+			ret = __cursor_alloc_unpack_json(session,
+			    cursor->key.data, cursor->key.size, fmt,
+			    &json->key_names, &json->key_buf, 1, ap);
+		else if (strcmp(fmt, "S") == 0)
 			*va_arg(ap, const char **) = cursor->key.data;
 		else if (strcmp(fmt, "u") == 0) {
 			key = va_arg(ap, WT_ITEM *);
@@ -242,6 +275,10 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
+
+	if (LF_ISSET(WT_CURSTD_JSON) && !LF_ISSET(WT_CURSTD_RAW))
+		WT_ERR_MSG(session, EINVAL,
+		    "Setting keys for JSON cursors not permitted");
 
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -307,7 +344,9 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
+	WT_CURSOR_JSON *json;
 
+	json = (WT_CURSOR_JSON *)cursor->json_private;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
@@ -317,7 +356,11 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
 	/* Fast path some common cases: single strings, byte arrays and bits. */
-	if (strcmp(fmt, "S") == 0)
+	if (json != NULL)
+		ret = __cursor_alloc_unpack_json(session,
+		    cursor->value.data, cursor->value.size, fmt,
+		    &json->value_names, &json->value_buf, 0, ap);
+	else if (strcmp(fmt, "S") == 0)
 		*va_arg(ap, const char **) = cursor->value.data;
 	else if (strcmp(fmt, "u") == 0) {
 		value = va_arg(ap, WT_ITEM *);
@@ -353,6 +396,10 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
+
+	if (F_ISSET(cursor, WT_CURSTD_JSON) && !F_ISSET(cursor, WT_CURSTD_RAW))
+		WT_ERR_MSG(session, EINVAL,
+		    "Setting values for JSON cursors not permitted");
 
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
@@ -411,12 +458,18 @@ __cursor_search(WT_CURSOR *cursor)
 int
 __wt_cursor_close(WT_CURSOR *cursor)
 {
+	WT_CURSOR_JSON *json;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
+	if ((json = (WT_CURSOR_JSON *)cursor->json_private) != NULL) {
+		__wt_free(session, json->key_buf);
+		__wt_free(session, json->value_buf);
+		__wt_free(session, json);
+	}
 
 	if (F_ISSET(cursor, WT_CURSTD_OPEN)) {
 		TAILQ_REMOVE(&session->cursors, cursor, q);
@@ -508,6 +561,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR *cdump;
+	WT_CURSOR_JSON *json;
 	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 
@@ -592,6 +646,14 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		owner = cdump;
 	} else
 		cdump = NULL;
+
+	/* json */
+	WT_RET(__wt_config_gets_def(session, cfg, "json", 0, &cval));
+	if (cval.val != 0) {
+		F_SET(cursor, WT_CURSTD_JSON);
+		WT_RET(__wt_calloc_def(session, 1, &json));
+		cursor->json_private = json;
+	}
 
 	/* raw */
 	WT_RET(__wt_config_gets_def(session, cfg, "raw", 0, &cval));

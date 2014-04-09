@@ -9,6 +9,8 @@
 
 static int __curtable_open_indices(WT_CURSOR_TABLE *ctable);
 static int __curtable_update(WT_CURSOR *cursor);
+static int __curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
+    const WT_CONFIG_ITEM *colconf);
 
 #define	APPLY_CG(ctable, f) do {					\
 	WT_CURSOR **__cp;						\
@@ -56,7 +58,7 @@ __wt_curtable_get_key(WT_CURSOR *cursor, ...)
 	primary = *ctable->cg_cursors;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(primary, cursor->flags, ap);
+	ret = __wt_cursor_get_keyv(primary, cursor, ap);
 	va_end(ap);
 
 	return (ret);
@@ -82,7 +84,8 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(primary);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK) &&
+	    !F_ISSET(cursor, WT_CURSTD_JSON)) {
 		ret = __wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value);
@@ -92,7 +95,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 			item->size = cursor->value.size;
 		}
 	} else
-		ret = __wt_schema_project_out(session,
+		ret = __wt_schema_project_out(session, cursor,
 		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
 
@@ -676,6 +679,52 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 }
 
 /*
+ * __curtable_json_init --
+ *	set json_key_names, json_value_names to comma separated lists
+ *	of column names.
+ */
+static int __curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
+    const WT_CONFIG_ITEM *colconf)
+{
+	WT_CURSOR_JSON *json;
+	WT_SESSION_IMPL *session;
+	const char *p, *end, *beginkey;
+	uint32_t nkeys;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+	json = (WT_CURSOR_JSON *)cursor->json_private;
+
+	beginkey = colconf->str;
+	end = beginkey + colconf->len;
+	if (colconf->len > 0 && *beginkey == '(') {
+		beginkey++;
+		if (end[-1] == ')')
+			end--;
+	}
+
+	nkeys = 0;
+	for ( ;*keyformat; keyformat++) {
+		if (!isdigit(*keyformat))
+			nkeys++;
+	}
+
+	p = beginkey;
+	while (p < end && nkeys > 0) {
+		if (*p == ',')
+			nkeys--;
+		p++;
+	}
+	json->value_names.str = p;
+	json->value_names.len = end - p;
+	if (p > beginkey)
+		p--;
+	json->key_names.str = beginkey;
+	json->key_names.len = p - beginkey;
+
+	return (0);
+}
+
+/*
  * __wt_curtable_open --
  *	WT_SESSION->open_cursor method for table cursors.
  */
@@ -768,6 +817,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	}
 
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
+
+	if (F_ISSET(cursor, WT_CURSTD_JSON)) {
+		WT_ERR(__curtable_json_init(cursor, table->key_format,
+		    &table->colconf));
+	}
 
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for

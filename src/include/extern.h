@@ -677,7 +677,9 @@ extern int __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key);
 extern void __wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key);
 extern int __wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value);
 extern void __wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value);
-extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
+extern int __wt_cursor_get_keyv(WT_CURSOR *cursor,
+    WT_CURSOR *container,
+    va_list ap);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
@@ -1244,6 +1246,7 @@ extern int __wt_schema_project_in(WT_SESSION_IMPL *session,
     const char *proj_arg,
     va_list ap);
 extern int __wt_schema_project_out(WT_SESSION_IMPL *session,
+    WT_CURSOR *container,
     WT_CURSOR **cp,
     const char *proj_arg,
     va_list ap);

@@ -117,6 +117,8 @@ struct __wt_cursor_dump;
     typedef struct __wt_cursor_dump WT_CURSOR_DUMP;
 struct __wt_cursor_index;
     typedef struct __wt_cursor_index WT_CURSOR_INDEX;
+struct __wt_cursor_json;
+    typedef struct __wt_cursor_json WT_CURSOR_JSON;
 struct __wt_cursor_lsm;
     typedef struct __wt_cursor_lsm WT_CURSOR_LSM;
 struct __wt_cursor_stat;

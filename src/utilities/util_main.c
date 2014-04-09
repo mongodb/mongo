@@ -106,6 +106,10 @@ main(int argc, char *argv[])
 		else if (strcmp(command, "dump") == 0)
 			func = util_dump;
 		break;
+	case 'j':
+		if (strcmp(command, "jsondump") == 0)
+			func = util_jsondump;
+		break;
 	case 'l':
 		if (strcmp(command, "list") == 0)
 			func = util_list;
@@ -211,6 +215,7 @@ usage(void)
 	    "\t" "create\t  create an object\n"
 	    "\t" "drop\t  drop an object\n"
 	    "\t" "dump\t  dump an object\n"
+	    "\t" "jsondump  dump an object as JSON\n"
 	    "\t" "list\t  list database objects\n"
 	    "\t" "load\t  load an object\n"
 	    "\t" "loadtext\t  load an object from a text file\n"
