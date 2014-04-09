@@ -25,6 +25,58 @@ var result;
 
 //
 //
+// Mongos _id autogeneration tests for sharded collections
+
+var coll = mongos.getCollection("foo.bar");
+assert.commandWorked(admin.runCommand({ enableSharding : coll.getDB().toString() }));
+assert.commandWorked(admin.runCommand({ shardCollection : coll.toString(),
+                                        key : { _id : 1 } }));
+
+//
+// Basic insert no _id
+coll.remove({});
+printjson( request = {insert : coll.getName(),
+                      documents: [{ a : 1 }] } );
+printjson( result = coll.runCommand(request) );
+assert(result.ok);
+assert.eq(1, result.n);
+assert.eq(1, coll.count());
+
+//
+// Multi insert some _ids
+coll.remove({});
+printjson( request = {insert : coll.getName(),
+                   documents: [{ _id : 0, a : 1 }, { a : 2 }] } );
+printjson( result = coll.runCommand(request) );
+assert(result.ok);
+assert.eq(2, result.n);
+assert.eq(2, coll.count());
+assert.eq(1, coll.count({ _id : 0 }));
+
+//
+// Ensure generating many _ids don't push us over limits
+var maxDocSize = (16 * 1024 * 1024) / 1000;
+var baseDocSize = Object.bsonsize({ a : 1, data : "" });
+var dataSize = maxDocSize - baseDocSize;
+
+var data = "";
+for (var i = 0; i < dataSize; i++)
+    data += "x";
+
+var documents = [];
+for (var i = 0; i < 1000; i++) documents.push({ a : i, data : data });
+
+assert.commandWorked(coll.getMongo().getDB("admin").runCommand({ setParameter : 1, logLevel : 4 }));
+coll.remove({});
+request = { insert : coll.getName(),
+            documents: documents };
+printjson( result = coll.runCommand(request) );
+assert(result.ok);
+assert.eq(1000, result.n);
+assert.eq(1000, coll.count());
+
+//
+//
 // Stale config progress tests
 // Set up a new collection across two shards, then revert the chunks to an earlier state to put
 // mongos and mongod permanently out of sync.
@@ -33,9 +85,9 @@ var result;
 var brokenColl = mongos.getCollection( "broken.coll" );
 assert.commandWorked(admin.runCommand({ enableSharding : brokenColl.getDB().toString() }));
 printjson(admin.runCommand({ movePrimary : brokenColl.getDB().toString(), to : shards[0]._id }));
-assert.commandWorked(admin.runCommand({ shardCollection : brokenColl.toString(), 
+assert.commandWorked(admin.runCommand({ shardCollection : brokenColl.toString(),
                                         key : { _id : 1 } }));
-assert.commandWorked(admin.runCommand({ split : brokenColl.toString(), 
+assert.commandWorked(admin.runCommand({ split : brokenColl.toString(),
                                         middle : { _id : 0 } }));
 
 var oldChunks = config.chunks.find().toArray();
@@ -49,7 +101,7 @@ assert.eq(null, brokenColl.getDB().getLastError());
 
 // Modify the chunks to make shards at a higher version
 
-assert.commandWorked(admin.runCommand({ moveChunk : brokenColl.toString(), 
+assert.commandWorked(admin.runCommand({ moveChunk : brokenColl.toString(),
                                         find : { _id : 0 },
                                         to : shards[1]._id }));
 
@@ -61,7 +113,7 @@ for ( var i = 0; i < oldChunks.length; i++ )
     config.chunks.insert(oldChunks[i]);
 assert.eq(null, config.getLastError());
 
-// Stale mongos can no longer bring itself up-to-date! 
+// Stale mongos can no longer bring itself up-to-date!
 // END SETUP
 
 //

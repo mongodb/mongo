@@ -47,6 +47,10 @@ namespace mongo {
         clear( &_history );
     }
 
+    const BatchItemRef& WriteOp::getWriteItem() const {
+        return _itemRef;
+    }
+
     WriteOpState WriteOp::getWriteState() const {
         return _state;
     }

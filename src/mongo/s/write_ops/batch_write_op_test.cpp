@@ -97,6 +97,16 @@ namespace {
         return updateDoc;
     }
 
+    static BatchedUpdateDocument* buildUpdate(const BSONObj& query,
+                                              const BSONObj& updateExpr,
+                                              bool multi) {
+        BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
+        updateDoc->setQuery( query );
+        updateDoc->setUpdateExpr( updateExpr );
+        updateDoc->setMulti( multi );
+        return updateDoc;
+    }
+
     static void buildResponse( int n, BatchedCommandResponse* response ) {
         response->clear();
         response->setOk( true );
@@ -1615,5 +1625,205 @@ namespace {
         ASSERT( !clientResponse.isErrDetailsSet() );
         ASSERT( clientResponse.isWriteConcernErrorSet() );
     }
+
+    //
+    // Tests of batch size limit functionality
+    //
+
+    TEST(WriteOpLimitTests, OneBigDoc) {
+
+        //
+        // Big single operation test - should go through
+        //
+
+        NamespaceString nss("foo.bar");
+        ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+        MockNSTargeter targeter;
+        initTargeterFullRange(nss, endpoint, &targeter);
+
+        // Create a BSONObj (slightly) bigger than the maximum size by including a max-size string
+        string bigString(BSONObjMaxUserSize, 'x');
+
+        // Do single-target, single doc batch write op
+        BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
+        request.setNS(nss.ns());
+        request.getInsertRequest()->addToDocuments(BSON( "x" << 1 << "data" << bigString ));
+
+        BatchWriteOp batchOp;
+        batchOp.initClientRequest(&request);
+
+        OwnedPointerVector<TargetedWriteBatch> targetedOwned;
+        vector<TargetedWriteBatch*>& targeted = targetedOwned.mutableVector();
+        Status status = batchOp.targetBatch(targeter, false, &targeted);
+        ASSERT(status.isOK());
+        ASSERT_EQUALS(targeted.size(), 1u);
+
+        BatchedCommandResponse response;
+        buildResponse(1, &response);
+
+        batchOp.noteBatchResponse(*targeted.front(), response, NULL);
+        ASSERT(batchOp.isFinished());
+    }
+
+    TEST(WriteOpLimitTests, OneBigOneSmall) {
+
+        //
+        // Big doc with smaller additional doc - should go through as two batches
+        //
+
+        NamespaceString nss("foo.bar");
+        ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+        MockNSTargeter targeter;
+        initTargeterFullRange(nss, endpoint, &targeter);
+
+        // Create a BSONObj (slightly) bigger than the maximum size by including a max-size string
+        string bigString(BSONObjMaxUserSize, 'x');
+
+        BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
+        request.setNS(nss.ns());
+        BatchedUpdateDocument* bigUpdateDoc = buildUpdate(BSON( "x" << 1 ),
+                                                          BSON( "data" << bigString ),
+                                                          false);
+        request.getUpdateRequest()->addToUpdates(bigUpdateDoc);
+        request.getUpdateRequest()->addToUpdates(buildUpdate(BSON( "x" << 2 ), false));
+
+        BatchWriteOp batchOp;
+        batchOp.initClientRequest(&request);
+
+        OwnedPointerVector<TargetedWriteBatch> targetedOwned;
+        vector<TargetedWriteBatch*>& targeted = targetedOwned.mutableVector();
+        Status status = batchOp.targetBatch(targeter, false, &targeted);
+        ASSERT(status.isOK());
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_EQUALS(targeted.front()->getWrites().size(), 1u);
+
+        BatchedCommandResponse response;
+        buildResponse(1, &response);
+
+        batchOp.noteBatchResponse(*targeted.front(), response, NULL);
+        ASSERT(!batchOp.isFinished());
+
+        targetedOwned.clear();
+        status = batchOp.targetBatch(targeter, false, &targeted);
+        ASSERT(status.isOK());
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_EQUALS(targeted.front()->getWrites().size(), 1u);
+
+        batchOp.noteBatchResponse(*targeted.front(), response, NULL);
+        ASSERT(batchOp.isFinished());
+    }
+
+    TEST(WriteOpLimitTests, TooManyOps) {
+
+        //
+        // Batch of 1002 documents
+        //
+
+        NamespaceString nss("foo.bar");
+        ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+        MockNSTargeter targeter;
+        initTargeterFullRange(nss, endpoint, &targeter);
+
+        BatchedCommandRequest request(BatchedCommandRequest::BatchType_Delete);
+        request.setNS(nss.ns());
+
+        // Add 2 more than the maximum to the batch
+        for (size_t i = 0; i < BatchedCommandRequest::kMaxWriteBatchSize + 2u; ++i) {
+            request.getDeleteRequest()->addToDeletes(buildDelete(BSON( "x" << 2 ), 0));
+        }
+
+        BatchWriteOp batchOp;
+        batchOp.initClientRequest(&request);
+
+        OwnedPointerVector<TargetedWriteBatch> targetedOwned;
+        vector<TargetedWriteBatch*>& targeted = targetedOwned.mutableVector();
+        Status status = batchOp.targetBatch(targeter, false, &targeted);
+        ASSERT(status.isOK());
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_EQUALS(targeted.front()->getWrites().size(), 1000u);
+
+        BatchedCommandResponse response;
+        buildResponse(1, &response);
+
+        batchOp.noteBatchResponse(*targeted.front(), response, NULL);
+        ASSERT(!batchOp.isFinished());
+
+        targetedOwned.clear();
+        status = batchOp.targetBatch(targeter, false, &targeted);
+        ASSERT(status.isOK());
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_EQUALS(targeted.front()->getWrites().size(), 2u);
+
+        batchOp.noteBatchResponse(*targeted.front(), response, NULL);
+        ASSERT(batchOp.isFinished());
+    }
+
+    TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
+
+        //
+        // Tests that the overhead of the extra fields in an update x 1000 is included in our size
+        // calculation
+        //
+
+        NamespaceString nss("foo.bar");
+        ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
+        MockNSTargeter targeter;
+        initTargeterFullRange(nss, endpoint, &targeter);
+
+        int updateDataBytes = BSONObjMaxUserSize
+                              / static_cast<int>(BatchedCommandRequest::kMaxWriteBatchSize);
+
+        string dataString(updateDataBytes - BSON( "x" << 1 << "data" << "" ).objsize(), 'x');
+
+        BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
+        request.setNS(nss.ns());
+
+        // Add the maximum number of updates
+        int estSizeBytes = 0;
+        for (size_t i = 0; i < BatchedCommandRequest::kMaxWriteBatchSize; ++i) {
+            BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
+            updateDoc->setQuery(BSON( "x" << 1 << "data" << dataString ));
+            updateDoc->setMulti(false);
+            updateDoc->setUpsert(false);
+            request.getUpdateRequest()->addToUpdates(updateDoc);
+            estSizeBytes += updateDoc->toBSON().objsize();
+        }
+
+        ASSERT_GREATER_THAN(estSizeBytes, BSONObjMaxInternalSize);
+
+        BatchWriteOp batchOp;
+        batchOp.initClientRequest(&request);
+
+        OwnedPointerVector<TargetedWriteBatch> targetedOwned;
+        vector<TargetedWriteBatch*>& targeted = targetedOwned.mutableVector();
+        Status status = batchOp.targetBatch(targeter, false, &targeted);
+        ASSERT(status.isOK());
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_LESS_THAN(targeted.front()->getWrites().size(), 1000u);
+
+        BatchedCommandRequest childRequest(BatchedCommandRequest::BatchType_Update);
+        batchOp.buildBatchRequest(*targeted.front(), &childRequest);
+        ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
+
+        BatchedCommandResponse response;
+        buildResponse(1, &response);
+
+        batchOp.noteBatchResponse(*targeted.front(), response, NULL);
+        ASSERT(!batchOp.isFinished());
+
+        targetedOwned.clear();
+        status = batchOp.targetBatch(targeter, false, &targeted);
+        ASSERT(status.isOK());
+        ASSERT_EQUALS(targeted.size(), 1u);
+        ASSERT_LESS_THAN(targeted.front()->getWrites().size(), 1000u);
+
+        childRequest.clear();
+        batchOp.buildBatchRequest(*targeted.front(), &childRequest);
+        ASSERT_LESS_THAN(childRequest.toBSON().objsize(), BSONObjMaxInternalSize);
+
+        batchOp.noteBatchResponse(*targeted.front(), response, NULL);
+        ASSERT(batchOp.isFinished());
+    }
+
 
 } // unnamed namespace
