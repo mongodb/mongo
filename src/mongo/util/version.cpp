@@ -109,17 +109,7 @@ namespace mongo {
     const char * compilerFlags() { return ""; }
 
 #if defined(_WIN32)
-    string sysInfo() {
-        stringstream ss;
-        ss << "not-scons win";
-        ss << " mscver:" << _MSC_FULL_VER << " built:" << __DATE__;
-        ss << " boostver:" << BOOST_VERSION;
-#if( !defined(_MT) )
-#error _MT is not defined
-#endif  // !defined(_MT)
-        ss << (sizeof(char *) == 8 ? " 64bit" : " 32bit");
-        return ss.str();
-    }
+
 #else  // defined(_WIN32)
     string sysInfo() { return ""; }
 
