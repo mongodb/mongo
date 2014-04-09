@@ -126,7 +126,7 @@ namespace mongo {
     }
 
     Status BtreeBasedAccessMethod::newCursor(IndexCursor **out) const {
-        *out = new BtreeIndexCursor(_btreeState, _interface);
+        *out = new BtreeIndexCursor(_btreeState, _btreeState->head(), _interface);
         return Status::OK();
     }
 
