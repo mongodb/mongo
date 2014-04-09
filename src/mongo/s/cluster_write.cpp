@@ -315,8 +315,12 @@ namespace mongo {
         dassert( response->isValid(NULL) );
     }
 
-    void ClusterWriter::write( const BatchedCommandRequest& request,
+    void ClusterWriter::write( const BatchedCommandRequest& origRequest,
                                BatchedCommandResponse* response ) {
+
+        // Add _ids to insert request if req'd
+        auto_ptr<BatchedCommandRequest> idRequest(BatchedCommandRequest::cloneWithIds(origRequest));
+        const BatchedCommandRequest& request = NULL != idRequest.get() ? *idRequest : origRequest;
 
         const NamespaceString nss = NamespaceString( request.getNS() );
         if ( !nss.isValid() ) {
