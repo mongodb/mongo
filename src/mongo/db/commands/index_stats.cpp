@@ -480,7 +480,7 @@ namespace mongo {
               << "and the fifth child of root.";
         }
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -497,6 +497,8 @@ namespace mongo {
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: indexStats " << nss;
             }
+
+            Client::ReadContext ctx(nss.ns());
 
             const Collection* collection = cc().database()->getCollection( nss.ns() );
             if (!collection) {

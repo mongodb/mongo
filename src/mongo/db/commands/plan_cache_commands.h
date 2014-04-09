@@ -41,7 +41,7 @@ namespace mongo {
     /**
      * PlanCacheCommand
      * Defines common attributes for all plan cache related commands
-     * such as slaveOk and locktype.
+     * such as slaveOk.
      */
     class PlanCacheCommand : public Command {
     public:
@@ -61,12 +61,7 @@ namespace mongo {
         bool run(const std::string& dbname, BSONObj& cmdObj, int options,
                  std::string& errmsg, BSONObjBuilder& result, bool fromRepl);
 
-        /**
-         * It's fine to return NONE here because plan cache commands
-         * create explicit read context to access collection info cache.
-         * Refer to dbcommands.cpp on how locktype() is handled.
-         */
-        virtual LockType locktype() const;
+        virtual bool isWriteCommandForConfigServer() const;
 
         virtual bool slaveOk() const;
 

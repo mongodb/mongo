@@ -254,7 +254,7 @@ namespace {
         PipelineCommand() :Command(Pipeline::commandName) {} // command is called "aggregate"
 
         // Locks are managed manually, in particular by DocumentSourceCursor.
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual void help(stringstream &help) const {

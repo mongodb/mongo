@@ -64,9 +64,7 @@ namespace mongo {
             return false;
         }
 
-        LockType locktype() const {
-            return Command::NONE;
-        }
+        bool isWriteCommandForConfigServer() const { return false; }
 
         Status checkAuthForCommand( ClientBasic* client,
                                     const std::string& dbname,

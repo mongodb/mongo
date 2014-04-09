@@ -50,7 +50,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "drop indexes for a collection";
         }
@@ -95,10 +95,13 @@ namespace mongo {
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
             BSONElement e = jsobj.firstElement();
-            string toDeleteNs = dbname + '.' + e.valuestr();
+            const string toDeleteNs = dbname + '.' + e.valuestr();
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
+
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(toDeleteNs);
 
             Collection* collection = cc().database()->getCollection( toDeleteNs );
             if ( ! collection ) {
@@ -179,7 +182,7 @@ namespace mongo {
     public:
         virtual bool logTheOp() { return false; } // only reindexes on the one node
         virtual bool slaveOk() const { return true; }    // can reindex on a secondary
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "re-index a collection";
         }
@@ -207,6 +210,9 @@ namespace mongo {
             string toDeleteNs = dbname + '.' + e.valuestr();
 
             MONGO_TLOG(0) << "CMD: reIndex " << toDeleteNs << endl;
+
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(toDeleteNs);
 
             Collection* collection = cc().database()->getCollection( toDeleteNs );
 

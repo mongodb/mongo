@@ -43,8 +43,7 @@ namespace mongo {
             return true;
         }
         virtual bool logTheOp() { return false; }
-        virtual bool lockGlobally() const { return true; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -58,12 +57,17 @@ namespace mongo {
         }
 
         CmdResync() : Command("resync") { }
-        virtual bool run(const string&,
+        virtual bool run(const string& dbname,
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
+
+            const std::string ns = parseNs(dbname, cmdObj);
+            Lock::GlobalWrite globalWriteLock;
+            Client::Context ctx(ns);
+
             if (replSettings.usingReplSets()) {
                 if (theReplSet->isPrimary()) {
                     errmsg = "primaries cannot resync";

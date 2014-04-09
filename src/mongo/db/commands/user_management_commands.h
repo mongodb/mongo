@@ -37,9 +37,9 @@ namespace mongo {
         CmdAuthSchemaUpgrade();
         virtual ~CmdAuthSchemaUpgrade();
 
+        virtual bool isWriteCommandForConfigServer() const;
         virtual bool slaveOk() const;
         virtual bool adminOnly() const;
-        virtual LockType locktype() const;
         virtual void help(stringstream& ss) const;
 
         virtual Status checkAuthForCommand(ClientBasic* client,

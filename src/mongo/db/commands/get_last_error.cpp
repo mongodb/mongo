@@ -46,7 +46,7 @@ namespace mongo {
     */
     class CmdResetError : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool logTheOp() {
             return false;
         }
@@ -69,8 +69,7 @@ namespace mongo {
     } cmdResetError;
 
     /* set by replica sets if specified in the configuration.
-       a pointer is used to avoid any possible locking issues with lockless reading (see below locktype() is NONE
-       and would like to keep that)
+       a pointer is used to avoid any possible locking issues with lockless reading.
        (for now, it simply orphans any old copy as config changes should be extremely rare).
        note: once non-null, never goes to null again.
     */
@@ -79,7 +78,7 @@ namespace mongo {
     class CmdGetLastError : public Command {
     public:
         CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
-        virtual LockType locktype() const { return NONE;  }
+        virtual bool isWriteCommandForConfigServer() const      { return false; }
         virtual bool logTheOp()           { return false; }
         virtual bool slaveOk() const      { return true;  }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -256,7 +255,7 @@ namespace mongo {
 
     class CmdGetPrevError : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool logTheOp() {
             return false;
         }

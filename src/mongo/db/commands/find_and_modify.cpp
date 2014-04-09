@@ -60,7 +60,7 @@ namespace mongo {
         CmdFindAndModify() : Command("findAndModify", false, "findandmodify") { }
         virtual bool logTheOp() { return false; } // the modifications will be logged directly
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -70,7 +70,7 @@ namespace mongo {
         bool runNoDirectClient( const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             verify( cmdObj["sort"].eoo() );
 
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             BSONObj query = cmdObj.getObjectField("query");
             BSONObj fields = cmdObj.getObjectField("fields");
@@ -94,6 +94,9 @@ namespace mongo {
                 errmsg = "need remove or update";
                 return false;
             }
+
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(ns);
             
             PageFaultRetryableSection s;
             while ( 1 ) {
@@ -295,10 +298,11 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
             static DBDirectClient db;
 
-            if ( cmdObj["sort"].eoo() )
-                return runNoDirectClient( dbname , cmdObj , x, errmsg , result, y );
+            if (cmdObj["sort"].eoo()) {
+                return runNoDirectClient(dbname, cmdObj, x, errmsg, result, y);
+            }
 
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
             Query q (origQuery);
@@ -317,6 +321,9 @@ namespace mongo {
                 if (!projection.includeID())
                     fields = NULL; // do projection in post-processing
             }
+
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(ns);
 
             BSONObj out = db.findOne(ns, q, fields);
             if (out.isEmpty()) {

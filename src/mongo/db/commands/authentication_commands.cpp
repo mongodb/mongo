@@ -96,7 +96,7 @@ namespace mongo {
             return true;
         }
         void help(stringstream& h) const { h << "internal"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -349,7 +349,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         void help(stringstream& h) const { h << "de-authenticate"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         CmdLogout() : Command("logout") {}
         bool run(const string& dbname,
                  BSONObj& cmdObj,

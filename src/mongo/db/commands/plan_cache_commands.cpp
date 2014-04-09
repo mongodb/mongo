@@ -128,9 +128,7 @@ namespace mongo {
         return true;
     }
 
-    Command::LockType PlanCacheCommand::locktype() const {
-        return NONE;
-    }
+    bool PlanCacheCommand::isWriteCommandForConfigServer() const { return false; }
 
     bool PlanCacheCommand::slaveOk() const {
         return false;

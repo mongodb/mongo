@@ -448,7 +448,7 @@ namespace mongo {
     public:
         void help(stringstream& h) const { h << "internal"; }
         HandshakeCmd() : Command( "handshake" ) {}
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,

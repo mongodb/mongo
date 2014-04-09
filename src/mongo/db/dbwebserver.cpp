@@ -443,7 +443,6 @@ namespace mongo {
 
                 Command * c = Command::findCommand( cmd );
                 verify( c );
-                verify( c->locktype() == 0 );
 
                 BSONObj co;
                 {

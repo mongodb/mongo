@@ -117,7 +117,7 @@ namespace mongo {
             help << "help for: " << c->name << " ";
             c->help( help );
             result.append( "help" , help.str() );
-            result.append( "lockType" , c->locktype() );
+            result.append("lockType", c->isWriteCommandForConfigServer() ? 1 : 0);
             appendCommandStatus(result, true, "");
             return;
         }

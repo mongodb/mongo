@@ -91,7 +91,7 @@ namespace mongo {
 
         ShardedPoolStats() : Command( "shardConnPoolStats" ) {}
         virtual void help( stringstream &help ) const { help << "stats about the shard connection pool"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
 
         // Same privs as connPoolStats

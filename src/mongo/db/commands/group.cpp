@@ -50,7 +50,7 @@ namespace mongo {
     class GroupCommand : public Command {
     public:
         GroupCommand() : Command("group") {}
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual void help( stringstream &help ) const {
@@ -219,8 +219,6 @@ namespace mongo {
             else
                 q = getQuery( p );
 
-            string ns = parseNs(dbname, jsobj);
-
             BSONObj key;
             string keyf;
             if ( p["key"].type() == Object ) {
@@ -253,6 +251,9 @@ namespace mongo {
             string finalize;
             if (p["finalize"].type())
                 finalize = p["finalize"]._asCode();
+
+            const string ns = parseNs(dbname, jsobj);
+            Client::ReadContext ctx(ns);
 
             return group( dbname , ns , q ,
                           key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,

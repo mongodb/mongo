@@ -50,7 +50,7 @@ namespace mongo {
         virtual void help(stringstream& h) const { h << "Validate contents of a namespace by scanning its data structures for correctness.  Slow.\n"
                                                         "Add full:true option to do a more thorough check"; }
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -75,6 +75,8 @@ namespace mongo {
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: validate " << ns << endl;
             }
+
+            Client::ReadContext ctx(ns_string.ns());
 
             Database* db = cc().database();
             if ( !db ) {

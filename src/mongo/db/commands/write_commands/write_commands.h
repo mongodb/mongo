@@ -65,7 +65,7 @@ namespace mongo {
 
         virtual bool slaveOk() const;
 
-        virtual LockType locktype() const;
+        virtual bool isWriteCommandForConfigServer() const;
 
         virtual Status checkAuthForCommand( ClientBasic* client,
                                             const std::string& dbname,

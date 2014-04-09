@@ -314,9 +314,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Adds a user to the system" << endl;
@@ -480,9 +478,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Used to update a user, for example to change its password" << endl;
@@ -637,9 +633,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Drops a single user." << endl;
@@ -739,9 +733,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Drops all users for a single database." << endl;
@@ -820,9 +812,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Grants roles to a user." << endl;
@@ -924,9 +914,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Revokes roles from a user." << endl;
@@ -1030,9 +1018,7 @@ namespace mongo {
             return true;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         CmdUsersInfo() : Command("usersInfo") {}
 
@@ -1185,9 +1171,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Adds a role to the system" << endl;
@@ -1336,9 +1320,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Used to update a role" << endl;
@@ -1472,9 +1454,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Grants privileges to a role" << endl;
@@ -1614,9 +1594,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Revokes privileges from a role" << endl;
@@ -1758,9 +1736,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Grants roles to another role." << endl;
@@ -1883,9 +1859,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Revokes roles from another role." << endl;
@@ -2002,9 +1976,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Drops a single role.  Before deleting the role completely it must remove it "
@@ -2185,9 +2157,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help(stringstream& ss) const {
             ss << "Drops all roles from the given database.  Before deleting the roles completely "
@@ -2325,9 +2295,7 @@ namespace mongo {
             return true;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         CmdRolesInfo() : Command("rolesInfo") {}
 
@@ -2432,9 +2400,7 @@ namespace mongo {
             return true;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         CmdInvalidateUserCache() : Command("invalidateUserCache") {}
 
@@ -2490,9 +2456,7 @@ namespace mongo {
             return false;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual bool adminOnly() const {
             return true;
@@ -2930,7 +2894,7 @@ namespace mongo {
 
     bool CmdAuthSchemaUpgrade::slaveOk() const { return false; }
     bool CmdAuthSchemaUpgrade::adminOnly() const { return true; }
-    Command::LockType CmdAuthSchemaUpgrade::locktype() const { return NONE; }
+    bool CmdAuthSchemaUpgrade::isWriteCommandForConfigServer() const { return false; }
 
     void CmdAuthSchemaUpgrade::help(stringstream& ss) const {
         ss << "Upgrades the auth data storage schema";

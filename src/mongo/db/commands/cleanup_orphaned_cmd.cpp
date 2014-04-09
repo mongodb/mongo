@@ -167,7 +167,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         // Input
         static BSONField<string> nsField;

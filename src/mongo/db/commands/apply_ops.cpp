@@ -46,8 +46,8 @@ namespace mongo {
     class ApplyOpsCmd : public Command {
     public:
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool lockGlobally() const { return true; } // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple ns used so locking individually requires more analysis
+        virtual bool isWriteCommandForConfigServer() const { return true; }
+
         ApplyOpsCmd() : Command( "applyOps" ) {}
         virtual void help( stringstream &help ) const {
             help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";
@@ -105,6 +105,9 @@ namespace mongo {
             BSONArrayBuilder ab;
             const bool alwaysUpsert = cmdObj.hasField("alwaysUpsert") ?
                     cmdObj["alwaysUpsert"].trueValue() : true;
+
+            // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple ns used so locking individually requires more analysis
+            Lock::GlobalWrite globalWriteLock;
             
             while ( i.more() ) {
                 BSONElement e = i.next();

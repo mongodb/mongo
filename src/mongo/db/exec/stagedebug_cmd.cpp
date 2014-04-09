@@ -92,7 +92,7 @@ namespace mongo {
         StageDebugCmd() : Command("stageDebug") { }
 
         // Boilerplate for commands
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
         void help(std::stringstream& h) const { }
@@ -107,13 +107,15 @@ namespace mongo {
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result,
                  bool fromRepl) {
-
             BSONElement argElt = cmdObj["stageDebug"];
             if (argElt.eoo() || !argElt.isABSONObj()) { return false; }
             BSONObj argObj = argElt.Obj();
 
             OwnedPointerVector<MatchExpression> exprs;
             auto_ptr<WorkingSet> ws(new WorkingSet());
+
+            const string ns = parseNs(dbname, cmdObj);
+            Client::ReadContext ctx(ns);
 
             PlanStage* userRoot = parseQuery(dbname, argObj, ws.get(), &exprs);
             uassert(16911, "Couldn't parse plan from " + argObj.toString(), NULL != userRoot);

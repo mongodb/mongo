@@ -310,7 +310,7 @@ namespace {
               << "{storageDetails: 'collectionName', analyze: 'diskStorage', granularity: 1 << 20}";
         }
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -786,6 +786,8 @@ namespace {
         if (!serverGlobalParams.quiet) {
             MONGO_TLOG(0) << "CMD: storageDetails " << ns << ", analyze " << subCommandStr << endl;
         }
+
+        Client::ReadContext ctx(ns);
 
         Database* db = cc().database();
         const Collection* collection = db->getCollection( ns );

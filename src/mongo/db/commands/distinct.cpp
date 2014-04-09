@@ -54,7 +54,7 @@ namespace mongo {
 
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -89,6 +89,8 @@ namespace mongo {
             long long nscanned = 0; // locations looked at
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
+
+            Client::ReadContext ctx(ns);
 
             Collection* collection = cc().database()->getCollection( ns );
 

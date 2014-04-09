@@ -51,8 +51,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool lockGlobally() const { return true; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual bool logTheOp() {
             return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
         }
@@ -126,6 +125,8 @@ namespace mongo {
             bool capped = false;
             long long size = 0;
             std::vector<BSONObj> indexesInProg;
+
+            Lock::GlobalWrite globalWriteLock;
 
             {
                 Client::Context srcCtx( source );

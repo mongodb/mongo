@@ -336,7 +336,7 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << " example: { cursorInfo : 1 }, deprecated";
         }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {

@@ -53,7 +53,7 @@ namespace mongo {
     public:
         Geo2dFindNearCmd() : Command("geoNear") {}
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
 
@@ -70,12 +70,14 @@ namespace mongo {
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string ns = dbname + "." + cmdObj.firstElement().valuestr();
+            const string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
             if (!cmdObj["start"].eoo()) {
                 errmsg = "using deprecated 'start' argument to geoNear";
                 return false;
             }
+
+            Client::ReadContext ctx(ns);
 
             Database* db = cc().database();
             if ( !db ) {

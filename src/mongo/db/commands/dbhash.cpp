@@ -146,6 +146,9 @@ namespace mongo {
             }
         }
 
+        const string ns = parseNs(dbname, cmdObj);
+        Client::ReadContext ctx(ns);
+
         list<string> colls;
         Database* db = cc().database();
         if ( db )

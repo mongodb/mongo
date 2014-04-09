@@ -30,6 +30,7 @@
 
 #include <string>
 
+#include "mongo/db/client.h"
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/pdfile.h"
@@ -41,10 +42,6 @@
 namespace mongo {
 
     namespace fts {
-
-        Command::LockType FTSCommand::locktype() const {
-            return READ;
-        }
 
         /*
          * Runs the command object cmdobj on the db with name dbname and puts result in result.
@@ -93,6 +90,8 @@ namespace mongo {
             projBob.appendElements(projection);
             projBob.appendElements(sortSpec);
             BSONObj projObj = projBob.obj();
+
+            Client::ReadContext ctx(ns);
 
             CanonicalQuery* cq;
             Status canonicalizeStatus = CanonicalQuery::canonicalize(ns, queryObj, sortSpec,

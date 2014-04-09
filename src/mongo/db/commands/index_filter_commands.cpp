@@ -132,9 +132,7 @@ namespace mongo {
         return true;
     }
 
-    Command::LockType IndexFilterCommand::locktype() const {
-        return NONE;
-    }
+    bool IndexFilterCommand::isWriteCommandForConfigServer() const { return false; }
 
     bool IndexFilterCommand::slaveOk() const {
         return false;

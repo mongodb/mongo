@@ -83,8 +83,7 @@ namespace mongo {
     // Slaves can't perform writes.
     bool WriteCmd::slaveOk() const { return false; }
 
-    // Write commands acquire write lock, but not for entire length of execution.
-    Command::LockType WriteCmd::locktype() const { return NONE; }
+    bool WriteCmd::isWriteCommandForConfigServer() const { return false; }
 
     Status WriteCmd::checkAuthForCommand( ClientBasic* client,
                                           const std::string& dbname,

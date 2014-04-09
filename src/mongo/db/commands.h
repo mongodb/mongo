@@ -61,10 +61,6 @@ namespace mutablebson {
         ResourcePattern parseResourcePattern(const std::string& dbname,
                                              const BSONObj& cmdObj) const;
 
-        // warning: isAuthorized uses the lockType() return values, and values are being passed 
-        // around as ints so be careful as it isn't really typesafe and will need cleanup later
-        enum LockType { READ = -1 , NONE = 0 , WRITE = 1 };
-
         const string name;
 
         /* run the given command
@@ -77,17 +73,15 @@ namespace mutablebson {
         */
         virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ) = 0;
 
-        /*
-           note: logTheOp() MUST be false if READ
-           if NONE, can't use Client::Context setup
-                    use with caution
+        /**
+         * This designation for the command is only used by the 'help' call and has nothing to do 
+         * with lock acquisition. The reason we need to have it there is because 
+         * SyncClusterConnection uses this to determine whether the command is update and needs to
+         * be sent to all three servers or just one.
+         *
+         * Eventually when SyncClusterConnection is refactored out, we can get rid of it.
          */
-        virtual LockType locktype() const = 0;
-
-        /** if true, lock globally instead of just the one database. by default only the one 
-            database will be locked. 
-        */
-        virtual bool lockGlobally() const { return false; }
+        virtual bool isWriteCommandForConfigServer() const = 0;
 
         /* Return true if only the admin ns has privileges to run this command. */
         virtual bool adminOnly() const {
@@ -203,7 +197,6 @@ namespace mutablebson {
                                          BSONObj& jsobj,
                                          BSONObjBuilder& anObjBuilder,
                                          int queryOptions = 0);
-        static LockType locktype( const string& name );
         static Command * findCommand( const string& name );
         // For mongod and webserver.
         static void execCommand(Command* c,

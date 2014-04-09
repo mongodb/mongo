@@ -117,7 +117,7 @@ namespace mongo {
     public:
         CmdCloneCollectionAsCapped() : Command( "cloneCollectionAsCapped" ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream &help ) const {
             help << "{ cloneCollectionAsCapped:<fromName>, toCollection:<toName>, size:<sizeInBytes> }";
         }
@@ -150,6 +150,9 @@ namespace mongo {
                 return false;
             }
 
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(dbname);
+
             Status status = cloneCollectionAsCapped( cc().database(), from, to, size, temp, true );
             return appendCommandStatus( result, status );
         }
@@ -164,9 +167,7 @@ namespace mongo {
     public:
         CmdConvertToCapped() : Command( "convertToCapped" ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
-        // calls renamecollection which does a global lock, so we must too:
-        virtual bool lockGlobally() const { return true; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual bool logTheOp() {
             // see CmdRenameCollection::logTheOp as to why this is best
             return true;
@@ -193,6 +194,11 @@ namespace mongo {
         }
 
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            // calls renamecollection which does a global lock, so we must too:
+            //
+            Lock::GlobalWrite globalWriteLock;
+            Client::Context ctx(dbname);
+
             Database* db = cc().database();
 
             stopIndexBuilds(db, jsobj);

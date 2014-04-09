@@ -47,7 +47,7 @@ namespace mongo {
     public:
         CmdCreateIndex() : Command( "createIndexes" ){}
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return false; } // TODO: this could be made true...
 

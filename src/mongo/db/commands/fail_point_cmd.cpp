@@ -66,9 +66,7 @@ namespace mongo {
             return true;
         }
 
-        virtual LockType locktype() const {
-            return NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual bool adminOnly() const {
             return true;

@@ -167,7 +167,7 @@ namespace mongo {
 
         ParallelCollectionScanCmd() : Command( "parallelCollectionScan" ){}
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
 
@@ -187,6 +187,8 @@ namespace mongo {
                           bool fromRepl = false ) {
 
             NamespaceString ns( dbname, cmdObj[name].String() );
+
+            Client::ReadContext ctx(ns.ns());
 
             Database* db = cc().database();
             Collection* collection = db->getCollection( ns );

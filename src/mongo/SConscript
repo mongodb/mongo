@@ -419,7 +419,6 @@ env.Library("coredb", [
         "db/commands/mr_common.cpp",
         "db/commands/rename_collection_common.cpp",
         "db/commands/server_status.cpp",
-        "db/commands/shutdown.cpp",
         "db/commands/parameters.cpp",
         "db/commands/user_management_commands.cpp",
         "db/commands/write_commands/write_commands_common.cpp",

@@ -120,7 +120,7 @@ namespace mongo {
             virtual bool passOptions() const { return false; }
 
             // all grid commands are designed not to lock
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
 
         protected:
 
@@ -167,7 +167,7 @@ namespace mongo {
             virtual bool adminOnly() const { return false; }
 
             // all grid commands are designed not to lock
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
 
             // default impl uses all shards for DB
             virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
