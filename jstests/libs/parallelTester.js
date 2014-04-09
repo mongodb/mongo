@@ -122,6 +122,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "profile1.js",
                                    "profile3.js",
                                    "profile4.js",
+                                   "mr_drop.js",
                                    "mr3.js",
                                    "indexh.js",
                                    "apitest_db.js",
