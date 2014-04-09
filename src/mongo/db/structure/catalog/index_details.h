@@ -30,14 +30,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
-#include <vector>
-
 #include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/structure/btree/key.h"
-#include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {
 
@@ -49,8 +42,7 @@ namespace mongo {
 
        ** MemoryMapped Record ** (i.e., this is on disk data)
      */
-    class IndexDetails {
-    public:
+    struct IndexDetails {
         /**
          * btree head disk location
          */

@@ -29,17 +29,11 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/structure/catalog/index_details.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/index_set.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/db/structure/catalog/namespace_index.h"
-#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
@@ -171,12 +165,7 @@ namespace mongo {
         DiskLoc& capExtent() { return _capExtent; }
         DiskLoc& capFirstNewRecord() { return _capFirstNewRecord; }
 
-    private:
-        Extent *theCapExtent() const { return _capExtent.ext(); }
-        void advanceCapExtent( const StringData& ns );
-        DiskLoc __capAlloc(int len);
-        DiskLoc &cappedFirstDeletedInCurExtent();
-        bool nextIsInCapExtent( const DiskLoc &dl ) const;
+        bool capLooped() const { return _capFirstNewRecord.isValid(); }
 
     public:
 
@@ -220,19 +209,6 @@ namespace mongo {
          * @return if the value is valid at all
          */
         static bool validMaxCappedDocs( long long* max );
-
-        DiskLoc& cappedListOfAllDeletedRecords() { return _deletedList[0]; }
-        DiskLoc& cappedLastDelRecLastExtent()    { return _deletedList[1]; }
-        bool capLooped() const { return _isCapped && _capFirstNewRecord.isValid();  }
-        bool inCapExtent( const DiskLoc &dl ) const;
-        void cappedCheckMigrate();
-        /**
-         * Truncate documents newer than the document at 'end' from the capped
-         * collection.  The collection cannot be completely emptied using this
-         * function.  An assertion will be thrown if that is attempted.
-         * @param inclusive - Truncate 'end' as well iff true
-         */
-        void cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive);
 
         /* when a background index build is in progress, we don't count the index in nIndexes until
            complete, yet need to still use it in _indexRecord() - thus we use this function for that.
@@ -378,10 +354,6 @@ namespace mongo {
         static int quantizePowerOf2AllocationSpace(int allocSize);
 
     public:
-
-        /* add a given record to the deleted chains for this NS */
-        void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
-
         // Start from firstExtent by default.
         DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
         // Start from lastExtent by default.
@@ -409,7 +381,6 @@ namespace mongo {
         void swapIndex( int a, int b );
 
         void maybeComplain( const StringData& ns, int len ) const;
-        void compact(); // combine adjacent deleted records
 
         friend class Database;
         friend class NamespaceIndex;

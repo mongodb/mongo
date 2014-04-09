@@ -156,7 +156,7 @@ namespace mongo {
                     unsigned long long *p = reinterpret_cast<unsigned long long *>( todelete->data() );
                     *getDur().writing(p) = 0;
                 }
-                _details->addDeletedRec((DeletedRecord*)todelete, dl);
+                addDeletedRec((DeletedRecord*)todelete, dl);
             }
         }
 
@@ -208,7 +208,7 @@ namespace mongo {
 
         _details->setLastExtentSize( e->length );
 
-        _details->addDeletedRec(emptyLoc.drec(), emptyLoc);
+        addDeletedRec(emptyLoc.drec(), emptyLoc);
     }
 
 }

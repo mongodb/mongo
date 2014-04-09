@@ -81,8 +81,10 @@ namespace mongo {
         // Signal that we are on first allocation iteration through extents.
         _capFirstNewRecord.setInvalid();
         // For capped case, signal that we are doing initial extent allocation.
-        if ( capped )
-            cappedLastDelRecLastExtent().setInvalid();
+        if ( capped ) {
+            // WAS: cappedLastDelRecLastExtent().setInvalid();
+            _deletedList[1].setInvalid();
+        }
         verify( sizeof(_dataFileVersion) == 2 );
         _dataFileVersion = 0;
         _indexFileVersion = 0;
@@ -91,44 +93,6 @@ namespace mongo {
         _extraOffset = 0;
         _indexBuildsInProgress = 0;
         memset(_reserved, 0, sizeof(_reserved));
-    }
-
-    void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
-        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
-
-        {
-            Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
-            d = &r->asDeleted();
-            // defensive code: try to make us notice if we reference a deleted record
-            reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
-        }
-        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
-        if ( isCapped() ) {
-            if ( !cappedLastDelRecLastExtent().isValid() ) {
-                // Initial extent allocation.  Insert at end.
-                d->nextDeleted() = DiskLoc();
-                if ( cappedListOfAllDeletedRecords().isNull() )
-                    getDur().writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
-                else {
-                    DiskLoc i = cappedListOfAllDeletedRecords();
-                    for (; !i.drec()->nextDeleted().isNull(); i = i.drec()->nextDeleted() )
-                        ;
-                    i.drec()->nextDeleted().writing() = dloc;
-                }
-            }
-            else {
-                d->nextDeleted() = cappedFirstDeletedInCurExtent();
-                getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
-                // always compact() after this so order doesn't matter
-            }
-        }
-        else {
-            int b = bucket(d->lengthWithHeaders());
-            DiskLoc& list = _deletedList[b];
-            DiskLoc oldHead = list;
-            getDur().writingDiskLoc(list) = dloc;
-            d->nextDeleted() = oldHead;
-        }
     }
 
     /* @return the size for an allocated record quantized to 1/16th of the BucketSize

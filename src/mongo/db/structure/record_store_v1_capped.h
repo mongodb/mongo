@@ -63,6 +63,33 @@ namespace mongo {
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 
+        virtual void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
+
+    private:
+        // -- start copy from cap.cpp --
+        void compact();
+        DiskLoc& cappedFirstDeletedInCurExtent();
+        void cappedCheckMigrate();
+        DiskLoc __capAlloc( int len );
+        bool inCapExtent( const DiskLoc &dl ) const;
+        DiskLoc& cappedListOfAllDeletedRecords();
+        DiskLoc& cappedLastDelRecLastExtent();
+        bool capLooped() const;
+        Extent *theCapExtent() const;
+        bool nextIsInCapExtent( const DiskLoc &dl ) const;
+        void advanceCapExtent( const StringData& ns );
+        void cappedTruncateLastDelUpdate();
+
+        /**
+         * Truncate documents newer than the document at 'end' from the capped
+         * collection.  The collection cannot be completely emptied using this
+         * function.  An assertion will be thrown if that is attempted.
+         * @param inclusive - Truncate 'end' as well iff true
+         */
+        void cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive);
+
+        // -- end copy from cap.cpp --
+
         Collection* _collection;
 
         OwnedPointerVector<MAdvise> _extentAdvice;

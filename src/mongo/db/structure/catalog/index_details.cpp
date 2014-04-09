@@ -28,17 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/structure/catalog/index_details.h"
-
-#include <boost/checked_delete.hpp>
-
-#include "mongo/db/client.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 

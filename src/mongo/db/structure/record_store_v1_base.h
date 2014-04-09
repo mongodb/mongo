@@ -62,6 +62,9 @@ namespace mongo {
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax ) = 0;
 
+        // TODO: document, remove, what have you
+        virtual void addDeletedRec(DeletedRecord *d, DiskLoc dloc) = 0;
+
         /** add a record to the end of the linked list chain within this extent.
             require: you must have already declared write intent for the record header.
         */

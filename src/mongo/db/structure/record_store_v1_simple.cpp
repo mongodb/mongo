@@ -195,7 +195,7 @@ namespace mongo {
         newDelW->lengthWithHeaders() = left;
         newDelW->nextDeleted().Null();
 
-        _details->addDeletedRec(newDel, newDelLoc);
+        addDeletedRec(newDel, newDelLoc);
 
         return loc;
 
@@ -240,5 +240,23 @@ namespace mongo {
     Status SimpleRecordStoreV1::truncate() {
         return Status( ErrorCodes::InternalError,
                        "SimpleRecordStoreV1::truncate not implemented" );
+    }
+
+    void SimpleRecordStoreV1::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
+        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
+
+        {
+            Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
+            d = &r->asDeleted();
+            // defensive code: try to make us notice if we reference a deleted record
+            reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
+        }
+        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
+
+        int b = _details->bucket(d->lengthWithHeaders());
+        DiskLoc& list = _details->_deletedList[b];
+        DiskLoc oldHead = list;
+        getDur().writingDiskLoc(list) = dloc;
+        d->nextDeleted() = oldHead;
     }
 }

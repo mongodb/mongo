@@ -32,6 +32,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/db/d_concurrency.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 
 
@@ -45,10 +46,7 @@ namespace mongo {
     NamespaceDetails* NamespaceIndex::details(const Namespace& ns) {
         if ( !_ht.get() )
             return 0;
-        NamespaceDetails *d = _ht->get(ns);
-        if ( d && d->isCapped() )
-            d->cappedCheckMigrate();
-        return d;
+        return _ht->get(ns);
     }
 
     void NamespaceIndex::add_ns(const StringData& ns, const DiskLoc& loc, bool capped) {
