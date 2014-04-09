@@ -68,8 +68,8 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 
 setup:
 	op->format = af;
-	op->iface.key_format = af->key_format;
-	op->iface.value_format = af->value_format;
+	op->iface.c.key_format = op->iface.key_format = af->key_format;
+	op->iface.c.value_format = op->iface.value_format = af->value_format;
 	return (0);
 
 err:
@@ -380,21 +380,21 @@ __async_runtime_config(WT_ASYNC_OP_IMPL *op, const char *cfg[])
 
 	session = O2S(op);
 	asyncop = (WT_ASYNC_OP *)op;
-	WT_RET(__wt_config_gets_def(session, cfg, "append", 1, &cval));
+	WT_RET(__wt_config_gets_def(session, cfg, "append", 0, &cval));
 	if (cval.val)
-		F_SET(asyncop, WT_ASYNCOP_APPEND);
+		F_SET(&asyncop->c, WT_CURSTD_APPEND);
 	else
-		F_CLR(asyncop, WT_ASYNCOP_APPEND);
+		F_CLR(&asyncop->c, WT_CURSTD_APPEND);
 	WT_RET(__wt_config_gets_def(session, cfg, "overwrite", 1, &cval));
 	if (cval.val)
-		F_SET(asyncop, WT_ASYNCOP_OVERWRITE);
+		F_SET(&asyncop->c, WT_CURSTD_OVERWRITE);
 	else
-		F_CLR(asyncop, WT_ASYNCOP_OVERWRITE);
-	WT_RET(__wt_config_gets_def(session, cfg, "raw", 1, &cval));
+		F_CLR(&asyncop->c, WT_CURSTD_OVERWRITE);
+	WT_RET(__wt_config_gets_def(session, cfg, "raw", 0, &cval));
 	if (cval.val)
-		F_SET(asyncop, WT_ASYNCOP_RAW);
+		F_SET(&asyncop->c, WT_CURSTD_RAW);
 	else
-		F_CLR(asyncop, WT_ASYNCOP_RAW);
+		F_CLR(&asyncop->c, WT_CURSTD_RAW);
 	return (0);
 
 }

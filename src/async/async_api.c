@@ -6,104 +6,6 @@
  */
 
 #include "wt_internal.h"
-
-/*
- * __async_kv_not_set --
- *	Standard error message for op key/values not set.
- */
-static int
-__async_kv_not_set(WT_ASYNC_OP *asyncop, int key)
-{
-	WT_ASYNC_OP_IMPL *op;
-	WT_SESSION_IMPL *session;
-
-	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	session = O2S(op);
-	WT_RET_MSG(session,
-	    asyncop->saved_err == 0 ? EINVAL : asyncop->saved_err,
-	    "requires %s be set", key ? "key" : "value");
-}
-
-/*
- * __async_get_keyv --
- *	WT_ASYNC_OP->get_key implementation for op handles.
- */
-static int
-__async_get_keyv(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
-{
-	WT_ITEM *key;
-
-	WT_UNUSED(flags);
-	if (!F_ISSET(asyncop, WT_ASYNCOP_KEY_SET))
-		WT_RET(__async_kv_not_set(asyncop, 1));
-
-	key = va_arg(ap, WT_ITEM *);
-	key->data = asyncop->key.data;
-	key->size = asyncop->key.size;
-	return (0);
-}
-
-/*
- * __async_set_keyv --
- *	WT_ASYNC_OP->set_key implementation for op handles.
- */
-static void
-__async_set_keyv(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
-{
-	WT_ITEM *item;
-	size_t sz;
-
-	F_CLR(asyncop, WT_ASYNCOP_KEY_SET);
-	if (LF_ISSET(WT_ASYNCOP_RAW)) {
-		item = va_arg(ap, WT_ITEM *);
-		sz = item->size;
-		asyncop->key.data = item->data;
-		asyncop->key.size = sz;
-		asyncop->saved_err = 0;
-		F_SET(asyncop, WT_ASYNCOP_KEY_EXT);
-	}
-}
-
-/*
- * __async_get_valuev --
- *	WT_ASYNC_OP->get_value implementation for op handles.
- */
-static int
-__async_get_valuev(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
-{
-	WT_ITEM *value;
-
-	WT_UNUSED(flags);
-	if (!F_ISSET(asyncop, WT_ASYNCOP_VALUE_SET))
-		WT_RET(__async_kv_not_set(asyncop, 0));
-
-	value = va_arg(ap, WT_ITEM *);
-	value->data = asyncop->value.data;
-	value->size = asyncop->value.size;
-	return (0);
-}
-
-/*
- * __async_set_valuev --
- *	WT_ASYNC_OP->set_value implementation for op handles.
- */
-static void
-__async_set_valuev(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
-{
-	WT_ITEM *item;
-	size_t sz;
-
-	F_CLR(asyncop, WT_ASYNCOP_VALUE_SET);
-	if (LF_ISSET(WT_ASYNCOP_RAW)) {
-		item = va_arg(ap, WT_ITEM *);
-		sz = item->size;
-		asyncop->value.data = item->data;
-		asyncop->value.size = sz;
-		asyncop->saved_err = 0;
-		F_SET(asyncop, WT_ASYNCOP_VALUE_EXT);
-	}
-}
-
 /*
  * __async_get_key --
  *	WT_ASYNC_OP->get_key implementation for op handles.
@@ -111,45 +13,13 @@ __async_set_valuev(WT_ASYNC_OP *asyncop, uint32_t flags, va_list ap)
 static int
 __async_get_key(WT_ASYNC_OP *asyncop, ...)
 {
-	WT_ASYNC_OP_IMPL *op;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	ASYNCOP_API_CALL(O2C(op), session, get_key);
 	va_start(ap, asyncop);
-	fprintf(stderr, "async_get_key: called id %d unique %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
-	ret = __async_get_keyv(asyncop, asyncop->flags, ap);
+	ret = __wt_cursor_get_keyv(&asyncop->c, asyncop->c.flags, ap);
 	va_end(ap);
-	API_END(session);
-err:
 	return (ret);
-}
-
-/*
- * __async_get_value --
- *	WT_ASYNC_OP->get_value implementation for op handles.
- */
-static int
-__async_get_value(WT_ASYNC_OP *asyncop, ...)
-{
-	WT_ASYNC_OP_IMPL *op;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	va_list ap;
-
-	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	ASYNCOP_API_CALL(O2C(op), session, get_value);
-	va_start(ap, asyncop);
-	fprintf(stderr, "async_get_value: called id %d unique %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
-	ret = __async_get_valuev(asyncop, asyncop->flags, ap);
-	va_end(ap);
-	API_END(session);
-err:
-	return (0);
 }
 
 /*
@@ -159,23 +29,27 @@ err:
 static void
 __async_set_key(WT_ASYNC_OP *asyncop, ...)
 {
-	WT_ASYNC_OP_IMPL *op;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	ASYNCOP_API_CALL(O2C(op), session, set_key);
 	va_start(ap, asyncop);
-	__async_set_keyv(asyncop, asyncop->flags, ap);
-	fprintf(stderr, "async_set_key: key_format %s id %d unique %"
-	    PRIu64 " key %s\n", op->iface.key_format,
-	    op->internal_id, op->unique_id, (char *)asyncop->key.data);
+	__wt_cursor_set_keyv(&asyncop->c, asyncop->c.flags, ap);
 	va_end(ap);
-	if (0) {
-err:		asyncop->saved_err = ret;
-	}
-	API_END(session);
+}
+
+/*
+ * __async_get_value --
+ *	WT_ASYNC_OP->get_value implementation for op handles.
+ */
+static int
+__async_get_value(WT_ASYNC_OP *asyncop, ...)
+{
+	WT_DECL_RET;
+	va_list ap;
+
+	va_start(ap, asyncop);
+	ret = __wt_cursor_get_valuev(&asyncop->c, ap);
+	va_end(ap);
+	return (ret);
 }
 
 /*
@@ -185,39 +59,11 @@ err:		asyncop->saved_err = ret;
 static void
 __async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
-	WT_ASYNC_OP_IMPL *op;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	op = (WT_ASYNC_OP_IMPL *)asyncop;
-	ASYNCOP_API_CALL(O2C(op), session, set_value);
 	va_start(ap, asyncop);
-	__async_set_valuev(asyncop, asyncop->flags, ap);
-	fprintf(stderr, "async_set_value: called id %d unique %" PRIu64 "\n",
-	    op->internal_id, op->unique_id);
+	__wt_cursor_set_valuev(&asyncop->c, ap);
 	va_end(ap);
-	if (0) {
-err:		asyncop->saved_err = ret;
-	}
-	API_END(session);
-}
-
-/*
- * __wt_async_set_raw_value --
- *	Set value via WT_ITEM.
- */
-void
-__wt_async_set_raw_value(WT_ASYNC_OP *asyncop, WT_ITEM *value)
-{
-	int raw_set;
-
-	raw_set = F_ISSET(asyncop, WT_ASYNCOP_RAW) ? 1 : 0;
-	if (!raw_set)
-		F_SET(asyncop, WT_ASYNCOP_RAW);
-	asyncop->set_value(asyncop, value);
-	if (!raw_set)
-		F_CLR(asyncop, WT_ASYNCOP_RAW);
 }
 
 /*
@@ -330,6 +176,7 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop = (WT_ASYNC_OP *)op;
 	asyncop->connection = (WT_CONNECTION *)conn;
 	asyncop->key_format = asyncop->value_format = NULL;
+	asyncop->c.key_format = asyncop->c.value_format = NULL;
 	asyncop->get_key = __async_get_key;
 	asyncop->get_value = __async_get_value;
 	asyncop->set_key = __async_set_key;
@@ -339,12 +186,21 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop->update = __async_update;
 	asyncop->remove = __async_remove;
 	asyncop->get_id = __async_get_id;
-	asyncop->recno = 0;
-	memset(&asyncop->raw_recno_buf, 0, sizeof(asyncop->raw_recno_buf));
-	memset(&asyncop->key, 0, sizeof(asyncop->key));
-	memset(&asyncop->value, 0, sizeof(asyncop->value));
-	asyncop->saved_err = 0;
-	asyncop->flags = 0;
+	/*
+	 * The cursor needs to have the get/set key/value functions initialized.
+	 * It also needs the key/value related fields set up.
+	 */
+	asyncop->c.get_key = __wt_cursor_get_key;
+	asyncop->c.set_key = __wt_cursor_set_key;
+	asyncop->c.get_value = __wt_cursor_get_value;
+	asyncop->c.set_value = __wt_cursor_set_value;
+	asyncop->c.recno = 0;
+	memset(&asyncop->c.raw_recno_buf, 0, sizeof(asyncop->c.raw_recno_buf));
+	memset(&asyncop->c.key, 0, sizeof(asyncop->c.key));
+	memset(&asyncop->c.value, 0, sizeof(asyncop->c.value));
+	asyncop->c.session = (WT_SESSION *)conn->default_session;
+	asyncop->c.saved_err = 0;
+	asyncop->c.flags = 0;
 
 	op->internal_id = id;
 	op->state = WT_ASYNCOP_FREE;
