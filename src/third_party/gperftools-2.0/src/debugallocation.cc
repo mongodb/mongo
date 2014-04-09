@@ -1075,14 +1075,22 @@ class DebugMallocImplementation : public TCMallocImplementation {
 
  };
 
-static DebugMallocImplementation debug_malloc_implementation;
+static union {
+  char chars[sizeof(DebugMallocImplementation)];
+  void *ptr;
+} debug_malloc_implementation_space;
 
 REGISTER_MODULE_INITIALIZER(debugallocation, {
+#if (__cplusplus >= 201103L)
+    COMPILE_ASSERT(alignof(debug_malloc_implementation_space) >= alignof(DebugMallocImplementation),
+                   debug_malloc_implementation_space_is_not_properly_aligned);
+#endif
   // Either we or valgrind will control memory management.  We
   // register our extension if we're the winner. Otherwise let
   // Valgrind use its own malloc (so don't register our extension).
   if (!RunningOnValgrind()) {
-    MallocExtension::Register(&debug_malloc_implementation);
+    DebugMallocImplementation *impl = new (debug_malloc_implementation_space.chars) DebugMallocImplementation();
+    MallocExtension::Register(impl);
   }
 });
 
