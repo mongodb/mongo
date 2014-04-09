@@ -56,6 +56,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
+#include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -794,11 +795,14 @@ namespace mongo {
         // such exceptions are interruptions.
         ExecInsertsState state(&request);
         normalizeInserts(request, &state.normalizedInserts);
+
+        ElapsedTracker elapsedTracker(128, 10); // 128 hits or 10 ms, matching RunnerYieldPolicy's
+
         for (state.currIndex = 0;
              state.currIndex < state.request->sizeWriteOps();
              ++state.currIndex) {
 
-            if (state.currIndex > 0) {
+            if (elapsedTracker.intervalHasElapsed()) {
                 // Consider yielding between inserts.
 
                 if (state.hasLock()) {
@@ -810,6 +814,7 @@ namespace mongo {
                     }
                 }
                 killCurrentOp.checkForInterrupt();
+                elapsedTracker.resetLastTime();
             }
 
             WriteErrorDetail* error = NULL;
