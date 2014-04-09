@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+#if defined(HAVE_FALLOCATE)
+#include <linux/falloc.h>
+#endif
+
 /*
  * __wt_fallocate --
  *	Allocate space for a file handle.
@@ -18,7 +22,15 @@ __wt_fallocate(WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, off_t len)
 
 	WT_VERBOSE_RET(session, fileops, "%s: fallocate", fh->name);
 
-#if defined(HAVE_POSIX_FALLOCATE)
+	/*
+	 * Prefer the non-portable Linux fallocate call if it's available,
+	 * it's the only one that doesn't require locking by our caller.
+	 * See the __block_extend function for details.
+	 */
+#if defined(HAVE_FALLOCATE)
+	WT_SYSCALL_RETRY(
+	    fallocate(fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
+#elif defined(HAVE_POSIX_FALLOCATE)
 	WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s: posix_fallocate", fh->name);
