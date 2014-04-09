@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_tree_walk_delete_rollback --
+ * __wt_delete_rollback --
  *	Abort pages that were deleted without being instantiated.
  */
 void
-__wt_tree_walk_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_UPDATE **upd;
 
@@ -70,11 +70,11 @@ __wt_tree_walk_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
- * __tree_walk_delete --
+ * __delete_skip --
  *	If deleting a range, try to delete the page without instantiating it.
  */
 static inline int
-__tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__delete_skip(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
@@ -150,13 +150,13 @@ err:	__wt_free(session, ref->page_del);
 }
 
 /*
- * __tree_walk_read --
+ * __delete_read_skip --
  *	If iterating a cursor, skip deleted pages that are visible to us.
  */
 static inline int
-__tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__delete_read_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	*skipp = 0;
+	int skip;
 
 	/*
 	 * Do a simple test first, avoid the atomic operation unless it's
@@ -174,11 +174,11 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
 
-	*skipp = ref->page_del == NULL ||
+	skip = ref->page_del == NULL ||
 	    __wt_txn_visible(session, ref->page_del->txnid) ? 1 : 0;
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
-	return (0);
+	return (skip);
 }
 
 /*
@@ -376,8 +376,7 @@ restart:	/*
 				 * If deleting a range, try to delete the page
 				 * without instantiating it.
 				 */
-				WT_ERR(__tree_walk_delete(
-				    session, ref, &skip));
+				WT_ERR(__delete_skip(session, ref, &skip));
 				if (skip)
 					break;
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
@@ -408,8 +407,7 @@ restart:	/*
 				 * If iterating a cursor, skip deleted pages
 				 * that are visible to us.
 				 */
-				WT_ERR(__tree_walk_read(session, ref, &skip));
-				if (skip)
+				if (__delete_read_skip(session, ref))
 					break;
 			}
 
