@@ -45,7 +45,7 @@ namespace mongo {
 
     class BtreeInMemoryState;
     class IndexDescriptor;
-    class IndexDetails;
+    struct IndexDetails;
     class IndexAccessMethod;
     class BtreeAccessMethod;
     class BtreeBasedAccessMethod;

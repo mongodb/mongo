@@ -610,8 +610,6 @@ namespace mongo {
         void setKey( int i, const DiskLoc recordLoc, const Key& key, const DiskLoc prevChildBucket );
     };
 
-    class IndexDetails;
-
     /**
      * This class adds functionality for manipulating buckets that are assembled
      * in a tree.  The requirements for const and non const functions and

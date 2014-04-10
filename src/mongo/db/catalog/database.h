@@ -43,7 +43,6 @@ namespace mongo {
     class Extent;
     class DataFile;
     class IndexCatalog;
-    class IndexDetails;
     class NamespaceDetails;
 
     struct CollectionOptions {
@@ -246,7 +245,6 @@ namespace mongo {
 
         friend class Collection;
         friend class NamespaceDetails;
-        friend class IndexDetails;
         friend class IndexCatalog;
     };
 
