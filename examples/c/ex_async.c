@@ -127,15 +127,15 @@ retry:
 		/*! [example insert] */
 	}
 
+	/*! [flush] */
+	wt_conn->async_flush(wt_conn);
+	/*! [flush] */
+
 	ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &opget);
 	snprintf(k[0], sizeof(k[0]), "key1");
 	opget->set_key(opget, k[0]);
 	search_id = opget->get_id(opget);
 	opget->search(opget);
-
-	/*! [flush] */
-	wt_conn->async_flush(wt_conn);
-	/*! [flush] */
 
 	/*! [example close] */
 	ret = wt_conn->close(wt_conn, NULL);

@@ -70,6 +70,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* We're shutting down.  Make sure everything gets freed. */
 	__wt_txn_update_oldest(session);
 
+	/* Clear any pending async ops. */
+	WT_TRET(__wt_async_flush(conn));
+
 	/*
 	 * Shut down server threads other than the eviction server, which is
 	 * needed later to close btree handles.  Some of these threads access
