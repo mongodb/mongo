@@ -80,7 +80,6 @@ int main(void)
 	/*! [example connection] */
 	WT_ASYNC_OP *op, *opget;
 	WT_CONNECTION *wt_conn;
-	WT_ITEM key, value;
 	WT_SESSION *session;
 	int i, ret;
 	char k[MAX_KEYS][16], v[MAX_KEYS][16];
