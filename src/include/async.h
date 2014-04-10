@@ -59,16 +59,14 @@ struct __wt_async_op_impl {
  * Definition of the async subsystem.
  */
 struct __wt_async {
-#define	WT_ASYNC_MAX_OPS	4096
 	/*
 	 * Ops array protected by the ops_lock.
 	 */
 	WT_SPINLOCK		 ops_lock;      /* Locked: ops array */
-	WT_ASYNC_OP_IMPL	 async_ops[WT_ASYNC_MAX_OPS];
-					/* Async ops */
+	WT_ASYNC_OP_IMPL	 *async_ops;	/* Async ops */
 #define	OPS_INVALID_INDEX	0xffffffff
 	uint32_t		 ops_index;	/* Active slot index */
-	uint64_t		 op_id;
+	uint64_t		 op_id;		/* Unique ID counter */
 	/*
 	 * Everything relating to the work queue and flushing is
 	 * protected by the opsq_lock.

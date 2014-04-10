@@ -305,7 +305,6 @@ connection_runtime_config = [
 	    Config('ops_max', '1024', r'''
 	        maximum number of expected simultaneous asynchronous
                 operations.''', min='10', max='4096'),
-                # !!! Must match WT_ASYNC_MAX_OPS
 	    Config('threads', '2', r'''
 	        the number of worker threads to service asynchronous
                 requests''',

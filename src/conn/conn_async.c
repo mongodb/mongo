@@ -66,8 +66,14 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 
 	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
 
-setup:
-	op->format = af;
+setup:	op->format = af;
+	/*
+	 * Copy the pointers for the formats.  Items in the async format
+	 * queue remain there until the connection is closed.  We must
+	 * initialize the format fields in the async_op, which are publicly
+	 * visible, and its internal cursor used by internal key/value
+	 * functions.
+	 */
 	op->iface.c.key_format = op->iface.key_format = af->key_format;
 	op->iface.c.value_format = op->iface.value_format = af->value_format;
 	return (0);
@@ -127,6 +133,9 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
 			}
 		}
 	}
+	/*
+	 * We still haven't found one.  Return an error.
+	 */
 	if (!found) {
 		ret = ENOMEM;
 		WT_STAT_FAST_CONN_INCR(session, async_full);
@@ -303,6 +312,7 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_free(session, af);
 		af = afnext;
 	}
+	__wt_free(session, async->async_ops);
 	__wt_spin_destroy(session, &async->ops_lock);
 	__wt_spin_destroy(session, &async->opsq_lock);
 	__wt_free(session, conn->async);

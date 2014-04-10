@@ -257,7 +257,9 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	async = conn->async;
 	op = &async->flush_op;
 	__async_op_init(conn, op, OPS_INVALID_INDEX);
-	for (i = 0; i < WT_ASYNC_MAX_OPS; i++) {
+	WT_RET(__wt_calloc_def(conn->default_session,
+	    conn->async_size, &async->async_ops));
+	for (i = 0; i < conn->async_size; i++) {
 		op = &async->async_ops[i];
 		__async_op_init(conn, op, i);
 	}
