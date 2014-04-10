@@ -263,7 +263,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			parent_incr += sizeof(WT_IKEY) + size;
 		} else
 			ref->key.recno = (*parent_refp)->key.recno;
-		ref->txnid = WT_TXN_NONE;
 		ref->state = WT_REF_MEM;
 
 		/* Initialize the child page. */
@@ -559,7 +558,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	ref->txnid = WT_TXN_NONE;
 	ref->state = multi->skip == NULL ? WT_REF_DISK : WT_REF_MEM;
 
 	/*

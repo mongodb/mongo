@@ -8,16 +8,13 @@
 #include "wt_internal.h"
 
 /*
- * __wt_tree_walk_delete_rollback --
+ * __wt_delete_rollback --
  *	Abort pages that were deleted without being instantiated.
  */
 void
-__wt_tree_walk_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_PAGE *page;
-	WT_ROW *rip;
-	WT_UPDATE *upd;
-	uint32_t i;
+	WT_UPDATE **upd;
 
 	/*
 	 * If the page is still "deleted", it's as we left it, reset the state
@@ -28,15 +25,25 @@ __wt_tree_walk_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 	for (;; __wt_yield())
 		switch (ref->state) {
 		case WT_REF_DISK:
-		case WT_REF_LOCKED:
 		case WT_REF_READING:
+			WT_ASSERT(session, 0);		/* Impossible, assert */
 			break;
 		case WT_REF_DELETED:
+			/*
+			 * If the page is still "deleted", it's as we left it,
+			 * reset the state.
+			 */
 			if (WT_ATOMIC_CAS(
 			    ref->state, WT_REF_DELETED, WT_REF_DISK))
 				return;
 			break;
+		case WT_REF_LOCKED:
+			/*
+			 * A possible state, the page is being instantiated.
+			 */
+			break;
 		case WT_REF_MEM:
+		case WT_REF_SPLIT:
 			/*
 			 * We can't use the normal read path to get a copy of
 			 * the page because the session may have closed the
@@ -45,32 +52,29 @@ __wt_tree_walk_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			 * with unresolved transactions, the page isn't going
 			 * anywhere.
 			 *
-			 * We don't care about any key/value items other than
-			 * the ones read from disk, any other items modified
-			 * after the page was read will have been separately
-			 * entered into the transaction list.
+			 * The page is in an in-memory state, walk the list of
+			 * update structures and abort them.
 			 */
-			page = ref->page;
-			WT_ROW_FOREACH(page, rip, i)
-			for (upd = WT_ROW_UPDATE(page, rip);
-			    upd != NULL; upd = upd->next)
-				if (upd->txnid == ref->txnid)
-					upd->txnid = WT_TXN_ABORTED;
-			return;
-		case WT_REF_SPLIT:
+			for (upd =
+			    ref->page_del->update_list; *upd != NULL; ++upd)
+				(*upd)->txnid = WT_TXN_ABORTED;
+
 			/*
-			 * This is possible and it's a really bad thing.
+			 * Discard the memory, the transaction can't abort
+			 * twice.
 			 */
-			WT_ASSERT(session, ref->state != WT_REF_SPLIT);
+			__wt_free(session, ref->page_del->update_list);
+			__wt_free(session, ref->page_del);
+			return;
 		}
 }
 
 /*
- * __tree_walk_delete --
+ * __delete_skip --
  *	If deleting a range, try to delete the page without instantiating it.
  */
 static inline int
-__tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__delete_skip(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
@@ -117,43 +121,42 @@ __tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 		goto err;
 
 	/*
-	 * Record the change in the transaction structure and set the change's
-	 * transaction ID.
-	 */
-	WT_ERR(__wt_txn_modify_ref(session, ref));
-
-	/*
 	 * This action dirties the parent page: mark it dirty now, there's no
 	 * future reconciliation of the child leaf page that will dirty it as
 	 * we write the tree.
 	 */
 	WT_ERR(__wt_page_parent_modify_set(session, ref, 0));
 
-	*skipp = 1;
+	/*
+	 * Record the change in the transaction structure and set the change's
+	 * transaction ID.
+	 */
+	WT_ERR(__wt_calloc_def(session, 1, &ref->page_del));
+	ref->page_del->txnid = session->txn.id;
 
-	/* Delete the page. */
+	WT_ERR(__wt_txn_modify_ref(session, ref));
+
+	*skipp = 1;
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (0);
 
-err:	/*
-	 * Restore the page to on-disk status, we'll have to instantiate it.  We
-	 * don't bother to back out adding this node to the transaction modify
-	 * list: on rollback, the rollback function will walk the page looking
-	 * for transactions to abort, which is potentially wasted work but won't
-	 * hurt anything.
+err:	__wt_free(session, ref->page_del);
+
+	/*
+	 * Restore the page to on-disk status, we'll have to instantiate it.
 	 */
 	WT_PUBLISH(ref->state, WT_REF_DISK);
 	return (ret);
 }
 
 /*
- * __tree_walk_read --
+ * __delete_read_skip --
  *	If iterating a cursor, skip deleted pages that are visible to us.
  */
 static inline int
-__tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__delete_read_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	*skipp = 0;
+	int skip;
 
 	/*
 	 * Do a simple test first, avoid the atomic operation unless it's
@@ -171,10 +174,11 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
 
-	*skipp = __wt_txn_visible(session, ref->txnid) ? 1 : 0;
+	skip = ref->page_del == NULL ||
+	    __wt_txn_visible(session, ref->page_del->txnid) ? 1 : 0;
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
-	return (0);
+	return (skip);
 }
 
 /*
@@ -372,8 +376,7 @@ restart:	/*
 				 * If deleting a range, try to delete the page
 				 * without instantiating it.
 				 */
-				WT_ERR(__tree_walk_delete(
-				    session, ref, &skip));
+				WT_ERR(__delete_skip(session, ref, &skip));
 				if (skip)
 					break;
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
@@ -404,8 +407,7 @@ restart:	/*
 				 * If iterating a cursor, skip deleted pages
 				 * that are visible to us.
 				 */
-				WT_ERR(__tree_walk_read(session, ref, &skip));
-				if (skip)
+				if (__delete_read_skip(session, ref))
 					break;
 			}
 

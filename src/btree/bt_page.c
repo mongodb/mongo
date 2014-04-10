@@ -542,41 +542,43 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			*sizep += sizeof(WT_IKEY) + current->size;
 			break;
 		case WT_CELL_ADDR_DEL:
-		case WT_CELL_ADDR_INT:
-		case WT_CELL_ADDR_LEAF:
-		case WT_CELL_ADDR_LEAF_NO:
-			ref->addr = cell;
-
 			/*
 			 * A cell may reference a deleted leaf page: if a leaf
-			 * page was deleted without first being read, and the
-			 * deletion committed, but older transactions in the
-			 * system required the previous version of the page to
-			 * be available, a special deleted-address type cell is
-			 * written.  If we crash and recover to a page with a
-			 * deleted-address cell, we now want to delete the leaf
-			 * page (because it was never deleted, but by definition
-			 * no earlier transaction might need it).
+			 * page was deleted without being read (fast truncate),
+			 * and the deletion committed, but older transactions
+			 * in the system required the previous version of the
+			 * page to remain available, a special deleted-address
+			 * type cell is written.  The only reason we'd ever see
+			 * that cell on a page we're reading is if we crashed
+			 * and recovered (otherwise a version of the page w/o
+			 * that cell would have eventually been written).  If we
+			 * crash and recover to a page with a deleted-address
+			 * cell, we want to discard the page from the backing
+			 * store (it was never discarded), and, of course, by
+			 * definition no earlier transaction will ever need it.
 			 *
-			 * Re-create the WT_REF state of a deleted node and give
-			 * the page a modify structure.
-			 *
+			 * Re-create the state of a deleted page.
+			 */
+			ref->addr = cell;
+			ref->state = WT_REF_DELETED;
+			++refp;
+
+			/*
 			 * If the tree is already dirty and so will be written,
-			 * mark the page dirty.  (We'd like to free the deleted
+			 * mark the page dirty.  (We want to free the deleted
 			 * pages, but if the handle is read-only or if the
 			 * application never modifies the tree, we're not able
 			 * to do so.)
 			 */
-			if (unpack->raw == WT_CELL_ADDR_DEL) {
-				ref->state = WT_REF_DELETED;
-				ref->txnid = WT_TXN_NONE;
-
-				if (btree->modified) {
-					WT_ERR(__wt_page_modify_init(
-					    session, page));
-					__wt_page_modify_set(session, page);
-				}
+			if (btree->modified) {
+				WT_ERR(__wt_page_modify_init(session, page));
+				__wt_page_modify_set(session, page);
 			}
+			break;
+		case WT_CELL_ADDR_INT:
+		case WT_CELL_ADDR_LEAF:
+		case WT_CELL_ADDR_LEAF_NO:
+			ref->addr = cell;
 			++refp;
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
