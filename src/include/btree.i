@@ -363,6 +363,36 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_page_parent_modify_set --
+ *	Mark the parent page and tree dirty.
+ */
+static inline int
+__wt_page_parent_modify_set(
+    WT_SESSION_IMPL *session, WT_REF *ref, int page_only)
+{
+	WT_PAGE *parent;
+
+	/*
+	 * This function exists as a place to stash this comment.  There are a
+	 * few places where we need to dirty a page's parent.  The trick is the
+	 * page's parent might split at any point, and the page parent might be
+	 * the wrong parent at any particular time.  We ignore this and dirty
+	 * whatever page the page's reference structure points to.  This is safe
+	 * because if we're pointing to the wrong parent, that parent must have
+	 * split, deepening the tree, which implies marking the original parent
+	 * and all of the newly-created children as dirty.  In other words, if
+	 * we have the wrong parent page, everything was marked dirty already.
+	 */
+	parent = ref->home;
+	WT_RET(__wt_page_modify_init(session, parent));
+	if (page_only)
+		__wt_page_only_modify_set(session, parent);
+	else
+		__wt_page_modify_set(session, parent);
+	return (0);
+}
+
+/*
  * __wt_off_page --
  *	Return if a pointer references off-page data.
  */

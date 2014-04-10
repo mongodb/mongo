@@ -144,27 +144,25 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
-		if (ref->addr != NULL &&
-		    __wt_off_page(parent, ref->addr)) {
+		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
 
 		/*
-		 * Update the parent to reference an empty page.
-		 *
-		 * Set the transaction ID to WT_TXN_NONE because the fact that
+		 * Update the parent to reference a deleted page.  The fact that
 		 * reconciliation left the page "empty" means there's no older
 		 * transaction in the system that might need to see an earlier
-		 * version of the page.  It isn't necessary (WT_TXN_NONE is 0),
-		 * but it's the right thing to do.
+		 * version of the page.  For that reason, we clear the address
+		 * of the page, if we're forced to "read" into that namespace,
+		 * we'll instantiate a new page instead of trying to read from
+		 * the backing store.
 		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
 		__wt_ref_out(session, ref);
 		ref->addr = NULL;
-		ref->txnid = WT_TXN_NONE;
 		WT_PUBLISH(ref->state, WT_REF_DELETED);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
@@ -172,8 +170,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		WT_RET(__wt_split_evict(session, ref, exclusive));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
-		if (ref->addr != NULL &&
-		    __wt_off_page(parent, ref->addr)) {
+		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}

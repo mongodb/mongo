@@ -8,63 +8,82 @@
 #include "wt_internal.h"
 
 /*
- * __wt_tree_walk_delete_rollback --
+ * __wt_delete_rollback --
  *	Abort pages that were deleted without being instantiated.
  */
 void
-__wt_tree_walk_delete_rollback(WT_REF *ref)
+__wt_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_PAGE *page;
-	WT_ROW *rip;
-	WT_UPDATE *upd;
-	uint32_t i;
+	WT_UPDATE **upd;
 
 	/*
-	 * If the page is still marked deleted, it's as we left it, reset the
-	 * state to on-disk and we're done.
+	 * If the page is still "deleted", it's as we left it, reset the state
+	 * to on-disk and we're done.  Otherwise, we expect the page is either
+	 * instantiated or being instantiated.  Loop because it's possible for
+	 * the page to return to the deleted state if instantiation fails.
 	 */
-	if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_DISK))
-		return;
+	for (;; __wt_yield())
+		switch (ref->state) {
+		case WT_REF_DISK:
+		case WT_REF_READING:
+			WT_ASSERT(session, 0);		/* Impossible, assert */
+			break;
+		case WT_REF_DELETED:
+			/*
+			 * If the page is still "deleted", it's as we left it,
+			 * reset the state.
+			 */
+			if (WT_ATOMIC_CAS(
+			    ref->state, WT_REF_DELETED, WT_REF_DISK))
+				return;
+			break;
+		case WT_REF_LOCKED:
+			/*
+			 * A possible state, the page is being instantiated.
+			 */
+			break;
+		case WT_REF_MEM:
+		case WT_REF_SPLIT:
+			/*
+			 * We can't use the normal read path to get a copy of
+			 * the page because the session may have closed the
+			 * cursor, we no longer have the reference to the tree
+			 * required for a hazard pointer.  We're safe because
+			 * with unresolved transactions, the page isn't going
+			 * anywhere.
+			 *
+			 * The page is in an in-memory state, walk the list of
+			 * update structures and abort them.
+			 */
+			for (upd =
+			    ref->page_del->update_list; *upd != NULL; ++upd)
+				(*upd)->txnid = WT_TXN_ABORTED;
 
-	/*
-	 * The page is either instantiated or being instantiated -- wait for
-	 * the page to settle down, as needed, and then clean up the update
-	 * structures.  We don't need a hazard pointer or anything on the
-	 * page because there are unresolved transactions, the page can't go
-	 * anywhere.
-	 *
-	 * XXXKEITH: we probably need to acquire a hazard pointer now.
-	 */
-	while (ref->state != WT_REF_MEM)
-		__wt_yield();
-	page = ref->page;
-	WT_ROW_FOREACH(page, rip, i)
-		for (upd =
-		    WT_ROW_UPDATE(page, rip); upd != NULL; upd = upd->next)
-			if (upd->txnid == ref->txnid)
-				upd->txnid = WT_TXN_ABORTED;
+			/*
+			 * Discard the memory, the transaction can't abort
+			 * twice.
+			 */
+			__wt_free(session, ref->page_del->update_list);
+			__wt_free(session, ref->page_del);
+			return;
+		}
 }
 
 /*
- * __tree_walk_delete --
+ * __delete_skip --
  *	If deleting a range, try to delete the page without instantiating it.
  */
 static inline int
-__tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__delete_skip(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 {
-	WT_PAGE *parent;
 	WT_DECL_RET;
+	WT_PAGE *parent;
 
 	*skipp = 0;
 
-	parent = ref->home;
-
 	/*
-	 * If the page is already instantiated in-memory, other threads may be
-	 * using it, no fast delete.
-	 *
-	 * Atomically switch the page's state to lock it.  If the page state
-	 * changes underneath us, no fast delete.
+	 * Atomically switch the page's state to lock it.  If the page is not
+	 * on-disk, other threads may be using it, no fast delete.
 	 *
 	 * Possible optimization: if the page is already deleted and the delete
 	 * is visible to us (the delete has been committed), we could skip the
@@ -77,63 +96,67 @@ __tree_walk_delete(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 		return (0);
 
 	/*
-	 * XXXKEITH: this may no longer be possible, review.
+	 * We cannot fast-delete pages that have overflow key/value items as
+	 * the overflow blocks have to be discarded.  The way we figure that
+	 * out is to check the on-page cell type for the page, cells for leaf
+	 * pages that have no overflow items are special.
 	 *
-	 * We may be in a reconciliation-built internal page if the page split.
-	 * In that case, the reference address doesn't point to a cell.  While
-	 * we could probably still fast-delete the page, I doubt it's a common
-	 * enough case to make it worth the effort.
+	 * In some cases, the reference address may not reference an on-page
+	 * cell (for example, some combination of page splits), in which case
+	 * we can't check the original cell value and we fail.
+	 *
+	 * To look at an on-page cell, we need to look at the parent page, and
+	 * that's dangerous, our parent page could change without warning if
+	 * the parent page were to split, deepening the tree.  It's safe: the
+	 * page's reference will always point to some valid page, and if we find
+	 * any problems we simply fail the fast-delete optimization.
+	 *
+	 * !!!
+	 * I doubt it's worth the effort, but we could copy the cell's type into
+	 * the reference structure, and then we wouldn't need an on-page cell.
 	 */
-	if (__wt_off_page(parent, ref->addr))
+	parent = ref->home;
+	if (__wt_off_page(parent, ref->addr) ||
+	    __wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LEAF_NO)
 		goto err;
-
-	/*
-	 * If the page references overflow items, we have to clean it up during
-	 * reconciliation, no fast delete.   Check this after we have the page
-	 * locked down, instantiating the page in memory and modifying it could
-	 * theoretically point the address somewhere away from the on-page cell.
-	 */
-	if (__wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LEAF_NO)
-		goto err;
-
-	/*
-	 * Record the change in the transaction structure and set the change's
-	 * transaction ID.
-	 */
-	WT_ERR(__wt_txn_modify_ref(session, ref));
 
 	/*
 	 * This action dirties the parent page: mark it dirty now, there's no
 	 * future reconciliation of the child leaf page that will dirty it as
 	 * we write the tree.
 	 */
-	WT_ERR(__wt_page_modify_init(session, parent));
-	__wt_page_modify_set(session, parent);
+	WT_ERR(__wt_page_parent_modify_set(session, ref, 0));
+
+	/*
+	 * Record the change in the transaction structure and set the change's
+	 * transaction ID.
+	 */
+	WT_ERR(__wt_calloc_def(session, 1, &ref->page_del));
+	ref->page_del->txnid = session->txn.id;
+
+	WT_ERR(__wt_txn_modify_ref(session, ref));
 
 	*skipp = 1;
-
-	/* Delete the page. */
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (0);
 
-err:	/*
+err:	__wt_free(session, ref->page_del);
+
+	/*
 	 * Restore the page to on-disk status, we'll have to instantiate it.
-	 * We're don't have to back out adding this node to the transaction
-	 * modify list, that's OK because the rollback function ignores nodes
-	 * that aren't set to WT_REF_DELETED.
 	 */
 	WT_PUBLISH(ref->state, WT_REF_DISK);
 	return (ret);
 }
 
 /*
- * __tree_walk_read --
+ * __delete_read_skip --
  *	If iterating a cursor, skip deleted pages that are visible to us.
  */
 static inline int
-__tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__delete_read_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	*skipp = 0;
+	int skip;
 
 	/*
 	 * Do a simple test first, avoid the atomic operation unless it's
@@ -151,10 +174,11 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
 
-	*skipp = __wt_txn_visible(session, ref->txnid) ? 1 : 0;
+	skip = ref->page_del == NULL ||
+	    __wt_txn_visible(session, ref->page_del->txnid) ? 1 : 0;
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
-	return (0);
+	return (skip);
 }
 
 /*
@@ -352,8 +376,7 @@ restart:	/*
 				 * If deleting a range, try to delete the page
 				 * without instantiating it.
 				 */
-				WT_ERR(__tree_walk_delete(
-				    session, ref, &skip));
+				WT_ERR(__delete_skip(session, ref, &skip));
 				if (skip)
 					break;
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
@@ -384,8 +407,7 @@ restart:	/*
 				 * If iterating a cursor, skip deleted pages
 				 * that are visible to us.
 				 */
-				WT_ERR(__tree_walk_read(session, ref, &skip));
-				if (skip)
+				if (__delete_read_skip(session, ref))
 					break;
 			}
 

@@ -185,6 +185,8 @@ struct __wt_ovfl_txnc;
     typedef struct __wt_ovfl_txnc WT_OVFL_TXNC;
 struct __wt_page;
     typedef struct __wt_page WT_PAGE;
+struct __wt_page_deleted;
+    typedef struct __wt_page_deleted WT_PAGE_DELETED;
 struct __wt_page_header;
     typedef struct __wt_page_header WT_PAGE_HEADER;
 struct __wt_page_index;

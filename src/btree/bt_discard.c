@@ -230,6 +230,12 @@ __wt_free_ref(
 		__wt_free(session, ref->addr);
 	}
 
+	/* Free any page-deleted information. */
+	if (ref->page_del != NULL) {
+		__wt_free(session, ref->page_del->update_list);
+		__wt_free(session, ref->page_del);
+	}
+
 	__wt_overwrite_and_free_len(session, ref, sizeof(*ref));
 }
 

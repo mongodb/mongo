@@ -420,7 +420,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 			op->u.op.upd->txnid = WT_TXN_ABORTED;
 			break;
 		case TXN_OP_REF:
-			__wt_tree_walk_delete_rollback(op->u.ref);
+			__wt_delete_rollback(session, op->u.ref);
 			break;
 		case TXN_OP_TRUNCATE_COL:
 		case TXN_OP_TRUNCATE_ROW:
