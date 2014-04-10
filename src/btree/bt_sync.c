@@ -86,9 +86,20 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (walk_page == NULL)
 				break;
 
-			/* Write dirty pages. */
+			/*
+			 * Write dirty pages, unless we can be sure they only
+			 * became dirty after the checkpoint started.
+			 *
+			 * XXX this test is not precise -- there is a race when
+			 * the checkpoint is starting, and between concurrent
+			 * transactions updating the same page.  It is intended
+			 * for performance evaluation only
+			 */
 			page = walk_page->page;
-			if (__wt_page_is_modified(page)) {
+			if (__wt_page_is_modified(page) &&
+			   (WT_PAGE_IS_INTERNAL(page) ||
+			   TXNID_LT(page->modify->disk_snap_min,
+			   session->txn.snap_min))) {
 				internal_bytes += page->memory_footprint;
 				++internal_pages;
 				WT_ERR(__wt_rec_write(
