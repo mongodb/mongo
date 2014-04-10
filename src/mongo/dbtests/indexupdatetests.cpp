@@ -36,7 +36,6 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"

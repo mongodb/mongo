@@ -26,124 +26,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/structure/collection_iterator.h"
+#include "mongo/db/structure/record_store_v1_capped_iterator.h"
 
-#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/record_store_v1_capped.h"
 
 namespace mongo {
 
-    //
-    // Regular / non-capped collection traversal
-    //
-
-    FlatIterator::FlatIterator(const Collection* collection,
-                               const DiskLoc& start,
-                               const CollectionScanParams::Direction& dir)
-        : _curr(start), _collection(collection), _direction(dir) {
-
-        if (_curr.isNull()) {
-
-            const ExtentManager* em = _collection->getExtentManager();
-
-            if ( _collection->_details->firstExtent().isNull() ) {
-                // nothing in the collection
-                verify( _collection->_details->lastExtent().isNull() );
-            }
-            else if (CollectionScanParams::FORWARD == _direction) {
-
-                // Find a non-empty extent and start with the first record in it.
-                Extent* e = em->getExtent( _collection->_details->firstExtent() );
-
-                while (e->firstRecord.isNull() && !e->xnext.isNull()) {
-                    e = em->getNextExtent( e );
-                }
-
-                // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
-                // valid e->xnext
-                _curr = e->firstRecord;
-            }
-            else {
-                // Walk backwards, skipping empty extents, and use the last record in the first
-                // non-empty extent we see.
-                Extent* e = em->getExtent( _collection->_details->lastExtent() );
-
-                // TODO ELABORATE
-                // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
-                while (e->lastRecord.isNull() && !e->xprev.isNull()) {
-                    e = em->getPrevExtent( e );
-                }
-
-                // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
-                // valid e->xprev
-                _curr = e->lastRecord;
-            }
-        }
-    }
-
-    bool FlatIterator::isEOF() {
-        return _curr.isNull();
-    }
-
-    DiskLoc FlatIterator::curr() { return _curr; }
-
-    DiskLoc FlatIterator::getNext() {
-        DiskLoc ret = _curr;
-
-        // Move to the next thing.
-        if (!isEOF()) {
-            if (CollectionScanParams::FORWARD == _direction) {
-                _curr = _collection->getExtentManager()->getNextRecord( _curr );
-            }
-            else {
-                _curr = _collection->getExtentManager()->getPrevRecord( _curr );
-            }
-        }
-
-        return ret;
-    }
-
-    void FlatIterator::invalidate(const DiskLoc& dl) {
-        verify( _collection->ok() );
-
-        // Just move past the thing being deleted.
-        if (dl == _curr) {
-            // We don't care about the return of getNext so much as the side effect of moving _curr
-            // to the 'next' thing.
-            getNext();
-        }
-    }
-
-    void FlatIterator::prepareToYield() {
-    }
-
-    bool FlatIterator::recoverFromYield() {
-        // if the collection is dropped, then the cursor should be destroyed
-        // this check is just a sanity check that the Collection instance we're about to use
-        // has need been destroyed
-        verify( _collection->ok() );
-
-        return true;
-    }
 
     //
     // Capped collection traversal
     //
-
-    CappedIterator::CappedIterator(const Collection* collection,
-                                   const DiskLoc& start, bool tailable,
-                                   const CollectionScanParams::Direction& dir)
+    CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator( const CappedRecordStoreV1* collection,
+                                                              const DiskLoc& start, bool tailable,
+                                                              const CollectionScanParams::Direction& dir)
         : _collection(collection), _curr(start), _tailable(tailable),
           _direction(dir), _killedByInvalidate(false) {
 
-        verify( collection->ok() );
-
         if (_curr.isNull()) {
 
-            const NamespaceDetails* nsd = _collection->_details;
-            const ExtentManager* em = _collection->getExtentManager();
+            const NamespaceDetails* nsd = _collection->details();
+            const ExtentManager* em = _collection->_extentManager;
 
             // If a start position isn't specified, we fill one out from the start of the
             // collection.
@@ -177,15 +83,15 @@ namespace mongo {
         }
     }
 
-    bool CappedIterator::isEOF() { return _curr.isNull(); }
+    bool CappedRecordStoreV1Iterator::isEOF() { return _curr.isNull(); }
 
-    DiskLoc CappedIterator::curr() { return _curr; }
+    DiskLoc CappedRecordStoreV1Iterator::curr() { return _curr; }
 
-    DiskLoc CappedIterator::getNext() {
+    DiskLoc CappedRecordStoreV1Iterator::getNext() {
         DiskLoc ret = _curr;
 
-        const NamespaceDetails* nsd = _collection->_details;
-        const ExtentManager* em = _collection->getExtentManager();
+        const NamespaceDetails* nsd = _collection->details();
+        const ExtentManager* em = _collection->_extentManager;
 
         // Move to the next thing.
         if (!isEOF()) {
@@ -208,7 +114,7 @@ namespace mongo {
         return ret;
     }
 
-    void CappedIterator::invalidate(const DiskLoc& dl) {
+    void CappedRecordStoreV1Iterator::invalidate(const DiskLoc& dl) {
         if ((_tailable && _curr.isNull() && dl == _prev) || (dl == _curr)) {
             // In the _tailable case, we're about to kill the DiskLoc that we're tailing.  Nothing
             // that we can possibly do to survive that.
@@ -223,22 +129,20 @@ namespace mongo {
         }
     }
 
-    void CappedIterator::prepareToYield() {
+    void CappedRecordStoreV1Iterator::prepareToYield() {
     }
 
-    bool CappedIterator::recoverFromYield() {
+    bool CappedRecordStoreV1Iterator::recoverFromYield() {
         // If invalidate invalidated the DiskLoc we relied on, give up now.
         if (_killedByInvalidate) {
             _collection = NULL;
             return false;
         }
 
-        verify( _collection->ok() );
-
         return true;
     }
 
-    DiskLoc CappedIterator::getNextCapped(const NamespaceDetails* nsd, const ExtentManager* em,
+    DiskLoc CappedRecordStoreV1Iterator::getNextCapped(const NamespaceDetails* nsd, const ExtentManager* em,
                                           const DiskLoc& dl,
                                           CollectionScanParams::Direction direction ) {
         verify(!dl.isNull());
@@ -297,7 +201,7 @@ namespace mongo {
         }
     }
 
-    DiskLoc CappedIterator::nextLoop(const NamespaceDetails* nsd, const ExtentManager* em,
+    DiskLoc CappedRecordStoreV1Iterator::nextLoop(const NamespaceDetails* nsd, const ExtentManager* em,
                                      const DiskLoc& prev) {
         // TODO ELABORATE
         verify(nsd->capLooped());
@@ -306,7 +210,7 @@ namespace mongo {
         return nsd->firstRecord();
     }
 
-    DiskLoc CappedIterator::prevLoop(const NamespaceDetails* nsd, const ExtentManager* em,
+    DiskLoc CappedRecordStoreV1Iterator::prevLoop(const NamespaceDetails* nsd, const ExtentManager* em,
                                      const DiskLoc& curr) {
         // TODO ELABORATE
         verify(nsd->capLooped());

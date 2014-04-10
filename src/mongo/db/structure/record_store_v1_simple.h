@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    class SimpleRecordStoreV1Iterator;
+
     // used by index and original collections
     class SimpleRecordStoreV1 : public RecordStoreV1Base {
     public:
@@ -45,6 +47,9 @@ namespace mongo {
 
         virtual ~SimpleRecordStoreV1();
 
+        virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
+                                             const CollectionScanParams::Direction& dir) const;
+
         virtual Status truncate();
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
@@ -54,6 +59,8 @@ namespace mongo {
         DiskLoc _allocFromExistingExtents( int lengthWithHeaders );
 
         bool _normalCollection;
+
+        friend class SimpleRecordStoreV1Iterator;
     };
 
 }

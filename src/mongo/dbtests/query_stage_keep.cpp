@@ -43,7 +43,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_registry.h"
@@ -60,7 +59,7 @@ namespace QueryStageKeep {
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+            RecordIterator* it = coll->getIterator(DiskLoc(), false,
                                                        CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();

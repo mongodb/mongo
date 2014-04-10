@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+    class CappedRecordStoreV1Iterator;
     class DocWriter;
     class ExtentManager;
     class NamespaceDetails;
@@ -61,6 +62,8 @@ namespace mongo {
 
         // TODO: another sad one
         virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
+
+        const NamespaceDetails* details() const { return _details; }
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax ) = 0;
 
@@ -78,6 +81,8 @@ namespace mongo {
         NamespaceDetails* _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
+
+        friend class CappedRecordStoreV1Iterator;
     };
 
 }

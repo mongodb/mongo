@@ -60,6 +60,9 @@ namespace mongo {
          */
         void temp_cappedTruncateAfter( DiskLoc end, bool inclusive );
 
+        virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
+                                             const CollectionScanParams::Direction& dir) const;
+
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 

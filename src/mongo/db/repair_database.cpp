@@ -41,7 +41,6 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 
@@ -328,7 +327,7 @@ namespace mongo {
                 Client::Context ctx( ns );
                 Collection* coll = originalDatabase->getCollection( ns );
                 if ( coll ) {
-                    scoped_ptr<CollectionIterator> it( coll->getIterator( DiskLoc(),
+                    scoped_ptr<RecordIterator> it( coll->getIterator( DiskLoc(),
                                                                           false,
                                                                           CollectionScanParams::FORWARD ) );
                     while ( !it->isEOF() ) {
@@ -394,7 +393,7 @@ namespace mongo {
 
                 }
 
-                scoped_ptr<CollectionIterator> iterator( originalCollection->getIterator( DiskLoc(),
+                scoped_ptr<RecordIterator> iterator( originalCollection->getIterator( DiskLoc(),
                                                                                           false,
                                                                                           CollectionScanParams::FORWARD ) );
                 while ( !iterator->isEOF() ) {

@@ -43,7 +43,6 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -121,7 +120,7 @@ namespace ReplTests {
             }
 
             int count = 0;
-            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+            RecordIterator* it = coll->getIterator( DiskLoc(), false,
                                                         CollectionScanParams::FORWARD );
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
@@ -139,7 +138,7 @@ namespace ReplTests {
             }
 
             int count = 0;
-            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+            RecordIterator* it = coll->getIterator( DiskLoc(), false,
                                                         CollectionScanParams::FORWARD );
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
@@ -155,7 +154,7 @@ namespace ReplTests {
                 Database* db = ctx.db();
                 Collection* coll = db->getCollection( cllNS() );
 
-                CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+                RecordIterator* it = coll->getIterator( DiskLoc(), false,
                                                             CollectionScanParams::FORWARD );
                 while ( !it->isEOF() ) {
                     DiskLoc currLoc = it->getNext();
@@ -186,7 +185,7 @@ namespace ReplTests {
                 coll = db->createCollection( ns );
             }
 
-            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+            RecordIterator* it = coll->getIterator( DiskLoc(), false,
                                                         CollectionScanParams::FORWARD );
             out() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
@@ -206,7 +205,7 @@ namespace ReplTests {
             }
 
             vector< DiskLoc > toDelete;
-            CollectionIterator* it = coll->getIterator( DiskLoc(), false,
+            RecordIterator* it = coll->getIterator( DiskLoc(), false,
                                                         CollectionScanParams::FORWARD );
             while ( !it->isEOF() ) {
                 toDelete.push_back( it->getNext() );

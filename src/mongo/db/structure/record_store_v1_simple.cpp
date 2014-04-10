@@ -38,6 +38,7 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/record_store_v1_simple_iterator.h"
 #include "mongo/util/mmap.h"
 
 namespace mongo {
@@ -260,4 +261,10 @@ namespace mongo {
         getDur().writingDiskLoc(list) = dloc;
         d->nextDeleted() = oldHead;
     }
+
+    RecordIterator* SimpleRecordStoreV1::getIterator( const DiskLoc& start, bool tailable,
+                                                      const CollectionScanParams::Direction& dir) const {
+        return new SimpleRecordStoreV1Iterator( this, start, dir );
+    }
+
 }

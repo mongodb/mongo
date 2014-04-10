@@ -32,6 +32,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/exec/collection_scan_common.h"
 
 namespace mongo {
 
@@ -41,6 +42,36 @@ namespace mongo {
     class MAdvise;
     class NamespaceDetails;
     class Record;
+
+    /**
+     * A RecordIterator provides an interface for walking over a RecordStore.
+     * The details of navigating the collection's structure are below this interface.
+     */
+    class RecordIterator {
+    public:
+        virtual ~RecordIterator() { }
+
+        // True if getNext will produce no more data, false otherwise.
+        virtual bool isEOF() = 0;
+
+        // Return the DiskLoc that the iterator points at.  Returns DiskLoc() if isEOF.
+        virtual DiskLoc curr() = 0;
+
+        // Return the DiskLoc that the iterator points at and move the iterator to the next item
+        // from the collection.  Returns DiskLoc() if isEOF.
+        virtual DiskLoc getNext() = 0;
+
+        // Can only be called after prepareToYield and before recoverFromYield.
+        virtual void invalidate(const DiskLoc& dl) = 0;
+
+        // Save any state required to resume operation (without crashing) after DiskLoc deletion or
+        // a collection drop.
+        virtual void prepareToYield() = 0;
+
+        // Returns true if collection still exists, false otherwise.
+        virtual bool recoverFromYield() = 0;
+    };
+
 
     class RecordStore {
         MONGO_DISALLOW_COPYING(RecordStore);
@@ -58,7 +89,16 @@ namespace mongo {
 
         virtual StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax ) = 0;
 
+        /**
+         * returned iterator owned by caller
+         * canonical to get all would be
+         * getIterator( DiskLoc(), false, CollectionScanParams::FORWARD )
+         */
+        virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
+                                             const CollectionScanParams::Direction& dir) const = 0;
+
         // higher level
+
 
         /**
          * removes all Records

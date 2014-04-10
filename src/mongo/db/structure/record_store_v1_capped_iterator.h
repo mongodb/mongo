@@ -28,72 +28,11 @@
 
 #pragma once
 
-#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/structure/record_store.h"
 
 namespace mongo {
 
-    class Collection;
-    class DiskLoc;
-    class ExtentManager;
-    class NamespaceDetails;
-
-    /**
-     * A CollectionIterator provides an interface for walking over a collection.
-     * The details of navigating the collection's structure are below this interface.
-     */
-    class CollectionIterator {
-    public:
-        virtual ~CollectionIterator() { }
-
-        // True if getNext will produce no more data, false otherwise.
-        virtual bool isEOF() = 0;
-
-        // Return the DiskLoc that the iterator points at.  Returns DiskLoc() if isEOF.
-        virtual DiskLoc curr() = 0;
-
-        // Return the DiskLoc that the iterator points at and move the iterator to the next item
-        // from the collection.  Returns DiskLoc() if isEOF.
-        virtual DiskLoc getNext() = 0;
-
-        // Can only be called after prepareToYield and before recoverFromYield.
-        virtual void invalidate(const DiskLoc& dl) = 0;
-
-        // Save any state required to resume operation (without crashing) after DiskLoc deletion or
-        // a collection drop.
-        virtual void prepareToYield() = 0;
-
-        // Returns true if collection still exists, false otherwise.
-        virtual bool recoverFromYield() = 0;
-    };
-
-    /**
-     * This class iterates over a non-capped collection identified by 'ns'.
-     * The collection must exist when the constructor is called.
-     *
-     * If start is not DiskLoc(), the iteration begins at that DiskLoc.
-     */
-    class FlatIterator : public CollectionIterator {
-    public:
-        FlatIterator(const Collection* collection, const DiskLoc& start,
-                     const CollectionScanParams::Direction& dir);
-        virtual ~FlatIterator() { }
-
-        virtual bool isEOF();
-        virtual DiskLoc getNext();
-        virtual DiskLoc curr();
-
-        virtual void invalidate(const DiskLoc& dl);
-        virtual void prepareToYield();
-        virtual bool recoverFromYield();
-
-    private:
-        // The result returned on the next call to getNext().
-        DiskLoc _curr;
-
-        const Collection* _collection;
-
-        CollectionScanParams::Direction _direction;
-    };
+    class CappedRecordStoreV1;
 
     /**
      * This class iterates over a capped collection identified by 'ns'.
@@ -104,11 +43,13 @@ namespace mongo {
      * If tailable is true, getNext() can be called after isEOF.  It will use the last valid
      * returned DiskLoc and try to find the next record from that.
      */
-    class CappedIterator : public CollectionIterator {
+    class CappedRecordStoreV1Iterator : public RecordIterator {
     public:
-        CappedIterator(const Collection* collection, const DiskLoc& start, bool tailable,
-                       const CollectionScanParams::Direction& dir);
-        virtual ~CappedIterator() { }
+        CappedRecordStoreV1Iterator( const CappedRecordStoreV1* collection,
+                                     const DiskLoc& start,
+                                     bool tailable,
+                                     const CollectionScanParams::Direction& dir );
+        virtual ~CappedRecordStoreV1Iterator() { }
 
         // If this is a tailable cursor, isEOF could change its mind after a call to getNext().
         virtual bool isEOF();
@@ -131,7 +72,7 @@ namespace mongo {
                                 const DiskLoc& prev);
 
         // The collection we're iterating over.
-        const Collection* _collection;
+        const CappedRecordStoreV1* _collection;
 
         // The result returned on the next call to getNext().
         DiskLoc _curr;

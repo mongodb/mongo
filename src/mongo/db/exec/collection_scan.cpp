@@ -33,11 +33,9 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/util/fail_point_service.h"
 
 #include "mongo/db/client.h" // XXX-ERH
-#include "mongo/db/pdfile.h" // XXX-ERH/ACM
 
 namespace mongo {
 
@@ -168,7 +166,7 @@ namespace mongo {
 
         // If we're here, 'dl' is being deleted.
 
-        // Deletions can harm the underlying CollectionIterator so we must pass them down.
+        // Deletions can harm the underlying RecordIterator so we must pass them down.
         if (NULL != _iter) {
             _iter->invalidate(dl);
         }

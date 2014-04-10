@@ -39,7 +39,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
 
@@ -231,7 +230,7 @@ namespace mongo {
 
             // Copy over all the data from source collection to target collection.
             bool insertSuccessful = true;
-            boost::scoped_ptr<CollectionIterator> sourceIt;
+            boost::scoped_ptr<RecordIterator> sourceIt;
 
             {
                 Client::Context srcCtx( source );

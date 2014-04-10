@@ -50,7 +50,7 @@ namespace mongo {
     class IndexCatalog;
     class MultiIndexBlock;
 
-    class CollectionIterator;
+    class RecordIterator;
     class FlatIterator;
     class CappedIterator;
 
@@ -139,8 +139,8 @@ namespace mongo {
          * canonical to get all would be
          * getIterator( DiskLoc(), false, CollectionScanParams::FORWARD )
          */
-        CollectionIterator* getIterator( const DiskLoc& start, bool tailable,
-                                         const CollectionScanParams::Direction& dir) const;
+        RecordIterator* getIterator( const DiskLoc& start, bool tailable,
+                                     const CollectionScanParams::Direction& dir) const;
 
 
         /**

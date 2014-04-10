@@ -44,7 +44,6 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
@@ -130,16 +129,14 @@ namespace mongo {
         return true;
     }
 
-    CollectionIterator* Collection::getIterator( const DiskLoc& start, bool tailable,
+    RecordIterator* Collection::getIterator( const DiskLoc& start, bool tailable,
                                                      const CollectionScanParams::Direction& dir) const {
-        verify( ok() );
-        if ( _details->isCapped() )
-            return new CappedIterator( this, start, tailable, dir );
-        return new FlatIterator( this, start, dir );
+        invariant( ok() );
+        return _recordStore->getIterator( start, tailable, dir );
     }
 
     int64_t Collection::countTableScan( const MatchExpression* expression ) {
-        scoped_ptr<CollectionIterator> iterator( getIterator( DiskLoc(),
+        scoped_ptr<RecordIterator> iterator( getIterator( DiskLoc(),
                                                               false,
                                                               CollectionScanParams::FORWARD ) );
         int64_t count = 0;
