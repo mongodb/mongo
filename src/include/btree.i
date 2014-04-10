@@ -328,6 +328,13 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (F_ISSET(&session->txn, TXN_RUNNING))
 			page->modify->disk_snap_min = session->txn.snap_min;
+
+		/*
+		 * Set the checkpoint generation: if a checkpoint is already
+		 * running, these changes cannot be included, by definition.
+		 */
+		page->modify->checkpoint_gen =
+		    S2C(session)->txn_global.checkpoint_gen;
 	}
 
 	/* Check if this is the largest transaction ID to update the page. */

@@ -325,6 +325,13 @@ struct __wt_page_modify {
 	 */
 	uint32_t write_gen;
 
+	/*
+	 * The checkpoint generation is the most recent checkpoint to have
+	 * visited a page.  When a checkpoint is in progress, dirty pages that
+	 * have not yet been visited can be evicted by application threads.
+	 */
+	uint32_t checkpoint_gen;
+
 #define	WT_PAGE_LOCK(s, p)						\
 	__wt_spin_lock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
 #define	WT_PAGE_UNLOCK(s, p)						\

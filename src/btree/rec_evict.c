@@ -241,6 +241,7 @@ __rec_review(
 	WT_PAGE_MODIFY *mod;
 	WT_REF *child;
 	uint32_t flags;
+	int behind_checkpoint;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -292,6 +293,8 @@ __rec_review(
 		} WT_INTL_FOREACH_END;
 
 	mod = page->modify;
+	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
+	    mod->checkpoint_gen >= S2C(session)->txn_global.checkpoint_gen;
 
 	/*
 	 * If the file is being checkpointed, we stop evicting dirty pages: the
@@ -312,7 +315,7 @@ __rec_review(
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	if (btree->checkpointing && __wt_page_is_modified(page)) {
+	if (behind_checkpoint && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
@@ -322,8 +325,7 @@ __rec_review(
 	 * If we are checkpointing, we can't merge multiblock pages into their
 	 * parent.
 	 */
-	if (btree->checkpointing &&
-	    mod != NULL && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
+	if (behind_checkpoint && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
 		return (EBUSY);
 
 	/*
@@ -371,12 +373,20 @@ __rec_review(
 	 */
 	if (__wt_page_is_modified(page)) {
 		flags = WT_EVICTION_LOCKED;
+		if (btree->checkpointing)
+			LF_SET(WT_SKIP_UPDATE_OK);
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
 		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
 		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, ref, NULL, flags));
+		/*
+		 * If we skipped some updates because we were helping out a
+		 * checkpoint, that's okay.
+		 */
+		if (LF_ISSET(WT_SKIP_UPDATE_OK) && __wt_page_is_modified(page))
+			return (EBUSY);
 		WT_ASSERT(session,
 		    !__wt_page_is_modified(page) ||
 		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));

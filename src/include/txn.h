@@ -49,7 +49,14 @@ struct __wt_txn_global {
 	/*
 	 * The transaction ID of a running checkpoint transaction (if any).
 	 */
-	uint64_t checkpoint_txn;
+	WT_SESSION_IMPL *checkpoint_session;
+
+	/*
+	 * The current checkpoint generation.  Use a 32-bit count for now: if
+	 * we can do 4 billion checkpoints without a restart, we'll be in good
+	 * shape.
+	 */
+	uint32_t checkpoint_gen;
 
 	/* Count of scanning threads, or -1 for exclusive access. */
 	volatile int32_t scan_count;

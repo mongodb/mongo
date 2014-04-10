@@ -848,7 +848,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * If not all updates are globally visible and checkpointing: continue,
 	 * we'll write what we can.
 	 */
-	if (!F_ISSET(r, WT_EVICTION_LOCKED))
+	if (!F_ISSET(r, WT_EVICTION_LOCKED) || F_ISSET(r, WT_SKIP_UPDATE_OK))
 		return (0);
 
 	/*
@@ -1139,7 +1139,8 @@ __rec_child_deleted(
 			    "reconciliation illegally skipped an update");
 
 		/* If this page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTION_LOCKED))
+		if (F_ISSET(r, WT_EVICTION_LOCKED) &&
+		    !F_ISSET(r, WT_SKIP_UPDATE_OK))
 			return (EBUSY);
 	}
 

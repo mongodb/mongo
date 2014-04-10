@@ -233,9 +233,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	wt_session = &session->iface;
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
-	/* Start a snapshot transaction for the checkpoint. */
-	WT_ASSERT(session, conn->txn_global.checkpoint_txn == WT_TXN_NONE);
-	conn->txn_global.checkpoint_txn = txn->id;
+	/* Set the global checkpoint transaction ID. */
+	WT_ASSERT(session, conn->txn_global.checkpoint_session == NULL);
+	conn->txn_global.checkpoint_session = session;
+
+	/* Increment the global checkpoint generation. */
+	++conn->txn_global.checkpoint_gen;
 
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full) {
@@ -247,6 +250,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
 	/* Release the snapshot transaction, before syncing the file(s). */
+	conn->txn_global.checkpoint_session = NULL;
 	__wt_txn_release(session);
 
 	/*
@@ -298,12 +302,11 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
+	conn->txn_global.checkpoint_session = NULL;
 	if (F_ISSET(txn, TXN_RUNNING))
 		__wt_txn_release(session);
 	else
 		__wt_txn_release_snapshot(session);
-
-	conn->txn_global.checkpoint_txn = WT_TXN_NONE;
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && started)

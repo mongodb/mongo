@@ -22,7 +22,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_TXN *txn;
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
-	uint32_t flags;
+	uint32_t checkpoint_gen, flags;
 
 	btree = S2BT(session);
 	walk_page = NULL;
@@ -71,6 +71,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * eviction to complete.
 		 */
 		btree->checkpointing = 1;
+		checkpoint_gen = S2C(session)->txn_global.checkpoint_gen;
 
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 			WT_ERR(__wt_evict_file_exclusive_on(session));
@@ -98,13 +99,21 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			page = walk_page->page;
 			if (__wt_page_is_modified(page) &&
 			   (WT_PAGE_IS_INTERNAL(page) ||
-			   TXNID_LT(page->modify->disk_snap_min,
-			   session->txn.snap_min))) {
+			   page->modify->checkpoint_gen < checkpoint_gen)) {
 				internal_bytes += page->memory_footprint;
 				++internal_pages;
 				WT_ERR(__wt_rec_write(
 				    session, walk_page, NULL, 0));
 			}
+
+			/*
+			 * Set the checkpoint generation, even if we didn't
+			 * write the page.  If it becomes dirty and is selected
+			 * for eviction, it can't be written until this
+			 * checkpoint completes.
+			 */
+			if (page->modify != NULL)
+				page->modify->checkpoint_gen = checkpoint_gen;
 		}
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
