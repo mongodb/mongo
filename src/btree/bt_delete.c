@@ -200,10 +200,22 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	int skip;
 
 	/*
-	 * It's possible the state is changing underneath us, we could race
-	 * between checking for a deleted state and looking at the stored
-	 * transaction ID to see if the delete is visible to us.  Lock down
-	 * the structure.
+	 * Deleted pages come from two sources: either it's a fast-delete as
+	 * described above, or the page has been emptied by other operations
+	 * and eviction deleted it.
+	 *
+	 * In both cases, the WT_REF state will be WT_REF_DELETED.  In the case
+	 * of a fast-delete page, there will be a WT_PAGE_DELETED structure with
+	 * the transaction ID of the transaction that deleted the page, and the
+	 * page is visible if that transaction ID is visible.  In the case of an
+	 * empty page, there will be no WT_PAGE_DELETED structure and the delete
+	 * is by definition visible, eviction could not have deleted the page if
+	 * there were changes on it that were not globally visible.
+	 *
+	 * We're here because we found a WT_REF state set to WT_REF_DELETED.  It
+	 * is possible the page is being read into memory right now, though, and
+	 * the page could switch to an in-memory state at any time.  Lock down
+	 * the structure, just to be safe.
 	 */
 	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
