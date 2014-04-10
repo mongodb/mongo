@@ -292,15 +292,11 @@ __rec_review(
 			}
 		} WT_INTL_FOREACH_END;
 
-	mod = page->modify;
-	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
-	    mod->checkpoint_gen >= S2C(session)->txn_global.checkpoint_gen;
-
 	/*
-	 * If the file is being checkpointed, we stop evicting dirty pages: the
-	 * problem is if we write a page, the previous version of the page will
-	 * be free'd, which previous version might be referenced by an internal
-	 * page already been written in service of the checkpoint, leaving the
+	 * If the file is being checkpointed, we can't evict dirty pages already
+	 * appearing in the checkpoint: if we write a page and free the previous
+	 * version of the page, that previous version might be referenced by
+	 * an internal page already been written in the checkpoint, leaving the
 	 * checkpoint inconsistent.
 	 *     Don't rely on new updates being skipped by the transaction used
 	 * for transaction reads: (1) there are paths that dirty pages for
@@ -315,6 +311,10 @@ __rec_review(
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
+	mod = page->modify;
+	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
+	    mod->checkpoint_gen >= S2C(session)->txn_global.checkpoint_gen;
+
 	if (behind_checkpoint && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
