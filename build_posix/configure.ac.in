@@ -88,7 +88,7 @@ AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 
 AC_CHECK_FUNCS([\
-	clock_gettime fcntl ftruncate gettimeofday posix_fadvise\
+	clock_gettime fallocate fcntl ftruncate gettimeofday posix_fadvise\
 	posix_fallocate posix_madvise posix_memalign strtouq sync_file_range])
 
 # OS X wrongly reports that it has fdatasync

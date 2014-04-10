@@ -337,10 +337,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "checksum=uncompressed,collator=,columns=,dictionary=0,"
 	  "format=btree,huffman_key=,huffman_value=,id=,internal_item_max=0"
 	  ",internal_key_truncate=,internal_page_max=4KB,key_format=u,"
-	  "key_gap=10,leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB"
-	  ",os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,"
-	  "prefix_compression_min=4,split_pct=75,value_format=u,"
-	  "version=(major=0,minor=0)",
+	  "key_gap=10,leaf_item_max=0,leaf_page_max=32KB,"
+	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
+	  "prefix_compression=,prefix_compression_min=4,split_pct=75,"
+	  "value_format=u,version=(major=0,minor=0)",
 	  confchk_file_meta
 	},
 	{ "index.meta",
@@ -373,8 +373,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "columns=,dictionary=0,exclusive=0,format=btree,huffman_key=,"
 	  "huffman_value=,internal_item_max=0,internal_key_truncate=,"
 	  "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	  "leaf_page_max=1MB,lsm=(auto_throttle=,bloom=,bloom_bit_count=16,"
-	  "bloom_config=,bloom_hash_count=8,bloom_oldest=0,chunk_max=5GB,"
+	  "leaf_page_max=32KB,lsm=(auto_throttle=,bloom=,bloom_bit_count=16"
+	  ",bloom_config=,bloom_hash_count=8,bloom_oldest=0,chunk_max=5GB,"
 	  "chunk_size=10MB,merge_max=15,merge_min=0,merge_threads=2),"
 	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
 	  "prefix_compression=,prefix_compression_min=4,source=,"

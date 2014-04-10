@@ -8,54 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __cache_read_row_deleted --
- *	Instantiate an entirely deleted row-store leaf page.
- */
-static int
-__cache_read_row_deleted(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	WT_BTREE *btree;
-	WT_PAGE *page;
-	WT_UPDATE **upd_array, *upd;
-	uint32_t i;
-
-	btree = S2BT(session);
-	page = ref->page;
-
-	/*
-	 * Give the page a modify structure.
-	 *
-	 * If the tree is already dirty and so will be written, mark the page
-	 * dirty.  (We'd like to free the deleted pages, but if the handle is
-	 * read-only or if the application never modifies the tree, we're not
-	 * able to do so.)
-	 */
-	if (btree->modified) {
-		WT_RET(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(session, page);
-	}
-
-	/* Allocate the update array. */
-	WT_RET(__wt_calloc_def(session, page->pg_row_entries, &upd_array));
-	page->pg_row_upd = upd_array;
-
-	/* Fill in the update array with deleted items. */
-	for (i = 0; i < page->pg_row_entries; ++i) {
-		WT_RET(__wt_calloc_def(session, 1, &upd));
-		upd->next = upd_array[i];
-		upd_array[i] = upd;
-
-		WT_UPDATE_DELETED_SET(upd);
-		upd->txnid = ref->txnid;
-	}
-
-	__wt_cache_page_inmem_incr(session, page,
-	    page->pg_row_entries * (sizeof(WT_UPDATE *) + sizeof(WT_UPDATE)));
-
-	return (0);
-}
-
-/*
  * __wt_cache_read --
  *	Read a page from the file.
  */
@@ -112,7 +64,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 
 		/* If the page was deleted, instantiate that information. */
 		if (previous_state == WT_REF_DELETED)
-			WT_ERR(__cache_read_row_deleted(session, ref));
+			WT_ERR(__wt_delete_page_instantiate(session, ref));
 	}
 
 	WT_VERBOSE_ERR(session, read,
