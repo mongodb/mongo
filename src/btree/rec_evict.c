@@ -386,7 +386,7 @@ __rec_review(
 		 * on the page are old enough they can be discarded from cache.
 		 */
 		if (!exclusive && mod != NULL &&
-		    !__wt_txn_visible_all(session, mod->rec_max_txn))
+		    !__wt_txn_visible_apps(session, mod->rec_max_txn))
 			return (EBUSY);
 	}
 

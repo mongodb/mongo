@@ -233,6 +233,10 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	wt_session = &session->iface;
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
+	/* Start a snapshot transaction for the checkpoint. */
+	WT_ASSERT(session, conn->txn_global.checkpoint_txn == WT_TXN_NONE);
+	conn->txn_global.checkpoint_txn = txn->id;
+
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full) {
 		WT_ERR(__wt_txn_checkpoint_log(
@@ -298,6 +302,8 @@ err:	/*
 		__wt_txn_release(session);
 	else
 		__wt_txn_release_snapshot(session);
+
+	conn->txn_global.checkpoint_txn = WT_TXN_NONE;
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && started)

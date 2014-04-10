@@ -808,7 +808,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 */
 		if (!modified && page->modify != NULL &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
-		    !__wt_txn_visible_all(session, page->modify->rec_max_txn))
+		    !__wt_txn_visible_apps(session, page->modify->rec_max_txn))
 			continue;
 
 		/*

@@ -97,12 +97,24 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline int
 __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
-	WT_TXN_GLOBAL *txn_global;
 	uint64_t oldest_id;
 
-	txn_global = &S2C(session)->txn_global;
-	oldest_id = txn_global->oldest_id;
+	oldest_id = S2C(session)->txn_global.oldest_id;
 	return (TXNID_LT(id, oldest_id));
+}
+
+/*
+ * __wt_txn_visible_apps --
+ *	Check if a given transaction ID is visible to all application
+ *	transactions (that is, all transactions other than checkpoints).
+ */
+static inline int
+__wt_txn_visible_apps(WT_SESSION_IMPL *session, uint64_t id)
+{
+	uint64_t oldest_app_id;
+
+	oldest_app_id = S2C(session)->txn_global.oldest_app_id;
+	return (TXNID_LT(id, oldest_app_id));
 }
 
 /*

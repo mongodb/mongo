@@ -40,6 +40,17 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
+	/*
+	 * The oldest transaction ID not yet visible to transactions,
+	 * excluding any checkpoint in progress.
+	 */
+	uint64_t oldest_app_id;
+
+	/*
+	 * The transaction ID of a running checkpoint transaction (if any).
+	 */
+	uint64_t checkpoint_txn;
+
 	/* Count of scanning threads, or -1 for exclusive access. */
 	volatile int32_t scan_count;
 
