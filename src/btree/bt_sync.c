@@ -99,6 +99,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			page = walk_page->page;
 			if (__wt_page_is_modified(page) &&
 			   (WT_PAGE_IS_INTERNAL(page) ||
+			   page->modify->checkpoint_gen == 0 ||
 			   page->modify->checkpoint_gen < checkpoint_gen)) {
 				internal_bytes += page->memory_footprint;
 				++internal_pages;
