@@ -787,15 +787,11 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * If the file is being checkpointed, there's a period of time
 		 * where we can't discard dirty pages because of possible races
 		 * with the checkpointing thread.
-		 *
-		 * During this phase, there is little point in trying to evict
-		 * dirty pages: we might be lucky and find an internal page that
-		 * has not yet been checkpointed, but much more likely is that
-		 * we will waste effort considering dirty leaf pages that cannot
-		 * be evicted.
 		 */
 		modified = __wt_page_is_modified(page);
-		if (modified && btree->checkpointing)
+		if (modified && btree->checkpointing &&
+		    page->modify->checkpoint_gen >=
+		    S2C(session)->txn_global.checkpoint_gen)
 			continue;
 
 		/* Optionally ignore clean pages. */
@@ -826,6 +822,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * completed sooner.
 		 */
 		if (modified && !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
+		    !btree->checkpointing &&
 		    (page->modify->disk_snap_min ==
 		    S2C(session)->txn_global.oldest_id ||
 		    !__wt_txn_visible_all(session,

@@ -28,6 +28,7 @@ typedef struct {
 
 	/* Track whether all changes to the page are written. */
 	uint64_t max_txn;
+	uint64_t min_skipped_txn;
 	uint32_t orig_write_gen;
 
 	/*
@@ -629,6 +630,12 @@ __rec_write_init(
 	/* Save the page's write generation before reading the page. */
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
+	/*
+	 * Running transactions may update the page after we write it, so
+	 * this is the highest ID we can be confident we will see.
+	 */
+	r->min_skipped_txn = S2C(session)->txn_global.last_running;
+
 	return (0);
 }
 
@@ -781,7 +788,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_PAGE *page;
 	WT_UPDATE *upd, *upd_list, *upd_ovfl;
 	size_t notused;
-	uint64_t max_txn, min_txn, txnid;
+	uint64_t max_txn, min_skipped, min_txn, txnid;
 
 	*updp = NULL;
 
@@ -793,7 +800,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	upd_list = ins == NULL ? WT_ROW_UPDATE(page, rip) : ins->upd;
 
-	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
+	for (max_txn = WT_TXN_NONE, min_skipped = min_txn = UINT64_MAX,
 	    upd = upd_list; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
@@ -803,6 +810,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			max_txn = txnid;
 		if (!TXNID_LT(min_txn, txnid))
 			min_txn = txnid;
+		if (TXNID_LT(txnid, min_skipped) &&
+		    !__wt_txn_visible_all(session, txnid))
+			min_skipped = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -830,6 +840,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	if (TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
+
+	if (TXNID_LT(min_skipped, r->min_skipped_txn))
+		r->min_skipped_txn = min_skipped;
 
 	/*
 	 * If all updates are globally visible, the page can be marked clean and
@@ -4625,6 +4638,8 @@ err:			__wt_scr_free(&tkey);
 			WT_PANIC_RETX(session,
 			    "reconciliation illegally skipped an update");
 
+		mod->rec_min_skipped_txn = r->min_skipped_txn;
+
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 	}
@@ -4643,6 +4658,12 @@ err:			__wt_scr_free(&tkey);
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
+
+	/*
+	 * Set the checkpoint generation, used to determine whether we can skip
+	 * writing this page again.
+	 */
+	mod->checkpoint_gen = S2C(session)->txn_global.checkpoint_gen;
 
 	return (0);
 }

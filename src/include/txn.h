@@ -49,7 +49,7 @@ struct __wt_txn_global {
 	/*
 	 * The transaction ID of a running checkpoint transaction (if any).
 	 */
-	WT_SESSION_IMPL *checkpoint_session;
+	uint64_t checkpoint_txn;
 
 	/*
 	 * The current checkpoint generation.  Use a 32-bit count for now: if

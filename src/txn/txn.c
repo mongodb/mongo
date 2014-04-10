@@ -89,13 +89,12 @@ void
 __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *checkpoint_session;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
-	uint64_t current_id, id, oldest_app_id, oldest_id;
+	uint64_t checkpoint_txn, current_id, id, oldest_app_id, oldest_id;
 	uint64_t prev_oldest_app_id, prev_oldest_id, snap_min;
-	uint32_t i, checkpoint_id, n, session_cnt;
+	uint32_t i, n, session_cnt;
 	int32_t count;
 
 	conn = S2C(session);
@@ -103,9 +102,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
 
-	checkpoint_session = txn_global->checkpoint_session;
-	checkpoint_id = (checkpoint_session != NULL) ?
-	    checkpoint_session->id : UINT32_MAX;
+	checkpoint_txn = txn_global->checkpoint_txn;
 	current_id = snap_min = txn_global->current;
 	prev_oldest_app_id = txn_global->oldest_app_id;
 	prev_oldest_id = txn_global->oldest_id;
@@ -167,7 +164,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 		 */
 		if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id &&
 		    TXNID_LE(prev_oldest_id, id) &&
-		    i != checkpoint_id) {
+		    id != checkpoint_txn) {
 			if (get_snapshot)
 				txn->snapshot[n++] = id;
 			if (TXNID_LT(id, snap_min))
@@ -185,7 +182,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 		 * Skip the checkpoint transaction when calculating the oldest
 		 * application transaction.
 		 */
-		if (i != checkpoint_id &&
+		if ((id != checkpoint_txn || checkpoint_txn == WT_TXN_NONE) &&
 		    (id = s->snap_min) != WT_TXN_NONE &&
 		    TXNID_LT(id, oldest_app_id))
 			oldest_app_id = id;

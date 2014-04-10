@@ -124,7 +124,6 @@ __wt_txn_visible_apps(WT_SESSION_IMPL *session, uint64_t id)
 static inline int
 __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 {
-	WT_SESSION_IMPL *checkpoint_session;
 	WT_TXN *txn;
 
 	txn = &session->txn;
@@ -133,14 +132,8 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * Eviction only sees globally visible updates, or if there is a
 	 * checkpoint transaction running, use its transaction.
 	*/
-	if (txn->isolation == TXN_ISO_EVICTION) {
-		if ((checkpoint_session =
-		    S2C(session)->txn_global.checkpoint_session) != NULL) {
-			session = checkpoint_session;
-			txn = &session->txn;
-		} else
-			return (__wt_txn_visible_all(session, id));
-	}
+	if (txn->isolation == TXN_ISO_EVICTION)
+		return (__wt_txn_visible_all(session, id));
 
 	/* Nobody sees the results of aborted transactions. */
 	if (id == WT_TXN_ABORTED)
