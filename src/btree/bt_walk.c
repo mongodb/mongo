@@ -8,180 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_delete_rollback --
- *	Abort pages that were deleted without being instantiated.
- */
-void
-__wt_delete_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	WT_UPDATE **upd;
-
-	/*
-	 * If the page is still "deleted", it's as we left it, reset the state
-	 * to on-disk and we're done.  Otherwise, we expect the page is either
-	 * instantiated or being instantiated.  Loop because it's possible for
-	 * the page to return to the deleted state if instantiation fails.
-	 */
-	for (;; __wt_yield())
-		switch (ref->state) {
-		case WT_REF_DISK:
-		case WT_REF_READING:
-			WT_ASSERT(session, 0);		/* Impossible, assert */
-			break;
-		case WT_REF_DELETED:
-			/*
-			 * If the page is still "deleted", it's as we left it,
-			 * reset the state.
-			 */
-			if (WT_ATOMIC_CAS(
-			    ref->state, WT_REF_DELETED, WT_REF_DISK))
-				return;
-			break;
-		case WT_REF_LOCKED:
-			/*
-			 * A possible state, the page is being instantiated.
-			 */
-			break;
-		case WT_REF_MEM:
-		case WT_REF_SPLIT:
-			/*
-			 * We can't use the normal read path to get a copy of
-			 * the page because the session may have closed the
-			 * cursor, we no longer have the reference to the tree
-			 * required for a hazard pointer.  We're safe because
-			 * with unresolved transactions, the page isn't going
-			 * anywhere.
-			 *
-			 * The page is in an in-memory state, walk the list of
-			 * update structures and abort them.
-			 */
-			for (upd =
-			    ref->page_del->update_list; *upd != NULL; ++upd)
-				(*upd)->txnid = WT_TXN_ABORTED;
-
-			/*
-			 * Discard the memory, the transaction can't abort
-			 * twice.
-			 */
-			__wt_free(session, ref->page_del->update_list);
-			__wt_free(session, ref->page_del);
-			return;
-		}
-}
-
-/*
- * __delete_skip --
- *	If deleting a range, try to delete the page without instantiating it.
- */
-static inline int
-__delete_skip(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
-{
-	WT_DECL_RET;
-	WT_PAGE *parent;
-
-	*skipp = 0;
-
-	/*
-	 * Atomically switch the page's state to lock it.  If the page is not
-	 * on-disk, other threads may be using it, no fast delete.
-	 *
-	 * Possible optimization: if the page is already deleted and the delete
-	 * is visible to us (the delete has been committed), we could skip the
-	 * page instead of instantiating it and figuring out there are no rows
-	 * in the page.  While that's a huge amount of work to no purpose, it's
-	 * unclear optimizing for overlapping range deletes is worth the effort.
-	 */
-	if (ref->state != WT_REF_DISK ||
-	    !WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_LOCKED))
-		return (0);
-
-	/*
-	 * We cannot fast-delete pages that have overflow key/value items as
-	 * the overflow blocks have to be discarded.  The way we figure that
-	 * out is to check the on-page cell type for the page, cells for leaf
-	 * pages that have no overflow items are special.
-	 *
-	 * In some cases, the reference address may not reference an on-page
-	 * cell (for example, some combination of page splits), in which case
-	 * we can't check the original cell value and we fail.
-	 *
-	 * To look at an on-page cell, we need to look at the parent page, and
-	 * that's dangerous, our parent page could change without warning if
-	 * the parent page were to split, deepening the tree.  It's safe: the
-	 * page's reference will always point to some valid page, and if we find
-	 * any problems we simply fail the fast-delete optimization.
-	 *
-	 * !!!
-	 * I doubt it's worth the effort, but we could copy the cell's type into
-	 * the reference structure, and then we wouldn't need an on-page cell.
-	 */
-	parent = ref->home;
-	if (__wt_off_page(parent, ref->addr) ||
-	    __wt_cell_type_raw(ref->addr) != WT_CELL_ADDR_LEAF_NO)
-		goto err;
-
-	/*
-	 * This action dirties the parent page: mark it dirty now, there's no
-	 * future reconciliation of the child leaf page that will dirty it as
-	 * we write the tree.
-	 */
-	WT_ERR(__wt_page_parent_modify_set(session, ref, 0));
-
-	/*
-	 * Record the change in the transaction structure and set the change's
-	 * transaction ID.
-	 */
-	WT_ERR(__wt_calloc_def(session, 1, &ref->page_del));
-	ref->page_del->txnid = session->txn.id;
-
-	WT_ERR(__wt_txn_modify_ref(session, ref));
-
-	*skipp = 1;
-	WT_PUBLISH(ref->state, WT_REF_DELETED);
-	return (0);
-
-err:	__wt_free(session, ref->page_del);
-
-	/*
-	 * Restore the page to on-disk status, we'll have to instantiate it.
-	 */
-	WT_PUBLISH(ref->state, WT_REF_DISK);
-	return (ret);
-}
-
-/*
- * __delete_read_skip --
- *	If iterating a cursor, skip deleted pages that are visible to us.
- */
-static inline int
-__delete_read_skip(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	int skip;
-
-	/*
-	 * Do a simple test first, avoid the atomic operation unless it's
-	 * demonstrably necessary.
-	 */
-	if (ref->state != WT_REF_DELETED)
-		return (0);
-
-	/*
-	 * It's possible the state is changing underneath us, we could race
-	 * between checking for a deleted state and looking at the stored
-	 * transaction ID to see if the delete is visible to us.  Lock down
-	 * the structure.
-	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
-		return (0);
-
-	skip = ref->page_del == NULL ||
-	    __wt_txn_visible(session, ref->page_del->txnid) ? 1 : 0;
-
-	WT_PUBLISH(ref->state, WT_REF_DELETED);
-	return (skip);
-}
-
-/*
  * __wt_tree_walk --
  *	Move to the next/previous page in the tree.
  */
@@ -376,7 +202,7 @@ restart:	/*
 				 * If deleting a range, try to delete the page
 				 * without instantiating it.
 				 */
-				WT_ERR(__delete_skip(session, ref, &skip));
+				WT_ERR(__wt_delete_page(session, ref, &skip));
 				if (skip)
 					break;
 			} else if (LF_ISSET(WT_READ_COMPACT)) {
@@ -404,10 +230,11 @@ restart:	/*
 				}
 			} else {
 				/*
-				 * If iterating a cursor, skip deleted pages
-				 * that are visible to us.
+				 * If iterating a cursor, try to skip deleted
+				 * pages that are visible to us.
 				 */
-				if (__delete_read_skip(session, ref))
+				if (ref->state == WT_REF_DELETED &&
+				    __wt_delete_page_skip(session, ref))
 					break;
 			}
 
