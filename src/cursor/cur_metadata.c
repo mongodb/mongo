@@ -8,6 +8,33 @@
 #include "wt_internal.h"
 
 /*
+ * __curmetadata_metadata_search --
+ *	Retrieve the metadata for the metadata table
+ */
+static int
+__curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
+{
+	WT_CURSOR_METADATA *mdc;
+	char *value;
+
+	mdc = (WT_CURSOR_METADATA *)cursor;
+	WT_RET(__wt_metadata_search(session,
+	    "file:metadata", (const char **)&value));
+	/*
+	 * Copy the value in the underlying btree cursors tmp item
+	 * which will be free'd when the cursor is closed.
+	 */
+	if (F_ISSET(mdc, WT_MDC_TMP_USED))
+		__wt_buf_free(session, &mdc->tmp_val);
+	mdc->tmp_val.data = mdc->tmp_val.mem = value;
+	mdc->tmp_val.size = mdc->tmp_val.memsize = strlen(value);
+	/* TODO: Is this assignment OK? */
+	cursor->value = mdc->tmp_val;
+	F_SET(mdc, WT_MDC_ONMETADATA | WT_MDC_POSITIONED | WT_MDC_TMP_USED);
+	return (0);
+}
+
+/*
  * __curmetadata_compare --
  *	WT_CURSOR->compare method for the metadata cursor type.
  */
@@ -56,13 +83,9 @@ __curmetadata_next(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session,
 	    next, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	if (!F_ISSET(mdc, WT_MDC_POSITIONED)) {
-		/* TODO retrieve and save the metadata metadata
-		__wt_metadata_search(session, blah); */
-		F_SET(mdc,
-		    WT_MDC_POSITIONED |
-		    WT_MDC_ONMETADATA);
-	} else {
+	if (!F_ISSET(mdc, WT_MDC_POSITIONED))
+		WT_ERR(__curmetadata_metadata_search(session, cursor));
+	else {
 		ret = file_cursor->next(mdc->file_cursor);
 		if (ret == 0)
 			F_CLR(mdc, WT_MDC_ONMETADATA);
@@ -92,13 +115,8 @@ __curmetadata_prev(WT_CURSOR *cursor)
 	if (F_ISSET(mdc, WT_MDC_ONMETADATA))
 		ret = WT_NOTFOUND;
 	else if ((ret =
-	    file_cursor->prev(file_cursor)) == WT_NOTFOUND) {
-		/* TODO retrieve and save the metadata metadata
-		ret = __wt_metadata_search(session, blah); */
-		F_SET(mdc,
-		    WT_MDC_POSITIONED |
-		    WT_MDC_ONMETADATA);
-	}
+	    file_cursor->prev(file_cursor)) == WT_NOTFOUND)
+		WT_ERR(__curmetadata_metadata_search(session, cursor));
 
 	if (ret != 0)
 		F_CLR(mdc,
@@ -147,7 +165,6 @@ __curmetadata_search(WT_CURSOR *cursor)
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char *value;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
@@ -157,26 +174,12 @@ __curmetadata_search(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (cursor->key.size == strlen("metadata") &&
-	    strncmp(cursor->key.data, "metadata", strlen("metadata")) == 0) {
-		WT_ERR(__wt_metadata_search(session,
-		    "file:metadata", (const char **)&value));
-		/*
-		 * Copy the value in the underlying btree cursors tmp item
-		 * which will be free'd when the cursor is closed.
-		 */
-		if (F_ISSET(mdc, WT_MDC_TMP_USED))
-			__wt_buf_free(session, &mdc->tmp_val);
-		mdc->tmp_val.data = mdc->tmp_val.mem = value;
-		mdc->tmp_val.size =
-		    mdc->tmp_val.memsize = strlen(value);
-		/* TODO: Is this assignment OK? */
-		cursor->value = mdc->tmp_val;
-		F_SET(mdc, WT_MDC_ONMETADATA | WT_MDC_TMP_USED);
-	} else
-		ret = file_cursor->search(file_cursor);
-
-	if (ret == 0)
+	    strncmp(cursor->key.data, "metadata", strlen("metadata")) == 0)
+		WT_ERR(__curmetadata_metadata_search(session, cursor));
+	else {
+		WT_ERR(file_cursor->search(file_cursor));
 		F_SET(mdc, WT_MDC_POSITIONED);
+	}
 
 err:	API_END(session);
 	return (ret);
@@ -193,7 +196,6 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	char *value;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
@@ -204,25 +206,12 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 
 	if (cursor->key.size == strlen("metadata") &&
 	    strncmp(cursor->key.data, "metadata", strlen("metadata")) == 0) {
-		WT_ERR(__wt_metadata_search(session,
-		    "file:metadata", (const char **)&value));
-		/*
-		 * Copy the value in the underlying btree cursors tmp item
-		 * which will be free'd when the cursor is closed.
-		 */
-		if (F_ISSET(mdc, WT_MDC_TMP_USED))
-			__wt_buf_free(session, &mdc->tmp_val);
-		mdc->tmp_val.data = mdc->tmp_val.mem = value;
-		mdc->tmp_val.size = mdc->tmp_val.memsize = strlen(value);
-		/* TODO: Is this assignment OK? */
-		cursor->value = mdc->tmp_val;
-		F_SET(mdc, WT_MDC_ONMETADATA | WT_MDC_TMP_USED);
+		WT_ERR(__curmetadata_metadata_search(session, cursor));
 		*exact = 1;
-	} else
-		ret = file_cursor->search_near(file_cursor, exact);
-
-	if (ret == 0)
+	} else {
+		WT_ERR(file_cursor->search_near(file_cursor, exact));
 		F_SET(mdc, WT_MDC_POSITIONED);
+	}
 
 err:	API_END(session);
 	return (ret);
@@ -375,6 +364,8 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	cursor = &mdc->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
+	cursor->key_format = "S";
+	cursor->value_format = "S";
 
 	/* Open the file cursor for operations on the regular metadata */
 	WT_ERR(__wt_metadata_cursor(session, cfg[1], &mdc->file_cursor));
