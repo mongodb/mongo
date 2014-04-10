@@ -46,6 +46,13 @@
  * stored in the WT_REF.page_del field, with the transaction ID, that way the
  * session unrolling the delete can find all of the WT_UPDATE structures that
  * require update.
+ *
+ * One final note: pages can also be marked deleted if emptied and evicted.  In
+ * that case, the WT_REF state will be set to WT_REF_DELETED but there will not
+ * be any associated WT_REF.page_del field.  These pages are always skipped
+ * during cursor traversal (the page could not have been evicted if there were
+ * updates that weren't globally visible), and if read is forced to instantiate
+ * such a page, it simply creates an empty page from scratch.
  */
 
 /*
