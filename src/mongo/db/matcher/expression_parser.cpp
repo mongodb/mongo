@@ -41,6 +41,27 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
+namespace {
+
+    using namespace mongo;
+
+    /**
+     * Returns true if subtree contains MatchExpression 'type'.
+     */
+    bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
+        if (type == root->matchType()) {
+            return true;
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            if (hasNode(root->getChild(i), type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+} // namespace
+
 namespace mongo {
 
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
@@ -80,6 +101,12 @@ namespace mongo {
         int x = e.getGtLtOp(-1);
         switch ( x ) {
         case -1:
+            // $where cannot be a sub-expression because it works on top-level documents only.
+            if ( mongoutils::str::equals( "$where", e.fieldName() ) ) {
+                return StatusWithMatchExpression( ErrorCodes::BadValue,
+                    "$where cannot be applied to a field" );
+            }
+
             return StatusWithMatchExpression( ErrorCodes::BadValue,
                                               mongoutils::str::stream() << "unknown operator: "
                                               << e.fieldName() );
@@ -619,6 +646,8 @@ namespace mongo {
         //     1) the argument is an expression document; and
         //     2) expression is not a AND/NOR/OR logical operator. Children of
         //        these logical operators are initialized with field names.
+        //     3) expression is not a WHERE operator. WHERE works on objects instead
+        //        of specific field.
         bool isElemMatchValue = false;
         if ( _isExpressionDocument( e, true ) ) {
             BSONObj o = e.Obj();
@@ -627,7 +656,8 @@ namespace mongo {
 
             isElemMatchValue = !mongoutils::str::equals( "$and", elt.fieldName() ) &&
                                !mongoutils::str::equals( "$nor", elt.fieldName() ) &&
-                               !mongoutils::str::equals( "$or", elt.fieldName() );
+                               !mongoutils::str::equals( "$or", elt.fieldName() ) &&
+                               !mongoutils::str::equals( "$where", elt.fieldName() );
         }
 
         if ( isElemMatchValue ) {
@@ -660,6 +690,13 @@ namespace mongo {
         StatusWithMatchExpression sub = _parse( obj, false );
         if ( !sub.isOK() )
             return sub;
+
+        // $where is not supported under $elemMatch because $where
+        // applies to top-level document, not array elements in a field.
+        if ( hasNode( sub.getValue(), MatchExpression::WHERE ) ) {
+            return StatusWithMatchExpression( ErrorCodes::BadValue,
+                "$elemMatch cannot contain $where expression" );
+        }
 
         std::auto_ptr<ElemMatchObjectMatchExpression> temp( new ElemMatchObjectMatchExpression() );
         Status status = temp->init( name, sub.getValue() );

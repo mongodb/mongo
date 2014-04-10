@@ -26,3 +26,14 @@ assert.throws( function() {
 assert.throws( function() {
     t.find( { a: 3, "b.c": { $where : "this.a;" } } ).itcount();
 } );
+
+// SERVER-13503
+assert.throws( function() {
+    t.find( { a: { $elemMatch : { $where : "this.a;", b : 1 } } } ).itcount();
+} );
+assert.throws( function() {
+    t.find( { a: { $elemMatch : { b : 1, $where : "this.a;" } } } ).itcount();
+} );
+assert.throws( function() {
+    t.find( { a: { $elemMatch : { $and : [ { b : 1 }, { $where : "this.a;" } ] } } } ).itcount();
+} );
