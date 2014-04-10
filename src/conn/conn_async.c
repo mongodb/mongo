@@ -294,7 +294,7 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_cond_destroy(session, &async->ops_cond));
 	WT_TRET(__wt_cond_destroy(session, &async->flush_cond));
 
-	/* Close the server thread's session. */
+	/* Close the server threads' sessions. */
 	for (i = 0; i < conn->async_workers; i++)
 		if (async->worker_sessions[i] != NULL) {
 			wt_session = &async->worker_sessions[i]->iface;
@@ -346,8 +346,17 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	 * clear the flush flags and return.
 	 */
 	__wt_spin_lock(session, &async->opsq_lock);
-	if (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS))
-		goto err;
+	while (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS)) {
+		/*
+		 * We're racing an in-progress flush.  We need to wait
+		 * our turn to start our own.  We need to convoy the
+		 * racing calls because a later call may be waiting for
+		 * specific enqueued ops to be complete before this returns.
+		 */
+		__wt_spin_unlock(session, &async->opsq_lock);
+		__wt_sleep(0, 100000);
+		__wt_spin_lock(session, &async->opsq_lock);
+	}
 
 	/*
 	 * We're the owner of this flush operation.  Set the
