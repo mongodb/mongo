@@ -360,7 +360,7 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 
 	/*
 	 * We're the owner of this flush operation.  Set the
-	 * WT_ASYNC_FLUSH_IN_PROGRESS to prevent other callers.
+	 * WT_ASYNC_FLUSH_IN_PROGRESS to block other callers.
 	 * We're also preventing all worker threads from taking
 	 * things off the work queue with the lock.
 	 */

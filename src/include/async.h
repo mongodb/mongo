@@ -44,7 +44,7 @@ struct __wt_async_format {
 struct __wt_async_op_impl {
 	WT_ASYNC_OP	iface;
 
-	STAILQ_ENTRY(__wt_async_op_impl) q;
+	STAILQ_ENTRY(__wt_async_op_impl) q;	/* Work queue links. */
 	WT_ASYNC_CALLBACK	*cb;
 
 	uint32_t	internal_id;	/* Array position id. */
@@ -79,7 +79,7 @@ struct __wt_async {
 #define	WT_ASYNC_FLUSH_COMPLETE		0x0001	/* Notify flush caller */
 #define	WT_ASYNC_FLUSH_IN_PROGRESS	0x0002	/* Prevent more callers */
 #define	WT_ASYNC_FLUSHING		0x0004	/* Notify workers */
-	uint32_t		 opsq_flush;	/* Queue flush op */
+	uint32_t		 opsq_flush;	/* Queue flush state */
 	/* Notify any waiting threads when work is enqueued. */
 	WT_CONDVAR		*ops_cond;
 	/* Notify any waiting threads when flushing is done. */
@@ -92,12 +92,13 @@ struct __wt_async {
 					/* Async worker threads */
 	pthread_t		 worker_tids[WT_ASYNC_MAX_WORKERS];
 
-	uint32_t		 flags;
+	uint32_t		 flags;	/* Currently unused. */
 };
 
 /*
  * WT_ASYNC_CURSOR --
- *	Async container for a cursor.
+ *	Async container for a cursor.  Each async worker thread
+ *	has a cache of async cursors to reuse for operations.
  */
 struct __wt_async_cursor {
 	STAILQ_ENTRY(__wt_async_cursor) q;	/* Worker cache */

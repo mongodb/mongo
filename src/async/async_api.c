@@ -109,7 +109,6 @@ __async_insert(WT_ASYNC_OP *asyncop)
 
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	ASYNCOP_API_CALL(O2C(op), session, insert);
-
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_insert);
 	WT_ERR(__async_op_wrap(op, WT_AOP_INSERT));
 err:	API_END(session);
@@ -235,10 +234,9 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
 	__wt_spin_unlock(conn->default_session, &async->opsq_lock);
 	WT_ERR(__wt_cond_signal(conn->default_session, async->ops_cond));
 	/*
-	 * Lock again if we need to for the caller.
+	 * Relock if we need to for the caller.
 	 */
-err:
-	if (locked)
+err:	if (locked)
 		__wt_spin_lock(conn->default_session, &async->opsq_lock);
 	return (ret);
 }
@@ -255,8 +253,14 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	uint32_t i;
 
 	async = conn->async;
-	op = &async->flush_op;
-	__async_op_init(conn, op, OPS_INVALID_INDEX);
+	/*
+	 * Initialize the flush op structure.
+	 */
+	__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX);
+
+	/*
+	 * Allocate and initialize all the user ops.
+	 */
 	WT_RET(__wt_calloc_def(conn->default_session,
 	    conn->async_size, &async->async_ops));
 	for (i = 0; i < conn->async_size; i++) {

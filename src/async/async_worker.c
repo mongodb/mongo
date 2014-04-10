@@ -17,6 +17,11 @@ __async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async, int *locked)
 {
 	WT_DECL_RET;
 
+	/*
+	 * We change the caller's locked setting so that if we return an
+	 * error from this function the caller can properly unlock or not
+	 * as needed.
+	 */
 	while (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSHING)) {
 		__wt_spin_unlock(session, &async->opsq_lock);
 		*locked= 0;
@@ -33,7 +38,7 @@ err:	return (ret);
  *	Return a cursor for the worker thread to use for its op.
  *	The worker thread caches cursors.  So first search for one
  *	with the same config/uri signature.  Otherwise open a new
- *	cursor.
+ *	cursor and cache it.
  */
 static int
 __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
@@ -50,6 +55,10 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
 		if (op->format->cfg_hash == ac->cfg_hash &&
 		    op->format->uri_hash == ac->uri_hash) {
+			/*
+			 * If one of our cached cursors has a matching
+			 * signature, use it and we're done.
+			 */
 			*cursorp = ac->c;
 			return (0);
 		}
@@ -69,8 +78,7 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	*cursorp = c;
 	return (0);
 
-err:
-	__wt_free(session, ac);
+err:	__wt_free(session, ac);
 	return (ret);
 }
 
@@ -87,6 +95,10 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	WT_ITEM val;
 
 	asyncop = (WT_ASYNC_OP *)op;
+	/*
+	 * Set the key of our local cursor from the async op handle.
+	 * If needed, also set the value.
+	 */
 	__wt_cursor_set_raw_key(cursor, &asyncop->c.key);
 	if (op->optype != WT_AOP_SEARCH)
 		__wt_cursor_set_raw_value(cursor, &asyncop->c.value);
@@ -152,7 +164,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	else
 		WT_TRET(__wt_txn_rollback(session, NULL));
 	/*
-	 * After the callback returns, and the transaction resolved released
+	 * After the callback returns, and the transaction resolved release
 	 * the op back to the free pool and reset our cached cursor.
 	 */
 	ret = 0;
@@ -198,9 +210,9 @@ __wt_async_worker(void *arg)
 			if (++async->flush_count == conn->async_workers) {
 				/*
 				 * We're last.  All workers accounted for so
-				 * signal the condition and clear the flushing
+				 * signal the condition and clear the FLUSHING
 				 * flag to release the other worker threads.
-				 * Set the complete flag so that the
+				 * Set the FLUSH_COMPLETE flag so that the
 				 * caller can return to the application.
 				 */
 				FLD_SET(async->opsq_flush,
