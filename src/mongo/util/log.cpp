@@ -64,6 +64,11 @@ namespace mongo {
         RotatableFileManager* manager = logger::globalRotatableFileManager();
         RotatableFileManager::FileNameStatusPairVector result(
                 manager->rotateAll("." + terseCurrentTime(false)));
+        for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
+                it != result.end(); it++) {
+            warning() << "Rotating log file " << it->first << " failed: " << it->second.toString()
+                    << endl;
+        }
         return result.empty();
     }
 
