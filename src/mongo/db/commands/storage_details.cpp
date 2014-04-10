@@ -549,7 +549,7 @@ namespace {
 
         DiskLoc prevDl = ex->firstRecord;
         for (DiskLoc dl = ex->firstRecord; !dl.isNull(); dl = extentManager.getNextRecordInExtent(dl)) {
-            r = dl.rec();
+            r = collection->getRecordStore()->recordFor(dl);
             processRecord(dl, prevDl, r, extentOfs, params, sliceData,
                           recordsArrayBuilder.get());
             prevDl = dl;

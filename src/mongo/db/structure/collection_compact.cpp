@@ -111,7 +111,7 @@ namespace mongo {
             DiskLoc L = e->firstRecord;
             if( !L.isNull() ) {
                 while( 1 ) {
-                    Record *recOld = L.rec();
+                    Record *recOld = _recordStore->recordFor(L);
                     BSONObj objOld = docFor( L );
                     L = getExtentManager()->getNextRecordInExtent(L);
 
@@ -170,7 +170,7 @@ namespace mongo {
                     RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
                     if( stopping || getDur().isCommitNeeded() ) {
                         e->firstRecord.writing() = L;
-                        Record *r = L.rec();
+                        Record *r = _recordStore->recordFor(L);
                         getDur().writingInt(r->prevOfs()) = DiskLoc::NullOfs;
                         getDur().commitIfNeeded();
                         killCurrentOp.checkForInterrupt();

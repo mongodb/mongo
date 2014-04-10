@@ -965,7 +965,7 @@ namespace mongo {
                 if ( estimate )
                     size += avgObjSize;
                 else
-                    size += loc.rec()->netLength();
+                    size += collection->getRecordStore()->recordFor(loc)->netLength();
 
                 numObjects++;
 

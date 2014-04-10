@@ -247,7 +247,7 @@ namespace mongo {
                             cl_last = cl;
                         }
 
-                        Record *r = cl.rec();
+                        Record *r = collection->getRecordStore()->recordFor(cl);
                         len += r->lengthWithHeaders();
                         nlen += r->netLength();
                         

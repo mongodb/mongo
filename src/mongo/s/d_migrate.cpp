@@ -506,22 +506,26 @@ namespace mongo {
 
                 {
                     Client::ReadContext ctx( _ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( _ns );
+
                     scoped_spinlock lk( _trackerLocks );
                     set<DiskLoc>::iterator i = _cloneLocs.begin();
                     for ( ; i!=_cloneLocs.end(); ++i ) {
                         if (tracker.intervalHasElapsed()) // should I yield?
                             break;
                         
+                        invariant( collection );
+
                         DiskLoc dl = *i;
                         
-                        Record* r = dl.rec();
+                        Record* r = collection->getRecordStore()->recordFor( dl );
                         if ( ! r->likelyInPhysicalMemory() ) {
                             fileLock.reset( new LockMongoFilesShared() );
                             recordToTouch = r;
                             break;
                         }
                         
-                        BSONObj o = dl.obj();
+                        BSONObj o = collection->docFor( dl );
 
                         // use the builder size instead of accumulating 'o's size so that we take into consideration
                         // the overhead of BSONArray indices, and *always* append one doc

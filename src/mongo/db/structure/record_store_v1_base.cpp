@@ -173,7 +173,7 @@ namespace mongo {
     }
 
     void RecordStoreV1Base::_addRecordToRecListInExtent(Record *r, DiskLoc loc) {
-        dassert( loc.rec() == r );
+        dassert( recordFor(loc) == r );
         Extent *e = _extentManager->extentFor( loc );
         if ( e->lastRecord.isNull() ) {
             Extent::FL *fl = getDur().writing(e->fl());
@@ -181,7 +181,7 @@ namespace mongo {
             r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
         }
         else {
-            Record *oldlast = e->lastRecord.rec();
+            Record *oldlast = recordFor(e->lastRecord);
             r->prevOfs() = e->lastRecord.getOfs();
             r->nextOfs() = DiskLoc::NullOfs;
             getDur().writingInt(oldlast->nextOfs()) = loc.getOfs();
