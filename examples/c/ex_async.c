@@ -80,7 +80,6 @@ int main(void)
 	/*! [example connection] */
 	WT_ASYNC_OP *op, *opget;
 	WT_CONNECTION *wt_conn;
-	WT_ITEM key, value;
 	WT_SESSION *session;
 	int i, ret;
 	char k[MAX_KEYS][16], v[MAX_KEYS][16];
@@ -118,25 +117,19 @@ retry:
 		snprintf(k[i], sizeof(k), "key%d", i);
 		snprintf(v[i], sizeof(v), "value%d", i);
 		/*! [Set the op's string key] */
-		key.data = k[i];
-		key.size = sizeof(k[i]);
-		value.data = v[i];
-		value.size = sizeof(v[i]);
-		op->set_key(op, &key);
+		op->set_key(op, k[i]);
 		/*! [Set the op's string key] */
 		/*! [Set the op's string value] */
-		op->set_value(op, &value);
+		op->set_value(op, v[i]);
 		/*! [Set the op's string value] */
 		/*! [example insert] */
 		ret = op->insert(op);
 		/*! [example insert] */
 	}
 
-	ret = wt_conn->async_new_op(wt_conn, uri, "raw", &cb, &opget);
+	ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &opget);
 	snprintf(k[0], sizeof(k[0]), "key1");
-	key.data = k[0];
-	key.size = sizeof(k[0]);
-	opget->set_key(opget, &key);
+	opget->set_key(opget, k[0]);
 	search_id = opget->get_id(opget);
 	opget->search(opget);
 

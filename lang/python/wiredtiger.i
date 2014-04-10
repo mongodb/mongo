@@ -89,7 +89,7 @@ from packing import pack, unpack
 	if (*$1 != NULL) {
 		PY_CALLBACK *pcb;
 
-		(*$1)->flags |= WT_ASYNCOP_RAW;
+		(*$1)->c.flags |= WT_CURSTD_RAW;
 		PyObject_SetAttrString($result, "is_column",
 		    PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
 		PyObject_SetAttrString($result, "key_format",
@@ -102,7 +102,7 @@ from packing import pack, unpack
 		else {
 			Py_XINCREF($result);
 			pcb->pyobj = $result;
-			(*$1)->lang_private = pcb;
+			(*$1)->c.lang_private = pcb;
 		}
 	}
 }

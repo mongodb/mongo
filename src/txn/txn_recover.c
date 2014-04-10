@@ -116,8 +116,7 @@ __txn_op_apply(
 		    &fileid, &recno, &value));
 		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 		cursor->set_key(cursor, recno);
-		WT_WITH_RAW(cursor, WT_CURSTD_RAW,
-		    cursor->set_value(cursor, &value));
+		__wt_cursor_set_raw_value(cursor, &value);
 		WT_ERR(cursor->insert(cursor));
 		break;
 
@@ -165,10 +164,8 @@ __txn_op_apply(
 		WT_ERR(__wt_logop_row_put_unpack(session, pp, end,
 		    &fileid, &key, &value));
 		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
-		WT_WITH_RAW(cursor, WT_CURSTD_RAW,
-		    cursor->set_key(cursor, &key));
-		WT_WITH_RAW(cursor, WT_CURSTD_RAW,
-		    cursor->set_value(cursor, &value));
+		__wt_cursor_set_raw_key(cursor, &key);
+		__wt_cursor_set_raw_value(cursor, &value);
 		WT_ERR(cursor->insert(cursor));
 		break;
 
@@ -176,8 +173,7 @@ __txn_op_apply(
 		WT_ERR(__wt_logop_row_remove_unpack(session, pp, end,
 		    &fileid, &key));
 		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
-		WT_WITH_RAW(cursor, WT_CURSTD_RAW,
-		    cursor->set_key(cursor, &key));
+		__wt_cursor_set_raw_key(cursor, &key);
 		WT_ERR(cursor->remove(cursor));
 		break;
 
@@ -208,11 +204,9 @@ __txn_op_apply(
 
 		/* Set the keys. */
 		if (start != NULL)
-			WT_WITH_RAW(start, WT_CURSTD_RAW,
-			    start->set_key(cursor, &start_key));
+			__wt_cursor_set_raw_key(start, &start_key);
 		if (stop != NULL)
-			WT_WITH_RAW(stop, WT_CURSTD_RAW,
-			    stop->set_key(cursor, &stop));
+			__wt_cursor_set_raw_key(stop, &stop_key);
 
 		WT_TRET(session->iface.truncate(&session->iface, NULL,
 		    start, stop, NULL));
