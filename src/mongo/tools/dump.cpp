@@ -41,6 +41,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/extent.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/tool.h"

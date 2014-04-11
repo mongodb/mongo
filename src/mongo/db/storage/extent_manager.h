@@ -115,11 +115,13 @@ namespace mongo {
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
+         * TODO(ERH): remove this - only RecordStore can do this
          */
         Extent* extentFor( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
+         * TODO(ERH): remove this - only RecordStore can do this
          */
         DiskLoc extentLocFor( const DiskLoc& loc ) const;
 

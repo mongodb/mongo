@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/storage/extent.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point_service.h"

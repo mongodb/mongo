@@ -114,7 +114,7 @@ namespace mongo {
 
         // Set up our extent hopping state.  Get the start of the extent that we were collection
         // scanning.
-        Extent* e = _curloc.rec()->myExtent(_curloc);
+        Extent* e = _curloc.rec()->myExtent(_curloc).ext();
         if (!_nsd->capLooped() || (e->myLoc != _nsd->capExtent())) {
             _curloc = e->firstRecord;
         }
@@ -187,7 +187,7 @@ namespace mongo {
 
     // static
     DiskLoc OplogStart::prevExtentFirstLoc(const NamespaceDetails* nsd, const DiskLoc& rec ) {
-        Extent *e = rec.rec()->myExtent( rec );
+        Extent *e = rec.rec()->myExtent( rec ).ext();
         if (nsd->capLooped() ) {
             while( true ) {
                 // Advance e to preceding extent (looping to lastExtent if necessary).

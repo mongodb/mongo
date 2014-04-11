@@ -40,6 +40,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/storage/extent.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/db/structure/catalog/namespace.h"

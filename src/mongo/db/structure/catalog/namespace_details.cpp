@@ -45,6 +45,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/extent.h"
 #include "mongo/db/structure/catalog/hashtab.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/startup_test.h"

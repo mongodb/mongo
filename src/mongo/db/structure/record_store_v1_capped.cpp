@@ -238,12 +238,15 @@ namespace mongo {
         memset(t->_reserved, 0, sizeof(t->_reserved));
 
         // Reset all existing extents and recreate the deleted list.
-        for( DiskLoc ext = t->_firstExtent; !ext.isNull(); ext = ext.ext()->xnext ) {
-            DiskLoc prev = ext.ext()->xprev;
-            DiskLoc next = ext.ext()->xnext;
-            DiskLoc empty = ext.ext()->reuse( _ns, true );
-            ext.ext()->xprev.writing() = prev;
-            ext.ext()->xnext.writing() = next;
+        for( DiskLoc ext = t->_firstExtent;
+             !ext.isNull();
+             ext = _extentManager->getExtent(ext)->xnext ) {
+
+            DiskLoc prev = _extentManager->getExtent(ext)->xprev;
+            DiskLoc next = _extentManager->getExtent(ext)->xnext;
+            DiskLoc empty = _extentManager->getExtent(ext)->reuse( _ns, true );
+            _extentManager->getExtent(ext)->xprev.writing() = prev;
+            _extentManager->getExtent(ext)->xnext.writing() = next;
             addDeletedRec( empty );
         }
 
@@ -509,10 +512,12 @@ namespace mongo {
                 DiskLoc newCapExtent = _details->_capExtent;
                 do {
                     // Find the previous extent, looping if necessary.
-                    newCapExtent = ( newCapExtent == _details->_firstExtent ) ? _details->_lastExtent : newCapExtent.ext()->xprev;
-                    newCapExtent.ext()->assertOk();
+                    newCapExtent = ( newCapExtent == _details->_firstExtent ) ?
+                        _details->_lastExtent :
+                        _extentManager->getExtent(newCapExtent)->xprev;
+                    _extentManager->getExtent(newCapExtent)->assertOk();
                 }
-                while ( newCapExtent.ext()->firstRecord.isNull() );
+                while ( _extentManager->getExtent(newCapExtent)->firstRecord.isNull() );
                 _details->_capExtent.writing() = newCapExtent;
 
                 // Place all documents in the new capExtent on the fresh side
@@ -539,7 +544,7 @@ namespace mongo {
     }
 
     Extent* CappedRecordStoreV1::theCapExtent() const {
-        return _details->_capExtent.ext();
+        return _extentManager->getExtent(_details->_capExtent);
     }
 
     void CappedRecordStoreV1::addDeletedRec( const DiskLoc& dloc ) {

@@ -31,8 +31,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/diskloc.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/db/storage/extent.h"
 
 namespace mongo {
 
@@ -75,8 +75,7 @@ namespace mongo {
         /* use this when a record is deleted. basically a union with next/prev fields */
         DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
 
-        // TODO(ERH): remove
-        Extent* myExtent(const DiskLoc& myLoc) { return DiskLoc(myLoc.a(), extentOfs() ).ext(); }
+        DiskLoc myExtent(const DiskLoc& myLoc) const { return DiskLoc(myLoc.a(), extentOfs() ); }
 
         struct NP {
             int nextOfs;
