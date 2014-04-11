@@ -583,4 +583,10 @@ namespace mongo {
         return new CappedRecordStoreV1Iterator( this, start, tailable, dir );
     }
 
+    Status CappedRecordStoreV1::compact( RecordStoreCompactAdaptor* adaptor,
+                                         const CompactOptions* options,
+                                         CompactStats* stats ) {
+        invariant(false);
+    }
+
 }

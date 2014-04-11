@@ -32,14 +32,19 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store_v1_simple_iterator.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/progress_meter.h"
+#include "mongo/util/touch_pages.h"
 
 namespace mongo {
 
@@ -265,6 +270,205 @@ namespace mongo {
     RecordIterator* SimpleRecordStoreV1::getIterator( const DiskLoc& start, bool tailable,
                                                       const CollectionScanParams::Direction& dir) const {
         return new SimpleRecordStoreV1Iterator( this, start, dir );
+    }
+
+    class CompactDocWriter : public DocWriter {
+    public:
+        /**
+         * param allocationSize - allocation size WITH header
+         */
+        CompactDocWriter( const Record* rec, unsigned dataSize, size_t allocationSize )
+            : _rec( rec ),
+              _dataSize( dataSize ),
+              _allocationSize( allocationSize ) {
+        }
+
+        virtual ~CompactDocWriter() {}
+
+        virtual void writeDocument( char* buf ) const {
+            memcpy( buf, _rec->data(), _dataSize );
+        }
+
+        virtual size_t documentSize() const {
+            return _allocationSize - Record::HeaderSize;
+        }
+
+        virtual bool addPadding() const {
+            return false;
+        }
+
+    private:
+        const Record* _rec;
+        size_t _dataSize;
+        size_t _allocationSize;
+    };
+
+    void SimpleRecordStoreV1::_compactExtent(const DiskLoc diskloc, int extentNumber,
+                                             RecordStoreCompactAdaptor* adaptor,
+                                             const CompactOptions* compactOptions,
+                                             CompactStats* stats ) {
+
+        log() << "compact begin extent #" << extentNumber
+              << " for namespace " << _ns << " " << diskloc;
+
+        unsigned oldObjSize = 0; // we'll report what the old padding was
+        unsigned oldObjSizeWithPadding = 0;
+
+        Extent *e = _extentManager->getExtent( diskloc );
+        e->assertOk();
+        fassert( 17437, e->validates(diskloc) );
+
+        {
+            // the next/prev pointers within the extent might not be in order so we first
+            // page the whole thing in sequentially
+            log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
+            Timer t;
+            size_t length = e->length;
+
+            touch_pages( reinterpret_cast<const char*>(e), length );
+            int ms = t.millis();
+            if( ms > 1000 )
+                log() << "compact end paging in " << ms << "ms "
+                      << e->length/1000000.0/t.seconds() << "MB/sec" << endl;
+        }
+
+        {
+            log() << "compact copying records" << endl;
+            long long datasize = 0;
+            long long nrecords = 0;
+            DiskLoc L = e->firstRecord;
+            if( !L.isNull() ) {
+                while( 1 ) {
+                    Record *recOld = recordFor(L);
+                    L = _extentManager->getNextRecordInExtent(L);
+
+                    if ( compactOptions->validateDocuments && !adaptor->isDataValid(recOld) ) {
+                        // object is corrupt!
+                        log() << "compact skipping corrupt document!";
+                        stats->corruptDocuments++;
+                    }
+                    else {
+                        unsigned dataSize = adaptor->dataSize( recOld );
+                        unsigned docSize = dataSize;
+
+                        nrecords++;
+                        oldObjSize += docSize;
+                        oldObjSizeWithPadding += recOld->netLength();
+
+                        unsigned lenWHdr = docSize + Record::HeaderSize;
+                        unsigned lenWPadding = lenWHdr;
+
+                        switch( compactOptions->paddingMode ) {
+                        case CompactOptions::NONE:
+                            if ( _details->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes) )
+                                lenWPadding = _details->quantizePowerOf2AllocationSpace(lenWPadding);
+                            break;
+                        case CompactOptions::PRESERVE:
+                            // if we are preserving the padding, the record should not change size
+                            lenWPadding = recOld->lengthWithHeaders();
+                            break;
+                        case CompactOptions::MANUAL:
+                            lenWPadding = compactOptions->computeRecordSize(lenWPadding);
+                            if (lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) {
+                                lenWPadding = lenWHdr;
+                            }
+                            break;
+                        }
+
+                        CompactDocWriter writer( recOld, dataSize, lenWPadding );
+                        StatusWith<DiskLoc> status = insertRecord( &writer, 0 );
+                        uassertStatusOK( status.getStatus() );
+                        datasize += recordFor( status.getValue() )->netLength();
+
+                        adaptor->inserted( recordFor( status.getValue() ), status.getValue() );
+                    }
+
+                    if( L.isNull() ) {
+                        // we just did the very last record from the old extent.  it's still pointed to
+                        // by the old extent ext, but that will be fixed below after this loop
+                        break;
+                    }
+
+                    // remove the old records (orphan them) periodically so our commit block doesn't get too large
+                    bool stopping = false;
+                    RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
+                    if( stopping || getDur().isCommitNeeded() ) {
+                        e->firstRecord.writing() = L;
+                        Record *r = recordFor(L);
+                        getDur().writingInt(r->prevOfs()) = DiskLoc::NullOfs;
+                        getDur().commitIfNeeded();
+                        killCurrentOp.checkForInterrupt();
+                    }
+                }
+            } // if !L.isNull()
+
+            invariant( _details->firstExtent() == diskloc );
+            invariant( _details->lastExtent() != diskloc );
+            DiskLoc newFirst = e->xnext;
+            _details->firstExtent().writing() = newFirst;
+            _extentManager->getExtent( newFirst )->xprev.writing().Null();
+            getDur().writing(e)->markEmpty();
+            _extentManager->freeExtents( diskloc, diskloc );
+
+            getDur().commitIfNeeded();
+
+            {
+                double op = 1.0;
+                if( oldObjSize )
+                    op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
+                log() << "compact finished extent #" << extentNumber << " containing " << nrecords
+                      << " documents (" << datasize/1000000.0 << "MB)"
+                      << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100;
+            }
+        }
+
+    }
+
+    Status SimpleRecordStoreV1::compact( RecordStoreCompactAdaptor* adaptor,
+                                         const CompactOptions* options,
+                                         CompactStats* stats ) {
+
+        // this is a big job, so might as well make things tidy before we start just to be nice.
+        getDur().commitIfNeeded();
+
+        list<DiskLoc> extents;
+        for( DiskLoc extLocation = _details->firstExtent();
+             !extLocation.isNull();
+             extLocation = _extentManager->getExtent( extLocation )->xnext ) {
+            extents.push_back( extLocation );
+        }
+        log() << "compact " << extents.size() << " extents";
+
+        log() << "compact orphan deleted lists" << endl;
+        _details->orphanDeletedList();
+
+        // Start over from scratch with our extent sizing and growth
+        _details->setLastExtentSize( 0 );
+
+        // create a new extent so new records go there
+        increaseStorageSize( _details->lastExtentSize(), true );
+
+        // reset data size and record counts to 0 for this namespace
+        // as we're about to tally them up again for each new extent
+        _details->setStats( 0, 0 );
+
+        ProgressMeterHolder pm(cc().curop()->setMessage("compact extent",
+                                                        "Extent Compacting Progress",
+                                                        extents.size()));
+
+        int extentNumber = 0;
+        for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) {
+            _compactExtent(*i, extentNumber++, adaptor, options, stats );
+            pm.hit();
+        }
+
+        invariant( _extentManager->getExtent( _details->firstExtent() )->xprev.isNull() );
+        invariant( _extentManager->getExtent( _details->lastExtent() )->xnext.isNull() );
+
+        // indexes will do their own progress meter
+        pm.finished();
+
+        return Status::OK();
     }
 
 }

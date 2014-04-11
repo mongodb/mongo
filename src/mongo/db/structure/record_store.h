@@ -37,11 +37,15 @@
 namespace mongo {
 
     class Collection;
+    struct CompactOptions;
+    struct CompactStats;
     class DocWriter;
     class ExtentManager;
     class MAdvise;
     class NamespaceDetails;
     class Record;
+
+    class RecordStoreCompactAdaptor;
     class RecordStore;
 
     /**
@@ -84,6 +88,11 @@ namespace mongo {
         RecordStore( const StringData& ns );
         virtual ~RecordStore();
 
+        // META
+
+        // name of the RecordStore implementation
+        virtual const char* name() const = 0;
+
         // CRUD related
 
         virtual Record* recordFor( const DiskLoc& loc ) const = 0;
@@ -110,6 +119,12 @@ namespace mongo {
          */
         virtual Status truncate() = 0;
 
+        // does this RecordStore support the compact operation
+        virtual bool compactSupported() const = 0;
+        virtual Status compact( RecordStoreCompactAdaptor* adaptor,
+                                const CompactOptions* options,
+                                CompactStats* stats ) = 0;
+
         // TODO: this makes me sad, it shouldn't be in the interface
         // do not use this anymore
         virtual void increaseStorageSize( int size, int quotaMax ) = 0;
@@ -121,4 +136,11 @@ namespace mongo {
         std::string _ns;
     };
 
+    class RecordStoreCompactAdaptor {
+    public:
+        virtual ~RecordStoreCompactAdaptor(){}
+        virtual bool isDataValid( Record* rec ) = 0;
+        virtual size_t dataSize( Record* rec ) = 0;
+        virtual void inserted( Record* rec, const DiskLoc& newLocation ) = 0;
+    };
 }

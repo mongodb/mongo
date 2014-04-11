@@ -2271,7 +2271,8 @@ var authCommandsLib = {
                 }
             ]
         },
-        {
+/*      temporarily removed see SERVER-13555 
+         {
             testname: "storageDetails",
             command: {storageDetails: "x", analyze: "diskStorage"},
             skipSharded: true,
@@ -2293,7 +2294,7 @@ var authCommandsLib = {
                     ]
                 }
             ]
-        },
+        }, */
         {
             testname: "text",
             command: {text: "x"},

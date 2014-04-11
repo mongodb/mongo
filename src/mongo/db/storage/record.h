@@ -75,7 +75,7 @@ namespace mongo {
         /* use this when a record is deleted. basically a union with next/prev fields */
         DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
 
-        DiskLoc myExtent(const DiskLoc& myLoc) const { return DiskLoc(myLoc.a(), extentOfs() ); }
+        DiskLoc myExtentLoc(const DiskLoc& myLoc) const { return DiskLoc(myLoc.a(), extentOfs() ); }
 
         struct NP {
             int nextOfs;

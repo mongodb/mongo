@@ -47,198 +47,71 @@
 
 namespace mongo {
 
-    class CompactDocWriter : public DocWriter {
-    public:
-        /**
-         * param allocationSize - allocation size WITH header
-         */
-        CompactDocWriter( const BSONObj& doc, size_t allocationSize )
-            : _doc( doc ), _allocationSize( allocationSize ) {
-        }
-
-        virtual ~CompactDocWriter() {}
-
-        virtual void writeDocument( char* buf ) const {
-            memcpy( buf, _doc.objdata(), _doc.objsize() );
-        }
-
-        virtual size_t documentSize() const {
-            return _allocationSize - Record::HeaderSize;
-        }
-
-        virtual bool addPadding() const {
-            return false;
-        }
-
-    private:
-        BSONObj _doc;
-        size_t _allocationSize;
-    };
-
-    void Collection::_compactExtent(const DiskLoc diskloc, int extentNumber,
-                                    MultiIndexBlock& indexesToInsertTo,
-                                    const CompactOptions* compactOptions, CompactStats* stats ) {
-
-        log() << "compact begin extent #" << extentNumber
-              << " for namespace " << _ns << " " << diskloc;
-
-        unsigned oldObjSize = 0; // we'll report what the old padding was
-        unsigned oldObjSizeWithPadding = 0;
-
-        Extent *e = getExtentManager()->getExtent( diskloc );
-        e->assertOk();
-        verify( e->validates(diskloc) );
-
-        {
-            // the next/prev pointers within the extent might not be in order so we first
-            // page the whole thing in sequentially
-            log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
-            Timer t;
-            size_t length = e->length;
-
-            touch_pages( reinterpret_cast<const char*>(e), length );
-            int ms = t.millis();
-            if( ms > 1000 )
-                log() << "compact end paging in " << ms << "ms "
-                      << e->length/1000000.0/t.seconds() << "MB/sec" << endl;
-        }
-
-        {
-            log() << "compact copying records" << endl;
-            long long datasize = 0;
-            long long nrecords = 0;
-            DiskLoc L = e->firstRecord;
-            if( !L.isNull() ) {
-                while( 1 ) {
-                    Record *recOld = _recordStore->recordFor(L);
-                    BSONObj objOld = docFor( L );
-                    L = getExtentManager()->getNextRecordInExtent(L);
-
-                    if ( compactOptions->validateDocuments && !objOld.valid() ) {
-                        // object is corrupt!
-                        log() << "compact skipping corrupt document!";
-                        stats->corruptDocuments++;
-                    }
-                    else {
-                        unsigned docSize = objOld.objsize();
-
-                        nrecords++;
-                        oldObjSize += docSize;
-                        oldObjSizeWithPadding += recOld->netLength();
-
-                        unsigned lenWHdr = docSize + Record::HeaderSize;
-                        unsigned lenWPadding = lenWHdr;
-
-                        switch( compactOptions->paddingMode ) {
-                        case CompactOptions::NONE:
-                            if ( details()->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes) )
-                                lenWPadding = details()->quantizePowerOf2AllocationSpace(lenWPadding);
-                            break;
-                        case CompactOptions::PRESERVE:
-                            // if we are preserving the padding, the record should not change size
-                            lenWPadding = recOld->lengthWithHeaders();
-                            break;
-                        case CompactOptions::MANUAL:
-                            lenWPadding = compactOptions->computeRecordSize(lenWPadding);
-                            if (lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) {
-                                lenWPadding = lenWHdr;
-                            }
-                            break;
-                        }
-
-                        CompactDocWriter writer( objOld, lenWPadding );
-                        StatusWith<DiskLoc> status = _recordStore->insertRecord( &writer, 0 );
-                        uassertStatusOK( status.getStatus() );
-                        datasize += _recordStore->recordFor( status.getValue() )->netLength();
-
-                        InsertDeleteOptions options;
-                        options.logIfError = false;
-                        options.dupsAllowed = true; // in compact we should be doing no checking
-
-                        indexesToInsertTo.insert( objOld, status.getValue(), options );
-                    }
-
-                    if( L.isNull() ) {
-                        // we just did the very last record from the old extent.  it's still pointed to
-                        // by the old extent ext, but that will be fixed below after this loop
-                        break;
-                    }
-
-                    // remove the old records (orphan them) periodically so our commit block doesn't get too large
-                    bool stopping = false;
-                    RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
-                    if( stopping || getDur().isCommitNeeded() ) {
-                        e->firstRecord.writing() = L;
-                        Record *r = _recordStore->recordFor(L);
-                        getDur().writingInt(r->prevOfs()) = DiskLoc::NullOfs;
-                        getDur().commitIfNeeded();
-                        killCurrentOp.checkForInterrupt();
-                    }
+    namespace {
+        BSONObj _compactAdjustIndexSpec( const BSONObj& oldSpec ) {
+            BSONObjBuilder b;
+            BSONObj::iterator i( oldSpec );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( str::equals( e.fieldName(), "v" ) ) {
+                    // Drop any preexisting index version spec.  The default index version will
+                    // be used instead for the new index.
+                    continue;
                 }
-            } // if !L.isNull()
-
-            verify( details()->firstExtent() == diskloc );
-            verify( details()->lastExtent() != diskloc );
-            DiskLoc newFirst = e->xnext;
-            details()->firstExtent().writing() = newFirst;
-            getExtentManager()->getExtent( newFirst )->xprev.writing().Null();
-            getDur().writing(e)->markEmpty();
-            getExtentManager()->freeExtents( diskloc, diskloc );
-
-            getDur().commitIfNeeded();
-
-            {
-                double op = 1.0;
-                if( oldObjSize )
-                    op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
-                log() << "compact finished extent #" << extentNumber << " containing " << nrecords
-                      << " documents (" << datasize/1000000.0 << "MB)"
-                      << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100;
+                if ( str::equals( e.fieldName(), "background" ) ) {
+                    // Create the new index in the foreground.
+                    continue;
+                }
+                // Pass the element through to the new index spec.
+                b.append(e);
             }
+            return b.obj();
         }
+
+        class MyCompactAdaptor : public RecordStoreCompactAdaptor {
+        public:
+            MyCompactAdaptor( Collection* collection,
+                              MultiIndexBlock* indexBlock )
+                : _collection( collection ),
+                  _multiIndexBlock( indexBlock ) {
+            }
+
+            virtual bool isDataValid( Record* rec ) {
+                return BSONObj( rec->data() ).valid();
+            }
+
+            virtual size_t dataSize( Record* rec ) {
+                return BSONObj( rec->data() ).objsize();
+            }
+
+            virtual void inserted( Record* rec, const DiskLoc& newLocation ) {
+                InsertDeleteOptions options;
+                options.logIfError = false;
+                options.dupsAllowed = true; // in compact we should be doing no checking
+
+                _multiIndexBlock->insert( BSONObj( rec->data() ), newLocation, options );
+            }
+
+        private:
+            Collection* _collection;
+            MultiIndexBlock* _multiIndexBlock;
+        };
 
     }
 
-    BSONObj _compactAdjustIndexSpec( const BSONObj& oldSpec ) {
-        BSONObjBuilder b;
-        BSONObj::iterator i( oldSpec );
-        while( i.more() ) {
-            BSONElement e = i.next();
-            if ( str::equals( e.fieldName(), "v" ) ) {
-                // Drop any preexisting index version spec.  The default index version will
-                // be used instead for the new index.
-                continue;
-            }
-            if ( str::equals( e.fieldName(), "background" ) ) {
-                // Create the new index in the foreground.
-                continue;
-            }
-            // Pass the element through to the new index spec.
-            b.append(e);
-        }
-        return b.obj();
-    }
 
     StatusWith<CompactStats> Collection::compact( const CompactOptions* compactOptions ) {
 
-        if ( isCapped() )
+        if ( !_recordStore->compactSupported() )
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
-                                             "cannot compact capped collection" );
+                                             str::stream() <<
+                                             "cannot compact collection with record store: " <<
+                                             _recordStore->name() );
 
         if ( _indexCatalog.numIndexesInProgress() )
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
                                              "cannot compact when indexes in progress" );
 
-        // this is a big job, so might as well make things tidy before we start just to be nice.
-        getDur().commitIfNeeded();
-
-        list<DiskLoc> extents;
-        for( DiskLoc extLocation = _details->firstExtent();
-             !extLocation.isNull();
-             extLocation = getExtentManager()->getExtent( extLocation )->xnext ) {
-            extents.push_back( extLocation );
-        }
-        log() << "compact " << extents.size() << " extents";
 
         // same data, but might perform a little different after compact?
         _infoCache.reset();
@@ -263,17 +136,6 @@ namespace mongo {
             }
         }
 
-        log() << "compact orphan deleted lists" << endl;
-        _details->orphanDeletedList();
-
-        // Start over from scratch with our extent sizing and growth
-        _details->setLastExtentSize( 0 );
-
-        // before dropping indexes, at least make sure we can allocate one extent!
-        // this will allocate an extent and add to free list
-        // if it cannot, it will throw an exception
-        increaseStorageSize( _details->lastExtentSize(), true );
-
         // note that the drop indexes call also invalidates all clientcursors for the namespace,
         // which is important and wanted here
         log() << "compact dropping indexes" << endl;
@@ -282,7 +144,6 @@ namespace mongo {
             return StatusWith<CompactStats>( status );
         }
 
-        getDur().commitIfNeeded();
         killCurrentOp.checkForInterrupt();
 
         CompactStats stats;
@@ -292,27 +153,11 @@ namespace mongo {
         if ( !status.isOK() )
             return StatusWith<CompactStats>( status );
 
-        // reset data size and record counts to 0 for this namespace
-        // as we're about to tally them up again for each new extent
-        _details->setStats( 0, 0 );
+        MyCompactAdaptor adaptor( this, &multiIndexBlock );
 
-        ProgressMeterHolder pm(cc().curop()->setMessage("compact extent",
-                                                        "Extent Compacting Progress",
-                                                        extents.size()));
-
-        int extentNumber = 0;
-        for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) {
-            _compactExtent(*i, extentNumber++, multiIndexBlock, compactOptions, &stats );
-            pm.hit();
-        }
-
-        invariant( getExtentManager()->getExtent( _details->firstExtent() )->xprev.isNull() );
-
-        // indexes will do their own progress meter
-        pm.finished();
+        _recordStore->compact( &adaptor, compactOptions, &stats );
 
         log() << "starting index commits";
-
         status = multiIndexBlock.commit();
         if ( !status.isOK() )
             return StatusWith<CompactStats>( status );

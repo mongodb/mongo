@@ -49,6 +49,8 @@ namespace mongo {
 
         virtual ~CappedRecordStoreV1();
 
+        const char* name() const { return "CappedRecordStoreV1"; }
+
         virtual Status truncate();
 
         /**
@@ -62,6 +64,12 @@ namespace mongo {
 
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
+
+        virtual bool compactSupported() const { return false; }
+
+        virtual Status compact( RecordStoreCompactAdaptor* adaptor,
+                                const CompactOptions* options,
+                                CompactStats* stats );
 
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );

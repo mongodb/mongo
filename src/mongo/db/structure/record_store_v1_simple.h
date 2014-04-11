@@ -47,16 +47,29 @@ namespace mongo {
 
         virtual ~SimpleRecordStoreV1();
 
+        const char* name() const { return "SimpleRecordStoreV1"; }
+
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual Status truncate();
+
+        virtual bool compactSupported() const { return true; }
+        virtual Status compact( RecordStoreCompactAdaptor* adaptor,
+                                const CompactOptions* options,
+                                CompactStats* stats );
+
     protected:
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 
         virtual void addDeletedRec(const DiskLoc& dloc);
     private:
         DiskLoc _allocFromExistingExtents( int lengthWithHeaders );
+
+        void _compactExtent(const DiskLoc diskloc, int extentNumber,
+                            RecordStoreCompactAdaptor* adaptor,
+                            const CompactOptions* compactOptions,
+                            CompactStats* stats );
 
         bool _normalCollection;
 
