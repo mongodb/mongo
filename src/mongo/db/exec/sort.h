@@ -55,8 +55,8 @@ namespace mongo {
         // The query.  Used to create the IndexBounds for the sorting.
         BSONObj query;
 
-        // Must be >= 0.  Equal to 0 for no limit.
-        int limit;
+        // Equal to 0 for no limit.
+        size_t limit;
     };
 
     /**
@@ -164,8 +164,8 @@ namespace mongo {
         // The raw query as expressed by the user
         BSONObj _query;
 
-        // Must be >= 0.  Equal to 0 for no limit.
-        int _limit;
+        // Equal to 0 for no limit.
+        size_t _limit;
 
         //
         // Sort key generation

@@ -224,7 +224,12 @@ namespace mongo {
         if (_ntoskip < 0) {
             return Status(ErrorCodes::BadValue, "bad skip value in query");
         }
-        
+
+        if (_ntoreturn == std::numeric_limits<int>::min()) {
+            // _ntoreturn is negative but can't be negated.
+            return Status(ErrorCodes::BadValue, "bad limit value in query");
+        }
+
         if (_ntoreturn < 0) {
             // _ntoreturn greater than zero is simply a hint on how many objects to send back per
             // "cursor batch".  A negative number indicates a hard limit.

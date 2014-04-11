@@ -526,7 +526,7 @@ namespace mongo {
         BSONObj query;
 
         // Sum of both limit and skip count in the parsed query.
-        int limit;
+        size_t limit;
     };
 
     struct LimitNode : public QuerySolutionNode {

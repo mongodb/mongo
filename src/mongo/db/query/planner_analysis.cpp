@@ -406,8 +406,11 @@ namespace mongo {
         // the limit N and skip count M. The sort should return an ordered list
         // N + M items so that the skip stage can discard the first M results.
         if (0 != query.getParsed().getNumToReturn()) {
-            sort->limit = query.getParsed().getNumToReturn() +
-                          query.getParsed().getSkip();
+            // Overflow here would be bad and could cause a nonsense limit. Cast
+            // skip and limit values to unsigned ints to make sure that the
+            // sum is never stored as signed. (See SERVER-13537).
+            sort->limit = size_t(query.getParsed().getNumToReturn()) +
+                          size_t(query.getParsed().getSkip());
 
             // This is a SORT with a limit. The wire protocol has a single quantity
             // called "numToReturn" which could mean either limit or batchSize.
