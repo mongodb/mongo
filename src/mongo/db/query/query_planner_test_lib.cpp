@@ -421,8 +421,9 @@ namespace mongo {
             BSONElement child = sortObj["node"];
             if (child.eoo() || !child.isABSONObj()) { return false; }
 
+            size_t expectedLimit = limitEl.numberInt();
             return (patternEl.Obj() == sn->pattern)
-                   && (limitEl.numberInt() == sn->limit)
+                   && (expectedLimit == sn->limit)
                    && solutionMatches(child.Obj(), sn->children[0]);
         }
         else if (STAGE_SORT_MERGE == trueSoln->getType()) {

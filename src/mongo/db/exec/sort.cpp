@@ -283,7 +283,6 @@ namespace mongo {
           _sorted(false),
           _resultIterator(_data.end()),
           _memUsage(0) {
-        dassert(_limit >= 0);
     }
 
     SortStage::~SortStage() { }
