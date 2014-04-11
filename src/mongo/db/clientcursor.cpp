@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/clientcursor.h"
 
 #include <string>
@@ -44,15 +42,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db.h"
-#include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
-#include "mongo/platform/random.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -307,90 +301,29 @@ namespace mongo {
     // ClientCursorMonitor
     //
 
-    // Used by sayMemoryStatus below.
-    struct Mem { 
-        Mem() { res = virt = mapped = 0; }
-        long long res;
-        long long virt;
-        long long mapped;
-        bool grew(const Mem& r) { 
-            return (r.res && (((double)res)/r.res)>1.1 ) ||
-              (r.virt && (((double)virt)/r.virt)>1.1 ) ||
-              (r.mapped && (((double)mapped)/r.mapped)>1.1 );
-        }
-    };
-
-    /**
-     * called once a minute from killcursors thread
-     */
-    void sayMemoryStatus() { 
-        static time_t last;
-        static Mem mlast;
-        try {
-            ProcessInfo p;
-            if (!serverGlobalParams.quiet && p.supported()) {
-                Mem m;
-                m.res = p.getResidentSize();
-                m.virt = p.getVirtualMemorySize();
-                m.mapped = MemoryMappedFile::totalMappedLength() / (1024 * 1024);
-                time_t now = time(0);
-                if( now - last >= 300 || m.grew(mlast) ) { 
-                    log() << "mem (MB) res:" << m.res << " virt:" << m.virt;
-                    long long totalMapped = m.mapped;
-                    if (storageGlobalParams.dur) {
-                        totalMapped *= 2;
-                        log() << " mapped (incl journal view):" << totalMapped;
-                    }
-                    else {
-                        log() << " mapped:" << totalMapped;
-                    }
-                    log() << " connections:" << Listener::globalTicketHolder.used();
-                    if (theReplSet) {
-                        log() << " replication threads:" << 
-                            ReplSetImpl::replWriterThreadCount + 
-                            ReplSetImpl::replPrefetcherThreadCount;
-                    }
-                    last = now;
-                    mlast = m;
-                }
-            }
-        }
-        catch(const std::exception&) {
-            log() << "ProcessInfo exception" << endl;
-        }
-    }
-
     void ClientCursorMonitor::run() {
         Client::initThread("clientcursormon");
         Client& client = cc();
         Timer t;
         const int Secs = 4;
-        unsigned n = 0;
         while ( ! inShutdown() ) {
             cursorStatsTimedOut.increment( CollectionCursorCache::timeoutCursorsGlobal( t.millisReset() ) );
             sleepsecs(Secs);
-            if( ++n % (60/Secs) == 0 /*once a minute*/ ) {
-                sayMemoryStatus();
-            }
         }
         client.shutdown();
     }
 
-    ClientCursorMonitor clientCursorMonitor;
-
-    //
-    // cursorInfo command.
-    //
-
-    void _appendCursorStats( BSONObjBuilder& b ) {
-        b.append( "note" , "deprecated, use server status metrics" );
-
-        b.appendNumber("clientCursors_size", cursorStatsOpen.get() );
-        b.appendNumber("totalOpen", cursorStatsOpen.get() );
-        b.appendNumber("pinned", cursorStatsOpenPinned.get() );
-        b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get() );
-
-        b.appendNumber("timedOut" , cursorStatsTimedOut.get());
+    namespace {
+        ClientCursorMonitor clientCursorMonitor;
+        
+        void _appendCursorStats( BSONObjBuilder& b ) {
+            b.append( "note" , "deprecated, use server status metrics" );
+            b.appendNumber("clientCursors_size", cursorStatsOpen.get() );
+            b.appendNumber("totalOpen", cursorStatsOpen.get() );
+            b.appendNumber("pinned", cursorStatsOpenPinned.get() );
+            b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get() );
+            b.appendNumber("timedOut" , cursorStatsTimedOut.get());
+        }
     }
 
     // QUESTION: Restrict to the namespace from which this command was issued?
