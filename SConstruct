@@ -88,7 +88,7 @@ use_clang = False
 options = {}
 
 def add_option( name, help, nargs, contributesToVariantDir,
-                dest=None, default = None, type="string", choices=None, metavar=None ):
+                dest=None, default = None, type="string", choices=None, metavar=None, const=None ):
 
     if dest is None:
         dest = name
@@ -104,6 +104,7 @@ def add_option( name, help, nargs, contributesToVariantDir,
                choices=choices,
                default=default,
                metavar=metavar,
+               const=const,
                help=help )
 
     options[name] = { "help" : help ,
@@ -247,11 +248,11 @@ add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild"
 add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , True , "debugBuildAndLogging" )
 
 # new style debug and optimize flags
-add_option( "dbg", "Enable runtime debugging checks", 1, True, "dbg",
-            type="choice", choices=["on", "off"] )
+add_option( "dbg", "Enable runtime debugging checks", "?", True, "dbg",
+            type="choice", choices=["on", "off"], const="on" )
 
-add_option( "opt", "Enable compile-time optimization", 1, True, "opt",
-            type="choice", choices=["on", "off"] )
+add_option( "opt", "Enable compile-time optimization", "?", True, "opt",
+            type="choice", choices=["on", "off"], const="on" )
 
 sanitizer_choices = ["address", "memory", "thread", "undefined"]
 add_option( "sanitize", "enable selected sanitizer", 1, True,
@@ -368,80 +369,27 @@ elif force64:
 
 releaseBuild = has_option("release")
 
-# validate debug and optimization options
-usingOldOptDbgOptions = has_option("debugBuild") or has_option("debugBuildAndLogging")
-usingNewOptDbgOptions = has_option('dbg') or has_option('opt')
-
-if usingOldOptDbgOptions and usingNewOptDbgOptions:
-    print("Error: Cannot mix old style --d or --dd options with new --dbg and --opt options")
+if has_option("debugBuild") or has_option("debugBuildAndLogging"):
+    print("Error: the --d and --dd flags are no longer permitted; use --dbg and --opt instead")
     Exit(1)
 
-# By default, if no options are specified, we assume the new style options and defaults.
-if not usingOldOptDbgOptions:
+dbg_opt_mapping = {
+    # --dbg, --opt   :   dbg    opt
+    ( None,  None  ) : ( False, True ),
+    ( None,  "on"  ) : ( False, True ),
+    ( None,  "off" ) : ( False, False ),
+    ( "on",  None  ) : ( True,  False ),  # special case interaction
+    ( "on",  "on"  ) : ( True,  True ),
+    ( "on",  "off" ) : ( True,  False ),
+    ( "off", None  ) : ( False, True ),
+    ( "off", "on"  ) : ( False, True ),
+    ( "off", "off" ) : ( False, False ),
+}
+debugBuild, optBuild = dbg_opt_mapping[(get_option('dbg'), get_option('opt'))]
 
-    dbg_opt_mapping = {
-        # --dbg, --opt   :   dbg    opt
-        ( None,  None  ) : ( False, True ),
-        ( None,  "on"  ) : ( False, True ),
-        ( None,  "off" ) : ( False, False ),
-        ( "on",  None  ) : ( True,  False ),  # special case interaction
-        ( "on",  "on"  ) : ( True,  True ),
-        ( "on",  "off" ) : ( True,  False ),
-        ( "off", None  ) : ( False, True ),
-        ( "off", "on"  ) : ( False, True ),
-        ( "off", "off" ) : ( False, False ),
-    }
-    debugBuild, optBuild = dbg_opt_mapping[(get_option('dbg'), get_option('opt'))]
-
-    if releaseBuild and (debugBuild or not optBuild):
-        print("Error: A --release build may not have debugging, and must have optimization")
-        Exit(1)
-
-else:
-    # TODO: Once all buildbots and variants have switched to the new flags,
-    # remove support for --d and --dd
-
-    d_provided = has_option( "debugBuild" )
-    dd_provided = has_option( "debugBuildAndLogging" )
-
-    dbg_opt_mapping = {
-        # win    --d    --dd   --release :   dbg    opt   release
-        ( False, False, False, False )   : ( False, True, False ),
-        ( False, False, False, True  )   : ( False, True, True ),
-
-        ( False, False, True,  False )   : ( True, False, False ),
-        ( False, False, True,  True  )   : None,
-
-
-        ( False, True, False, False )    : ( False, False, False ),
-        ( False, True, False, True  )    : None,
-
-        ( False, True, True,  False )    : ( True, False, False ),
-        ( False, True, True,  True  )    : None,
-
-
-
-
-        ( True, False, False, False )    : ( False, False, False ),
-        ( True, False, False, True  )    : ( False, True, True ),
-
-        ( True, False, True,  False )    : ( True, False, False ),
-        ( True, False, True,  True  )    : ( False, True, True ),  # --release dominates on windows
-
-
-        ( True, True, False, False )     : ( True, False, False ),
-        ( True, True, False, True  )     : ( False, True, True ),  # --release dominates on windows
-
-        ( True, True, True,  False )     : ( True, False, False ),
-        ( True, True, True,  True  )     : ( False, True, True ),  # --release dominates on windows
-    }
-
-    values = dbg_opt_mapping.get((windows, d_provided, dd_provided, releaseBuild))
-    if not values:
-        print("Error: An invalid combination of --d, --dd, and --release was specified")
-        Exit(1)
-
-    debugBuild, optBuild, releaseBuild = values
+if releaseBuild and (debugBuild or not optBuild):
+    print("Error: A --release build may not have debugging, and must have optimization")
+    Exit(1)
 
 static = has_option( "static" )
 
