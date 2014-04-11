@@ -8,6 +8,29 @@
 #include "wt_internal.h"
 
 /*
+ * Custom NEED macros for metadata cursors - that copy the values into the
+ * backing metadata table cursor.
+ * TODO: Would a reference be enough here?
+ */
+#define	WT_MD_CURSOR_NEEDKEY(cursor) do {				\
+	WT_CURSOR_NEEDKEY(cursor);					\
+	__wt_buf_set(session,						\
+	    &((WT_CURSOR_METADATA *)(cursor))->file_cursor->key,	\
+	    cursor->key.data, cursor->key.size);			\
+	F_SET(((WT_CURSOR_METADATA *)(cursor))->file_cursor,		\
+	    WT_CURSTD_KEY_EXT);						\
+} while (0)
+
+#define	WT_MD_CURSOR_NEEDVALUE(cursor) do {				\
+	WT_CURSOR_NEEDVALUE(cursor);					\
+	__wt_buf_set(session,						\
+	    &((WT_CURSOR_METADATA *)(cursor))->file_cursor->value,	\
+	    cursor->value.data, cursor->value.size);			\
+	F_SET(((WT_CURSOR_METADATA *)(cursor))->file_cursor,		\
+	    WT_CURSTD_VALUE_EXT);					\
+} while (0)
+
+/*
  * __curmetadata_metadata_search --
  *	Retrieve the metadata for the metadata table
  */
@@ -18,19 +41,23 @@ __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	char *value;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
-	WT_RET(__wt_metadata_search(session,
-	    "file:metadata", (const char **)&value));
+	/* The metadata search interface allocates a new string in value */
+	WT_RET(__wt_metadata_search(
+	    session, WT_METADATA_URI, (const char **)&value));
 	/*
 	 * Copy the value in the underlying btree cursors tmp item
 	 * which will be free'd when the cursor is closed.
 	 */
 	if (F_ISSET(mdc, WT_MDC_TMP_USED))
 		__wt_buf_free(session, &mdc->tmp_val);
-	mdc->tmp_val.data = mdc->tmp_val.mem = value;
-	mdc->tmp_val.size = mdc->tmp_val.memsize = strlen(value);
+	WT_RET(__wt_buf_set(session, &mdc->tmp_val, value, strlen(value)));
 	/* TODO: Is this assignment OK? */
-	cursor->value = mdc->tmp_val;
+	cursor->key.data = WT_METADATA_URI;
+	cursor->key.size = strlen(WT_METADATA_URI);
+	cursor->value.data = mdc->tmp_val.data;
+	cursor->value.size = mdc->tmp_val.size;
 	F_SET(mdc, WT_MDC_ONMETADATA | WT_MDC_POSITIONED | WT_MDC_TMP_USED);
+	F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 	return (0);
 }
 
@@ -55,8 +82,8 @@ __curmetadata_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Can only compare cursors of the same type");
 
-	WT_CURSOR_NEEDKEY(a);
-	WT_CURSOR_NEEDKEY(b);
+	WT_MD_CURSOR_NEEDKEY(a);
+	WT_MD_CURSOR_NEEDKEY(b);
 
 	/* TODO: Compare if both cursors are positioned on metadata table */
 
@@ -86,12 +113,22 @@ __curmetadata_next(WT_CURSOR *cursor)
 	if (!F_ISSET(mdc, WT_MDC_POSITIONED))
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 	else {
-		ret = file_cursor->next(mdc->file_cursor);
-		if (ret == 0)
-			F_CLR(mdc, WT_MDC_ONMETADATA);
+		WT_ERR(file_cursor->next(mdc->file_cursor));
+		F_CLR(mdc, WT_MDC_ONMETADATA);
+		F_SET(mdc, WT_MDC_POSITIONED);
+		/* Make the key/value visible. */
+		cursor->key.data = file_cursor->key.data;
+		cursor->key.size = file_cursor->key.size;
+		cursor->value.data = file_cursor->value.data;
+		cursor->value.size = file_cursor->value.size;
+		F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 	}
 
-err:	API_END(session);
+err:	if (ret != 0) {
+		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+	}
+	API_END(session);
 	return (ret);
 }
 
@@ -112,18 +149,27 @@ __curmetadata_prev(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session,
 	    prev, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	if (F_ISSET(mdc, WT_MDC_ONMETADATA))
+	if (F_ISSET(mdc, WT_MDC_ONMETADATA)) {
 		ret = WT_NOTFOUND;
-	else if ((ret =
-	    file_cursor->prev(file_cursor)) == WT_NOTFOUND)
+		goto err;
+	}
+
+	ret = file_cursor->prev(file_cursor);
+	if (ret == 0) {
+		/* Make the key/value visible. */
+		cursor->key.data = file_cursor->key.data;
+		cursor->key.size = file_cursor->key.size;
+		cursor->value.data = file_cursor->value.data;
+		cursor->value.size = file_cursor->value.size;
+		F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+	} else if (ret == WT_NOTFOUND)
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 
-	if (ret != 0)
-		F_CLR(mdc,
-		    WT_MDC_POSITIONED |
-		    WT_MDC_ONMETADATA);
-
-err:	API_END(session);
+err:	if (ret != 0) {
+		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+	}
+	API_END(session);
 	return (ret);
 }
 
@@ -149,6 +195,7 @@ __curmetadata_reset(WT_CURSOR *cursor)
 	    ret = file_cursor->reset(file_cursor);
 	F_CLR(mdc,
 	    WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END(session);
 	return (ret);
@@ -171,17 +218,27 @@ __curmetadata_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session,
 	    search, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_MD_CURSOR_NEEDKEY(cursor);
 
-	if (cursor->key.size == strlen("metadata") &&
-	    strncmp(cursor->key.data, "metadata", strlen("metadata")) == 0)
+	if (WT_STRING_MATCH(
+	    (char *)cursor->key.data, "metadata:", cursor->key.size - 1))
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 	else {
 		WT_ERR(file_cursor->search(file_cursor));
+		/* Make the key/value visible. */
+		cursor->key.data = file_cursor->key.data;
+		cursor->key.size = file_cursor->key.size;
+		cursor->value.data = file_cursor->value.data;
+		cursor->value.size = file_cursor->value.size;
+		F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 		F_SET(mdc, WT_MDC_POSITIONED);
 	}
 
-err:	API_END(session);
+err:	if (ret != 0) {
+		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+	}
+	API_END(session);
 	return (ret);
 }
 
@@ -202,10 +259,10 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 	CURSOR_API_CALL(cursor, session,
 	    search_near, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_MD_CURSOR_NEEDKEY(cursor);
 
-	if (cursor->key.size == strlen("metadata") &&
-	    strncmp(cursor->key.data, "metadata", strlen("metadata")) == 0) {
+	if (WT_STRING_MATCH(
+	    (char *)cursor->key.data, "metadata:", cursor->key.size - 1)) {
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 		*exact = 1;
 	} else {
@@ -234,8 +291,8 @@ __curmetadata_insert(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session,
 	    insert, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_MD_CURSOR_NEEDKEY(cursor);
+	WT_MD_CURSOR_NEEDVALUE(cursor);
 
 	/* TODO: Copy key/value so we know they are NULL terminated */
 	ret =__wt_metadata_insert(session,
@@ -262,8 +319,8 @@ __curmetadata_update(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session,
 	    update, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_MD_CURSOR_NEEDKEY(cursor);
+	WT_MD_CURSOR_NEEDVALUE(cursor);
 
 	/* TODO: Copy key/value so we know they are NULL terminated */
 	ret = __wt_metadata_update(session,
@@ -290,7 +347,7 @@ __curmetadata_remove(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session,
 	    remove, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_MD_CURSOR_NEEDKEY(cursor);
 
 	/* TODO: Copy key so we know it is NULL terminated */
 	ret = __wt_metadata_remove(session, (const char *)cursor->key.data);
@@ -317,8 +374,6 @@ __curmetadata_close(WT_CURSOR *cursor)
 	    close, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
 	ret = file_cursor->close(file_cursor);
-	if (F_ISSET(mdc, WT_MDC_TMP_USED))
-		__wt_buf_free(session, &mdc->tmp_val);
 
 	WT_ERR(__wt_cursor_close(cursor));
 

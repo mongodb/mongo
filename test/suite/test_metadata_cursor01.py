@@ -91,6 +91,7 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
             value = cursor.get_value()
 
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
+        cursor.reset()
         self.assertCursorHasNoKeyValue(cursor)
         cursor.close()
 
@@ -118,12 +119,11 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
         self.assertCursorHasNoKeyValue(cursor)
         
         # Ensure the 'special' metadata metadata is found.
-        value = cursor['metadata']
+        value = cursor['metadata:']
         self.assertTrue(value.find('key_format') != -1)
 
         # Ensure the metadata for the table we created is found
         value = cursor['table:' + self.table_name1]
-        self.assertEqual(key, 'table:' + self.table_name1)
         self.assertTrue(value.find('key_format') != -1)
 
 if __name__ == '__main__':
