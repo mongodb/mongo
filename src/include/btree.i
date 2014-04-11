@@ -310,6 +310,8 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline void
 __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+        WT_TXN_GLOBAL *txn_global;
+
 	/*
 	 * We depend on atomic-add being a write barrier, that is, a barrier to
 	 * ensure all changes to the page are flushed before updating the page
@@ -333,8 +335,9 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Set the checkpoint generation: if a checkpoint is already
 		 * running, these changes cannot be included, by definition.
 		 */
-		page->modify->checkpoint_gen =
-		    S2C(session)->txn_global.checkpoint_gen;
+		txn_global = &S2C(session)->txn_global;
+		page->modify->checkpoint_gen = txn_global->checkpoint_gen;
+		page->modify->rec_min_skipped_txn = txn_global->last_running;
 	}
 
 	/* Check if this is the largest transaction ID to update the page. */
