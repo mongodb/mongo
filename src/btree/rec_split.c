@@ -623,15 +623,14 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		parent = ref->home;
 		F_CAS_ATOMIC(parent, WT_PAGE_SPLITTING, ret);
 		if (ret == 0) {
-			if (parent != ref->home) {
-				F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
-				continue;
-			}
-			break;
-		} else if (ret == EBUSY)
-			__wt_yield();
-		else
-			WT_ERR(ret);
+			if (parent == ref->home)
+				break;
+			F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+			continue;
+		}
+		if (ret != EBUSY)
+			goto err;
+		__wt_yield();
 	}
 	locked = 1;
 
