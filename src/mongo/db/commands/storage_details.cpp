@@ -13,6 +13,7 @@
  *    limitations under the License.
  */
 
+#if 0 // disable SERVER-13555
 #include "mongo/pch.h"
 
 #include <ctime>
@@ -867,3 +868,4 @@ namespace {
 
 }  // namespace mongo
 
+#endif
