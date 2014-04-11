@@ -294,10 +294,10 @@ __rec_review(
 
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages already
-	 * appearing in the checkpoint: if we write a page and free the previous
-	 * version of the page, that previous version might be referenced by
-	 * an internal page already been written in the checkpoint, leaving the
-	 * checkpoint inconsistent.
+	 * visited during the checkpoint: if we write a page and free the
+	 * previous version of the page, that previous version might be
+	 * referenced by an internal page already been written in the
+	 * checkpoint, leaving the checkpoint inconsistent.
 	 *     Don't rely on new updates being skipped by the transaction used
 	 * for transaction reads: (1) there are paths that dirty pages for
 	 * artificial reasons; (2) internal pages aren't transactional; and
@@ -382,8 +382,9 @@ __rec_review(
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, ref, NULL, flags));
 		/*
-		 * If we skipped some updates because we were helping out a
-		 * checkpoint, that's okay.
+		 * If we wrote the page and skipped some updates because we
+		 * were helping out a checkpoint, that's okay, but we can't
+		 * evict the page.
 		 */
 		if (LF_ISSET(WT_SKIP_UPDATE_OK) && __wt_page_is_modified(page))
 			return (EBUSY);
