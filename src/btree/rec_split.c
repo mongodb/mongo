@@ -423,7 +423,7 @@ __split_inmem_build(
 	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *skip;
 	uint64_t recno;
-	uint32_t i;
+	uint32_t i, slot;
 
 	WT_CLEAR(cbt);
 	cbt.btree = S2BT(session);
@@ -451,19 +451,13 @@ __split_inmem_build(
 	multi->skip_dsk = NULL;
 
 	/* Re-create each modification we couldn't write. */
-	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip) {
-		if (skip->ins == NULL) {
-			upd = orig->pg_row_upd[WT_ROW_SLOT(orig, skip->rip)];
-			orig->pg_row_upd[WT_ROW_SLOT(orig, skip->rip)] = NULL;
-		} else {
-			upd = skip->ins->upd;
-			skip->ins->upd = NULL;
-		}
-
+	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip)
 		switch (orig->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 			/* Build a key. */
+			upd = skip->ins->upd;
+			skip->ins->upd = NULL;
 			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
@@ -475,10 +469,17 @@ __split_inmem_build(
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
-			if (skip->ins == NULL)
+			if (skip->ins == NULL) {
+				slot = WT_ROW_SLOT(orig, skip->rip);
+				upd = orig->pg_row_upd[slot];
+				orig->pg_row_upd[slot] = NULL;
+
 				WT_RET(__wt_row_leaf_key(
 				    session, orig, skip->rip, &key, 0));
-			else {
+			} else {
+				upd = skip->ins->upd;
+				skip->ins->upd = NULL;
+
 				key.data = WT_INSERT_KEY(skip->ins);
 				key.size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
@@ -492,7 +493,6 @@ __split_inmem_build(
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
-	}
 
 	return (0);
 }
