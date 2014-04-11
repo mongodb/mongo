@@ -2113,6 +2113,15 @@ namespace {
         assertSolutionExists("{cscan: {dir: 1}}");
     }
 
+    // Negated $elemMatch value won't use the index
+    TEST_F(QueryPlannerTest, NegationElemMatchValue) {
+        addIndex(BSON("i" << 1));
+        runQuery(fromjson("{i: {$not: {$elemMatch: {$gt: 3, $lt: 10}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
     // Negated $elemMatch object won't use the index
     TEST_F(QueryPlannerTest, NegationElemMatchObject) {
         addIndex(BSON("i.j" << 1));
