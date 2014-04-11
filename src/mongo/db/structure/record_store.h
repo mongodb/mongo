@@ -42,6 +42,7 @@ namespace mongo {
     class MAdvise;
     class NamespaceDetails;
     class Record;
+    class RecordStore;
 
     /**
      * A RecordIterator provides an interface for walking over a RecordStore.
@@ -70,6 +71,10 @@ namespace mongo {
 
         // Returns true if collection still exists, false otherwise.
         virtual bool recoverFromYield() = 0;
+
+        // normally this will just go back to the RecordStore and convert
+        // but this gives the iterator an oppurtnity to optimize
+        virtual const Record* recordFor( const DiskLoc& loc ) const = 0;
     };
 
 

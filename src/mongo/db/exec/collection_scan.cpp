@@ -53,7 +53,7 @@ namespace mongo {
             return true;
         }
 
-        return loc.rec()->likelyInPhysicalMemory();
+        return _iter->recordFor(loc)->likelyInPhysicalMemory();
     }
 
     CollectionScan::CollectionScan(const CollectionScanParams& params,

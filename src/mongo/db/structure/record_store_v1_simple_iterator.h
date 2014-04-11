@@ -55,11 +55,13 @@ namespace mongo {
         virtual void prepareToYield();
         virtual bool recoverFromYield();
 
+        virtual const Record* recordFor( const DiskLoc& loc ) const;
+
     private:
         // The result returned on the next call to getNext().
         DiskLoc _curr;
 
-        const SimpleRecordStoreV1* _collection;
+        const SimpleRecordStoreV1* _recordStore;
 
         CollectionScanParams::Direction _direction;
     };

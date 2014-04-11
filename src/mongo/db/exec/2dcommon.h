@@ -194,7 +194,6 @@ namespace twod_exec {
         /* called before query getmore block is iterated */
         virtual void checkLocation();
 
-        virtual Record* _current();
         virtual BSONObj current();
         virtual DiskLoc currLoc();
         virtual BSONObj currKey() const;

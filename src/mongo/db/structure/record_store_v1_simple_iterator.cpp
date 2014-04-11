@@ -43,20 +43,20 @@ namespace mongo {
     SimpleRecordStoreV1Iterator::SimpleRecordStoreV1Iterator(const SimpleRecordStoreV1* collection,
                                                              const DiskLoc& start,
                                                              const CollectionScanParams::Direction& dir)
-        : _curr(start), _collection(collection), _direction(dir) {
+        : _curr(start), _recordStore(collection), _direction(dir) {
 
         if (_curr.isNull()) {
 
-            const ExtentManager* em = _collection->_extentManager;
+            const ExtentManager* em = _recordStore->_extentManager;
 
-            if ( _collection->details()->firstExtent().isNull() ) {
+            if ( _recordStore->details()->firstExtent().isNull() ) {
                 // nothing in the collection
-                verify( _collection->details()->lastExtent().isNull() );
+                verify( _recordStore->details()->lastExtent().isNull() );
             }
             else if (CollectionScanParams::FORWARD == _direction) {
 
                 // Find a non-empty extent and start with the first record in it.
-                Extent* e = em->getExtent( _collection->details()->firstExtent() );
+                Extent* e = em->getExtent( _recordStore->details()->firstExtent() );
 
                 while (e->firstRecord.isNull() && !e->xnext.isNull()) {
                     e = em->getNextExtent( e );
@@ -69,7 +69,7 @@ namespace mongo {
             else {
                 // Walk backwards, skipping empty extents, and use the last record in the first
                 // non-empty extent we see.
-                Extent* e = em->getExtent( _collection->details()->lastExtent() );
+                Extent* e = em->getExtent( _recordStore->details()->lastExtent() );
 
                 // TODO ELABORATE
                 // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
@@ -96,10 +96,10 @@ namespace mongo {
         // Move to the next thing.
         if (!isEOF()) {
             if (CollectionScanParams::FORWARD == _direction) {
-                _curr = _collection->_extentManager->getNextRecord( _curr );
+                _curr = _recordStore->_extentManager->getNextRecord( _curr );
             }
             else {
-                _curr = _collection->_extentManager->getPrevRecord( _curr );
+                _curr = _recordStore->_extentManager->getPrevRecord( _curr );
             }
         }
 
@@ -121,6 +121,10 @@ namespace mongo {
     bool SimpleRecordStoreV1Iterator::recoverFromYield() {
         // if the collection is dropped, then the cursor should be destroyed
         return true;
+    }
+
+    const Record* SimpleRecordStoreV1Iterator::recordFor( const DiskLoc& loc ) const {
+        return _recordStore->recordFor( loc );
     }
 
 }

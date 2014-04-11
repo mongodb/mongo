@@ -43,13 +43,13 @@ namespace mongo {
     CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator( const CappedRecordStoreV1* collection,
                                                               const DiskLoc& start, bool tailable,
                                                               const CollectionScanParams::Direction& dir)
-        : _collection(collection), _curr(start), _tailable(tailable),
+        : _recordStore(collection), _curr(start), _tailable(tailable),
           _direction(dir), _killedByInvalidate(false) {
 
         if (_curr.isNull()) {
 
-            const NamespaceDetails* nsd = _collection->details();
-            const ExtentManager* em = _collection->_extentManager;
+            const NamespaceDetails* nsd = _recordStore->details();
+            const ExtentManager* em = _recordStore->_extentManager;
 
             // If a start position isn't specified, we fill one out from the start of the
             // collection.
@@ -90,8 +90,8 @@ namespace mongo {
     DiskLoc CappedRecordStoreV1Iterator::getNext() {
         DiskLoc ret = _curr;
 
-        const NamespaceDetails* nsd = _collection->details();
-        const ExtentManager* em = _collection->_extentManager;
+        const NamespaceDetails* nsd = _recordStore->details();
+        const ExtentManager* em = _recordStore->_extentManager;
 
         // Move to the next thing.
         if (!isEOF()) {
@@ -135,7 +135,7 @@ namespace mongo {
     bool CappedRecordStoreV1Iterator::recoverFromYield() {
         // If invalidate invalidated the DiskLoc we relied on, give up now.
         if (_killedByInvalidate) {
-            _collection = NULL;
+            _recordStore = NULL;
             return false;
         }
 
@@ -218,5 +218,10 @@ namespace mongo {
         if (!prev.isNull()) { return prev; }
         return nsd->lastRecord();
     }
+
+    const Record* CappedRecordStoreV1Iterator::recordFor( const DiskLoc& loc ) const {
+        return _recordStore->recordFor( loc );
+    }
+
 
 }  // namespace mongo

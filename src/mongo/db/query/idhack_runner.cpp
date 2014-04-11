@@ -133,7 +133,7 @@ namespace mongo {
             invariant(!hasIDProjection(_query.get()));
 
             // Fetch object from storage.
-            Record* record = loc.rec();
+            Record* record = _collection->getRecordStore()->recordFor( loc );
 
             _nscannedObjects++;
 

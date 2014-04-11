@@ -376,7 +376,6 @@ namespace twod_exec {
         _max.recoverFromYield();
     }
 
-    Record* GeoBrowse::_current() { verify(ok()); return _cur._loc.rec(); }
     BSONObj GeoBrowse::current() { verify(ok()); return _cur._o; }
     DiskLoc GeoBrowse::currLoc() { verify(ok()); return _cur._loc; }
     BSONObj GeoBrowse::currKey() const { return _cur._key; }

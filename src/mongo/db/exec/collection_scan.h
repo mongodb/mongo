@@ -63,7 +63,7 @@ namespace mongo {
         /**
          * Returns true if the record 'loc' references is in memory, false otherwise.
          */
-        static bool diskLocInMemory(DiskLoc loc);
+        bool diskLocInMemory(DiskLoc loc);
 
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;

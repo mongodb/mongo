@@ -60,6 +60,7 @@ namespace mongo {
         virtual void prepareToYield();
         virtual bool recoverFromYield();
 
+        virtual const Record* recordFor( const DiskLoc& loc ) const;
     private:
         /**
          * Internal collection navigation helper methods.
@@ -72,7 +73,7 @@ namespace mongo {
                                 const DiskLoc& prev);
 
         // The collection we're iterating over.
-        const CappedRecordStoreV1* _collection;
+        const CappedRecordStoreV1* _recordStore;
 
         // The result returned on the next call to getNext().
         DiskLoc _curr;
