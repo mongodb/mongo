@@ -152,7 +152,8 @@ namespace mongo {
         static void translateEquality(const BSONElement& data,
                                       bool isHashed,
                                       OrderedIntervalList* oil,
-                                      BoundsTightness* tightnessOut);
+                                      BoundsTightness* tightnessOut,
+                                      bool isPrefixed, int prefixLength);
 
         static void unionize(OrderedIntervalList* oilOut);
         static void intersectize(const OrderedIntervalList& arg,

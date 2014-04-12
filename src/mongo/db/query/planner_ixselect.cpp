@@ -235,6 +235,9 @@ namespace mongo {
         else if (IndexNames::HASHED == indexedFieldType) {
             return exprtype == MatchExpression::MATCH_IN || exprtype == MatchExpression::EQ;
         }
+        else if (IndexNames::PREFIX == indexedFieldType) {
+            return node->isComparision() || exprtype == MatchExpression::MATCH_IN;
+        }
         else if (IndexNames::GEO_2DSPHERE == indexedFieldType) {
             if (exprtype == MatchExpression::GEO) {
                 // within or intersect.

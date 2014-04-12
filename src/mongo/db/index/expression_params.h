@@ -36,6 +36,7 @@ namespace mongo {
 
     class ExpressionParams {
     public:
+        static const int DEFAULT_PREFIX_LENGTH = 100;
         static void parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParams* out) {
             BSONObjIterator i(infoObj.getObjectField("key"));
 
@@ -97,6 +98,20 @@ namespace mongo {
             BSONElement firstElt = infoObj.getObjectField("key").firstElement();
             massert(16765, "error: no hashed index field",
                     firstElt.str().compare(IndexNames::HASHED) == 0);
+            *fieldOut = firstElt.fieldName();
+        }
+
+        static void parsePrefixParams(const BSONObj& infoObj,
+                                      int *prefixLength,
+                                      string* fieldOut) {
+            if (infoObj["prefixLength"].eoo()) {
+                *prefixLength = DEFAULT_PREFIX_LENGTH;
+            }
+            else {
+                *prefixLength = infoObj["prefixLength"].numberInt();
+            }
+            uassert(17434, "Error: prefixLength value must be greater than 0.", *prefixLength > 0);
+            BSONElement firstElt = infoObj.getObjectField("key").firstElement();
             *fieldOut = firstElt.fieldName();
         }
 

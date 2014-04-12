@@ -339,6 +339,47 @@ namespace mongo {
     }
 
     // static
+    void ExpressionKeysPrivate::getPrefixKeys(const BSONObj& obj,
+                                              const string& prefixField,
+                                              int prefixLength,
+                                              bool isSparse,
+                                              BSONObjSet* keys) {
+        const char* cstr = prefixField.c_str();
+        BSONElement fieldVal = obj.getFieldDottedOrArray(cstr);
+
+        uassert(17433, "Error: prefix indexes do not support types other than String or binData",
+                fieldVal.type() == String || fieldVal.type() == BinData ||
+                fieldVal.type() == Undefined || fieldVal.type() == EOO);
+
+        if (!fieldVal.eoo()) {
+            keys->insert(makeSinglePrefixKey(fieldVal, prefixLength));
+        }
+        else if (!isSparse) {
+            BSONObj nullObj = BSON("" << BSONNULL);
+            keys->insert(makeSinglePrefixKey(nullObj.firstElement(), prefixLength));
+        }
+    }
+
+    // static
+    BSONObj ExpressionKeysPrivate::makeSinglePrefixKey(const BSONElement& e, int prefixLength) {
+        if (e.type() == String) {
+            return BSON("" << string(e.valuestr(),
+                e.valuestrsize() > prefixLength ? prefixLength : e.valuestrsize()));
+        }
+        else if (e.type() == BinData) {
+            BSONObjBuilder bob;
+            // BinData types have extra byte to store the subtype information. So the
+            // actual data starts 1 byte after the valuestr().
+            bob.appendBinData("", (int) e.objsize() > prefixLength ? prefixLength : e.objsize(),
+                              e.binDataType(), e.valuestr() + 1);
+            return bob.obj();
+        }
+        // In general this function is not called on elements with types other than String or
+        // BinData, but called in situations where the prefix indexed field is null or not defined.
+        return BSON("" << string("", 0));
+    }
+
+    // static
     void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
                                                 const std::string& geoField,
                                                 const std::vector<std::string>& otherFields,

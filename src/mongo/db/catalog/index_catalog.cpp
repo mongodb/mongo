@@ -46,6 +46,7 @@
 #include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
+#include "mongo/db/index/prefix_access_method.h"
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -1125,6 +1126,9 @@ namespace mongo {
 
         if (IndexNames::HASHED == type)
             return new HashAccessMethod( entry );
+
+        if (IndexNames::PREFIX == type)
+            return new PrefixAccessMethod( entry );
 
         if (IndexNames::GEO_2DSPHERE == type)
             return new S2AccessMethod( entry );
