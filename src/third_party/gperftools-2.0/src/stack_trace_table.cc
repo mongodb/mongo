@@ -135,7 +135,7 @@ void** StackTraceTable::ReadStackTracesAndClear() {
       b = b->next;
     }
   }
-  out[idx++] = static_cast<uintptr_t>(0);
+  out[idx++] = NULL;
   ASSERT(idx == out_len);
 
   // Clear state

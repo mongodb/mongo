@@ -244,7 +244,7 @@ void PrintCountAndSize(MallocExtensionWriter* writer,
                        uintptr_t count, uintptr_t size) {
   char buf[100];
   snprintf(buf, sizeof(buf),
-           "%6"PRIu64": %8"PRIu64" [%6"PRIu64": %8"PRIu64"] @",
+           "%6" PRIu64 ": %8" PRIu64 " [%6" PRIu64 ": %8" PRIu64 "] @",
            static_cast<uint64>(count),
            static_cast<uint64>(size),
            static_cast<uint64>(count),

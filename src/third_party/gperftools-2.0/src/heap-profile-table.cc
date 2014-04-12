@@ -303,7 +303,7 @@ int HeapProfileTable::UnparseBucket(const Bucket& b,
     profile_stats->free_size += b.free_size;
   }
   int printed =
-    snprintf(buf + buflen, bufsize - buflen, "%6d: %8"PRId64" [%6d: %8"PRId64"] @%s",
+    snprintf(buf + buflen, bufsize - buflen, "%6d: %8" PRId64 " [%6d: %8" PRId64 "] @%s",
              b.allocs - b.frees,
              b.alloc_size - b.free_size,
              b.allocs,
@@ -616,8 +616,8 @@ void HeapProfileTable::Snapshot::ReportLeaks(const char* checker_name,
   // This is only used by the heap leak checker, but is intimately
   // tied to the allocation map that belongs in this module and is
   // therefore placed here.
-  RAW_LOG(ERROR, "Leak check %s detected leaks of %"PRIuS" bytes "
-          "in %"PRIuS" objects",
+  RAW_LOG(ERROR, "Leak check %s detected leaks of %" PRIuS " bytes "
+          "in %" PRIuS " objects",
           checker_name,
           size_t(total_.alloc_size),
           size_t(total_.allocs));
@@ -663,7 +663,7 @@ void HeapProfileTable::Snapshot::ReportLeaks(const char* checker_name,
                    e.bytes, e.count);
     for (int j = 0; j < e.bucket->depth; j++) {
       const void* pc = e.bucket->stack[j];
-      printer.Printf("\t@ %"PRIxPTR" %s\n",
+      printer.Printf("\t@ %" PRIxPTR " %s\n",
           reinterpret_cast<uintptr_t>(pc), symbolization_table.GetSymbol(pc));
     }
     RAW_LOG(ERROR, "%s", buffer);
@@ -687,7 +687,7 @@ void HeapProfileTable::Snapshot::ReportObject(const void* ptr,
                                               char* unused) {
   // Perhaps also log the allocation stack trace (unsymbolized)
   // on this line in case somebody finds it useful.
-  RAW_LOG(ERROR, "leaked %"PRIuS" byte object %p", v->bytes, ptr);
+  RAW_LOG(ERROR, "leaked %" PRIuS " byte object %p", v->bytes, ptr);
 }
 
 void HeapProfileTable::Snapshot::ReportIndividualObjects() {

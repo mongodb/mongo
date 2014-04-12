@@ -267,21 +267,21 @@ static void MaybeDumpProfileLocked() {
     if (FLAGS_heap_profile_allocation_interval > 0 &&
         total.alloc_size >=
         last_dump_alloc + FLAGS_heap_profile_allocation_interval) {
-      snprintf(buf, sizeof(buf), ("%"PRId64" MB allocated cumulatively, "
-                                  "%"PRId64" MB currently in use"),
+      snprintf(buf, sizeof(buf), ("%" PRId64 " MB allocated cumulatively, "
+                                  "%" PRId64 " MB currently in use"),
                total.alloc_size >> 20, inuse_bytes >> 20);
       need_to_dump = true;
     } else if (FLAGS_heap_profile_deallocation_interval > 0 &&
                total.free_size >=
                last_dump_free + FLAGS_heap_profile_deallocation_interval) {
-      snprintf(buf, sizeof(buf), ("%"PRId64" MB freed cumulatively, "
-                                  "%"PRId64" MB currently in use"),
+      snprintf(buf, sizeof(buf), ("%" PRId64 " MB freed cumulatively, "
+                                  "%" PRId64 " MB currently in use"),
                total.free_size >> 20, inuse_bytes >> 20);
       need_to_dump = true;
     } else if (FLAGS_heap_profile_inuse_interval > 0 &&
                inuse_bytes >
                high_water_mark + FLAGS_heap_profile_inuse_interval) {
-      snprintf(buf, sizeof(buf), "%"PRId64" MB currently in use",
+      snprintf(buf, sizeof(buf), "%" PRId64 " MB currently in use",
                inuse_bytes >> 20);
       need_to_dump = true;
     }
@@ -346,8 +346,8 @@ static void MmapHook(const void* result, const void* start, size_t size,
     // in pretty-printing of NULL as "nil".
     // TODO(maxim): instead should use a safe snprintf reimplementation
     RAW_LOG(INFO,
-            "mmap(start=0x%"PRIxPTR", len=%"PRIuS", prot=0x%x, flags=0x%x, "
-            "fd=%d, offset=0x%x) = 0x%"PRIxPTR"",
+            "mmap(start=0x%" PRIxPTR ", len=%" PRIuS ", prot=0x%x, flags=0x%x, "
+            "fd=%d, offset=0x%x) = 0x%" PRIxPTR "",
             (uintptr_t) start, size, prot, flags, fd, (unsigned int) offset,
             (uintptr_t) result);
 #ifdef TODO_REENABLE_STACK_TRACING
@@ -364,9 +364,9 @@ static void MremapHook(const void* result, const void* old_addr,
     // in pretty-printing of NULL as "nil".
     // TODO(maxim): instead should use a safe snprintf reimplementation
     RAW_LOG(INFO,
-            "mremap(old_addr=0x%"PRIxPTR", old_size=%"PRIuS", "
-            "new_size=%"PRIuS", flags=0x%x, new_addr=0x%"PRIxPTR") = "
-            "0x%"PRIxPTR"",
+            "mremap(old_addr=0x%" PRIxPTR ", old_size=%" PRIuS ", "
+            "new_size=%" PRIuS ", flags=0x%x, new_addr=0x%" PRIxPTR ") = "
+            "0x%" PRIxPTR "",
             (uintptr_t) old_addr, old_size, new_size, flags,
             (uintptr_t) new_addr, (uintptr_t) result);
 #ifdef TODO_REENABLE_STACK_TRACING
@@ -380,7 +380,7 @@ static void MunmapHook(const void* ptr, size_t size) {
     // We use PRIxS not just '%p' to avoid deadlocks
     // in pretty-printing of NULL as "nil".
     // TODO(maxim): instead should use a safe snprintf reimplementation
-    RAW_LOG(INFO, "munmap(start=0x%"PRIxPTR", len=%"PRIuS")",
+    RAW_LOG(INFO, "munmap(start=0x%" PRIxPTR ", len=%" PRIuS ")",
                   (uintptr_t) ptr, size);
 #ifdef TODO_REENABLE_STACK_TRACING
     DumpStackTrace(1, RawInfoStackDumper, NULL);
@@ -390,7 +390,7 @@ static void MunmapHook(const void* ptr, size_t size) {
 
 static void SbrkHook(const void* result, ptrdiff_t increment) {
   if (FLAGS_mmap_log) {  // log it
-    RAW_LOG(INFO, "sbrk(inc=%"PRIdS") = 0x%"PRIxPTR"",
+    RAW_LOG(INFO, "sbrk(inc=%" PRIdS ") = 0x%" PRIxPTR "",
                   increment, (uintptr_t) result);
 #ifdef TODO_REENABLE_STACK_TRACING
     DumpStackTrace(1, RawInfoStackDumper, NULL);

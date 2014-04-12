@@ -587,7 +587,7 @@ static void NewHook(const void* ptr, size_t size) {
         }
       }
     }
-    RAW_VLOG(17, "Alloc Recorded: %p of %"PRIuS"", ptr, size);
+    RAW_VLOG(17, "Alloc Recorded: %p of %" PRIuS "", ptr, size);
   }
 }
 
@@ -645,12 +645,12 @@ static void RegisterStackLocked(const void* top_ptr) {
   if (MemoryRegionMap::FindAndMarkStackRegion(top, &region)) {
     // Make the proper portion of the stack live:
     if (stack_direction == GROWS_TOWARDS_LOW_ADDRESSES) {
-      RAW_VLOG(11, "Live stack at %p of %"PRIuPTR" bytes",
+      RAW_VLOG(11, "Live stack at %p of %" PRIuPTR " bytes",
                   top_ptr, region.end_addr - top);
       live_objects->push_back(AllocObject(top_ptr, region.end_addr - top,
                                           THREAD_DATA));
     } else {  // GROWS_TOWARDS_HIGH_ADDRESSES
-      RAW_VLOG(11, "Live stack at %p of %"PRIuPTR" bytes",
+      RAW_VLOG(11, "Live stack at %p of %" PRIuPTR " bytes",
                   AsPtr(region.start_addr),
                   top - region.start_addr);
       live_objects->push_back(AllocObject(AsPtr(region.start_addr),
@@ -692,12 +692,12 @@ static void RegisterStackLocked(const void* top_ptr) {
           }
           // Make the proper portion of the stack live:
           if (stack_direction == GROWS_TOWARDS_LOW_ADDRESSES) {
-            RAW_VLOG(11, "Live stack at %p of %"PRIuPTR" bytes",
+            RAW_VLOG(11, "Live stack at %p of %" PRIuPTR " bytes",
                         top_ptr, stack_end - top);
             live_objects->push_back(
               AllocObject(top_ptr, stack_end - top, THREAD_DATA));
           } else {  // GROWS_TOWARDS_HIGH_ADDRESSES
-            RAW_VLOG(11, "Live stack at %p of %"PRIuPTR" bytes",
+            RAW_VLOG(11, "Live stack at %p of %" PRIuPTR " bytes",
                         AsPtr(stack_start), top - stack_start);
             live_objects->push_back(
               AllocObject(AsPtr(stack_start), top - stack_start, THREAD_DATA));
@@ -770,14 +770,14 @@ static void MakeDisabledLiveCallbackLocked(
         // and the rest of the region where the stack lives can well
         // contain outdated stack variables which are not live anymore,
         // hence should not be treated as such.
-        RAW_VLOG(11, "Not %s-disabling %"PRIuS" bytes at %p"
+        RAW_VLOG(11, "Not %s-disabling %" PRIuS " bytes at %p"
                     ": have stack inside: %p",
                     (stack_disable ? "stack" : "range"),
                     info.object_size, ptr, AsPtr(*iter));
         return;
       }
     }
-    RAW_VLOG(11, "%s-disabling %"PRIuS" bytes at %p",
+    RAW_VLOG(11, "%s-disabling %" PRIuS " bytes at %p",
                 (stack_disable ? "Stack" : "Range"), info.object_size, ptr);
     live_objects->push_back(AllocObject(ptr, info.object_size,
                                         MUST_BE_ON_HEAP));
@@ -1061,7 +1061,7 @@ static enum {
   if (thread_registers.size()) {
     // Make thread registers be live heap data sources.
     // we rely here on the fact that vector is in one memory chunk:
-    RAW_VLOG(11, "Live registers at %p of %"PRIuS" bytes",
+    RAW_VLOG(11, "Live registers at %p of %" PRIuS " bytes",
                 &thread_registers[0], thread_registers.size() * sizeof(void*));
     live_objects->push_back(AllocObject(&thread_registers[0],
                                         thread_registers.size() * sizeof(void*),
@@ -1098,7 +1098,7 @@ void HeapLeakChecker::IgnoreNonThreadLiveObjectsLocked() {
     for (IgnoredObjectsMap::const_iterator object = ignored_objects->begin();
          object != ignored_objects->end(); ++object) {
       const void* ptr = AsPtr(object->first);
-      RAW_VLOG(11, "Ignored live object at %p of %"PRIuS" bytes",
+      RAW_VLOG(11, "Ignored live object at %p of %" PRIuS " bytes",
                   ptr, object->second);
       live_objects->
         push_back(AllocObject(ptr, object->second, MUST_BE_ON_HEAP));
@@ -1107,7 +1107,7 @@ void HeapLeakChecker::IgnoreNonThreadLiveObjectsLocked() {
       size_t object_size;
       if (!(heap_profile->FindAlloc(ptr, &object_size)  &&
             object->second == object_size)) {
-        RAW_LOG(FATAL, "Object at %p of %"PRIuS" bytes from an"
+        RAW_LOG(FATAL, "Object at %p of %" PRIuS " bytes from an"
                        " IgnoreObject() has disappeared", ptr, object->second);
       }
     }
@@ -1214,7 +1214,7 @@ void HeapLeakChecker::IgnoreNonThreadLiveObjectsLocked() {
       if (VLOG_IS_ON(11)) {
         for (LiveObjectsStack::const_iterator i = l->second.begin();
              i != l->second.end(); ++i) {
-          RAW_VLOG(11, "Library live region at %p of %"PRIuPTR" bytes",
+          RAW_VLOG(11, "Library live region at %p of %" PRIuPTR " bytes",
                       i->ptr, i->size);
         }
       }
@@ -1335,7 +1335,7 @@ void HeapLeakChecker::IgnoreAllLiveObjectsLocked(const void* self_stack_top) {
     IgnoreNonThreadLiveObjectsLocked();
   }
   if (live_objects_total) {
-    RAW_VLOG(10, "Ignoring %"PRId64" reachable objects of %"PRId64" bytes",
+    RAW_VLOG(10, "Ignoring %" PRId64 " reachable objects of %" PRId64 " bytes",
                 live_objects_total, live_bytes_total);
   }
   // Free these: we made them here and heap_profile never saw them
@@ -1394,7 +1394,7 @@ static SpinLock alignment_checker_lock(SpinLock::LINKER_INITIALIZED);
       live_object_count += 1;
       live_byte_count += size;
     }
-    RAW_VLOG(13, "Looking for heap pointers in %p of %"PRIuS" bytes",
+    RAW_VLOG(13, "Looking for heap pointers in %p of %" PRIuS " bytes",
                 object, size);
     const char* const whole_object = object;
     size_t const whole_size = size;
@@ -1465,8 +1465,8 @@ static SpinLock alignment_checker_lock(SpinLock::LINKER_INITIALIZED);
           // a heap object which is in fact leaked.
           // I.e. in very rare and probably not repeatable/lasting cases
           // we might miss some real heap memory leaks.
-          RAW_VLOG(14, "Found pointer to %p of %"PRIuS" bytes at %p "
-                      "inside %p of size %"PRIuS"",
+          RAW_VLOG(14, "Found pointer to %p of %" PRIuS " bytes at %p "
+                      "inside %p of size %" PRIuS "",
                       ptr, object_size, object, whole_object, whole_size);
           if (VLOG_IS_ON(15)) {
             // log call stacks to help debug how come something is not a leak
@@ -1491,7 +1491,7 @@ static SpinLock alignment_checker_lock(SpinLock::LINKER_INITIALIZED);
   live_objects_total += live_object_count;
   live_bytes_total += live_byte_count;
   if (live_object_count) {
-    RAW_VLOG(10, "Removed %"PRId64" live heap objects of %"PRId64" bytes: %s%s",
+    RAW_VLOG(10, "Removed %" PRId64 " live heap objects of %" PRId64 " bytes: %s%s",
                 live_object_count, live_byte_count, name, name2);
   }
 }
@@ -1513,7 +1513,7 @@ void HeapLeakChecker::DoIgnoreObject(const void* ptr) {
   if (!HaveOnHeapLocked(&ptr, &object_size)) {
     RAW_LOG(ERROR, "No live heap object at %p to ignore", ptr);
   } else {
-    RAW_VLOG(10, "Going to ignore live object at %p of %"PRIuS" bytes",
+    RAW_VLOG(10, "Going to ignore live object at %p of %" PRIuS " bytes",
                 ptr, object_size);
     if (ignored_objects == NULL)  {
       ignored_objects = new(Allocator::Allocate(sizeof(IgnoredObjectsMap)))
@@ -1540,7 +1540,7 @@ void HeapLeakChecker::UnIgnoreObject(const void* ptr) {
         ignored_objects->erase(object);
         found = true;
         RAW_VLOG(10, "Now not going to ignore live object "
-                    "at %p of %"PRIuS" bytes", ptr, object_size);
+                    "at %p of %" PRIuS " bytes", ptr, object_size);
       }
     }
     if (!found)  RAW_LOG(FATAL, "Object at %p has not been ignored", ptr);
@@ -1588,8 +1588,8 @@ void HeapLeakChecker::Create(const char *name, bool make_start_snapshot) {
       const HeapProfileTable::Stats& t = heap_profile->total();
       const size_t start_inuse_bytes = t.alloc_size - t.free_size;
       const size_t start_inuse_allocs = t.allocs - t.frees;
-      RAW_VLOG(10, "Start check \"%s\" profile: %"PRIuS" bytes "
-               "in %"PRIuS" objects",
+      RAW_VLOG(10, "Start check \"%s\" profile: %" PRIuS " bytes "
+               "in %" PRIuS " objects",
                name_, start_inuse_bytes, start_inuse_allocs);
     } else {
       RAW_LOG(WARNING, "Heap checker is not active, "
@@ -1813,7 +1813,7 @@ bool HeapLeakChecker::DoNoLeaks(ShouldSymbolize should_symbolize) {
     RAW_VLOG(heap_checker_info_level,
              "No leaks found for check \"%s\" "
              "(but no 100%% guarantee that there aren't any): "
-             "found %"PRId64" reachable heap objects of %"PRId64" bytes",
+             "found %" PRId64 " reachable heap objects of %" PRId64 " bytes",
              name_,
              int64(stats.allocs - stats.frees),
              int64(stats.alloc_size - stats.free_size));
@@ -2353,7 +2353,7 @@ inline bool HeapLeakChecker::HaveOnHeapLocked(const void** ptr,
   const uintptr_t addr = AsInt(*ptr);
   if (heap_profile->FindInsideAlloc(
         *ptr, max_heap_object_size, ptr, object_size)) {
-    RAW_VLOG(16, "Got pointer into %p at +%"PRIuPTR" offset",
+    RAW_VLOG(16, "Got pointer into %p at +%" PRIuPTR " offset",
              *ptr, addr - AsInt(*ptr));
     return true;
   }

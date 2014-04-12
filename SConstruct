@@ -1163,13 +1163,6 @@ def doConfigure(myenv):
                 if not AddToCXXFLAGSIfSupported(myenv, '-std=c++0x'):
                     print( 'C++11 mode requested, but cannot find a flag to enable it' )
                     Exit(1)
-            # Our current builtin tcmalloc is not compilable in C++11 mode. Remove this
-            # check when our builtin release of tcmalloc contains the resolution to
-            # http://code.google.com/p/gperftools/issues/detail?id=477.
-            if get_option('allocator') == 'tcmalloc':
-                if not use_system_version_of_library('tcmalloc'):
-                    print( 'TCMalloc is not currently compatible with C++11' )
-                    Exit(1)
 
             if not AddToCFLAGSIfSupported(myenv, '-std=c99'):
                 print( 'C++11 mode selected for C++ files, but failed to enable C99 for C files' )

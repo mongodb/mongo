@@ -229,7 +229,7 @@ int SymbolTable::Symbolize() {
            iter != symbolization_table_.end(); ++iter) {
         written += snprintf(pprof_buffer + written, kOutBufSize - written,
                  // pprof expects format to be 0xXXXXXX
-                 "0x%"PRIxPTR"\n", reinterpret_cast<uintptr_t>(iter->first));
+                 "0x%" PRIxPTR "\n", reinterpret_cast<uintptr_t>(iter->first));
       }
       write(child_in[1], pprof_buffer, strlen(pprof_buffer));
       close(child_in[1]);             // that's all we need to write
