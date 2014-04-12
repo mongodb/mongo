@@ -92,6 +92,7 @@ namespace {
 
     static BatchedUpdateDocument* buildUpdate( const BSONObj& query, bool multi ) {
         BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
+        updateDoc->setUpdateExpr( BSONObj() );
         updateDoc->setQuery( query );
         updateDoc->setMulti( multi );
         return updateDoc;
@@ -1685,7 +1686,9 @@ namespace {
                                                           BSON( "data" << bigString ),
                                                           false);
         request.getUpdateRequest()->addToUpdates(bigUpdateDoc);
-        request.getUpdateRequest()->addToUpdates(buildUpdate(BSON( "x" << 2 ), false));
+        request.getUpdateRequest()->addToUpdates(buildUpdate(BSON( "x" << 2 ),
+                                                             BSONObj(),
+                                                             false));
 
         BatchWriteOp batchOp;
         batchOp.initClientRequest(&request);
@@ -1783,6 +1786,7 @@ namespace {
         for (size_t i = 0; i < BatchedCommandRequest::kMaxWriteBatchSize; ++i) {
             BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
             updateDoc->setQuery(BSON( "x" << 1 << "data" << dataString ));
+            updateDoc->setUpdateExpr(BSONObj());
             updateDoc->setMulti(false);
             updateDoc->setUpsert(false);
             request.getUpdateRequest()->addToUpdates(updateDoc);
