@@ -216,7 +216,8 @@ add_option( "cc", "compiler to use for c" , 1 , True )
 add_option( "cc-use-shell-environment", "use $CC from shell for C compiler" , 0 , False )
 add_option( "cxx-use-shell-environment", "use $CXX from shell for C++ compiler" , 0 , False )
 add_option( "ld", "linker to use" , 1 , True )
-add_option( "c++11", "enable c++11 support (experimental)", 0, True )
+add_option( "c++11", "enable c++11 support (experimental)", "?", True,
+            type="choice", choices=["on", "off", "auto"], const="on", default="auto" )
 
 add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , False )
 add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , False )
@@ -1150,21 +1151,6 @@ def doConfigure(myenv):
         # primary mongo sources as well.
         AddToCCFLAGSIfSupported(myenv, "-Wno-unused-const-variable")
 
-    if has_option('c++11'):
-        # The Microsoft compiler does not need a switch to enable C++11. Again we should be
-        # checking for MSVC, not windows. In theory, we might be using clang or icc on windows.
-        if not using_msvc():
-            # For our other compilers (gcc and clang) we need to pass -std=c++0x or -std=c++11,
-            # but we prefer the latter. Try that first, and fall back to c++0x if we don't
-            # detect that --std=c++11 works.
-            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++11'):
-                if not AddToCXXFLAGSIfSupported(myenv, '-std=c++0x'):
-                    print( 'C++11 mode requested, but cannot find a flag to enable it' )
-                    Exit(1)
-
-            if not AddToCFLAGSIfSupported(myenv, '-std=c99'):
-                print( 'C++11 mode selected for C++ files, but failed to enable C99 for C files' )
-
     # This needs to happen before we check for libc++, since it affects whether libc++ is available.
     if darwin and has_option('osx-version-min'):
         min_version = get_option('osx-version-min')
@@ -1236,11 +1222,93 @@ def doConfigure(myenv):
         haveGoodLibStdCxx = conf.CheckModernLibStdCxx()
         conf.Finish()
 
-    if has_option('c++11') and usingLibStdCxx and not haveGoodLibStdCxx:
-        print( 'Detected libstdc++ is too old to support C++11 mode' )
-        if darwin:
-            print( 'Try building with --libc++ and --osx-version-min=10.7 or higher' )
-        Exit(1)
+    # Sort out whether we can and should use C++11:
+    cxx11_mode = get_option("c++11")
+
+    if using_msvc():
+        if cxx11_mode == "off":
+            print( 'WARNING: Cannot disable C++11 features when using MSVC' )
+    else:
+
+        # In C++11 'auto' mode, don't use C++11 if we are linking against any system C++ libs.
+        if cxx11_mode == "auto" and using_system_version_of_cxx_libraries():
+            cxx11_mode = "off"
+
+        # If we are using libstdc++, only allow C++11 mode with our line-in-the-sand good
+        # libstdc++. As always, if in auto mode fall back to disabling if we don't have a good
+        # libstdc++, otherwise fail the build because we can't honor the explicit request.
+        if cxx11_mode != "off" and usingLibStdCxx:
+            if not haveGoodLibStdCxx:
+                if cxx11_mode == "auto":
+                    cxx11_mode = "off"
+                else:
+                    print( 'Detected libstdc++ is too old to support C++11 mode' )
+                    if darwin:
+                        print( 'Try building with --libc++ and --osx-version-min=10.7 or higher' )
+                    Exit(1)
+
+        # We are going to be adding flags to the environment, but we don't want to persist
+        # those changes unless we pass all the below checks. Make a copy of the environment
+        # that we will modify, we will only "commit" the changes to the env if we pass all the
+        # checks.
+        cxx11Env = myenv.Clone()
+
+        # For our other compilers (gcc and clang) we need to pass -std=c++0x or -std=c++11,
+        # but we prefer the latter. Try that first, and fall back to c++0x if we don't
+        # detect that --std=c++11 works. If we can't find a flag and C++11 was explicitly
+        # requested, error out, otherwise turn off C++11 support in auto mode.
+        if cxx11_mode != "off":
+            if not AddToCXXFLAGSIfSupported(cxx11Env, '-std=c++11'):
+                if not AddToCXXFLAGSIfSupported(cxx11Env, '-std=c++0x'):
+                    if cxx11_mode == "auto":
+                        cxx11_mode = "off"
+                    else:
+                        print( 'C++11 mode requested, but cannot find a flag to enable it' )
+                        Exit(1)
+
+        # We appear to have C++11, or at least a flag to enable it, which is now set in the
+        # environment. If we are in auto mode, check if the compiler claims that it strictly
+        # supports C++11, and disable C++11 if not. If the user has explicitly requested C++11,
+        # we don't care about what the compiler claims to support, trust the user.
+        if cxx11_mode == "auto":
+            def CheckCxx11Official(context):
+                test_body = """
+                #if __cplusplus < 201103L
+                #error
+                #endif
+                const int not_an_empty_file = 0;
+                """
+
+                context.Message('Checking if __cplusplus >= 201103L to auto-enable C++11... ')
+                ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+                context.Result(ret)
+                return ret
+
+            conf = Configure(cxx11Env, help=False, custom_tests = {
+                'CheckCxx11Official' : CheckCxx11Official,
+            })
+
+            if cxx11_mode == "auto" and not conf.CheckCxx11Official():
+                cxx11_mode = "off"
+
+            conf.Finish()
+
+        # We require c99 mode for C files when C++11 is enabled, so perform the same dance
+        # as above: if C++11 mode is not off, try the flag, if we are in auto mode and we fail
+        # then turn off C++11, otherwise C++11 was explicitly requested and we should error out.
+        if cxx11_mode != "off":
+            if not AddToCFLAGSIfSupported(cxx11Env, '-std=c99'):
+                if cxx11_mode == "auto":
+                    cxx11_mode = "off"
+                else:
+                    print( "C++11 mode selected for C++ files, but can't enable C99 for C files" )
+                    Exit(1)
+
+        # If we got here and cxx11_mode hasn't become false, then its true, so swap in the
+        # modified environment.
+        if cxx11_mode != "off":
+            cxx11_mode = "on"
+            myenv = cxx11Env
 
     # If we are using a modern libstdc++ and this is a debug build and we control all C++
     # dependencies, then turn on the debugging features in libstdc++.
