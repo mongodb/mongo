@@ -89,6 +89,23 @@ namespace mongo {
          */
         static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
 
+        /**
+         * Generate keys for prefix access method.
+         */
+        static void getPrefixKeys(const BSONObj& obj,
+                                  const string& prefixField,
+                                  int prefixLength,
+                                  bool isSparse,
+                                  BSONObjSet* keys);
+
+        /**
+         * This function is used by both getPrefixKeys and the cursors we create.
+         * Returns a new BSON object with the prefix of the element e. This returns
+         * a BSON object with empty string if the type of "e" is neither String
+         * nor BinData.
+         */
+        static BSONObj makeSinglePrefixKey(const BSONElement& e, int prefixLength);
+
         //
         // Haystack
         //

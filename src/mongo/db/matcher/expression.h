@@ -120,6 +120,17 @@ namespace mongo {
             return AND == _matchType || OR == _matchType || NOT == _matchType || NOR == _matchType;
         }
 
+        bool isComparision() const {
+            if (_matchType == LTE ||
+                _matchType == LT ||
+                _matchType == EQ ||
+                _matchType == GT ||
+                _matchType == GTE) {
+                return true;
+            }
+            return false;
+        }
+
         /**
          * Is this node an array operator?  Array operators have multiple clauses but operate on one
          * field.
