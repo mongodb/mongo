@@ -1,5 +1,9 @@
 /*! @page bulk_load Bulk-load
 
+When loading a large amount of data into a new object, using a cursor
+with the \c bulk configuration string enabled and loading the data in
+sorted order will be much faster than doing out-of-order inserts.
+
 WiredTiger cursors can be configured for bulk-load using the \c bulk
 configuration keyword to WT_SESSION::open_cursor.  Bulk-load is a "fast
 path" for quickly loading a large number of rows.  Bulk-load may only
