@@ -41,7 +41,6 @@ static void wt_shutdown(void);
 int
 main(int argc, char *argv[])
 {
-	u_int workers;
 	table_type ttype;
 	int ch, cnt, runs;
 	char *config_open, *home;
@@ -56,10 +55,11 @@ main(int argc, char *argv[])
 	ttype = MIX;
 	g.nkeys = 1000;
 	g.nops = 10000;
+	g.ntables = 3;
+	g.nworkers = 1;
 	runs = 1;
-	workers = 10;
 
-	while ((ch = getopt(argc, argv, "C:h:k:l:n:r:t:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "C:h:k:l:n:r:t:T:W:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
@@ -101,8 +101,11 @@ main(int argc, char *argv[])
 				return (usage());
 			}
 			break;
+		case 'T':
+			g.ntables = (u_int)atoi(optarg);
+			break;
 		case 'W':
-			workers = (u_int)atoi(optarg);
+			g.nworkers = (u_int)atoi(optarg);
 			break;
 		default:
 			return (usage());
@@ -121,17 +124,22 @@ main(int argc, char *argv[])
 	printf("%s: process %" PRIu64 "\n", g.progname, (uint64_t)getpid());
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
 		printf(
-		    "    %d: %u workers\n", cnt, workers);
+		    "    %d: %u workers, %u tables\n",
+		    cnt, g.nworkers, g.ntables);
 
 		cleanup();			/* Clean up previous runs */
 
 		wt_connect(config_open);	/* WiredTiger connection */
 
+		start_checkpoints();
 						/* Loop operations */
-		if (start_workers(workers, ttype))
+		if (start_workers(ttype))
 			return (EXIT_FAILURE);
 
+		end_checkpoints();
+
 		wt_shutdown();			/* WiredTiger shut down */
+		free(g.cookies);
 	}
 	return (0);
 }

@@ -42,6 +42,22 @@
 
 #define	URI_BASE	"table:__wt"		/* File name */
 
+/*
+ * There are three different table types in the test, and a 'special' type
+ * of mixed (i.e a mixture of the other three types.
+ */
+#define	MAX_TABLE_TYPE	3
+typedef enum { MIX = 0, COL, LSM, ROW } table_type;	/* File type */
+
+/*
+ * Per-table cookie structure.
+ */
+typedef struct {
+	int id;
+	table_type type;			/* Type for table. */
+	char uri[128];
+} COOKIE;
+
 typedef struct {
 	char *home;				/* Home directory */
 	char *home_init;			/* Home directory init shell */
@@ -50,17 +66,17 @@ typedef struct {
 	u_int nops;				/* Operations per thread */
 	FILE *logfp;				/* Message log file. */
 	char *progname;				/* Program name */
+	int nworkers;				/* Number workers configured */
+	int ntables;				/* Number tables configured */
+	int ntables_created;			/* Number tables opened */
+	COOKIE *cookies;			/* Per-thread info */
+	pthread_t checkpoint_thread;		/* Checkpoint thread */
+	int checkpoint_phase;			/* How checkpoints are going */
 } GLOBAL;
 extern GLOBAL g;
 
-
-/*
- * There are three different table types in the test, and a 'special' type
- * of mixed (i.e a mixture of the other three types.
- */
-#define	MAX_TABLE_TYPE	3
-typedef enum { MIX = 0, COL, LSM, ROW } table_type;	/* File type */
-
 void die(const char *, int) WT_GCC_ATTRIBUTE((noreturn));
+void  end_checkpoints(void);
 void load(void);
-int  start_workers(u_int, table_type);
+void  start_checkpoints(void);
+int  start_workers(table_type);
