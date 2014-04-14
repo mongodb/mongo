@@ -23,7 +23,7 @@ overallMax = 1
 var res = t.ensureIndex({ loc: "2d" },
                         { max: overallMax - epsilon / 2,
                           min: overallMin + epsilon / 2 });
-assert.neq(null, res);
+assert.commandFailed(res);
 
 // Create a point index only slightly bigger than the points we have
 res = t.ensureIndex( { loc : "2d" }, { max : overallMax + epsilon, min : overallMin - epsilon } );
@@ -102,18 +102,15 @@ cornerPt = t
 assert.eq( cornerPt.loc.y, overallMin )
 
 // Make sure we can't get corner point when center is over bounds
-try {
+assert.throws(function(){
     t.findOne( { loc : { $within : { $center : [ offBounds, Math.sqrt( 8 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
-    assert( false )
-} catch (e) {
-}
+});
 
 // Make sure we can't get corner point when center is on max bounds
-try {
-    t.findOne( { loc : { $within : { $center : [ onBounds, Math.sqrt( 8 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
-    assert( false )
-} catch (e) {
-}
+// Broken - see SERVER-13581
+//assert.throws(function(){
+//    t.findOne( { loc : { $within : { $center : [ onBounds, Math.sqrt( 8 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
+//});
 
 // ***********
 // Near tests
@@ -126,17 +123,15 @@ assert.eq( overallMax, t.find( { loc : { $near : offCenter } } ).next().loc.y );
 assert.eq( overallMin, t.find( { loc : { $near : onBoundsNeg } } ).next().loc.y );
 
 // Make sure we can't get all nearby points to point over boundary
-try {
-    t.findOne( { loc : { $near : offBounds } } )
-    assert( false )
-} catch (e) {
-}
+assert.throws(function(){
+    t.findOne( { loc : { $near : offBounds } } );
+});
+
 // Make sure we can't get all nearby points to point on max boundary
-try {
-    t.findOne( { loc : { $near : onBoundsNeg } } )
-    assert( false )
-} catch (e) {
-}
+//Broken - see SERVER-13581
+//assert.throws(function(){
+//    t.findOne( { loc : { $near : onBoundsNeg } } );
+//});
 
 // Make sure we can get all nearby points within one step (4 points in top
 // corner)
