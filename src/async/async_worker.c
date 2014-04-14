@@ -274,8 +274,12 @@ __wt_async_worker(void *arg)
 wait_for_work:
 		WT_ASSERT(session, locked == 0);
 		/* Wait until the next event. */
+#if 0
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, async->ops_cond, 100000));
+#else
+		__wt_yield();
+#endif
 	}
 
 	if (0) {

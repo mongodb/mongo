@@ -232,7 +232,9 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
 	 * Signal the worker threads something is on the queue.
 	 */
 	__wt_spin_unlock(conn->default_session, &async->opsq_lock);
+#if 0
 	WT_ERR(__wt_cond_signal(conn->default_session, async->ops_cond));
+#endif
 	/*
 	 * Relock if we need to for the caller.
 	 */

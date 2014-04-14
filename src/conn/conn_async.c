@@ -286,7 +286,9 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 
 	for (i = 0; i < conn->async_workers; i++)
 		if (async->worker_tids[i] != 0) {
+#if 0
 			WT_TRET(__wt_cond_signal(session, async->ops_cond));
+#endif
 			WT_TRET(__wt_thread_join(
 			    session, async->worker_tids[i]));
 			async->worker_tids[i] = 0;
