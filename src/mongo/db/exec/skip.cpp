@@ -42,8 +42,6 @@ namespace mongo {
     PlanStage::StageState SkipStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
-        if (isEOF()) { return PlanStage::IS_EOF; }
-
         WorkingSetID id = WorkingSet::INVALID_ID;
         StageState status = _child->work(&id);
 
