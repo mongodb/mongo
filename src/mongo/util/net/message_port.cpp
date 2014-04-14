@@ -202,7 +202,8 @@ again:
                         sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_requireSSL);
 #endif // MONGO_SSL
             }
-            else if ( len < static_cast<int>(sizeof(MSGHEADER)) || len > MaxMessageSizeBytes ) {
+            if ( static_cast<size_t>(len) < sizeof(MSGHEADER) || 
+                 static_cast<size_t>(len) > MaxMessageSizeBytes ) {
                 LOG(0) << "recv(): message len " << len << " is invalid. "
                        << "Min " << sizeof(MSGHEADER) << " Max: " << MaxMessageSizeBytes << endl;
                 return false;
