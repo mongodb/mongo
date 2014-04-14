@@ -17,6 +17,28 @@ import gzip
 # Only really tested/works on Linux.
 #
 
+def version_tuple(version):
+    """Returns a version tuple that can be used for numeric sorting
+    of version strings such as '2.6.0-rc1' and '2.4.0'"""
+
+    RC_OFFSET = -100
+    version_parts = re.split(r'\.|-', version[0])
+
+    if version_parts[-1].startswith("rc"):
+        rc_part = version_parts.pop()
+        rc_part = rc_part.split('rc')[1]
+
+        # RC versions are weighted down to allow future RCs and general
+        # releases to be sorted in ascending order (e.g., 2.6.0-rc1,
+        # 2.6.0-rc2, 2.6.0).
+        version_parts.append(int(rc_part) + RC_OFFSET)
+    else:
+        # Non-RC releases have an extra 0 appended so version tuples like
+        # (2, 6, 0, -100) and (2, 6, 0, 0) sort in ascending order.
+        version_parts.append(0)
+
+    return tuple(map(int, version_parts))
+
 class MultiVersionDownloader :
 
     def __init__(self, install_dir, link_dir, platform):
@@ -25,7 +47,13 @@ class MultiVersionDownloader :
         match = re.compile("(.*)\/(.*)").match(platform)
         self.platform = match.group(1)
         self.arch = match.group(2)
-        self.links = self.download_links()
+        self._links = None
+
+    @property
+    def links(self):
+        if self._links is None:
+            self._links = self.download_links()
+        return self._links
 
     def download_links(self):
         href = "http://dl.mongodb.org/dl/%s/%s" \
@@ -70,7 +98,7 @@ class MultiVersionDownloader :
             raise Exception("Cannot find a link for version %s, versions %s found." \
                 % (version, self.links))
 
-        urls.sort()
+        urls.sort(key=version_tuple)
         full_version = urls[-1][0]
         url = urls[-1][1]
         extract_dir = url.split("/")[-1][:-4]
