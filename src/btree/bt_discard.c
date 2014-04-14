@@ -224,8 +224,7 @@ __wt_free_ref(
 	}
 
 	/* Free any address allocation. */
-	if (ref->addr != NULL &&
-	    (page == NULL || __wt_off_page(page, ref->addr))) {
+	if (ref->addr != NULL && __wt_off_page(page, ref->addr)) {
 		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 		__wt_free(session, ref->addr);
 	}
