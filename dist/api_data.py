@@ -217,7 +217,7 @@ file_config = format_meta + [
 	    constraining the number of keys processed to instantiate a
 	    random Btree leaf page key''',
 	    min='0', undoc=True),
-	Config('leaf_page_max', '1MB', r'''
+	Config('leaf_page_max', '32KB', r'''
 	    the maximum page size for leaf nodes, in bytes; the size must
 	    be a multiple of the allocation size, and is significant for
 	    applications wanting to maximize sequential data transfer from

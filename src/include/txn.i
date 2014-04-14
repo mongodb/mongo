@@ -76,7 +76,7 @@ err:            __wt_txn_unmodify(session);
 
 /*
  * __wt_txn_modify_ref --
- *	Mark a WT_REF object modified by the current transaction.
+ *	Remember a WT_REF object modified by the current transaction.
  */
 static inline int
 __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -86,7 +86,6 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__txn_next_op(session, &op));
 	op->type = TXN_OP_REF;
 	op->u.ref = ref;
-	ref->txnid = session->txn.id;
 	return (0);
 }
 

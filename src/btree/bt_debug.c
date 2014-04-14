@@ -1002,8 +1002,10 @@ __debug_cell_data(WT_DBG *ds,
 	 * Column-store references to deleted cells return a NULL cell
 	 * reference.
 	 */
-	if (unpack == NULL)
-		goto deleted;
+	if (unpack == NULL) {
+		__debug_item(ds, tag, "deleted", strlen("deleted"));
+		return (0);
+	}
 
 	switch (unpack->raw) {
 	case WT_CELL_ADDR_DEL:
@@ -1013,7 +1015,7 @@ __debug_cell_data(WT_DBG *ds,
 	case WT_CELL_DEL:
 	case WT_CELL_KEY_OVFL_RM:
 	case WT_CELL_VALUE_OVFL_RM:
-deleted:	p = __wt_cell_type_string(unpack->raw);
+		p = __wt_cell_type_string(unpack->raw);
 		__debug_item(ds, tag, p, strlen(p));
 		break;
 	case WT_CELL_KEY:

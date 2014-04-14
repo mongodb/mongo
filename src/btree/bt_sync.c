@@ -53,9 +53,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 					    session, WT_TXN_NONE, 1);
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
-				ret =
-				    __wt_rec_write(session, walk_page, NULL, 0);
-				WT_ERR(ret);
+				WT_ERR(__wt_rec_write(
+				    session, walk_page, NULL, 0));
 			}
 		}
 		break;

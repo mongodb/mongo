@@ -335,7 +335,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_PAGE *page, *parent;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
 	int locked;
@@ -442,10 +442,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	parent = ref->home;
-	WT_RET(__wt_page_modify_init(session, parent));
-	__wt_page_only_modify_set(session, parent);
-	return (0);
+	return (__wt_page_parent_modify_set(session, ref, 1));
 }
 
 /*
@@ -987,16 +984,16 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * The child is in a deleted state.
 			 *
-			 * It's possible the state is changing underneath us and
-			 * we can race between checking for a deleted state and
-			 * looking at the stored transaction ID to see if the
-			 * delete is visible to us.  Lock down the structure.
+			 * It's possible the state could change underneath us as
+			 * the page is read in, and we can race between checking
+			 * for a deleted state and looking at the transaction ID
+			 * to see if the delete is visible to us.  Lock down the
+			 * structure.
 			 */
 			if (!WT_ATOMIC_CAS(
 			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
-			ret =
-			    __rec_child_deleted(session, r, ref, statep);
+			ret = __rec_child_deleted(session, r, ref, statep);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			goto done;
 
@@ -1114,10 +1111,12 @@ __rec_child_deleted(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, int *statep)
 {
 	WT_BM *bm;
+	WT_PAGE_DELETED *page_del;
 	size_t addr_size;
 	const uint8_t *addr;
 
 	bm = S2BT(session)->bm;
+	page_del = ref->page_del;
 
 	/*
 	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
@@ -1126,8 +1125,11 @@ __rec_child_deleted(
 	 * us.  In that case, we proceed as with any change that's not visible
 	 * during reconciliation by setting the skipped flag and ignoring the
 	 * change for the purposes of writing the internal page.
+	 *
+	 * In this case, there must be an associated page-deleted structure, and
+	 * it holds the transaction ID we care about.
 	 */
-	if (!__wt_txn_visible(session, ref->txnid)) {
+	if (page_del != NULL && !__wt_txn_visible(session, page_del->txnid)) {
 		/*
 		 * In some cases (for example, when closing a file), there had
 		 * better not be any updates we can't write.
@@ -1142,11 +1144,12 @@ __rec_child_deleted(
 	}
 
 	/*
-	 * Deal with any underlying disk blocks.  First, check to see if there
-	 * is an address associated with this leaf: if there isn't, we're done.
+	 * The deletion is visible to us, deal with any underlying disk blocks.
 	 *
-	 * Check for any transactions in the system that might want to see the
-	 * page's state before the deletion.
+	 * First, check to see if there is an address associated with this leaf:
+	 * if there isn't, we're done, the underlying page is already gone.  If
+	 * the page still exists, check for any transactions in the system that
+	 * might want to see the page's state before it's deleted.
 	 *
 	 * If any such transactions exist, we cannot discard the underlying leaf
 	 * page to the block manager because the transaction may eventually read
@@ -1160,22 +1163,13 @@ __rec_child_deleted(
 	 * outside of the underlying tracking routines because this action is
 	 * permanent and irrevocable.  (Clearing the address means we've lost
 	 * track of the disk address in a permanent way.  This is safe because
-	 * there's no path to reading the leaf page again: if reconciliation
-	 * fails, and we ever read into this part of the name space again, the
-	 * cache read function instantiates a new page.)
-	 *
-	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
-	 * it means this WT_REF is the re-creation of a deleted node (we wrote
-	 * out the deleted node after the deletion became visible, but before
-	 * we could delete the leaf page, and subsequently crashed, then read
-	 * the page and re-created the WT_REF_DELETED state).   In other words,
-	 * the delete is visible to all (it became visible), and by definition
-	 * there are no older transactions needing to see previous versions of
-	 * the page.
+	 * there's no path to reading the leaf page again: if there's ever a
+	 * read into this part of the name space again, the cache read function
+	 * instantiates an entirely new page.)
 	 */
 	if (ref->addr != NULL &&
-	    (ref->txnid == WT_TXN_NONE ||
-	    __wt_txn_visible_all(session, ref->txnid))) {
+	    (page_del == NULL ||
+	    __wt_txn_visible_all(session, page_del->txnid))) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		WT_RET(bm->free(bm, session, addr, addr_size));
 
@@ -1184,6 +1178,20 @@ __rec_child_deleted(
 			__wt_free(session, ref->addr);
 		}
 		ref->addr = NULL;
+	}
+
+	/*
+	 * Minor memory cleanup: if a truncate call deleted this page and we
+	 * were ever forced to instantiate the page in memory, we would have
+	 * built a list of updates in the page reference in order to be able
+	 * to abort the truncate.  It's a cheap test to make that memory go
+	 * away, we do it here because there's really nowhere else we do the
+	 * checks.  In short, if we have such a list, and the backing address
+	 * blocks are gone, there can't be any transaction that can abort.
+	 */
+	if (ref->addr == NULL && page_del != NULL) {
+		__wt_free(session, ref->page_del->update_list);
+		__wt_free(session, ref->page_del);
 	}
 
 	/*

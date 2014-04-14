@@ -27,6 +27,21 @@
 
 #include "format.h"
 
+static inline uint32_t
+kv_len(uint64_t keyno, uint32_t min, uint32_t max)
+{
+	/*
+	 * We want to focus on relatively small key/value items, but admitting
+	 * the possibility of larger items.  Pick a size close to the minimum
+	 * most of the time, only roll the dice for a really big item 1 in 20
+	 * times.  (The configuration can force large key/value minimum sizes,
+	 * where every key/value item will be an overflow.)
+	 */
+	if (keyno % 20 != 0 && max > min + 20)
+		max = min + 20;
+	return (MMRAND(min, max));
+}
+
 void
 key_len_setup(void)
 {
@@ -42,7 +57,8 @@ key_len_setup(void)
 	 * Fill in the random key lengths.
 	 */
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
-		g.key_rand_len[i] = (uint32_t)MMRAND(g.c_key_min, g.c_key_max);
+		g.key_rand_len[i] =
+		    kv_len((uint64_t)i, g.c_key_min, g.c_key_max);
 }
 
 void
@@ -110,7 +126,8 @@ val_gen_setup(uint8_t **valp)
 
 	*valp = val;
 
-	val_dup_data_len = MMRAND(g.c_value_min, g.c_value_max);
+	val_dup_data_len =
+	    kv_len((uint64_t)MMRAND(1, 20), g.c_value_min, g.c_value_max);
 }
 
 void
@@ -162,7 +179,7 @@ value_gen(uint8_t *val, size_t *sizep, uint64_t keyno)
 	} else {
 		(void)sprintf((char *)val, "%010" PRIu64, keyno);
 		val[10] = '/';
-		*sizep = MMRAND(g.c_value_min, g.c_value_max);
+		*sizep = kv_len(keyno, g.c_value_min, g.c_value_max);
 	}
 }
 
