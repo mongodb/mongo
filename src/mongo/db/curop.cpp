@@ -219,6 +219,7 @@ namespace mongo {
 
         if( a ) {
             b.append("secs_running", elapsedSeconds() );
+            b.append("microsecs_running", static_cast<long long int>(elapsedMicros()) );
         }
 
         b.append( "op" , opToString( _op ) );
