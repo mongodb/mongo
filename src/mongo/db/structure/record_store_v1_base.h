@@ -60,11 +60,18 @@ namespace mongo {
 
         void increaseStorageSize( int size, int quotaMax );
 
+        virtual Status validate( bool full, bool scanData,
+                                 ValidateAdaptor* adaptor,
+                                 ValidateResults* results, BSONObjBuilder* output ) const;
+
         // TODO: another sad one
         virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
         const NamespaceDetails* details() const { return _details; }
     protected:
+
+        virtual bool isCapped() const = 0;
+
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax ) = 0;
 
         // TODO: document, remove, what have you
@@ -72,6 +79,9 @@ namespace mongo {
 
         // TODO: another sad one
         virtual DeletedRecord* drec( const DiskLoc& loc ) const;
+
+        // just a haper for _extentManager->getExtent( loc );
+        Extent* _getExtent( const DiskLoc& loc ) const;
 
         /** add a record to the end of the linked list chain within this extent.
             require: you must have already declared write intent for the record header.

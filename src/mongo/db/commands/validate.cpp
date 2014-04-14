@@ -64,7 +64,10 @@ namespace mongo {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
 
             NamespaceString ns_string(ns);
-            if ( !ns_string.isNormal() && cmdObj["full"].trueValue() ) {
+            const bool full = cmdObj["full"].trueValue();
+            const bool scanData = full || cmdObj["scandata"].trueValue();
+
+            if ( !ns_string.isNormal() && full ) {
                 errmsg = "Can only run full validate on a regular collection";
                 return false;
             }
@@ -75,348 +78,37 @@ namespace mongo {
 
             Database* db = cc().database();
             if ( !db ) {
-                errmsg = "ns nout found";
+                errmsg = "database not found";
                 return false;
             }
 
             Collection* collection = db->getCollection( ns );
             if ( !collection ) {
-                errmsg = "ns not found";
+                errmsg = "collection not found";
                 return false;
             }
 
             result.append( "ns", ns );
-            validateNS( ns , collection, cmdObj, result);
-            return true;
-        }
 
-    private:
-        void validateNS(const string& ns,
-                        Collection* collection,
-                        const BSONObj& cmdObj,
-                        BSONObjBuilder& result) {
+            ValidateResults results;
+            Status status = collection->validate( full, scanData, &results, &result );
+            if ( !status.isOK() )
+                return appendCommandStatus( result, status );
 
-            const bool full = cmdObj["full"].trueValue();
-            const bool scanData = full || cmdObj["scandata"].trueValue();
-
-            const NamespaceDetails* nsd = collection->details();
-
-            bool valid = true;
-            BSONArrayBuilder errors; // explanation(s) for why valid = false
-            if ( collection->isCapped() ){
-                result.append("capped", nsd->isCapped());
-                result.appendNumber("max", nsd->maxCappedDocs());
-            }
-
-            if ( nsd->firstExtent().isNull() )
-                result.append( "firstExtent", "null" );
-            else
-                result.append( "firstExtent", str::stream() << nsd->firstExtent().toString()
-                               << " ns:" << nsd->firstExtent().ext()->nsDiagnostic.toString());
-            if ( nsd->lastExtent().isNull() )
-                result.append( "lastExtent", "null" );
-            else
-                result.append( "lastExtent", str::stream() <<  nsd->lastExtent().toString()
-                               << " ns:" <<  nsd->lastExtent().ext()->nsDiagnostic.toString());
-
-            BSONArrayBuilder extentData;
-            int extentCount = 0;
-            try {
-
-                if ( !nsd->firstExtent().isNull() ) {
-                    nsd->firstExtent().ext()->assertOk();
-                    nsd->lastExtent().ext()->assertOk();
-                }
-
-                DiskLoc extentDiskLoc = nsd->firstExtent();
-                while (!extentDiskLoc.isNull()) {
-                    Extent* thisExtent = extentDiskLoc.ext();
-                    if (full) {
-                        extentData << thisExtent->dump();
-                    }
-                    if (!thisExtent->validates(extentDiskLoc, &errors)) {
-                        valid = false;
-                    }
-                    DiskLoc nextDiskLoc = thisExtent->xnext;
-                    if (extentCount > 0 && !nextDiskLoc.isNull()
-                                        &&  nextDiskLoc.ext()->xprev != extentDiskLoc) {
-                        StringBuilder sb;
-                        sb << "'xprev' pointer " << nextDiskLoc.ext()->xprev.toString()
-                           << " in extent " << nextDiskLoc.toString()
-                           << " does not point to extent " << extentDiskLoc.toString();
-                        errors << sb.str();
-                        valid = false;
-                    }
-                    if (nextDiskLoc.isNull() && extentDiskLoc != nsd->lastExtent()) {
-                        StringBuilder sb;
-                        sb << "'lastExtent' pointer " << nsd->lastExtent().toString()
-                           << " does not point to last extent in list " << extentDiskLoc.toString();
-                        errors << sb.str();
-                        valid = false;
-                    }
-                    extentDiskLoc = nextDiskLoc;
-                    extentCount++;
-                    killCurrentOp.checkForInterrupt();
-                }
-            }
-            catch (const DBException& e) {
-                StringBuilder sb;
-                sb << "exception validating extent " << extentCount
-                   << ": " << e.what();
-                errors << sb.str();
-                valid = false;
-            }
-            result.append("extentCount", extentCount);
-
-            if ( full )
-                result.appendArray( "extents" , extentData.arr() );
-
-            result.appendNumber("datasize", nsd->dataSize());
-            result.appendNumber("nrecords", nsd->numRecords());
-            result.appendNumber("lastExtentSize", nsd->lastExtentSize());
-            result.appendNumber("padding", nsd->paddingFactor());
-
-            try {
-
-                bool testingLastExtent = false;
-                try {
-                    if (nsd->firstExtent().isNull()) {
-                        // this is ok
-                    }
-                    else {
-                        result.append("firstExtentDetails", nsd->firstExtent().ext()->dump());
-                        if (!nsd->firstExtent().ext()->xprev.isNull()) {
-                            StringBuilder sb;
-                            sb << "'xprev' pointer in 'firstExtent' " << nsd->firstExtent().toString()
-                               << " is " << nsd->firstExtent().ext()->xprev.toString()
-                               << ", should be null";
-                            errors << sb.str();
-                            valid=false;
-                        }
-                    }
-                    testingLastExtent = true;
-                    if (nsd->lastExtent().isNull()) {
-                        // this is ok
-                    }
-                    else {
-                        if (nsd->firstExtent() != nsd->lastExtent()) {
-                            result.append("lastExtentDetails", nsd->lastExtent().ext()->dump());
-                            if (!nsd->lastExtent().ext()->xnext.isNull()) {
-                                StringBuilder sb;
-                                sb << "'xnext' pointer in 'lastExtent' " << nsd->lastExtent().toString()
-                                   << " is " << nsd->lastExtent().ext()->xnext.toString()
-                                   << ", should be null";
-                                errors << sb.str();
-                                valid = false;
-                            }
-                        }
-                    }
-                }
-                catch (const DBException& e) {
-                    StringBuilder sb;
-                    sb << "exception processing '"
-                       << (testingLastExtent ? "lastExtent" : "firstExtent")
-                       << "': " << e.what();
-                    errors << sb.str();
-                    valid = false;
-                }
-
-                set<DiskLoc> recs;
-                if( scanData ) {
-                    int n = 0;
-                    int nInvalid = 0;
-                    long long nQuantizedSize = 0;
-                    long long nPowerOf2QuantizedSize = 0;
-                    long long len = 0;
-                    long long nlen = 0;
-                    long long bsonLen = 0;
-                    int outOfOrder = 0;
-                    DiskLoc cl_last;
-
-                    DiskLoc cl;
-                    Runner::RunnerState state;
-                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
-                    while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &cl))) {
-                        n++;
-
-                        if ( n < 1000000 )
-                            recs.insert(cl);
-                        if ( nsd->isCapped() ) {
-                            if ( cl < cl_last )
-                                outOfOrder++;
-                            cl_last = cl;
-                        }
-
-                        Record *r = collection->getRecordStore()->recordFor(cl);
-                        len += r->lengthWithHeaders();
-                        nlen += r->netLength();
-                        
-                        if ( r->lengthWithHeaders() ==
-                                NamespaceDetails::quantizeAllocationSpace
-                                    ( r->lengthWithHeaders() ) ) {
-                            // Count the number of records having a size consistent with
-                            // the quantizeAllocationSpace quantization implementation.
-                            ++nQuantizedSize;
-                        }
-
-                        if ( r->lengthWithHeaders() ==
-                                NamespaceDetails::quantizePowerOf2AllocationSpace
-                                    ( r->lengthWithHeaders() - 1 ) ) {
-                            // Count the number of records having a size consistent with the
-                            // quantizePowerOf2AllocationSpace quantization implementation.
-                            // Because of SERVER-8311, power of 2 quantization is not idempotent and
-                            // r->lengthWithHeaders() - 1 must be checked instead of the record
-                            // length itself.
-                            ++nPowerOf2QuantizedSize;
-                        }
-
-                        if (full){
-                            BSONObj obj = collection->docFor(cl);
-                            const Status status = validateBSON(obj.objdata(), obj.objsize());
-                            if (!status.isOK()) {
-                                valid = false;
-                                if (nInvalid == 0) // only log once;
-                                    errors << "invalid bson object detected (see logs for more info)";
-
-                                nInvalid++;
-                                log() << "Invalid bson detected in " << ns
-                                      << ": " << status.reason();
-                            }
-                            else {
-                                bsonLen += obj.objsize();
-                            }
-                        }
-                    }
-                    if (Runner::RUNNER_EOF != state) {
-                        // TODO: more descriptive logging.
-                        warning() << "Internal error while reading collection " << ns << endl;
-                    }
-                    if ( nsd->isCapped() && !nsd->capLooped() ) {
-                        result.append("cappedOutOfOrder", outOfOrder);
-                        if ( outOfOrder > 1 ) {
-                            valid = false;
-                            errors << "too many out of order records";
-                        }
-                    }
-                    result.append("objectsFound", n);
-
-                    if (full) {
-                        result.append("invalidObjects", nInvalid);
-                    }
-
-                    result.appendNumber("nQuantizedSize", nQuantizedSize);
-                    result.appendNumber("nPowerOf2QuantizedSize", nPowerOf2QuantizedSize);
-                    result.appendNumber("bytesWithHeaders", len);
-                    result.appendNumber("bytesWithoutHeaders", nlen);
-
-                    if (full) {
-                        result.appendNumber("bytesBson", bsonLen);
-                    }
-                }
-
-                BSONArrayBuilder deletedListArray;
-                for ( int i = 0; i < Buckets; i++ ) {
-                    deletedListArray << nsd->deletedListEntry(i).isNull();
-                }
-
-                int ndel = 0;
-                long long delSize = 0;
-                BSONArrayBuilder delBucketSizes;
-                int incorrect = 0;
-                for ( int i = 0; i < Buckets; i++ ) {
-                    DiskLoc loc = nsd->deletedListEntry(i);
-                    try {
-                        int k = 0;
-                        while ( !loc.isNull() ) {
-                            if ( recs.count(loc) )
-                                incorrect++;
-                            ndel++;
-
-                            if ( loc.questionable() ) {
-                                if( nsd->isCapped() && !loc.isValid() && i == 1 ) {
-                                    /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
-                                       see comments in namespace.h
-                                    */
-                                    break;
-                                }
-
-                                string err( str::stream() << "bad pointer in deleted record list: "
-                                                          << loc.toString()
-                                                          << " bucket: " << i
-                                                          << " k: " << k );
-                                errors << err;
-                                valid = false;
-                                break;
-                            }
-
-                            const DeletedRecord* d = collection->getRecordStore()->deletedRecordFor(loc);
-                            delSize += d->lengthWithHeaders();
-                            loc = d->nextDeleted();
-                            k++;
-                            killCurrentOp.checkForInterrupt();
-                        }
-                        delBucketSizes << k;
-                    }
-                    catch (...) {
-                        errors << ("exception in deleted chain for bucket " + BSONObjBuilder::numStr(i));
-                        valid = false;
-                    }
-                }
-                result.appendNumber("deletedCount", ndel);
-                result.appendNumber("deletedSize", delSize);
-                if ( full ) {
-                    result << "delBucketSizes" << delBucketSizes.arr();
-                }
-
-                if ( incorrect ) {
-                    errors << (BSONObjBuilder::numStr(incorrect) + " records from datafile are in deleted list");
-                    valid = false;
-                }
-
-                int idxn = 0;
-                try  {
-                    IndexCatalog* indexCatalog = collection->getIndexCatalog();
-
-                    result.append("nIndexes", indexCatalog->numIndexesReady() );
-                    BSONObjBuilder indexes; // not using subObjStart to be exception safe
-                    IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(false);
-                    while( i.more() ) {
-                        IndexDescriptor* descriptor = i.next();
-                        log() << "validating index " << descriptor->indexNamespace() << endl;
-                        IndexAccessMethod* iam = indexCatalog->getIndex( descriptor );
-                        verify( iam );
-
-                        int64_t keys;
-                        iam->validate(&keys);
-                        indexes.appendNumber(descriptor->indexNamespace(),
-                                             static_cast<long long>(keys));
-                        idxn++;
-                    }
-                    result.append("keysPerIndex", indexes.done());
-                }
-                catch (...) {
-                    errors << ("exception during index validate idxn " + BSONObjBuilder::numStr(idxn));
-                    valid=false;
-                }
-
-            }
-            catch (AssertionException) {
-                errors << "exception during validate";
-                valid = false;
-            }
-
-            result.appendBool("valid", valid);
-            result.append("errors", errors.arr());
+            result.appendBool("valid", results.valid);
+            result.append("errors", results.errors);
 
             if ( !full ){
                 result.append("warning", "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
             }
-            
-            if ( !valid ) {
+
+            if ( !results.valid ) {
                 result.append("advice", "ns corrupt. See http://dochub.mongodb.org/core/data-recovery");
             }
 
+            return true;
         }
+
     } validateCmd;
 
 }

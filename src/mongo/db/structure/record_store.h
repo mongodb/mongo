@@ -48,6 +48,9 @@ namespace mongo {
     class RecordStoreCompactAdaptor;
     class RecordStore;
 
+    struct ValidateResults;
+    class ValidateAdaptor;
+
     /**
      * A RecordIterator provides an interface for walking over a RecordStore.
      * The details of navigating the collection's structure are below this interface.
@@ -125,6 +128,17 @@ namespace mongo {
                                 const CompactOptions* options,
                                 CompactStats* stats ) = 0;
 
+        /**
+         * @param full - does more checks
+         * @param scanData - scans each document
+         * @return OK if the validate run successfully
+         *         OK will be returned even if corruption is found
+         *         deatils will be in result
+         */
+        virtual Status validate( bool full, bool scanData,
+                                 ValidateAdaptor* adaptor,
+                                 ValidateResults* results, BSONObjBuilder* output ) const = 0;
+
         // TODO: this makes me sad, it shouldn't be in the interface
         // do not use this anymore
         virtual void increaseStorageSize( int size, int quotaMax ) = 0;
@@ -142,5 +156,25 @@ namespace mongo {
         virtual bool isDataValid( Record* rec ) = 0;
         virtual size_t dataSize( Record* rec ) = 0;
         virtual void inserted( Record* rec, const DiskLoc& newLocation ) = 0;
+    };
+
+    struct ValidateResults {
+        ValidateResults() {
+            valid = true;
+        }
+        bool valid;
+        std::vector<std::string> errors;
+    };
+
+    /**
+     * This is so when a RecordStore is validating all records
+     * it can call back to someone to check if a record is valid.
+     * The actual data contained in a Record is totally opaque to the implementation.
+     */
+    class ValidateAdaptor {
+    public:
+        virtual ~ValidateAdaptor(){}
+
+        virtual Status validate( Record* record, size_t* dataSize ) = 0;
     };
 }

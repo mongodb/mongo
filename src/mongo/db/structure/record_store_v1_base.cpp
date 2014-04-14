@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
@@ -65,6 +66,10 @@ namespace mongo {
     DeletedRecord* RecordStoreV1Base::drec( const DiskLoc& loc ) const {
         invariant( loc.a() != -1 );
         return reinterpret_cast<DeletedRecord*>( recordFor( loc ) );
+    }
+
+    Extent* RecordStoreV1Base::_getExtent( const DiskLoc& loc ) const {
+        return _extentManager->getExtent( loc );
     }
 
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( const DocWriter* doc, int quotaMax ) {
@@ -219,6 +224,307 @@ namespace mongo {
         _details->setLastExtentSize( e->length );
 
         addDeletedRec(emptyLoc);
+    }
+
+    Status RecordStoreV1Base::validate( bool full, bool scanData,
+                                        ValidateAdaptor* adaptor,
+                                        ValidateResults* results, BSONObjBuilder* output ) const {
+
+        // 1) basic status that require no iteration
+        // 2) extent level info
+        // 3) check extent start and end
+        // 4) check deleted list
+
+        // -------------
+
+        // 1111111111111111111
+        if ( isCapped() ){
+            output->appendBool("capped", true);
+            output->appendNumber("max", _details->maxCappedDocs());
+        }
+
+        output->appendNumber("datasize", _details->dataSize());
+        output->appendNumber("nrecords", _details->numRecords());
+        output->appendNumber("lastExtentSize", _details->lastExtentSize());
+        output->appendNumber("padding", _details->paddingFactor());
+
+        if ( _details->firstExtent().isNull() )
+            output->append( "firstExtent", "null" );
+        else
+            output->append( "firstExtent",
+                            str::stream() << _details->firstExtent().toString()
+                            << " ns:"
+                            << _getExtent( _details->firstExtent() )->nsDiagnostic.toString());
+        if ( _details->lastExtent().isNull() )
+            output->append( "lastExtent", "null" );
+        else
+            output->append( "lastExtent", str::stream() << _details->lastExtent().toString()
+                            << " ns:"
+                            << _getExtent( _details->lastExtent() )->nsDiagnostic.toString());
+
+        // 22222222222222222222222222
+        { // validate extent basics
+            BSONArrayBuilder extentData;
+            int extentCount = 0;
+            try {
+                if ( !_details->firstExtent().isNull() ) {
+                    _getExtent( _details->firstExtent() )->assertOk();
+                    _getExtent( _details->lastExtent() )->assertOk();
+                }
+
+                DiskLoc extentDiskLoc = _details->firstExtent();
+                while (!extentDiskLoc.isNull()) {
+                    Extent* thisExtent = _getExtent( extentDiskLoc );
+                    if (full) {
+                        extentData << thisExtent->dump();
+                    }
+                    if (!thisExtent->validates(extentDiskLoc, &results->errors)) {
+                        results->valid = false;
+                    }
+                    DiskLoc nextDiskLoc = thisExtent->xnext;
+                    if (extentCount > 0 && !nextDiskLoc.isNull()
+                        &&  _getExtent( nextDiskLoc )->xprev != extentDiskLoc) {
+                        StringBuilder sb;
+                        sb << "'xprev' pointer " << _getExtent( nextDiskLoc )->xprev.toString()
+                           << " in extent " << nextDiskLoc.toString()
+                           << " does not point to extent " << extentDiskLoc.toString();
+                        results->errors.push_back( sb.str() );
+                        results->valid = false;
+                    }
+                    if (nextDiskLoc.isNull() && extentDiskLoc != _details->lastExtent()) {
+                        StringBuilder sb;
+                        sb << "'lastExtent' pointer " << _details->lastExtent().toString()
+                           << " does not point to last extent in list " << extentDiskLoc.toString();
+                        results->errors.push_back( sb.str() );
+                        results->valid = false;
+                    }
+                    extentDiskLoc = nextDiskLoc;
+                    extentCount++;
+                    killCurrentOp.checkForInterrupt();
+                }
+            }
+            catch (const DBException& e) {
+                StringBuilder sb;
+                sb << "exception validating extent " << extentCount
+                   << ": " << e.what();
+                results->errors.push_back( sb.str() );
+                results->valid = false;
+                return Status::OK();
+            }
+            output->append("extentCount", extentCount);
+
+            if ( full )
+                output->appendArray( "extents" , extentData.arr() );
+
+        }
+
+        try {
+            // 333333333333333333333333333
+            bool testingLastExtent = false;
+            try {
+                if (_details->firstExtent().isNull()) {
+                    // this is ok
+                }
+                else {
+                    output->append("firstExtentDetails", _getExtent(_details->firstExtent())->dump());
+                    if (!_getExtent(_details->firstExtent())->xprev.isNull()) {
+                        StringBuilder sb;
+                        sb << "'xprev' pointer in 'firstExtent' " << _details->firstExtent().toString()
+                           << " is " << _getExtent(_details->firstExtent())->xprev.toString()
+                           << ", should be null";
+                        results->errors.push_back( sb.str() );
+                        results->valid = false;
+                    }
+                }
+                testingLastExtent = true;
+                if (_details->lastExtent().isNull()) {
+                    // this is ok
+                }
+                else {
+                    if (_details->firstExtent() != _details->lastExtent()) {
+                        output->append("lastExtentDetails", _getExtent(_details->lastExtent())->dump());
+                        if (!_getExtent(_details->lastExtent())->xnext.isNull()) {
+                            StringBuilder sb;
+                            sb << "'xnext' pointer in 'lastExtent' " << _details->lastExtent().toString()
+                               << " is " << _getExtent(_details->lastExtent())->xnext.toString()
+                               << ", should be null";
+                            results->errors.push_back( sb.str() );
+                            results->valid = false;
+                        }
+                    }
+                }
+            }
+            catch (const DBException& e) {
+                StringBuilder sb;
+                sb << "exception processing '"
+                   << (testingLastExtent ? "lastExtent" : "firstExtent")
+                   << "': " << e.what();
+                results->errors.push_back( sb.str() );
+                results->valid = false;
+            }
+
+            // 4444444444444444444444444
+
+            set<DiskLoc> recs;
+            if( scanData ) {
+                int n = 0;
+                int nInvalid = 0;
+                long long nQuantizedSize = 0;
+                long long nPowerOf2QuantizedSize = 0;
+                long long len = 0;
+                long long nlen = 0;
+                long long bsonLen = 0;
+                int outOfOrder = 0;
+                DiskLoc cl_last;
+
+                scoped_ptr<RecordIterator> iterator( getIterator( DiskLoc(),
+                                                                  false,
+                                                                  CollectionScanParams::FORWARD ) );
+                DiskLoc cl;
+                while ( !( cl = iterator->getNext() ).isNull() ) {
+                    n++;
+
+                    if ( n < 1000000 )
+                        recs.insert(cl);
+                    if ( isCapped() ) {
+                        if ( cl < cl_last )
+                            outOfOrder++;
+                        cl_last = cl;
+                    }
+
+                    Record *r = recordFor(cl);
+                    len += r->lengthWithHeaders();
+                    nlen += r->netLength();
+
+                    if ( r->lengthWithHeaders() ==
+                         NamespaceDetails::quantizeAllocationSpace
+                         ( r->lengthWithHeaders() ) ) {
+                        // Count the number of records having a size consistent with
+                        // the quantizeAllocationSpace quantization implementation.
+                        ++nQuantizedSize;
+                    }
+
+                    if ( r->lengthWithHeaders() ==
+                         NamespaceDetails::quantizePowerOf2AllocationSpace
+                         ( r->lengthWithHeaders() - 1 ) ) {
+                        // Count the number of records having a size consistent with the
+                        // quantizePowerOf2AllocationSpace quantization implementation.
+                        // Because of SERVER-8311, power of 2 quantization is not idempotent and
+                        // r->lengthWithHeaders() - 1 must be checked instead of the record
+                        // length itself.
+                        ++nPowerOf2QuantizedSize;
+                    }
+
+                    if (full){
+                        size_t dataSize = 0;
+                        const Status status = adaptor->validate( r, &dataSize );
+                        if (!status.isOK()) {
+                            results->valid = false;
+                            if (nInvalid == 0) // only log once;
+                                results->errors.push_back( "invalid object detected (see logs)" );
+
+                            nInvalid++;
+                            log() << "Invalid object detected in " << _ns
+                                  << ": " << status.reason();
+                        }
+                        else {
+                            bsonLen += dataSize;
+                        }
+                    }
+                }
+
+                if ( isCapped() && !_details->capLooped() ) {
+                    output->append("cappedOutOfOrder", outOfOrder);
+                    if ( outOfOrder > 1 ) {
+                        results->valid = false;
+                        results->errors.push_back( "too many out of order records" );
+                    }
+                }
+                output->append("objectsFound", n);
+
+                if (full) {
+                    output->append("invalidObjects", nInvalid);
+                }
+
+                output->appendNumber("nQuantizedSize", nQuantizedSize);
+                output->appendNumber("nPowerOf2QuantizedSize", nPowerOf2QuantizedSize);
+                output->appendNumber("bytesWithHeaders", len);
+                output->appendNumber("bytesWithoutHeaders", nlen);
+
+                if (full) {
+                    output->appendNumber("bytesBson", bsonLen);
+                }
+            } // end scanData
+
+            // 55555555555555555555555555
+            BSONArrayBuilder deletedListArray;
+            for ( int i = 0; i < Buckets; i++ ) {
+                deletedListArray << _details->deletedListEntry(i).isNull();
+            }
+
+            int ndel = 0;
+            long long delSize = 0;
+            BSONArrayBuilder delBucketSizes;
+            int incorrect = 0;
+            for ( int i = 0; i < Buckets; i++ ) {
+                DiskLoc loc = _details->deletedListEntry(i);
+                try {
+                    int k = 0;
+                    while ( !loc.isNull() ) {
+                        if ( recs.count(loc) )
+                            incorrect++;
+                        ndel++;
+
+                        if ( loc.questionable() ) {
+                            if( _details->isCapped() && !loc.isValid() && i == 1 ) {
+                                /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
+                                   see comments in namespace.h
+                                */
+                                break;
+                            }
+
+                            string err( str::stream() << "bad pointer in deleted record list: "
+                                        << loc.toString()
+                                        << " bucket: " << i
+                                        << " k: " << k );
+                            results->errors.push_back( err );
+                            results->valid = false;
+                            break;
+                        }
+
+                        const DeletedRecord* d = deletedRecordFor(loc);
+                        delSize += d->lengthWithHeaders();
+                        loc = d->nextDeleted();
+                        k++;
+                        killCurrentOp.checkForInterrupt();
+                    }
+                    delBucketSizes << k;
+                }
+                catch (...) {
+                    results->errors.push_back( (string)"exception in deleted chain for bucket " +
+                                               BSONObjBuilder::numStr(i) );
+                    results->valid = false;
+                }
+            }
+            output->appendNumber("deletedCount", ndel);
+            output->appendNumber("deletedSize", delSize);
+            if ( full ) {
+                output->append( "delBucketSizes", delBucketSizes.arr() );
+            }
+
+            if ( incorrect ) {
+                results->errors.push_back( BSONObjBuilder::numStr(incorrect) +
+                                           " records from datafile are in deleted list" );
+                results->valid = false;
+            }
+
+        }
+        catch (AssertionException) {
+            results->errors.push_back( "exception during validate" );
+            results->valid = false;
+        }
+
+        return Status::OK();
     }
 
 }

@@ -190,6 +190,16 @@ namespace mongo {
         Status truncate();
 
         /**
+         * @param full - does more checks
+         * @param scanData - scans each document
+         * @return OK if the validate run successfully
+         *         OK will be returned even if corruption is found
+         *         deatils will be in result
+         */
+        Status validate( bool full, bool scanData,
+                         ValidateResults* results, BSONObjBuilder* output );
+
+        /**
          * Truncate documents newer than the document at 'end' from the capped
          * collection.  The collection cannot be completely emptied using this
          * function.  An assertion will be thrown if that is attempted.

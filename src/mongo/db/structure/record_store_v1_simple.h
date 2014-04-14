@@ -60,6 +60,8 @@ namespace mongo {
                                 CompactStats* stats );
 
     protected:
+        virtual bool isCapped() const { return false; }
+
         virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
 
         virtual void addDeletedRec(const DiskLoc& dloc);

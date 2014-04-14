@@ -504,4 +504,61 @@ namespace mongo {
         reinterpret_cast<CappedRecordStoreV1*>(_recordStore.get())->temp_cappedTruncateAfter( end, inclusive );
     }
 
+    namespace {
+        class MyValidateAdaptor : public ValidateAdaptor {
+        public:
+            virtual ~MyValidateAdaptor(){}
+
+            virtual Status validate( Record* record, size_t* dataSize ) {
+                BSONObj obj = BSONObj( record->data() );
+                const Status status = validateBSON(obj.objdata(), obj.objsize());
+                if ( status.isOK() )
+                    *dataSize = obj.objsize();
+                return Status::OK();
+            }
+
+        };
+    }
+
+    Status Collection::validate( bool full, bool scanData,
+                                 ValidateResults* results, BSONObjBuilder* output ){
+
+        MyValidateAdaptor adaptor;
+        Status status = _recordStore->validate( full, scanData, &adaptor, results, output );
+        if ( !status.isOK() )
+            return status;
+
+        { // indexes
+            output->append("nIndexes", _indexCatalog.numIndexesReady() );
+            int idxn = 0;
+            try  {
+                BSONObjBuilder indexes; // not using subObjStart to be exception safe
+                IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(false);
+                while( i.more() ) {
+                    const IndexDescriptor* descriptor = i.next();
+                    log() << "validating index " << descriptor->indexNamespace() << endl;
+                    IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
+                    invariant( iam );
+
+                    int64_t keys;
+                    iam->validate(&keys);
+                    indexes.appendNumber(descriptor->indexNamespace(),
+                                         static_cast<long long>(keys));
+                    idxn++;
+                }
+                output->append("keysPerIndex", indexes.done());
+            }
+            catch ( DBException& exc ) {
+                string err = str::stream() <<
+                    "exception during index validate idxn "<<
+                    BSONObjBuilder::numStr(idxn) <<
+                    ": " << exc.toString();
+                results->errors.push_back( err );
+                results->valid = false;
+            }
+        }
+
+        return Status::OK();
+    }
+
 }
