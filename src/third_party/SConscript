@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library windows darwin usev8 v8suffix")
+Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris")
 
 env.SConscript( [
         "murmurhash3/SConscript",
@@ -92,3 +92,10 @@ else:
     env.SConscript('yaml-cpp-0.5.1/SConscript')
     env.Library("shim_yaml", ['shim_yaml.cpp'],
                 LIBDEPS=['yaml-cpp-0.5.1/yaml'])
+
+if solaris:
+    env.Append(CPPPATH='$BUILD_DIR/third_party/tz')
+    env.SConscript('tz/SConscript')
+    env.Library('shim_tz', ['shim_tz.cpp'], LIBDEPS=['tz/tz'])
+else:
+    env.Library('shim_tz', ['shim_tz.cpp'], LIBDEPS=[])

@@ -375,5 +375,427 @@ namespace {
         ASSERT_NOT_OK(dateFromISOString("1970-01-01T00:00:00.x00Z").getStatus());
     }
 
+    TEST(TimeParsing, LeapYears) {
+        StatusWith<Date_t> swull = dateFromISOString("1972-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 68169600000ULL);
+
+        swull = dateFromISOString("1976-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 194400000000ULL);
+
+        swull = dateFromISOString("1980-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 320630400000ULL);
+
+        swull = dateFromISOString("1984-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 446860800000ULL);
+
+        swull = dateFromISOString("1988-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 573091200000ULL);
+
+        swull = dateFromISOString("1992-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 699321600000ULL);
+
+        swull = dateFromISOString("1996-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 825552000000ULL);
+
+        swull = dateFromISOString("2000-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 951782400000ULL);
+
+        swull = dateFromISOString("2004-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1078012800000ULL);
+
+        swull = dateFromISOString("2008-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1204243200000ULL);
+
+        swull = dateFromISOString("2012-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1330473600000ULL);
+
+        swull = dateFromISOString("2016-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1456704000000ULL);
+
+        swull = dateFromISOString("2020-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1582934400000ULL);
+
+        swull = dateFromISOString("2024-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1709164800000ULL);
+
+        swull = dateFromISOString("2028-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1835395200000ULL);
+
+        swull = dateFromISOString("2032-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 1961625600000ULL);
+
+        swull = dateFromISOString("2036-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2087856000000ULL);
+
+        swull = dateFromISOString("2040-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2214086400000ULL);
+
+        swull = dateFromISOString("2044-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2340316800000ULL);
+
+        swull = dateFromISOString("2048-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2466547200000ULL);
+
+        swull = dateFromISOString("2052-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2592777600000ULL);
+
+        swull = dateFromISOString("2056-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2719008000000ULL);
+
+        swull = dateFromISOString("2060-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2845238400000ULL);
+
+        swull = dateFromISOString("2064-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 2971468800000ULL);
+
+        swull = dateFromISOString("2068-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3097699200000ULL);
+
+        swull = dateFromISOString("2072-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3223929600000ULL);
+
+        swull = dateFromISOString("2076-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3350160000000ULL);
+
+        swull = dateFromISOString("2080-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3476390400000ULL);
+
+        swull = dateFromISOString("2084-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3602620800000ULL);
+
+        swull = dateFromISOString("2088-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3728851200000ULL);
+
+        swull = dateFromISOString("2092-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3855081600000ULL);
+
+        swull = dateFromISOString("2096-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 3981312000000ULL);
+
+        swull = dateFromISOString("2104-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 4233686400000ULL);
+
+        swull = dateFromISOString("2108-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 4359916800000ULL);
+
+        swull = dateFromISOString("2112-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 4486147200000ULL);
+
+        swull = dateFromISOString("2116-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 4612377600000ULL);
+
+        swull = dateFromISOString("2120-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 4738608000000ULL);
+
+        swull = dateFromISOString("2124-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 4864838400000ULL);
+
+        swull = dateFromISOString("2128-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 4991068800000ULL);
+
+        swull = dateFromISOString("2132-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 5117299200000ULL);
+
+        swull = dateFromISOString("2136-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 5243529600000ULL);
+
+        swull = dateFromISOString("2140-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 5369760000000ULL);
+
+        swull = dateFromISOString("2144-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 5495990400000ULL);
+
+        swull = dateFromISOString("2148-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 5622220800000ULL);
+
+        swull = dateFromISOString("2152-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 5748451200000ULL);
+
+        swull = dateFromISOString("2156-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 5874681600000ULL);
+
+        swull = dateFromISOString("2160-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6000912000000ULL);
+
+        swull = dateFromISOString("2164-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6127142400000ULL);
+
+        swull = dateFromISOString("2168-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6253372800000ULL);
+
+        swull = dateFromISOString("2172-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6379603200000ULL);
+
+        swull = dateFromISOString("2176-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6505833600000ULL);
+
+        swull = dateFromISOString("2180-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6632064000000ULL);
+
+        swull = dateFromISOString("2184-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6758294400000ULL);
+
+        swull = dateFromISOString("2188-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 6884524800000ULL);
+
+        swull = dateFromISOString("2192-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 7010755200000ULL);
+
+        swull = dateFromISOString("2196-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 7136985600000ULL);
+
+        swull = dateFromISOString("2204-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 7389360000000ULL);
+
+        swull = dateFromISOString("2208-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 7515590400000ULL);
+
+        swull = dateFromISOString("2212-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 7641820800000ULL);
+
+        swull = dateFromISOString("2216-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 7768051200000ULL);
+
+        swull = dateFromISOString("2220-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 7894281600000ULL);
+
+        swull = dateFromISOString("2224-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8020512000000ULL);
+
+        swull = dateFromISOString("2228-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8146742400000ULL);
+
+        swull = dateFromISOString("2232-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8272972800000ULL);
+
+        swull = dateFromISOString("2236-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8399203200000ULL);
+
+        swull = dateFromISOString("2240-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8525433600000ULL);
+
+        swull = dateFromISOString("2244-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8651664000000ULL);
+
+        swull = dateFromISOString("2248-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8777894400000ULL);
+
+        swull = dateFromISOString("2252-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 8904124800000ULL);
+
+        swull = dateFromISOString("2256-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9030355200000ULL);
+
+        swull = dateFromISOString("2260-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9156585600000ULL);
+
+        swull = dateFromISOString("2264-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9282816000000ULL);
+
+        swull = dateFromISOString("2268-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9409046400000ULL);
+
+        swull = dateFromISOString("2272-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9535276800000ULL);
+
+        swull = dateFromISOString("2276-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9661507200000ULL);
+
+        swull = dateFromISOString("2280-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9787737600000ULL);
+
+        swull = dateFromISOString("2284-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 9913968000000ULL);
+
+        swull = dateFromISOString("2288-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 10040198400000ULL);
+
+        swull = dateFromISOString("2292-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 10166428800000ULL);
+
+        swull = dateFromISOString("2296-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 10292659200000ULL);
+
+        swull = dateFromISOString("2304-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 10545033600000ULL);
+
+        swull = dateFromISOString("2308-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 10671264000000ULL);
+
+        swull = dateFromISOString("2312-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 10797494400000ULL);
+
+        swull = dateFromISOString("2316-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 10923724800000ULL);
+
+        swull = dateFromISOString("2320-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11049955200000ULL);
+
+        swull = dateFromISOString("2324-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11176185600000ULL);
+
+        swull = dateFromISOString("2328-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11302416000000ULL);
+
+        swull = dateFromISOString("2332-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11428646400000ULL);
+
+        swull = dateFromISOString("2336-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11554876800000ULL);
+
+        swull = dateFromISOString("2340-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11681107200000ULL);
+
+        swull = dateFromISOString("2344-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11807337600000ULL);
+
+        swull = dateFromISOString("2348-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 11933568000000ULL);
+
+        swull = dateFromISOString("2352-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12059798400000ULL);
+
+        swull = dateFromISOString("2356-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12186028800000ULL);
+
+        swull = dateFromISOString("2360-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12312259200000ULL);
+
+        swull = dateFromISOString("2364-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12438489600000ULL);
+
+        swull = dateFromISOString("2368-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12564720000000ULL);
+
+        swull = dateFromISOString("2372-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12690950400000ULL);
+
+        swull = dateFromISOString("2376-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12817180800000ULL);
+
+        swull = dateFromISOString("2380-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 12943411200000ULL);
+
+        swull = dateFromISOString("2384-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 13069641600000ULL);
+
+        swull = dateFromISOString("2388-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 13195872000000ULL);
+
+        swull = dateFromISOString("2392-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 13322102400000ULL);
+
+        swull = dateFromISOString("2396-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 13448332800000ULL);
+
+        swull = dateFromISOString("2400-02-29T00:00:00.000Z");
+        ASSERT_OK(swull.getStatus());
+        ASSERT_EQUALS(swull.getValue(), 13574563200000ULL);
+    }
+
 }  // namespace
 }  // namespace mongo
