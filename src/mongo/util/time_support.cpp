@@ -52,6 +52,13 @@
 #define snprintf _snprintf
 #endif
 
+#ifdef __sunos__
+// Some versions of Solaris do not have timegm defined, so fall back to our implementation when
+// building on Solaris.  See SERVER-13446.
+extern "C" time_t
+timegm(struct tm *const tmp);
+#endif
+
 namespace mongo {
 
     // jsTime_virtual_skew is just for testing. a test command manipulates it.
