@@ -318,7 +318,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->async_op_remove.desc = "async op remove calls";
 	stats->async_op_search.desc = "async op search calls";
 	stats->async_op_update.desc = "async op update calls";
-	stats->async_ops.desc = "async: number of operations performed";
 	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
 	stats->block_byte_read.desc = "block manager: bytes read";
 	stats->block_byte_write.desc = "block manager: bytes written";
@@ -440,7 +439,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->async_op_remove.v = 0;
 	stats->async_op_search.v = 0;
 	stats->async_op_update.v = 0;
-	stats->async_ops.v = 0;
 	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;

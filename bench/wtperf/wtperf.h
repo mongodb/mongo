@@ -93,6 +93,8 @@ struct __config {			/* Configuration struction */
 
 	FILE *logf;			/* Logging handle */
 
+	char *async_config;		/* Config string for async */
+
 	const char *compress_ext;	/* Compression extension for conn */
 	const char *compress_table;	/* Compression arg to table create */
 
@@ -113,6 +115,7 @@ struct __config {			/* Configuration struction */
 	uint64_t update_ops;		/* update operations */
 
 	uint64_t insert_key;		/* insert key */
+	uint64_t insert_complete;	/* async insert ops complete */
 
 	volatile int ckpt;		/* checkpoint in progress */
 	volatile int error;		/* thread error */

@@ -45,7 +45,6 @@ connection_stats = [
 	##########################################
 	Stat('async_flush', 'async: number of async flush calls'),
 	Stat('async_full', 'async: number of times op allocation failed'),
-	Stat('async_ops', 'async: number of operations performed'),
 	Stat('async_cur_queue', 'async: current work queue length'),
 	Stat('async_max_queue', 'async: maximum work queue length',
 	    'max_aggregate,no_scale'),

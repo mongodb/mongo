@@ -126,7 +126,6 @@ struct __wt_connection_stats {
 	WT_STATS async_op_remove;
 	WT_STATS async_op_search;
 	WT_STATS async_op_update;
-	WT_STATS async_ops;
 	WT_STATS block_byte_map_read;
 	WT_STATS block_byte_read;
 	WT_STATS block_byte_write;

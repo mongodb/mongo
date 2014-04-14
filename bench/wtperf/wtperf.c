@@ -36,6 +36,7 @@ static const CONFIG default_cfg = {
 	NULL,				/* helium_mount */
 	NULL,				/* conn */
 	NULL,				/* logf */
+	NULL,				/* async */
 	NULL, NULL,			/* compressor ext, blk */
 	NULL, NULL,			/* populate, checkpoint threads */
 
@@ -48,6 +49,7 @@ static const CONFIG default_cfg = {
 	0,				/* read operations */
 	0,				/* update operations */
 	0,				/* insert key */
+	0,				/* async insert complete */
 	0,				/* checkpoint in progress */
 	0,				/* thread error */
 	0,				/* notify threads to stop */
@@ -107,6 +109,13 @@ static inline uint64_t
 get_next_incr(CONFIG *cfg)
 {
 	return (ATOMIC_ADD(cfg->insert_key, 1));
+}
+
+/* Count number of async inserts completed. */
+static inline uint64_t
+async_next_incr(CONFIG *cfg)
+{
+	return (ATOMIC_ADD(cfg->insert_complete, 1));
 }
 
 static void
@@ -655,6 +664,155 @@ err:		cfg->error = cfg->stop = 1;
 	return (NULL);
 }
 
+static int
+cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
+{
+
+	CONFIG *cfg;
+	CONFIG_THREAD *thread;
+
+	(void)cb;
+	(void)flags;
+	thread = (CONFIG_THREAD *)op->c.lang_private;
+	cfg = thread->cfg;
+
+	if (ret != 0) {
+		/* We always expect success.  Panic if error */
+		lprintf(cfg, ret, 0, "Error in op %" PRIu64,
+		    op->get_id(op));
+		cfg->error = cfg->stop = 1;
+		return (1);
+	}
+	(void)async_next_incr(cfg);
+	return (0);
+}
+
+static WT_ASYNC_CALLBACK cb = { cb_asyncop };
+
+static void *
+populate_async(void *arg)
+{
+	struct timespec start, stop;
+	CONFIG *cfg;
+	CONFIG_THREAD *thread;
+	TRACK *trk;
+	WT_ASYNC_OP *asyncop;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	size_t i;
+	uint64_t op, usecs;
+	uint32_t opcount;
+	int intxn, measure_latency, ret;
+	char *value_buf, *key_buf;
+	const char *cursor_config;
+
+	thread = (CONFIG_THREAD *)arg;
+	cfg = thread->cfg;
+	conn = cfg->conn;
+	session = NULL;
+	ret = 0;
+	trk = &thread->insert;
+
+	key_buf = thread->key_buf;
+	value_buf = thread->value_buf;
+
+	if ((ret = conn->open_session(
+	    conn, NULL, cfg->sess_config, &session)) != 0) {
+		lprintf(cfg, ret, 0, "populate: WT_CONNECTION.open_session");
+		goto err;
+	}
+
+	/*
+	 * Measuring latency of one async op is not meaningful.  We
+	 * will measure the time it takes to do all of them, including
+	 * the time to process by workers.
+	 */
+	measure_latency = 
+	    cfg->sample_interval != 0 && trk->ops != 0 && (
+	    trk->ops % cfg->sample_rate == 0);
+	if (measure_latency &&
+	    (ret = __wt_epoch(NULL, &start)) != 0) {
+		lprintf(cfg, ret, 0, "Get time call failed");
+		goto err;
+	}
+	/* Populate the databases. */
+	for (intxn = 0, opcount = 0;;) {
+		op = get_next_incr(cfg);
+		if (op > cfg->icount)
+			break;
+		/*
+		 * Allocate an async op for whichever table.
+		 */
+		asyncop = NULL;
+retry:		if ((ret = conn->async_new_op(
+		    conn, cfg->uris[op % cfg->table_count],
+		    NULL, &cb, &asyncop)) != 0) {
+			if (ret != ENOMEM)
+				goto err;
+			sched_yield();
+			goto retry;
+		}
+		asyncop->c.lang_private = thread;
+
+		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
+		asyncop->set_key(asyncop, key_buf);
+		if (cfg->random_value)
+			randomize_value(cfg, value_buf);
+		asyncop->set_value(asyncop, value_buf);
+		if ((ret = asyncop->insert(asyncop)) != 0) {
+			lprintf(cfg, ret, 0, "Failed inserting");
+			goto err;
+		}
+		++thread->insert.ops;	/* Same as trk->ops */
+
+		if (cfg->populate_ops_per_txn != 0) {
+			if (++opcount < cfg->populate_ops_per_txn)
+				continue;
+			opcount = 0;
+
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0)
+				lprintf(cfg, ret, 0,
+				    "Fail committing, transaction was aborted");
+			intxn = 0;
+		}
+	}
+	/*
+	 * Gather statistics.
+	 * We measure the latency of inserting a single key.  If there
+	 * are multiple tables, it is the time for insertion into all
+	 * of them.  Note that currently every populate thread will call
+	 * async_flush and those calls will convoy.  That is not the
+	 * most efficient way, but we want to flush before measuring latency.
+	 */
+	conn->async_flush(conn);
+	if (measure_latency) {
+		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Get time call failed");
+			goto err;
+		}
+		++trk->latency_ops;
+		usecs = ns_to_us(WT_TIMEDIFF(stop, start));
+		track_operation(trk, usecs);
+	}
+	if (intxn &&
+	    (ret = session->commit_transaction(session, NULL)) != 0)
+		lprintf(cfg, ret, 0,
+		    "Fail committing, transaction was aborted");
+
+	if ((ret = session->close(session, NULL)) != 0) {
+		lprintf(cfg, ret, 0, "Error closing session in populate");
+		goto err;
+	}
+
+	/* Notify our caller we failed and shut the system down. */
+	if (0) {
+err:		cfg->error = cfg->stop = 1;
+	}
+	return (NULL);
+}
+
 static void *
 monitor(void *arg)
 {
@@ -879,16 +1037,23 @@ execute_populate(CONFIG *cfg)
 	uint64_t last_ops;
 	uint32_t interval;
 	int elapsed, ret, t_ret;
+	void *(*pfunc)(void *);
 
 	session = NULL;
 	lprintf(cfg, 0, 1,
-	    "Starting %" PRIu32 " populate thread(s)", cfg->populate_threads);
+	    "Starting %" PRIu32
+	    " populate thread(s) for %" PRIu32 " items",
+	    cfg->populate_threads, cfg->icount);
 
 	if ((cfg->popthreads =
 	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
 		return (enomem(cfg));
+	if (cfg->async_threads > 0)
+		pfunc = populate_async;
+	else
+		pfunc = populate_thread;
 	if ((ret = start_threads(cfg, NULL,
-	    cfg->popthreads, cfg->populate_threads, populate_thread)) != 0)
+	    cfg->popthreads, cfg->populate_threads, pfunc)) != 0)
 		return (ret);
 
 	cfg->insert_key = 0;
@@ -1609,7 +1774,24 @@ main(int argc, char *argv[])
 				goto einval;
 			break;
 		}
-
+	
+	cfg->async_config = NULL;
+	if (cfg->async_threads > 0) {
+		/*
+		 * The maximum number of async threasd is two digits, so just
+		 * use that to compute the space we need.  Assume the default
+		 * of 1024 for the max ops.  Although we could bump that up
+		 * to 4096 if needed.
+		 */
+		req_len = strlen(",async=(enabled=true,threads=)") + 4;
+		if ((cfg->async_config = calloc(req_len, 1)) == NULL) {
+			ret = enomem(cfg);
+			goto err;
+		}
+		snprintf(cfg->async_config, req_len,
+		    ",async=(enabled=true,threads=%d)",
+		    cfg->async_threads);
+	}
 	if ((ret = config_compress(cfg)) != 0)
 		goto err;
 
@@ -1630,10 +1812,12 @@ main(int argc, char *argv[])
 
 	/* Concatenate non-default configuration strings. */
 	if (cfg->verbose > 1 || user_cconfig != NULL ||
-	    cfg->compress_ext != NULL) {
+	    cfg->compress_ext != NULL || cfg->async_config != NULL) {
 		req_len = strlen(cfg->conn_config) + strlen(debug_cconfig) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
+		if (cfg->async_config != NULL)
+			req_len += strlen(cfg->async_config);
 		if (cfg->compress_ext != NULL)
 			req_len += strlen(cfg->compress_ext);
 		if ((cc_buf = calloc(req_len, 1)) == NULL) {
@@ -1643,8 +1827,9 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(cc_buf, req_len, "%s%s%s%s%s%s",
+		snprintf(cc_buf, req_len, "%s%s%s%s%s%s%s",
 		    cfg->conn_config,
+		    cfg->async_config ? cfg->async_config : "",
 		    cfg->compress_ext ? cfg->compress_ext : "",
 		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_cconfig : "",
