@@ -699,12 +699,10 @@ populate_async(void *arg)
 	WT_ASYNC_OP *asyncop;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	size_t i;
 	uint64_t op, usecs;
 	uint32_t opcount;
 	int intxn, measure_latency, ret;
 	char *value_buf, *key_buf;
-	const char *cursor_config;
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
