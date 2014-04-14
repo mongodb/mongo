@@ -31,7 +31,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/index/expression_keys_private.h"
 
 namespace mongo {
 
@@ -46,10 +45,6 @@ namespace mongo {
             BSONObjBuilder bob;
             bob.append("", BSONElementHasher::hash64(value, BSONElementHasher::DEFAULT_HASH_SEED));
             return bob.obj();
-        }
-
-        static BSONObj prefix(const BSONElement& value, int prefixLength) {
-            return ExpressionKeysPrivate::makeSinglePrefixKey(value, prefixLength);
         }
 
         // TODO: what should we really pass in for indexInfoObj?

@@ -54,7 +54,6 @@ namespace mongo {
         INDEX_2DSPHERE,
         INDEX_TEXT,
         INDEX_HASHED,
-        INDEX_PREFIX,
     };
 
     /**
@@ -69,7 +68,6 @@ namespace mongo {
         static const string TEXT;
         static const string HASHED;
         static const string BTREE;
-        static const string PREFIX;
 
         /**
          * True if is a regular (non-plugin) index or uses a plugin that existed before 2.4.

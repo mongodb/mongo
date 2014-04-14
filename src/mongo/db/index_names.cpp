@@ -38,7 +38,6 @@ namespace mongo {
     const string IndexNames::TEXT = "text";
     const string IndexNames::HASHED = "hashed";
     const string IndexNames::BTREE = "";
-    const string IndexNames::PREFIX = "prefix";
 
     // static
     string IndexNames::findPluginName(const BSONObj& keyPattern) {
@@ -68,7 +67,6 @@ namespace mongo {
                || name == IndexNames::GEO_HAYSTACK
                || name == IndexNames::TEXT
                || name == IndexNames::HASHED
-               || name == IndexNames::PREFIX
                || name == IndexNames::BTREE;
     }
 
@@ -88,9 +86,6 @@ namespace mongo {
         }
         else if (IndexNames::HASHED == accessMethod) {
             return INDEX_HASHED;
-        }
-        else if (IndexNames::PREFIX == accessMethod) {
-            return INDEX_PREFIX;
         }
         else {
             return INDEX_BTREE;
