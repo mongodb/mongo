@@ -42,8 +42,10 @@ namespace mongo {
     PlanStage::StageState LimitStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
-        // If we've returned as many results as we're limited to, isEOF will be true.
-        if (isEOF()) { return PlanStage::IS_EOF; }
+        if (0 == _numToReturn) {
+            // We've returned as many results as we're limited to.
+            return PlanStage::IS_EOF;
+        }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         StageState status = _child->work(&id);
