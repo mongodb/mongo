@@ -71,7 +71,6 @@ addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
 
 addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])
 addSmokeSuite( "smokeCppUnittests", "$UNITTEST_LIST" )
-addSmokeSuite( "smokeModuleTests", "$MODULETEST_LIST" )
 
 # These tests require the mongo shell
 if shellEnv is not None:

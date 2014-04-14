@@ -407,8 +407,6 @@ env = Environment( BUILD_DIR=variantDir,
                    MODULE_BANNERS=[],
                    ARCHIVE_ADDITION_DIR_MAP={},
                    ARCHIVE_ADDITIONS=[],
-                   MODULETEST_ALIAS='moduletests',
-                   MODULETEST_LIST='#build/moduletests.txt',
                    MSVS_ARCH=msarch ,
                    PYTHON=utils.find_python(),
                    SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
@@ -1693,4 +1691,4 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
-env.Alias('all', ['core', 'tools', 'test', 'unittests', 'moduletests'])
+env.Alias('all', ['core', 'tools', 'test', 'unittests'])
