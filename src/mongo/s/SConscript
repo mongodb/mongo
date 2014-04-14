@@ -330,5 +330,17 @@ env.Library(
     ],
 )
 
-
+env.CppUnitTest(
+    target='chunk_manager_targeter_test',
+    source=[
+        'chunk_manager_targeter_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/coreserver',
+        '$BUILD_DIR/mongo/coreshard',
+        '$BUILD_DIR/mongo/mongocommon',
+        '$BUILD_DIR/mongo/mongoscore',
+    ]
+)
 

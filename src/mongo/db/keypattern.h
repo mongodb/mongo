@@ -34,6 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/db/query/index_bounds.h"
 
 namespace mongo {
 
@@ -173,6 +174,31 @@ namespace mongo {
          */
         BoundList keyBounds( const FieldRangeSet& queryConstraints ) const;
 
+        /**
+         * Return an ordered list of bounds generated using this KeyPattern and the
+         * bounds from the IndexBounds.  This function is used in sharding to
+         * determine where to route queries according to the shard key pattern.
+         *
+         * Examples:
+         *
+         * Key { a: 1 }, Bounds a: [0] => { a: 0 } -> { a: 0 }
+         * Key { a: 1 }, Bounds a: [2, 3) => { a: 2 } -> { a: 3 }  // bound inclusion ignored.
+         *
+         * The bounds returned by this function may be a superset of those defined
+         * by the constraints.  For instance, if this KeyPattern is {a : 1, b: 1}
+         * Bounds: { a : {$in : [1,2]} , b : {$in : [3,4,5]} }
+         *         => {a : 1 , b : 3} -> {a : 1 , b : 5}, {a : 2 , b : 3} -> {a : 2 , b : 5}
+         *
+         * If the IndexBounds are not defined for all the fields in this keypattern, which
+         * means some fields are unsatisfied, an empty BoundList could return.
+         *
+         */
+        static BoundList keyBounds( const BSONObj& keyPattern, const IndexBounds& indexBounds );
+
+        static bool isHashed( const BSONElement& fieldExpression ) {
+            return mongoutils::str::equals( fieldExpression.valuestrsafe() , "hashed" );
+        }
+
     private:
         BSONObj _pattern;
 
@@ -200,10 +226,6 @@ namespace mongo {
 
         bool isDescending( const BSONElement& fieldExpression ) const {
             return ( fieldExpression.isNumber()  && fieldExpression.numberInt() == -1 );
-        }
-
-        bool isHashed( const BSONElement& fieldExpression ) const {
-            return mongoutils::str::equals( fieldExpression.valuestrsafe() , "hashed" );
         }
 
         /* Takes a list of intervals corresponding to constraints on a given field

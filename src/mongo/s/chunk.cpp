@@ -52,6 +52,10 @@
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/timer.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/index_bounds_builder.h"
 
 namespace mongo {
 
@@ -1156,49 +1160,39 @@ namespace mongo {
     }
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
-        // TODO Determine if the third argument to OrRangeGenerator() is necessary, see SERVER-5165.
-        OrRangeGenerator org(_ns.c_str(), query, false);
+        CanonicalQuery* canonicalQuery;
+        Status status = CanonicalQuery::canonicalize(_ns, query, &canonicalQuery);
+        uassert(status.code(), status.reason(), status.isOK());
 
-        const SpecialIndices special = org.getSpecial();
-        if (special.has("2d") || special.has("2dsphere")) {
-            BSONForEach(field, query) {
-                if (getGtLtOp(field) == BSONObj::opNEAR) {
-                    uassert(13501, "use geoNear command rather than $near query", false);
-                    // TODO: convert to geoNear rather than erroring out
-                }
-                // $within queries are fine
-            }
-        } else if (!special.empty()) {
-            uassert(13502, "unrecognized special query type: " + special.toString(), false);
+        boost::scoped_ptr<CanonicalQuery> canonicalQueryPtr(canonicalQuery);
+
+        // Query validation
+        if (QueryPlannerCommon::hasNode(canonicalQuery->root(), MatchExpression::GEO_NEAR)) {
+            uassert(13501, "use geoNear command rather than $near query", false);
         }
 
-        do {
-            boost::scoped_ptr<FieldRangeSetPair> frsp (org.topFrsp());
+        // Transforms query into bounds for each field in the shard key
+        // for example :
+        //   Key { a: 1, b: 1 },
+        //   Query { a : { $gte : 1, $lt : 2 },
+        //            b : { $gte : 3, $lt : 4 } }
+        //   => Bounds { a : [1, 2), b : [3, 4) }
+        IndexBounds bounds = getIndexBoundsForQuery(_key.key(), canonicalQuery);
 
-            // special case if most-significant field isn't in query
-            FieldRange range = frsp->shardKeyRange(_key.key().firstElementFieldName());
-            if ( range.universal() ) {
-                getShardsForRange( shards, _key.globalMin(), _key.globalMax() );
-                return;
-            }
-            
-            if ( frsp->matchPossibleForSingleKeyFRS( _key.key() ) ) {
-                BoundList ranges = _key.keyBounds( frsp->getSingleKeyFRS() );
-                for ( BoundList::const_iterator it=ranges.begin(); it != ranges.end(); ++it ){
+        // Transforms bounds for each shard key field into full shard key ranges
+        // for example :
+        //   Key { a : 1, b : 1 }
+        //   Bounds { a : [1, 2), b : [3, 4) }
+        //   => Ranges { a : 1, b : 3 } => { a : 2, b : 4 }
+        BoundList ranges = KeyPattern::keyBounds(_key.key(), bounds);
 
-                    getShardsForRange( shards, it->first /*min*/, it->second /*max*/ );
+        for ( BoundList::const_iterator it=ranges.begin(); it != ranges.end(); ++it ){
+            getShardsForRange( shards, it->first /*min*/, it->second /*max*/ );
 
-                    // once we know we need to visit all shards no need to keep looping
-                    if( shards.size() == _shards.size() ) return;
-                }
-            }
-
-            if (!org.orRangesExhausted())
-                org.popOrClauseSingleKey();
-
+            // once we know we need to visit all shards no need to keep looping
+            if( shards.size() == _shards.size() ) break;
         }
-        while (!org.orRangesExhausted());
-        
+
         // SERVER-4914 Some clients of getShardsForQuery() assume at least one shard will be
         // returned.  For now, we satisfy that assumption by adding a shard with no matches rather
         // than return an empty set of shards.
@@ -1229,6 +1223,106 @@ namespace mongo {
 
     void ChunkManager::getAllShards( set<Shard>& all ) const {
         all.insert(_shards.begin(), _shards.end());
+    }
+
+    IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery* canonicalQuery) {
+        // $text is not allowed in planning since we don't have text index on mongos.
+        //
+        // TODO: Treat $text query as a no-op in planning. So with shard key {a: 1},
+        //       the query { a: 2, $text: { ... } } will only target to {a: 2}.
+        if (QueryPlannerCommon::hasNode(canonicalQuery->root(), MatchExpression::TEXT)) {
+            IndexBounds bounds;
+            IndexBoundsBuilder::allValuesBounds(key, &bounds); // [minKey, maxKey]
+            return bounds;
+        }
+
+        // Consider shard key as an index
+        string accessMethod = IndexNames::BTREE;
+        if (KeyPattern::isHashed(key.firstElement())) {
+            accessMethod = IndexNames::HASHED;
+        }
+
+        // Use query framework to generate index bounds
+        QueryPlannerParams plannerParams;
+        // Must use "shard key" index
+        plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
+        IndexEntry indexEntry(key, accessMethod, false /* multiKey */, false /* sparse */, "shardkey", BSONObj());
+        plannerParams.indices.push_back(indexEntry);
+
+        vector<QuerySolution*> solutions;
+        Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
+        uassert(status.code(), status.reason(), status.isOK());
+
+        IndexBounds bounds;
+
+        for (vector<QuerySolution*>::const_iterator it = solutions.begin();
+                bounds.size() == 0 && it != solutions.end(); it++) {
+            // Try next solution if we failed to generate index bounds, i.e. bounds.size() == 0
+            bounds = collapseQuerySolution((*it)->root.get());
+        }
+
+        if (bounds.size() == 0) {
+            // We cannot plan the query without collection scan, so target to all shards.
+            IndexBoundsBuilder::allValuesBounds(key, &bounds); // [minKey, maxKey]
+        }
+        return bounds;
+    }
+
+    IndexBounds ChunkManager::collapseQuerySolution( const QuerySolutionNode* node ) {
+        if (node->children.size() == 0) {
+            invariant(node->getType() == STAGE_IXSCAN);
+
+            const IndexScanNode* ixNode = static_cast<const IndexScanNode*>( node );
+            return ixNode->bounds;
+        }
+
+        if (node->children.size() == 1) {
+            // e.g. FETCH -> IXSCAN
+            return collapseQuerySolution( node->children.front() );
+        }
+
+        // children.size() > 1, assert it's OR / SORT_MERGE.
+        if ( node->getType() != STAGE_OR && node->getType() != STAGE_SORT_MERGE ) {
+            // Unexpected node. We should never reach here.
+            error() << "could not generate index bounds on query solution tree: " << node->toString();
+            dassert(false); // We'd like to know this error in testing.
+
+            // Bail out with all shards in production, since this isn't a fatal error.
+            return IndexBounds();
+        }
+
+        IndexBounds bounds;
+        for ( vector<QuerySolutionNode*>::const_iterator it = node->children.begin();
+                it != node->children.end(); it++ )
+        {
+            // The first branch under OR
+            if ( it == node->children.begin() ) {
+                invariant(bounds.size() == 0);
+                bounds = collapseQuerySolution( *it );
+                if (bounds.size() == 0) { // Got unexpected node in query solution tree
+                    return IndexBounds();
+                }
+                continue;
+            }
+
+            IndexBounds childBounds = collapseQuerySolution( *it );
+            if (childBounds.size() == 0) { // Got unexpected node in query solution tree
+                return IndexBounds();
+            }
+
+            invariant(childBounds.size() == bounds.size());
+            for ( size_t i = 0; i < bounds.size(); i++ ) {
+                bounds.fields[i].intervals.insert( bounds.fields[i].intervals.end(),
+                                                   childBounds.fields[i].intervals.begin(),
+                                                   childBounds.fields[i].intervals.end() );
+            }
+        }
+
+        for ( size_t i = 0; i < bounds.size(); i++ ) {
+            IndexBoundsBuilder::unionize( &bounds.fields[i] );
+        }
+
+        return bounds;
     }
 
     bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ) const {

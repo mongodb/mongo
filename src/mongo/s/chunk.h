@@ -37,6 +37,7 @@
 #include "mongo/s/shard.h"
 #include "mongo/s/shardkey.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
@@ -437,6 +438,24 @@ namespace mongo {
         void getAllShards( set<Shard>& all ) const;
         /** @param shards set to the shards covered by the interval [min, max], see SERVER-4791 */
         void getShardsForRange( set<Shard>& shards, const BSONObj& min, const BSONObj& max ) const;
+
+        // Transforms query into bounds for each field in the shard key
+        // for example :
+        //   Key { a: 1, b: 1 },
+        //   Query { a : { $gte : 1, $lt : 2 },
+        //            b : { $gte : 3, $lt : 4 } }
+        //   => Bounds { a : [1, 2), b : [3, 4) }
+        static IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery* canonicalQuery);
+
+        // Collapse query solution tree.
+        //
+        // If it has OR node, the result could be a superset of the index bounds generated.
+        // Since to give a single IndexBounds, this gives the union of bounds on each field.
+        // for example:
+        //   OR: { a: (0, 1), b: (0, 1) },
+        //       { a: (2, 3), b: (2, 3) }
+        //   =>  { a: (0, 1), (2, 3), b: (0, 1), (2, 3) }
+        static IndexBounds collapseQuerySolution( const QuerySolutionNode* node );
 
         ChunkMap getChunkMap() const { return _chunkMap; }
 

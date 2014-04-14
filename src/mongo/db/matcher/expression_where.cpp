@@ -192,6 +192,7 @@ namespace mongo {
     }
 
     MONGO_INITIALIZER( MatchExpressionWhere )( ::mongo::InitializerContext* context ) {
+        // This could be overrided by MatchExpressionWhereNoOp in mongos
         expressionParserWhereCallback = expressionParserWhereCallbackReal;
         return Status::OK();
     }

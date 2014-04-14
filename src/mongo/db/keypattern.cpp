@@ -217,6 +217,97 @@ namespace mongo {
         return ret;
     }
 
+    BoundList KeyPattern::keyBounds( const BSONObj& keyPattern, const IndexBounds& indexBounds ) {
+        invariant(indexBounds.fields.size() == (size_t)keyPattern.nFields());
+
+        // If any field is unsatisfied, return empty bound list.
+        for (vector<OrderedIntervalList>::const_iterator it = indexBounds.fields.begin();
+                it != indexBounds.fields.end(); it++) {
+            if (it->intervals.size() == 0) {
+                return BoundList();
+            }
+        }
+        // To construct our bounds we will generate intervals based on bounds for
+        // the first field, then compound intervals based on constraints for the first
+        // 2 fields, then compound intervals for the first 3 fields, etc.
+        // As we loop through the fields, we start generating new intervals that will later
+        // get extended in another iteration of the loop.  We define these partially constructed
+        // intervals using pairs of BSONObjBuilders (shared_ptrs, since after one iteration of the
+        // loop they still must exist outside their scope).
+        typedef vector< pair< shared_ptr<BSONObjBuilder> ,
+                              shared_ptr<BSONObjBuilder> > > BoundBuilders;
+        BoundBuilders builders;
+        builders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ),
+                                       shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
+        BSONObjIterator keyIter( keyPattern );
+        // until equalityOnly is false, we are just dealing with equality (no range or $in queries).
+        bool equalityOnly = true;
+
+        for (size_t i = 0; i < indexBounds.fields.size(); i++) {
+            BSONElement e = keyIter.next();
+
+            StringData fieldName = e.fieldNameStringData();
+
+            // get the relevant intervals for this field, but we may have to transform the
+            // list of what's relevant according to the expression for this field
+            const OrderedIntervalList& oil = indexBounds.fields[i];
+            const vector<Interval>& intervals = oil.intervals;
+
+            if ( equalityOnly ) {
+                if ( intervals.size() == 1 && intervals.front().isPoint() ){
+                    // this field is only a single point-interval
+                    BoundBuilders::const_iterator j;
+                    for( j = builders.begin(); j != builders.end(); ++j ) {
+                        j->first->appendAs( intervals.front().start, fieldName );
+                        j->second->appendAs( intervals.front().end, fieldName );
+                    }
+                }
+                else {
+                    // This clause is the first to generate more than a single point.
+                    // We only execute this clause once. After that, we simplify the bound
+                    // extensions to prevent combinatorial explosion.
+                    equalityOnly = false;
+
+                    BoundBuilders newBuilders;
+
+                    for(BoundBuilders::const_iterator it = builders.begin(); it != builders.end(); ++it ) {
+                        BSONObj first = it->first->obj();
+                        BSONObj second = it->second->obj();
+
+                        for ( vector<Interval>::const_iterator interval = intervals.begin();
+                                interval != intervals.end(); ++interval )
+                        {
+                            uassert( 17439,
+                                     "combinatorial limit of $in partitioning of results exceeded" ,
+                                     newBuilders.size() < MAX_IN_COMBINATIONS );
+                            newBuilders.push_back(
+                                     make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ),
+                                                shared_ptr<BSONObjBuilder>( new BSONObjBuilder())));
+                            newBuilders.back().first->appendElements( first );
+                            newBuilders.back().second->appendElements( second );
+                            newBuilders.back().first->appendAs( interval->start, fieldName );
+                            newBuilders.back().second->appendAs( interval->end, fieldName );
+                        }
+                    }
+                    builders = newBuilders;
+                }
+            }
+            else {
+                // if we've already generated a range or multiple point-intervals
+                // just extend what we've generated with min/max bounds for this field
+                BoundBuilders::const_iterator j;
+                for( j = builders.begin(); j != builders.end(); ++j ) {
+                    j->first->appendAs( intervals.front().start, fieldName );
+                    j->second->appendAs( intervals.back().end, fieldName );
+                }
+            }
+        }
+        BoundList ret;
+        for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i )
+            ret.push_back( make_pair( i->first->obj(), i->second->obj() ) );
+        return ret;
+    }
+
     BoundList KeyPattern::_transformFieldBounds( const vector<FieldInterval>& oldIntervals ,
                                                  const BSONElement& field  ) const {
 

@@ -745,6 +745,7 @@ mongosLibraryFiles = [
     "s/version_manager.cpp",
     "s/version_mongos.cpp",
     "s/mongos_persistence_stubs.cpp",
+    "s/expression_where_noop.cpp",
     ]
 
 env.Library( "mongoscore",
