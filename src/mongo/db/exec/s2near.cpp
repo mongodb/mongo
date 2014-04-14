@@ -64,7 +64,7 @@ namespace mongo {
 
         verify(_nearFieldIndex < _params.indexKeyPattern.nFields());
 
-        // FLAT implies the distances are in radians.  Convert to meters.
+        // FLAT implies the input distances are in radians.  Convert to meters.
         if (FLAT == _params.nearQuery.centroid.crs) {
             _params.nearQuery.minDistance *= kRadiusOfEarthInMeters;
             _params.nearQuery.maxDistance *= kRadiusOfEarthInMeters;
@@ -365,7 +365,14 @@ namespace mongo {
             (_outerRadiusInclusive ? minDistance <= _outerRadius : minDistance < _outerRadius)) {
             _results.push(Result(*out, minDistance));
             if (_params.addDistMeta) {
-                member->addComputed(new GeoDistanceComputedData(minDistance));
+                // FLAT implies the output distances are in radians.  Convert to meters.
+                if (FLAT == _params.nearQuery.centroid.crs) {
+                    member->addComputed(new GeoDistanceComputedData(minDistance
+                                                                    / kRadiusOfEarthInMeters));
+                }
+                else {
+                    member->addComputed(new GeoDistanceComputedData(minDistance));
+                }
             }
             if (_params.addPointMeta) {
                 member->addComputed(new GeoNearPointComputedData(minDistanceObj));
