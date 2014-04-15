@@ -102,10 +102,10 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'T':
-			g.ntables = (u_int)atoi(optarg);
+			g.ntables = atoi(optarg);
 			break;
 		case 'W':
-			g.nworkers = (u_int)atoi(optarg);
+			g.nworkers = atoi(optarg);
 			break;
 		default:
 			return (usage());

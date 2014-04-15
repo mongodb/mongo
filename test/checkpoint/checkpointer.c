@@ -121,7 +121,7 @@ verify_checkpoint(WT_SESSION *session, const char *name)
 	key_count = 0;
 	zero_type = g.cookies[0].type;
 	snprintf(ckpt, 128, "checkpoint=%s", name);
-	cursors = calloc(g.ntables, sizeof(*cursors));
+	cursors = calloc((size_t)g.ntables, sizeof(*cursors));
 
 	for (i = 0; i < g.ntables; i++) {
 		/*
