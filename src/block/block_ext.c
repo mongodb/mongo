@@ -1311,7 +1311,7 @@ __wt_block_extlist_init(WT_SESSION_IMPL *session,
 {
 	size_t size;
 
-	memset(el, 0, sizeof(*el));
+	WT_CLEAR(*el);
 
 	size = (name == NULL ? 0 : strlen(name)) +
 	    strlen(".") + (extname == NULL ? 0 : strlen(extname) + 1);
@@ -1346,7 +1346,7 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	}
 
 	/* Extent lists are re-used, clear them. */
-	memset(el, 0, sizeof(*el));
+	WT_CLEAR(*el);
 }
 
 /*

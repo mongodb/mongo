@@ -1328,6 +1328,7 @@ int
 __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR_STATIC_INIT(iface,
 	    NULL,			/* get-key */
 	    NULL,			/* get-value */
@@ -1353,6 +1354,11 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 
 	if (!WT_PREFIX_MATCH(uri, "lsm:"))
 		return (EINVAL);
+
+	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
+	if (cval.len != 0)
+		WT_RET_MSG((WT_SESSION_IMPL *)cursor->session, EINVAL,
+		    "LSM does not yet support zero-length data items");
 
 	/* Get the LSM tree. */
 	WT_WITH_SCHEMA_LOCK(session,

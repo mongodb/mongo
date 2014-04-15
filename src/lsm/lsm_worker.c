@@ -333,8 +333,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 				    &S2C(session)->checkpoint_lock, &id)) == 0)
 					locked = 1;
 				else if (ret == EBUSY) {
-					__wt_yield();
 					ret = 0;
+					__wt_yield();
 				}
 			}
 			if (locked) {
@@ -626,6 +626,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			 */
 			if ((ret = __lsm_drop_file(
 			    session, chunk->bloom_uri)) == EBUSY) {
+				ret = 0;
 				WT_VERBOSE_ERR(session, lsm,
 				    "LSM worker bloom drop busy: %s.",
 				    chunk->bloom_uri);
@@ -643,6 +644,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			 */
 			if ((ret = __lsm_drop_file(
 			    session, chunk->uri)) == EBUSY) {
+				ret = 0;
 				WT_VERBOSE_ERR(session, lsm,
 				    "LSM worker drop busy: %s.",
 				    chunk->uri);
