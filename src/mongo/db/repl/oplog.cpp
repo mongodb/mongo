@@ -655,8 +655,22 @@ namespace mongo {
         else if ( *opType == 'c' ) {
             BufBuilder bb;
             BSONObjBuilder ob;
-            _runCommands(ns, o, bb, ob, true, 0);
             // _runCommands takes care of adjusting opcounters for command counting.
+            if (!_runCommands(ns, o, bb, ob, true, 0)) {
+                // command failed to run
+                severe() << "failed to run replicated command during replication: "
+                         << o.toString();
+                fassertFailedNoTrace(17442);
+            }
+            Status cmdStatus = Command::getStatusFromCommandResult(ob.asTempObj());
+            if (!cmdStatus.isOK()) {
+                // command hit an error of some sort
+                severe() << "failed to run replicated command during replication "
+                         << causedBy(cmdStatus)
+                         << ": "
+                         << o.toString();
+                fassertFailedNoTrace(17443);
+            }
         }
         else if ( *opType == 'n' ) {
             // no op
