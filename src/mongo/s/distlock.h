@@ -71,6 +71,19 @@ namespace mongo {
      * (1) remembering the ping document time along with config server time when unable to
      * take a lock, and (2) ensuring all config servers report similar times and have similar
      * time rates (the difference in times must start and stay small).
+     *
+     * Lock states include:
+     * 0: unlocked
+     * 1: about to be locked
+     * 2: locked
+     *
+     * Valid state transitions:
+     * 0 -> 1
+     * 1 -> 2
+     * 2 -> 0
+     *
+     * Note that at any point in time, a lock can be force unlocked if the ping for the lock
+     * becomes too stale.
      */
     class MONGO_CLIENT_API DistributedLock {
     public:

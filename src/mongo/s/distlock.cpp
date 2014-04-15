@@ -964,11 +964,6 @@ namespace mongo {
             }
             else {
                 LOG( logLvl - 1 ) << "lock update lost, lock '" << lockName << "' not propagated." << endl;
-
-                // Register the lock for deletion, to speed up failover
-                // Not strictly necessary, but helpful
-                distLockPinger.addUnlockOID( lockDetails[LocksType::lockID()].OID() );
-
                 gotLock = false;
             }
         }
