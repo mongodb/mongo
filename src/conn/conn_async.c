@@ -10,7 +10,7 @@
 /*
  * __async_get_format --
  *	Find or allocate the uri/config/format structure.
- *	Called with the async opsq lock.
+ *	Called with the async ops lock.
  */
 static int
 __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
@@ -235,10 +235,7 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_ASYNC), &conn->async));
 	async = conn->async;
 	STAILQ_INIT(&async->formatqh);
-	STAILQ_INIT(&async->opqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
-	WT_RET(__wt_spin_init(session, &async->opsq_lock, "ops queue"));
-	WT_RET(__wt_cond_alloc(session, "async op", 0, &async->ops_cond));
 	WT_RET(__wt_cond_alloc(session, "async flush", 0, &async->flush_cond));
 	WT_RET(__wt_async_op_init(conn));
 
@@ -283,17 +280,12 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (!conn->async_cfg)
 		return (0);
-
 	for (i = 0; i < conn->async_workers; i++)
 		if (async->worker_tids[i] != 0) {
-#if 0
-			WT_TRET(__wt_cond_signal(session, async->ops_cond));
-#endif
 			WT_TRET(__wt_thread_join(
 			    session, async->worker_tids[i]));
 			async->worker_tids[i] = 0;
 		}
-	WT_TRET(__wt_cond_destroy(session, &async->ops_cond));
 	WT_TRET(__wt_cond_destroy(session, &async->flush_cond));
 
 	/* Close the server threads' sessions. */
@@ -316,7 +308,6 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 	}
 	__wt_free(session, async->async_ops);
 	__wt_spin_destroy(session, &async->ops_lock);
-	__wt_spin_destroy(session, &async->opsq_lock);
 	__wt_free(session, conn->async);
 
 	return (ret);
@@ -347,18 +338,14 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	 * that the flush is complete on their side.  Then we
 	 * clear the flush flags and return.
 	 */
-	__wt_spin_lock(session, &async->opsq_lock);
-	while (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS)) {
+	while (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS))
 		/*
 		 * We're racing an in-progress flush.  We need to wait
 		 * our turn to start our own.  We need to convoy the
 		 * racing calls because a later call may be waiting for
 		 * specific enqueued ops to be complete before this returns.
 		 */
-		__wt_spin_unlock(session, &async->opsq_lock);
 		__wt_sleep(0, 100000);
-		__wt_spin_lock(session, &async->opsq_lock);
-	}
 
 	/*
 	 * We're the owner of this flush operation.  Set the
@@ -371,20 +358,17 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	WT_ASSERT(conn->default_session,
 	    async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
-	WT_ERR(__wt_async_op_enqueue(conn, &async->flush_op, 1));
-	while (!FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_COMPLETE)) {
-		__wt_spin_unlock(session, &async->opsq_lock);
+	WT_ERR(__wt_async_op_enqueue(conn, &async->flush_op));
+	while (!FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_COMPLETE))
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(NULL, async->flush_cond, 100000));
-		__wt_spin_lock(session, &async->opsq_lock);
-	}
 	/*
 	 * Flush is done.  Clear the flags.
 	 */
 	async->flush_op.state = WT_ASYNCOP_FREE;
 	FLD_CLR(async->opsq_flush,
 	   (WT_ASYNC_FLUSH_COMPLETE | WT_ASYNC_FLUSH_IN_PROGRESS));
-err:	__wt_spin_unlock(session, &async->opsq_lock);
+err:
 	return (ret);
 }
 

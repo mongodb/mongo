@@ -74,7 +74,7 @@ static int
 __async_op_wrap(WT_ASYNC_OP_IMPL *op, WT_ASYNC_OPTYPE type)
 {
 	op->optype = type;
-	return (__wt_async_op_enqueue(O2C(op), op, 0));
+	return (__wt_async_op_enqueue(O2C(op), op));
 }
 
 /*
@@ -211,35 +211,34 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
  *	Enqueue an operation onto the work queue.
  */
 int
-__wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
-    WT_ASYNC_OP_IMPL *op, int locked)
+__wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
 {
 	WT_ASYNC *async;
 	WT_DECL_RET;
+	uint64_t my_alloc, my_slot;
 
 	async = conn->async;
-	if (!locked)
-		__wt_spin_lock(conn->default_session, &async->opsq_lock);
 	/*
 	 * Enqueue op at the tail of the work queue.
 	 */
 	WT_ASSERT(conn->default_session, op->state == WT_ASYNCOP_READY);
-	STAILQ_INSERT_TAIL(&async->opqh, op, q);
+	/*
+	 * We get our slot in the ring buffer to use.
+	 */
+	my_alloc = WT_ATOMIC_ADD(async->alloc_head, 1);
+	my_slot = my_alloc % conn->async_size;
+	WT_ASSERT(conn->default_session, async->async_queue[my_slot] == NULL);
+	async->async_queue[my_slot] = op;
 	op->state = WT_ASYNCOP_ENQUEUED;
 	if (++async->cur_queue > async->max_queue)
 		async->max_queue = async->cur_queue;
 	/*
-	 * Signal the worker threads something is on the queue.
+	 * Multiple threads may be adding ops to the queue.  We need to wait
+	 * our turn to make our slot visible to workers.
 	 */
-	__wt_spin_unlock(conn->default_session, &async->opsq_lock);
-#if 0
-	WT_ERR(__wt_cond_signal(conn->default_session, async->ops_cond));
-#endif
-	/*
-	 * Relock if we need to for the caller.
-	 */
-err:	if (locked)
-		__wt_spin_lock(conn->default_session, &async->opsq_lock);
+	while (async->head != (my_alloc - 1))
+		__wt_yield();
+	WT_ATOMIC_STORE(async->head, my_alloc);
 	return (ret);
 }
 
@@ -260,6 +259,13 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	 */
 	__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX);
 
+	/*
+	 * Allocate and initialize the work queue.  This is sized so that
+	 * the ring buffer is known to be big enough such that the head
+	 * can never overlap the tail.  Include 1 extra for the flush op.
+	 */
+	WT_RET(__wt_calloc_def(conn->default_session,
+	    conn->async_size + 1, &async->async_queue));
 	/*
 	 * Allocate and initialize all the user ops.
 	 */

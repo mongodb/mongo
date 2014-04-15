@@ -44,7 +44,6 @@ struct __wt_async_format {
 struct __wt_async_op_impl {
 	WT_ASYNC_OP	iface;
 
-	STAILQ_ENTRY(__wt_async_op_impl) q;	/* Work queue links. */
 	WT_ASYNC_CALLBACK	*cb;
 
 	uint32_t	internal_id;	/* Array position id. */
@@ -68,20 +67,25 @@ struct __wt_async {
 	uint32_t		 ops_index;	/* Active slot index */
 	uint64_t		 op_id;		/* Unique ID counter */
 	/*
-	 * Everything relating to the work queue and flushing is
-	 * protected by the opsq_lock.
+	 * We need to have two head pointers.  One that is allocated to
+	 * enqueue threads and one that indicates ready slots to the
+	 * consumers.  We only need one tail pointer to coordinate
+	 * consuming threads against each other.  We don't need to worry
+	 * about head catch up with tail because we know the queue is
+	 * large enough for all possible work.
 	 */
-	WT_SPINLOCK		 opsq_lock;	/* Locked: work queue */
+	WT_ASYNC_OP_IMPL	 **async_queue;	/* Async ops work queue */
+	uint64_t		 alloc_head;	/* Next slot to enqueue */
+	uint64_t		 head;		/* Head visible to worker */
+	uint64_t		 tail;		/* Worker consumed tail */
+
 	STAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
-	STAILQ_HEAD(__wt_async_qh, __wt_async_op_impl) opqh;
 	int			 cur_queue;	/* Currently enqueued */
 	int			 max_queue;	/* Maximum enqueued */
 #define	WT_ASYNC_FLUSH_COMPLETE		0x0001	/* Notify flush caller */
 #define	WT_ASYNC_FLUSH_IN_PROGRESS	0x0002	/* Prevent more callers */
 #define	WT_ASYNC_FLUSHING		0x0004	/* Notify workers */
 	uint32_t		 opsq_flush;	/* Queue flush state */
-	/* Notify any waiting threads when work is enqueued. */
-	WT_CONDVAR		*ops_cond;
 	/* Notify any waiting threads when flushing is done. */
 	WT_CONDVAR		*flush_cond;
 	WT_ASYNC_OP_IMPL	 flush_op;	/* Special flush op */
