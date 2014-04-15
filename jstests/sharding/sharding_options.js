@@ -1,62 +1,7 @@
 var baseName = "jstests_sharding_sharding_options";
 
-function removeOptionsAddedByFramework(getCmdLineOptsResult) {
-    // Remove options that we are not interested in checking, but that get set by the test
-    delete getCmdLineOptsResult.parsed.setParameter
-    delete getCmdLineOptsResult.parsed.storage
-    delete getCmdLineOptsResult.parsed.net
-    delete getCmdLineOptsResult.parsed.fastsync
-    delete getCmdLineOptsResult.parsed.security
-    return getCmdLineOptsResult;
-}
+load('jstests/libs/command_line/test_parsed_options.js');
 
-function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
-
-    // Start mongod with options
-    var mongod = MongoRunner.runMongod(mongoRunnerConfig);
-
-    // Get the parsed options
-    var getCmdLineOptsResult = mongod.adminCommand("getCmdLineOpts");
-    printjson(getCmdLineOptsResult);
-
-    // Remove options added by the test framework
-    getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-
-    // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
-
-    // Cleanup
-    MongoRunner.stopMongod(mongod.port);
-}
-
-function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
-
-    // Start mongod with options
-    var mongod = MongoRunner.runMongod();
-
-    // Add configdb option
-    mongoRunnerConfig['configdb'] = mongod.host;
-
-    // Start mongos connected to mongod
-    var mongos = MongoRunner.runMongos(mongoRunnerConfig);
-
-    // Get the parsed options
-    var getCmdLineOptsResult = mongos.adminCommand("getCmdLineOpts");
-    printjson(getCmdLineOptsResult);
-
-    // Remove options added by the test framework
-    getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-
-    // Remove the configdb option
-    delete getCmdLineOptsResult.parsed.sharding.configDB;
-
-    // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
-
-    // Cleanup
-    MongoRunner.stopMongod(mongod.port);
-    MongoRunner.stopMongos(mongos.port);
-}
 
 
 // Move Paranoia
@@ -89,7 +34,8 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_paranoia.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_paranoia.json" },
+                         expectedResult);
 
 
 
@@ -123,7 +69,8 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/set_shardingrole.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/set_shardingrole.json" },
+                         expectedResult);
 
 
 
@@ -149,7 +96,5 @@ expectedResult = {
 };
 testGetCmdLineOptsMongos({ config : "jstests/libs/config_files/enable_autosplit.json" },
                          expectedResult);
-
-
 
 print(baseName + " succeeded.");

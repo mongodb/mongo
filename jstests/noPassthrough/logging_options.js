@@ -1,33 +1,6 @@
 var baseName = "jstests_core_logging_options";
 
-function removeOptionsAddedByFramework(getCmdLineOptsResult) {
-    // Remove options that we are not interested in checking, but that get set by the test
-    delete getCmdLineOptsResult.parsed.setParameter
-    delete getCmdLineOptsResult.parsed.storage
-    delete getCmdLineOptsResult.parsed.net
-    delete getCmdLineOptsResult.parsed.fastsync
-    delete getCmdLineOptsResult.parsed.security
-    return getCmdLineOptsResult;
-}
-
-function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
-
-    // Start mongod with options
-    var mongod = MongoRunner.runMongod(mongoRunnerConfig);
-
-    // Get the parsed options
-    var getCmdLineOptsResult = mongod.adminCommand("getCmdLineOpts");
-    printjson(getCmdLineOptsResult);
-
-    // Remove options added by the test framework
-    getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-
-    // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
-
-    // Cleanup
-    MongoRunner.stopMongod(mongod.port);
-}
+load('jstests/libs/command_line/test_parsed_options.js');
 
 // Verbosity testing
 jsTest.log("Testing \"verbose\" command line option with no args");
@@ -38,7 +11,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ verbose : "" }, expectedResult);
+testGetCmdLineOptsMongod({ verbose : "" }, expectedResult);
 
 jsTest.log("Testing \"verbose\" command line option with one \"v\"");
 var expectedResult = {
@@ -48,7 +21,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ verbose : "v" }, expectedResult);
+testGetCmdLineOptsMongod({ verbose : "v" }, expectedResult);
 
 jsTest.log("Testing \"verbose\" command line option with two \"v\"s");
 var expectedResult = {
@@ -58,7 +31,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ verbose : "vv" }, expectedResult);
+testGetCmdLineOptsMongod({ verbose : "vv" }, expectedResult);
 
 jsTest.log("Testing \"v\" command line option");
 var expectedResult = {
@@ -69,7 +42,7 @@ var expectedResult = {
     }
 };
 // Currently the test converts "{ v : 1 }" to "-v" when it spawns the binary.
-testGetCmdLineOpts({ v : 1 }, expectedResult);
+testGetCmdLineOptsMongod({ v : 1 }, expectedResult);
 
 jsTest.log("Testing \"vv\" command line option");
 var expectedResult = {
@@ -80,7 +53,7 @@ var expectedResult = {
     }
 };
 // Currently the test converts "{ v : 2 }" to "-vv" when it spawns the binary.
-testGetCmdLineOpts({ v : 2 }, expectedResult);
+testGetCmdLineOptsMongod({ v : 2 }, expectedResult);
 
 jsTest.log("Testing \"systemLog.verbosity\" config file option");
 expectedResult = {
@@ -91,7 +64,8 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ config : "jstests/libs/config_files/set_verbosity.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/set_verbosity.json" },
+                         expectedResult);
 
 
 
@@ -112,7 +86,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ logpath : logDir + "/mylog.log" }, expectedResult);
+testGetCmdLineOptsMongod({ logpath : logDir + "/mylog.log" }, expectedResult);
 
 
 
@@ -120,7 +94,7 @@ jsTest.log("Testing with no explicit logging setting");
 expectedResult = {
     "parsed" : { }
 };
-testGetCmdLineOpts({}, expectedResult);
+testGetCmdLineOptsMongod({}, expectedResult);
 
 resetDbpath(baseDir);
 

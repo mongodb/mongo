@@ -1,17 +1,9 @@
 var baseName = "jstests_dur_journaling_options";
 
-function removeOptionsAddedByFramework(getCmdLineOptsResult) {
-    // Remove options that we are not interested in checking, but that get set by the test
-    delete getCmdLineOptsResult.parsed.setParameter
-    delete getCmdLineOptsResult.parsed.storage.dbPath
-    delete getCmdLineOptsResult.parsed.net
-    delete getCmdLineOptsResult.parsed.fastsync
-    return getCmdLineOptsResult;
-}
+load('jstests/libs/command_line/test_parsed_options.js');
 
 jsTest.log("Testing \"dur\" command line option");
-var mongodSource = MongoRunner.runMongod({ dur : "" });
-var getCmdLineOptsExpected = {
+var expectedResult = {
     "parsed" : {
         "storage" : {
             "journal" : {
@@ -20,16 +12,10 @@ var getCmdLineOptsExpected = {
         }
     }
 };
-
-var getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
-printjson(getCmdLineOptsResult);
-getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-assert.docEq(getCmdLineOptsResult.parsed, getCmdLineOptsExpected.parsed);
-MongoRunner.stopMongod(mongodSource.port);
+testGetCmdLineOptsMongod({ dur : "" }, expectedResult);
 
 jsTest.log("Testing \"nodur\" command line option");
-mongodSource = MongoRunner.runMongod({ nodur : "" });
-getCmdLineOptsExpected = {
+expectedResult = {
     "parsed" : {
         "storage" : {
             "journal" : {
@@ -38,16 +24,10 @@ getCmdLineOptsExpected = {
         }
     }
 };
-
-getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
-printjson(getCmdLineOptsResult);
-getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-assert.docEq(getCmdLineOptsResult.parsed, getCmdLineOptsExpected.parsed);
-MongoRunner.stopMongod(mongodSource.port);
+testGetCmdLineOptsMongod({ nodur : "" }, expectedResult);
 
 jsTest.log("Testing \"journal\" command line option");
-mongodSource = MongoRunner.runMongod({ journal : "" });
-getCmdLineOptsExpected = {
+expectedResult = {
     "parsed" : {
         "storage" : {
             "journal" : {
@@ -56,16 +36,10 @@ getCmdLineOptsExpected = {
         }
     }
 };
-
-getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
-printjson(getCmdLineOptsResult);
-getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-assert.docEq(getCmdLineOptsResult.parsed, getCmdLineOptsExpected.parsed);
-MongoRunner.stopMongod(mongodSource.port);
+testGetCmdLineOptsMongod({ journal : "" }, expectedResult);
 
 jsTest.log("Testing \"nojournal\" command line option");
-mongodSource = MongoRunner.runMongod({ nojournal : "" });
-getCmdLineOptsExpected = {
+expectedResult = {
     "parsed" : {
         "storage" : {
             "journal" : {
@@ -74,16 +48,10 @@ getCmdLineOptsExpected = {
         }
     }
 };
-
-getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
-printjson(getCmdLineOptsResult);
-getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-assert.docEq(getCmdLineOptsResult.parsed, getCmdLineOptsExpected.parsed);
-MongoRunner.stopMongod(mongodSource.port);
+testGetCmdLineOptsMongod({ nojournal : "" }, expectedResult);
 
 jsTest.log("Testing \"storage.journal.enabled\" config file option");
-mongodSource = MongoRunner.runMongod({ config : "jstests/libs/config_files/enable_journal.json" });
-getCmdLineOptsExpected = {
+expectedResult = {
     "parsed" : {
         "config" : "jstests/libs/config_files/enable_journal.json",
         "storage" : {
@@ -93,25 +61,15 @@ getCmdLineOptsExpected = {
         }
     }
 };
-
-getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
-printjson(getCmdLineOptsResult);
-getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-assert.docEq(getCmdLineOptsResult.parsed, getCmdLineOptsExpected.parsed);
-MongoRunner.stopMongod(mongodSource.port);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_journal.json" },
+                         expectedResult);
 
 jsTest.log("Testing with no explicit journal setting");
-mongodSource = MongoRunner.runMongod();
-getCmdLineOptsExpected = {
+expectedResult = {
     "parsed" : {
         "storage" : { }
     }
 };
-
-getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
-printjson(getCmdLineOptsResult);
-getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-assert.docEq(getCmdLineOptsResult.parsed, getCmdLineOptsExpected.parsed);
-MongoRunner.stopMongod(mongodSource.port);
+testGetCmdLineOptsMongod({}, expectedResult);
 
 print(baseName + " succeeded.");

@@ -1,32 +1,6 @@
 var baseName = "jstests_disk_index_options";
 
-function removeOptionsAddedByFramework(getCmdLineOptsResult) {
-    // Remove options that we are not interested in checking, but that get set by the test
-    delete getCmdLineOptsResult.parsed.setParameter
-    delete getCmdLineOptsResult.parsed.storage.dbPath
-    delete getCmdLineOptsResult.parsed.net
-    delete getCmdLineOptsResult.parsed.fastsync
-    return getCmdLineOptsResult;
-}
-
-function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
-
-    // Start mongod with options
-    var mongod = MongoRunner.runMongod(mongoRunnerConfig);
-
-    // Get the parsed options
-    var getCmdLineOptsResult = mongod.adminCommand("getCmdLineOpts");
-    printjson(getCmdLineOptsResult);
-
-    // Remove options added by the test framework
-    getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-
-    // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
-
-    // Cleanup
-    MongoRunner.stopMongod(mongod.port);
-}
+load('jstests/libs/command_line/test_parsed_options.js');
 
 jsTest.log("Testing \"noIndexBuildRetry\" command line option");
 var expectedResult = {
@@ -36,7 +10,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ noIndexBuildRetry : "" }, expectedResult);
+testGetCmdLineOptsMongod({ noIndexBuildRetry : "" }, expectedResult);
 
 jsTest.log("Testing \"storage.indexBuildRetry\" config file option");
 expectedResult = {
@@ -47,7 +21,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_indexbuildretry.json" },
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_indexbuildretry.json" },
                    expectedResult);
 
 jsTest.log("Testing with no explicit index option setting");
@@ -56,6 +30,6 @@ expectedResult = {
         "storage" : { }
     }
 };
-testGetCmdLineOpts({}, expectedResult);
+testGetCmdLineOptsMongod({}, expectedResult);
 
 print(baseName + " succeeded.");
