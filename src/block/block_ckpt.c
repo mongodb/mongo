@@ -21,7 +21,7 @@ int
 __wt_block_ckpt_init(
     WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci, const char *name)
 {
-	memset(ci, 0, sizeof(*ci));
+	WT_CLEAR(*ci);
 
 	ci->version = WT_BM_CHECKPOINT_VERSION;
 	ci->root_offset = WT_BLOCK_INVALID_OFFSET;
@@ -195,7 +195,9 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
 	__wt_block_extlist_free(session, &ci->alloc);
 	__wt_block_extlist_free(session, &ci->avail);
 	__wt_block_extlist_free(session, &ci->discard);
+	__wt_block_extlist_free(session, &ci->ckpt_alloc);
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
+	__wt_block_extlist_free(session, &ci->ckpt_discard);
 }
 
 /*
