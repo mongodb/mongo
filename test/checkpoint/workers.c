@@ -64,7 +64,7 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 	p = config;
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
-	    "key_format=%s,value_format=u",
+	    "key_format=%s,value_format=S",
 	    cookie->type == COL ? "r" : "u");
 	if (cookie->type == LSM)
 		(void)snprintf(p, (size_t)(end - p), ",type=lsm");
@@ -146,7 +146,9 @@ static inline int
 worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
 {
 	WT_ITEM *key, _key, *value, _value;
+	u_int new_val;
 	int ret;
+	char *old_val;
 	char keybuf[64], valuebuf[64];
 
 	key = &_key;
@@ -160,11 +162,21 @@ worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
 		    snprintf(keybuf, sizeof(keybuf), "%017u", keyno);
 		cursor->set_key(cursor, key);
 	}
+	new_val = keyno;
+	if (cursor->search(cursor) == 0) {
+		cursor->get_value(cursor, &old_val);
+		new_val = atol(old_val) + 1;
+	}
+	/* Need to set the key again - it'd be nice if we didn't need to. */
+	if (cookie->type == COL)
+		cursor->set_key(cursor, (uint32_t)keyno);
+	else
+		cursor->set_key(cursor, key);
 
 	value->data = valuebuf;
 	value->size = (uint32_t)snprintf(
-	    valuebuf, sizeof(valuebuf), "XXX %37u", keyno);
-	cursor->set_value(cursor, value);
+	    valuebuf, sizeof(valuebuf), "%037u", new_val);
+	cursor->set_value(cursor, valuebuf);
 	if ((ret = cursor->update(cursor)) != 0)
 		return (log_print_err("cursor.update", ret, 1));
 	return (0);

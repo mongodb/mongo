@@ -153,6 +153,8 @@ main(int argc, char *argv[])
 			break;
 		}
 	}
+	if (g.logfp != NULL)
+		fclose(g.logfp);
 	/*
 	 * Attempt to cleanup on error. Ideally we'd wait to know that the
 	 * checkpoint and worker threads are all done.

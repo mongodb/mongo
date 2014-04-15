@@ -171,8 +171,8 @@ compare_cursors(
     WT_CURSOR *second, table_type second_type)
 {
 	WT_ITEM first_key, second_key;
-	WT_ITEM first_value, second_value;
 	u_int first_key_int, second_key_int;
+	char *first_value, *second_value;
 	char buf[128];
 
 	memset(buf, 0, 128);
@@ -198,7 +198,7 @@ compare_cursors(
 		second_key_int = atol(buf);
 	}
 	if (first_key_int != second_key_int) {
-		printf("Key mismatch %" PRIu32 " from an %s table "
+		printf("Key mismatch %" PRIu32 " from a %s table "
 		    "is not %" PRIu32 " from a %s table\n",
 		    first_key_int, type_to_string(first_type),
 		    second_key_int, type_to_string(second_type));
@@ -208,8 +208,12 @@ compare_cursors(
 	/* Now check the values. */
 	first->get_value(first, &first_value);
 	second->get_value(second, &second_value);
-	if (first_value.size != second_value.size)
+	if (g.logfp != NULL)
+		fprintf(g.logfp, "k1: %" PRIu32 " k2: %" PRIu32
+		    " val1: %s val2: %s \n",
+		    first_key_int, second_key_int,
+		    first_value, second_value);
+	if (strlen(first_value) != strlen(second_value))
 		return (1);
-	return (memcmp(
-	    first_value.data, second_value.data, first_value.size));
+	return (strcmp(first_value, second_value));
 }
