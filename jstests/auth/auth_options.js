@@ -1,32 +1,6 @@
 var baseName = "jstests_auth_auth_options";
 
-function removeOptionsAddedByFramework(getCmdLineOptsResult) {
-    // Remove options that we are not interested in checking, but that get set by the test
-    delete getCmdLineOptsResult.parsed.setParameter
-    delete getCmdLineOptsResult.parsed.storage
-    delete getCmdLineOptsResult.parsed.net
-    delete getCmdLineOptsResult.parsed.fastsync
-    return getCmdLineOptsResult;
-}
-
-function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
-
-    // Start mongod with options
-    var mongod = MongoRunner.runMongod(mongoRunnerConfig);
-
-    // Get the parsed options
-    var getCmdLineOptsResult = mongod.adminCommand("getCmdLineOpts");
-    printjson(getCmdLineOptsResult);
-
-    // Remove options added by the test framework
-    getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-
-    // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
-
-    // Cleanup
-    MongoRunner.stopMongod(mongod.port);
-}
+load('jstests/libs/command_line/test_parsed_options.js');
 
 jsTest.log("Testing \"auth\" command line option");
 var expectedResult = {
@@ -36,7 +10,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ auth : "" }, expectedResult);
+testGetCmdLineOptsMongod({ auth : "" }, expectedResult);
 
 jsTest.log("Testing \"noauth\" command line option");
 expectedResult = {
@@ -46,7 +20,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ noauth : "" }, expectedResult);
+testGetCmdLineOptsMongod({ noauth : "" }, expectedResult);
 
 jsTest.log("Testing \"security.authorization\" config file option");
 expectedResult = {
@@ -57,12 +31,12 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_auth.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_auth.json" }, expectedResult);
 
 jsTest.log("Testing with no explicit object check setting");
 expectedResult = {
     "parsed" : { }
 };
-testGetCmdLineOpts({}, expectedResult);
+testGetCmdLineOptsMongod({}, expectedResult);
 
 print(baseName + " succeeded.");

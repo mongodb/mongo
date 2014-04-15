@@ -1,33 +1,6 @@
 var baseName = "jstests_core_network_options";
 
-function removeOptionsAddedByFramework(getCmdLineOptsResult) {
-    // Remove options that we are not interested in checking, but that get set by the test
-    delete getCmdLineOptsResult.parsed.setParameter
-    delete getCmdLineOptsResult.parsed.storage
-    delete getCmdLineOptsResult.parsed.net.port
-    delete getCmdLineOptsResult.parsed.fastsync
-    delete getCmdLineOptsResult.parsed.security
-    return getCmdLineOptsResult;
-}
-
-function testGetCmdLineOpts(mongoRunnerConfig, expectedResult) {
-
-    // Start mongod with options
-    var mongod = MongoRunner.runMongod(mongoRunnerConfig);
-
-    // Get the parsed options
-    var getCmdLineOptsResult = mongod.adminCommand("getCmdLineOpts");
-    printjson(getCmdLineOptsResult);
-
-    // Remove options added by the test framework
-    getCmdLineOptsResult = removeOptionsAddedByFramework(getCmdLineOptsResult);
-
-    // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
-
-    // Cleanup
-    MongoRunner.stopMongod(mongod.port);
-}
+load('jstests/libs/command_line/test_parsed_options.js');
 
 // Object Check
 jsTest.log("Testing \"objcheck\" command line option");
@@ -38,7 +11,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ objcheck : "" }, expectedResult);
+testGetCmdLineOptsMongod({ objcheck : "" }, expectedResult);
 
 jsTest.log("Testing \"noobjcheck\" command line option");
 expectedResult = {
@@ -48,7 +21,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ noobjcheck : "" }, expectedResult);
+testGetCmdLineOptsMongod({ noobjcheck : "" }, expectedResult);
 
 jsTest.log("Testing \"net.wireObjectCheck\" config file option");
 expectedResult = {
@@ -59,7 +32,8 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_objcheck.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_objcheck.json" },
+                         expectedResult);
 
 jsTest.log("Testing with no explicit network option setting");
 expectedResult = {
@@ -67,7 +41,7 @@ expectedResult = {
         "net" : { }
     }
 };
-testGetCmdLineOpts({}, expectedResult);
+testGetCmdLineOptsMongod({}, expectedResult);
 
 
 
@@ -82,7 +56,7 @@ var expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ httpinterface : "" }, expectedResult);
+testGetCmdLineOptsMongod({ httpinterface : "" }, expectedResult);
 
 jsTest.log("Testing \"nohttpinterface\" command line option");
 expectedResult = {
@@ -94,7 +68,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ nohttpinterface : "" }, expectedResult);
+testGetCmdLineOptsMongod({ nohttpinterface : "" }, expectedResult);
 
 jsTest.log("Testing implicit enabling of http interface with \"jsonp\" command line option");
 expectedResult = {
@@ -107,7 +81,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ jsonp : "" }, expectedResult);
+testGetCmdLineOptsMongod({ jsonp : "" }, expectedResult);
 
 jsTest.log("Testing implicit enabling of http interface with \"rest\" command line option");
 expectedResult = {
@@ -120,7 +94,7 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ rest : "" }, expectedResult);
+testGetCmdLineOptsMongod({ rest : "" }, expectedResult);
 
 jsTest.log("Testing \"net.http.enabled\" config file option");
 expectedResult = {
@@ -133,7 +107,8 @@ expectedResult = {
         }
     }
 };
-testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_httpinterface.json" }, expectedResult);
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_httpinterface.json" },
+                         expectedResult);
 
 jsTest.log("Testing with no explicit network option setting");
 expectedResult = {
@@ -141,7 +116,7 @@ expectedResult = {
         "net" : { }
     }
 };
-testGetCmdLineOpts({}, expectedResult);
+testGetCmdLineOptsMongod({}, expectedResult);
 
 
 
@@ -157,7 +132,7 @@ if (!_isWindows()) {
             }
         }
     };
-    testGetCmdLineOpts({ nounixsocket : "" }, expectedResult);
+    testGetCmdLineOptsMongod({ nounixsocket : "" }, expectedResult);
 
     jsTest.log("Testing \"net.wireObjectCheck\" config file option");
     expectedResult = {
@@ -170,7 +145,7 @@ if (!_isWindows()) {
             }
         }
     };
-    testGetCmdLineOpts({ config : "jstests/libs/config_files/enable_unixsocket.json" },
+    testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/enable_unixsocket.json" },
                        expectedResult);
 
     jsTest.log("Testing with no explicit network option setting");
@@ -179,7 +154,7 @@ if (!_isWindows()) {
             "net" : { }
         }
     };
-    testGetCmdLineOpts({}, expectedResult);
+    testGetCmdLineOptsMongod({}, expectedResult);
 }
 
 print(baseName + " succeeded.");
