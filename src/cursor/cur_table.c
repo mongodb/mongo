@@ -85,7 +85,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSOR_RAW_OK) &&
-	    !F_ISSET(cursor, WT_CURSTD_JSON)) {
+	    !F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		ret = __wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value);
@@ -816,7 +816,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
-	if (F_ISSET(cursor, WT_CURSTD_JSON)) {
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		WT_ERR(__curtable_json_init(cursor, table->key_format,
 		    &table->colconf));
 	}

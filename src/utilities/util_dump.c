@@ -88,7 +88,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		len =
 		    checkpoint == NULL ? 0 : strlen("checkpoint=") +
 		    strlen(checkpoint) + 1;
-		len += strlen(json ? "json" :
+		len += strlen(json ? "dump=json" :
 		    (hex ? "dump=hex" : "dump=print"));
 		if ((config = malloc(len + 10)) == NULL)
 			goto err;
@@ -99,7 +99,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			(void)strcat(config, checkpoint);
 			(void)strcat(config, ",");
 		}
-		(void)strcat(config, json ? "json" :
+		(void)strcat(config, json ? "dump=json" :
 		    (hex ? "dump=hex" : "dump=print"));
 		if ((ret = session->open_cursor(
 		    session, name, NULL, config, &cursor)) != 0) {

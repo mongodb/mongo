@@ -88,7 +88,7 @@ from packing import pack, unpack
 		PY_CALLBACK *pcb;
 		uint32_t json;
 
-		json = (*$1)->flags & WT_CURSTD_JSON;
+		json = (*$1)->flags & WT_CURSTD_DUMP_JSON;
 		if (!json)
 			(*$1)->flags |= WT_CURSTD_RAW;
 		PyObject_SetAttrString($result, "is_json",

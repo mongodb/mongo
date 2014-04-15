@@ -276,7 +276,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
-	if (LF_ISSET(WT_CURSTD_JSON) && !LF_ISSET(WT_CURSTD_RAW))
+	if (LF_ISSET(WT_CURSTD_DUMP_JSON) && !LF_ISSET(WT_CURSTD_RAW))
 		WT_ERR_MSG(session, EINVAL,
 		    "Setting keys for JSON cursors not permitted");
 
@@ -397,7 +397,8 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
-	if (F_ISSET(cursor, WT_CURSTD_JSON) && !F_ISSET(cursor, WT_CURSTD_RAW))
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON) &&
+	    !F_ISSET(cursor, WT_CURSTD_RAW))
 		WT_ERR_MSG(session, EINVAL,
 		    "Setting values for JSON cursors not permitted");
 
@@ -640,20 +641,20 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		WT_ASSERT(session, owner == NULL);
 
 		F_SET(cursor,
-		    WT_STRING_MATCH("print", cval.str, cval.len) ?
-		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
-		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
-		owner = cdump;
+		    WT_STRING_MATCH("json", cval.str, cval.len) ?
+		    WT_CURSTD_DUMP_JSON : 
+		    (WT_STRING_MATCH("print", cval.str, cval.len) ?
+		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX));
+		if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
+			WT_RET(__wt_calloc_def(session, 1, &json));
+			cursor->json_private = json;
+			cdump = NULL;
+		} else {
+			WT_RET(__wt_curdump_create(cursor, owner, &cdump));
+			owner = cdump;
+		}
 	} else
 		cdump = NULL;
-
-	/* json */
-	WT_RET(__wt_config_gets_def(session, cfg, "json", 0, &cval));
-	if (cval.val != 0) {
-		F_SET(cursor, WT_CURSTD_JSON);
-		WT_RET(__wt_calloc_def(session, 1, &json));
-		cursor->json_private = json;
-	}
 
 	/* raw */
 	WT_RET(__wt_config_gets_def(session, cfg, "raw", 0, &cval));

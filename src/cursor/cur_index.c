@@ -63,7 +63,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW) &&
-	    !F_ISSET(cursor, WT_CURSTD_JSON)) {
+	    !F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		ret = __wt_schema_project_merge(session,
 		    cindex->cg_cursors, cindex->value_plan,
 		    cursor->value_format, &cursor->value);
@@ -475,7 +475,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
-	if (F_ISSET(cursor, WT_CURSTD_JSON)) {
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		WT_ERR(__curindex_json_init(cursor, table->key_format,
 			&idx->colconf, &table->colconf));
 	}

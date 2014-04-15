@@ -71,7 +71,7 @@ class test_jsondump02(wttest.WiredTigerTestCase):
 
     # Check the result of using a JSON cursor on the URI.
     def check_json(self, uri, expect):
-        cursor = self.session.open_cursor(uri, None, 'json')
+        cursor = self.session.open_cursor(uri, None, 'dump=json')
         pos = 0
         for k,v in cursor:
             self.assertEqual(k, expect[pos][0])
@@ -180,7 +180,7 @@ class test_jsondump02(wttest.WiredTigerTestCase):
                 ('"key0" : "A"', '"value0" : "aaaa"'),
                 ('"key0" : "B"', '"value0" : "bbbb"')))
 
-        cursor = self.session.open_cursor(self.table_uri1, None, 'json')
+        cursor = self.session.open_cursor(self.table_uri1, None, 'dump=json')
         cursor.next()
 
         with self.expectedStderrPattern('Setting keys for JSON cursors not permitted'):

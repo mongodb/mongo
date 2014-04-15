@@ -516,8 +516,8 @@ struct __wt_cursor {
 #define	WT_CURSTD_BULK		0x0002
 #define	WT_CURSTD_DATA_SOURCE	0x0004
 #define	WT_CURSTD_DUMP_HEX	0x0008
-#define	WT_CURSTD_DUMP_PRINT	0x0010
-#define	WT_CURSTD_JSON		0x0020
+#define	WT_CURSTD_DUMP_JSON	0x0010
+#define	WT_CURSTD_DUMP_PRINT	0x0020
 #define	WT_CURSTD_KEY_EXT	0x0040	/* Key points out of the tree. */
 #define	WT_CURSTD_KEY_INT	0x0080	/* Key points into the tree. */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
@@ -679,14 +679,14 @@ struct __wt_session {
 	 * taken for the object). The cursor does not support data
 	 * modification., a string; default empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
-	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
+	 * outputs: "hex" selects a simple hexadecimal format;, "json" selects
+         * a JSON format with each key and value formatted as fields\, named
+         * by column names if available; "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
-	 * The cursor dump format is compatible with the @ref util_dump and @ref
-	 * util_load commands., a string\, chosen from the following options: \c
-	 * "hex"\, \c "print"; default empty.}
-	 * @config{json, configure the cursor for JSON dump format: each key
-	 * and value in the record are formatted as fields in an JSON object,
-	 * named by a column name if available, or a predictable default name.
+	 * The cursor "hex" and "print" dump formats are compatible with
+         *  the @ref util_dump and @ref util_load commands.,
+         * a string\, chosen from the following options: \c
+	 * "hex"\, \c "json"\, \c "print"; default empty.}
 	 * The cursor json format is used by the @ref util_jsondump commands.
 	 * @config{next_random, configure the cursor to return a pseudo-random
 	 * record from the object; valid only for row-store cursors.  Cursors
