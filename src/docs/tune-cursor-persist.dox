@@ -9,12 +9,16 @@ decrease performance.  The best combination is to cache cursors, but use
 the WT_CURSOR::reset method to discard the cursor's position in the
 object when the position is no longer needed.
 
+However, the WT_CURSOR::insert method does maintain hold a cursor
+position, so there's no need to call WT_CURSOR::reset.  For this
+reason, WT_CURSOR::insert is preferable to WT_CURSOR::update when
+there's no reason to track a position in the object.
+
 Additionally, cursors are automatically reset whenever a transaction
 boundary is crossed; when a transaction is started with the
 WT_SESSION::begin_transaction or ended with either
 WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction, all
 open cursors are automatically reset, there is no need to call the
-WT_CURSOR::reset method explicitly, and the cursor can be immediately
-reused.
+WT_CURSOR::reset method explicitly.
 
  */
