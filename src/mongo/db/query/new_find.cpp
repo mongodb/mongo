@@ -91,6 +91,19 @@ namespace {
         return n >= pq.getNumToReturn();
     }
 
+    /**
+     * Returns true if 'me' is a GTE or GE predicate over the "ts" field.
+     * Such predicates can be used for the oplog start hack.
+     */
+    bool isOplogTsPred(const mongo::MatchExpression* me) {
+        if (mongo::MatchExpression::GT != me->matchType()
+            && mongo::MatchExpression::GTE != me->matchType()) {
+            return false;
+        }
+
+        return mongoutils::str::equals(me->path().rawData(), "ts");
+    }
+
 }  // namespace
 
 namespace mongo {
@@ -322,9 +335,35 @@ namespace mongo {
             return Status(ErrorCodes::InternalError,
                           "getOplogStartHack called with a NULL collection" );
 
+        // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over
+        // the "ts" field (the operation's timestamp). Find that predicate and pass it to
+        // the OplogStart stage.
+        MatchExpression* tsExpr = NULL;
+        if (MatchExpression::AND == cq->root()->matchType()) {
+            // The query has an AND at the top-level. See if any of the children
+            // of the AND are $gt or $gte predicates over 'ts'.
+            for (size_t i = 0; i < cq->root()->numChildren(); ++i) {
+                MatchExpression* me = cq->root()->getChild(i);
+                if (isOplogTsPred(me)) {
+                    tsExpr = me;
+                    break;
+                }
+            }
+        }
+        else if (isOplogTsPred(cq->root())) {
+            // The root of the tree is a $gt or $gte predicate over 'ts'.
+            tsExpr = cq->root();
+        }
+
+        if (NULL == tsExpr) {
+            return Status(ErrorCodes::OplogOperationUnsupported,
+                          "OplogReplay query does not contain top-level "
+                          "$gt or $gte over the 'ts' field.");
+        }
+
         // Make an oplog start finding stage.
         WorkingSet* oplogws = new WorkingSet();
-        OplogStart* stage = new OplogStart(cq->ns(), cq->root(), oplogws);
+        OplogStart* stage = new OplogStart(cq->ns(), tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
         auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
