@@ -39,6 +39,7 @@
 
 #include <wiredtiger.h>
 #include <gcc.h>				/* WiredTiger internal */
+#include "wt_internal.h"			/* For __wt_random */
 
 #define	URI_BASE	"table:__wt"		/* File name */
 
@@ -72,7 +73,6 @@ typedef struct {
 	int running;				/* Whether to stop */
 	COOKIE *cookies;			/* Per-thread info */
 	pthread_t checkpoint_thread;		/* Checkpoint thread */
-	int checkpoint_phase;			/* How checkpoints are going */
 } GLOBAL;
 extern GLOBAL g;
 

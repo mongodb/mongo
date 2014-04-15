@@ -87,7 +87,6 @@ real_checkpointer()
 	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
 		return (log_print_err("conn.open_session", ret, 1));
 
-	sleep(1);
 	while (g.running) {
 
 		/* Execute a checkpoint */
@@ -125,6 +124,12 @@ verify_checkpoint(WT_SESSION *session, const char *name)
 	cursors = calloc(g.ntables, sizeof(*cursors));
 
 	for (i = 0; i < g.ntables; i++) {
+		/*
+		 * TODO: LSM doesn't currently support reading from
+		 * checkpoints.
+		 */
+		if (g.cookies[i].type == LSM)
+			continue;
 		snprintf(next_uri, 128, "table:__wt%04d", i);
 		if ((ret = session->open_cursor(
 		    session, next_uri, NULL, ckpt, &cursors[i])) != 0)
@@ -142,6 +147,12 @@ verify_checkpoint(WT_SESSION *session, const char *name)
 		 * same key/value pair.
 		 */
 		for (i = 1; i < g.ntables; i++) {
+			/*
+			 * TODO: LSM doesn't currently support reading from
+			 * checkpoints.
+			 */
+			if (g.cookies[i].type == LSM)
+				continue;
 			t_ret = cursors[i]->next(cursors[i]);
 			if (t_ret != 0 && t_ret != WT_NOTFOUND)
 				return (log_print_err("cursor->next", ret, 1));

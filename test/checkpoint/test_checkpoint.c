@@ -216,6 +216,8 @@ wt_shutdown(void)
 static int
 cleanup(void)
 {
+	g.running = 0;
+	g.ntables_created = 0;
 	return (system(g.home_init));
 }
 

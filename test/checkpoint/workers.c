@@ -30,31 +30,6 @@
 static int real_worker(void);
 static void *worker(void *);
 
-/*
- * r --
- *	Return a 32-bit pseudo-random number.
- *
- * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
- * random number generator.  Computationally fast, with reasonable randomness
- * properties.
- */
-static inline uint32_t
-r(void)
-{
-	static uint32_t m_w = 0, m_z = 0;
-
-	if (m_w == 0) {
-		struct timeval t;
-		(void)gettimeofday(&t, NULL);
-		m_w = (uint32_t)t.tv_sec;
-		m_z = (uint32_t)t.tv_usec;
-	}
-
-	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
-	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
-	return (m_z << 16) + (m_w & 65535);
-}
-
 static int
 create_table(WT_SESSION *session, COOKIE *cookie)
 {
@@ -167,7 +142,10 @@ worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
 		cursor->get_value(cursor, &old_val);
 		new_val = atol(old_val) + 1;
 	}
-	/* Need to set the key again - it'd be nice if we didn't need to. */
+	/*
+	 * The search cleared the key from our cursor - set it again. It would
+	 * be nice if we didn't need to.
+	 */
 	if (cookie->type == COL)
 		cursor->set_key(cursor, (uint32_t)keyno);
 	else
@@ -177,8 +155,11 @@ worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
 	value->size = (uint32_t)snprintf(
 	    valuebuf, sizeof(valuebuf), "%037u", new_val);
 	cursor->set_value(cursor, valuebuf);
-	if ((ret = cursor->update(cursor)) != 0)
-		return (log_print_err("cursor.update", ret, 1));
+	if ((ret = cursor->insert(cursor)) != 0) {
+		if (ret == WT_DEADLOCK)
+			return (WT_DEADLOCK);
+		return (log_print_err("cursor.insert", ret, 1));
+	}
 	return (0);
 }
 
@@ -210,19 +191,32 @@ real_worker()
 	    (size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
 		return (log_print_err("malloc", ENOMEM, 1));
 
-	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
+	if ((ret = g.conn->open_session(
+	    g.conn, NULL, "isolation=snapshot", &session)) != 0)
 		return (log_print_err("conn.open_session", ret, 1));
 
 	for (j = 0; j < g.ntables; j++)
 		if ((ret = session->open_cursor(
 		    session, g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0)
 			return (log_print_err("session.open_cursor", ret, 1));
+
+
 	for (i = 0; i < g.nops && g.running; ++i, sched_yield()) {
 		session->begin_transaction(session, NULL);
-		keyno = r() % g.nkeys + 1;
-		for (j = 0; j < g.ntables; j++)
-			worker_op(cursors[j], &g.cookies[j], keyno);
-		session->commit_transaction(session, NULL);
+		keyno = __wt_random() % g.nkeys + 1;
+		for (j = 0; j < g.ntables; j++) {
+			if ((ret = worker_op(
+			    cursors[j], &g.cookies[j], keyno)) != 0)
+				break;
+		}
+		if (ret == 0)
+			session->commit_transaction(session, NULL);
+		else if (ret == WT_DEADLOCK)
+			session->rollback_transaction(session, NULL);
+		else {
+			(void)log_print_err("worker op failed", ret, 1);
+			break;
+		}
 	}
 	if ((ret = session->close(session, NULL)) != 0)
 		return (log_print_err("session.close", ret, 1));
