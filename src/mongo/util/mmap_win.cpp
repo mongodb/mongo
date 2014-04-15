@@ -477,9 +477,6 @@ namespace mongo {
         return newPrivateView;
     }
 
-    // prevent WRITETODATAFILES() from running at the same time as FlushViewOfFile()
-    SimpleMutex globalFlushMutex("globalFlushMutex");
-
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
         WindowsFlushable( MemoryMappedFile* theFile,
@@ -487,7 +484,8 @@ namespace mongo {
                           HANDLE fd,
                           const std::string& filename,
                           boost::shared_ptr<mutex> flushMutex )
-            : _theFile(theFile), _view(view), _fd(fd), _filename(filename), _flushMutex(flushMutex)
+            : _theFile(theFile), _view(view), _fd(fd), _filename(filename),
+              _flushMutex(flushMutex)
         {}
 
         void flush() {
@@ -500,44 +498,59 @@ namespace mongo {
                 return;
             }
 
-            SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
             scoped_lock lk(*_flushMutex);
 
-            int loopCount = 0;
-            bool success = false;
-            bool timeout = false;
-            int dosError = ERROR_SUCCESS;
             const int maximumTimeInSeconds = 60 * 15;
-            Timer t;
-            while ( !success && !timeout ) {
-                ++loopCount;
-                success = FALSE != FlushViewOfFile( _view, 0 );
-                if ( !success ) {
-                    dosError = GetLastError();
-                    if ( dosError != ERROR_LOCK_VIOLATION ) {
-                        break;
+            const unsigned long long chunkSize = 2 * 1024 * 1024;
+
+            for ( unsigned long long i = 0; i < _theFile->length(); i += chunkSize )
+            {
+                bool success = false;
+                int loopCount = 0;
+                bool timeout = false;
+                int dosError = ERROR_SUCCESS;
+
+                unsigned long long flushSize = min(chunkSize, _theFile->length() - i);
+                LPCVOID flushAddress = reinterpret_cast<LPCVOID>(
+                    reinterpret_cast<unsigned long long>(_view) + i);
+                Timer t;
+                while ( !success && !timeout ) {
+                    ++loopCount;
+
+                    // We flush the file in 2MB chunks to avoid a bug in Windows Azure Drives
+                    // that are attached with caching set to none or read-only, see SERVER-13681
+                    success = FlushViewOfFile(flushAddress, flushSize);
+                    if ( !success ) {
+                        dosError = GetLastError();
+                        if ( dosError != ERROR_LOCK_VIOLATION ) {
+                            break;
+                        }
+                        timeout = t.seconds() > maximumTimeInSeconds;
                     }
-                    timeout = t.seconds() > maximumTimeInSeconds;
                 }
-            }
-            if ( success && loopCount > 1 ) {
-                log() << "FlushViewOfFile for " << _filename
+
+                if ( success && loopCount > 1 ) {
+                    log() << "FlushViewOfFile for " << _filename
+                        << " for address " << flushAddress
+                        << " of size " << flushSize
                         << " succeeded after " << loopCount
                         << " attempts taking " << t.millis()
                         << "ms" << endl;
-            }
-            else if ( !success ) {
-                log() << "FlushViewOfFile for " << _filename
+                }
+                else if ( !success ) {
+                    log() << "FlushViewOfFile for " << _filename
                         << " failed with error " << dosError
+                        << " for address " << flushAddress
+                        << " of size " << flushSize
                         << " after " << loopCount
                         << " attempts taking " << t.millis()
                         << "ms" << endl;
-                // Abort here to avoid data corruption
-                fassert(16387, false);
+                    // Abort here to avoid data corruption
+                    fassert(16387, false);
+                }
             }
 
-            success = FALSE != FlushFileBuffers(_fd);
-            if (!success) {
+            if (!FlushFileBuffers(_fd)) {
                 int err = GetLastError();
                 log() << "FlushFileBuffers failed: " << errnoWithDescription( err )
                       << " file: " << _filename << endl;
@@ -555,13 +568,14 @@ namespace mongo {
     void MemoryMappedFile::flush(bool sync) {
         uassert(13056, "Async flushing not supported on windows", sync);
         if( !views.empty() ) {
-            WindowsFlushable f( this, viewForFlushing() , fd , filename() , _flushMutex);
+            WindowsFlushable f(this, viewForFlushing(), fd, filename(), _flushMutex);
             f.flush();
         }
     }
 
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
-        return new WindowsFlushable( this, viewForFlushing() , fd , filename() , _flushMutex );
+        return new WindowsFlushable(this, viewForFlushing(), fd,
+                                    filename(), _flushMutex);
     }
 
 }
