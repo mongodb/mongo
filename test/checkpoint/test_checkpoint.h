@@ -69,15 +69,16 @@ typedef struct {
 	int nworkers;				/* Number workers configured */
 	int ntables;				/* Number tables configured */
 	int ntables_created;			/* Number tables opened */
+	int running;				/* Whether to stop */
 	COOKIE *cookies;			/* Per-thread info */
 	pthread_t checkpoint_thread;		/* Checkpoint thread */
 	int checkpoint_phase;			/* How checkpoints are going */
 } GLOBAL;
 extern GLOBAL g;
 
-void die(const char *, int) WT_GCC_ATTRIBUTE((noreturn));
-void  end_checkpoints(void);
+int log_print_err(const char *, int, int);
+int  end_checkpoints(void);
 void load(void);
-void  start_checkpoints(void);
+int  start_checkpoints(void);
 int  start_workers(table_type);
 const char *type_to_string(table_type);

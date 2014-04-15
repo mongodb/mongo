@@ -29,27 +29,26 @@
 
 static void *checkpointer(void *);
 static int compare_cursors(WT_CURSOR *, table_type, WT_CURSOR *, table_type);
+static int real_checkpointer(void);
 static int verify_checkpoint(WT_SESSION *, const char *);
 
-void
+int
 start_checkpoints()
 {
 	int ret;
 
-	g.checkpoint_phase = 1;
 	if ((ret = pthread_create(
 	    &g.checkpoint_thread, NULL, checkpointer, NULL)) != 0)
-		die("pthread_create", ret);
-
+		return (log_print_err("pthread_create", ret, 1));
+	return (0);
 }
 
-void
+int
 end_checkpoints()
 {
 	void *thread_ret;
 
-	g.checkpoint_phase = 2;
-	(void)pthread_join(g.checkpoint_thread, &thread_ret);
+	return (pthread_join(g.checkpoint_thread, &thread_ret));
 
 }
 
@@ -60,42 +59,55 @@ end_checkpoints()
 static void *
 checkpointer(void *arg)
 {
-	WT_SESSION *session;
 	pthread_t tid;
-	int ret;
 
 	WT_UNUSED(arg);
 	tid = pthread_self();
 	printf("checkpointer thread starting: tid: %p\n", (void *)tid);
 
-	while (g.ntables > g.ntables_created || g.checkpoint_phase == 0)
+	(void)real_checkpointer();
+	return (NULL);
+}
+	
+
+static int
+real_checkpointer()
+{
+	WT_SESSION *session;
+	int ret;
+
+
+	if (g.running == 0)
+		return (log_print_err(
+		    "Checkpoint thread started stopped\n", EINVAL, 1));
+
+	while (g.ntables > g.ntables_created)
 		sched_yield();
-	sleep(1);
 
 	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
-		die("conn.open_session", ret);
+		return (log_print_err("conn.open_session", ret, 1));
 
-	while (g.checkpoint_phase != 2) {
+	sleep(1);
+	while (g.running) {
 
 		/* Execute a checkpoint */
 		if ((ret = session->checkpoint(session, NULL)) != 0)
-			die("session.checkpoint", ret);
+			return (log_print_err("session.checkpoint", ret, 1));
 		printf("Finished a checkpoint\n");
 
-		if (g.checkpoint_phase == 2)
+		if (!g.running)
 			goto done;
 
 		/* Verify the content of the checkpoint. */
 		if ((ret = verify_checkpoint(
 		    session, "WiredTigerCheckpoint")) != 0)
-			die("verify_checkpoint", ret);
-
+			return (log_print_err("verify_checkpoint", ret, 1));
 	}
 
 done:	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		return (log_print_err("session.close", ret, 1));
 
-	return (NULL);
+	return (0);
 }
 
 static int
@@ -116,14 +128,15 @@ verify_checkpoint(WT_SESSION *session, const char *name)
 		snprintf(next_uri, 128, "table:__wt%04d", i);
 		if ((ret = session->open_cursor(
 		    session, next_uri, NULL, ckpt, &cursors[i])) != 0)
-			die("verify_checkpoint:session.open_cursor", ret);
+			return (log_print_err(
+			    "verify_checkpoint:session.open_cursor", ret, 1));
 	}
 
 	while (ret == 0) {
 		++key_count;
 		ret = cursors[0]->next(cursors[0]);
 		if (ret != 0 && ret != WT_NOTFOUND)
-			die("cursor->next", ret);
+			return (log_print_err("cursor->next", ret, 1));
 		/*
 		 * Check to see that all remaining cursors have the 
 		 * same key/value pair.
@@ -131,18 +144,20 @@ verify_checkpoint(WT_SESSION *session, const char *name)
 		for (i = 1; i < g.ntables; i++) {
 			t_ret = cursors[i]->next(cursors[i]);
 			if (t_ret != 0 && t_ret != WT_NOTFOUND)
-				die("cursor->next", ret);
+				return (log_print_err("cursor->next", ret, 1));
 
 			if (ret == WT_NOTFOUND && t_ret == WT_NOTFOUND)
 				continue;
 			else if (ret == WT_NOTFOUND || t_ret == WT_NOTFOUND)
-				die("verify_checkpoint tables with different"
-				    " amount of data", EFAULT);
+				return (log_print_err(
+				    "verify_checkpoint tables with different"
+				    " amount of data", EFAULT, 1));
 
 			if (compare_cursors(cursors[0], zero_type,
 			    cursors[i], g.cookies[i].type) != 0)
-				die("verify_checkpoint - mismatching data",
-				    EFAULT);
+				return (log_print_err(
+				    "verify_checkpoint - mismatching data",
+				    EFAULT, 1));
 		}
 	}
 	printf("Finished verifying a checkpoint with %d tables and %" PRIu64

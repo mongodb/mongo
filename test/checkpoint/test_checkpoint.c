@@ -32,17 +32,17 @@ GLOBAL g;
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int);
-static void path_setup(const char *);
-static void cleanup(void);
+static int  path_setup(const char *);
+static int  cleanup(void);
 static int  usage(void);
-static void wt_connect(char *);
-static void wt_shutdown(void);
+static int  wt_connect(char *);
+static int  wt_shutdown(void);
 
 int
 main(int argc, char *argv[])
 {
 	table_type ttype;
-	int ch, cnt, runs;
+	int ch, cnt, ret, runs;
 	char *config_open, *home;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
@@ -53,8 +53,8 @@ main(int argc, char *argv[])
 	config_open = NULL;
 	home = NULL;
 	ttype = MIX;
-	g.nkeys = 1000;
-	g.nops = 10000;
+	g.nkeys = 10000;
+	g.nops = 100000;
 	g.ntables = 3;
 	g.nworkers = 1;
 	runs = 1;
@@ -127,18 +127,38 @@ main(int argc, char *argv[])
 		    "    %d: %u workers, %u tables\n",
 		    cnt, g.nworkers, g.ntables);
 
-		cleanup();			/* Clean up previous runs */
+		(void)cleanup();		/* Clean up previous runs */
+		g.running = 1;
 
-		wt_connect(config_open);	/* WiredTiger connection */
+		if ((ret = wt_connect(config_open)) != 0) {
+			(void)log_print_err("Connection failed", ret, 1);
+			break;
+		}
 
 		start_checkpoints();
-						/* Loop operations */
-		if (start_workers(ttype))
-			return (EXIT_FAILURE);
+		if ((ret = start_workers(ttype)) != 0) {
+			(void)log_print_err("Start workers failed", ret, 1);
+			break;
+		}
 
-		end_checkpoints();
+		g.running = 0;
+		if ((ret = end_checkpoints()) != 0) {
+			(void)log_print_err("Start workers failed", ret, 1);
+			break;
+		}
 
-		wt_shutdown();			/* WiredTiger shut down */
+		free(g.cookies);
+		if ((ret = wt_shutdown()) != 0) {
+			(void)log_print_err("Start workers failed", ret, 1);
+			break;
+		}
+	}
+	/*
+	 * Attempt to cleanup on error. Ideally we'd wait to know that the
+	 * checkpoint and worker threads are all done.
+	 */
+	if (ret != 0) {
+		(void)wt_shutdown();
 		free(g.cookies);
 	}
 	return (0);
@@ -148,7 +168,7 @@ main(int argc, char *argv[])
  * wt_connect --
  *	Configure the WiredTiger connection.
  */
-static void
+static int
 wt_connect(char *config_open)
 {
 	static WT_EVENT_HANDLER event_handler = {
@@ -168,31 +188,33 @@ wt_connect(char *config_open)
 
 	if ((ret = wiredtiger_open(
 	    g.home, &event_handler, config, &g.conn)) != 0)
-		die("wiredtiger_open", ret);
+		return (log_print_err("wiredtiger_open", ret, 1));
+	return (0);
 }
 
 /*
  * wt_shutdown --
  *	Shut down the WiredTiger connection.
  */
-static void
+static int
 wt_shutdown(void)
 {
 	int ret;
 
 	printf("Closing connection\n");
 	if ((ret = g.conn->close(g.conn, NULL)) != 0)
-		die("conn.close", ret);
+		return (log_print_err("conn.close", ret, 1));
+	return (0);
 }
 
 /*
  * cleanup --
  *	Clean up from previous runs.
  */
-static void
+static int
 cleanup(void)
 {
-	WT_UNUSED_RET(system(g.home_init));
+	return (system(g.home_init));
 }
 
 static int
@@ -228,43 +250,49 @@ onint(int signo)
 {
 	WT_UNUSED(signo);
 
-	cleanup();
+	(void)cleanup();
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
 
 /*
- * die --
- *	Report an error and quit.
+ * log_print_err --
+ *	Report an error and return the error.
  */
-void
-die(const char *m, int e)
+int
+log_print_err(const char *m, int e, int fatal)
 {
+	if (fatal)
+		g.running = 0;
 	fprintf(stderr, "%s: %s: %s\n", g.progname, m, wiredtiger_strerror(e));
-	exit(EXIT_FAILURE);
+	if (g.logfp != NULL)
+		fprintf(g.logfp, "%s: %s: %s\n",
+		    g.progname, m, wiredtiger_strerror(e));
+	return (e);
 }
 
 /*
  * path_setup --
  *	Build the standard paths and shell commands we use.
  */
-void
+int
 path_setup(const char *home)
 {
 	size_t len;
 
 	/* Home directory. */
 	if ((g.home = strdup(home == NULL ? "WT_TEST" : home)) == NULL)
-		die("malloc", ENOMEM);
+		return (log_print_err("malloc", ENOMEM, 1));
 
 	/* Home directory initialize command: remove everything */
 #undef	CMD
 #define	CMD	"mkdir -p %s && cd %s && rm -rf `ls`"
 	len = (strlen(g.home) * 2) + strlen(CMD) + 1;
 	if ((g.home_init = malloc(len)) == NULL)
-		die("malloc", ENOMEM);
+		return (log_print_err("malloc", ENOMEM, 1));
 	snprintf(g.home_init, len, CMD, g.home, g.home);
+	return (0);
 }
 
 const char *
