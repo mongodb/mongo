@@ -100,7 +100,7 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * If needed, also set the value.
 	 */
 	__wt_cursor_set_raw_key(cursor, &asyncop->c.key);
-	if (op->optype != WT_AOP_SEARCH)
+	if (op->optype != WT_AOP_SEARCH && op->optype != WT_AOP_REMOVE)
 		__wt_cursor_set_raw_value(cursor, &asyncop->c.value);
 	switch (op->optype) {
 		case WT_AOP_INSERT:
