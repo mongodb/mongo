@@ -80,3 +80,4 @@ void  end_checkpoints(void);
 void load(void);
 void  start_checkpoints(void);
 int  start_workers(table_type);
+const char *type_to_string(table_type);

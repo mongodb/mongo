@@ -267,6 +267,21 @@ path_setup(const char *home)
 	snprintf(g.home_init, len, CMD, g.home, g.home);
 }
 
+const char *
+type_to_string(table_type type)
+{
+	if (type == COL)
+		return "COL";
+	if (type == LSM)
+		return "LSM";
+	if (type == ROW)
+		return "ROW";
+	if (type == MIX)
+		return "MIX";
+	return "INVALID";
+}
+
+
 /*
  * usage --
  *	Display usage statement and exit failure.

@@ -140,17 +140,15 @@ start_workers(table_type type)
  *	Write operation.
  */
 static inline void
-worker_op(WT_CURSOR *cursor, COOKIE *cookie)
+worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
 {
 	WT_ITEM *key, _key, *value, _value;
-	u_int keyno;
 	int ret;
 	char keybuf[64], valuebuf[64];
 
 	key = &_key;
 	value = &_value;
 
-	keyno = r() % g.nkeys + 1;
 	if (cookie->type == COL)
 		cursor->set_key(cursor, (uint32_t)keyno);
 	else {
@@ -178,7 +176,7 @@ worker(void *arg)
 	WT_CURSOR **cursors;
 	WT_SESSION *session;
 	pthread_t tid;
-	u_int i;
+	u_int i, keyno;
 	int j, ret;
 
 	WT_UNUSED(arg);
@@ -198,8 +196,9 @@ worker(void *arg)
 			die("session.open_cursor", ret);
 	for (i = 0; i < g.nops; ++i, sched_yield()) {
 		session->begin_transaction(session, NULL);
+		keyno = r() % g.nkeys + 1;
 		for (j = 0; j < g.ntables; j++)
-			worker_op(cursors[j], &g.cookies[j]);
+			worker_op(cursors[j], &g.cookies[j], keyno);
 		session->commit_transaction(session, NULL);
 	}
 	if ((ret = session->close(session, NULL)) != 0)

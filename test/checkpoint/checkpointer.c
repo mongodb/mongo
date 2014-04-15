@@ -28,6 +28,7 @@
 #include "test_checkpoint.h"
 
 static void *checkpointer(void *);
+static int compare_cursors(WT_CURSOR *, table_type, WT_CURSOR *, table_type);
 static int verify_checkpoint(WT_SESSION *, const char *);
 
 void
@@ -69,23 +70,27 @@ checkpointer(void *arg)
 
 	while (g.ntables > g.ntables_created || g.checkpoint_phase == 0)
 		sched_yield();
+	sleep(1);
 
 	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
 		die("conn.open_session", ret);
 
-	if (g.checkpoint_phase == 2)
-		goto done;
+	while (g.checkpoint_phase != 2) {
 
-	/* Execute a checkpoint */
-	if ((ret = session->checkpoint(session, NULL)) != 0)
-		die("session.checkpoint", ret);
+		/* Execute a checkpoint */
+		if ((ret = session->checkpoint(session, NULL)) != 0)
+			die("session.checkpoint", ret);
+		printf("Finished a checkpoint\n");
 
-	if (g.checkpoint_phase == 2)
-		goto done;
+		if (g.checkpoint_phase == 2)
+			goto done;
 
-	/* Verify the content of the checkpoint. */
-	if ((ret = verify_checkpoint(session, "WiredTigerCheckpoint")) != 0)
-		die("verify_checkpoint", ret);
+		/* Verify the content of the checkpoint. */
+		if ((ret = verify_checkpoint(
+		    session, "WiredTigerCheckpoint")) != 0)
+			die("verify_checkpoint", ret);
+
+	}
 
 done:	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
@@ -97,13 +102,16 @@ static int
 verify_checkpoint(WT_SESSION *session, const char *name)
 {
 	WT_CURSOR **cursors;
+	table_type zero_type;
 	char next_uri[128], ckpt[128];
-	char first_key[64], first_value[64];
-	char curr_key[64], curr_value[64];
 	int i, ret, t_ret;
+	uint64_t key_count;
 
+	key_count = 0;
+	zero_type = g.cookies[0].type;
 	snprintf(ckpt, 128, "checkpoint=%s", name);
 	cursors = calloc(g.ntables, sizeof(*cursors));
+
 	for (i = 0; i < g.ntables; i++) {
 		snprintf(next_uri, 128, "table:__wt%04d", i);
 		if ((ret = session->open_cursor(
@@ -112,11 +120,9 @@ verify_checkpoint(WT_SESSION *session, const char *name)
 	}
 
 	while (ret == 0) {
+		++key_count;
 		ret = cursors[0]->next(cursors[0]);
-		if (ret == 0) {
-			cursors[0]->get_key(cursors[0], &first_key);
-			cursors[0]->get_value(cursors[0], &first_value);
-		} else if (ret != WT_NOTFOUND)
+		if (ret != 0 && ret != WT_NOTFOUND)
 			die("cursor->next", ret);
 		/*
 		 * Check to see that all remaining cursors have the 
@@ -133,14 +139,62 @@ verify_checkpoint(WT_SESSION *session, const char *name)
 				die("verify_checkpoint tables with different"
 				    " amount of data", EFAULT);
 
-			/* Normal case - match the data */
-			cursors[i]->get_key(cursors[i], &curr_key);
-			cursors[i]->get_value(cursors[i], &curr_value);
-			if (strcmp(first_key, curr_key) != 0 ||
-			    strcmp(first_value, curr_value) != 0)
-				die("verify_checkpoint - mismatching values",
+			if (compare_cursors(cursors[0], zero_type,
+			    cursors[i], g.cookies[i].type) != 0)
+				die("verify_checkpoint - mismatching data",
 				    EFAULT);
 		}
 	}
+	printf("Finished verifying a checkpoint with %d tables and %" PRIu64
+	    " keys\n", g.ntables, key_count);
 	return (0);
+}
+
+int
+compare_cursors(
+    WT_CURSOR *first, table_type first_type,
+    WT_CURSOR *second, table_type second_type)
+{
+	WT_ITEM first_key, second_key;
+	WT_ITEM first_value, second_value;
+	u_int first_key_int, second_key_int;
+	char buf[128];
+
+	memset(buf, 0, 128);
+
+	/*
+	 * Column stores have a different format than all others, but the
+	 * underlying value should still match.
+	 * Copy the string out of a non-column store in that case to
+	 * ensure that it's nul terminated.
+	 */
+	if (first_type == COL)
+		first->get_key(first, &first_key_int);
+	else {
+		first->get_key(first, &first_key);
+		memcpy(buf, first_key.data, first_key.size);
+		first_key_int = atol(buf);
+	}
+	if (second_type == COL)
+		first->get_key(first, &second_key_int);
+	else {
+		second->get_key(second, &second_key);
+		memcpy(buf, second_key.data, second_key.size);
+		second_key_int = atol(buf);
+	}
+	if (first_key_int != second_key_int) {
+		printf("Key mismatch %" PRIu32 " from an %s table "
+		    "is not %" PRIu32 " from a %s table\n",
+		    first_key_int, type_to_string(first_type),
+		    second_key_int, type_to_string(second_type));
+		return (1);
+	}
+
+	/* Now check the values. */
+	first->get_value(first, &first_value);
+	second->get_value(second, &second_value);
+	if (first_value.size != second_value.size)
+		return (1);
+	return (memcmp(
+	    first_value.data, second_value.data, first_value.size));
 }
