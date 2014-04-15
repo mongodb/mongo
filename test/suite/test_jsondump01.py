@@ -100,7 +100,7 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(self, uri, 'key_format=' + self.keyfmt, self.nentries)
 
         # Dump the object.
-        self.runWt(['jsondump', uri], outfilename='jsondump.out')
+        self.runWt(['dump', '-j', uri], outfilename='jsondump.out')
 
         # Load it using python's built-in JSON
         dumpin = open('jsondump.out')
