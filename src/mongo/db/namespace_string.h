@@ -62,7 +62,7 @@ namespace mongo {
         /**
          * Constructs a NamespaceString from the fully qualified namespace named in "ns".
          */
-        NamespaceString( const StringData& ns );
+        explicit NamespaceString( const StringData& ns );
 
         /**
          * Constructs a NamespaceString for the given database and collection names.
