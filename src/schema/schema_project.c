@@ -159,20 +159,18 @@ __wt_schema_project_out(WT_SESSION_IMPL *session, WT_CURSOR *container,
 	WT_CURSOR_JSON *json;
 	WT_DECL_PACK(pack);
 	WT_DECL_PACK_VALUE(pv);
-	WT_ITEM *item;
 	WT_PACK_NAME packname;
 	char *proj, *jbuf;
+	const char **jresult;
 	int unpacked;
 	size_t jsize, jbufsize;
 	uint8_t *p, *end;
 	u_long arg;
 
-	item = NULL;
-
 	json = (WT_CURSOR_JSON *)container->json_private;
 	if (json != NULL) {
-		/* Unpacking a json cursor implies a single WT_ITEM arg. */
-		item = va_arg(ap, WT_ITEM *);
+		/* Unpacking a json cursor implies a single arg. */
+		jresult = va_arg(ap, const char **);
 		jbufsize = 0;
 		jbuf = NULL;
 	}
@@ -257,8 +255,7 @@ restart:
 			WT_RET(__wt_realloc(session, NULL, jbufsize,
 			    &json->value_buf));
 			jbuf = json->value_buf;
-			item->data = jbuf;
-			item->size = jbufsize - 1;
+			*jresult = jbuf;
 			goto restart;
 		}
 		else

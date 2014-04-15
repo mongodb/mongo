@@ -398,6 +398,16 @@ typedef int int_void;
 		return (ret);
 	}
 
+	int_void _get_json_key(char **datap, int *sizep) {
+		const char *k;
+		int ret = $self->get_key($self, &k);
+		if (ret == 0) {
+			*datap = (char *)k;
+			*sizep = strlen(k);
+		}
+		return (ret);
+	}
+
 	int_void _get_recno(uint64_t *recnop) {
 		WT_ITEM k;
 		int ret = $self->get_key($self, &k);
@@ -413,6 +423,16 @@ typedef int int_void;
 		if (ret == 0) {
 			*datap = (char *)v.data;
 			*sizep = (int)v.size;
+		}
+		return (ret);
+	}
+
+	int_void _get_json_value(char **datap, int *sizep) {
+		const char *k;
+		int ret = $self->get_value($self, &k);
+		if (ret == 0) {
+			*datap = (char *)k;
+			*sizep = strlen(k);
 		}
 		return (ret);
 	}
@@ -472,7 +492,7 @@ typedef int int_void;
 		
 		@copydoc WT_CURSOR::get_key'''
 		if self.is_json:
-			return [self._get_key()]
+			return [self._get_json_key()]
 		elif self.is_column:
 			return [self._get_recno(),]
 		else:
@@ -493,7 +513,7 @@ typedef int int_void;
 		
 		@copydoc WT_CURSOR::get_value'''
 		if self.is_json:
-			return [self._get_value()]
+			return [self._get_json_value()]
 		else:
 			return unpack(self.value_format, self._get_value())
 

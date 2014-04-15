@@ -703,7 +703,6 @@ __wt_struct_json_unpackv(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM name;
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
-	WT_ITEM *item;
 	WT_PACK pack;
 	WT_PACK_NAME packname;
 	int needcr;
@@ -714,10 +713,8 @@ __wt_struct_json_unpackv(WT_SESSION_IMPL *session,
 	end = p + size;
 	needcr = 0;
 
-	/* Unpacking a cursor marked as json implies a single WT_ITEM arg. */
-	item = va_arg(ap, WT_ITEM *);
-	item->data = jbuf;
-	item->size = jbufsize - 1;  /* don't include null */
+	/* Unpacking a cursor marked as json implies a single arg. */
+	*va_arg(ap, const char **) = jbuf;
 
 	WT_ERR(__pack_name_init(session, names, iskey, &packname));
 	WT_ERR(__pack_init(session, &pack, fmt));

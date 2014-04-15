@@ -10,8 +10,6 @@
 static int dump_config(WT_SESSION *, const char *, int);
 static int dump_json_begin(void);
 static int dump_json_end(void);
-static int dump_json_forward(WT_CURSOR *cursor, const char *name);
-static int dump_json_reverse(WT_CURSOR *cursor, const char *name);
 static int dump_json_separator(void);
 static int dump_json_table_begin(WT_CURSOR *, const char *, const char *);
 static int dump_json_table_cg(WT_CURSOR *, const char *, const char *,
@@ -19,6 +17,7 @@ static int dump_json_table_cg(WT_CURSOR *, const char *, const char *,
 static int dump_json_table_config(WT_SESSION *, const char *);
 static int dump_json_table_end(void);
 static int dump_prefix(int);
+static int dump_record(WT_CURSOR *, const char *, int, int);
 static int dump_suffix(void);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
 static int dump_table_config_type(WT_SESSION *,
@@ -26,40 +25,6 @@ static int dump_table_config_type(WT_SESSION *,
 static int dup_json_string(const char *, char **);
 static int print_config(WT_SESSION *, const char *, const char *, const char *);
 static int usage(void);
-
-static inline int
-dump_forward(WT_CURSOR *cursor, const char *name)
-{
-	WT_DECL_RET;
-	const char *key, *value;
-
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(name, "get_key", ret));
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(name, "get_value", ret));
-		if (printf("%s\n%s\n", key, value) < 0)
-			return (util_err(EIO, NULL));
-	}
-	return (ret == WT_NOTFOUND ? 0 : util_cerr(name, "next", ret));
-}
-
-static inline int
-dump_reverse(WT_CURSOR *cursor, const char *name)
-{
-	WT_DECL_RET;
-	const char *key, *value;
-
-	while ((ret = cursor->prev(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(name, "get_key", ret));
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(name, "get_value", ret));
-		if (printf("%s\n%s\n", key, value) < 0)
-			return (util_err(EIO, NULL));
-	}
-	return (ret == WT_NOTFOUND ? 0 : util_cerr(name, "prev", ret));
-}
 
 int
 util_dump(WT_SESSION *session, int argc, char *argv[])
@@ -106,7 +71,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 
 	for (i = 0; i < argc; i++) {
-		if (i > 0) {
+		if (json && i > 0) {
 			free(name);
 			if ((ret = dump_json_separator()) != 0)
 				goto err;
@@ -122,7 +87,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 
 		len =
 		    checkpoint == NULL ? 0 : strlen("checkpoint=") +
-		    strlen(checkpoint);
+		    strlen(checkpoint) + 1;
 		len += strlen(json ? "json" :
 		    (hex ? "dump=hex" : "dump=print"));
 		if ((config = malloc(len + 10)) == NULL)
@@ -143,21 +108,10 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			goto err;
 		}
 
-		if (json) {
-			if (reverse)
-				ret = dump_json_reverse(cursor, name);
-			else
-				ret = dump_json_forward(cursor, name);
-			if (ret != 0)
-				goto err;
-			if ((ret = dump_json_table_end()) != 0)
-				goto err;
-		} else {
-			if (reverse)
-				ret = dump_reverse(cursor, name);
-			else
-				ret = dump_forward(cursor, name);
-		}
+		if ((ret = dump_record(cursor, name, reverse, json)) != 0)
+			goto err;
+		if (json && (ret = dump_json_table_end()) != 0)
+			goto err;
 	}
 	if (json && ((ret = dump_json_end()) != 0))
 		goto err;
@@ -267,58 +221,6 @@ dump_json_end(void)
 	if (printf("\n}\n") < 0)
 		return (util_err(EIO, NULL));
 	return (0);
-}
-
-static int
-dump_json_forward(WT_CURSOR *cursor, const char *name)
-{
-	WT_DECL_RET;
-	WT_ITEM key;
-	WT_ITEM value;
-	int once;
-
-	once = 0;
-	while ((ret = cursor->next(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(name, "get_key", ret));
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(name, "get_value", ret));
-		if (printf("%s\n            {\n%s,\n%s\n            }",
-			(once ? "," : ""),
-			(const char *)key.data,
-			(const char *)value.data) < 0)
-			return (util_err(EIO, NULL));
-		once = 1;
-	}
-	if (once && printf("\n") < 0)
-		return (util_err(EIO, NULL));
-	return (ret == WT_NOTFOUND ? 0 : util_cerr(name, "next", ret));
-}
-
-static int
-dump_json_reverse(WT_CURSOR *cursor, const char *name)
-{
-	WT_DECL_RET;
-	WT_ITEM key;
-	WT_ITEM value;
-	int once;
-
-	once = 0;
-	while ((ret = cursor->prev(cursor)) == 0) {
-		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr(name, "get_key", ret));
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr(name, "get_value", ret));
-		if (printf("%s            {\n%s,\n%s\n            }",
-			(once ? ",\n" : ""),
-			(const char *)key.data,
-			(const char *)value.data) < 0)
-			return (util_err(EIO, NULL));
-		once = 1;
-	}
-	if (once && printf("\n") < 0)
-		return (util_err(EIO, NULL));
-	return (ret == WT_NOTFOUND ? 0 : util_cerr(name, "prev", ret));
 }
 
 /*
@@ -690,6 +592,46 @@ dump_prefix(int hex)
 	    printf("Header\n") < 0)
 		return (util_err(EIO, NULL));
 	return (0);
+}
+
+/*
+ * dump_record --
+ *	Dump a single record, advance cursor to next/prev, along
+ *	with JSON formatting if needed.
+ */
+static int
+dump_record(WT_CURSOR *cursor, const char *name, int reverse, int json)
+{
+	WT_DECL_RET;
+	const char *infix, *key, *prefix, *suffix, *value;
+	int once;
+
+	once = 0;
+	if (json) {
+		prefix = "\n            {\n";
+		infix = ",\n";
+		suffix = "\n            }";
+	}
+	else {
+		prefix = "";
+		infix = "\n";
+		suffix = "\n";
+	}
+	while ((ret =
+	    (reverse ? cursor->prev(cursor) : cursor->next(cursor))) == 0) {
+		if ((ret = cursor->get_key(cursor, &key)) != 0)
+			return (util_cerr(name, "get_key", ret));
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (util_cerr(name, "get_value", ret));
+		if (printf("%s%s%s%s%s%s", (json && once) ? "," : "",
+		    prefix, key, infix, value, suffix) < 0)
+			return (util_err(EIO, NULL));
+		once = 1;
+	}
+	if (json && once && printf("\n") < 0)
+		return (util_err(EIO, NULL));
+	return (ret == WT_NOTFOUND ? 0 :
+	    util_cerr(name, (reverse ? "prev" : "next"), ret));
 }
 
 /*
