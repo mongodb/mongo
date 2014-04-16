@@ -51,6 +51,7 @@ main(int argc, char *argv[])
 		++g.progname;
 
 	config_open = NULL;
+	ret = 0;
 	home = NULL;
 	ttype = MIX;
 	g.checkpoint_name = "WiredTigerCheckpoint";
