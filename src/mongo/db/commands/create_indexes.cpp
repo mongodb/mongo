@@ -201,13 +201,14 @@ namespace mongo {
                     appendCommandStatus( result, status );
                     return false;
                 }
+
+                if ( !fromRepl ) {
+                    std::string systemIndexes = ns.getSystemIndexesCollection();
+                    logOp( "i", systemIndexes.c_str(), spec );
+                }
             }
 
             result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal() );
-            if ( !fromRepl ) {
-                string cmdNs = ns.getCommandNS();
-                logOp( "c", cmdNs.c_str(), cmdObj );
-            }
 
             return true;
         }
