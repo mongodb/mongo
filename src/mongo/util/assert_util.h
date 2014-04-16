@@ -37,7 +37,6 @@ namespace mongo {
         NotMasterOrSecondaryCode = 13436, // uassert( 13436 )
         NotMasterNoSlaveOkCode = 13435,   // uassert( 13435 )
         NotMaster = 10107,                // uassert( 10107 )
-        IndexOptionsDiffer = 17427        // uassert( 17427 )
     };
 
     class MONGO_CLIENT_API AssertionCount {

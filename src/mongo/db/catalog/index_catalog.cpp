@@ -631,7 +631,7 @@ namespace mongo {
                 // index already exists with same name
 
                 if ( !desc->keyPattern().equal( key ) )
-                    return Status( ErrorCodes::CannotCreateIndex,
+                    return Status( ErrorCodes::IndexKeySpecsConflict,
                                    str::stream() << "Trying to create an index "
                                    << "with same name " << name
                                    << " with different key spec " << key
@@ -641,10 +641,9 @@ namespace mongo {
                                       _getAccessMethodName( key ),
                                       spec );
                 if ( !desc->areIndexOptionsEquivalent( &temp ) )
-                    return Status( ErrorCodes::CannotCreateIndex,
+                    return Status( ErrorCodes::IndexOptionsConflict,
                                    str::stream() << "Index with name: " << name
-                                   << " already exists with different options",
-                                   IndexOptionsDiffer);
+                                   << " already exists with different options" );
 
                 // Index already exists with the same options, so no need to build a new
                 // one (not an error). Most likely requested by a client using ensureIndex.
@@ -663,10 +662,9 @@ namespace mongo {
                                       _getAccessMethodName( key ),
                                       spec );
                 if ( !desc->areIndexOptionsEquivalent( &temp ) )
-                    return Status( ErrorCodes::CannotCreateIndex,
+                    return Status( ErrorCodes::IndexOptionsConflict,
                                    str::stream() << "Index with pattern: " << key
-                                   << " already exists with different options",
-                                   IndexOptionsDiffer );
+                                   << " already exists with different options" );
 
                 return Status( ErrorCodes::IndexAlreadyExists, name );
             }
@@ -690,7 +688,7 @@ namespace mongo {
                 return Status( ErrorCodes::CannotCreateIndex,
                                str::stream() << "only one text index per collection allowed, "
                                << "found existing text index \"" << textIndexes[0]->indexName()
-                               << "\"");
+                               << "\"" );
             }
         }
         return Status::OK();
