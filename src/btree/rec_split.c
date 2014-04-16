@@ -494,6 +494,12 @@ __split_inmem_build(
 		WT_ILLEGAL_VALUE(session);
 		}
 
+	/*
+	 * We modified the page above, which will have copied the current
+	 * checkpoint generation.  If there is a checkpoint in progress, it
+	 * must write this page, so reset the checkpoint generation to zero.
+	 */
+	page->modify->checkpoint_gen = 0;
 	return (0);
 }
 
