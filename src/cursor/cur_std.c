@@ -634,12 +634,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	/* dump */
 	WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
 	if (cval.len != 0) {
-		/*
-		 * Dump cursors should not have owners: only the top-level
-		 * cursor should be wrapped in a dump cursor.
-		 */
-		WT_ASSERT(session, owner == NULL);
-
 		F_SET(cursor,
 		    WT_STRING_MATCH("json", cval.str, cval.len) ?
 		    WT_CURSTD_DUMP_JSON : 
@@ -650,6 +644,12 @@ __wt_cursor_init(WT_CURSOR *cursor,
 			cursor->json_private = json;
 			cdump = NULL;
 		} else {
+			/*
+			 * Dump cursors should not have owners: only the
+			 * top-level cursor should be wrapped in a dump cursor.
+			 */
+			WT_ASSERT(session, owner == NULL);
+
 			WT_RET(__wt_curdump_create(cursor, owner, &cdump));
 			owner = cdump;
 		}
