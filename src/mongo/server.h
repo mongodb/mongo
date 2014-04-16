@@ -1,5 +1,6 @@
 //server.h
 
+// HELLO!
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
