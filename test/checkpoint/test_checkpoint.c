@@ -53,14 +53,18 @@ main(int argc, char *argv[])
 	config_open = NULL;
 	home = NULL;
 	ttype = MIX;
+	g.checkpoint_name = "WiredTigerCheckpoint";
 	g.nkeys = 10000;
 	g.nops = 100000;
 	g.ntables = 3;
 	g.nworkers = 1;
 	runs = 1;
 
-	while ((ch = getopt(argc, argv, "C:h:k:l:n:r:t:T:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "c:C:h:k:l:n:r:t:T:W:")) != EOF)
 		switch (ch) {
+		case 'c':
+			g.checkpoint_name = optarg;
+			break;
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
 			break;
@@ -324,10 +328,11 @@ usage(void)
 	fprintf(stderr,
 	    "usage: %s "
 	    "[-S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
-	    "[-n ops] [-r runs] [-t f|r|v] [-W workers]\n",
+	    "[-n ops] [-c checkpoint] [-r runs] [-t f|r|v] [-W workers]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"
+	    "\t-c checkpoint name to used named checkpoints\n"
 	    "\t-k set number of keys to load\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"

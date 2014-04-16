@@ -43,6 +43,9 @@
 
 #define	URI_BASE	"table:__wt"		/* File name */
 
+#define ERR_KEY_MISMATCH	0x200001
+#define	ERR_DATA_MISMATCH	0x200002
+
 /*
  * There are three different table types in the test, and a 'special' type
  * of mixed (i.e a mixture of the other three types.
@@ -62,6 +65,7 @@ typedef struct {
 typedef struct {
 	char *home;				/* Home directory */
 	char *home_init;			/* Home directory init shell */
+	const char *checkpoint_name;		/* Checkpoint name */
 	WT_CONNECTION *conn;			/* WiredTiger connection */
 	u_int nkeys;				/* Keys to load */
 	u_int nops;				/* Operations per thread */
