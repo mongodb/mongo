@@ -519,9 +519,9 @@ namespace mongo {
                     if ( status.isOK() ) {
                         // yay
                     }
-                    else if ( status.code() == ErrorCodes::CannotCreateIndex &&
-                              status.location() == IndexOptionsDiffer ) {
-                        // SERVER-13206
+                    else if ( status.code() == ErrorCodes::IndexOptionsConflict ||
+                              status.code() == ErrorCodes::IndexKeySpecsConflict ) {
+                        // SERVER-13206, SERVER-13496
                         // 2.4 (and earlier) will add an ensureIndex to an oplog if its ok or not
                         // so in 2.6+ where we do stricter validation, it will fail
                         // but we shouldn't care as the primary is responsible
