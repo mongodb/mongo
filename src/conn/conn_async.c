@@ -39,7 +39,12 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	else
 		cfg_hash = 0;
 
-	__wt_spin_lock(session, &async->ops_lock);
+	/*
+	 * We don't need to hold a lock around this walk.  The list is
+	 * permanent and always valid.  We might race an insert and there
+	 * is a possibility a duplicate entry might be inserted, but
+	 * that is not harmful.
+	 */
 	STAILQ_FOREACH(af, &async->formatqh, q) {
 		if (af->uri_hash == uri_hash && af->cfg_hash == cfg_hash)
 			goto setup;
@@ -64,10 +69,11 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	WT_ERR(c->close(c));
 	have_cursor = 0;
 
+	__wt_spin_lock(session, &async->ops_lock);
 	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
+	__wt_spin_unlock(session, &async->ops_lock);
 
-setup:	__wt_spin_unlock(session, &async->ops_lock);
-	op->format = af;
+setup:	op->format = af;
 	/*
 	 * Copy the pointers for the formats.  Items in the async format
 	 * queue remain there until the connection is closed.  We must
@@ -80,7 +86,6 @@ setup:	__wt_spin_unlock(session, &async->ops_lock);
 	return (0);
 
 err:
-	__wt_spin_unlock(session, &async->ops_lock);
 	if (have_cursor)
 		c->close(c);
 	__wt_free(session, af->uri);
