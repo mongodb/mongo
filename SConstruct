@@ -196,16 +196,12 @@ add_option( "extra-variant-dirs", "extra variant dir components, separated by co
 add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
 add_option( "variant-dir", "override variant subdirectory", 1, False )
 
-add_option( "sharedclient", "build a libmongoclient.so/.dll [DEPRECATED/IGNORED]" , 0 , False )
-add_option( "full", "include client and headers when doing scons install [DEPRECATED/IGNORED]", 0 , False )
-
 # linking options
 add_option( "release" , "release build" , 0 , True )
 add_option( "static" , "fully static build" , 0 , False )
 add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
 add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
 add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
-add_option( "disable-declspec-thread", "don't use __declspec(thread) on Windows [DEPRECATED/IGNORED]", 0, True)
 
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
@@ -1742,7 +1738,6 @@ Export("s3push")
 Export("use_clang")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
-env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False)
 env.SConscript(['SConscript.buildinfo', 'SConscript.smoke'])
 
 def clean_old_dist_builds(env, target, source):

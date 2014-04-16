@@ -58,26 +58,3 @@
 
 #endif // gcc 4.3
 
-#include "mongo/client/dbclient.h"
-
-#ifdef malloc
-# error malloc macro defined
-#endif
-
-#ifdef verify
-# error verify defined 1
-#endif
-
-#include "mongo/client/redef_macros.h"
-
-#ifndef verify
-# error verify not defined 3
-#endif
-
-#include "mongo/client/undef_macros.h"
-
-#ifdef verify
-# error verify defined 3
-#endif
-
-
