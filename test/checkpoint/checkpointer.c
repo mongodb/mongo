@@ -255,8 +255,15 @@ compare_cursors(
 		    first_key_int, second_key_int,
 		    first_value, second_value);
 	if (strlen(first_value) != strlen(second_value) ||
-	    strcmp(first_value, second_value) != 0)
+	    strcmp(first_value, second_value) != 0) {
+		printf("Value mismatch %s from a %s table "
+		    "is not %s from a %s table\n",
+		    first_value,
+		    type_to_string(g.cookies[first_index].type),
+		    second_value,
+		    type_to_string(g.cookies[second_index].type));
 		return (ERR_DATA_MISMATCH);
+	}
 
 	return (0);
 }
