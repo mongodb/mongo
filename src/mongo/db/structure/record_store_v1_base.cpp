@@ -233,7 +233,8 @@ namespace mongo {
         // 1) basic status that require no iteration
         // 2) extent level info
         // 3) check extent start and end
-        // 4) check deleted list
+        // 4) check each non-deleted record
+        // 5) check deleted list
 
         // -------------
 
