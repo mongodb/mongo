@@ -210,6 +210,7 @@ get_key_int(WT_CURSOR *cursor, int index, u_int *rval)
 		cursor->get_key(cursor, &val);
 	else {
 		cursor->get_key(cursor, &key);
+		memset(buf, 0, 128);
 		memcpy(buf, key.data, key.size);
 		val = atol(buf);
 	}
@@ -319,15 +320,21 @@ diagnose_key_error(
 	c->set_key(c, &first_key);
 	if ((ret = c->search(c)) != 0)
 		log_print_err("1st cursor didn't find 1st key\n", ret, 0);
-	c->set_key(c, &second_key);
-	if ((ret = c->search(c)) != 0)
-		log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
+	if (g.cookies[first_index].type == g.cookies[second_index].type) {
+		c->set_key(c, &second_key);
+		if ((ret = c->search(c)) != 0)
+			log_print_err(
+			    "1st cursor didn't find 2nd key\n", ret, 0);
+	}
 	c->close(c);
 	snprintf(next_uri, 128, "table:__wt%04d", second_index);
 	ret = session->open_cursor(session, next_uri, NULL, ckpt, &c);
-	c->set_key(c, &first_key);
-	if ((ret = c->search(c)) != 0)
-		log_print_err("2nd cursor didn't find 1st key\n", ret, 0);
+	if (g.cookies[first_index].type == g.cookies[second_index].type) {
+		c->set_key(c, &first_key);
+		if ((ret = c->search(c)) != 0)
+			log_print_err(
+			    "2nd cursor didn't find 1st key\n", ret, 0);
+	}
 	c->set_key(c, &second_key);
 	if ((ret = c->search(c)) != 0)
 		log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
