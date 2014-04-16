@@ -58,17 +58,17 @@ namespace mongo {
         /**
          * Get the cpu address size (e.g. 32, 36, 64)
          */
-        const unsigned getAddrSize() const { return sysInfo().addrSize; }
+        unsigned getAddrSize() const { return sysInfo().addrSize; }
 
         /**
          * Get the total amount of system memory in MB
          */
-        const unsigned long long getMemSizeMB() const { return sysInfo().memSize / (1024 * 1024); }
+        unsigned long long getMemSizeMB() const { return sysInfo().memSize / (1024 * 1024); }
 
         /**
          * Get the number of CPUs
          */
-        const unsigned getNumCores() const { return sysInfo().numCores; }
+        unsigned getNumCores() const { return sysInfo().numCores; }
 
         /**
          * Get the system page size in bytes.

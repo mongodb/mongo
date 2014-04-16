@@ -48,7 +48,7 @@ namespace MatcherTests {
             client().dropCollection( ns() );
         }
     protected:
-        const char * const ns() const { return _ns; }
+        const char* ns() const { return _ns; }
         DBDirectClient &client() { return _client; }
     private:
         const char * const _ns;

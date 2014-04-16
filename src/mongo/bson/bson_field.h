@@ -96,7 +96,7 @@ namespace mongo {
             return _default;
         }
 
-        const bool hasDefault() const {
+        bool hasDefault() const {
             return _defaultSet;
         }
 

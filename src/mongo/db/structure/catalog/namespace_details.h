@@ -287,13 +287,13 @@ namespace mongo {
             }
         }
 
-        const int systemFlags() const { return _systemFlags; }
+        int systemFlags() const { return _systemFlags; }
         bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }
         void setSystemFlag( int flag );
         void clearSystemFlag( int flag );
         void clearSystemFlags();
 
-        const int userFlags() const { return _userFlags; }
+        int userFlags() const { return _userFlags; }
         bool isUserFlagSet( int flag ) const { return _userFlags & flag; }
 
         /**

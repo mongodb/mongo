@@ -319,7 +319,7 @@ namespace mongo {
 
             const Config& config() { return _config; }
 
-            const bool isOnDisk() { return _onDisk; }
+            bool isOnDisk() { return _onDisk; }
 
             long long numEmits() const { if (_jsMode) return _scope->getNumberLongLong("_emitCt"); return _numEmits; }
             long long numReduces() const { if (_jsMode) return _scope->getNumberLongLong("_redCt"); return _config.reducer->numReduces; }
