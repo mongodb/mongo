@@ -43,6 +43,8 @@ connection_stats = [
 	##########################################
 	# Async API statistics
 	##########################################
+	Stat('async_alloc_race', 'async: number of allocation state races'),
+	Stat('async_alloc_view', 'async: number of op slots viewed for alloc'),
 	Stat('async_flush', 'async: number of async flush calls'),
 	Stat('async_full', 'async: number of times op allocation failed'),
 	Stat('async_cur_queue', 'async: current work queue length'),

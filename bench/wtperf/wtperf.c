@@ -69,8 +69,10 @@ static const char * const debug_tconfig = "";
  */
 #if defined(_lint)
 #define	ATOMIC_ADD(v, val)	((v) += (val), (v))
+#define	ATOMIC_ADD_PTR(p, val)	((*p) += (val), (*p))
 #else
 #define	ATOMIC_ADD(v, val)	__sync_add_and_fetch(&(v), val)
+#define	ATOMIC_ADD_PTR(p, val)	__sync_add_and_fetch((p), val)
 #endif
 
 static void	*checkpoint_worker(void *);
@@ -113,9 +115,9 @@ get_next_incr(CONFIG *cfg)
 
 /* Count number of async inserts completed. */
 static inline uint64_t
-async_next_incr(CONFIG *cfg)
+async_next_incr(uint64_t *val)
 {
-	return (ATOMIC_ADD(cfg->insert_complete, 1));
+	return (ATOMIC_ADD_PTR(val, 1));
 }
 
 static void
@@ -683,7 +685,8 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		cfg->error = cfg->stop = 1;
 		return (1);
 	}
-	(void)async_next_incr(cfg);
+	(void)async_next_incr(&thread->insert.ops);
+	(void)async_next_incr(&cfg->insert_complete);
 	return (0);
 }
 
@@ -747,7 +750,7 @@ retry:		if ((ret = conn->async_new_op(
 		    NULL, &cb, &asyncop)) != 0) {
 			if (ret != ENOMEM)
 				goto err;
-			sched_yield();
+			(void)usleep(10000);
 			goto retry;
 		}
 		asyncop->c.lang_private = thread;
@@ -761,8 +764,6 @@ retry:		if ((ret = conn->async_new_op(
 			lprintf(cfg, ret, 0, "Failed inserting");
 			goto err;
 		}
-		++thread->insert.ops;	/* Same as trk->ops */
-
 		if (cfg->populate_ops_per_txn != 0) {
 			if (++opcount < cfg->populate_ops_per_txn)
 				continue;

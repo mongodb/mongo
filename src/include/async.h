@@ -20,6 +20,13 @@ typedef enum {
 	WT_ASYNCOP_WORKING	/* Operation in progress by worker */
 } WT_ASYNC_STATE;
 
+typedef enum {
+	WT_ASYNC_FLUSH_NONE=0,		/* No flush in progress */
+	WT_ASYNC_FLUSH_COMPLETE,	/* Notify flush caller it's done */
+	WT_ASYNC_FLUSH_IN_PROGRESS,	/* Prevent other callers */
+	WT_ASYNC_FLUSHING		/* Notify workers */
+} WT_ASYNC_FLUSH_STATE;
+
 #define	O2C(op)	((WT_CONNECTION_IMPL *)(op)->iface.connection)
 #define	O2S(op)								\
     (((WT_CONNECTION_IMPL *)(op)->iface.connection)->default_session)
@@ -82,10 +89,7 @@ struct __wt_async {
 	STAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
 	int			 cur_queue;	/* Currently enqueued */
 	int			 max_queue;	/* Maximum enqueued */
-#define	WT_ASYNC_FLUSH_COMPLETE		0x0001	/* Notify flush caller */
-#define	WT_ASYNC_FLUSH_IN_PROGRESS	0x0002	/* Prevent more callers */
-#define	WT_ASYNC_FLUSHING		0x0004	/* Notify workers */
-	uint32_t		 opsq_flush;	/* Queue flush state */
+	WT_ASYNC_FLUSH_STATE	 flush_state;	/* Queue flush state */
 	/* Notify any waiting threads when flushing is done. */
 	WT_CONDVAR		*flush_cond;
 	WT_ASYNC_OP_IMPL	 flush_op;	/* Special flush op */

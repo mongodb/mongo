@@ -29,17 +29,19 @@ __async_op_dequeue(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session,
 	 * Then grab the slot containing the work.  If we lose, try again.
 	 */
 retry:
+	WT_READ_BARRIER();
 	while ((old_tail = async->tail) == async->head &&
 	    ++tries < max_tries &&
-	    !FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSHING))
+	    async->flush_state != WT_ASYNC_FLUSHING)
 		__wt_yield();
 	if (tries >= max_tries ||
-	    FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSHING))
+	    async->flush_state == WT_ASYNC_FLUSHING)
 		return (0);
 	/*
 	 * Try to increment the tail to claim this slot.  If we lose
 	 * a race, try again.
 	 */
+	WT_WRITE_BARRIER();
 	if (!WT_ATOMIC_CAS(async->tail, old_tail, old_tail + 1))
 		goto retry;
 	my_slot = (old_tail + 1) % conn->async_size;
@@ -48,19 +50,15 @@ retry:
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
 	WT_ASSERT(session, (*op)->state == WT_ASYNCOP_ENQUEUED);
-	--async->cur_queue;
+	WT_WRITE_BARRIER();
+	WT_ATOMIC_SUB(async->cur_queue, 1);
 	(*op)->state = WT_ASYNCOP_WORKING;
 
-	if (*op == &async->flush_op) {
-		WT_ASSERT(session, FLD_ISSET(async->opsq_flush,
-		    WT_ASYNC_FLUSH_IN_PROGRESS));
+	if (*op == &async->flush_op)
 		/*
 		 * We're the worker to take the flush op off the queue.
-		 * Set the flushing flag and set count to 1.
 		 */
-		FLD_SET(async->opsq_flush, WT_ASYNC_FLUSHING);
-		WT_WRITE_BARRIER();
-	}
+		WT_PUBLISH(async->flush_state, WT_ASYNC_FLUSHING);
 	return (0);
 }
 
@@ -73,7 +71,7 @@ __async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async)
 {
 	WT_DECL_RET;
 
-	while (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSHING))
+	while (async->flush_state == WT_ASYNC_FLUSHING)
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, async->flush_cond, 10000));
 err:	return (ret);
@@ -234,6 +232,7 @@ __wt_async_worker(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint32_t fc;
 
 	session = arg;
 	conn = S2C(session);
@@ -245,14 +244,16 @@ __wt_async_worker(void *arg)
 		WT_ERR(__async_op_dequeue(conn, session, &op));
 		if (op != NULL && op != &async->flush_op)
 			WT_ERR(__async_worker_op(session, op, &worker));
-		else if (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSHING)) {
+		else if (async->flush_state == WT_ASYNC_FLUSHING) {
 			/*
 			 * Worker flushing going on.  Last worker to the party
 			 * needs to clear the FLUSHING flag and signal the cond.
 			 * If FLUSHING is going on, we do not take anything off
 			 * the queue.
 			 */
-			if (++async->flush_count == conn->async_workers) {
+			WT_WRITE_BARRIER();
+			if ((fc = WT_ATOMIC_ADD(async->flush_count, 1)) ==
+			    conn->async_workers) {
 				/*
 				 * We're last.  All workers accounted for so
 				 * signal the condition and clear the FLUSHING
@@ -260,18 +261,16 @@ __wt_async_worker(void *arg)
 				 * Set the FLUSH_COMPLETE flag so that the
 				 * caller can return to the application.
 				 */
-				FLD_SET(async->opsq_flush,
+				WT_PUBLISH(async->flush_state,
 				    WT_ASYNC_FLUSH_COMPLETE);
-				FLD_CLR(async->opsq_flush, WT_ASYNC_FLUSHING);
 				WT_ERR(__wt_cond_signal(session,
 				    async->flush_cond));
-			} else {
+			} else
 				/*
 				 * We need to wait for the last worker to
 				 * signal the condition.
 				 */
 				WT_ERR(__async_flush_wait(session, async));
-			}
 		}
 	}
 

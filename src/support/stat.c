@@ -309,6 +309,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	/* Clear, so can also be called for reinitialization. */
 	memset(stats, 0, sizeof(*stats));
 
+	stats->async_alloc_race.desc =
+	    "async: number of allocation state races";
+	stats->async_alloc_view.desc =
+	    "async: number of op slots viewed for alloc";
 	stats->async_cur_queue.desc = "async: current work queue length";
 	stats->async_flush.desc = "async: number of async flush calls";
 	stats->async_full.desc = "async: number of times op allocation failed";
@@ -430,6 +434,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	WT_CONNECTION_STATS *stats;
 
 	stats = (WT_CONNECTION_STATS *)stats_arg;
+	stats->async_alloc_race.v = 0;
+	stats->async_alloc_view.v = 0;
 	stats->async_cur_queue.v = 0;
 	stats->async_flush.v = 0;
 	stats->async_full.v = 0;

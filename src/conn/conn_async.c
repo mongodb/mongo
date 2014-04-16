@@ -10,7 +10,6 @@
 /*
  * __async_get_format --
  *	Find or allocate the uri/config/format structure.
- *	Called with the async ops lock.
  */
 static int
 __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
@@ -40,6 +39,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	else
 		cfg_hash = 0;
 
+	__wt_spin_lock(session, &async->ops_lock);
 	STAILQ_FOREACH(af, &async->formatqh, q) {
 		if (af->uri_hash == uri_hash && af->cfg_hash == cfg_hash)
 			goto setup;
@@ -48,7 +48,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * We didn't find one in the cache.  Allocate and initialize one.
 	 * Insert it at the head expecting LRU usage.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &af));
+	WT_ERR(__wt_calloc_def(session, 1, &af));
 	WT_ERR(__wt_strdup(session, uri, &af->uri));
 	WT_ERR(__wt_strdup(session, config, &af->config));
 	af->uri_hash = uri_hash;
@@ -66,7 +66,8 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 
 	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
 
-setup:	op->format = af;
+setup:	__wt_spin_unlock(session, &async->ops_lock);
+	op->format = af;
 	/*
 	 * Copy the pointers for the formats.  Items in the async format
 	 * queue remain there until the connection is closed.  We must
@@ -79,6 +80,7 @@ setup:	op->format = af;
 	return (0);
 
 err:
+	__wt_spin_unlock(session, &async->ops_lock);
 	if (have_cursor)
 		c->close(c);
 	__wt_free(session, af->uri);
@@ -101,20 +103,21 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
 	WT_ASYNC_OP_IMPL *op;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	uint32_t found, i, save_i;
+	uint32_t found, i, save_i, view;
 
 	async = conn->async;
 	session = conn->default_session;
 	WT_STAT_FAST_CONN_INCR(conn->default_session, async_op_alloc);
 	*opp = NULL;
+retry:
 	ret = 0;
-	__wt_spin_lock(session, &async->ops_lock);
 	save_i = async->ops_index;
 	/*
 	 * Look after the last one allocated for a free one.  We'd expect
 	 * ops to be freed mostly FIFO so we should quickly find one.
 	 */
-	for (found = 0, i = save_i; i < conn->async_size; i++) {
+	for (view = 1, found = 0, i = save_i;
+	    i < conn->async_size; i++, view++) {
 		op = &async->async_ops[i];
 		if (op->state == WT_ASYNCOP_FREE) {
 			found = 1;
@@ -125,7 +128,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * Loop around back to the beginning if we need to.
 	 */
 	if (!found) {
-		for (i = 0; i < save_i; i++) {
+		for (i = 0; i < save_i; i++, view++) {
 			op = &async->async_ops[i];
 			if (op->state == WT_ASYNCOP_FREE) {
 				found = 1;
@@ -142,15 +145,20 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
 		goto err;
 	}
 	/*
-	 * Start the next search at the next entry after this one.
 	 * Set the state of this op handle as READY for the user to use.
+	 * If we can set the state then the op entry is ours.
+	 * Start the next search at the next entry after this one.
 	 */
+	if (!WT_ATOMIC_CAS(op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
+		WT_STAT_FAST_CONN_INCR(session, async_alloc_race);
+		goto retry;
+	}
+	WT_STAT_FAST_CONN_INCRV(conn->default_session, async_alloc_view, view);
 	WT_ERR(__async_get_format(conn, uri, config, op));
-	op->state = WT_ASYNCOP_READY;
-	op->unique_id = async->op_id++;
-	async->ops_index = (i + 1) % conn->async_size;
+	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
+	(void)WT_ATOMIC_STORE(async->ops_index, (i + 1) % conn->async_size);
 	*opp = op;
-err:	__wt_spin_unlock(session, &async->ops_lock);
+err:
 	return (ret);
 }
 
@@ -338,7 +346,8 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 	 * that the flush is complete on their side.  Then we
 	 * clear the flush flags and return.
 	 */
-	while (FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS))
+retry:
+	while (async->flush_state != WT_ASYNC_FLUSH_NONE)
 		/*
 		 * We're racing an in-progress flush.  We need to wait
 		 * our turn to start our own.  We need to convoy the
@@ -347,27 +356,28 @@ __wt_async_flush(WT_CONNECTION_IMPL *conn)
 		 */
 		__wt_sleep(0, 100000);
 
+	if (!WT_ATOMIC_CAS(async->flush_state, WT_ASYNC_FLUSH_NONE,
+	    WT_ASYNC_FLUSH_IN_PROGRESS))
+		goto retry;
 	/*
 	 * We're the owner of this flush operation.  Set the
 	 * WT_ASYNC_FLUSH_IN_PROGRESS to block other callers.
 	 * We're also preventing all worker threads from taking
 	 * things off the work queue with the lock.
 	 */
-	FLD_SET(async->opsq_flush, WT_ASYNC_FLUSH_IN_PROGRESS);
 	async->flush_count = 0;
 	WT_ASSERT(conn->default_session,
 	    async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_ERR(__wt_async_op_enqueue(conn, &async->flush_op));
-	while (!FLD_ISSET(async->opsq_flush, WT_ASYNC_FLUSH_COMPLETE))
+	while (async->flush_state != WT_ASYNC_FLUSH_COMPLETE)
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(NULL, async->flush_cond, 100000));
 	/*
 	 * Flush is done.  Clear the flags.
 	 */
 	async->flush_op.state = WT_ASYNCOP_FREE;
-	FLD_CLR(async->opsq_flush,
-	   (WT_ASYNC_FLUSH_COMPLETE | WT_ASYNC_FLUSH_IN_PROGRESS));
+	WT_PUBLISH(async->flush_state, WT_ASYNC_FLUSH_NONE);
 err:
 	return (ret);
 }
