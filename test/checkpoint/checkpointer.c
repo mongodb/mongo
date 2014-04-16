@@ -145,9 +145,10 @@ verify_checkpoint(WT_SESSION *session)
 	}
 
 	while (ret == 0) {
-		++key_count;
 		ret = cursors[0]->next(cursors[0]);
-		if (ret != 0 && ret != WT_NOTFOUND)
+		if (ret == 0)
+			++key_count;
+		else if (ret != WT_NOTFOUND)
 			return (log_print_err("cursor->next", ret, 1));
 		/*
 		 * Check to see that all remaining cursors have the 
