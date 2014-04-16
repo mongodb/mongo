@@ -134,9 +134,6 @@ assert.eq( 100 , t.count() , "C3" )
 
 assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )
 
-// Let the balancer start again
-s.setBalancer( true )
-
 // by non-shard key
 
 m = new Mongo( s.s.name );
@@ -158,6 +155,10 @@ assert.lte( before.query + 10 , after.query , "D3" )
 // by shard key
 
 m = new Mongo( s.s.name );
+m.forceWriteMode("commands");
+
+db.printShardingStatus()
+
 ts = m.getDB( "test" ).foo
 
 before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
@@ -177,14 +178,22 @@ assert.eq( 100 , ts.count() , "E4" )
 assert.eq( 100 , ts.find().itcount() , "E5" )
 printjson( ts.find().batchSize(5).explain() )
 
-before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
-// Careful, mongos can poll the masters here too unrelated to the query, 
-// resulting in this test failing sporadically if/when there's a delay here.
-assert.eq( 100 , ts.find().batchSize(5).itcount() , "E6" )
-after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
-assert.eq( before.query + before.getmore , after.query + after.getmore , "E6.1" )
-
-assert.eq( 100 , ts.find().batchSize(5).itcount() , "F1" )
+// fsyncLock the secondaries
+rs.test.getSecondaries().forEach(function(secondary) {
+    secondary.getDB( "test" ).fsyncLock();
+})
+// Modify data only on the primary replica of the primary shard.
+// { x: 60 } goes to the shard of "rs", which is the primary shard.
+assert.writeOK( ts.insert( { primaryOnly: true, x: 60 } ) );
+// Read from secondary through mongos, the doc is not there due to replication delay or fsync.
+// But we can guarantee not to read from primary.
+assert.eq( 0, ts.find({ primaryOnly: true, x: 60 }).itcount() );
+// Unlock the secondaries
+rs.test.getSecondaries().forEach(function(secondary) {
+    secondary.getDB( "test" ).fsyncUnlock();
+})
+// Clean up the data
+assert.writeOK( ts.remove( { primaryOnly: true, x: 60 }, { writeConcern: { w: 2 }} ) );
 
 for ( i=0; i<10; i++ ) {
     m = new Mongo( s.s.name );
