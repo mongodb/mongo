@@ -323,7 +323,7 @@ namespace mongo {
             return _conn;
         }
 
-        bool ok() const { return _conn > 0; }
+        bool ok() const { return _conn != NULL; }
 
         string getHost() const { return _host; }
 

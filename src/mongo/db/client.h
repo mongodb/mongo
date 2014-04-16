@@ -238,6 +238,6 @@ namespace mongo {
         return *c;
     }
 
-    inline bool haveClient() { return currentClient.get() > 0; }
+    inline bool haveClient() { return currentClient.get() != NULL; }
 
 };

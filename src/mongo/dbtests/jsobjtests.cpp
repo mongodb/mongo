@@ -1929,7 +1929,7 @@ namespace JsobjTests {
                 }
                 catch ( std::exception& e ) {
                     state = 2;
-                    ASSERT( strstr( e.what() , "_id: 5" ) > 0 );
+                    ASSERT( strstr( e.what() , "_id: 5" ) != NULL );
                 }
                 free( crap );
                 ASSERT_EQUALS( 2 , state );
