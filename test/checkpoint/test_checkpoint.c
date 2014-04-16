@@ -153,6 +153,7 @@ main(int argc, char *argv[])
 		}
 
 		free(g.cookies);
+		g.cookies = NULL;
 		if ((ret = wt_shutdown()) != 0) {
 			(void)log_print_err("Start workers failed", ret, 1);
 			break;
@@ -166,7 +167,8 @@ main(int argc, char *argv[])
 	 */
 	if (ret != 0) {
 		(void)wt_shutdown();
-		free(g.cookies);
+		if (g.cookies != NULL)
+			free(g.cookies);
 	}
 	return (0);
 }
