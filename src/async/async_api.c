@@ -33,6 +33,8 @@ __async_set_key(WT_ASYNC_OP *asyncop, ...)
 
 	va_start(ap, asyncop);
 	__wt_cursor_set_keyv(&asyncop->c, asyncop->c.flags, ap);
+	__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &asyncop->c.key,
+	    asyncop->c.key.data, asyncop->c.key.size);
 	va_end(ap);
 }
 
@@ -63,6 +65,8 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 
 	va_start(ap, asyncop);
 	__wt_cursor_set_valuev(&asyncop->c, ap);
+	__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &asyncop->c.value,
+	    asyncop->c.value.data, asyncop->c.value.size);
 	va_end(ap);
 }
 
