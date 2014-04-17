@@ -194,7 +194,7 @@ worker(void *arg)
  *     consistent values.
  */
 static int
-real_worker()
+real_worker(void)
 {
 	WT_CURSOR **cursors;
 	WT_SESSION *session;
