@@ -222,7 +222,7 @@ static int
 get_key_int(WT_CURSOR *cursor, int table_index, u_int *rval)
 {
 	WT_ITEM key;
-	u_int val;
+	uint64_t val;
 	char buf[128];
 
 	if (g.cookies[table_index].type == COL)
@@ -231,10 +231,10 @@ get_key_int(WT_CURSOR *cursor, int table_index, u_int *rval)
 		cursor->get_key(cursor, &key);
 		memset(buf, 0, 128);
 		memcpy(buf, key.data, key.size);
-		val = (u_int)atol(buf);
+		val = (uint64_t)atol(buf);
 	}
 
-	*rval = val;
+	*rval = (u_int)val;
 	return (0);
 }
 
