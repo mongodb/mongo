@@ -33,9 +33,9 @@
 #include "mongo/base/status.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/index/btree_interface.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/structure/btree/btree_interface.h"
 
 namespace mongo {
 
@@ -66,7 +66,9 @@ namespace mongo {
          */
         void seek(const BSONObj& position, bool afterKey);
 
-        Status skip(const BSONObj &keyBegin, int keyBeginLen, bool afterKey,
+        Status skip(const BSONObj& keyBegin,
+                    int keyBeginLen,
+                    bool afterKey,
                     const vector<const BSONElement*>& keyEnd,
                     const vector<bool>& keyEndInclusive);
 
@@ -91,42 +93,42 @@ namespace mongo {
         // We keep the constructor private and only allow the AM to create us.
         friend class BtreeBasedAccessMethod;
 
+        /**
+         * head is the head of the Btree.
+         * interface is an abstraction to hide the fact that we have two types of Btrees.
+         *
+         * 'this' will forward by default.  Call setOptions to change this.
+         * XXX: put options in ctor(?)
+         *
+         * Intentionally private, we're friends with the only class allowed to call it.
+         */
+        BtreeIndexCursor(const DiskLoc head,
+                         transition::BtreeInterface* newInterface);
+
+        bool isSavedPositionValid();
+
+        /**
+         * Move to the next (or previous depending on the direction) key.  Used by normal getNext
+         * and also skipping unused keys.
+         */
+        void advance();
+
         // For handling bucket deletion.
         static unordered_set<BtreeIndexCursor*> _activeCursors;
         static SimpleMutex _activeCursorsMutex;
 
-        /**
-         * btreeState is the ICE of the Btree that we're going to traverse.
-         * head is the head of the Btree.
-         * interface is an abstraction to hide the fact that we have two types of Btrees.
-         *
-         * Go forward by default.
-         *
-         * Intentionally private, we're friends with the only class allowed to call it.
-         */
-        BtreeIndexCursor(const IndexCatalogEntry* btreeState,
-                         const DiskLoc head,
-                         BtreeInterface *interface);
-
-        void skipUnusedKeys();
-
-        bool isSavedPositionValid();
-
-        // Move to the next/prev. key.  Used by normal getNext and also skipping unused keys.
-        void advance(const char* caller);
-
         // For saving/restoring position.
-        BSONObj _savedKey;
-        DiskLoc _savedLoc;
-
-        BSONObj _emptyObj;
+        transition::BtreeInterface::SavedPositionData _savedData;
 
         int _direction;
-        const IndexCatalogEntry* _btreeState; // not-owned
-        BtreeInterface* _interface;
 
+        // Not owned here.
+        transition::BtreeInterface* _interface;
+
+        // TODO: Have some kind of BtreeInterface::BtreePosition to encapsulate this.
         // What are we looking at RIGHT NOW?  We look at a bucket.
         DiskLoc _bucket;
+
         // And we look at an offset in the bucket.
         int _keyOffset;
     };

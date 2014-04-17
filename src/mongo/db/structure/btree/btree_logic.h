@@ -81,13 +81,13 @@ namespace transition {
                     int* posOut,
                     DiskLoc* bucketLocOut) const;
 
+        void advance(DiskLoc* bucketLocInOut, int* posInOut, int direction) const;
+
         bool exists(const KeyDataType& key) const;
 
         bool unindex(const BSONObj& key, const DiskLoc& recordLoc);
 
         bool isEmpty() const;
-
-        DiskLoc advance(const DiskLoc& bucketLoc, int* posInOut, int direction) const;
 
         Status find(BucketType* bucket,
                     const KeyDataType& key,
@@ -100,6 +100,44 @@ namespace transition {
                                bool strict,
                                bool dumpBuckets,
                                unsigned depth);
+
+        DiskLoc getDiskLoc(const DiskLoc& bucketLoc, const int keyOffset);
+
+        BSONObj getKey(const DiskLoc& bucketLoc, const int keyOffset);
+
+        //
+        // Composite key navigation methods
+        //
+
+        void customLocate(DiskLoc* locInOut,
+                          int* keyOfsInOut,
+                          const BSONObj& keyBegin,
+                          int keyBeginLen,
+                          bool afterKey,
+                          const vector<const BSONElement*>& keyEnd,
+                          const vector<bool>& keyEndInclusive,
+                          int direction) const;
+
+        void advanceTo(DiskLoc* thisLocInOut,
+                       int* keyOfsInOut,
+                       const BSONObj &keyBegin,
+                       int keyBeginLen,
+                       bool afterKey,
+                       const vector<const BSONElement*>& keyEnd,
+                       const vector<bool>& keyEndInclusive,
+                       int direction) const;
+
+        void restorePosition(const BSONObj& savedKey,
+                             const DiskLoc& savedLoc,
+                             int direction,
+                             DiskLoc* bucketInOut,
+                             int* keyOffsetInOut) const;
+
+        bool keyIsAt(const BSONObj& savedKey,
+                     const DiskLoc& savedLoc,
+                     BucketType* bucket,
+                     int keyPos) const;
+                     
 
     private:
         /**
@@ -164,22 +202,15 @@ namespace transition {
 
         static void popBack(BucketType* bucket, DiskLoc* recordLocOut, KeyDataType *keyDataOut);
 
-        bool basicInsert(BucketType* bucket,
-                         const DiskLoc bucketLoc,
-                         int& keypos,
-                         const KeyDataType& key,
-                         const DiskLoc recordLoc);
-
         static bool mayDropKey(BucketType* bucket, int index, int refPos);
 
         static int packedDataSize(BucketType* bucket, int refPos);
 
         static void setPacked(BucketType* bucket);
+
         static void setNotPacked(BucketType* bucket);
 
         static BucketType* btreemod(BucketType* bucket);
-
-        void _pack(BucketType* bucket, const DiskLoc thisLoc, int &refPos);
 
         static int splitPos(BucketType* bucket, int keypos);
 
@@ -190,8 +221,6 @@ namespace transition {
                            const DiskLoc recordLoc,
                            const KeyDataType &key,
                            const DiskLoc prevChildBucket);
-
-        void dropFront(BucketType* bucket, int nDrop, int &refpos);
 
         static bool isHead(BucketType* bucket);
 
@@ -204,7 +233,55 @@ namespace transition {
         // information).
         //
 
+        bool basicInsert(BucketType* bucket,
+                         const DiskLoc bucketLoc,
+                         int& keypos,
+                         const KeyDataType& key,
+                         const DiskLoc recordLoc);
+
+        void dropFront(BucketType* bucket, int nDrop, int& refpos);
+
+        void _pack(BucketType* bucket, const DiskLoc thisLoc, int &refPos);
+
+        void customLocate(DiskLoc* locInOut,
+                          int* keyOfsInOut,
+                          const BSONObj& keyBegin,
+                          int keyBeginLen,
+                          bool afterKey,
+                          const vector<const BSONElement*>& keyEnd,
+                          const vector<bool>& keyEndInclusive,
+                          int direction,
+                          pair<DiskLoc, int>& bestParent) const;
+
+        bool customFind(int low,
+                        int high,
+                        const BSONObj& keyBegin,
+                        int keyBeginLen,
+                        bool afterKey,
+                        const vector<const BSONElement*>& keyEnd,
+                        const vector<bool>& keyEndInclusive,
+                        const Ordering& order,
+                        int direction,
+                        DiskLoc* thisLocInOut,
+                        int* keyOfsInOut,
+                        pair<DiskLoc, int>& bestParent) const;
+
+        void advanceToImpl(DiskLoc* thisLocInOut,
+                           int* keyOfsInOut,
+                           const BSONObj &keyBegin,
+                           int keyBeginLen,
+                           bool afterKey,
+                           const vector<const BSONElement*>& keyEnd,
+                           const vector<bool>& keyEndInclusive,
+                           int direction) const;
+
         bool wouldCreateDup(const KeyDataType& key, const DiskLoc self) const;
+
+        bool keyIsUsed(const DiskLoc& loc, const int& pos) const;
+
+        void skipUnusedKeys(DiskLoc* loc, int* pos, int direction) const;
+
+        DiskLoc advance(const DiskLoc& bucketLoc, int* posInOut, int direction) const;
 
         DiskLoc locate(const DiskLoc& bucketLoc,
                        const KeyDataType& key,
@@ -322,7 +399,7 @@ namespace transition {
                           const vector<const BSONElement*>& rEnd,
                           const vector<bool>& rEndInclusive,
                           const Ordering& o,
-                          int direction);
+                          int direction) const;
 
         // TODO needs 'this' for _ordering for sanity check
         bool _pushBack(BucketType* bucket,

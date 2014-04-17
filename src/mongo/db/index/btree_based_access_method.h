@@ -33,7 +33,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/index/btree_interface.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -112,9 +111,6 @@ namespace mongo {
 
         IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
         const IndexDescriptor* _descriptor;
-
-        // There are 2 types of Btree disk formats.  We put them both behind one interface.
-        BtreeInterface* _interface;
 
     private:
         bool removeOneKey(const BSONObj& key, const DiskLoc& loc);

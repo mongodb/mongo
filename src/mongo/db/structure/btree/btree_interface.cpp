@@ -60,9 +60,10 @@ namespace transition {
         virtual bool locate(const BSONObj& key,
                             const DiskLoc& loc,
                             const int direction,
-                            BtreeLocation* locOut) {
+                            DiskLoc* bucketOut,
+                            int* keyPosOut) {
 
-            return _btree->locate(key, loc, direction, &locOut->pos, &locOut->bucket);
+            return _btree->locate(key, loc, direction, keyPosOut, bucketOut);
         }
 
         virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) {
@@ -71,6 +72,72 @@ namespace transition {
 
         virtual bool isEmpty() {
             return _btree->isEmpty();
+        }
+
+        virtual void customLocate(DiskLoc* locInOut,
+                                 int* keyOfsInOut,
+                                 const BSONObj& keyBegin,
+                                 int keyBeginLen,
+                                 bool afterKey,
+                                 const vector<const BSONElement*>& keyEnd,
+                                 const vector<bool>& keyEndInclusive,
+                                 int direction) {
+
+            _btree->customLocate(locInOut,
+                                 keyOfsInOut,
+                                 keyBegin,
+                                 keyBeginLen,
+                                 afterKey, 
+                                 keyEnd,
+                                 keyEndInclusive,
+                                 direction);
+        }
+
+        void advanceTo(DiskLoc* thisLocInOut,
+                       int* keyOfsInOut,
+                       const BSONObj &keyBegin,
+                       int keyBeginLen,
+                       bool afterKey,
+                       const vector<const BSONElement*>& keyEnd,
+                       const vector<bool>& keyEndInclusive,
+                       int direction) const {
+
+            _btree->advanceTo(thisLocInOut,
+                              keyOfsInOut,
+                              keyBegin,
+                              keyBeginLen,
+                              afterKey,
+                              keyEnd,
+                              keyEndInclusive,
+                              direction);
+        }
+
+        virtual BSONObj getKey(const DiskLoc& bucket, const int keyOffset) {
+            return _btree->getKey(bucket, keyOffset);
+        }
+
+        virtual DiskLoc getDiskLoc(const DiskLoc& bucket, const int keyOffset) {
+            return _btree->getDiskLoc(bucket, keyOffset);
+        }
+
+        virtual void advance(DiskLoc* bucketInOut, int* posInOut, int direction) {
+            _btree->advance(bucketInOut, posInOut, direction);
+        }
+
+        virtual void savePosition(const DiskLoc& bucket,
+                                  const int keyOffset,
+                                  SavedPositionData* savedOut) {
+
+            savedOut->key = getKey(bucket, keyOffset).getOwned();
+            savedOut->loc = getDiskLoc(bucket, keyOffset);
+        }
+
+        virtual void restorePosition(const SavedPositionData& saved,
+                                     int direction,
+                                     DiskLoc* bucketInOut,
+                                     int* keyOffsetInOut) {
+
+            _btree->restorePosition(saved.key, saved.loc, direction, bucketInOut, keyOffsetInOut);
         }
 
     private:

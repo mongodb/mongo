@@ -35,7 +35,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index/btree_index_cursor.h"
-#include "mongo/db/index/btree_interface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/kill_current_op.h"
@@ -54,8 +53,6 @@ namespace mongo {
         : _btreeState(btreeState), _descriptor(btreeState->descriptor()) {
 
         verify(0 == _descriptor->version() || 1 == _descriptor->version());
-        _interface = BtreeInterface::interfaces[_descriptor->version()];
-
         _newInterface.reset(transition::BtreeInterface::getInterface(btreeState->headManager(),
                                                                      btreeState->recordStore(),
                                                                      btreeState->ordering(),
@@ -144,7 +141,8 @@ namespace mongo {
     }
 
     Status BtreeBasedAccessMethod::newCursor(IndexCursor **out) const {
-        *out = new BtreeIndexCursor(_btreeState, _btreeState->head(), _interface);
+        *out = new BtreeIndexCursor(_btreeState->head(),
+                                    _newInterface.get());
         return Status::OK();
     }
 
@@ -213,9 +211,10 @@ namespace mongo {
         BSONObjSet keys;
         getKeys(obj, &keys);
 
-        transition::BtreeInterface::BtreeLocation loc;
+        DiskLoc loc;
+        int keyPos;
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            _newInterface->locate(*i, DiskLoc(), 1, &loc);
+            _newInterface->locate(*i, DiskLoc(), 1, &loc, &keyPos);
         }
 
         return Status::OK();

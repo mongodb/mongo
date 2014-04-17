@@ -40,19 +40,17 @@ namespace transition {
     /**
      * This is the interface for interacting with the Btree.  The index access and catalog layers
      * should use this.
+     *
+     * TODO: do we want to hide the fact that (DiskLoc, int) identify an entry?
      */
     class BtreeInterface {
     public:
-        virtual ~BtreeInterface() { }
-
-        /**
-         * Represents a location in the Btree.
-         */
-        struct BtreeLocation {
-            // XXX: can these be private?
-            DiskLoc bucket;
-            int pos;
+        struct SavedPositionData {
+            BSONObj key;
+            DiskLoc loc;
         };
+
+        virtual ~BtreeInterface() { }
 
         /**
          * Interact with the Btree through the BtreeInterface.
@@ -66,25 +64,78 @@ namespace transition {
                                             const Ordering& ordering,
                                             int version);
 
+        //
+        // Data changes
+        //
+
         virtual Status insert(const BSONObj& key, const DiskLoc& loc, bool dupsAllowed) = 0;
 
         virtual bool unindex(const BSONObj& key, const DiskLoc& loc) = 0;
 
-        virtual bool locate(const BSONObj& key,
-                            const DiskLoc& loc,
-                            const int direction,
-                            BtreeLocation* locOut) = 0;
+        // TODO: Hide this by exposing an update method?
+        virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) = 0;
+
+        //
+        // Information about the tree
+        //
 
         // TODO: expose full set of args for testing?
         virtual void fullValidate(long long* numKeysOut) = 0;
 
         virtual bool isEmpty() = 0;
 
+        //
+        // Navigation
+        //
+
+        virtual bool locate(const BSONObj& key,
+                            const DiskLoc& loc,
+                            const int direction,
+                            DiskLoc* bucketOut,
+                            int* keyPosOut) = 0;
+
+        virtual void advanceTo(DiskLoc* thisLocInOut,
+                               int* keyOfsInOut,
+                               const BSONObj &keyBegin,
+                               int keyBeginLen,
+                               bool afterKey,
+                               const vector<const BSONElement*>& keyEnd,
+                               const vector<bool>& keyEndInclusive,
+                               int direction) const = 0;
+
+        /**
+         * Locate a key with fields comprised of a combination of keyBegin fields and keyEnd fields.
+         */
+        virtual void customLocate(DiskLoc* locInOut,
+                                  int* keyOfsInOut,
+                                  const BSONObj& keyBegin,
+                                  int keyBeginLen,
+                                  bool afterVersion,
+                                  const vector<const BSONElement*>& keyEnd,
+                                  const vector<bool>& keyEndInclusive,
+                                  int direction) = 0;
+
         /**
          * Return OK if it's not
          * Otherwise return a status that can be displayed 
          */
-        virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) = 0;
+        virtual BSONObj getKey(const DiskLoc& bucket, const int keyOffset) = 0;
+
+        virtual DiskLoc getDiskLoc(const DiskLoc& bucket, const int keyOffset) = 0;
+
+        virtual void advance(DiskLoc* bucketInOut, int* posInOut, int direction) = 0;
+
+        //
+        // Saving and restoring state
+        //
+        virtual void savePosition(const DiskLoc& bucket,
+                                  const int keyOffset,
+                                  SavedPositionData* savedOut) = 0;
+
+        virtual void restorePosition(const SavedPositionData& saved,
+                                     int direction,
+                                     DiskLoc* bucketOut,
+                                     int* keyOffsetOut) = 0;
     };
 
 }  // namespace transition

@@ -67,7 +67,6 @@ namespace mongo {
     class TwoDAccessMethod : public BtreeBasedAccessMethod {
     public:
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_interface;
 
         TwoDAccessMethod(IndexCatalogEntry* btreeState);
         virtual ~TwoDAccessMethod() { }

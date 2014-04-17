@@ -51,7 +51,6 @@ namespace mongo {
         // Every Btree-based index needs these.  We put them in the BtreeBasedAccessMethod
         // superclass and subclasses (like this) can use them.
         using BtreeBasedAccessMethod::_descriptor;
-        using BtreeBasedAccessMethod::_interface;
 
         BtreeAccessMethod(IndexCatalogEntry* btreeState );
         virtual ~BtreeAccessMethod() { }

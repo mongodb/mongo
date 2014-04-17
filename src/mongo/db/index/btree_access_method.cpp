@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/index/btree_index_cursor.h"
-#include "mongo/db/index/btree_interface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/pdfile.h"
