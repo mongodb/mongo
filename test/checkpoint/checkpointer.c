@@ -39,7 +39,7 @@ static int verify_checkpoint(WT_SESSION *);
  *     Responsible for creating the checkpoint thread.
  */
 int
-start_checkpoints()
+start_checkpoints(void)
 {
 	int ret;
 
@@ -54,7 +54,7 @@ start_checkpoints()
  *     Responsible for cleanly shutting down the checkpoint thread.
  */
 int
-end_checkpoints()
+end_checkpoints(void)
 {
 	void *thread_ret;
 
@@ -85,7 +85,7 @@ checkpointer(void *arg)
  *     responsible for finishing in a timely fashion.
  */
 static int
-real_checkpointer()
+real_checkpointer(void)
 {
 	WT_SESSION *session;
 	char *checkpoint_config, _buf[128];
@@ -207,6 +207,7 @@ verify_checkpoint(WT_SESSION *session)
 			return (log_print_err(
 			    "verify_checkpoint:cursor close", ret, 1));
 	}
+	free(cursors);
 	printf("Finished verifying a checkpoint with %d tables and %" PRIu64
 	    " keys\n", g.ntables, key_count);
 	return (0);
@@ -222,7 +223,7 @@ static int
 get_key_int(WT_CURSOR *cursor, int table_index, u_int *rval)
 {
 	WT_ITEM key;
-	u_int val;
+	uint64_t val;
 	char buf[128];
 
 	if (g.cookies[table_index].type == COL)
@@ -231,10 +232,10 @@ get_key_int(WT_CURSOR *cursor, int table_index, u_int *rval)
 		cursor->get_key(cursor, &key);
 		memset(buf, 0, 128);
 		memcpy(buf, key.data, key.size);
-		val = (u_int)atol(buf);
+		val = (uint64_t)atol(buf);
 	}
 
-	*rval = val;
+	*rval = (u_int)val;
 	return (0);
 }
 

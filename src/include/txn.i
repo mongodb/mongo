@@ -111,10 +111,14 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 static inline int
 __wt_txn_visible_apps(WT_SESSION_IMPL *session, uint64_t id)
 {
+#ifdef FAST_CHECKPOINTS
 	uint64_t oldest_app_id;
 
 	oldest_app_id = S2C(session)->txn_global.oldest_app_id;
 	return (TXNID_LT(id, oldest_app_id));
+#else
+	return (__wt_txn_visible_all(session, id));
+#endif
 }
 
 /*
