@@ -69,14 +69,15 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		} else {
 			upd_size = sizeof(WT_UPDATE) + upd->size;
 			/*
-			 * We are restoring an update on a new page: there
-			 * better not be one there already.
-			 *
+			 * We are restoring updates that couldn't be evicted,
+			 * there should only be one update list per key.
+			 */
+			WT_ASSERT(session, *upd_entry == NULL);
+			/*
 			 * Set the "old" entry to the second update in the list
 			 * so that the serialization function succeeds in
 			 * swapping the first update into place.
 			 */
-			WT_ASSERT(session, *upd_entry == NULL);
 			old_upd = *upd_entry = upd->next;
 		}
 
