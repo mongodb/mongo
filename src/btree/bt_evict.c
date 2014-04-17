@@ -789,13 +789,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * with the checkpointing thread.
 		 */
 		modified = __wt_page_is_modified(page);
-#ifdef FAST_CHECKPOINTS
 		if (modified && btree->checkpointing &&
 		    page->modify->checkpoint_gen >=
 		    S2C(session)->txn_global.checkpoint_gen)
-#else
-		if (modified && btree->checkpointing)
-#endif
 			continue;
 
 		/* Optionally ignore clean pages. */
