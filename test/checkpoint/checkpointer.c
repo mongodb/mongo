@@ -218,13 +218,13 @@ verify_checkpoint(WT_SESSION *session)
  *     non-column store in that case to ensure that it's nul terminated.
  */
 static int
-get_key_int(WT_CURSOR *cursor, int index, u_int *rval)
+get_key_int(WT_CURSOR *cursor, int table_index, u_int *rval)
 {
 	WT_ITEM key;
 	u_int val;
 	char buf[128];
 
-	if (g.cookies[index].type == COL)
+	if (g.cookies[table_index].type == COL)
 		cursor->get_key(cursor, &val);
 	else {
 		cursor->get_key(cursor, &key);
