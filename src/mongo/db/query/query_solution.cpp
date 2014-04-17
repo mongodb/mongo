@@ -515,25 +515,37 @@ namespace mongo {
         // Since this involves a powerset, we only remove point intervals that the prior sort
         // planning code removed, namely the contiguous prefix of the key pattern.
         BSONObjIterator it(sortPattern);
-        BSONObjBuilder prefixBob;
+        BSONObjBuilder suffixBob;
         while (it.more()) {
             BSONElement elt = it.next();
             // TODO: string slowness.  fix when bounds are stringdata not string.
             if (equalityFields.end() == equalityFields.find(string(elt.fieldName()))) {
-                prefixBob.append(elt);
+                suffixBob.append(elt);
                 // This field isn't a point interval, can't drop.
                 break;
             }
         }
 
         while (it.more()) {
-            prefixBob.append(it.next());
+            suffixBob.append(it.next());
         }
 
-        // If we have an index {a:1} and an equality on 'a' don't append an empty sort order.
-        BSONObj filterPointsObj = prefixBob.obj();
-        if (!filterPointsObj.isEmpty()) {
-            _sorts.insert(filterPointsObj);
+        // We've found the suffix following the contiguous prefix of equality fields.
+        //   Ex. For index {a: 1, b: 1, c: 1, d: 1} and query {a: 3, b: 5}, this suffix
+        //   of the key pattern is {c: 1, d: 1}.
+        //
+        // Now we have to add all prefixes of this suffix as possible sort orders.
+        //   Ex. Continuing the example from above, we have to include sort orders
+        //   {c: 1} and {c: 1, d: 1}.
+        BSONObj filterPointsObj = suffixBob.obj();
+        for (int i = 0; i < filterPointsObj.nFields(); ++i) {
+            // Make obj out of fields [0,i]
+            BSONObjIterator it(filterPointsObj);
+            BSONObjBuilder prefixBob;
+            for (int j = 0; j <= i; ++j) {
+                prefixBob.append(it.next());
+            }
+            _sorts.insert(prefixBob.obj());
         }
     }
 
