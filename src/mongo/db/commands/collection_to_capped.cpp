@@ -66,7 +66,7 @@ namespace mongo {
             if ( temp )
                 spec.appendBool( "temp", true );
 
-            Status status = userCreateNS( toNs.c_str(), spec.done(), logForReplication );
+            Status status = userCreateNS( ctx.db(), toNs, spec.done(), logForReplication );
             if ( !status.isOK() )
                 return status;
         }
@@ -154,7 +154,7 @@ namespace mongo {
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(dbname);
 
-            Status status = cloneCollectionAsCapped( cc().database(), from, to, size, temp, true );
+            Status status = cloneCollectionAsCapped( ctx.db(), from, to, size, temp, true );
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -200,7 +200,7 @@ namespace mongo {
             Lock::GlobalWrite globalWriteLock;
             Client::Context ctx(dbname);
 
-            Database* db = cc().database();
+            Database* db = ctx.db();
 
             stopIndexBuilds(db, jsobj);
             BackgroundOperation::assertNoBgOpInProgForDb(dbname.c_str());

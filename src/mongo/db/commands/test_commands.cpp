@@ -187,10 +187,11 @@ namespace mongo {
             NamespaceString nss( dbname, coll );
 
             Client::WriteContext ctx( nss.ns() );
-            Collection* collection = ctx.ctx().db()->getCollection( nss.ns() );
+            Database* db = ctx.ctx().db();
+            Collection* collection = db->getCollection( nss.ns() );
             massert( 13429, "emptycapped no such collection", collection );
 
-            std::vector<BSONObj> indexes = stopIndexBuilds(cc().database(), cmdObj);
+            std::vector<BSONObj> indexes = stopIndexBuilds(db, cmdObj);
 
             Status status = collection->truncate();
             if ( !status.isOK() )

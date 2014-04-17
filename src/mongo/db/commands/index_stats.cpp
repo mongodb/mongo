@@ -500,7 +500,7 @@ namespace mongo {
 
             Client::ReadContext ctx(nss.ns());
 
-            const Collection* collection = cc().database()->getCollection( nss.ns() );
+            const Collection* collection = ctx.ctx().db()->getCollection( nss.ns() );
             if (!collection) {
                 errmsg = "ns not found";
                 return false;

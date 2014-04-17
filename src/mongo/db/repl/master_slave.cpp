@@ -354,7 +354,7 @@ namespace mongo {
     void ReplSource::resyncDrop( const string& db ) {
         log() << "resync: dropping database " << db;
         Client::Context ctx(db);
-        dropDatabase(db);
+        dropDatabase(ctx.db());
     }
 
     /* grab initial copy of a database from the master */
@@ -489,7 +489,7 @@ namespace mongo {
             incompleteCloneDbs.erase(*i);
             addDbNextPass.erase(*i);
             Client::Context ctx(*i);
-            dropDatabase(*i);
+            dropDatabase(ctx.db());
         }
         
         massert( 14034, "Duplicate database names present after attempting to delete duplicates",
@@ -497,13 +497,15 @@ namespace mongo {
         return true;
     }
 
-    void ReplSource::applyOperation(const BSONObj& op) {
+    void ReplSource::applyOperation(Database* db, const BSONObj& op) {
         try {
-            bool failedUpdate = applyOperation_inlock( op );
+            bool failedUpdate = applyOperation_inlock( db, op );
             if (failedUpdate) {
                 Sync sync(hostName);
                 if (sync.shouldRetry(op)) {
-                    uassert(15914, "Failure retrying initial sync update", !applyOperation_inlock(op));
+                    uassert(15914,
+                            "Failure retrying initial sync update",
+                            !applyOperation_inlock(db, op));
                 }
             }
         }
@@ -611,7 +613,7 @@ namespace mongo {
         // always apply admin command command
         // this is a bit hacky -- the semantics of replication/commands aren't well specified
         if ( strcmp( clientName, "admin" ) == 0 && *op.getStringField( "op" ) == 'c' ) {
-            applyOperation( op );
+            applyOperation( ctx.db(), op );
             return;
         }
 
@@ -640,7 +642,7 @@ namespace mongo {
             save();
         }
         else {
-            applyOperation( op );
+            applyOperation( ctx.db(), op );
             addDbNextPass.erase( clientName );
         }
     }
@@ -1254,7 +1256,7 @@ namespace mongo {
                     b.append(_id);
                     BSONObj result;
                     Client::Context ctx( ns );
-                    if( Helpers::findById(cc(), ns, b.done(), result) )
+                    if( Helpers::findById(ctx.db(), ns, b.done(), result) )
                         _dummy_z += result.objsize(); // touch
                 }
             }
@@ -1288,7 +1290,7 @@ namespace mongo {
                 b.append(_id);
                 BSONObj result;
                 Client::ReadContext ctx( ns );
-                if( Helpers::findById(cc(), ns, b.done(), result) )
+                if( Helpers::findById(ctx.ctx().db(), ns, b.done(), result) )
                     _dummy_z += result.objsize(); // touch
             }
         }

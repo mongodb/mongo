@@ -1587,7 +1587,7 @@ namespace QueryUtilTests {
             Client::Context _ctx;
         public:
             IndexBase() : _lk(ns()), _ctx( ns() ) , indexNum_( 0 ) {
-                userCreateNS( ns(), BSONObj(), false );
+                userCreateNS( _ctx.db(), ns(), BSONObj(), false );
             }
             ~IndexBase() {
                 if ( !nsd() )

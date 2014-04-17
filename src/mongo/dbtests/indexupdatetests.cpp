@@ -475,7 +475,7 @@ namespace IndexUpdateTests {
             // Request an interrupt.
             killCurrentOp.killAll();
             // The call is not interrupted.
-            Helpers::ensureIndex( _ns, BSON( "a" << 1 ), false, "a_1" );
+            Helpers::ensureIndex( collection(), BSON( "a" << 1 ), false, "a_1" );
             // only want to interrupt the index build
             killCurrentOp.reset();
             // The new index is listed in system.indexes because the index build completed.

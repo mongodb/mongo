@@ -59,7 +59,7 @@ namespace mongo {
 
         bool isCachable( const StringData& ns ) const;
 
-        string hashCollection( const string& fullCollectionName, bool* fromCache );
+        string hashCollection( Database* db, const string& fullCollectionName, bool* fromCache );
 
         map<string,string> _cachedHashed;
         mutex _cachedHashedMutex;

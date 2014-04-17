@@ -553,12 +553,12 @@ namespace mongo {
                         // did we just empty the collection?  if so let's check if it even exists on the source.
                         if( collection->numRecords() == 0 ) {
                             try {
-                                string sys = cc().database()->name() + ".system.namespaces";
+                                string sys = c.db()->name() + ".system.namespaces";
                                 bo o = them->findOne(sys, QUERY("name"<<d.ns));
                                 if( o.isEmpty() ) {
                                     // we should drop
                                     try {
-                                        cc().database()->dropCollection(d.ns);
+                                        c.db()->dropCollection(d.ns);
                                     }
                                     catch(...) {
                                         log() << "replset error rolling back collection " << d.ns << rsLog;

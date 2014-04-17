@@ -316,7 +316,7 @@ namespace ReplSetTests {
 
         void create() {
             Client::Context c(_cappedNs);
-            ASSERT( userCreateNS( _cappedNs, fromjson( spec() ), false ).isOK() );
+            ASSERT( userCreateNS( c.db(), _cappedNs, fromjson( spec() ), false ).isOK() );
         }
 
         void dropCapped() {
@@ -359,7 +359,7 @@ namespace ReplSetTests {
         bool apply(const BSONObj& op) {
             Client::Context ctx( _cappedNs );
             // in an annoying twist of api, returns true on failure
-            return !applyOperation_inlock(op, true);
+            return !applyOperation_inlock(ctx.db(), op, true);
         }
 
         void run() {

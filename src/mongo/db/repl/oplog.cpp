@@ -466,7 +466,8 @@ namespace mongo {
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
-    bool applyOperation_inlock(const BSONObj& op, bool fromRepl, bool convertUpdateToUpsert) {
+    bool applyOperation_inlock(Database* db, const BSONObj& op,
+                               bool fromRepl, bool convertUpdateToUpsert) {
         LOG(3) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
@@ -495,7 +496,7 @@ namespace mongo {
 
         Lock::assertWriteLocked(ns);
 
-        Collection* collection = cc().database()->getCollection( ns );
+        Collection* collection = db->getCollection( ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 
         // operation type -- see logOp() comments for types

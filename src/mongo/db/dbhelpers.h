@@ -63,9 +63,6 @@ namespace mongo {
 
            Note: does nothing if collection does not yet exist.
         */
-        static void ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name);
-
-        // same as other ensureIndex
         static void ensureIndex(Collection* collection,
                                 BSONObj keyPattern, bool unique, const char *name);
 
@@ -94,8 +91,8 @@ namespace mongo {
          * @param foundIndex if passed in will be set to 1 if ns and index found
          * @return true if object found
          */
-        static bool findById(Client&, const char *ns, BSONObj query, BSONObj& result ,
-                             bool * nsFound = 0 , bool * indexFound = 0 );
+        static bool findById(Database* db, const char *ns, BSONObj query, BSONObj& result,
+                             bool* nsFound = 0, bool* indexFound = 0 );
 
         /* TODO: should this move into Collection?
          * uasserts if no _id index.

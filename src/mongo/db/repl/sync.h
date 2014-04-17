@@ -32,7 +32,9 @@
 
 #include "mongo/db/jsobj.h"
 
-namespace mongo { 
+namespace mongo {
+
+    class Database;
 
     class Sync {
     protected:
@@ -40,7 +42,7 @@ namespace mongo {
     public:
         Sync(const string& hostname) : hn(hostname) {}
         virtual ~Sync() {}
-        virtual BSONObj getMissingDoc(const BSONObj& o);
+        virtual BSONObj getMissingDoc(Database* db, const BSONObj& o);
 
         /**
          * If applyOperation_inlock should be called again after an update fails.

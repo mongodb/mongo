@@ -102,14 +102,15 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(toDeleteNs);
+            Database* db = ctx.db();
 
-            Collection* collection = cc().database()->getCollection( toDeleteNs );
+            Collection* collection = db->getCollection( toDeleteNs );
             if ( ! collection ) {
                 errmsg = "ns not found";
                 return false;
             }
 
-            stopIndexBuilds(cc().database(), jsobj);
+            stopIndexBuilds(db, jsobj);
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             anObjBuilder.appendNumber("nIndexesWas", indexCatalog->numIndexesTotal() );
@@ -214,7 +215,7 @@ namespace mongo {
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(toDeleteNs);
 
-            Collection* collection = cc().database()->getCollection( toDeleteNs );
+            Collection* collection = ctx.db()->getCollection( toDeleteNs );
 
             if ( !collection ) {
                 errmsg = "ns not found";
@@ -223,7 +224,7 @@ namespace mongo {
 
             BackgroundOperation::assertNoBgOpInProgForNs( toDeleteNs );
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(cc().database(), jsobj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(ctx.db(), jsobj);
 
             list<BSONObj> all;
             auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );

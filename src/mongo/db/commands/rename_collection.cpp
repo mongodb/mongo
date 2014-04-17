@@ -182,7 +182,7 @@ namespace mongo {
                         return false;
                     }
 
-                    Status s = cc().database()->dropCollection( target );
+                    Status s = ctx.db()->dropCollection( target );
                     if ( !s.isOK() ) {
                         errmsg = s.toString();
                         restoreIndexBuildsOnSource( indexesInProg, source );

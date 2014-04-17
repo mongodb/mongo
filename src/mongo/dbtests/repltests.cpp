@@ -172,7 +172,7 @@ namespace ReplTests {
                     if ( 0 ) {
                         mongo::unittest::log() << "op: " << *i << endl;
                     }
-                    a.applyOperation( *i );
+                    a.applyOperation( ctx.db(), *i );
                 }
             }
         }
@@ -243,6 +243,9 @@ namespace ReplTests {
             b.appendOID( "_id", &id );
             b.appendElements( fromjson( json ) );
             return b.obj();
+        }
+        Database* db() {
+            return _context.db();
         }
     private:
         static DBDirectClient client_;
@@ -1384,7 +1387,7 @@ namespace ReplTests {
         bool returnEmpty;
         SyncTest() : Sync(""), returnEmpty(false) {}
         virtual ~SyncTest() {}
-        virtual BSONObj getMissingDoc(const BSONObj& o) {
+        virtual BSONObj getMissingDoc(Database* db, const BSONObj& o) {
             if (returnEmpty) {
                 BSONObj o;
                 return o;
@@ -1402,7 +1405,7 @@ namespace ReplTests {
             // this should fail because we can't connect
             try {
                 Sync badSource("localhost:123");
-                badSource.getMissingDoc(o);
+                badSource.getMissingDoc(db(), o);
             }
             catch (DBException&) {
                 threw = true;

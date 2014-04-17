@@ -39,6 +39,7 @@ ixscan3 = {ixscan: {args:{name: "stages_and_sorted", keyPattern:{baz: 1},
 // Intersect foo==1 with bar==1 with baz==12.
 andix1ix2 = {andSorted: {args: {nodes: [ixscan1, ixscan2, ixscan3]}}};
 res = db.runCommand({stageDebug: andix1ix2});
+printjson(res);
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, N);
 

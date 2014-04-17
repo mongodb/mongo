@@ -32,8 +32,10 @@
 
 namespace mongo {
     class Collection;
+    class Database;
+
     // page in both index and data pages for an op from the oplog
-    void prefetchPagesForReplicatedOp(const BSONObj& op);
+    void prefetchPagesForReplicatedOp(Database* db, const BSONObj& op);
 
     // page in pages needed for all index lookups on a given object
     void prefetchIndexPages(Collection *nsd, const BSONObj& obj);

@@ -128,7 +128,7 @@ namespace replset {
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
-        bool ok = !applyOperation_inlock(op, true, convertUpdateToUpsert);
+        bool ok = !applyOperation_inlock(ctx.db(), op, true, convertUpdateToUpsert);
         opsAppliedStats.increment();
         getDur().commitIfNeeded();
 
@@ -219,7 +219,7 @@ namespace replset {
                 // one possible tweak here would be to stay in the read lock for this database 
                 // for multiple prefetches if they are for the same database.
                 Client::ReadContext ctx(ns);
-                prefetchPagesForReplicatedOp(op);
+                prefetchPagesForReplicatedOp(ctx.ctx().db(), op);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;
@@ -786,7 +786,7 @@ namespace replset {
         changeState(MemberState::RS_RECOVERING);
 
         Client::Context ctx("local");
-        cc().database()->dropCollection("local.oplog.rs");
+        ctx.db()->dropCollection("local.oplog.rs");
         {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
             theReplSet->initialSyncRequested = true;

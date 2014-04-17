@@ -405,7 +405,7 @@ namespace mongo {
             }
 
             Collection* oldCollection = collection;
-            collection = cc().database()->getCollection(nsString.ns());
+            collection = cc().getContext()->db()->getCollection(nsString.ns());
 
             // We should not get a new pointer to the same collection...
             if (oldCollection && (oldCollection != collection))
@@ -500,7 +500,7 @@ namespace mongo {
         const NamespaceString& nsString = request.getNamespaceString();
         UpdateLifecycle* lifecycle = request.getLifecycle();
         const CurOp* curOp = cc().curop();
-        Collection* collection = cc().database()->getCollection(nsString.ns());
+        Collection* collection = cc().getContext()->db()->getCollection(nsString.ns());
 
         validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
@@ -874,9 +874,10 @@ namespace mongo {
 
         // Only create the collection if the doc will be inserted.
         if (!collection) {
-            collection = cc().database()->getCollection(request.getNamespaceString().ns());
+            Database* db = cc().getContext()->db();
+            collection = db->getCollection(request.getNamespaceString().ns());
             if (!collection) {
-                collection = cc().database()->createCollection(request.getNamespaceString().ns());
+                collection = db->createCollection(request.getNamespaceString().ns());
             }
         }
 

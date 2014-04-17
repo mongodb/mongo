@@ -73,7 +73,7 @@ namespace mongo {
             const string ns = dbname + "." + cmdObj.firstElement().valuestr();
             Client::ReadContext ctx(ns);
 
-            Database* db = cc().database();
+            Database* db = ctx.ctx().db();
             if ( !db ) {
                 errmsg = "can't find ns";
                 return false;

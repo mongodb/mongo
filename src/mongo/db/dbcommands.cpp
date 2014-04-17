@@ -214,7 +214,7 @@ namespace mongo {
 
                 Client::Context context(dbname);
                 stopIndexBuilds(context.db(), cmdObj);
-                dropDatabase(dbname);
+                dropDatabase(context.db());
 
                 log() << "dropDatabase " << dbname << " finished";
             }
@@ -358,7 +358,7 @@ namespace mongo {
             Client::Context ctx(dbname);
 
             BSONElement e = cmdObj.firstElement();
-            result.append("was", cc().database()->getProfilingLevel());
+            result.append("was", ctx.db()->getProfilingLevel());
             result.append("slowms", serverGlobalParams.slowMS);
 
             int p = (int) e.number();
@@ -367,7 +367,7 @@ namespace mongo {
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
-                ok = cc().database()->setProfilingLevel( p , errmsg );
+                ok = ctx.db()->setProfilingLevel( p , errmsg );
             }
 
             BSONElement slow = cmdObj["slowms"];
@@ -482,8 +482,9 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(nsToDrop);
+            Database* db = ctx.db();
 
-            Collection* coll = cc().database()->getCollection( nsToDrop );
+            Collection* coll = db->getCollection( nsToDrop );
             // If collection does not exist, short circuit and return.
             if ( !coll ) {
                 errmsg = "ns not found";
@@ -492,12 +493,12 @@ namespace mongo {
 
             int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
 
-            stopIndexBuilds(cc().database(), cmdObj);
+            stopIndexBuilds(db, cmdObj);
 
             result.append( "ns", nsToDrop );
             result.append( "nIndexesWas", numIndexes );
 
-            Status s = cc().database()->dropCollection( nsToDrop );
+            Status s = db->dropCollection( nsToDrop );
 
             if ( s.isOK() )
                 return true;
@@ -649,7 +650,7 @@ namespace mongo {
 
             // Create collection.
             return appendCommandStatus( result,
-                                        userCreateNS(ns.c_str(), options, !fromRepl) );
+                                        userCreateNS(ctx.db(), ns.c_str(), options, !fromRepl) );
         }
     } cmdCreate;
 
@@ -1339,10 +1340,10 @@ namespace mongo {
             }
 
             const string ns = parseNs(dbname, jsobj);
-            Client::ReadContext ctx(ns);
-
             list<string> collections;
-            Database* d = cc().database();
+
+            Client::ReadContext ctx(ns);
+            Database* d = ctx.ctx().db();
 
             if ( d && ( d->isEmpty() || d->getExtentManager().numFiles() == 0 ) )
                 d = NULL;

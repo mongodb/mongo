@@ -413,7 +413,7 @@ namespace mongo {
         Lock::assertWriteLocked( ns );
 
         string system_namespaces = nsToDatabaseSubstring(ns).toString() + ".system.namespaces";
-        Collection* coll = cc().database()->getCollection( system_namespaces );
+        Collection* coll = cc().getContext()->db()->getCollection( system_namespaces );
 
         DiskLoc oldLocation = Helpers::findOne( coll, BSON( "name" << ns ), false );
         fassert( 17247, !oldLocation.isNull() );

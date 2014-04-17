@@ -79,9 +79,9 @@ namespace {
     }
 } // namespace
 
-    static void _profile(const Client& c, CurOp& currentOp, BufBuilder& profileBufBuilder) {
-        Database *db = c.database();
-        DEV verify( db );
+    static void _profile(const Client& c, Database* db,
+                         CurOp& currentOp, BufBuilder& profileBufBuilder) {
+        dassert( db );
 
         // build object
         BSONObjBuilder b(profileBufBuilder);
@@ -137,7 +137,8 @@ namespace {
             Lock::DBWrite lk( currentOp.getNS() );
             if (dbHolder()._isLoaded(nsToDatabase(currentOp.getNS()), storageGlobalParams.dbpath)) {
                 Client::Context cx(currentOp.getNS(), storageGlobalParams.dbpath, false);
-                _profile(c, currentOp, profileBufBuilder);
+                _profile(c, cx.db(),
+                         currentOp, profileBufBuilder);
             }
             else {
                 mongo::log() << "note: not profiling because db went away - probably a close on: "

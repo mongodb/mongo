@@ -63,8 +63,8 @@ namespace QueryMultiPlanRunner {
             _client.ensureIndex(ns(), obj);
         }
 
-        IndexDescriptor* getIndex(const BSONObj& obj) {
-            Collection* collection = cc().database()->getCollection( ns() );
+        IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
+            Collection* collection = db->getCollection( ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
@@ -102,7 +102,7 @@ namespace QueryMultiPlanRunner {
             // Every call to work() returns something so this should clearly win (by current scoring
             // at least).
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(BSON("foo" << 1));
+            ixparams.descriptor = getIndex(ctx.ctx().db(), BSON("foo" << 1));
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << 7);
             ixparams.bounds.endKey = BSON("" << 7);

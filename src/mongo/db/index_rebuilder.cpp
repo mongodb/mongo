@@ -62,7 +62,7 @@ namespace mongo {
                  dbName < dbNames.end();
                  dbName++) {
                 Client::ReadContext ctx(*dbName);
-                Database* db = cc().database();
+                Database* db = ctx.ctx().db();
                 db->namespaceIndex().getNamespaces(collNames, /* onlyCollections */ true);
             }
             checkNS(collNames);

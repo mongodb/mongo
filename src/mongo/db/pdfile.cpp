@@ -106,18 +106,19 @@ namespace mongo {
      * @param createDefaultIndexes - if false, defers id (and other) index creation.
      * @return true if successful
     */
-    Status userCreateNS( const StringData& ns,
+    Status userCreateNS( Database* db,
+                         const StringData& ns,
                          BSONObj options,
                          bool logForReplication,
                          bool createDefaultIndexes ) {
+
+        invariant( db );
 
         LOG(1) << "create collection " << ns << ' ' << options;
 
         if ( !NamespaceString::validCollectionComponent(ns) )
             return Status( ErrorCodes::InvalidNamespace,
                            str::stream() << "invalid ns: " << ns );
-
-        Database* db = cc().database();
 
         Collection* collection = db->getCollection( ns );
 
@@ -156,21 +157,22 @@ namespace mongo {
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
                 Client::Context ctx(*i);
-                dropDatabase(*i);
+                dropDatabase(ctx.db());
             }
         }
     }
 
-    void dropDatabase(const std::string& db) {
-        LOG(1) << "dropDatabase " << db << endl;
-        Lock::assertWriteLocked(db);
-        Database *d = cc().database();
-        verify( d );
-        verify( d->name() == db );
+    void dropDatabase(Database* db ) {
+        invariant( db );
 
-        BackgroundOperation::assertNoBgOpInProgForDb(d->name().c_str());
+        string name = db->name(); // just to have safe
+        LOG(1) << "dropDatabase " << name << endl;
 
-        audit::logDropDatabase( currentClient.get(), db );
+        Lock::assertWriteLocked( name );
+
+        BackgroundOperation::assertNoBgOpInProgForDb(name.c_str());
+
+        audit::logDropDatabase( currentClient.get(), name );
 
         // Not sure we need this here, so removed.  If we do, we need to move it down
         // within other calls both (1) as they could be called from elsewhere and
@@ -181,10 +183,10 @@ namespace mongo {
 
         getDur().syncDataAndTruncateJournal();
 
-        Database::closeDatabase( d->name(), d->path() );
-        d = 0; // d is now deleted
+        Database::closeDatabase( name, db->path() );
+        db = 0; // d is now deleted
 
-        _deleteDataFiles( db );
+        _deleteDataFiles( name );
     }
 
 } // namespace mongo

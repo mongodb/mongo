@@ -1044,7 +1044,7 @@ namespace QueryTests {
             Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
-            ASSERT_EQUALS( "unittests", cc().database()->name() );
+            ASSERT_EQUALS( "unittests", ctx.db()->name() );
         }
         const char *ns;
     };
@@ -1171,7 +1171,8 @@ namespace QueryTests {
             Client::WriteContext ctx( "unittests" );
 
             // note that extents are always at least 4KB now - so this will get rounded up a bit.
-            ASSERT( userCreateNS( ns(), fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
+            ASSERT( userCreateNS( ctx.ctx().db(), ns(),
+                                  fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
             for ( int i=0; i<200; i++ ) {
                 insertNext();
 //                cout << count() << endl;
@@ -1230,10 +1231,10 @@ namespace QueryTests {
                                       BSON( "_id" << 20 ) , res , true ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( Helpers::findById( cc(), ns() , BSON( "_id" << 20 ) , res ) );
+            ASSERT( Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( ! Helpers::findById( cc(), ns() , BSON( "_id" << 200 ) , res ) );
+            ASSERT( ! Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 200 ) , res ) );
 
             unsigned long long slow , fast;
 
@@ -1250,7 +1251,7 @@ namespace QueryTests {
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findById( cc(), ns() , BSON( "_id" << 20 ) , res ) );
+                    ASSERT( Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
                 }
                 fast = t.micros();
             }
@@ -1278,7 +1279,7 @@ namespace QueryTests {
 
             BSONObj res;
             for ( int i=0; i<1000; i++ ) {
-                bool found = Helpers::findById( cc(), ns() , BSON( "_id" << i ) , res );
+                bool found = Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << i ) , res );
                 ASSERT_EQUALS( i % 2 , int(found) );
             }
 

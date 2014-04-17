@@ -124,7 +124,7 @@ namespace {
                 continue;
 
             Client::Context ctx(*it);
-            cc().database()->clearTmpCollections();
+            ctx.db()->clearTmpCollections();
         }
     }
 }

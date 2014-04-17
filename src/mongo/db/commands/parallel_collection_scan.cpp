@@ -190,7 +190,7 @@ namespace mongo {
 
             Client::ReadContext ctx(ns.ns());
 
-            Database* db = cc().database();
+            Database* db = ctx.ctx().db();
             Collection* collection = db->getCollection( ns );
 
             if ( !collection )

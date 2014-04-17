@@ -1041,12 +1041,12 @@ namespace NamespaceTests {
             virtual ~Base() {
                 if ( !nsd() )
                     return;
-                cc().database()->dropCollection( ns() );
+                _context.db()->dropCollection( ns() );
             }
         protected:
             void create() {
                 Lock::GlobalWrite lk;
-                ASSERT( userCreateNS( ns(), fromjson( spec() ), false ).isOK() );
+                ASSERT( userCreateNS( db(), ns(), fromjson( spec() ), false ).isOK() );
             }
             virtual string spec() const {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":1}";

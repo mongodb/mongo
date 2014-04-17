@@ -114,10 +114,9 @@ namespace mongo {
             OwnedPointerVector<MatchExpression> exprs;
             auto_ptr<WorkingSet> ws(new WorkingSet());
 
-            const string ns = parseNs(dbname, cmdObj);
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(dbname);
 
-            PlanStage* userRoot = parseQuery(dbname, argObj, ws.get(), &exprs);
+            PlanStage* userRoot = parseQuery(ctx.ctx().db(), argObj, ws.get(), &exprs);
             uassert(16911, "Couldn't parse plan from " + argObj.toString(), NULL != userRoot);
 
             // Add a fetch at the top for the user so we can get obj back for sure.
@@ -136,7 +135,7 @@ namespace mongo {
             return true;
         }
 
-        PlanStage* parseQuery(const string& dbname, BSONObj obj, WorkingSet* workingSet,
+        PlanStage* parseQuery(Database* db, BSONObj obj, WorkingSet* workingSet,
                               OwnedPointerVector<MatchExpression>* exprs) {
             BSONElement firstElt = obj.firstElement();
             if (!firstElt.isABSONObj()) { return NULL; }
@@ -176,8 +175,7 @@ namespace mongo {
 
             if ("ixscan" == nodeName) {
 
-                Database* db = cc().database();
-                Collection* collection = db->getCollection( dbname + "." + nodeArgs["name"].String() );
+                Collection* collection = db->getCollection( db->name() + "." + nodeArgs["name"].String() );
                 uassert(16913, "Can't find collection " + nodeArgs["name"].String(), collection);
 
                 IndexDescriptor* desc =
@@ -207,7 +205,7 @@ namespace mongo {
                     uassert(16922, "node of AND isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
                     uassert(16923, "Can't parse sub-node of AND: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -233,7 +231,7 @@ namespace mongo {
                     uassert(16925, "node of AND isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
                     uassert(16926, "Can't parse sub-node of AND: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -256,7 +254,7 @@ namespace mongo {
                 while (it.more()) {
                     BSONElement e = it.next();
                     if (!e.isABSONObj()) { return NULL; }
-                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
                     uassert(16936, "Can't parse sub-node of OR: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -268,7 +266,7 @@ namespace mongo {
             else if ("fetch" == nodeName) {
                 uassert(16929, "Node argument must be provided to fetch",
                         nodeArgs["node"].isABSONObj());
-                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
                 return new FetchStage(workingSet, subNode, matcher);
             }
             else if ("limit" == nodeName) {
@@ -278,7 +276,7 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16931, "Num argument must be provided to limit",
                         nodeArgs["num"].isNumber());
-                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
                 return new LimitStage(nodeArgs["num"].numberInt(), workingSet, subNode);
             }
             else if ("skip" == nodeName) {
@@ -288,15 +286,15 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16933, "Num argument must be provided to skip",
                         nodeArgs["num"].isNumber());
-                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
                 return new SkipStage(nodeArgs["num"].numberInt(), workingSet, subNode);
             }
             else if ("cscan" == nodeName) {
                 CollectionScanParams params;
 
                 // What collection?
-                string ns = dbname + "." + nodeArgs["name"].String();
-                params.collection = cc().database()->getCollection(ns);
+                string ns = db->name() + "." + nodeArgs["name"].String();
+                params.collection = db->getCollection(ns);
                 uassert(16962, "Can't find collection " + ns, NULL != params.collection );
 
                 // What direction?
@@ -318,7 +316,7 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16970, "Pattern argument must be provided to sort",
                         nodeArgs["pattern"].isABSONObj());
-                PlanStage* subNode = parseQuery(dbname, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
                 SortStageParams params;
                 params.pattern = nodeArgs["pattern"].Obj();
                 return new SortStage(params, workingSet, subNode);
@@ -342,7 +340,7 @@ namespace mongo {
                     uassert(16973, "node of mergeSort isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(dbname, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
                     uassert(16974, "Can't parse sub-node of mergeSort: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -353,7 +351,6 @@ namespace mongo {
             else if ("text" == nodeName) {
                 string ns = nodeArgs["name"].String();
                 string search = nodeArgs["search"].String();
-                Database* db = cc().database();
                 Collection* collection = db->getCollection( ns );
                 uassert(17193, "Can't find namespace " + ns, collection);
                 vector<IndexDescriptor*> idxMatches;

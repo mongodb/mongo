@@ -62,7 +62,7 @@ namespace QueryStageCollectionScan {
             stringstream spec;
             spec << "{\"capped\":true,\"size\":2000,\"$nExtents\":" << nExtents() << "}";
 
-            ASSERT( userCreateNS( ns(), fromjson( spec.str() ), false ).isOK() );
+            ASSERT( userCreateNS( db(), ns(), fromjson( spec.str() ), false ).isOK() );
 
             // Tell the test to add data/extents/etc.
             insertTestData();

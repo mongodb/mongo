@@ -60,17 +60,6 @@ namespace mongo {
 
     const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
 
-    void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
-        Database* db = cc().database();
-        verify(db);
-
-        Collection* collection = db->getCollection( ns );
-        if ( !collection )
-            return;
-
-        ensureIndex( collection, keyPattern, unique, name );
-    }
-
     void Helpers::ensureIndex(Collection* collection,
                               BSONObj keyPattern, bool unique, const char *name) {
         BSONObjBuilder b;
@@ -122,11 +111,10 @@ namespace mongo {
         return DiskLoc();
     }
 
-    bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
+    bool Helpers::findById(Database* database, const char *ns, BSONObj query, BSONObj& result ,
                            bool* nsFound , bool* indexFound ) {
         Lock::assertAtLeastReadLocked(ns);
-        Database *database = c.database();
-        verify( database );
+        invariant( database );
 
         Collection* collection = database->getCollection( ns );
         if ( !collection ) {
@@ -295,11 +283,11 @@ namespace mongo {
         return kpBuilder.obj();
     }
 
-    bool findShardKeyIndexPattern_inlock( const string& ns,
-                                          const BSONObj& shardKeyPattern,
-                                          BSONObj* indexPattern ) {
-        verify( Lock::isLocked() );
-        Collection* collection = cc().database()->getCollection( ns );
+    bool findShardKeyIndexPattern( const string& ns,
+                                   const BSONObj& shardKeyPattern,
+                                   BSONObj* indexPattern ) {
+        Client::ReadContext context( ns );
+        Collection* collection = context.ctx().db()->getCollection( ns );
         if ( !collection )
             return false;
 
@@ -314,13 +302,6 @@ namespace mongo {
             return false;
         *indexPattern = idx->keyPattern().getOwned();
         return true;
-    }
-
-    bool findShardKeyIndexPattern( const string& ns,
-                                   const BSONObj& shardKeyPattern,
-                                   BSONObj* indexPattern ) {
-        Client::ReadContext context( ns );
-        return findShardKeyIndexPattern_inlock( ns, shardKeyPattern, indexPattern );
     }
 
     long long Helpers::removeRange( const KeyRange& range,
@@ -372,7 +353,8 @@ namespace mongo {
             {
                 Client::WriteContext ctx(ns);
                 Collection* collection = ctx.ctx().db()->getCollection( ns );
-                if ( !collection ) break;
+                if ( !collection )
+                    break;
 
                 IndexDescriptor* desc =
                     collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
@@ -383,7 +365,6 @@ namespace mongo {
                                                                    InternalPlanner::IXSCAN_FETCH));
 
                 runner->setYieldPolicy(Runner::YIELD_AUTO);
-
                 DiskLoc rloc;
                 BSONObj obj;
                 Runner::RunnerState state;
@@ -422,12 +403,11 @@ namespace mongo {
                         break;
                     }
                 }
-
                 if ( callback )
                     callback->goingToDelete( obj );
 
                 logOp("d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
-                c.database()->getCollection( ns )->deleteDocument( rloc );
+                collection->deleteDocument( rloc );
                 numDeleted++;
             }
 

@@ -279,9 +279,6 @@ namespace mongo {
 
         log() << "repairDatabase " << dbName << endl;
 
-        invariant( cc().database()->name() == dbName );
-        invariant( cc().database()->path() == storageGlobalParams.dbpath );
-
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
         getDur().syncDataAndTruncateJournal(); // Must be done before and after repair

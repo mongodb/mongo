@@ -44,9 +44,12 @@
 
 namespace mongo {
 
-    void dropDatabase(const std::string& db);
+    class Database;
 
-    Status userCreateNS( const StringData& ns,
+    void dropDatabase(Database* db);
+
+    Status userCreateNS( Database* db,
+                         const StringData& ns,
                          BSONObj options,
                          bool logForReplication,
                          bool createDefaultIndexes = true );

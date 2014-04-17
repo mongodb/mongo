@@ -320,7 +320,8 @@ namespace mongo {
                 break;
 
             case 'u':
-                if ( ! Helpers::findById( cc() , _ns.c_str() , ide.wrap() , it ) ) {
+                Client::Context ctx( _ns );
+                if ( ! Helpers::findById( ctx.db(), _ns.c_str(), ide.wrap(), it ) ) {
                     warning() << "logOpForSharding couldn't find: " << ide << " even though should have" << migrateLog;
                     return;
                 }
@@ -335,7 +336,7 @@ namespace mongo {
             _memoryUsed += ide.size() + 5;
         }
 
-        void xfer( list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ) {
+        void xfer( Database* db, list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ) {
             const long long maxSize = 1024 * 1024;
 
             if ( l->size() == 0 || size > maxSize )
@@ -349,7 +350,7 @@ namespace mongo {
                 BSONObj t = *i;
                 if ( explode ) {
                     BSONObj it;
-                    if ( Helpers::findById( cc() , _ns.c_str() , t, it ) ) {
+                    if ( Helpers::findById( db , _ns.c_str() , t, it ) ) {
                         arr.append( it );
                         size += it.objsize();
                     }
@@ -379,8 +380,8 @@ namespace mongo {
             {
                 Client::ReadContext cx( _ns );
 
-                xfer( &_deleted , b , "deleted" , size , false );
-                xfer( &_reload , b , "reload" , size , true );
+                xfer( cx.ctx().db(), &_deleted, b, "deleted", size, false );
+                xfer( cx.ctx().db(), &_reload, b, "reload", size, true );
             }
 
             b.append( "size" , size );
@@ -1652,7 +1653,7 @@ namespace mongo {
                     string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
                     if ( entry["options"].isABSONObj() ) {
-                        Status status = userCreateNS( ns, entry["options"].Obj(), true, 0 );
+                        Status status = userCreateNS( db, ns, entry["options"].Obj(), true, 0 );
                         if ( !status.isOK() ) {
                             warning() << "failed to create collection [" << ns << "] "
                                       << " with options: " << status;
@@ -1778,7 +1779,7 @@ namespace mongo {
                                     Client::WriteContext cx( ns );
 
                                     BSONObj localDoc;
-                                    if ( willOverrideLocalId( o, &localDoc ) ) {
+                                    if ( willOverrideLocalId( cx.ctx().db(), o, &localDoc ) ) {
                                         string errMsg =
                                             str::stream() << "cannot migrate chunk, local document "
                                                           << localDoc
@@ -1981,7 +1982,7 @@ namespace mongo {
 
                     // do not apply deletes if they do not belong to the chunk being migrated
                     BSONObj fullObj;
-                    if ( Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
+                    if ( Helpers::findById( cx.ctx().db(), ns.c_str(), id, fullObj ) ) {
                         if ( ! isInRange( fullObj , min , max , shardKeyPattern ) ) {
                             log() << "not applying out of range deletion: " << fullObj << migrateLog;
 
@@ -2014,7 +2015,7 @@ namespace mongo {
                     BSONObj it = i.next().Obj();
 
                     BSONObj localDoc;
-                    if ( willOverrideLocalId( it, &localDoc ) ) {
+                    if ( willOverrideLocalId( cx.ctx().db(), it, &localDoc ) ) {
                         string errMsg =
                             str::stream() << "cannot migrate chunk, local document "
                                           << localDoc
@@ -2044,10 +2045,10 @@ namespace mongo {
          * Must be in WriteContext to avoid races and DBHelper errors.
          * TODO: Could optimize this check out if sharding on _id.
          */
-        bool willOverrideLocalId( BSONObj remoteDoc, BSONObj* localDoc ) {
+        bool willOverrideLocalId( Database* db, BSONObj remoteDoc, BSONObj* localDoc ) {
 
             *localDoc = BSONObj();
-            if ( Helpers::findById( cc(), ns.c_str(), remoteDoc, *localDoc ) ) {
+            if ( Helpers::findById( db, ns.c_str(), remoteDoc, *localDoc ) ) {
                 return !isInRange( *localDoc , min , max , shardKeyPattern );
             }
 

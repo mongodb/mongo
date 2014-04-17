@@ -126,7 +126,7 @@ namespace mongo {
                 invariant(Lock::nested());
 
                 Client::Context ctx(ns);
-                bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
+                bool failed = applyOperation_inlock(ctx.db(), temp, false, alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;

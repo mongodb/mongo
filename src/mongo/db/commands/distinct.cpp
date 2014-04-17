@@ -92,7 +92,7 @@ namespace mongo {
 
             Client::ReadContext ctx(ns);
 
-            Collection* collection = cc().database()->getCollection( ns );
+            Collection* collection = ctx.ctx().db()->getCollection( ns );
 
             if (!collection) {
                 result.appendArray( "values" , BSONObj() );

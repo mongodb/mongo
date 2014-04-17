@@ -77,8 +77,7 @@ namespace mongo {
             }
 
             Client::ReadContext ctx(ns_string.ns());
-
-            Database* db = cc().database();
+            Database* db = ctx.ctx().db();
             if ( !db ) {
                 errmsg = "database not found";
                 return false;

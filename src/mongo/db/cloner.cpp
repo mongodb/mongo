@@ -84,7 +84,7 @@ namespace mongo {
        we need to fix up the value in the "ns" parameter so that the name prefix is correct on a
        copy to a new name.
     */
-    BSONObj fixindex(BSONObj o) {
+    BSONObj fixindex(const string& newDbName, BSONObj o) {
         BSONObjBuilder b;
         BSONObjIterator i(o);
         while ( i.moreWithEOO() ) {
@@ -101,7 +101,7 @@ namespace mongo {
                 uassert( 10024 , "bad ns field for index during dbcopy", e.type() == String);
                 const char *p = strchr(e.valuestr(), '.');
                 uassert( 10025 , "bad ns field for index during dbcopy [2]", p);
-                string newname = cc().database()->name() + p;
+                string newname = newDbName + p;
                 b.append("ns", newname);
             }
             else
@@ -174,7 +174,7 @@ namespace mongo {
                 BSONObj js = tmp;
                 if ( isindex ) {
                     verify(nsToCollectionSubstring(from_collection) == "system.indexes");
-                    js = fixindex(tmp);
+                    js = fixindex(context.db()->name(), tmp);
                     indexesToBuild->push_back( js.getOwned() );
                     continue;
                 }
@@ -315,7 +315,7 @@ namespace mongo {
         string temp = ctx.ctx().db()->name() + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
         if (config["options"].isABSONObj()) {
-            Status status = userCreateNS(ns.c_str(), config["options"].Obj(), logForRepl, 0);
+            Status status = userCreateNS(ctx.ctx().db(), ns, config["options"].Obj(), logForRepl, 0);
             if ( !status.isOK() ) {
                 errmsg = status.toString();
                 return false;
@@ -351,13 +351,13 @@ namespace mongo {
         }
         massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
-        string todb = cc().database()->name();
+        string todb = context.db()->name();
         stringstream a,b;
         a << "localhost:" << serverGlobalParams.port;
         b << "127.0.0.1:" << serverGlobalParams.port;
         bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
         if ( masterSameProcess ) {
-            if (opts.fromDB == todb && cc().database()->path() == storageGlobalParams.dbpath) {
+            if (opts.fromDB == todb && context.db()->path() == storageGlobalParams.dbpath) {
                 // guard against an "infinite" loop
                 /* if you are replicating, the local.sources config may be wrong if you get this */
                 errmsg = "can't clone from self (localhost).";
@@ -469,7 +469,7 @@ namespace mongo {
 
             {
                 /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(to_name, options, opts.logForRepl, false);
+                userCreateNS(context.db(), to_name, options, opts.logForRepl, false);
             }
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
@@ -485,7 +485,7 @@ namespace mongo {
                 bool old = inDBRepair;
                 try {
                     inDBRepair = true;
-                    Collection* c = cc().database()->getCollection( to_name );
+                    Collection* c = context.db()->getCollection( to_name );
                     if ( c )
                         c->getIndexCatalog()->ensureHaveIdIndex();
                     inDBRepair = old;

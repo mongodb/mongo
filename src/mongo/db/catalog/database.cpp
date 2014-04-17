@@ -359,8 +359,6 @@ namespace mongo {
             return true;
         }
 
-        verify( cc().database() == this );
-
         if (!getOrCreateProfileCollection(this, true, &errmsg))
             return false;
 

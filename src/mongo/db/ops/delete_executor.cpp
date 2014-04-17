@@ -101,12 +101,14 @@ namespace mongo {
             }
         }
 
+        Database* db = currentClient.get()->getContext()->db();
+
         massert(17418,
                 mongoutils::str::stream() <<
-                "dbname = " << currentClient.get()->database()->name() <<
+                "dbname = " << db->name() <<
                 "; ns = " << ns.ns(),
-                currentClient.get()->database()->name() == nsToDatabaseSubstring(ns.ns()));
-        Collection* collection = currentClient.get()->database()->getCollection(ns.ns());
+                db->name() == nsToDatabaseSubstring(ns.ns()));
+        Collection* collection = db->getCollection(ns.ns());
         if (NULL == collection) {
             return 0;
         }
