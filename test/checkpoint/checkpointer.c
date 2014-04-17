@@ -207,6 +207,7 @@ verify_checkpoint(WT_SESSION *session)
 			return (log_print_err(
 			    "verify_checkpoint:cursor close", ret, 1));
 	}
+	free(cursors);
 	printf("Finished verifying a checkpoint with %d tables and %" PRIu64
 	    " keys\n", g.ntables, key_count);
 	return (0);

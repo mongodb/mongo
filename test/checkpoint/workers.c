@@ -231,6 +231,7 @@ real_worker()
 			break;
 		}
 	}
+	free(cursors);
 	if ((ret = session->close(session, NULL)) != 0)
 		return (log_print_err("session.close", ret, 1));
 
