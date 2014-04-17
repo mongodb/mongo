@@ -35,6 +35,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/health.h"
+#include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/background.h"
@@ -56,30 +57,6 @@ namespace mongo {
     extern bool replSetBlind;
 
     unsigned int HeartbeatInfo::numPings;
-
-    long long HeartbeatInfo::timeDown() const {
-        if( up() ) return 0;
-        if( downSince == 0 )
-            return 0; // still waiting on first heartbeat
-        return jsTime() - downSince;
-    }
-
-    void HeartbeatInfo::updateFromLastPoll(const HeartbeatInfo& newInfo) {
-        hbstate = newInfo.hbstate;
-        health = newInfo.health;
-        upSince = newInfo.upSince;
-        downSince = newInfo.downSince;
-        lastHeartbeat = newInfo.lastHeartbeat;
-        lastHeartbeatMsg = newInfo.lastHeartbeatMsg;
-        // Note: lastHeartbeatRecv is updated through CmdReplSetHeartbeat::run().
-
-        syncingTo = newInfo.syncingTo;
-        opTime = newInfo.opTime;
-        skew = newInfo.skew;
-        authIssue = newInfo.authIssue;
-        ping = newInfo.ping;
-        electionTime = newInfo.electionTime;
-    }
 
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {

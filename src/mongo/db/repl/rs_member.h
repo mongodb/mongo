@@ -78,68 +78,6 @@ namespace mongo {
         bool operator!=(const MemberState& r) const { return s != r.s; }
     };
 
-    /* this is supposed to be just basic information on a member,
-       and copy constructable. */
-    class HeartbeatInfo {
-        unsigned _id;
-    public:
-        HeartbeatInfo() : _id(0xffffffff), hbstate(MemberState::RS_UNKNOWN), health(-1.0),
-            downSince(0), lastHeartbeatRecv(0), skew(INT_MIN), authIssue(false), ping(0) { }
-        HeartbeatInfo(unsigned id);
-        unsigned id() const { return _id; }
-        MemberState hbstate;
-        double health;
-        time_t upSince;
-        long long downSince;
-        // This is the last time we got a response from a heartbeat request to a given member.
-        time_t lastHeartbeat;
-        // This is the last time we got a heartbeat request from a given member.
-        time_t lastHeartbeatRecv;
-        DiagStr lastHeartbeatMsg;
-        DiagStr syncingTo;
-        OpTime opTime;
-        int skew;
-        bool authIssue;
-        unsigned int ping; // milliseconds
-        static unsigned int numPings;
-
-        // Time node was elected primary
-        OpTime electionTime;
-
-        bool up() const { return health > 0; }
-
-        /** health is set to -1 on startup.  that means we haven't even checked yet.  0 means we checked and it failed. */
-        bool maybeUp() const { return health != 0; }
-
-        long long timeDown() const; // ms
-
-        /* true if changed in a way of interest to the repl set manager. */
-        bool changed(const HeartbeatInfo& old) const;
-
-        /**
-         * Updates this with the info received from the command result we got from
-         * the last replSetHeartbeat.
-         */
-        void updateFromLastPoll(const HeartbeatInfo& newInfo);
-    };
-
-    inline HeartbeatInfo::HeartbeatInfo(unsigned id) :
-        _id(id),
-        lastHeartbeatRecv(0),
-        authIssue(false),
-        ping(0) {
-        hbstate = MemberState::RS_UNKNOWN;
-        health = -1.0;
-        downSince = 0;
-        lastHeartbeat = upSince = 0;
-        skew = INT_MIN;
-    }
-
-    inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const {
-        return health != old.health ||
-               hbstate != old.hbstate;
-    }
-
     inline string MemberState::toString() const {
         switch ( s ) {
         case RS_STARTUP: return "STARTUP";
