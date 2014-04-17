@@ -799,7 +799,7 @@ err:	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 
 	if (hazard)
-		WT_ERR(__wt_hazard_clear(session, parent));
+		WT_TRET(__wt_hazard_clear(session, parent));
 
 	/*
 	 * Discard the child; test for split completion instead of errors, there
