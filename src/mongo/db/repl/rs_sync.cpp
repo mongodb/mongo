@@ -56,7 +56,6 @@
 namespace mongo {
 
     using namespace bson;
-    extern unsigned replSetForceInitialSyncFailure;
 
     // For testing network failures in percolate() for chaining
     MONGO_FP_DECLARE(rsChaining1);
@@ -70,97 +69,6 @@ namespace mongo {
         }
         return Status::OK();
     }
-
-namespace replset {
-
-    static AtomicUInt32 replWriterWorkerId;
-    void initializeWriterThread() {
-        // Only do this once per thread
-        if (!ClientBasic::getCurrent()) {
-            string threadName = str::stream() << "repl writer worker " << replWriterWorkerId.addAndFetch(1);
-            Client::initThread( threadName.c_str() );
-            // allow us to get through the magic barrier
-            Lock::ParallelBatchWriterMode::iAmABatchParticipant();
-            replLocalAuth();
-        }
-    }
-
-    // This free function is used by the writer threads to apply each op
-    void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
-        initializeWriterThread();
-
-        // convert update operations only for 2.2.1 or greater, because we need guaranteed
-        // idempotent operations for this to work.  See SERVER-6825
-        bool convertUpdatesToUpserts = theReplSet->oplogVersion > 1 ? true : false;
-
-        for (std::vector<BSONObj>::const_iterator it = ops.begin();
-             it != ops.end();
-             ++it) {
-            try {
-                if (!st->syncApply(*it, convertUpdatesToUpserts)) {
-                    fassertFailedNoTrace(16359);
-                }
-            } catch (const DBException& e) {
-                error() << "writer worker caught exception: " << causedBy(e)
-                        << " on: " << it->toString() << endl;
-                fassertFailedNoTrace(16360);
-            }
-        }
-    }
-
-    // This free function is used by the initial sync writer threads to apply each op
-    void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
-        initializeWriterThread();
-        for (std::vector<BSONObj>::const_iterator it = ops.begin();
-             it != ops.end();
-             ++it) {
-            try {
-                if (!st->syncApply(*it)) {
-                    bool status;
-                    {
-                        Lock::GlobalWrite lk;
-                        status = st->shouldRetry(*it);
-                    }
-                    if (status) {
-                        // retry
-                        if (!st->syncApply(*it)) {
-                            fassertFailedNoTrace(15915);
-                        }
-                    }
-                    // If shouldRetry() returns false, fall through.
-                    // This can happen if the document that was moved and missed by Cloner
-                    // subsequently got deleted and no longer exists on the Sync Target at all
-                }
-            }
-            catch (const DBException& e) {
-                error() << "exception: " << causedBy(e) << " on: " << it->toString() << endl;
-                fassertFailedNoTrace(16361);
-            }
-        }
-    }
-
-    InitialSync::InitialSync(BackgroundSyncInterface *q) : 
-        SyncTail(q) {}
-
-    InitialSync::~InitialSync() {}
-
-    /* initial oplog application, during initial sync, after cloning.
-    */
-    BSONObj InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
-        if (replSetForceInitialSyncFailure > 0) {
-            log() << "replSet test code invoked, forced InitialSync failure: " << replSetForceInitialSyncFailure << rsLog;
-            replSetForceInitialSyncFailure--;
-            throw DBException("forced error",0);
-        }
-
-        // create the initial oplog entry
-        syncApply(applyGTEObj);
-        _logOpObjRS(applyGTEObj);
-
-        return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
-    }
-
-} // namespace replset
 
     /* should be in RECOVERING state on arrival here.
        readlocks

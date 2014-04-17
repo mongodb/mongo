@@ -43,7 +43,6 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
-
 namespace replset {
 
     static Counter64 opsAppliedStats;

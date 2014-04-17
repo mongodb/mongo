@@ -40,7 +40,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
-#include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/mongoutils/str.h"
 
