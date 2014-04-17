@@ -300,7 +300,17 @@ namespace mongo {
             // See if it's the order we're looking for.
             BSONObj possibleSort = resultingSortBob.obj();
             if (!desiredSort.isPrefixOf(possibleSort)) {
-                return false;
+                // We can't get the sort order from the index scan. See if we can
+                // get the sort by reversing the scan.
+                BSONObj reversePossibleSort = QueryPlannerCommon::reverseSortObj(possibleSort);
+                if (!desiredSort.isPrefixOf(reversePossibleSort)) {
+                    // Can't get the sort order from the reversed index scan either. Give up.
+                    return false;
+                }
+                else {
+                    // We can get the sort order we need if we reverse the scan.
+                    QueryPlannerCommon::reverseScans(isn);
+                }
             }
 
             // Do some bookkeeping to see how many ixscans we'll create total.
