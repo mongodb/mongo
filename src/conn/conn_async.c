@@ -371,6 +371,7 @@ retry:
 	 * things off the work queue with the lock.
 	 */
 	async->flush_count = 0;
+	WT_ATOMIC_ADD(async->flush_gen, 1);
 	WT_ASSERT(conn->default_session,
 	    async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;

@@ -67,11 +67,12 @@ retry:
  *	Wait for the final worker to finish flushing.
  */
 static int
-__async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async)
+__async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async, uint64_t my_gen)
 {
 	WT_DECL_RET;
 
-	while (async->flush_state == WT_ASYNC_FLUSHING)
+	while (async->flush_state == WT_ASYNC_FLUSHING &&
+	    async->flush_gen == my_gen)
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, async->flush_cond, 10000));
 err:	return (ret);
@@ -232,6 +233,7 @@ __wt_async_worker(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint64_t flush_gen;
 	uint32_t fc;
 
 	session = arg;
@@ -251,7 +253,7 @@ __wt_async_worker(void *arg)
 			 * If FLUSHING is going on, we do not take anything off
 			 * the queue.
 			 */
-			WT_WRITE_BARRIER();
+			WT_ORDERED_READ(flush_gen, async->flush_gen);
 			if ((fc = WT_ATOMIC_ADD(async->flush_count, 1)) ==
 			    conn->async_workers) {
 				/*
@@ -270,7 +272,8 @@ __wt_async_worker(void *arg)
 				 * We need to wait for the last worker to
 				 * signal the condition.
 				 */
-				WT_ERR(__async_flush_wait(session, async));
+				WT_ERR(__async_flush_wait(
+				    session, async, flush_gen));
 		}
 	}
 
