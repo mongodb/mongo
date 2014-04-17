@@ -34,6 +34,10 @@ static int get_key_int(WT_CURSOR *, int, u_int *);
 static int real_checkpointer(void);
 static int verify_checkpoint(WT_SESSION *);
 
+/*
+ * start_checkpoints --
+ *     Responsible for creating the checkpoint thread.
+ */
 int
 start_checkpoints()
 {
@@ -45,6 +49,10 @@ start_checkpoints()
 	return (0);
 }
 
+/*
+ * end_checkpoints --
+ *     Responsible for cleanly shutting down the checkpoint thread.
+ */
 int
 end_checkpoints()
 {
@@ -71,7 +79,11 @@ checkpointer(void *arg)
 	return (NULL);
 }
 	
-
+/*
+ * real_checkpointer --
+ *     Do the work of creating checkpoints and then verifying them. Also
+ *     responsible for finishing in a timely fashion.
+ */
 static int
 real_checkpointer()
 {
@@ -118,6 +130,12 @@ done:	if ((ret = session->close(session, NULL)) != 0)
 	return (0);
 }
 
+/*
+ * verify_checkpoint --
+ *     Open a cursor on each table at the last checkpoint and walk through
+ *     the tables in parallel. The key/values should match across all
+ *     tables.
+ */
 static int
 verify_checkpoint(WT_SESSION *session)
 {
@@ -220,6 +238,10 @@ get_key_int(WT_CURSOR *cursor, int index, u_int *rval)
 	return (0);
 }
 
+/*
+ * compare_cursors --
+ *     Compare the key/value pairs from two cursors.
+ */
 static int
 compare_cursors(
     WT_CURSOR *first, int first_index,
@@ -270,7 +292,8 @@ compare_cursors(
 
 /*
  * diagnose_key_error --
- *     Dig a bit deeper on failure
+ *     Dig a bit deeper on failure. Continue after some failures here to
+ *     extract as much information as we can.
  */
 static int
 diagnose_key_error(
@@ -299,7 +322,7 @@ diagnose_key_error(
 	if (get_key_int(first, first_index, &key1i) != 0 ||
 	    get_key_int(second, second_index, &key2i) != 0)
 		log_print_err("Error decoding key", EINVAL, 1);
-	if (key1i != key2i)
+	else if (key1i != key2i)
 		log_print_err("Now previous keys don't match", EINVAL, 0);
 
 	if (first->next(first) != 0 || second->next(second) != 0)
@@ -307,7 +330,7 @@ diagnose_key_error(
 	if (get_key_int(first, first_index, &key1i) != 0 ||
 	    get_key_int(second, second_index, &key2i) != 0)
 		log_print_err("Error decoding key", EINVAL, 1);
-	if (key1i == key2i)
+	else if (key1i == key2i)
 		log_print_err("After prev/next keys match", EINVAL, 0);
 
 	if (first->next(first) != 0 || second->next(second) != 0)
@@ -315,7 +338,7 @@ diagnose_key_error(
 	if (get_key_int(first, first_index, &key1i) != 0 ||
 	    get_key_int(second, second_index, &key2i) != 0)
 		log_print_err("Error decoding key", EINVAL, 1);
-	if (key1i == key2i)
+	else if (key1i == key2i)
 		log_print_err("After prev/next/next keys match", EINVAL, 0);
 
 	/*

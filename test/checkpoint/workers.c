@@ -30,6 +30,10 @@
 static int real_worker(void);
 static void *worker(void *);
 
+/*
+ * create_table --
+ *     Create a WiredTiger table of the configured type for this cookie.
+ */
 static int
 create_table(WT_SESSION *session, COOKIE *cookie)
 {
@@ -51,6 +55,11 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 	return (0);
 }
 
+/*
+ * start_workers --
+ *     Setup the configuration for the tables being populated, then start
+ *     the worker thread(s) and wait for them to finish.
+ */
 int
 start_workers(table_type type)
 {
@@ -179,6 +188,11 @@ worker(void *arg)
 	return (NULL);
 }
 
+/*
+ * real_worker --
+ *     A single worker thread that transactionally updates all tables with
+ *     consistent values.
+ */
 static int
 real_worker()
 {
