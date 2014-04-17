@@ -41,9 +41,9 @@ namespace mongo {
 
     static bool _isPasswordArgument(const char* argumentName) {
         static const char* const passwordArguments[] = {
-            "sslPEMKeyPassword",
-            "ssl.PEMKeyPassword",
-            "servicePassword",
+            "net.ssl.PEMKeyPassword",
+            "net.ssl.clusterPassword",
+            "processManagement.windowsService.servicePassword",
             NULL  // Last entry sentinel.
         };
         for (const char* const* current = passwordArguments; *current; ++current) {
@@ -54,6 +54,13 @@ namespace mongo {
     }
 
     static bool _isPasswordSwitch(const char* switchName) {
+        static const char* const passwordSwitches[] = {
+            "sslPEMKeyPassword",
+            "sslClusterPassword",
+            "servicePassword",
+            NULL  // Last entry sentinel.
+        };
+
         if (switchName[0] != '-')
             return false;
         size_t i = 1;
@@ -61,7 +68,11 @@ namespace mongo {
             i = 2;
         switchName += i;
 
-        return _isPasswordArgument(switchName);
+        for (const char* const* current = passwordSwitches; *current; ++current) {
+            if (mongoutils::str::equals(switchName, *current))
+                return true;
+        }
+        return false;
     }
 
     static void _redact(char* arg) {
