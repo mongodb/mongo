@@ -233,7 +233,7 @@ compare_cursors(
 
 	if (get_key_int(first, first_index, &first_key_int) != 0 ||
 	    get_key_int(second, second_index, &second_key_int) != 0)
-		log_print_err("Error decoding key", EINVAL, 1);
+		return (log_print_err("Error decoding key", EINVAL, 1));
 
 	if (first_key_int != second_key_int) {
 		printf("Key mismatch %" PRIu32 " from a %s table "
