@@ -43,7 +43,7 @@
 
 #define	URI_BASE	"table:__wt"		/* File name */
 
-#define ERR_KEY_MISMATCH	0x200001
+#define	ERR_KEY_MISMATCH	0x200001
 #define	ERR_DATA_MISMATCH	0x200002
 
 /*

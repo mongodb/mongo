@@ -78,7 +78,7 @@ checkpointer(void *arg)
 	(void)real_checkpointer();
 	return (NULL);
 }
-	
+
 /*
  * real_checkpointer --
  *     Do the work of creating checkpoints and then verifying them. Also
@@ -90,7 +90,6 @@ real_checkpointer()
 	WT_SESSION *session;
 	char *checkpoint_config, _buf[128];
 	int ret;
-
 
 	if (g.running == 0)
 		return (log_print_err(
@@ -169,7 +168,7 @@ verify_checkpoint(WT_SESSION *session)
 		else if (ret != WT_NOTFOUND)
 			return (log_print_err("cursor->next", ret, 1));
 		/*
-		 * Check to see that all remaining cursors have the 
+		 * Check to see that all remaining cursors have the
 		 * same key/value pair.
 		 */
 		for (i = 1; i < g.ntables; i++) {
@@ -312,7 +311,7 @@ diagnose_key_error(
 
 	snprintf(ckpt, 128, "checkpoint=%s", g.checkpoint_name);
 
-	/* Save the orinal failed keys. */
+	/* Save the failed keys. */
 	first->get_key(first, &first_key);
 	second->get_key(second, &second_key);
 

@@ -310,16 +310,15 @@ const char *
 type_to_string(table_type type)
 {
 	if (type == COL)
-		return "COL";
+		return ("COL");
 	if (type == LSM)
-		return "LSM";
+		return ("LSM");
 	if (type == ROW)
-		return "ROW";
+		return ("ROW");
 	if (type == MIX)
-		return "MIX";
-	return "INVALID";
+		return ("MIX");
+	return ("INVALID");
 }
-
 
 /*
  * usage --

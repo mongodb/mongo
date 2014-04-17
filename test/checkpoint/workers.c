@@ -214,7 +214,6 @@ real_worker()
 		    session, g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0)
 			return (log_print_err("session.open_cursor", ret, 1));
 
-
 	for (i = 0; i < g.nops && g.running; ++i, sched_yield()) {
 		session->begin_transaction(session, NULL);
 		keyno = __wt_random() % g.nkeys + 1;

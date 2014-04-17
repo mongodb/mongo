@@ -310,7 +310,7 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline void
 __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-        WT_TXN_GLOBAL *txn_global;
+	WT_TXN_GLOBAL *txn_global;
 
 	/*
 	 * We depend on atomic-add being a write barrier, that is, a barrier to
