@@ -151,7 +151,12 @@ namespace mongo {
             if ( sizeNeeded + DataFileHeader::HeaderSize > minSize )
                 minSize = sizeNeeded + DataFileHeader::HeaderSize;
             try {
+                Timer t;
                 p->open( fullNameString.c_str(), minSize, preallocateOnly );
+                if ( t.seconds() > 1 ) {
+                    log() << "ExtentManager took " << t.seconds()
+                          << " seconds to open: " << fullNameString;
+                }
             }
             catch ( AssertionException& ) {
                 delete p;
