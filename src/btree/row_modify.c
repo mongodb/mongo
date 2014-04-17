@@ -68,7 +68,16 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			logged = 1;
 		} else {
 			upd_size = sizeof(WT_UPDATE) + upd->size;
-			old_upd = *upd_entry;
+			/*
+			 * We are restoring an update on a new page: there
+			 * better not be one there already.
+			 *
+			 * Set the "old" entry to the second update in the list
+			 * so that the serialization function succeeds in
+			 * swapping the first update into place.
+			 */
+			WT_ASSERT(session, *upd_entry == NULL);
+			old_upd = *upd_entry = upd->next;
 		}
 
 		/*
