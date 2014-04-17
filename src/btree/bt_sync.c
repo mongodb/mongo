@@ -91,12 +91,16 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 * became dirty after the checkpoint started.
 			 */
 			page = walk_page->page;
+#ifdef FAST_CHECKPOINTS
 			if (__wt_page_is_modified(page) &&
 			    (WT_PAGE_IS_INTERNAL(page) ||
 			    page->modify->checkpoint_gen == 0 ||
 			    page->modify->checkpoint_gen < checkpoint_gen ||
 			    TXNID_LE(page->modify->rec_min_skipped_txn,
 			    session->txn.snap_max))) {
+#else
+			if (__wt_page_is_modified(page)) {
+#endif
 				if (WT_PAGE_IS_INTERNAL(page)) {
 					internal_bytes +=
 					    page->memory_footprint;
