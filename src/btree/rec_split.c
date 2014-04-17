@@ -583,16 +583,17 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *parent, *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
-	WT_REF **alloc_refp, **ref_tmp;
+	WT_REF **alloc_refp, *parent_ref, **ref_tmp;
 	size_t parent_decr, parent_incr, size;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
-	int complete, locked;
+	int complete, hazard, locked;
 
 	kpack = &_kpack;
 	alloc_index = NULL;
+	parent_ref = NULL;
 	ref_tmp = NULL;
 	parent_decr = parent_incr = 0;
-	complete = locked = 0;
+	complete = hazard = locked = 0;
 
 	child = ref->page;
 	mod = child->modify;
@@ -633,6 +634,18 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		__wt_yield();
 	}
 	locked = 1;
+
+	/*
+	 * We have exclusive access to the parent, and at this point, the child
+	 * prevents the parent from being evicted.  However, once we update the
+	 * parent's index, it will no longer refer to the child, and could
+	 * conceivably be evicted.  Get a hazard pointer on the parent now, so
+	 * that we can safely access it after updating the index.
+	 */
+	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
+		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_GEN));
+		hazard = 1;
+	}
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
@@ -784,6 +797,9 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 err:	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+
+	if (hazard)
+		WT_ERR(__wt_hazard_clear(session, parent));
 
 	/*
 	 * Discard the child; test for split completion instead of errors, there
