@@ -711,7 +711,9 @@ shellHelper.show = function (what) {
             } else if (res.errmsg == "no such cmd: getLog" ) {
                 // Don't print if the command is not available
                 return "";
-            } else if (res.errmsg == "unauthorized" || res.errmsg == "need to login") {
+            } else if (res.code == 13 /*unauthorized*/ ||
+                       res.errmsg == "unauthorized" ||
+                       res.errmsg == "need to login") {
                 // Don't print if startupWarnings command failed due to auth
                 return "";
             } else {
