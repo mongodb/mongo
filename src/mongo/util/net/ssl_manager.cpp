@@ -634,6 +634,15 @@ namespace mongo {
     }
 
     bool SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
+        // Set the list of CAs sent to clients
+        STACK_OF (X509_NAME) * certNames = SSL_load_client_CA_file(caFile.c_str());
+        if (certNames == NULL) {
+            error() << "cannot read certificate authority file: " << caFile << " " <<
+                getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+        SSL_CTX_set_client_CA_list(context, certNames);
+
         // Load trusted CA
         if (SSL_CTX_load_verify_locations(context, caFile.c_str(), NULL) != 1) {
             error() << "cannot read certificate authority file: " << caFile << " " <<
