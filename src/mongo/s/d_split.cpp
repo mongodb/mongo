@@ -285,8 +285,6 @@ namespace mongo {
                     return false;
                 }
 
-                const NamespaceDetails* d = collection->details();
-
                 // Allow multiKey based on the invariant that shard keys must be single-valued.
                 // Therefore, any multi-key index prefixed by shard key cannot be multikey over
                 // the shard key fields.
@@ -309,8 +307,8 @@ namespace mongo {
                     max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
                 }
 
-                const long long recCount = d->numRecords();
-                const long long dataSize = d->dataSize();
+                const long long recCount = collection->numRecords();
+                const long long dataSize = collection->dataSize();
 
                 //
                 // 1.b Now that we have the size estimate, go over the remaining parameters and apply any maximum size

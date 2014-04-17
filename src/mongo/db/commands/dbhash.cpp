@@ -97,7 +97,7 @@ namespace mongo {
                                                     InternalPlanner::FORWARD,
                                                     InternalPlanner::IXSCAN_FETCH));
         }
-        else if ( collection->details()->isCapped() ) {
+        else if ( collection->isCapped() ) {
             runner.reset(InternalPlanner::collectionScan(fullCollectionName,
                                                          collection));
         }

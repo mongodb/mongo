@@ -474,7 +474,7 @@ namespace mongo {
         const long long totalDocsInNS = collection->numRecords();
         if ( totalDocsInNS > 0 ) {
             // TODO: Figure out what's up here
-            avgDocSizeBytes = collection->details()->dataSize() / totalDocsInNS;
+            avgDocSizeBytes = collection->dataSize() / totalDocsInNS;
             avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
             avgDocsWhenFull = std::min( kMaxDocsPerChunk + 1,
                                         130 * avgDocsWhenFull / 100 /* slack */);
