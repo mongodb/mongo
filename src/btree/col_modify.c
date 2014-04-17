@@ -76,7 +76,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * key must not exist on the new page.
 		 */
 		WT_ASSERT(session, upd == NULL);
-		
+
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_txn_update_check(
 		    session, old_upd = cbt->ins->upd));
