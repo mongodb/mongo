@@ -231,7 +231,7 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
 	 */
 	WT_WRITE_BARRIER();
 	my_alloc = WT_ATOMIC_ADD(async->alloc_head, 1);
-	my_slot = my_alloc % conn->async_size;
+	my_slot = my_alloc % async->async_qsize;
 	WT_ASSERT(conn->default_session, async->async_queue[my_slot] == NULL);
 	async->async_queue[my_slot] = op;
 	op->state = WT_ASYNCOP_ENQUEUED;
@@ -268,10 +268,11 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	/*
 	 * Allocate and initialize the work queue.  This is sized so that
 	 * the ring buffer is known to be big enough such that the head
-	 * can never overlap the tail.  Include 1 extra for the flush op.
+	 * can never overlap the tail.  Include extra for the flush op.
 	 */
+	async->async_qsize = conn->async_size + 2;
 	WT_RET(__wt_calloc_def(conn->default_session,
-	    conn->async_size + 1, &async->async_queue));
+	    async->async_qsize, &async->async_queue));
 	/*
 	 * Allocate and initialize all the user ops.
 	 */

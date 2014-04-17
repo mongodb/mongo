@@ -82,6 +82,7 @@ struct __wt_async {
 	 * large enough for all possible work.
 	 */
 	WT_ASYNC_OP_IMPL	 **async_queue;	/* Async ops work queue */
+	uint32_t		 async_qsize;	/* Async work queue size */
 	uint64_t		 alloc_head;	/* Next slot to enqueue */
 	uint64_t		 head;		/* Head visible to worker */
 	uint64_t		 tail;		/* Worker consumed tail */

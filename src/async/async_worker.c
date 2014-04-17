@@ -44,7 +44,7 @@ retry:
 	WT_WRITE_BARRIER();
 	if (!WT_ATOMIC_CAS(async->tail, old_tail, old_tail + 1))
 		goto retry;
-	my_slot = (old_tail + 1) % conn->async_size;
+	my_slot = (old_tail + 1) % async->async_qsize;
 	*op = WT_ATOMIC_STORE(async->async_queue[my_slot], NULL);
 
 	WT_ASSERT(session, async->cur_queue > 0);
