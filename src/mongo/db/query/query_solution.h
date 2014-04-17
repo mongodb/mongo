@@ -180,8 +180,6 @@ namespace mongo {
         // Any filters in root or below point into this object.  Must be owned.
         BSONObj filterData;
 
-        string ns;
-
         // There are two known scenarios in which a query solution might potentially block:
         //
         // Sort stage:

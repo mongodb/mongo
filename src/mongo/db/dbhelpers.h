@@ -80,8 +80,10 @@ namespace mongo {
 
            @return true if object found
         */
-        static bool findOne(const StringData& ns, const BSONObj &query, BSONObj& result, bool requireIndex = false);
-        static DiskLoc findOne(const StringData& ns, const BSONObj &query, bool requireIndex);
+        static bool findOne(Collection* collection, const BSONObj &query,
+                            BSONObj& result, bool requireIndex = false);
+        static DiskLoc findOne(Collection* collection, const BSONObj &query,
+                               bool requireIndex);
 
         /**
          * have to be locked already

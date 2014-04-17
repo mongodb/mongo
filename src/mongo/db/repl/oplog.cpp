@@ -625,7 +625,7 @@ namespace mongo {
                         if (collection == NULL ||
                             (indexCatalog->haveIdIndex() && Helpers::findById(collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
-                            (!indexCatalog->haveIdIndex() && Helpers::findOne(ns, updateCriteria, false).isNull())) {
+                            (!indexCatalog->haveIdIndex() && Helpers::findOne(collection, updateCriteria, false).isNull())) {
                             failedUpdate = true;
                             log() << "replication couldn't find doc: " << op.toString() << endl;
                         }

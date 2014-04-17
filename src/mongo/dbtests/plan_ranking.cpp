@@ -111,7 +111,7 @@ namespace PlanRankingTests {
             for (size_t i = 0; i < solutions.size(); ++i) {
                 WorkingSet* ws;
                 PlanStage* root;
-                ASSERT(StageBuilder::build(*solutions[i], &root, &ws));
+                ASSERT(StageBuilder::build(collection, *solutions[i], &root, &ws));
                 // Takes ownership of all arguments.
                 _mpr->addPlan(solutions[i], root, ws);
             }

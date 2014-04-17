@@ -61,17 +61,6 @@ namespace mongo {
      * If the query cannot be executed, returns a Status indicating why.  Deletes
      * rawCanonicalQuery.
      */
-    Status getRunner(CanonicalQuery* rawCanonicalQuery,
-                     Runner** out,
-                     size_t plannerOptions = 0);
-
-    /**
-     * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
-     *
-     * As 'getRunner' above, but takes a Collection* as the first argument, for cases where the
-     * work to obtain the Collection has already been done by the caller. The 'collection'
-     * argument may be NULL.
-     */
     Status getRunner(Collection* collection,
                      CanonicalQuery* rawCanonicalQuery,
                      Runner** out,

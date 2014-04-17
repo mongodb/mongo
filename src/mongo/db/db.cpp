@@ -414,8 +414,9 @@ namespace mongo {
                 }
             }
             else {
-                const string systemIndexes = cc().database()->name() + ".system.indexes";
-                auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
+                const string systemIndexes = ctx.db()->name() + ".system.indexes";
+                Collection* coll = ctx.db()->getCollection( systemIndexes );
+                auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes,coll));
                 BSONObj index;
                 Runner::RunnerState state;
                 while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {

@@ -227,7 +227,8 @@ namespace mongo {
        and cursor in effect.
     */
     void ReplSource::loadAll(SourceVector &v) {
-        Client::Context ctx("local.sources");
+        const char* localSources = "local.sources";
+        Client::Context ctx(localSources);
         SourceVector old = v;
         v.clear();
 
@@ -236,7 +237,8 @@ namespace mongo {
             // check that no items are in sources other than that
             // add if missing
             int n = 0;
-            auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
+            auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
+                                                                    ctx.db()->getCollection(localSources)));
             BSONObj obj;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -278,7 +280,8 @@ namespace mongo {
             }
         }
 
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
+                                                                ctx.db()->getCollection(localSources)));
         BSONObj obj;
         Runner::RunnerState state;
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {

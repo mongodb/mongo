@@ -146,6 +146,7 @@ namespace mongo {
             massert( 13417, "captrunc collection not found or empty", collection);
 
             boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(nss.ns(),
+                                                                             collection,
                                                                              InternalPlanner::BACKWARD));
             DiskLoc end;
             // We remove 'n' elements so the start is one past that

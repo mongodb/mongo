@@ -81,6 +81,7 @@ namespace mongo {
                                     ( toCollection->storageSize() * 2 ) );
 
         scoped_ptr<Runner> runner( InternalPlanner::collectionScan(fromNs,
+                                                                   fromCollection,
                                                                    InternalPlanner::FORWARD ) );
 
 

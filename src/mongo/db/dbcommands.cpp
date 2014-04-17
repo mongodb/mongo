@@ -808,10 +808,6 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const std::string ns = parseNs(dbname, jsobj);
 
-            // Check shard version at startup.
-            // This will throw before we've done any work if shard version is outdated
-            Client::ReadContext ctx(ns);
-
             md5digest d;
             md5_state_t st;
             md5_init(&st);
@@ -837,6 +833,11 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] << "n" << GTE << n );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
+            // Check shard version at startup.
+            // This will throw before we've done any work if shard version is outdated
+            Client::ReadContext ctx(ns);
+            Collection* coll = ctx.ctx().db()->getCollection(ns);
+
             CanonicalQuery* cq;
             if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
@@ -844,7 +845,7 @@ namespace mongo {
             }
 
             Runner* rawRunner;
-            if (!getRunner(cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
+            if (!getRunner(coll, cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
                 uasserted(17241, "Can't get runner for query " + query.toString());
                 return 0;
             }
@@ -989,7 +990,7 @@ namespace mongo {
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
-                runner.reset(InternalPlanner::collectionScan(ns));
+                runner.reset(InternalPlanner::collectionScan(ns,collection));
             }
             else if ( min.isEmpty() || max.isEmpty() ) {
                 errmsg = "only one of min or max specified";

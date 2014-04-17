@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/client.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/fts/fts_command.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/pdfile.h"
@@ -103,7 +104,7 @@ namespace mongo {
             }
 
             Runner* rawRunner;
-            Status getRunnerStatus = getRunner(cq, &rawRunner, 0);
+            Status getRunnerStatus = getRunner(ctx.ctx().db()->getCollection(ns), cq, &rawRunner);
             if (!getRunnerStatus.isOK()) {
                 errmsg = getRunnerStatus.reason();
                 return false;

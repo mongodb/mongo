@@ -80,7 +80,7 @@ namespace QuerySingleSolutionRunner {
         SingleSolutionRunner* makeCollScanRunner(Client::Context& ctx,
                                                  BSONObj& filterObj) {
             CollectionScanParams csparams;
-            csparams.ns = ns();
+            csparams.collection = ctx.db()->getCollection( ns() );
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> ws(new WorkingSet());
             // Parse the filter.

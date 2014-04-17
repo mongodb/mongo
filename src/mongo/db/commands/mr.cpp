@@ -591,7 +591,8 @@ namespace mongo {
                     bool found;
                     {
                         Client::Context tx( _config.outputOptions.finalNamespace );
-                        found = Helpers::findOne(_config.outputOptions.finalNamespace.c_str(),
+                        Collection* coll = tx.db()->getCollection( _config.outputOptions.finalNamespace );
+                        found = Helpers::findOne(coll,
                                                  temp["_id"].wrap(),
                                                  old,
                                                  true);
@@ -958,7 +959,8 @@ namespace mongo {
             verify(CanonicalQuery::canonicalize(_config.incLong, BSONObj(), sortKey, BSONObj(), &cq).isOK());
 
             Runner* rawRunner;
-            verify(getRunner(cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
+            verify(getRunner(ctx.ctx().db()->getCollection(_config.incLong),
+                             cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
             const ScopedRunnerRegistration safety(runner.get());
@@ -1297,7 +1299,7 @@ namespace mongo {
                         }
 
                         Runner* rawRunner;
-                        if (!getRunner(cq, &rawRunner).isOK()) {
+                        if (!getRunner(ctx.db()->getCollection( config.ns), cq, &rawRunner).isOK()) {
                             uasserted(17239, "Can't get runner for query " + config.filter.toString());
                             return 0;
                         }

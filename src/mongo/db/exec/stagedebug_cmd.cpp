@@ -295,9 +295,9 @@ namespace mongo {
                 CollectionScanParams params;
 
                 // What collection?
-                params.ns = dbname + "." + nodeArgs["name"].String();
-                uassert(16962, "Can't find collection " + nodeArgs["name"].String(),
-                        NULL != cc().database()->getCollection(params.ns));
+                string ns = dbname + "." + nodeArgs["name"].String();
+                params.collection = cc().database()->getCollection(ns);
+                uassert(16962, "Can't find collection " + ns, NULL != params.collection );
 
                 // What direction?
                 uassert(16963, "Direction argument must be specified and be a number",
@@ -364,7 +364,6 @@ namespace mongo {
                 FTSAccessMethod* fam =
                     dynamic_cast<FTSAccessMethod*>( collection->getIndexCatalog()->getIndex( index ) );
                 TextStageParams params(fam->getSpec());
-                params.ns = ns;
                 params.index = index;
 
                 // TODO: Deal with non-empty filters.  This is a hack to put in covering information

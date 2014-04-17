@@ -41,7 +41,7 @@ namespace mongo {
 
     struct TwoDNearParams {
         NearQuery nearQuery;
-        string ns;
+        Collection* collection; // not owned
         BSONObj indexKeyPattern;
         MatchExpression* filter;
         int numWanted;

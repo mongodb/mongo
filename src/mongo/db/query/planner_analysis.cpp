@@ -465,12 +465,11 @@ namespace mongo {
 
     // static
     QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& query,
-                                                   const QueryPlannerParams& params,
-                                                   QuerySolutionNode* solnRoot) {
+                                                           const QueryPlannerParams& params,
+                                                           QuerySolutionNode* solnRoot) {
         auto_ptr<QuerySolution> soln(new QuerySolution());
         soln->filterData = query.getQueryObj();
         verify(soln->filterData.isOwned());
-        soln->ns = query.ns();
         soln->indexFilterApplied = params.indexFiltersApplied;
 
         solnRoot->computeProperties();

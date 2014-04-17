@@ -65,6 +65,7 @@ namespace {
 }
 
     boost::shared_ptr<Runner> PipelineD::prepareCursorSource(
+            Collection* collection,
             const intrusive_ptr<Pipeline>& pPipeline,
             const intrusive_ptr<ExpressionContext>& pExpCtx) {
         // get the full "namespace" name
@@ -162,7 +163,7 @@ namespace {
                                              projectionForQuery,
                                              &cq);
             Runner* rawRunner;
-            if (status.isOK() && getRunner(cq, &rawRunner, runnerOptions).isOK()) {
+            if (status.isOK() && getRunner(collection, cq, &rawRunner, runnerOptions).isOK()) {
                 // success: The Runner will handle sorting for us using an index.
                 runner.reset(rawRunner);
                 sortInRunner = true;
@@ -186,7 +187,7 @@ namespace {
                                              &cq));
 
             Runner* rawRunner;
-            uassertStatusOK(getRunner(cq, &rawRunner, runnerOptions));
+            uassertStatusOK(getRunner(collection, cq, &rawRunner, runnerOptions));
             runner.reset(rawRunner);
         }
 

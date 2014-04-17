@@ -86,8 +86,10 @@ namespace mongo {
             int n = 0;
             list<BSONObj> src;
             {
-                Client::ReadContext ctx("local.sources", storageGlobalParams.dbpath);
-                auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
+                const char* localSources = "local.sources";
+                Client::ReadContext ctx(localSources, storageGlobalParams.dbpath);
+                auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
+                                                                        ctx.ctx().db()->getCollection(localSources)));
                 BSONObj obj;
                 Runner::RunnerState state;
                 while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {

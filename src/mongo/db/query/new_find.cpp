@@ -363,7 +363,7 @@ namespace mongo {
 
         // Make an oplog start finding stage.
         WorkingSet* oplogws = new WorkingSet();
-        OplogStart* stage = new OplogStart(cq->ns(), tsExpr, oplogws);
+        OplogStart* stage = new OplogStart(collection, tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
         auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
@@ -374,7 +374,7 @@ namespace mongo {
         Runner::RunnerState state = runner->getNext(NULL, &startLoc);
 
         // This is normal.  The start of the oplog is the beginning of the collection.
-        if (Runner::RUNNER_EOF == state) { return getRunner(cq, runnerOut); }
+        if (Runner::RUNNER_EOF == state) { return getRunner(collection, cq, runnerOut); }
 
         // This is not normal.  An error was encountered.
         if (Runner::RUNNER_ADVANCED != state) {
@@ -386,7 +386,7 @@ namespace mongo {
 
         // Build our collection scan...
         CollectionScanParams params;
-        params.ns = cq->ns();
+        params.collection = collection;
         params.start = startLoc;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = cq->getParsed().hasOption(QueryOption_CursorTailable);
@@ -495,7 +495,7 @@ namespace mongo {
             if (shardingState.needCollectionMetadata(pq.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
-            status = getRunner(cq, &rawRunner, options);
+            status = getRunner(collection, cq, &rawRunner, options);
         }
 
         if (!status.isOK()) {

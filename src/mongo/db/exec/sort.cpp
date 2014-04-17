@@ -44,7 +44,10 @@ namespace mongo {
 
     const size_t kMaxBytes = 32 * 1024 * 1024;
 
-    SortStageKeyGenerator::SortStageKeyGenerator(const BSONObj& sortSpec, const BSONObj& queryObj) {
+    SortStageKeyGenerator::SortStageKeyGenerator(Collection* collection,
+                                                 const BSONObj& sortSpec,
+                                                 const BSONObj& queryObj) {
+        _collection = collection;
         _hasBounds = false;
         _sortHasMeta = false;
         _rawSortSpec = sortSpec;
@@ -275,7 +278,8 @@ namespace mongo {
     }
 
     SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
-        : _ws(ws),
+        : _collection(params.collection),
+          _ws(ws),
           _child(child),
           _pattern(params.pattern),
           _query(params.query),
@@ -298,7 +302,7 @@ namespace mongo {
 
         if (NULL == _sortKeyGen) {
             // This is heavy and should be done as part of work().
-            _sortKeyGen.reset(new SortStageKeyGenerator(_pattern, _query));
+            _sortKeyGen.reset(new SortStageKeyGenerator(_collection, _pattern, _query));
             _sortKeyComparator.reset(new WorkingSetComparator(_sortKeyGen->getSortComparator()));
             // If limit > 1, we need to initialize _dataSet here to maintain ordered
             // set of data items while fetching from the child stage.

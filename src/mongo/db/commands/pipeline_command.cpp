@@ -319,7 +319,9 @@ namespace {
 
                 // This does mongod-specific stuff like creating the input Runner and adding to the
                 // front of the pipeline if needed.
-                boost::shared_ptr<Runner> input = PipelineD::prepareCursorSource(pPipeline, pCtx);
+                boost::shared_ptr<Runner> input = PipelineD::prepareCursorSource(collection,
+                                                                                 pPipeline,
+                                                                                 pCtx);
                 pPipeline->stitch();
 
                 runnerHolder.reset(new PipelineRunner(pPipeline, input));

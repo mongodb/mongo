@@ -79,15 +79,14 @@ namespace mongo {
 
         // Do some init if we haven't already.
         if (NULL == _iter) {
-            Collection* collection = cc().database()->getCollection( _params.ns );
-            if ( collection == NULL ) {
+            if ( _params.collection == NULL ) {
                 _nsDropped = true;
                 return PlanStage::DEAD;
             }
 
-            _iter.reset( collection->getIterator( _params.start,
-                                                  _params.tailable,
-                                                  _params.direction ) );
+            _iter.reset( _params.collection->getIterator( _params.start,
+                                                          _params.tailable,
+                                                          _params.direction ) );
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;

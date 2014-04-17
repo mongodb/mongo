@@ -55,9 +55,6 @@ namespace mongo {
     struct TextStageParams {
         TextStageParams(const FTSSpec& s) : spec(s) {}
 
-        // Namespace.
-        string ns;
-
         // Text index descriptor.  IndexCatalog owns this.
         IndexDescriptor* index;
 

@@ -98,7 +98,8 @@ namespace mongo {
                                                     InternalPlanner::IXSCAN_FETCH));
         }
         else if ( collection->details()->isCapped() ) {
-            runner.reset(InternalPlanner::collectionScan(fullCollectionName));
+            runner.reset(InternalPlanner::collectionScan(fullCollectionName,
+                                                         collection));
         }
         else {
             log() << "can't find _id index for: " << fullCollectionName << endl;

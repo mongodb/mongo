@@ -255,7 +255,8 @@ namespace mongo {
 
         fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
 
-        auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName ) );
+        auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName,
+                                                                  db->getCollection( db->_indexesName ) ) );
 
         BSONObj index;
         Runner::RunnerState state;

@@ -85,21 +85,6 @@ namespace mongo {
         temp.swap(*indexEntries);
     }
 
-    /**
-     * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
-     * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
-     */
-    Status getRunner(CanonicalQuery* rawCanonicalQuery,
-                     Runner** out, size_t plannerOptions) {
-        verify(rawCanonicalQuery);
-        Database* db = cc().database();
-        verify(db);
-        return getRunner(db->getCollection(rawCanonicalQuery->ns()),
-                         rawCanonicalQuery,
-                         out,
-                         plannerOptions);
-    }
-
     Status getRunner(Collection* collection,
                      const std::string& ns,
                      const BSONObj& unparsedQuery,
@@ -240,7 +225,7 @@ namespace mongo {
 
                 WorkingSet* ws;
                 PlanStage* root;
-                verify(StageBuilder::build(*qs, &root, &ws));
+                verify(StageBuilder::build(collection, *qs, &root, &ws));
                 *out = new SingleSolutionRunner(collection,
                                                 canonicalQuery, qs, root, ws);
                 if (NULL != backupQs) {
@@ -256,7 +241,7 @@ namespace mongo {
 
         WorkingSet* ws;
         PlanStage* root;
-        verify(StageBuilder::build(*qs, &root, &ws));
+        verify(StageBuilder::build(collection, *qs, &root, &ws));
         CachedPlanRunner* cpr = new CachedPlanRunner(collection,
                                                      canonicalQuery,
                                                      qs,
@@ -267,7 +252,7 @@ namespace mongo {
         if (NULL != backupQs) {
             WorkingSet* backupWs;
             PlanStage* backupRoot;
-            verify(StageBuilder::build(*backupQs, &backupRoot, &backupWs));
+            verify(StageBuilder::build(collection, *backupQs, &backupRoot, &backupWs));
             cpr->setBackupPlan(backupQs, backupRoot, backupWs);
         }
 
@@ -397,7 +382,7 @@ namespace mongo {
                     // We're not going to cache anything that's fast count.
                     WorkingSet* ws;
                     PlanStage* root;
-                    verify(StageBuilder::build(*solutions[i], &root, &ws));
+                    verify(StageBuilder::build(collection, *solutions[i], &root, &ws));
                     *out = new SingleSolutionRunner(collection,
                                                     canonicalQuery.release(),
                                                     solutions[i],
@@ -416,7 +401,7 @@ namespace mongo {
             // Only one possible plan.  Run it.  Build the stages from the solution.
             WorkingSet* ws;
             PlanStage* root;
-            verify(StageBuilder::build(*solutions[0], &root, &ws));
+            verify(StageBuilder::build(collection, *solutions[0], &root, &ws));
 
             // And, run the plan.
             *out = new SingleSolutionRunner(collection,
@@ -436,7 +421,7 @@ namespace mongo {
                 if (solutions[i]->cacheData.get()) {
                     solutions[i]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
                 }
-                verify(StageBuilder::build(*solutions[i], &root, &ws));
+                verify(StageBuilder::build(collection, *solutions[i], &root, &ws));
                 // Takes ownership of all arguments.
                 mpr->addPlan(solutions[i], root, ws);
             }
@@ -750,7 +735,7 @@ namespace mongo {
             }
 
             // Takes ownership of cq.
-            return getRunner(cq, out);
+            return getRunner(collection, cq, out);
         }
 
         //
@@ -796,7 +781,7 @@ namespace mongo {
 
             WorkingSet* ws;
             PlanStage* root;
-            verify(StageBuilder::build(*soln, &root, &ws));
+            verify(StageBuilder::build(collection, *soln, &root, &ws));
             *out = new SingleSolutionRunner(collection, cq, soln, root, ws);
             return Status::OK();
         }
@@ -805,7 +790,7 @@ namespace mongo {
         vector<QuerySolution*> solutions;
         status = QueryPlanner::plan(*cq, plannerParams, &solutions);
         if (!status.isOK()) {
-            return getRunner(cq, out);
+            return getRunner(collection, cq, out);
         }
 
         // We look for a solution that has an ixscan we can turn into a distinctixscan
@@ -824,7 +809,7 @@ namespace mongo {
                 // Build and return the SSR over solutions[i].
                 WorkingSet* ws;
                 PlanStage* root;
-                verify(StageBuilder::build(*solutions[i], &root, &ws));
+                verify(StageBuilder::build(collection, *solutions[i], &root, &ws));
                 *out = new SingleSolutionRunner(collection, cq, solutions[i], root, ws);
                 return Status::OK();
             }
@@ -849,7 +834,7 @@ namespace mongo {
         }
 
         // Takes ownership of cq.
-        return getRunner(cq, out);
+        return getRunner(collection, cq, out);
     }
 
     ScopedRunnerRegistration::ScopedRunnerRegistration(Runner* runner)

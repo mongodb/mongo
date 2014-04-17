@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    class Collection;
+
     class QueryPlannerAnalysis {
     public:
 

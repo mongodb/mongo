@@ -139,6 +139,7 @@ namespace mongo {
             
             Lock::DBWrite lk( ns );
             Client::Context cx( ns );
+            Collection* collection = cx.db()->getCollection( ns );
 
             BSONObj doc;
             bool found = false;
@@ -149,7 +150,7 @@ namespace mongo {
 
                 Runner* rawRunner;
                 massert(17384, "Could not get runner for query " + queryOriginal.toString(),
-                        getRunner(cq, &rawRunner, QueryPlannerParams::DEFAULT).isOK());
+                        getRunner(collection, cq, &rawRunner, QueryPlannerParams::DEFAULT).isOK());
 
                 auto_ptr<Runner> runner(rawRunner);
 
@@ -255,6 +256,10 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
                     UpdateResult res = mongo::update(request, &cc().curop()->debug());
+                    if ( !collection ) {
+                        // collection created by an upsert
+                        collection = cx.db()->getCollection( ns );
+                    }
 
                     LOG(3) << "update result: "  << res ;
                     if ( returnNew ) {
@@ -270,7 +275,7 @@ namespace mongo {
                         }
 
                         LOG(3) << "using modified query to return the new doc: " << queryModified;
-                        if ( ! Helpers::findOne( ns.c_str() , queryModified , doc ) ) {
+                        if ( ! Helpers::findOne( collection, queryModified, doc ) ) {
                             errmsg = str::stream() << "can't find object after modification  " 
                                                    << " ns: " << ns 
                                                    << " queryModified: " << queryModified 

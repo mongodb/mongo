@@ -114,7 +114,7 @@ namespace QueryMultiPlanRunner {
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
-            csparams.ns = ns();
+            csparams.collection = ctx.ctx().db()->getCollection( ns() );
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> secondWs(new WorkingSet());
             // Make the filter.

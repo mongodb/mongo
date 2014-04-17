@@ -229,8 +229,9 @@ namespace mongo {
         verify( Lock::isLocked() );
         Client::Context c(rsoplog);
 
-        boost::scoped_ptr<Runner> runner(
-            InternalPlanner::collectionScan(rsoplog, InternalPlanner::BACKWARD));
+        boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(rsoplog,
+                                                                         c.db()->getCollection(rsoplog),
+                                                                         InternalPlanner::BACKWARD));
 
         BSONObj ourObj;
         DiskLoc ourLoc;
@@ -496,7 +497,7 @@ namespace mongo {
 
                 // Add the doc to our rollback file
                 BSONObj obj;
-                bool found = Helpers::findOne(d.ns, pattern, obj, false);
+                bool found = Helpers::findOne(c.db()->getCollection(d.ns), pattern, obj, false);
                 if ( found ) {
                     rs->goingToDelete( obj );
                 } else {
@@ -517,7 +518,7 @@ namespace mongo {
                                 /** todo: IIRC cappedTruncateAfter does not handle completely empty.  todo. */
                                 // this will crazy slow if no _id index.
                                 long long start = Listener::getElapsedTimeMillis();
-                                DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
+                                DiskLoc loc = Helpers::findOne(collection, pattern, false);
                                 if( Listener::getElapsedTimeMillis() - start > 200 )
                                     log() << "replSet warning roll back slow no _id index for " << d.ns << " perhaps?" << rsLog;
                                 //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);

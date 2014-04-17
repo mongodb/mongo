@@ -71,6 +71,7 @@ namespace mongo {
          * @param pExpCtx the expression context for this pipeline
          */
         static boost::shared_ptr<Runner> prepareCursorSource(
+            Collection* collection,
             const intrusive_ptr<Pipeline> &pPipeline,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 

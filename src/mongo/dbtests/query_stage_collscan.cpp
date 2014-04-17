@@ -68,7 +68,7 @@ namespace QueryStageCollectionScan {
             insertTestData();
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = collection();
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
             params.start = DiskLoc();
@@ -321,7 +321,7 @@ namespace QueryStageCollectionScan {
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( ns() );
             params.direction = direction;
             params.tailable = false;
 
@@ -341,11 +341,13 @@ namespace QueryStageCollectionScan {
             return count;
         }
 
-        void getLocs(CollectionScanParams::Direction direction, vector<DiskLoc>* out) {
+        void getLocs(Collection* collection,
+                     CollectionScanParams::Direction direction,
+                     vector<DiskLoc>* out) {
             WorkingSet ws;
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = collection;
             params.direction = direction;
             params.tailable = false;
 
@@ -427,7 +429,7 @@ namespace QueryStageCollectionScan {
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( ns() );
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
@@ -457,7 +459,7 @@ namespace QueryStageCollectionScan {
             Client::ReadContext ctx(ns());
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( ns() );
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
@@ -485,13 +487,15 @@ namespace QueryStageCollectionScan {
         void run() {
             Client::WriteContext ctx(ns());
 
+            Collection* coll = ctx.ctx().db()->getCollection( ns() );
+
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
-            getLocs(CollectionScanParams::FORWARD, &locs);
+            getLocs(coll, CollectionScanParams::FORWARD, &locs);
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
@@ -544,14 +548,15 @@ namespace QueryStageCollectionScan {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Collection* coll = ctx.ctx().db()->getCollection(ns());
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
-            getLocs(CollectionScanParams::BACKWARD, &locs);
+            getLocs(coll, CollectionScanParams::BACKWARD, &locs);
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
@@ -599,6 +604,7 @@ namespace QueryStageCollectionScan {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Collection* coll = ctx.ctx().db()->getCollection(ns());
 
             // We want every result from our collscan to NOT be in memory, at least
             // the first time around.
@@ -609,11 +615,11 @@ namespace QueryStageCollectionScan {
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
-            getLocs(CollectionScanParams::FORWARD, &locs);
+            getLocs(coll, CollectionScanParams::FORWARD, &locs);
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 

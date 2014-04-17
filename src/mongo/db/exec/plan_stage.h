@@ -34,6 +34,7 @@
 
 namespace mongo {
 
+    class Collection;
     class DiskLoc;
 
     /**
@@ -220,6 +221,7 @@ namespace mongo {
          * Caller owns returned pointer.
          */
         virtual PlanStageStats* getStats() = 0;
+
     };
 
 }  // namespace mongo

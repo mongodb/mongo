@@ -413,11 +413,11 @@ namespace mongo {
         Lock::assertWriteLocked( ns );
 
         string system_namespaces = nsToDatabaseSubstring(ns).toString() + ".system.namespaces";
+        Collection* coll = cc().database()->getCollection( system_namespaces );
 
-        DiskLoc oldLocation = Helpers::findOne( system_namespaces, BSON( "name" << ns ), false );
+        DiskLoc oldLocation = Helpers::findOne( coll, BSON( "name" << ns ), false );
         fassert( 17247, !oldLocation.isNull() );
 
-        Collection* coll = cc().database()->getCollection( system_namespaces );
         BSONObj oldEntry = coll->docFor( oldLocation );
 
         BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );

@@ -127,7 +127,7 @@ namespace QueryStageKeep {
 
             // Create a collscan to provide the 10 objects in the collection.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
             params.start = DiskLoc();

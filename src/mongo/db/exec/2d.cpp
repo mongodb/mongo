@@ -38,7 +38,8 @@ namespace mongo {
 
     TwoD::TwoD(const TwoDParams& params, WorkingSet* ws)
         : _params(params), _workingSet(ws), _initted(false),
-          _descriptor(NULL), _am(NULL) { }
+          _descriptor(NULL), _am(NULL) {
+    }
 
     TwoD::~TwoD() { }
 
@@ -52,19 +53,16 @@ namespace mongo {
         if (!_initted) {
             _initted = true;
 
-            Database* database = cc().database();
-            if ( !database )
+            if ( !_params.collection )
                 return PlanStage::IS_EOF;
 
-            Collection* collection = database->getCollection( _params.ns );
-            if ( !collection )
-                return PlanStage::IS_EOF;
+            IndexCatalog* indexCatalog = _params.collection->getIndexCatalog();
 
-            _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+            _descriptor = indexCatalog->findIndexByKeyPattern(_params.indexKeyPattern);
             if ( _descriptor == NULL )
                 return PlanStage::IS_EOF;
 
-            _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
+            _am = static_cast<TwoDAccessMethod*>( indexCatalog->getIndex( _descriptor ) );
             verify( _am );
 
             if (NULL != _params.gq.getGeometry()._cap.get()) {

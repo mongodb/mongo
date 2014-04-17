@@ -38,13 +38,14 @@
 namespace mongo {
 
     // Does not take ownership.
-    OplogStart::OplogStart(const string& ns, MatchExpression* filter, WorkingSet* ws)
+    OplogStart::OplogStart(Collection* collection, MatchExpression* filter, WorkingSet* ws)
         : _needInit(true),
           _backwardsScanning(false),
           _extentHopping(false),
           _done(false),
+          _collection(collection),
+          _nsd(NULL),
           _workingSet(ws),
-          _ns(ns),
           _filter(filter) { }
 
     OplogStart::~OplogStart() { }
@@ -53,11 +54,10 @@ namespace mongo {
         // We do our (heavy) init in a work(), where work is expected.
         if (_needInit) {
             CollectionScanParams params;
-            params.ns = _ns;
+            params.collection = _collection;
             params.direction = CollectionScanParams::BACKWARD;
             _cs.reset(new CollectionScan(params, _workingSet, NULL));
-            Collection* collection = cc().database()->getCollection( _ns );
-            _nsd = collection->details();
+            _nsd = _collection->details();
             _needInit = false;
             _backwardsScanning = true;
             _timer.reset();

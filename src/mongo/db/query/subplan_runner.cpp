@@ -249,7 +249,7 @@ namespace mongo {
                 for (size_t i = 0; i < solutions.size(); ++i) {
                     WorkingSet* ws;
                     PlanStage* root;
-                    verify(StageBuilder::build(*solutions[i], &root, &ws));
+                    verify(StageBuilder::build(_collection, *solutions[i], &root, &ws));
                     // Takes ownership of all arguments.
                     mpr->addPlan(solutions[i], root, ws);
                 }
@@ -336,7 +336,7 @@ namespace mongo {
         MultiPlanRunner* mpr = new MultiPlanRunner(_collection, _query.release());
         WorkingSet* ws;
         PlanStage* root;
-        verify(StageBuilder::build(*soln, &root, &ws));
+        verify(StageBuilder::build(_collection, *soln, &root, &ws));
         // Takes ownership of all arguments.
         mpr->addPlan(soln, root, ws);
 

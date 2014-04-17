@@ -308,33 +308,32 @@ namespace mongo {
     void Database::clearTmpCollections() {
 
         Lock::assertWriteLocked( _name );
-        Client::Context ctx( _name );
-
-        string systemNamespaces =  _name + ".system.namespaces";
 
         // Note: we build up a toDelete vector rather than dropping the collection inside the loop
         // to avoid modifying the system.namespaces collection while iterating over it since that
         // would corrupt the cursor.
         vector<string> toDelete;
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemNamespaces));
-        BSONObj nsObj;
-        Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&nsObj, NULL))) {
-            BSONElement e = nsObj.getFieldDotted( "options.temp" );
-            if ( !e.trueValue() )
-                continue;
+        {
+            Collection* coll = getCollection( _namespacesName );
+            if ( coll ) {
+                scoped_ptr<RecordIterator> it( coll->getIterator() );
+                DiskLoc next;
+                while ( !( next = it->getNext() ).isNull() ) {
+                    BSONObj nsObj = coll->docFor( next );
 
-            string ns = nsObj["name"].String();
+                    BSONElement e = nsObj.getFieldDotted( "options.temp" );
+                    if ( !e.trueValue() )
+                        continue;
 
-            // Do not attempt to drop indexes
-            if ( !NamespaceString::normal(ns.c_str()) )
-                continue;
+                    string ns = nsObj["name"].String();
 
-            toDelete.push_back(ns);
-        }
+                    // Do not attempt to drop indexes
+                    if ( !NamespaceString::normal(ns.c_str()) )
+                        continue;
 
-        if (Runner::RUNNER_EOF != state) {
-            warning() << "Internal error while reading collection " << systemNamespaces << endl;
+                    toDelete.push_back(ns);
+                }
+            }
         }
 
         for (size_t i=0; i < toDelete.size(); i++) {
@@ -509,7 +508,9 @@ namespace mongo {
 
         // move index namespaces
         BSONObj oldIndexSpec;
-        while( Helpers::findOne( _indexesName, BSON( "ns" << fromNS ), oldIndexSpec ) ) {
+        while( Helpers::findOne( getCollection( _indexesName ),
+                                 BSON( "ns" << fromNS ),
+                                 oldIndexSpec ) ) {
             oldIndexSpec = oldIndexSpec.getOwned();
 
             BSONObj newIndexSpec;
@@ -615,7 +616,9 @@ namespace mongo {
         {
 
             BSONObj oldSpec;
-            if ( !Helpers::findOne( _namespacesName, BSON( "name" << fromNS ), oldSpec ) )
+            if ( !Helpers::findOne( getCollection( _namespacesName ),
+                                    BSON( "name" << fromNS ),
+                                    oldSpec ) )
                 return Status( ErrorCodes::InternalError, "can't find system.namespaces entry" );
 
             BSONObjBuilder b;

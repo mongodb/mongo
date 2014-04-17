@@ -169,7 +169,7 @@ namespace DocumentSourceTests {
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
                 Runner* runnerBare;
-                uassertStatusOK(getRunner(cq, &runnerBare));
+                uassertStatusOK(getRunner(ctx.ctx().db()->getCollection(ns), cq, &runnerBare));
 
                 _runner.reset(runnerBare);
                 _runner->setYieldPolicy(Runner::YIELD_AUTO);

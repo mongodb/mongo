@@ -104,7 +104,7 @@ namespace mongo {
         unsigned long long n = 0;
         unsigned long long numDropped = 0;
 
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,collection));
 
         // We're not delegating yielding to the runner because we need to know when a yield
         // happens.

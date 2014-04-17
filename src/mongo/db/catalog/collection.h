@@ -139,8 +139,9 @@ namespace mongo {
          * canonical to get all would be
          * getIterator( DiskLoc(), false, CollectionScanParams::FORWARD )
          */
-        RecordIterator* getIterator( const DiskLoc& start, bool tailable,
-                                     const CollectionScanParams::Direction& dir) const;
+        RecordIterator* getIterator( const DiskLoc& start = DiskLoc(),
+                                     bool tailable = false,
+                                     const CollectionScanParams::Direction& dir = CollectionScanParams::FORWARD ) const;
 
 
         /**

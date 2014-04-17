@@ -89,8 +89,8 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    bool Helpers::findOne(const StringData& ns, const BSONObj &query, BSONObj& result, bool requireIndex) {
-        DiskLoc loc = findOne( ns, query, requireIndex );
+    bool Helpers::findOne(Collection* collection, const BSONObj &query, BSONObj& result, bool requireIndex) {
+        DiskLoc loc = findOne( collection, query, requireIndex );
         if ( loc.isNull() )
             return false;
         result = loc.obj();
@@ -100,15 +100,18 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
+    DiskLoc Helpers::findOne(Collection* collection, const BSONObj &query, bool requireIndex) {
+        if ( !collection )
+            return DiskLoc();
+
         CanonicalQuery* cq;
         massert(17244, "Could not canonicalize " + query.toString(),
-                CanonicalQuery::canonicalize(ns.toString(), query, &cq).isOK());
+                CanonicalQuery::canonicalize(collection->ns(), query, &cq).isOK());
 
         Runner* rawRunner;
         size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
         massert(17245, "Could not get runner for query " + query.toString(),
-                getRunner(cq, &rawRunner, options).isOK());
+                getRunner(collection, cq, &rawRunner, options).isOK());
 
         auto_ptr<Runner> runner(rawRunner);
         Runner::RunnerState state;
@@ -174,7 +177,7 @@ namespace mongo {
 
         Runner* rawRunner;
         uassert(17237, "Could not get runner for query " + query.toString(),
-                getRunner(cq, &rawRunner).isOK());
+                getRunner(ctx.db()->getCollection( ns ), cq, &rawRunner).isOK());
 
         vector<BSONObj> all;
 
@@ -190,7 +193,8 @@ namespace mongo {
 
     bool Helpers::isEmpty(const char *ns) {
         Client::Context context(ns, storageGlobalParams.dbpath);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
+                                                                context.db()->getCollection(ns)));
         return Runner::RUNNER_EOF == runner->getNext(NULL, NULL);
     }
 
@@ -201,7 +205,8 @@ namespace mongo {
     */
     bool Helpers::getSingleton(const char *ns, BSONObj& result) {
         Client::Context context(ns);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
+                                                                context.db()->getCollection(ns)));
         Runner::RunnerState state = runner->getNext(&result, NULL);
         context.getClient()->curop()->done();
         return Runner::RUNNER_ADVANCED == state;
@@ -209,7 +214,10 @@ namespace mongo {
 
     bool Helpers::getLast(const char *ns, BSONObj& result) {
         Client::Context ctx(ns);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns, InternalPlanner::BACKWARD));
+        Collection* coll = ctx.db()->getCollection( ns );
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
+                                                                coll,
+                                                                InternalPlanner::BACKWARD));
         Runner::RunnerState state = runner->getNext(&result, NULL);
         return Runner::RUNNER_ADVANCED == state;
     }

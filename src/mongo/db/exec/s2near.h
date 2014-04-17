@@ -44,7 +44,8 @@
 namespace mongo {
 
     struct S2NearParams {
-        string ns;
+        S2NearParams() : collection(NULL) { }
+        Collection* collection;
         BSONObj indexKeyPattern;
         NearQuery nearQuery;
         IndexBounds baseBounds;

@@ -80,19 +80,13 @@ namespace mongo {
         _outerRadiusInclusive = false;
 
         // Grab the IndexDescriptor.
-        Database* db = cc().database();
-        if (!db) {
+        if ( !_params.collection ) {
             _failed = true;
             return;
         }
 
-        Collection* collection = db->getCollection(_params.ns);
-        if (!collection) {
-            _failed = true;
-            return;
-        }
-
-        _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+        _descriptor =
+            _params.collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
         if (NULL == _descriptor) {
             _failed = true;
             return;
