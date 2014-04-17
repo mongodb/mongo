@@ -231,7 +231,7 @@ get_key_int(WT_CURSOR *cursor, int table_index, u_int *rval)
 		cursor->get_key(cursor, &key);
 		memset(buf, 0, 128);
 		memcpy(buf, key.data, key.size);
-		val = atol(buf);
+		val = (u_int)atol(buf);
 	}
 
 	*rval = val;

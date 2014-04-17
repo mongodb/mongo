@@ -149,7 +149,7 @@ worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
 	new_val = keyno;
 	if (cursor->search(cursor) == 0) {
 		cursor->get_value(cursor, &old_val);
-		new_val = atol(old_val) + 1;
+		new_val = (u_int)atol(old_val) + 1;
 	}
 	/*
 	 * The search cleared the key from our cursor - set it again. It would
