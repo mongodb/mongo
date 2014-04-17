@@ -143,6 +143,7 @@ verify_checkpoint(WT_SESSION *session)
 	int i, ret, t_ret;
 	uint64_t key_count;
 
+	ret = t_ret = 0;
 	key_count = 0;
 	snprintf(ckpt, 128, "checkpoint=%s", g.checkpoint_name);
 	cursors = calloc((size_t)g.ntables, sizeof(*cursors));
