@@ -985,7 +985,7 @@ namespace mongo {
             auto_ptr<Runner> runner;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
-                    result.appendNumber( "size" , collection->details()->dataSize() );
+                    result.appendNumber( "size" , collection->dataSize() );
                     result.appendNumber( "numObjects",
                                          static_cast<long long>( collection->numRecords() ) );
                     result.append( "millis" , timer.millis() );
@@ -1019,7 +1019,7 @@ namespace mongo {
                 runner.reset(InternalPlanner::indexScan(collection, idx, min, max, false));
             }
 
-            long long avgObjSize = collection->details()->dataSize() / collection->numRecords();
+            long long avgObjSize = collection->dataSize() / collection->numRecords();
 
             long long maxSize = jsobj["maxSize"].numberLong();
             long long maxObjects = jsobj["maxObjects"].numberLong();
