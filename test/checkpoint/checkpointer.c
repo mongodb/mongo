@@ -39,7 +39,7 @@ static int verify_checkpoint(WT_SESSION *);
  *     Responsible for creating the checkpoint thread.
  */
 int
-start_checkpoints()
+start_checkpoints(void)
 {
 	int ret;
 
@@ -54,7 +54,7 @@ start_checkpoints()
  *     Responsible for cleanly shutting down the checkpoint thread.
  */
 int
-end_checkpoints()
+end_checkpoints(void)
 {
 	void *thread_ret;
 
@@ -85,7 +85,7 @@ checkpointer(void *arg)
  *     responsible for finishing in a timely fashion.
  */
 static int
-real_checkpointer()
+real_checkpointer(void)
 {
 	WT_SESSION *session;
 	char *checkpoint_config, _buf[128];
