@@ -636,7 +636,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	if (cval.len != 0) {
 		F_SET(cursor,
 		    WT_STRING_MATCH("json", cval.str, cval.len) ?
-		    WT_CURSTD_DUMP_JSON : 
+		    WT_CURSTD_DUMP_JSON :
 		    (WT_STRING_MATCH("print", cval.str, cval.len) ?
 		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX));
 		if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {

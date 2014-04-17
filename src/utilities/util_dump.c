@@ -663,7 +663,7 @@ dup_json_string(const char *str, char **result)
 		nchars += __unpack_json_char(*p, NULL, 0, 0);
 	q = malloc(nchars + 1);
 	if (q == NULL)
-		return 1;
+		return (1);
 	*result = q;
 	left = nchars;
 	for (p = str; *p; p++, nchars++) {
@@ -672,7 +672,7 @@ dup_json_string(const char *str, char **result)
 		q += nchars;
 	}
 	*q = '\0';
-	return 0;
+	return (0);
 }
 
 /*
