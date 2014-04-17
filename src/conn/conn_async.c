@@ -116,7 +116,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
 	*opp = NULL;
 retry:
 	ret = 0;
-	save_i = async->ops_index;
+	WT_ORDERED_READ(save_i, async->ops_index);
 	/*
 	 * Look after the last one allocated for a free one.  We'd expect
 	 * ops to be freed mostly FIFO so we should quickly find one.

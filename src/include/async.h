@@ -73,19 +73,24 @@ struct __wt_async {
 #define	OPS_INVALID_INDEX	0xffffffff
 	uint32_t		 ops_index;	/* Active slot index */
 	uint64_t		 op_id;		/* Unique ID counter */
-	/*
-	 * We need to have two head pointers.  One that is allocated to
-	 * enqueue threads and one that indicates ready slots to the
-	 * consumers.  We only need one tail pointer to coordinate
-	 * consuming threads against each other.  We don't need to worry
-	 * about head catch up with tail because we know the queue is
-	 * large enough for all possible work.
-	 */
 	WT_ASYNC_OP_IMPL	 **async_queue;	/* Async ops work queue */
 	uint32_t		 async_qsize;	/* Async work queue size */
+	/*
+	 * We need to have two head and tail values.  All but one is
+	 * maintained as an ever increasing value to ease wrap around.
+	 *
+	 * alloc_head: the next one to allocate for producers.
+	 * head: the current head visible to consumers.
+	 * head is always <= alloc_head.
+	 * alloc_tail: the next slot for consumers to dequeue.
+	 * alloc_tail is always <= head.
+	 * tail_slot: the last slot consumed.
+	 * A producer may need wait for tail_slot to advance.
+	 */
 	uint64_t		 alloc_head;	/* Next slot to enqueue */
 	uint64_t		 head;		/* Head visible to worker */
-	uint64_t		 tail;		/* Worker consumed tail */
+	uint64_t		 alloc_tail;	/* Next slot to dequeue */
+	uint64_t		 tail_slot;	/* Worker slot consumed */
 
 	STAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
 	int			 cur_queue;	/* Currently enqueued */

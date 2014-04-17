@@ -219,7 +219,10 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
 {
 	WT_ASYNC *async;
 	WT_DECL_RET;
-	uint64_t my_alloc, my_slot;
+	uint64_t cur_head, cur_tail, my_alloc, my_slot;
+#ifdef	HAVE_DIAGNOSTIC
+	WT_ASYNC_OP_IMPL *my_op;
+#endif
 
 	async = conn->async;
 	/*
@@ -229,21 +232,37 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
 	/*
 	 * We get our slot in the ring buffer to use.
 	 */
-	WT_WRITE_BARRIER();
 	my_alloc = WT_ATOMIC_ADD(async->alloc_head, 1);
 	my_slot = my_alloc % async->async_qsize;
-	WT_ASSERT(conn->default_session, async->async_queue[my_slot] == NULL);
-	async->async_queue[my_slot] = op;
+
+	/*
+	 * Make sure we haven't wrapped around the queue.
+	 * If so, wait for the tail to advance off this slot.
+	 */
+	WT_ORDERED_READ(cur_tail, async->tail_slot);
+	while (cur_tail == my_slot) {
+		__wt_yield();
+		WT_ORDERED_READ(cur_tail, async->tail_slot);
+	}
+
+#ifdef	HAVE_DIAGNOSTIC
+	WT_ORDERED_READ(my_op, async->async_queue[my_slot]);
+	if (my_op != NULL)
+		__wt_panic(conn->default_session);
+#endif
+	WT_PUBLISH(async->async_queue[my_slot], op);
 	op->state = WT_ASYNCOP_ENQUEUED;
-	WT_WRITE_BARRIER();
 	if (WT_ATOMIC_ADD(async->cur_queue, 1) > async->max_queue)
-		async->max_queue = async->cur_queue;
+		WT_PUBLISH(async->max_queue, async->cur_queue);
 	/*
 	 * Multiple threads may be adding ops to the queue.  We need to wait
 	 * our turn to make our slot visible to workers.
 	 */
-	while (async->head != (my_alloc - 1))
+	WT_ORDERED_READ(cur_head, async->head);
+	while (cur_head != (my_alloc - 1)) {
 		__wt_yield();
+		WT_ORDERED_READ(cur_head, async->head);
+	}
 	WT_PUBLISH(async->head, my_alloc);
 	return (ret);
 }

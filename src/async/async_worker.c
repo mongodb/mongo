@@ -17,7 +17,7 @@ __async_op_dequeue(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session,
     WT_ASYNC_OP_IMPL **op)
 {
 	WT_ASYNC *async;
-	uint64_t my_slot, old_tail;
+	uint64_t cur_tail, last_consume, my_consume, my_slot, prev_slot;
 	uint32_t max_tries, tries;
 
 	async = conn->async;
@@ -29,11 +29,14 @@ __async_op_dequeue(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session,
 	 * Then grab the slot containing the work.  If we lose, try again.
 	 */
 retry:
-	WT_READ_BARRIER();
-	while ((old_tail = async->tail) == async->head &&
-	    ++tries < max_tries &&
-	    async->flush_state != WT_ASYNC_FLUSHING)
+	WT_ORDERED_READ(last_consume, async->alloc_tail);
+	while (last_consume == async->head && ++tries < max_tries &&
+	    async->flush_state != WT_ASYNC_FLUSHING) {
 		__wt_yield();
+		WT_ORDERED_READ(last_consume, async->alloc_tail);
+	}
+	if (F_ISSET(conn, WT_CONN_PANIC))
+		__wt_panic(session);
 	if (tries >= max_tries ||
 	    async->flush_state == WT_ASYNC_FLUSHING)
 		return (0);
@@ -41,16 +44,20 @@ retry:
 	 * Try to increment the tail to claim this slot.  If we lose
 	 * a race, try again.
 	 */
-	WT_WRITE_BARRIER();
-	if (!WT_ATOMIC_CAS(async->tail, old_tail, old_tail + 1))
+	my_consume = last_consume + 1;
+	if (!WT_ATOMIC_CAS(async->alloc_tail, last_consume, my_consume))
 		goto retry;
-	my_slot = (old_tail + 1) % async->async_qsize;
+	/*
+	 * This item of work is ours to process.  Clear it out of the
+	 * queue and return.
+	 */
+	my_slot = my_consume % async->async_qsize;
+	prev_slot = last_consume % async->async_qsize;
 	*op = WT_ATOMIC_STORE(async->async_queue[my_slot], NULL);
 
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
 	WT_ASSERT(session, (*op)->state == WT_ASYNCOP_ENQUEUED);
-	WT_WRITE_BARRIER();
 	WT_ATOMIC_SUB(async->cur_queue, 1);
 	(*op)->state = WT_ASYNCOP_WORKING;
 
@@ -59,6 +66,12 @@ retry:
 		 * We're the worker to take the flush op off the queue.
 		 */
 		WT_PUBLISH(async->flush_state, WT_ASYNC_FLUSHING);
+	WT_ORDERED_READ(cur_tail, async->tail_slot);
+	while (cur_tail != prev_slot) {
+		__wt_yield();
+		WT_ORDERED_READ(cur_tail, async->tail_slot);
+	}
+	WT_PUBLISH(async->tail_slot, my_slot);
 	return (0);
 }
 
@@ -213,8 +226,8 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * the op back to the free pool and reset our cached cursor.
 	 * We do this regardless of success or failure.
 	 */
-	op->state = WT_ASYNCOP_FREE;
 	F_CLR(&asyncop->c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	WT_PUBLISH(op->state, WT_ASYNCOP_FREE);
 	cursor->reset(cursor);
 	return (ret);
 }
