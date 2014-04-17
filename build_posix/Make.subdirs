@@ -18,6 +18,7 @@ ext/test/kvs_bdb HAVE_BERKELEY_DB
 lang/java JAVA
 lang/python PYTHON
 test/bloom
+test/checkpoint
 test/fops
 test/format HAVE_BERKELEY_DB
 test/huge
