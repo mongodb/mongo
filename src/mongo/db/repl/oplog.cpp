@@ -214,7 +214,10 @@ namespace mongo {
         const OpTime ts = OpTime::now(lk2);
         long long hashNew;
         if( theReplSet ) {
-            massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
+            if (!theReplSet->box.getState().primary()) {
+                log() << "replSet error : logOp() but not primary";
+                fassertFailed(17405);
+            }
             hashNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
         }
         else {
@@ -415,26 +418,26 @@ namespace mongo {
         }
 
         /* create an oplog collection, if it doesn't yet exist. */
-        BSONObjBuilder b;
-        double sz;
-        if (replSettings.oplogSize != 0)
-            sz = (double)replSettings.oplogSize;
+        long long sz = 0;
+        if ( replSettings.oplogSize != 0 ) {
+            sz = replSettings.oplogSize;
+        }
         else {
             /* not specified. pick a default size */
-            sz = 50.0 * 1024 * 1024;
+            sz = 50LL * 1024LL * 1024LL;
             if ( sizeof(int *) >= 8 ) {
 #if defined(__APPLE__)
                 // typically these are desktops (dev machines), so keep it smallish
                 sz = (256-64) * 1024 * 1024;
 #else
-                sz = 990.0 * 1024 * 1024;
-                boost::intmax_t free =
+                sz = 990LL * 1024 * 1024;
+                double free =
                     File::freeSpace(storageGlobalParams.dbpath); //-1 if call not supported.
-                double fivePct = free * 0.05;
+                long long fivePct = static_cast<long long>( free * 0.05 );
                 if ( fivePct > sz )
                     sz = fivePct;
                 // we use 5% of free space up to 50GB (1TB free)
-                double upperBound = 50.0 * 1024 * 1024 * 1024;
+                static long long upperBound = 50LL * 1024 * 1024 * 1024;
                 if (fivePct > upperBound)
                     sz = upperBound;
 #endif
@@ -444,13 +447,12 @@ namespace mongo {
         log() << "******" << endl;
         log() << "creating replication oplog of size: " << (int)( sz / ( 1024 * 1024 ) ) << "MB..." << endl;
 
-        b.append("size", sz);
-        b.appendBool("capped", 1);
-        b.appendBool("autoIndexId", false);
+        CollectionOptions options;
+        options.capped = true;
+        options.cappedSize = sz;
+        options.autoIndexId = CollectionOptions::NO;
 
-        string err;
-        BSONObj o = b.done();
-        userCreateNS(ns, o, err, false);
+        invariant( ctx.db()->createCollection( ns, options ) );
         if( !rs )
             logOp( "n", "", BSONObj() );
 
@@ -464,7 +466,8 @@ namespace mongo {
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
-    bool applyOperation_inlock(const BSONObj& op, bool fromRepl, bool convertUpdateToUpsert) {
+    bool applyOperation_inlock(Database* db, const BSONObj& op,
+                               bool fromRepl, bool convertUpdateToUpsert) {
         LOG(3) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
@@ -493,7 +496,7 @@ namespace mongo {
 
         Lock::assertWriteLocked(ns);
 
-        Collection* collection = cc().database()->getCollection( ns );
+        Collection* collection = db->getCollection( ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 
         // operation type -- see logOp() comments for types
@@ -513,7 +516,22 @@ namespace mongo {
                     Client::Context* ctx = cc().getContext();
                     verify( ctx );
                     IndexBuilder builder(o);
-                    uassertStatusOK( builder.build( *ctx ) );
+                    Status status = builder.build( *ctx );
+                    if ( status.isOK() ) {
+                        // yay
+                    }
+                    else if ( status.code() == ErrorCodes::IndexOptionsConflict ||
+                              status.code() == ErrorCodes::IndexKeySpecsConflict ) {
+                        // SERVER-13206, SERVER-13496
+                        // 2.4 (and earlier) will add an ensureIndex to an oplog if its ok or not
+                        // so in 2.6+ where we do stricter validation, it will fail
+                        // but we shouldn't care as the primary is responsible
+                        warning() << "index creation attempted on secondary that conflicts, "
+                                  << "skipping: " << status;
+                    }
+                    else {
+                        uassertStatusOK( status );
+                    }
                 }
             }
             else {
@@ -608,7 +626,7 @@ namespace mongo {
                         if (collection == NULL ||
                             (indexCatalog->haveIdIndex() && Helpers::findById(collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
-                            (!indexCatalog->haveIdIndex() && Helpers::findOne(ns, updateCriteria, false).isNull())) {
+                            (!indexCatalog->haveIdIndex() && Helpers::findOne(collection, updateCriteria, false).isNull())) {
                             failedUpdate = true;
                             log() << "replication couldn't find doc: " << op.toString() << endl;
                         }
@@ -638,8 +656,22 @@ namespace mongo {
         else if ( *opType == 'c' ) {
             BufBuilder bb;
             BSONObjBuilder ob;
-            _runCommands(ns, o, bb, ob, true, 0);
             // _runCommands takes care of adjusting opcounters for command counting.
+            if (!_runCommands(ns, o, bb, ob, true, 0)) {
+                // command failed to run
+                severe() << "failed to run replicated command during replication: "
+                         << o.toString();
+                fassertFailedNoTrace(17442);
+            }
+            Status cmdStatus = Command::getStatusFromCommandResult(ob.asTempObj());
+            if (!cmdStatus.isOK()) {
+                // command hit an error of some sort
+                severe() << "failed to run replicated command during replication "
+                         << causedBy(cmdStatus)
+                         << ": "
+                         << o.toString();
+                fassertFailedNoTrace(17443);
+            }
         }
         else if ( *opType == 'n' ) {
             // no op

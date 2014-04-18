@@ -61,7 +61,9 @@ namespace {
         ServerParameter(sps, name, false, false) {}
 
     void AuthzVersionParameter::append(BSONObjBuilder& b, const std::string& name) {
-        b.append(name, getGlobalAuthorizationManager()->getAuthorizationVersion());
+        int authzVersion;
+        uassertStatusOK(getGlobalAuthorizationManager()->getAuthorizationVersion(&authzVersion));
+        b.append(name, authzVersion);
     }
 
     Status AuthzVersionParameter::set(const BSONElement& newValueElement) {
@@ -80,6 +82,7 @@ namespace {
 
     void clearGlobalAuthorizationManager() {
         fassert(16843, globalAuthManager != NULL);
+        delete globalAuthManager;
         globalAuthManager = NULL;
     }
 

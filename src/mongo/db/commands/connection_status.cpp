@@ -38,7 +38,7 @@ namespace mongo {
         CmdConnectionStatus() : Command("connectionStatus") {}
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required

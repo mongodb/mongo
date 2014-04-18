@@ -70,14 +70,19 @@ namespace {
         void addIndex(BSONObj keyPattern, bool multikey = false) {
             // The first false means not multikey.
             // The second false means not sparse.
-            // The third arg is the index name and I am egotistical.
-            params.indices.push_back(IndexEntry(keyPattern, multikey, false,
-                                                "hari_king_of_the_stove"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                false,
+                                                "hari_king_of_the_stove",
+                                                BSONObj()));
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-            params.indices.push_back(IndexEntry(keyPattern, multikey, sparse,
-                                                "note_to_self_dont_break_build"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                sparse,
+                                                "note_to_self_dont_break_build",
+                                                BSONObj()));
         }
 
         //
@@ -137,7 +142,9 @@ namespace {
                           bool snapshot) {
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                                    minObj, maxObj, snapshot, &cq);
+                                                    minObj, maxObj, snapshot,
+                                                    false, // explain
+                                                    &cq);
             if (!s.isOK()) { cq = NULL; }
             ASSERT_OK(s);
             s = QueryPlanner::plan(*cq, params, &solns);
@@ -187,7 +194,9 @@ namespace {
                                  bool snapshot) {
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                                    minObj, maxObj, snapshot, &cq);
+                                                    minObj, maxObj, snapshot,
+                                                    false, // explain
+                                                    &cq);
             if (!s.isOK()) { cq = NULL; }
             ASSERT_OK(s);
             s = QueryPlanner::plan(*cq, params, &solns);
@@ -346,14 +355,11 @@ namespace {
     TEST_F(QueryPlannerTest, HaveBadPrefixOnTextIndex) {
         params.options = QueryPlannerParams::NO_TABLE_SCAN;
         addIndex(BSON("a" << 1 << "_fts" << "text" << "_ftsx" << 1));
-        runQuery(fromjson("{a:{$gt: 1}, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:{$gt: 1}, $text:{$search: 'blah'}}"));
 
-        runQuery(fromjson("{$text: {$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{$text: {$search: 'blah'}}"));
 
-        runQuery(fromjson("{$or: [{a:1}, {$text: {$search: 'blah'}}]}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{$or: [{a:1}, {$text: {$search: 'blah'}}]}"));
     }
 
     // There can be more than one prefix, but they all require points.
@@ -367,20 +373,16 @@ namespace {
         assertNumSolutions(1);
 
         // Missing a.
-        runQuery(fromjson("{b:1, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{b:1, $text:{$search: 'blah'}}"));
 
         // Missing b.
-        runQuery(fromjson("{a:1, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:1, $text:{$search: 'blah'}}"));
 
         // a is not a point
-        runQuery(fromjson("{a:{$gt: 1}, b:1, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:{$gt: 1}, b:1, $text:{$search: 'blah'}}"));
 
         // b is not a point
-        runQuery(fromjson("{a:1, b:{$gt: 1}, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:1, b:{$gt: 1}, $text:{$search: 'blah'}}"));
     }
 
     // And, suffixes.  They're optional and don't need to be points.
@@ -426,8 +428,7 @@ namespace {
 
         // 'a' is not an EQ so it doesn't compound w/the text pred.  We also shouldn't use the text
         // index to satisfy it w/o the text query.
-        runQuery(fromjson("{a:{$elemMatch:{$gt: 0, $lt: 2}}, $text:{$search: 'blah'}}"));
-        assertNumSolutions(0);
+        runInvalidQuery(fromjson("{a:{$elemMatch:{$gt: 0, $lt: 2}}, $text:{$search: 'blah'}}"));
     }
 
     TEST_F(QueryPlannerTest, IndexOnOwnFieldButNotLeafSuffixNoPrefix) {
@@ -436,6 +437,130 @@ namespace {
 
         runQuery(fromjson("{b:{$elemMatch:{$gt: 0, $lt: 2}}, $text:{$search: 'blah'}}"));
         assertNumSolutions(1);
+    }
+
+    TEST_F(QueryPlannerTest, TextInsideAndWithCompoundIndex) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1 << "_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$and: [{a: 3}, {$text: {$search: 'foo'}}], a: 3}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{text: {prefix: {a:3}, search: 'foo'}}");
+    }
+
+    // SERVER-13039: Test that we don't generate invalid solutions when the TEXT node
+    // is buried beneath a logical node.
+    TEST_F(QueryPlannerTest, TextInsideOrBasic) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{a: 0, $or: [{_id: 1}, {$text: {$search: 'foo'}}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a:0}, node: {or: {nodes: ["
+                                "{text: {search: 'foo'}}, "
+                                "{ixscan: {filter: null, pattern: {_id: 1}}}]}}}}");
+    }
+
+    // SERVER-13039
+    TEST_F(QueryPlannerTest, TextInsideOrWithAnotherOr) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$and: [{$or: [{a: 3}, {a: 4}]}, "
+                                  "{$or: [{$text: {$search: 'foo'}}, {a: 5}]}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {$or: [{a: 3}, {a: 4}]}, node: "
+                                "{or: {nodes: ["
+                                    "{text: {search: 'foo'}}, "
+                                    "{ixscan: {filter: null, pattern: {a: 1}}}]}}}}");
+    }
+
+    // SERVER-13039
+    TEST_F(QueryPlannerTest, TextInsideOrOfAnd) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$or: [{a: {$gt: 1, $gt: 2}}, "
+                                 "{a: {$gt: 3}, $text: {$search: 'foo'}}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: null, node: {or: {nodes: ["
+                                "{ixscan: {filter: null, pattern: {a:1}, bounds: "
+                                    "{a: [[2,Infinity,false,true]]}}}, "
+                                "{fetch: {filter: {a:{$gt:3}}, node: "
+                                    "{text: {search: 'foo'}}}}]}}}}");
+    }
+
+    // SERVER-13039
+    TEST_F(QueryPlannerTest, TextInsideAndOrAnd) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{a: 1, $or: [{a:2}, {b:2}, "
+                                       "{a: 1, $text: {$search: 'foo'}}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a:1}, node: {or: {nodes: ["
+                                "{ixscan: {filter: null, pattern: {a:1}}}, "
+                                "{fetch: {filter: {a:1}, node: {text: {search: 'foo'}}}}, "
+                                "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    }
+
+    // SERVER-13039
+    TEST_F(QueryPlannerTest, TextInsideAndOrAndOr) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$or: [{a: {$gt: 1, $gt: 2}}, "
+                                 "{a: {$gt: 3}, $or: [{$text: {$search: 'foo'}}, "
+                                                     "{a: 6}]}], "
+                            "a: 5}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a:5}, node: {or: {nodes: ["
+                                "{ixscan: {filter: null, pattern: {a: 1}}}, "
+                                "{fetch: {filter: {a:{$gt:3}}, node: {or: {nodes: ["
+                                    "{text: {search: 'foo'}}, "
+                                    "{ixscan: {filter: null, pattern: {a: 1}}}]}}}}]}}}}");
+    }
+
+    // If only one branch of the $or can be indexed, then no indexed
+    // solutions are generated, even if one branch is $text.
+    TEST_F(QueryPlannerTest, TextInsideOrOneBranchNotIndexed) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{a: 1, $or: [{b: 2}, {$text: {$search: 'foo'}}]}"));
+
+        assertNumSolutions(0);
+    }
+
+    // If the unindexable $or is not the one containing the $text predicate,
+    // then we should still be able to generate an indexed solution.
+    TEST_F(QueryPlannerTest, TextInsideOrWithAnotherUnindexableOr) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$and: [{$or: [{a: 1}, {b: 1}]}, "
+                                  "{$or: [{a: 2}, {$text: {$search: 'foo'}}]}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {$or:[{a:1},{b:1}]}, node: {or: {nodes: ["
+                                "{text: {search: 'foo'}}, "
+                                "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, AndTextWithGeoNonNear) {
+        addIndex(BSON("_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$text: {$search: 'foo'}, a: {$geoIntersects: {$geometry: "
+                            "{type: 'Point', coordinates: [3.0, 1.0]}}}}"));
+
+        // Mandatory text index is used, and geo predicate becomes a filter.
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {text: {search: 'foo'}}}}");
     }
 
 }  // namespace

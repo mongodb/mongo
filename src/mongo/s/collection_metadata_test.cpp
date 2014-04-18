@@ -651,6 +651,96 @@ namespace {
         ASSERT( !cloned->keyIsPending(BSON( "a" << 35 )) );
     }
 
+    TEST_F(SingleChunkFixture, SingleSplit) {
+        string errMsg;
+        ChunkType chunk;
+        scoped_ptr<CollectionMetadata> cloned;
+
+        chunk.setMin( BSON("a" << 10) );
+        chunk.setMax( BSON("a" << 20) );
+
+        vector<BSONObj> splitPoints;
+        splitPoints.push_back( BSON("a" << 14) );
+
+        ChunkVersion version;
+        getCollMetadata().getCollVersion().cloneTo( &version );
+        version.incMinor();
+
+        cloned.reset( getCollMetadata().cloneSplit( chunk,
+                                          splitPoints,
+                                          version,
+                                          &errMsg ) );
+
+        ASSERT_EQUALS( errMsg, "" );
+        ASSERT( cloned != NULL );
+
+        ChunkVersion newVersion( cloned->getCollVersion() );
+        ASSERT_EQUALS( version.epoch(), newVersion.epoch() );
+        ASSERT_EQUALS( version.majorVersion(), newVersion.majorVersion() );
+        ASSERT_EQUALS( version.minorVersion() + 1, newVersion.minorVersion() );
+
+        chunk.clear();
+        ASSERT( cloned->getNextChunk(BSON("a" << MINKEY), &chunk) );
+        ASSERT( chunk.getMin().woCompare( BSON("a" << 10) ) == 0 );
+        ASSERT( chunk.getMax().woCompare( BSON("a" << 14) ) == 0 );
+
+        chunk.clear();
+        ASSERT( cloned->getNextChunk(BSON("a" << 14), &chunk) );
+        ASSERT( chunk.getMin().woCompare( BSON("a" << 14) ) == 0 );
+        ASSERT( chunk.getMax().woCompare( BSON("a" << 20) ) == 0 );
+
+        chunk.clear();
+        ASSERT_FALSE( cloned->getNextChunk(BSON("a" << 20), &chunk) );
+    }
+
+    TEST_F(SingleChunkFixture, MultiSplit) {
+        string errMsg;
+        ChunkType chunk;
+        scoped_ptr<CollectionMetadata> cloned;
+
+        chunk.setMin( BSON("a" << 10) );
+        chunk.setMax( BSON("a" << 20) );
+
+        vector<BSONObj> splitPoints;
+        splitPoints.push_back( BSON("a" << 14) );
+        splitPoints.push_back( BSON("a" << 16) );
+
+        ChunkVersion version;
+        getCollMetadata().getCollVersion().cloneTo( &version );
+        version.incMinor();
+
+        cloned.reset( getCollMetadata().cloneSplit( chunk,
+                                          splitPoints,
+                                          version,
+                                          &errMsg ) );
+
+        ASSERT_EQUALS( errMsg, "" );
+        ASSERT( cloned != NULL );
+
+        ChunkVersion newVersion( cloned->getCollVersion() );
+        ASSERT_EQUALS( version.epoch(), newVersion.epoch() );
+        ASSERT_EQUALS( version.majorVersion(), newVersion.majorVersion() );
+        ASSERT_EQUALS( version.minorVersion() + 2, newVersion.minorVersion() );
+
+        chunk.clear();
+        ASSERT( cloned->getNextChunk(BSON("a" << MINKEY), &chunk) );
+        ASSERT( chunk.getMin().woCompare( BSON("a" << 10) ) == 0 );
+        ASSERT( chunk.getMax().woCompare( BSON("a" << 14) ) == 0 );
+
+        chunk.clear();
+        ASSERT( cloned->getNextChunk(BSON("a" << 14), &chunk) );
+        ASSERT( chunk.getMin().woCompare( BSON("a" << 14) ) == 0 );
+        ASSERT( chunk.getMax().woCompare( BSON("a" << 16) ) == 0 );
+
+        chunk.clear();
+        ASSERT( cloned->getNextChunk(BSON("a" << 16), &chunk) );
+        ASSERT( chunk.getMin().woCompare( BSON("a" << 16) ) == 0 );
+        ASSERT( chunk.getMax().woCompare( BSON("a" << 20) ) == 0 );
+
+        chunk.clear();
+        ASSERT_FALSE( cloned->getNextChunk(BSON("a" << 20), &chunk) );
+    }
+
     TEST_F(SingleChunkFixture, SplitChunkWithPending) {
 
         string errMsg;

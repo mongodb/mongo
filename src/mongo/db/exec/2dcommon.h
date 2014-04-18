@@ -194,15 +194,12 @@ namespace twod_exec {
         /* called before query getmore block is iterated */
         virtual void checkLocation();
 
-        virtual Record* _current();
         virtual BSONObj current();
         virtual DiskLoc currLoc();
         virtual BSONObj currKey() const;
 
         // Are we finished getting points?
         virtual bool moreToDo();
-
-        Box makeBox(const GeoHash &hash) const;
 
         // Fills the stack, but only checks a maximum number of maxToCheck points at a time.
         // Further calls to this function will continue the expand/check neighbors algorithm.

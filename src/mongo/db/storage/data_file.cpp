@@ -107,7 +107,7 @@ namespace mongo {
                       << filename << endl;
             }
             else {
-                log() << "openExisting size " << sz << " less then minimum file size expectation "
+                log() << "openExisting size " << sz << " less than minimum file size expectation "
                       << filename << endl;
                 verify(false);
             }

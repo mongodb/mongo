@@ -32,8 +32,28 @@
 
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/head_manager.h"
 
 namespace mongo {
+
+    class HeadManagerImpl : public HeadManager {
+    public:
+        HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) { }
+        virtual ~HeadManagerImpl() { }
+
+        const DiskLoc& getHead() const {
+            return _catalogEntry->head();
+        }
+
+        void setHead(const DiskLoc& newHead) {
+            _catalogEntry->setHead(newHead);
+        }
+
+    private:
+        // Not owned here.
+        IndexCatalogEntry* _catalogEntry;
+    };
 
     IndexCatalogEntry::IndexCatalogEntry( Collection* collection,
                                           IndexDescriptor* descriptor,
@@ -42,7 +62,7 @@ namespace mongo {
           _descriptor( descriptor ),
           _recordStore( recordstore ),
           _accessMethod( NULL ),
-          _forcedBtreeIndex( NULL ),
+          _headManager(new HeadManagerImpl(this)),
           _ordering( Ordering::make( descriptor->keyPattern() ) ),
           _isReady( false ) {
         _descriptor->_cachedEntry = this;
@@ -51,11 +71,9 @@ namespace mongo {
     IndexCatalogEntry::~IndexCatalogEntry() {
         _descriptor->_cachedEntry = NULL; // defensive
 
-        delete _forcedBtreeIndex;
+        delete _headManager;
         delete _accessMethod;
-
         delete _recordStore;
-
         delete _descriptor;
     }
 
@@ -91,7 +109,7 @@ namespace mongo {
     }
 
     void IndexCatalogEntry::setHead( DiskLoc newHead ) {
-        NamespaceDetails* nsd = _collection->details();
+        NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         IndexDetails& id = nsd->idx( idxNo );
         id.head.writing() = newHead;
@@ -101,7 +119,7 @@ namespace mongo {
     void IndexCatalogEntry::setMultikey() {
         if ( isMultikey() )
             return;
-        NamespaceDetails* nsd = _collection->details();
+        NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         if ( nsd->setIndexIsMultikey( idxNo, true ) ) {
             LOG(1) << _collection->ns().ns() << ": clearing plan cache - index "
@@ -118,13 +136,13 @@ namespace mongo {
     }
 
     DiskLoc IndexCatalogEntry::_catalogHead() const {
-        NamespaceDetails* nsd = _collection->details();
+        const NamespaceDetails* nsd = _collection->details();
         int idxNo = _indexNo();
         return nsd->idx( idxNo ).head;
     }
 
     bool IndexCatalogEntry::_catalogIsMultikey() const {
-        NamespaceDetails* nsd = _collection->details();
+        const NamespaceDetails* nsd = _collection->details();
         int idxNo = _indexNo();
         return nsd->isMultikey( idxNo );
     }
@@ -180,9 +198,10 @@ namespace mongo {
             if ( e->descriptor() != desc )
                 continue;
             _entries.mutableVector().erase( i );
+            delete e;
             return true;
         }
         return false;
     }
 
-}
+}  // namespace mongo

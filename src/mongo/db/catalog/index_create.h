@@ -31,11 +31,18 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/index/index_access_method.h"
 
 namespace mongo {
 
-    class IndexCatalogEntry;
+    class BSONObj;
     class Collection;
+    class IndexCatalogEntry;
 
     // Build an index in the foreground
     // If background is false, uses fast index builder
@@ -43,5 +50,37 @@ namespace mongo {
     void buildAnIndex( Collection* collection,
                        IndexCatalogEntry* btreeState,
                        bool mayInterrupt );
+
+    class MultiIndexBlock {
+        MONGO_DISALLOW_COPYING( MultiIndexBlock );
+    public:
+        MultiIndexBlock( Collection* collection );
+        ~MultiIndexBlock();
+
+        Status init( std::vector<BSONObj>& specs );
+
+        Status insert( const BSONObj& doc,
+                       const DiskLoc& loc,
+                       const InsertDeleteOptions& options );
+
+        Status commit();
+
+    private:
+        Collection* _collection;
+
+        struct IndexState {
+            IndexState()
+                : block( NULL ), real( NULL ), bulk( NULL ) {
+            }
+
+            IndexAccessMethod* forInsert() { return bulk ? bulk : real; }
+
+            IndexCatalog::IndexBuildBlock* block;
+            IndexAccessMethod* real;
+            IndexAccessMethod* bulk;
+        };
+
+        std::vector<IndexState> _states;
+    };
 
 } // namespace mongo

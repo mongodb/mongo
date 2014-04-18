@@ -50,7 +50,7 @@ namespace mongo {
             err = "";
         }
 
-        void appendTo( BSONObjBuilder* result ) const;
+        void appendTo( const WriteConcernOptions& writeConcern, BSONObjBuilder* result ) const;
 
         int syncMillis;
         int fsyncFiles;

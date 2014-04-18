@@ -34,18 +34,14 @@ replTest.partition(4,1);
 replTest.partition(4,3);
 
 jsTestLog("Checking that ops still replicate correctly");
-master.getDB("foo").bar.insert({x:1});
-
-var result = master.getDB("admin").runCommand({getLastError:1,w:5,wtimeout:30000});
-assert.eq(null, result.err, tojson(result));
+var option = { writeConcern: { w: 5, wtimeout: 30000 }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, option));
 
 // 4 is connected to 3
 replTest.partition(4,2);
 replTest.unPartition(4,3);
 
-master.getDB("foo").bar.insert({x:1});
-
-result = master.getDB("admin").runCommand({getLastError:1,w:5,wtimeout:30000});
-assert.eq(null, result.err, tojson(result));
+option = { writeConcern: { w: 5, wtimeout: 30000 }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, option));
 
 replTest.stopSet();

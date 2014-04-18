@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    const size_t BatchedCommandRequest::kMaxWriteBatchSize = 1000;
+
     BatchedCommandRequest::BatchedCommandRequest( BatchType batchType ) :
             _batchType( batchType ) {
         switch ( getBatchType() ) {
@@ -91,6 +93,34 @@ namespace mongo {
     bool BatchedCommandRequest::isUniqueIndexRequest() const {
         if ( !isInsertIndexRequest() ) return false;
         return extractUniqueIndex( getInsertRequest()->getDocumentsAt( 0 ) );
+    }
+
+    bool BatchedCommandRequest::isValidIndexRequest( string* errMsg ) const {
+
+        string dummy;
+        if ( !errMsg )
+            errMsg = &dummy;
+        dassert( isInsertIndexRequest() );
+
+        if ( sizeWriteOps() != 1 ) {
+            *errMsg = "invalid batch request for index creation";
+            return false;
+        }
+
+        NamespaceString targetNSS( getTargetingNS() );
+        if ( !targetNSS.isValid() ) {
+            *errMsg = targetNSS.ns() + " is not a valid namespace to index";
+            return false;
+        }
+
+        NamespaceString reqNSS( getNS() );
+        if ( reqNSS.db().compare( targetNSS.db() ) != 0 ) {
+            *errMsg = targetNSS.ns() + " namespace is not in the request database "
+                      + reqNSS.db().toString();
+            return false;
+        }
+
+        return true;
     }
 
     static void extractIndexNSS( const BSONObj& indexDesc, NamespaceString* indexNSS ) {
@@ -243,6 +273,51 @@ namespace mongo {
 
     BatchedRequestMetadata* BatchedCommandRequest::getMetadata() const {
         INVOKE( getMetadata );
+    }
+
+    /**
+     * Generates a new request with insert _ids if required.  Otherwise returns NULL.
+     */
+    BatchedCommandRequest* //
+    BatchedCommandRequest::cloneWithIds(const BatchedCommandRequest& origCmdRequest) {
+
+        if (origCmdRequest.getBatchType() != BatchedCommandRequest::BatchType_Insert
+            || origCmdRequest.isInsertIndexRequest())
+            return NULL;
+
+        auto_ptr<BatchedInsertRequest> idRequest;
+        BatchedInsertRequest* origRequest = origCmdRequest.getInsertRequest();
+
+        const vector<BSONObj>& inserts = origRequest->getDocuments();
+
+        size_t i = 0u;
+        for (vector<BSONObj>::const_iterator it = inserts.begin(); it != inserts.end(); ++it, ++i) {
+
+            const BSONObj& insert = *it;
+            BSONObj idInsert;
+
+            if (insert["_id"].eoo()) {
+                BSONObjBuilder idInsertB;
+                idInsertB.append("_id", OID::gen());
+                idInsertB.appendElements(insert);
+                idInsert = idInsertB.obj();
+            }
+
+            if (NULL == idRequest.get() && !idInsert.isEmpty()) {
+                idRequest.reset(new BatchedInsertRequest);
+                origRequest->cloneTo(idRequest.get());
+            }
+
+            if (!idInsert.isEmpty()) {
+                idRequest->setDocumentAt(i, idInsert);
+            }
+        }
+
+        if (NULL == idRequest.get())
+            return NULL;
+
+        // Command request owns idRequest
+        return new BatchedCommandRequest(idRequest.release());
     }
 
     bool BatchedCommandRequest::containsUpserts( const BSONObj& writeCmdObj ) {

@@ -185,6 +185,8 @@ namespace mongo {
     }
 
     void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version ) {
+        
+        Lock::assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -211,7 +213,10 @@ namespace mongo {
     }
 
     void ShardingState::undoDonateChunk( const string& ns, CollectionMetadataPtr prevMetadata ) {
+        
+        Lock::assertWriteLocked( ns );        
         scoped_lock lk( _mutex );
+        
         log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
 
         CollectionMetadataMap::iterator it = _collMetadata.find( ns );
@@ -224,6 +229,8 @@ namespace mongo {
                                      const BSONObj& max,
                                      const OID& epoch,
                                      string* errMsg ) {
+        
+        Lock::assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -266,6 +273,8 @@ namespace mongo {
                                        const BSONObj& max,
                                        const OID& epoch,
                                        string* errMsg ) {
+        
+        Lock::assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -307,8 +316,9 @@ namespace mongo {
                                     const BSONObj& min,
                                     const BSONObj& max,
                                     const vector<BSONObj>& splitKeys,
-                                    ChunkVersion version )
-    {
+                                    ChunkVersion version ) {
+        
+        Lock::assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -331,6 +341,7 @@ namespace mongo {
                                      const BSONObj& maxKey,
                                      ChunkVersion mergedVersion ) {
 
+        Lock::assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -635,21 +646,19 @@ namespace mongo {
         //
         // Do messaging based on what happened above
         //
-
-        string versionMsg = str::stream()
-            << " (loaded metadata version : " << remoteCollVersion.toString()
-            << ( beforeCollVersion.epoch() == afterCollVersion.epoch() ?
-                     string( ", stored version : " ) + afterCollVersion.toString() :
-                     string( ", stored versions : " ) +
-                         beforeCollVersion.toString() + " / " + afterCollVersion.toString() )
-            << ", took " << refreshMillis << "ms)";
+        string localShardVersionMsg =
+                beforeShardVersion.epoch() == afterShardVersion.epoch() ?
+                        afterShardVersion.toString() :
+                        beforeShardVersion.toString() + " / " + afterShardVersion.toString();
 
         if ( choice == ChunkVersion::VersionChoice_Unknown ) {
 
-            string errMsg =
-                str::stream() << "need to retry loading metadata for " << ns
-                              << ", collection may have been dropped or recreated during load"
-                              << versionMsg;
+            string errMsg = str::stream()
+                << "need to retry loading metadata for " << ns
+                << ", collection may have been dropped or recreated during load"
+                << " (loaded shard version : " << remoteShardVersion.toString()
+                << ", stored shard versions : " << localShardVersionMsg
+                << ", took " << refreshMillis << "ms)";
 
             warning() << errMsg << endl;
             return Status( ErrorCodes::RemoteChangeDetected, errMsg );
@@ -657,7 +666,9 @@ namespace mongo {
 
         if ( choice == ChunkVersion::VersionChoice_Local ) {
 
-            LOG( 0 ) << "newer metadata not found for " << ns << versionMsg << endl;
+            LOG( 0 ) << "metadata of collection " << ns << " already up to date (shard version : "
+                     << afterShardVersion.toString() << ", took " << refreshMillis << "ms)"
+                     << endl;
             return Status::OK();
         }
 
@@ -665,20 +676,32 @@ namespace mongo {
 
         switch( installType ) {
         case InstallType_New:
-            LOG( 0 ) << "loaded new metadata for " << ns << versionMsg << endl;
+            LOG( 0 ) << "collection " << ns << " was previously unsharded"
+                     << ", new metadata loaded with shard version " << remoteShardVersion
+                     << endl;
             break;
         case InstallType_Update:
-            LOG( 0 ) << "loaded newer metadata for " << ns << versionMsg << endl;
+            LOG( 0 ) << "updating metadata for " << ns << " from shard version "
+                     << localShardVersionMsg << " to shard version " << remoteShardVersion
+                     << endl;
             break;
         case InstallType_Replace:
-            LOG( 0 ) << "replacing metadata for " << ns << versionMsg << endl;
+            LOG( 0 ) << "replacing metadata for " << ns << " at shard version "
+                     << localShardVersionMsg << " with a new epoch (shard version "
+                     << remoteShardVersion << ")" << endl;
             break;
         case InstallType_Drop:
-            LOG( 0 ) << "dropping metadata for " << ns << versionMsg << endl;
+            LOG( 0 ) << "dropping metadata for " << ns << " at shard version "
+                     << localShardVersionMsg << ", took " << refreshMillis << "ms" << endl;
             break;
         default:
             verify( false );
             break;
+        }
+
+        if ( installType != InstallType_Drop ) {
+            LOG( 0 ) << "collection version was loaded at version " << remoteCollVersion
+                     << ", took " << refreshMillis << "ms" << endl;
         }
 
         return Status::OK();
@@ -818,7 +841,7 @@ namespace mongo {
             help << "internal";
         }
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual bool slaveOk() const { return true; }
 
@@ -846,7 +869,7 @@ namespace mongo {
         }
 
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -1161,7 +1184,7 @@ namespace mongo {
             help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
         }
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
@@ -1210,7 +1233,7 @@ namespace mongo {
     public:
         ShardingStateCmd() : MongodShardCommand( "shardingState" ) {}
 
-        virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
+        virtual bool isWriteCommandForConfigServer() const { return true; }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -1220,7 +1243,10 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(dbname);
+
             shardingState.appendInfo( result );
             return true;
         }

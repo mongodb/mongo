@@ -31,11 +31,14 @@
 #include "mongo/pch.h"
 
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 
 namespace mongo {
@@ -55,7 +58,7 @@ namespace mongo {
         CmdGet() : Command( "getParameter" ) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -110,7 +113,7 @@ namespace mongo {
         CmdSet() : Command( "setParameter" ) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -338,6 +341,11 @@ namespace mongo {
             }
 
             virtual Status setFromString(const std::string& str) {
+#ifndef MONGO_SSL
+                return Status(ErrorCodes::IllegalOperation, mongoutils::str::stream() <<
+                                "Unable to set clusterAuthMode, " <<
+                                "SSL support is not compiled into server");
+#endif
                 if (str != "keyFile" && str != "sendKeyFile" &&
                     str != "sendX509" && str != "x509") { 
                         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
@@ -346,10 +354,24 @@ namespace mongo {
                 }
 
                 int oldMode = serverGlobalParams.clusterAuthMode.load();
+                int sslMode = sslGlobalParams.sslMode.load();
                 if (str == "sendX509" && 
                     oldMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
+                    if (sslMode == SSLGlobalParams::SSLMode_disabled ||
+                        sslMode == SSLGlobalParams::SSLMode_allowSSL) {
+                        return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                                    "Illegal state transition for clusterAuthMode, " <<
+                                    "need to enable SSL for outgoing connections");
+                    }
                     serverGlobalParams.clusterAuthMode.store
                         (ServerGlobalParams::ClusterAuthMode_sendX509);
+#ifdef MONGO_SSL
+                    setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << 
+                                              "MONGODB-X509" <<
+                                              saslCommandUserDBFieldName << "$external" <<
+                                              saslCommandUserFieldName << 
+                                              getSSLManager()->getClientSubjectName()));
+#endif 
                 }
                 else if (str == "x509" && 
                     oldMode == ServerGlobalParams::ClusterAuthMode_sendX509) {

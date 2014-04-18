@@ -51,7 +51,7 @@ namespace mongo {
 
     class CompactCmd : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool adminOnly() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool maintenanceMode() const { return true; }
@@ -65,7 +65,7 @@ namespace mongo {
         }
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
-                "warning: this operation blocks the server and is slow. you can cancel with cancelOp()\n"
+                "warning: this operation locks the database and is slow. you can cancel with killOp()\n"
                 "{ compact : <collection_name>, [force:<bool>], [validate:<bool>],\n"
                 "  [paddingFactor:<num>], [paddingBytes:<num>] }\n"
                 "  force - allows to run on a replica set primary\n"
@@ -73,14 +73,14 @@ namespace mongo {
         }
         CompactCmd() : Command("compact") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname,
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
             std::string coll = cmdObj.firstElement().valuestr();
-            std::string ns = dbname + "." + coll;
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+            std::string ns = db->name() + "." + coll;
 
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         virtual bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -159,7 +159,7 @@ namespace mongo {
 
             log() << "compact " << ns << " begin, options: " << compactOptions.toString();
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(db, cmdObj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(ctx.db(), cmdObj);
 
             StatusWith<CompactStats> status = collection->compact( &compactOptions );
             if ( !status.isOK() )

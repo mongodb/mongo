@@ -79,10 +79,25 @@ namespace mongo {
          * All further calls to getNext(...) will return results from the best plan.
          *
          * Returns true if a best plan was picked, false if there was an error.
+         * If there was a failure in the underlying plan, *objOut may hold error details.
          *
          * If out is not-NULL, set *out to the index of the picked plan.
          */
-        bool pickBestPlan(size_t* out);
+        bool pickBestPlan(size_t* out, BSONObj* objOut);
+
+        /**
+         * Returns true if a backup plan was picked.
+         * This is the case when the best plan has a blocking stage.
+         * Exposed for testing.
+         */
+        bool hasBackupPlan() const;
+
+        /**
+         * Caching the best plan is (currently implemented as) a destructive act so we separate it
+         * from ranking so that inspection of the winning solution is possible.  Also sets a backup
+         * plan if a backup plan is needed.  Exposed for testing.
+         */
+        void cacheBestPlan();
 
         virtual void saveState();
         virtual bool restoreState();
@@ -107,8 +122,10 @@ namespace mongo {
     private:
         /**
          * Have all our candidate plans do something.
+         * If all our candidate plans fail, *objOut will contain
+         * information on the failure.
          */
-        bool workAllPlans();
+        bool workAllPlans(BSONObj* objOut);
         void allPlansSaveState();
         void allPlansRestoreState();
 
@@ -153,6 +170,12 @@ namespace mongo {
 
         // The query that we're trying to figure out the best solution to.
         boost::scoped_ptr<CanonicalQuery> _query;
+
+        // What's the ranking?  Produced by pickBestPlan, consumed by cacheBestPlan.
+        auto_ptr<PlanRankingDecision> _ranking;
+
+        // What's the best child?  Filled out by pickBestPlan, consumed by cacheBestPlan.
+        size_t _bestChild;
 
         //
         // Backup plan for sort

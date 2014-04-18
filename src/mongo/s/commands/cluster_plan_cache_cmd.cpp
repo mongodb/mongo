@@ -62,9 +62,7 @@ namespace mongo {
             return false;
         }
 
-        LockType locktype() const {
-            return Command::NONE;
-        }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         void help(stringstream& ss) const {
             ss << _helpText;

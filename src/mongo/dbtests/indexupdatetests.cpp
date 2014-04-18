@@ -36,7 +36,6 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -333,6 +332,8 @@ namespace IndexUpdateTests {
             // The call is interrupted because mayInterrupt == true.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
             ASSERT_NOT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is not listed in the index catalog because the index build failed.
             ASSERT( !coll->getIndexCatalog()->findIndexByName( "a_1" ) );
         }
@@ -360,6 +361,8 @@ namespace IndexUpdateTests {
             // The call is not interrupted because mayInterrupt == false.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
             ASSERT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in the index catalog because the index build completed.
             ASSERT( coll->getIndexCatalog()->findIndexByName( "a_1" ) );
         }
@@ -372,8 +375,10 @@ namespace IndexUpdateTests {
             // Recreate the collection as capped, without an _id index.
             Database* db = _ctx.ctx().db();
             db->dropCollection( _ns );
-            const BSONObj collOptions = BSON( "size" << (10 * 1024) );
-            Collection* coll = db->createCollection( _ns, true, &collOptions );
+            CollectionOptions options;
+            options.capped = true;
+            options.cappedSize = 10 * 1024;
+            Collection* coll = db->createCollection( _ns, options );
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
@@ -390,6 +395,8 @@ namespace IndexUpdateTests {
             // The call is interrupted because mayInterrupt == true.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
             ASSERT_NOT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is not listed in the index catalog because the index build failed.
             ASSERT( !coll->getIndexCatalog()->findIndexByName( "_id_" ) );
         }
@@ -402,8 +409,10 @@ namespace IndexUpdateTests {
             // Recreate the collection as capped, without an _id index.
             Database* db = _ctx.ctx().db();
             db->dropCollection( _ns );
-            const BSONObj collOptions = BSON( "size" << (10 * 1024) );
-            Collection* coll = db->createCollection( _ns, true, &collOptions );
+            CollectionOptions options;
+            options.capped = true;
+            options.cappedSize = 10 * 1024;
+            Collection* coll = db->createCollection( _ns, options );
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
@@ -420,6 +429,8 @@ namespace IndexUpdateTests {
             // The call is not interrupted because mayInterrupt == false.
             Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
             ASSERT_OK( status.code() );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in the index catalog because the index build succeeded.
             ASSERT( coll->getIndexCatalog()->findIndexByName( "_id_" ) );
         }
@@ -441,6 +452,8 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             // The call is not interrupted.
             _client.ensureIndex( _ns, BSON( "a" << 1 ) );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in system.indexes because the index build completed.
             ASSERT_EQUALS( 1U,
                            _client.count( "unittests.system.indexes",
@@ -462,7 +475,9 @@ namespace IndexUpdateTests {
             // Request an interrupt.
             killCurrentOp.killAll();
             // The call is not interrupted.
-            Helpers::ensureIndex( _ns, BSON( "a" << 1 ), false, "a_1" );
+            Helpers::ensureIndex( collection(), BSON( "a" << 1 ), false, "a_1" );
+            // only want to interrupt the index build
+            killCurrentOp.reset();
             // The new index is listed in system.indexes because the index build completed.
             ASSERT_EQUALS( 1U,
                            _client.count( "unittests.system.indexes",
@@ -629,21 +644,6 @@ namespace IndexUpdateTests {
         }
     };
 
-    class SameSpecDifferentDropDups: public ComplexIndex {
-    public:
-        void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "super2"
-                         << "ns" << _ns
-                         << "unique" << 1
-                         << "dropDups" << false
-                         << "sparse" << true
-                         << "expireAfterSeconds" << 3600
-                         << "key" << BSON("superIdx" << "2d")));
-            ASSERT_NOT_EQUALS(_client.getLastError(), "");
-        }
-    };
-
     class SameSpecDifferentSparse: public ComplexIndex {
     public:
         void run() {
@@ -715,7 +715,6 @@ namespace IndexUpdateTests {
             add<DifferentSpecSameName>();
             add<SameSpecSameOptionDifferentOrder>();
             add<SameSpecDifferentUnique>();
-            add<SameSpecDifferentDropDups>();
             add<SameSpecDifferentSparse>();
             add<SameSpecDifferentTTL>();
 

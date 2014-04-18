@@ -61,7 +61,7 @@ namespace mongo {
     class OplogStart : public PlanStage {
     public:
         // Does not take ownership.
-        OplogStart(const string& ns, MatchExpression* filter, WorkingSet* ws);
+        OplogStart(Collection* collection, MatchExpression* filter, WorkingSet* ws);
         virtual ~OplogStart();
 
         virtual StageState work(WorkingSetID* out);
@@ -80,7 +80,7 @@ namespace mongo {
         bool isBackwardsScanning() { return _backwardsScanning; }
     private:
         // Copied verbatim.
-        static DiskLoc prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec);
+        static DiskLoc prevExtentFirstLoc(const NamespaceDetails* nsd, const DiskLoc& rec);
 
         StageState workBackwardsScan(WorkingSetID* out);
 
@@ -107,7 +107,8 @@ namespace mongo {
         // Our final state: done.
         bool _done;
 
-        NamespaceDetails* _nsd;
+        Collection* _collection;
+        const NamespaceDetails* _nsd;
 
         // We only go backwards via a collscan for a few seconds.
         Timer _timer;
@@ -116,7 +117,7 @@ namespace mongo {
         WorkingSet* _workingSet;
 
         string _ns;
-        
+
         MatchExpression* _filter;
 
         static int _backwardsScanTime;

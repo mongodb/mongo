@@ -249,7 +249,23 @@ namespace mongo {
         }
 
         BSONObjBuilder bob;
-        if (!requiresDocument()) {
+        if (member->hasObj()) {
+            MatchDetails matchDetails;
+
+            // If it's a positional projection we need a MatchDetails.
+            if (transformRequiresDetails()) {
+                matchDetails.requestElemMatchKey();
+                verify(NULL != _queryExpression);
+                verify(_queryExpression->matchesBSON(member->obj, &matchDetails));
+            }
+
+            Status projStatus = transform(member->obj, &bob, &matchDetails);
+            if (!projStatus.isOK()) {
+                return projStatus;
+            }
+        }
+        else {
+            verify(!requiresDocument());
             // Go field by field.
             if (_includeID) {
                 BSONElement elt;
@@ -271,24 +287,6 @@ namespace mongo {
                 if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
                     bob.appendAs(keyElt, specElt.fieldName());
                 }
-            }
-        }
-        else {
-            // Planner should have done this.
-            verify(member->hasObj());
-
-            MatchDetails matchDetails;
-
-            // If it's a positional projection we need a MatchDetails.
-            if (transformRequiresDetails()) {
-                matchDetails.requestElemMatchKey();
-                verify(NULL != _queryExpression);
-                verify(_queryExpression->matchesBSON(member->obj, &matchDetails));
-            }
-
-            Status projStatus = transform(member->obj, &bob, &matchDetails);
-            if (!projStatus.isOK()) {
-                return projStatus;
             }
         }
 

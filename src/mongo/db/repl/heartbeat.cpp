@@ -78,6 +78,7 @@ namespace mongo {
         skew = newInfo.skew;
         authIssue = newInfo.authIssue;
         ping = newInfo.ping;
+        electionTime = newInfo.electionTime;
     }
 
     /* { replSetHeartbeat : <setname> } */
@@ -155,7 +156,13 @@ namespace mongo {
                 return false;
             }
             result.append("set", theReplSet->name());
-            result.append("state", theReplSet->state().s);
+
+            MemberState currentState = theReplSet->state();
+            result.append("state", currentState.s);
+            if (currentState == MemberState::RS_PRIMARY) {
+                result.appendDate("electionTime", theReplSet->getElectionTime().asDate());
+            }
+
             result.append("e", theReplSet->iAmElectable());
             result.append("hbmsg", theReplSet->hbmsg());
             result.append("time", (long long) time(0));
@@ -512,6 +519,10 @@ namespace mongo {
                 boost::function<void()> f =
                     boost::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
                 theReplSet->mgr->send(f);
+            }
+            if (info.hasElement("electionTime")) {
+                LOG(4) << "setting electionTime to " << info["electionTime"];
+                mem.electionTime = info["electionTime"].Date();
             }
         }
 

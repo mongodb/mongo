@@ -216,5 +216,22 @@ namespace auth {
                                        const StringData& dbname,
                                        std::vector<UserName>* parsedUserNames);
 
+
+    struct MergeAuthzCollectionsArgs {
+        std::string usersCollName;
+        std::string rolesCollName;
+        bool drop;
+        BSONObj writeConcern;
+        MergeAuthzCollectionsArgs() : drop(false) {}
+    };
+
+    /**
+     * Takes a command object describing an invocation of the "_mergeAuthzCollections" command and
+     * parses out the name of the temporary collections to use for user and role data, whether or
+     * not to drop the existing users/roles, and the writeConcern.
+     */
+    Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
+                                             MergeAuthzCollectionsArgs* parsedArgs);
+
 } // namespace auth
 } // namespace mongo

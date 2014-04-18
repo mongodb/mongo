@@ -34,161 +34,29 @@
 #include "mongo/db/geo/core.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/expression_params.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
-
-    static double configValueWithDefault(const IndexDescriptor *desc, const string& name, double def) {
-        BSONElement e = desc->getInfoElement(name);
-        if (e.isNumber()) { return e.numberDouble(); }
-        return def;
-    }
 
     TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState)
         : BtreeBasedAccessMethod(btreeState) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 
-        BSONObjIterator i(descriptor->keyPattern());
-        while (i.more()) {
-            BSONElement e = i.next();
-            if (e.type() == String && IndexNames::GEO_2D == e.valuestr()) {
-                uassert(16800, "can't have 2 geo fields", _params.geo.size() == 0);
-                uassert(16801, "2d has to be first in index", _params.other.size() == 0);
-                _params.geo = e.fieldName();
-            } else {
-                int order = 1;
-                if (e.isNumber()) {
-                    order = static_cast<int>(e.Number());
-                }
-                _params.other.push_back(make_pair(e.fieldName(), order));
-            }
-        }
-        uassert(16802, "no geo field specified", _params.geo.size());
-
-        double bits =  configValueWithDefault(descriptor, "bits", 26);  // for lat/long, ~ 1ft
-        uassert(16803, "bits in geo index must be between 1 and 32", bits > 0 && bits <= 32);
-
-        GeoHashConverter::Parameters params;
-        params.bits = static_cast<unsigned>(bits);
-        params.max = configValueWithDefault(descriptor, "max", 180.0);
-        params.min = configValueWithDefault(descriptor, "min", -180.0);
-        double numBuckets = (1024 * 1024 * 1024 * 4.0);
-        params.scaling = numBuckets / (params.max - params.min);
-
-        _params.geoHashConverter.reset(new GeoHashConverter(params));
-
-        BSONObjBuilder b;
-        b.appendNull("");
-        _nullObj = b.obj();
-        _nullElt = _nullObj.firstElement();
+        ExpressionParams::parseTwoDParams(descriptor->infoObj(), &_params);
     }
 
     /** Finds the key objects to put in an index */
     void TwoDAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        getKeys(obj, keys, NULL);
+        ExpressionKeysPrivate::get2DKeys(obj, _params, keys, NULL);
     }
 
     /** Finds all locations in a geo-indexed object */
     void TwoDAccessMethod::getKeys(const BSONObj& obj, vector<BSONObj>& locs) const {
-        getKeys(obj, NULL, &locs);
-    }
-
-    /** Finds the key objects and/or locations for a geo-indexed object */
-    void TwoDAccessMethod::getKeys(const BSONObj &obj, BSONObjSet* keys,
-                                   vector<BSONObj>* locs) const {
-        BSONElementMSet bSet;
-
-        // Get all the nested location fields, but don't return individual elements from
-        // the last array, if it exists.
-        obj.getFieldsDotted(_params.geo.c_str(), bSet, false);
-
-        if (bSet.empty())
-            return;
-
-        for (BSONElementMSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI) {
-            BSONElement geo = *setI;
-
-            if (geo.eoo() || !geo.isABSONObj())
-                continue;
-
-            //
-            // Grammar for location lookup:
-            // locs ::= [loc,loc,...,loc]|{<k>:loc,<k>:loc,...,<k>:loc}|loc
-            // loc  ::= { <k1> : #, <k2> : # }|[#, #]|{}
-            //
-            // Empty locations are ignored, preserving single-location semantics
-            //
-
-            BSONObj embed = geo.embeddedObject();
-            if (embed.isEmpty())
-                continue;
-
-            // Differentiate between location arrays and locations
-            // by seeing if the first element value is a number
-            bool singleElement = embed.firstElement().isNumber();
-
-            BSONObjIterator oi(embed);
-
-            while (oi.more()) {
-                BSONObj locObj;
-
-                if (singleElement) {
-                    locObj = embed;
-                } else {
-                    BSONElement locElement = oi.next();
-
-                    uassert(16804, str::stream() << "location object expected, location "
-                                                "array not in correct format",
-                            locElement.isABSONObj());
-
-                    locObj = locElement.embeddedObject();
-                    if(locObj.isEmpty())
-                        continue;
-                }
-
-                BSONObjBuilder b(64);
-
-                // Remember the actual location object if needed
-                if (locs)
-                    locs->push_back(locObj);
-
-                // Stop if we don't need to get anything but location objects
-                if (!keys) {
-                    if (singleElement) break;
-                    else continue;
-                }
-
-                _params.geoHashConverter->hash(locObj, &obj).appendToBuilder(&b, "");
-   
-                // Go through all the other index keys
-                for (vector<pair<string, int> >::const_iterator i = _params.other.begin();
-                     i != _params.other.end(); ++i) {
-                    // Get *all* fields for the index key
-                    BSONElementSet eSet;
-                    obj.getFieldsDotted(i->first, eSet);
-
-                    if (eSet.size() == 0)
-                        b.appendAs(_nullElt, "");
-                    else if (eSet.size() == 1)
-                        b.appendAs(*(eSet.begin()), "");
-                    else {
-                        // If we have more than one key, store as an array of the objects
-                        BSONArrayBuilder aBuilder;
-
-                        for (BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end();
-                             ++ei) {
-                            aBuilder.append(*ei);
-                        }
-
-                        b.append("", aBuilder.arr());
-                    }
-                }
-                keys->insert(b.obj());
-                if(singleElement) break;
-            }
-        }
+        ExpressionKeysPrivate::get2DKeys(obj, _params, NULL, &locs);
     }
 
 }  // namespace mongo

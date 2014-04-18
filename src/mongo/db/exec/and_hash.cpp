@@ -32,8 +32,19 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/util/mongoutils/str.h"
+
+namespace {
+
+    // Upper limit for buffered data.
+    // Stage execution will fail once size of all buffered data exceeds this threshold.
+    const size_t kDefaultMaxMemUsageBytes = 32 * 1024 * 1024;
+
+} // namespace
 
 namespace mongo {
+
+    using std::auto_ptr;
 
     const size_t AndHashStage::kLookAheadWorks = 10;
 
@@ -41,13 +52,27 @@ namespace mongo {
         : _ws(ws),
           _filter(filter),
           _hashingChildren(true),
-          _currentChild(0) {}
+          _currentChild(0),
+          _memUsage(0),
+          _maxMemUsage(kDefaultMaxMemUsageBytes) {}
+
+    AndHashStage::AndHashStage(WorkingSet* ws, const MatchExpression* filter, size_t maxMemUsage)
+        : _ws(ws),
+          _filter(filter),
+          _hashingChildren(true),
+          _currentChild(0),
+          _memUsage(0),
+          _maxMemUsage(maxMemUsage) {}
 
     AndHashStage::~AndHashStage() {
         for (size_t i = 0; i < _children.size(); ++i) { delete _children[i]; }
     }
 
     void AndHashStage::addChild(PlanStage* child) { _children.push_back(child); }
+
+    size_t AndHashStage::getMemUsage() const {
+        return _memUsage;
+    }
 
     bool AndHashStage::isEOF() {
         // This is empty before calling work() and not-empty after.
@@ -108,6 +133,16 @@ namespace mongo {
                     else if (PlanStage::FAILURE == childStatus) {
                         // Propage error to parent.
                         *out = _lookAheadResults[i];
+                        // If a stage fails, it may create a status WSM to indicate why it
+                        // failed, in which case 'id' is valid.  If ID is invalid, we
+                        // create our own error message.
+                        if (WorkingSet::INVALID_ID == *out) {
+                            mongoutils::str::stream ss;
+                            ss << "hashed AND stage failed to read in look ahead results "
+                               << "from child " << i;
+                            Status status(ErrorCodes::InternalError, ss);
+                            *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                        }
 
                         _hashingChildren = false;
                         _dataMap.clear();
@@ -128,6 +163,16 @@ namespace mongo {
 
         // We read the first child into our hash table.
         if (_hashingChildren) {
+            // Check memory usage of previously hashed results.
+            if (_memUsage > _maxMemUsage) {
+                mongoutils::str::stream ss;
+                ss << "hashed AND stage buffered data usage of " << _memUsage
+                   << " bytes exceeds internal limit of " << kDefaultMaxMemUsageBytes << " bytes";
+                Status status(ErrorCodes::Overflow, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                return PlanStage::FAILURE;
+            }
+
             if (0 == _currentChild) {
                 return readFirstChild(out);
             }
@@ -230,6 +275,10 @@ namespace mongo {
             verify(_dataMap.end() == _dataMap.find(member->loc));
 
             _dataMap[member->loc] = id;
+
+            // Update memory stats.
+            _memUsage += member->getMemUsage();
+
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
@@ -250,6 +299,15 @@ namespace mongo {
         }
         else if (PlanStage::FAILURE == childStatus) {
             *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "hashed AND stage failed to read in results to from first child";
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            }
             return childStatus;
         }
         else {
@@ -289,7 +347,12 @@ namespace mongo {
                 // We have a hit.  Copy data into the WSM we already have.
                 _seenMap.insert(member->loc);
                 WorkingSetMember* olderMember = _ws->get(_dataMap[member->loc]);
+                size_t memUsageBefore = olderMember->getMemUsage();
+
                 AndCommon::mergeFrom(olderMember, *member);
+
+                // Update memory stats.
+                _memUsage += olderMember->getMemUsage() - memUsageBefore;
             }
             _ws->free(id);
             ++_commonStats.needTime;
@@ -305,6 +368,11 @@ namespace mongo {
                 if (_seenMap.end() == _seenMap.find(it->first)) {
                     DataMap::iterator toErase = it;
                     ++it;
+
+                    // Update memory stats.
+                    WorkingSetMember* member = _ws->get(toErase->second);
+                    _memUsage -= member->getMemUsage();
+
                     _ws->free(toErase->second);
                     _dataMap.erase(toErase);
                 }
@@ -333,6 +401,16 @@ namespace mongo {
         }
         else if (PlanStage::FAILURE == childStatus) {
             *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it
+            // failed, in which case 'id' is valid.  If ID is invalid, we
+            // create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                mongoutils::str::stream ss;
+                ss << "hashed AND stage failed to read in results from other child "
+                   << _currentChild;
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+            }
             return childStatus;
         }
         else {
@@ -405,6 +483,9 @@ namespace mongo {
                 ++_specificStats.flaggedButPassed;
             }
 
+            // Update memory stats.
+            _memUsage -= member->getMemUsage();
+
             // The loc is about to be invalidated.  Fetch it and clear the loc.
             WorkingSetCommon::fetchAndInvalidateLoc(member);
 
@@ -418,6 +499,9 @@ namespace mongo {
 
     PlanStageStats* AndHashStage::getStats() {
         _commonStats.isEOF = isEOF();
+
+        _specificStats.memLimit = _maxMemUsage;
+        _specificStats.memUsage = _memUsage;
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_HASH));
         ret->specific.reset(new AndHashStats(_specificStats));

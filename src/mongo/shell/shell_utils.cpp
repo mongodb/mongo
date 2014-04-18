@@ -21,6 +21,8 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/index/external_key_generator.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
@@ -136,6 +138,25 @@ namespace mongo {
             return BSON( "" << b.done() );
         }
 
+        BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
+            uassert(17428, "keyTooLarge takes exactly 2 arguments", a.nFields() == 2);
+            BSONObjIterator i(a);
+            BSONObj index = i.next().Obj();
+            BSONObj doc = i.next().Obj();
+
+            return BSON("" << isAnyIndexKeyTooLarge(index, doc));
+        }
+
+        BSONObj validateIndexKey(const BSONObj& a, void* data) {
+            BSONObj key = a[0].Obj();
+            Status indexValid = validateKeyPattern(key);
+            if (!indexValid.isOK()) {
+                return BSON("" << BSON("ok" << false << "type"
+                               << indexValid.codeString() << "errmsg" << indexValid.reason()));
+            }
+            return BSON("" << BSON("ok" << true));
+        }
+
         BSONObj replMonitorStats(const BSONObj& a, void* data) {
             uassert(17134, "replMonitorStats requires a single string argument (the ReplSet name)",
                     a.nFields() == 1 && a.firstElement().type() == String);
@@ -153,6 +174,10 @@ namespace mongo {
             return BSON("" << shellGlobalParams.useWriteCommandsDefault);
         }
 
+        BSONObj writeMode(const BSONObj&, void*) {
+            return BSON("" << shellGlobalParams.writeMode);
+        }
+
         BSONObj interpreterVersion(const BSONObj& a, void* data) {
             uassert( 16453, "interpreterVersion accepts no arguments", a.nFields() == 0 );
             return BSON( "" << globalScriptEngine->getInterpreterVersionString() );
@@ -167,6 +192,8 @@ namespace mongo {
             scope.injectNative( "_isWindows" , isWindows );
             scope.injectNative( "interpreterVersion", interpreterVersion );
             scope.injectNative( "getBuildInfo", getBuildInfo );
+            scope.injectNative( "isKeyTooLarge", isKeyTooLarge );
+            scope.injectNative( "validateIndexKey", validateIndexKey );
 
 #ifndef MONGO_SAFE_SHELL
             //can't launch programs
@@ -178,6 +205,7 @@ namespace mongo {
         void initScope( Scope &scope ) {
             // Need to define this method before JSFiles::utils is executed.
             scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
+            scope.injectNative("_writeMode", writeMode);
             scope.externalSetup();
             mongo::shell_utils::installShellUtils( scope );
             scope.execSetup(JSFiles::servers);

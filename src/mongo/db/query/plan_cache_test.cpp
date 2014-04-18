@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/query_solution.h"
@@ -56,12 +57,16 @@ namespace {
     /**
      * Utility functions to create a CanonicalQuery
      */
-    CanonicalQuery* canonicalize(const char* queryStr) {
-        BSONObj queryObj = fromjson(queryStr);
+    CanonicalQuery* canonicalize(const BSONObj& queryObj) {
         CanonicalQuery* cq;
         Status result = CanonicalQuery::canonicalize(ns, queryObj, &cq);
         ASSERT_OK(result);
         return cq;
+    }
+
+    CanonicalQuery* canonicalize(const char* queryStr) {
+        BSONObj queryObj = fromjson(queryStr);
+        return canonicalize(queryObj);
     }
 
     CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr,
@@ -94,7 +99,35 @@ namespace {
                                                      skip, limit,
                                                      hintObj,
                                                      minObj, maxObj,
-                                                     false, &cq);
+                                                     false, // snapshot
+                                                     false, // explain
+                                                     &cq);
+        ASSERT_OK(result);
+        return cq;
+    }
+
+     CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr,
+                                 const char* projStr,
+                                 long long skip, long long limit,
+                                 const char* hintStr,
+                                 const char* minStr, const char* maxStr,
+                                 bool snapshot,
+                                 bool explain) {
+        BSONObj queryObj = fromjson(queryStr);
+        BSONObj sortObj = fromjson(sortStr);
+        BSONObj projObj = fromjson(projStr);
+        BSONObj hintObj = fromjson(hintStr);
+        BSONObj minObj = fromjson(minStr);
+        BSONObj maxObj = fromjson(maxStr);
+        CanonicalQuery* cq;
+        Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj,
+                                                     projObj,
+                                                     skip, limit,
+                                                     hintObj,
+                                                     minObj, maxObj,
+                                                     snapshot,
+                                                     explain,
+                                                     &cq);
         ASSERT_OK(result);
         return cq;
     }
@@ -182,6 +215,11 @@ namespace {
         FAIL(ss);
     }
 
+    void assertShouldNotCacheQuery(const BSONObj& query) {
+        auto_ptr<CanonicalQuery> cq(canonicalize(query));
+        assertShouldNotCacheQuery(*cq);
+    }
+
     void assertShouldNotCacheQuery(const char* queryStr) {
         auto_ptr<CanonicalQuery> cq(canonicalize(queryStr));
         assertShouldNotCacheQuery(*cq);
@@ -246,6 +284,74 @@ namespace {
         assertShouldNotCacheQuery(*cq);
     }
 
+    /**
+     * $geoWithin queries with legacy coordinates are cacheable as long as
+     * the planner is able to come up with a cacheable solution.
+     */
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyCoordinates) {
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoWithin: "
+                                                 "{$box: [[-180, -90], [180, 90]]}}}"));
+        assertShouldCacheQuery(*cq);
+    }
+
+    /**
+     * $geoWithin queries with GeoJSON coordinates are supported by the index bounds builder.
+     */
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinJSONCoordinates) {
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoWithin: "
+                                                 "{$geometry: {type: 'Polygon', coordinates: "
+                                                 "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
+        assertShouldCacheQuery(*cq);
+    }
+
+    /**
+     * $geoWithin queries with both legacy and GeoJSON coordinates are cacheable.
+     */
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoWithinLegacyAndJSONCoordinates) {
+        auto_ptr<CanonicalQuery> cq(canonicalize(
+            "{$or: [{a: {$geoWithin: {$geometry: {type: 'Polygon', "
+                                                 "coordinates: [[[0, 0], [0, 90], "
+                                                                "[90, 0], [0, 0]]]}}}},"
+                   "{a: {$geoWithin: {$box: [[-180, -90], [180, 90]]}}}]}"));
+        assertShouldCacheQuery(*cq);
+    }
+
+    /**
+     * $geoIntersects queries are always cacheable because they support GeoJSON coordinates only.
+     */
+    TEST(PlanCacheTest, ShouldCacheQueryWithGeoIntersects) {
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoIntersects: "
+                                                 "{$geometry: {type: 'Point', coordinates: "
+                                                 "[10.0, 10.0]}}}}"));
+        assertShouldCacheQuery(*cq);
+    }
+
+    /**
+     * $geoNear queries are cacheable because we are able to distinguish
+     * between flat and spherical queries.
+     */
+    TEST(PlanCacheTest, ShouldNotCacheQueryWithGeoNear) {
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: {$geoNear: {$geometry: {type: 'Point',"
+                                                 "coordinates: [0,0]}, $maxDistance:100}}}"));
+        assertShouldCacheQuery(*cq);
+    }
+
+    /**
+     * Explain queries are not-cacheable because of allPlans cannot
+     * be accurately generated from stale cached stats in the plan cache for
+     * non-winning plans.
+     */
+    TEST(PlanCacheTest, ShouldNotCacheQueryExplain) {
+        auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}", 0, 0, "{}",
+                                                 "{}", "{}", // min, max
+                                                 false, // snapshot
+                                                 true // explain
+                                                 ));
+        const LiteParsedQuery& pq = cq->getParsed();
+        ASSERT_TRUE(pq.isExplain());
+        assertShouldNotCacheQuery(*cq);
+    }
+
     // Adding an empty vector of query solutions should fail.
     TEST(PlanCacheTest, AddEmptySolutions) {
         PlanCache planCache;
@@ -282,26 +388,25 @@ namespace {
         ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
         ASSERT_EQUALS(planCache.size(), 1U);
 
-        // First (PlanCache::kPlanCacheMaxWriteOperations - 1) notifications should have
-        // no effect on cache contents.
-        for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
+        // First (N - 1) write ops should have no effect on cache contents.
+        for (int i = 0; i < (internalQueryCacheWriteOpsBetweenFlush - 1); ++i) {
             planCache.notifyOfWriteOp();
         }
         ASSERT_EQUALS(planCache.size(), 1U);
 
-        // 1000th notification will cause cache to be cleared.
+        // N-th notification will cause cache to be cleared.
         planCache.notifyOfWriteOp();
         ASSERT_EQUALS(planCache.size(), 0U);
 
         // Clearing the cache should reset the internal write
         // operation counter.
-        // Repopulate cache. Write (PlanCache::kPlanCacheMaxWriteOperations - 1) times.
+        // Repopulate cache. Write (N - 1) times.
         // Clear cache.
         // Add cache entry again.
         // After clearing and adding a new entry, the next write operation should not
         // clear the cache.
         ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
-        for (int i = 0; i < (PlanCache::kPlanCacheMaxWriteOperations - 1); ++i) {
+        for (int i = 0; i < (internalQueryCacheWriteOpsBetweenFlush - 1); ++i) {
             planCache.notifyOfWriteOp();
         }
         ASSERT_EQUALS(planCache.size(), 1U);
@@ -354,13 +459,19 @@ namespace {
             // The first false means not multikey.
             // The second false means not sparse.
             // The third arg is the index name and I am egotistical.
-            params.indices.push_back(IndexEntry(keyPattern, multikey, false,
-                                                "hari_king_of_the_stove"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                false,
+                                                "hari_king_of_the_stove",
+                                                BSONObj()));
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-            params.indices.push_back(IndexEntry(keyPattern, multikey, sparse,
-                                                "note_to_self_dont_break_build"));
+            params.indices.push_back(IndexEntry(keyPattern,
+                                                multikey,
+                                                sparse,
+                                                "note_to_self_dont_break_build",
+                                                BSONObj()));
         }
 
         //
@@ -420,7 +531,9 @@ namespace {
                           bool snapshot) {
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                                    minObj, maxObj, snapshot, &cq);
+                                                    minObj, maxObj, snapshot,
+                                                    false, // explain
+                                                    &cq);
             if (!s.isOK()) { cq = NULL; }
             ASSERT_OK(s);
             s = QueryPlanner::plan(*cq, params, &solns);
@@ -437,6 +550,43 @@ namespace {
                     ++it) {
                 ost << (*it)->toString() << '\n';
             }
+        }
+
+        /**
+         * Returns number of generated solutions matching JSON.
+         */
+        size_t numSolutionMatches(const string& solnJson) const {
+            BSONObj testSoln = fromjson(solnJson);
+            size_t matches = 0;
+            for (vector<QuerySolution*>::const_iterator it = solns.begin();
+                    it != solns.end();
+                    ++it) {
+                QuerySolutionNode* root = (*it)->root.get();
+                if (QueryPlannerTestLib::solutionMatches(testSoln, root)) {
+                    ++matches;
+                }
+            }
+            return matches;
+        }
+
+        /**
+         * Verifies that the solution tree represented in json by 'solnJson' is
+         * one of the solutions generated by QueryPlanner.
+         *
+         * The number of expected matches, 'numMatches', could be greater than
+         * 1 if solutions differ only by the pattern of index tags on a filter.
+         */
+        void assertSolutionExists(const string& solnJson, size_t numMatches = 1) const {
+            size_t matches = numSolutionMatches(solnJson);
+            if (numMatches == matches) {
+                return;
+            }
+            mongoutils::str::stream ss;
+            ss << "expected " << numMatches << " matches for solution " << solnJson
+               << " but got " << matches
+               << " instead. all solutions generated: " << '\n';
+            dumpSolutions(ss);
+            FAIL(ss);
         }
 
         /**
@@ -741,7 +891,9 @@ namespace {
     // SERVER-10801
     TEST_F(CachePlanSelectionTest, SortOnGeoQuery) {
         addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
-        BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", coordinates: [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}");
+        BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", "
+                                 "coordinates: [[[1, 1], [1, 90], [180, 90], "
+                                 "[180, 1], [1, 1]]]}}}}");
         BSONObj sort = fromjson("{timestamp: -1}");
         runQuerySortProj(query, sort, BSONObj());
 

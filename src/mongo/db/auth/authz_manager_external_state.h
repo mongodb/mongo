@@ -62,6 +62,7 @@ namespace mongo {
 
         /**
          * Retrieves the schema version of the persistent data describing users and roles.
+         * Will leave *outVersion unmodified on non-OK status return values.
          */
         virtual Status getStoredAuthorizationVersion(int* outVersion) = 0;
 

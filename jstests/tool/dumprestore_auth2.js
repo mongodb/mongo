@@ -11,7 +11,8 @@ db.createUser({user: 'user',pwd: 'password', roles: jsTest.basicUserRoles});
 db.createRole({role: 'role', roles: [], privileges:[]});
 
 assert.eq(1, db.system.users.count(), "setup")
-assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}), "setup2")
+assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}),
+          "setup2: " + tojson( db.system.users.getIndexes() ) );
 assert.eq(1, db.system.roles.count(), "setup3")
 assert.eq(2, db.system.indexes.count({ns: "admin.system.roles"}), "setup4")
 assert.eq(1, db.system.version.count());

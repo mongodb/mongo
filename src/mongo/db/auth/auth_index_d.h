@@ -31,13 +31,16 @@
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
+
+    class Collection;
+
 namespace authindex {
 
     /**
      * Creates the appropriate indexes on _new_ system collections supporting authentication and
      * authorization.
      */
-    void createSystemIndexes(const NamespaceString& ns);
+    void createSystemIndexes(Collection* collection);
 
     /**
      * Ensures that exactly the appropriate indexes to support authentication and authorization

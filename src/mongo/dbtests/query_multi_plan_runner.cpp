@@ -63,8 +63,8 @@ namespace QueryMultiPlanRunner {
             _client.ensureIndex(ns(), obj);
         }
 
-        IndexDescriptor* getIndex(const BSONObj& obj) {
-            Collection* collection = cc().database()->getCollection( ns() );
+        IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
+            Collection* collection = db->getCollection( ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
@@ -102,7 +102,7 @@ namespace QueryMultiPlanRunner {
             // Every call to work() returns something so this should clearly win (by current scoring
             // at least).
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(BSON("foo" << 1));
+            ixparams.descriptor = getIndex(ctx.ctx().db(), BSON("foo" << 1));
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << 7);
             ixparams.bounds.endKey = BSON("" << 7);
@@ -114,7 +114,7 @@ namespace QueryMultiPlanRunner {
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
-            csparams.ns = ns();
+            csparams.collection = ctx.ctx().db()->getCollection( ns() );
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> secondWs(new WorkingSet());
             // Make the filter.
@@ -136,7 +136,8 @@ namespace QueryMultiPlanRunner {
 
             // Plan 0 aka the first plan aka the index scan should be the best.
             size_t best;
-            ASSERT(mpr.pickBestPlan(&best));
+            BSONObj unused;
+            ASSERT(mpr.pickBestPlan(&best, &unused));
             ASSERT_EQUALS(size_t(0), best);
 
             // Get all our results out.

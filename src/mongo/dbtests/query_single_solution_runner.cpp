@@ -80,7 +80,7 @@ namespace QuerySingleSolutionRunner {
         SingleSolutionRunner* makeCollScanRunner(Client::Context& ctx,
                                                  BSONObj& filterObj) {
             CollectionScanParams csparams;
-            csparams.ns = ns();
+            csparams.collection = ctx.db()->getCollection( ns() );
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> ws(new WorkingSet());
             // Parse the filter.
@@ -120,7 +120,7 @@ namespace QuerySingleSolutionRunner {
                                                   BSONObj& indexSpec, int start, int end) {
             // Build the index scan stage.
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(indexSpec);
+            ixparams.descriptor = getIndex(context.db(), indexSpec);
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << start);
             ixparams.bounds.endKey = BSON("" << end);
@@ -163,8 +163,8 @@ namespace QuerySingleSolutionRunner {
         }
 
     private:
-        IndexDescriptor* getIndex(const BSONObj& obj) {
-            Collection* collection = cc().database()->getCollection( ns() );
+        IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
+            Collection* collection = db->getCollection( ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 

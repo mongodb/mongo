@@ -20,11 +20,12 @@ var initialize = function() {
 
 var populate = function(master) {
   // insert records
+  var bulk = master.foo.initializeUnorderedBulkOp();
   for (var i =0; i<1000; i++) {
-    master.foo.insert({_id:1});
+    bulk.insert({ _id: i });
   }
-  
-  master.runCommand({getlasterror:1});
+
+  assert.writeOK(bulk.execute());
 }
 
 doTest = function( signal ) {

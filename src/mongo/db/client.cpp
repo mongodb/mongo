@@ -169,7 +169,8 @@ namespace mongo {
         _god(0),
         _lastOp(0)
     {
-        _hasWrittenThisPass = false;
+        _hasWrittenThisOperation = false;
+        _hasWrittenSinceCheckpoint = false;
         _pageFaultRetryableSection = 0;
         _connectionId = p ? p->connectionId() : 0;
         _curOp = new CurOp( this );
@@ -237,7 +238,7 @@ namespace mongo {
         return false;
     }
 
-    BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
+    BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     Client::Context::Context(const std::string& ns , Database * db) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
@@ -267,12 +268,14 @@ namespace mongo {
     /** "read lock, and set my context, all in one operation" 
      *  This handles (if not recursively locked) opening an unopened database.
      */
-    Client::ReadContext::ReadContext(const string& ns, const std::string& path) {
+    Client::ReadContext::ReadContext(const string& ns,
+                                     const std::string& path,
+                                     bool doVersion) {
         {
             lk.reset( new Lock::DBRead(ns) );
             Database *db = dbHolder().get(ns, path);
             if( db ) {
-                c.reset( new Context(path, ns, db) );
+                c.reset( new Context(path, ns, db, doVersion) );
                 return;
             }
         }
@@ -283,17 +286,17 @@ namespace mongo {
             if( Lock::isW() ) { 
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                c.reset(new Context(ns, path));
+                c.reset(new Context(ns, path, doVersion));
             }
             else if( !Lock::nested() ) { 
                 lk.reset(0);
                 {
                     Lock::GlobalWrite w;
-                    Context c(ns, path);
+                    Context c(ns, path, doVersion);
                 }
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
                 lk.reset( new Lock::DBRead(ns) );
-                c.reset(new Context(ns, path));
+                c.reset(new Context(ns, path, doVersion));
             }
             else { 
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
@@ -305,9 +308,9 @@ namespace mongo {
         //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
 
-    Client::WriteContext::WriteContext(const string& ns, const std::string& path)
+    Client::WriteContext::WriteContext(const string& ns, const std::string& path, bool doVersion)
         : _lk( ns ) ,
-          _c(ns, path) {
+          _c(ns, path, doVersion) {
     }
 
 
@@ -331,12 +334,12 @@ namespace mongo {
     }
 
     // invoked from ReadContext
-    Client::Context::Context(const string& path, const string& ns, Database *db) :
+    Client::Context::Context(const string& path, const string& ns, Database *db, bool doVersion) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
         _path( path ), 
         _justCreated(false),
-        _doVersion( true ),
+        _doVersion( doVersion ),
         _ns( ns ), 
         _db(db)
     {
@@ -409,7 +412,7 @@ namespace mongo {
         return c->toString();
     }
 
-    void Client::gotHandshake( const BSONObj& o ) {
+    bool Client::gotHandshake( const BSONObj& o ) {
         BSONObjIterator i(o);
 
         {
@@ -426,9 +429,11 @@ namespace mongo {
 
         _handshake = b.obj();
 
-        if (theReplSet && o.hasField("member")) {
-            theReplSet->registerSlave(_remoteId, o["member"].Int());
+        if (!theReplSet || !o.hasField("member")) {
+            return false;
         }
+
+        return theReplSet->registerSlave(_remoteId, o["member"].Int());
     }
 
     bool ClientBasic::hasCurrent() {
@@ -443,7 +448,7 @@ namespace mongo {
     public:
         void help(stringstream& h) const { h << "internal"; }
         HandshakeCmd() : Command( "handshake" ) {}
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -520,9 +525,9 @@ namespace mongo {
     }
 
     bool Client::allowedToThrowPageFaultException() const {
-        if ( _hasWrittenThisPass )
+        if ( _hasWrittenThisOperation )
             return false;
-        
+
         if ( ! _pageFaultRetryableSection )
             return false;
 
@@ -552,6 +557,7 @@ namespace mongo {
         exhaust = false;
 
         nscanned = -1;
+        nscannedObjects = -1;
         idhack = false;
         scanAndOrder = false;
         nMatched = -1;
@@ -564,6 +570,7 @@ namespace mongo {
         upsert = false;
         keyUpdates = 0;  // unsigned, so -1 not possible
         planSummary = "";
+        execStats.reset();
         
         exceptionInfo.reset();
         
@@ -592,6 +599,7 @@ namespace mongo {
                     mutablebson::Document cmdToLog(curop.query(), 
                             mutablebson::Document::kInPlaceDisabled);
                     curCommand->redactForLogging(&cmdToLog);
+                    s << curCommand->name << " ";
                     s << cmdToLog.toString();
                 } 
                 else { // Should not happen but we need to handle curCommand == NULL gracefully
@@ -619,6 +627,7 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP_BOOL( exhaust );
 
         OPDEBUG_TOSTRING_HELP( nscanned );
+        OPDEBUG_TOSTRING_HELP( nscannedObjects );
         OPDEBUG_TOSTRING_HELP_BOOL( idhack );
         OPDEBUG_TOSTRING_HELP_BOOL( scanAndOrder );
         OPDEBUG_TOSTRING_HELP( nmoved );
@@ -711,6 +720,7 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( exhaust );
 
         OPDEBUG_APPEND_NUMBER( nscanned );
+        OPDEBUG_APPEND_NUMBER( nscannedObjects );
         OPDEBUG_APPEND_BOOL( idhack );
         OPDEBUG_APPEND_BOOL( scanAndOrder );
         OPDEBUG_APPEND_BOOL( moved );

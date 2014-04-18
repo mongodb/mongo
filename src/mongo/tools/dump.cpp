@@ -41,6 +41,8 @@
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/extent.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -260,7 +262,9 @@ public:
             return DiskLoc();
         }
 
-        Extent * e = db->getExtentManager().getExtent( eLoc, false );
+        const ExtentManager& extentManager = db->getExtentManager();
+
+        Extent* e = extentManager.getExtent( eLoc, false );
         if ( ! e->isOk() ){
             toolError() << "Extent not ok magic: " << e->magic << " going to try to continue"
                       << std::endl;
@@ -287,7 +291,6 @@ public:
             if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
                 toolInfoLog() << loc << std::endl;
             }
-            Record* rec = loc.rec();
             BSONObj obj;
             try {
                 obj = loc.obj();
@@ -311,12 +314,12 @@ public:
                     }
                 }
             }
-            loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
+            loc = forward ?
+                extentManager.getNextRecordInExtent( loc )
+                : extentManager.getPrevRecordInExtent( loc );
 
             // break when new loc is outside current extent boundary
-            if ( ( forward && loc.compare( e->lastRecord ) > 0 ) || 
-                 ( ! forward && loc.compare( e->firstRecord ) < 0 ) ) 
-            {
+            if ( loc.isNull() ) {
                 break;
             }
         }

@@ -105,7 +105,7 @@ namespace mongo {
     };
 
     LockStat* Lock::nestableLockStat( Nestable db ) {
-        return &nestableLocks[db]->stats;
+        return &nestableLocks[db]->getStats();
     }
 
     static void locked_W();
@@ -519,26 +519,27 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockOther(const StringData& db) {
-        fassert( 16252, !db.empty() );
+        fassert(16252, !db.empty());
         LockState& ls = lockState();
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
-        if( ls.otherCount() ) { 
+        if (ls.otherCount()) {
             // nested. if/when we do temprelease with DBWrite we will need to increment here
             // (so we can not release or assert if nested).
-            massert(16106, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName() << " new:" << db , db == ls.otherName() );
+            massert(16106, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName() << " new:" << db, db == ls.otherName());
             return;
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
         massert(16098, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount() == 0);
 
-        if( db != ls.otherName() )
-        {
+        if (db != ls.otherName()) {
             DBLocksMap::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
-            if( lock == 0 )
+            if (lock == NULL) {
                 lock = new WrapperForRWLock(db);
+            }
+
             ls.lockedOther( db , 1 , lock );
         }
         else { 
@@ -567,7 +568,6 @@ namespace mongo {
         _locked_W=false;
         _locked_w=false; 
         _weLocked=0;
-
 
         massert( 16186 , "can't get a DBWrite while having a read lock" , ! ls.hasAnyReadLock() );
         if( ls.isW() )
@@ -655,9 +655,11 @@ namespace mongo {
                 qlk.unlock_W();
             }
         }
+
         if( _locked_W ) {
             qlk.unlock_W();
         }
+
         _weLocked = 0;
         _locked_W = _locked_w = false;
     }
@@ -723,24 +725,26 @@ namespace mongo {
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
         massert(16100, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount() == 0);
 
-        if( db != ls.otherName() )
-        {
+        if (db != ls.otherName()) {
             DBLocksMap::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
-            if( lock == 0 )
+            if (lock == NULL) {
                 lock = new WrapperForRWLock(db);
+            }
+
             ls.lockedOther( db , -1 , lock );
         }
         else { 
             DEV OCCASIONALLY { dassert( dblocks.get(db) == ls.otherLock() ); }
             ls.lockedOther(-1);
         }
+
         fassert(16135,_weLocked==0);
         ls.otherLock()->lock_shared();
         _weLocked = ls.otherLock();
     }
 
-    Lock::DBWrite::UpgradeToExclusive::UpgradeToExclusive() {
+    Lock::UpgradeGlobalLockToExclusive::UpgradeGlobalLockToExclusive() {
         fassert( 16187, lockState().threadState() == 'w' );
 
         // We're about to temporarily drop w, so stop the lock time stopwatch
@@ -753,7 +757,7 @@ namespace mongo {
         }
     }
 
-    Lock::DBWrite::UpgradeToExclusive::~UpgradeToExclusive() {
+    Lock::UpgradeGlobalLockToExclusive::~UpgradeGlobalLockToExclusive() {
         if ( _gotUpgrade ) {
             fassert( 16188, lockState().threadState() == 'W' );
             lockState().recordLockTime();
@@ -859,12 +863,12 @@ namespace mongo {
         BSONObj generateSection( const BSONElement& configElement ) const {
             BSONObjBuilder b;
             b.append(".", qlk.stats.report());
-            b.append("admin", nestableLocks[Lock::admin]->stats.report());
-            b.append("local", nestableLocks[Lock::local]->stats.report());
+            b.append("admin", nestableLocks[Lock::admin]->getStats().report());
+            b.append("local", nestableLocks[Lock::local]->getStats().report());
             {
                 DBLocksMap::ref r(dblocks);
                 for( DBLocksMap::const_iterator i = r.r.begin(); i != r.r.end(); ++i ) {
-                    b.append(i->first, i->second->stats.report());
+                    b.append(i->first, i->second->getStats().report());
                 }
             }
             return b.obj();

@@ -27,18 +27,11 @@ replTest.awaitReplication();
 master = replTest.getMaster();
 var db = master.getDB("test");
 
-// Insert a document and getLastError with write concern : anydc
-db.foo.insert( {x:1} );
-var result = db.runCommand( {getLastError:1, w:"anydc", wtimeout:20000} );
-printjson (result)
-assert.eq (result.err, null);
+// Insert a document with write concern : anydc
+assert.writeOK(db.foo.insert({ x: 1 }, { writeConcern: { w: 'anydc', wtimeout: 20000 }}));
 
-// Insert a document and getLastError with write concern : alldc
-db.foo.insert( {x:2} );
-var result = db.runCommand( {getLastError:1, w:"alldc", wtimeout:20000} );
-printjson (result)
-assert.eq (result.err, null);
-
+// Insert a document with write concern : alldc
+assert.writeOK(db.foo.insert({ x: 2 }, { writeConcern: { w: 'alldc', wtimeout: 20000 }}));
 
 // Add a new tag to the replica set
 var config = master.getDB("local").system.replset.findOne();
@@ -64,17 +57,10 @@ printjson(config);
 master = replTest.getMaster();
 var db = master.getDB("test");
 
-// Insert a document and getLastError with write concern : anydc
-db.foo.insert( {x:3} );
-var result = db.runCommand( {getLastError:1, w:"anydc", wtimeout:20000} );
-printjson (result)
-assert.eq (result.err, null);
+// Insert a document with write concern : anydc
+assert.writeOK(db.foo.insert({ x: 3 }, { writeConcern: { w: 'anydc', wtimeout: 20000 }}));
 
-// Insert a document and getLastError with write concern : alldc
-db.foo.insert( {x:4} );
-var result = db.runCommand( {getLastError:1, w:"alldc", wtimeout:20000} );
-printjson (result)
-assert.eq (result.err, null);
-
+// Insert a document with write concern : alldc
+assert.writeOK(db.foo.insert({ x: 4 }, { writeConcern: { w: 'alldc', wtimeout: 20000 }}));
 
 replTest.stopSet();

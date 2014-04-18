@@ -74,11 +74,15 @@ namespace mongo {
         if( _isMaster() )
             return true;
         if ( ! dbname ) {
-            Database *database = cc().database();
-            verify( database );
-            dbname = database->name().c_str();
+            // XXX: remove this magic and make dbname required?
+            if ( cc().getContext() ) {
+                Database *database = cc().getContext()->db();
+                if ( database ) {
+                    dbname = database->name().c_str();
+                }
+            }
         }
-        return strcmp( dbname , "local" ) == 0;
+        return strcmp( dbname, "local" ) == 0;
     }
     inline bool isMasterNs( const char *ns ) {
         if ( _isMaster() )

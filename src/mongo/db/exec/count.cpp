@@ -63,9 +63,11 @@ namespace mongo {
         IndexCursor* endCursor;
         verify(_iam->newCursor(&endCursor).isOK());
         verify(endCursor);
+
         // Is this assumption always valid?  See SERVER-12397
         _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
         _endCursor->setOptions(cursorOptions);
+
         // If the end key is inclusive we want to point *past* it since that's the end.
         _endCursor->seek(_params.endKey, _params.endKeyInclusive);
 
@@ -76,24 +78,21 @@ namespace mongo {
     void Count::checkEnd() {
         if (isEOF()) { return; }
 
-        // See if we're already past our end key.
-        int cmp = _btreeCursor->getKey().woCompare(_params.endKey, _descriptor->keyPattern(), false);
-        if (cmp > 0 || (cmp == 0 && !_params.endKeyInclusive)) {
-            _hitEnd = true;
-            return;
+        if (_endCursor->isEOF()) {
+            // If the endCursor is EOF we're only done when our 'current count position' hits EOF.
+            _hitEnd = _btreeCursor->isEOF();
         }
-
-        // If not, we're only done when we hit the end cursor.
-        _hitEnd = _btreeCursor->pointsAt(*_endCursor.get());
+        else {
+            // If not, we're only done when we hit the end cursor's (valid) position.
+            _hitEnd = _btreeCursor->pointsAt(*_endCursor.get());
+        }
     }
 
     PlanStage::StageState Count::work(WorkingSetID* out) {
-        ++_commonStats.works;
         if (NULL == _btreeCursor.get()) {
             // First call to work().  Perform cursor init.
             initIndexCursor();
             checkEnd();
-            ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
 
@@ -105,7 +104,6 @@ namespace mongo {
 
         if (_shouldDedup) {
             if (_returned.end() != _returned.find(loc)) {
-                ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
             else {
@@ -113,7 +111,6 @@ namespace mongo {
             }
         }
 
-        ++_commonStats.advanced;
         *out = WorkingSet::INVALID_ID;
         return PlanStage::ADVANCED;
     }
@@ -128,7 +125,6 @@ namespace mongo {
     }
 
     void Count::prepareToYield() {
-        ++_commonStats.yields;
         if (isEOF() || (NULL == _btreeCursor.get())) { return; }
 
         verify(!_btreeCursor->isEOF());
@@ -139,32 +135,47 @@ namespace mongo {
     }
 
     void Count::recoverFromYield() {
-        ++_commonStats.unyields;
-
         if (isEOF() || (NULL == _btreeCursor.get())) { return; }
 
         if (!_btreeCursor->restorePosition().isOK()) {
             _hitEnd = true;
         }
 
+        if (_btreeCursor->isEOF()) {
+            _hitEnd = true;
+            return;
+        }
+
+        // See if we're somehow already past our end key (maybe the thing we were pointing at got
+        // deleted...)
+        int cmp = _btreeCursor->getKey().woCompare(_params.endKey, _descriptor->keyPattern(), false);
+        if (cmp > 0 || (cmp == 0 && !_params.endKeyInclusive)) {
+            _hitEnd = true;
+            return;
+        }
+
         if (!_endCursor->isEOF()) {
             if (!_endCursor->restorePosition().isOK()) {
                 _hitEnd = true;
+                return;
             }
         }
-        else {
-            // If we were EOF when we yielded we don't always want to have _btreeCursor run until
-            // EOF.  New documents may have been inserted after our endKey and our end marker
-            // may be before them.
-            //
-            // As an example, say we're counting from 5 to 10 and the index only has keys
-            // for 6, 7, 8, and 9.  btreeCursor will point at a 6 key at the start and the
-            // endCursor will be EOF.  If we insert documents with keys 11 during a yield we
-            // need to relocate the endCursor to point at them as the "end key" of our count.
-            _endCursor->seek(_params.endKey, _params.endKeyInclusive);
-        }
 
+        // If we were EOF when we yielded we don't always want to have _btreeCursor run until
+        // EOF.  New documents may have been inserted after our endKey and our end marker
+        // may be before them.
+        //
+        // As an example, say we're counting from 5 to 10 and the index only has keys
+        // for 6, 7, 8, and 9.  btreeCursor will point at a 6 key at the start and the
+        // endCursor will be EOF.  If we insert documents with keys 11 during a yield we
+        // need to relocate the endCursor to point at them as the "end key" of our count.
+        //
+        // If we weren't EOF our end position might have moved around.  Relocate it.
+        _endCursor->seek(_params.endKey, _params.endKeyInclusive);
+
+        // This can change during yielding.
         _shouldDedup = _descriptor->isMultikey();
+
         checkEnd();
     }
 
@@ -184,9 +195,10 @@ namespace mongo {
     }
 
     PlanStageStats* Count::getStats() {
-        _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT));
-        return ret.release();
+        // We don't collect stats since this stage is only used by the count command.
+        // If count ever collects stats we must implement this.
+        invariant(0);
+        return NULL;
     }
 
 }  // namespace mongo

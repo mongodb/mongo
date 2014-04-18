@@ -140,13 +140,10 @@ namespace {
         // v=true              | 1
         // vv=true             | 2 (etc.)
         //
-        // JSON Config Option  | Resulting Verbosity
+        // YAML Config Option  | Resulting Verbosity
         // _________________________________________
-        // { "verbose" : "" }  | 0
-        // { "verbose" : "v" } | 1
-        // { "verbose" : "vv" }| 2 (etc.)
-        // { "v" : true }      | 1
-        // { "vv" : true }     | 2 (etc.)
+        // systemLog:          |
+        //    verbosity: 5     | 5
         options->addOptionChaining("verbose", "verbose,v", moe::String,
                 "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
                                   .setImplicit(moe::Value(std::string("v")))
@@ -168,7 +165,7 @@ namespace {
         options->addOptionChaining("logpath", "logpath", moe::String,
                 "log file to send write to instead of stdout - has to be a file, not directory")
                                   .setSources(moe::SourceAllLegacy)
-                                  .incompatibleWith("systemLog.syslog");
+                                  .incompatibleWith("syslog");
 
         options->addOptionChaining("systemLog.path", "", moe::String,
                 "log file to send writes to if logging to a file - has to be a file, not directory")
@@ -179,10 +176,14 @@ namespace {
                 "Destination of system log output.  (syslog/file)")
                                   .setSources(moe::SourceYAMLConfig)
                                   .hidden()
-                                  .requires("systemLog.path")
                                   .format("(:?syslog)|(:?file)", "(syslog/file)");
 
 #ifndef _WIN32
+        options->addOptionChaining("syslog", "syslog", moe::Switch,
+                "log to system's syslog facility instead of file or stdout")
+                                  .incompatibleWith("systemLog.logpath")
+                                  .setSources(moe::SourceAllLegacy);
+
         options->addOptionChaining("systemLog.syslogFacility", "syslogFacility", moe::String,
                 "syslog facility used for monogdb syslog message");
 
@@ -207,7 +208,8 @@ namespace {
 
         options->addOptionChaining("httpinterface", "httpinterface", moe::Switch,
                 "enable http interface")
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("nohttpinterface");
 
         options->addOptionChaining("net.http.enabled", "", moe::Bool, "enable http interface")
                                   .setSources(moe::SourceYAMLConfig);
@@ -237,11 +239,6 @@ namespace {
         options->addOptionChaining("processManagement.fork", "fork", moe::Switch,
                 "fork server process");
 
-        options->addOptionChaining("systemLog.syslog", "syslog", moe::Switch,
-                "log to system's syslog facility instead of file or stdout")
-                                  .incompatibleWith("systemLog.logpath")
-                                  .setSources(moe::SourceAllLegacy);
-
 #endif
 
         /* support for -vv -vvvv etc. */
@@ -255,17 +252,20 @@ namespace {
         options->addOptionChaining("nohttpinterface", "nohttpinterface", moe::Switch,
                 "disable http interface")
                                   .hidden()
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("httpinterface");
 
         options->addOptionChaining("objcheck", "objcheck", moe::Switch,
                 "inspect client data for validity on receipt (DEFAULT)")
                                   .hidden()
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("noobjcheck");
 
         options->addOptionChaining("noobjcheck", "noobjcheck", moe::Switch,
                 "do NOT inspect client data for validity on receipt")
                                   .hidden()
-                                  .setSources(moe::SourceAllLegacy);
+                                  .setSources(moe::SourceAllLegacy)
+                                  .incompatibleWith("objcheck");
 
         options->addOptionChaining("net.wireObjectCheck", "", moe::Bool,
                 "inspect client data for validity on receipt (DEFAULT)")
@@ -380,6 +380,163 @@ namespace {
         log() << "options: " << serverGlobalParams.parsedOpts << endl;
     }
 
+    Status validateServerOptions(const moe::Environment& params) {
+        if (params.count("verbose")) {
+            std::string verbosity = params["verbose"].as<std::string>();
+
+            // Skip this for backwards compatibility.  See SERVER-11471.
+            if (verbosity != "true") {
+                for (std::string::iterator iterator = verbosity.begin();
+                    iterator != verbosity.end(); iterator++) {
+                    if (*iterator != 'v') {
+                        return Status(ErrorCodes::BadValue,
+                                      "The \"verbose\" option string cannot contain any characters "
+                                      "other than \"v\"");
+                    }
+                }
+            }
+        }
+
+        return Status::OK();
+    }
+
+    Status canonicalizeServerOptions(moe::Environment* params) {
+
+        // "net.wireObjectCheck" comes from the config file, so override it if either "objcheck" or
+        // "noobjcheck" are set, since those come from the command line.
+        if (params->count("objcheck")) {
+            Status ret = params->set("net.wireObjectCheck", moe::Value(true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("objcheck");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        if (params->count("noobjcheck")) {
+            Status ret = params->set("net.wireObjectCheck", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noobjcheck");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "net.http.enabled" comes from the config file, so override it if "nohttpinterface" or
+        // "httpinterface" are set since those come from the command line.
+        if (params->count("nohttpinterface")) {
+            Status ret = params->set("net.http.enabled", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nohttpinterface");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("httpinterface")) {
+            Status ret = params->set("net.http.enabled", moe::Value(true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("httpinterface");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "net.unixDomainSocket.enabled" comes from the config file, so override it if
+        // "nounixsocket" is set since that comes from the command line.
+        if (params->count("nounixsocket")) {
+            Status ret = params->set("net.unixDomainSocket.enabled", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nounixsocket");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // Handle both the "--verbose" string argument and the "-vvvv" arguments at the same time so
+        // that we ensure that we set the log level to the maximum of the options provided
+        int logLevel = -1;
+        for (std::string s = ""; s.length() <= 14; s.append("v")) {
+            if (!s.empty() && params->count(s)) {
+                logLevel = s.length();
+            }
+
+            if (params->count("verbose")) {
+                std::string verbosity;
+                params->get("verbose", &verbosity);
+                if (s == verbosity ||
+                    // Treat a verbosity of "true" the same as a single "v".  See SERVER-11471.
+                    (s == "v" && verbosity == "true")) {
+                    logLevel = s.length();
+                }
+            }
+
+            // Remove all "v" options we have already handled
+            Status ret = params->remove(s);
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        if (logLevel != -1) {
+            Status ret = params->set("systemLog.verbosity", moe::Value(logLevel));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("verbose");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        if (params->count("logpath")) {
+            std::string logpath;
+            Status ret = params->get("logpath", &logpath);
+            if (!ret.isOK()) {
+                return ret;
+            }
+            if (logpath.empty()) {
+                return Status(ErrorCodes::BadValue, "logpath cannot be empty if supplied");
+            }
+            ret = params->set("systemLog.destination", moe::Value(std::string("file")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->set("systemLog.path", moe::Value(logpath));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("logpath");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        // "systemLog.destination" comes from the config file, so override it if "syslog" is set
+        // since that comes from the command line.
+        if (params->count("syslog")) {
+            Status ret = params->set("systemLog.destination", moe::Value(std::string("syslog")));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("syslog");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        return Status::OK();
+    }
+
     Status storeServerOptions(const moe::Environment& params,
                               const std::vector<std::string>& args) {
 
@@ -409,51 +566,15 @@ namespace {
                           "The net.http.port option is not currently supported");
         }
 
-        if (params.count("verbose")) {
-            std::string verbosity = params["verbose"].as<std::string>();
-
-            // Skip this for backwards compatibility.  See SERVER-11471.
-            if (verbosity != "true") {
-                for (std::string::iterator iterator = verbosity.begin();
-                    iterator != verbosity.end(); iterator++) {
-                    if (*iterator != 'v') {
-                        return Status(ErrorCodes::BadValue,
-                                      "The \"verbose\" option string cannot contain any characters "
-                                      "other than \"v\"");
-                    }
-                }
-            }
-        }
-
-        // Handle the JSON config file verbosity setting first so that it gets overriden by the
-        // setting on the command line
         if (params.count("systemLog.verbosity")) {
             int verbosity = params["systemLog.verbosity"].as<int>();
             if (verbosity < 0) {
+                // This can only happen in YAML config
                 return Status(ErrorCodes::BadValue,
-                                "systemLog.verbosity in JSON Config cannot be negative");
+                              "systemLog.verbosity YAML Config cannot be negative");
             }
             logger::globalLogDomain()->setMinimumLoggedSeverity(
                     logger::LogSeverity::Debug(verbosity));
-        }
-
-        // Handle both the "--verbose" string argument and the "-vvvv" arguments at the same time so
-        // that we ensure that we set the log level to the maximum of the options provided
-        for (string s = ""; s.length() <= 14; s.append("v")) {
-            if (!s.empty() && params.count(s)) {
-                logger::globalLogDomain()->setMinimumLoggedSeverity(
-                        logger::LogSeverity::Debug(s.length()));
-            }
-
-            if (params.count("verbose")) {
-                std::string verbosity = params["verbose"].as<std::string>();
-                if (s == verbosity ||
-                    // Treat a verbosity of "true" the same as a single "v".  See SERVER-11471.
-                    (s == "v" && verbosity == "true")) {
-                    logger::globalLogDomain()->setMinimumLoggedSeverity(
-                            logger::LogSeverity::Debug(s.length()));
-                }
-            }
         }
 
         if (params.count("enableExperimentalIndexStatsCmd")) {
@@ -469,6 +590,10 @@ namespace {
 
         if (params.count("net.bindIp")) {
             serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
+        }
+
+        if (params.count("net.http.enabled")) {
+            serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
         }
 
         if (params.count("security.clusterAuthMode")) {
@@ -514,21 +639,8 @@ namespace {
             }
         }
 
-        // Check "net.wireObjectCheck" first which comes from the config file so that specifying
-        // "objcheck" or "noobjcheck" which come from the command line will override
-        // "net.wireObjectCheck"
         if (params.count("net.wireObjectCheck")) {
             serverGlobalParams.objcheck = params["net.wireObjectCheck"].as<bool>();
-        }
-
-        if (params.count("objcheck")) {
-            serverGlobalParams.objcheck = true;
-        }
-        if (params.count("noobjcheck")) {
-            if (params.count("objcheck")) {
-                return Status(ErrorCodes::BadValue, "can't have both --objcheck and --noobjcheck");
-            }
-            serverGlobalParams.objcheck = false;
         }
 
         if (params.count("net.bindIp")) {
@@ -545,14 +657,8 @@ namespace {
             serverGlobalParams.socket = params["net.unixDomainSocket.pathPrefix"].as<string>();
         }
 
-        // --nounixsocket is checked after this since net.unixDomainSocket.enabled is from the
-        // config file and the command line should override the config file
         if (params.count("net.unixDomainSocket.enabled")) {
             serverGlobalParams.noUnixSocket = !params["net.unixDomainSocket.enabled"].as<bool>();
-        }
-
-        if (params.count("nounixsocket")) {
-            serverGlobalParams.noUnixSocket = true;
         }
 
         if (params.count("processManagement.fork") && !params.count("shutdown")) {
@@ -564,13 +670,13 @@ namespace {
             using logger::MessageEventDetailsEncoder;
             std::string formatterName = params["systemLog.timeStampFormat"].as<string>();
             if (formatterName == "ctime") {
-                MessageEventDetailsEncoder::setDateFormatter(dateToCtimeString);
+                MessageEventDetailsEncoder::setDateFormatter(outputDateAsCtime);
             }
             else if (formatterName == "iso8601-utc") {
-                MessageEventDetailsEncoder::setDateFormatter(dateToISOStringUTC);
+                MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringUTC);
             }
             else if (formatterName == "iso8601-local") {
-                MessageEventDetailsEncoder::setDateFormatter(dateToISOStringLocal);
+                MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringLocal);
             }
             else {
                 StringBuilder sb;
@@ -597,7 +703,7 @@ namespace {
                                   "Can only use systemLog.path if systemLog.destination is to a "
                                   "file");
                 }
-                // syslog facility is set independently of these options
+                serverGlobalParams.logWithSyslog = true;
             }
             else {
                 StringBuilder sb;
@@ -613,15 +719,6 @@ namespace {
             }
 
         }
-
-        if (params.count("logpath")) {
-            serverGlobalParams.logpath = params["logpath"].as<string>();
-            if (serverGlobalParams.logpath.empty()) {
-                return Status(ErrorCodes::BadValue, "logpath cannot be empty if supplied");
-            }
-        }
-
-        serverGlobalParams.logWithSyslog = params.count("systemLog.syslog");
 
 #ifndef _WIN32
         if (params.count("systemLog.syslogFacility")) {

@@ -26,9 +26,7 @@ replTest.awaitReplication();
 
 master = replTest.getMaster();
 var db = master.getDB("test");
-db.foo.insert( {x:1} );
-var result = db.runCommand( {getLastError:1, w:"backedUp", wtimeout:20000} );
-assert.eq (result.err, null);
+assert.writeOK(db.foo.insert({ x: 1 }, { writeConcern: { w: 'backedUp', wtimeout: 20000 }}));
 
 conf.version = 2;
 conf.settings.getLastErrorModes.backedUp.backup = 3;
@@ -37,9 +35,7 @@ replTest.awaitReplication();
 
 master = replTest.getMaster();
 var db = master.getDB("test");
-db.foo.insert( {x:2} );
-var result = db.runCommand( {getLastError:1, w:"backedUp", wtimeout:20000} );
-assert.eq (result.err, null);
+assert.writeOK(db.foo.insert({ x: 2 }, { writeConcern: { w: 'backedUp', wtimeout: 20000 }}));
 
 conf.version = 3;
 conf.members[0].priorty = 3;
@@ -48,8 +44,6 @@ master.getDB("admin").runCommand( {replSetReconfig: conf} );
 
 master = replTest.getMaster();
 var db = master.getDB("test");
-db.foo.insert( {x:3} );
-var result = db.runCommand( {getLastError:1, w:"backedUp", wtimeout:20000} );
-assert.eq (result.err, null);
+assert.writeOK(db.foo.insert({ x: 3 }, { writeConcern: { w: 'backedUp', wtimeout: 20000 }}));
 
 replTest.stopSet();

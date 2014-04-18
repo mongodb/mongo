@@ -53,6 +53,8 @@ namespace mongo {
         bool usingPassword;
         std::string authenticationMechanism;
         std::string authenticationDatabase;
+        std::string gssapiServiceName;
+        std::string gssapiHostName;
 
         bool runShell;
         bool nodb;
@@ -62,8 +64,12 @@ namespace mongo {
 
         bool autoKillOp;
         bool useWriteCommandsDefault;
+        std::string writeMode;
 
-        ShellGlobalParams() : autoKillOp(false), useWriteCommandsDefault(true) { }
+        ShellGlobalParams() : autoKillOp(false),
+                              useWriteCommandsDefault(true),
+                              writeMode("commands") {
+        }
     };
 
     extern ShellGlobalParams shellGlobalParams;

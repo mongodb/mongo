@@ -17,7 +17,7 @@
 /*
  * This library supports a templating language that helps in generating BSON documents from a
  * template. The language supports the following template:
- * #RAND_INT, #RAND_STRING and #CONCAT.
+ * #RAND_INT, #SEQ_INT, #RAND_STRING, #CONCAT, and #OID.
  *
  * The language will help in quickly expressing richer documents  for use in benchRun.
  * Ex. : { key : { #RAND_INT: [10, 20] } } or  { key : { #CONCAT: ["hello", " ", "world"] } }
@@ -88,6 +88,11 @@ namespace mongo {
         BsonTemplateEvaluator();
         ~BsonTemplateEvaluator();
 
+        /**
+         * Set an identifying number for this template evaluator.
+         */
+        Status setId(size_t id);
+
         /*
          * "Add a new operator, "name" with behavior "op" to this evaluator.
          */
@@ -117,6 +122,15 @@ namespace mongo {
         // evaluates a BSON element. This is internally called by the top level evaluate method.
         Status _evalElem(BSONElement in, BSONObjBuilder& out);
 
+        // An identifier for this template evaluator instance, which distinguishes it
+        // from other evaluators. Useful for threaded benchruns which, say, want to insert
+        // similar sequences of values without colliding with one another.
+        unsigned char _id;
+
+        // Keeps state for each SEQ_INT expansion being evaluated by this bson template evaluator
+        // instance. Maps from the seq_id of the sequence to its current value.
+        std::map< int, long long > _seqIdMap;
+
         /*
          * Operator method to support #RAND_INT :  { key : { #RAND_INT: [10, 20] } }
          * The array arguments to #RAND_INT are the min and mix range between which a random number
@@ -128,14 +142,38 @@ namespace mongo {
          * choose a random number between 10 and 20 and then multiple the chosen value with 4.
          */
         static Status evalRandInt(BsonTemplateEvaluator* btl, const char* fieldName,
-                                  const BSONObj in, BSONObjBuilder& out);
+                                  const BSONObj& in, BSONObjBuilder& out);
+        /*
+         * Operator method to support #SEQ_INT :
+         *    { key : { #SEQ_INT: { seq_id: 0, start: 100, step: -2, unique: true } } }
+         *
+         * Used to generate arithmetic sequences of integers in each successive template
+         * evaluation. The 'seq_id' identifies this expansion so that the same document can
+         * have multiple expansions. The sequence will begin with the value 'start' and
+         * then increment by 'step' for each successive expansion.
+         *
+         * If 'unique: true' is specified, then the sequences are adjusted according to the
+         * _id of this template evaluator so that various worker threads don't overrun each
+         * other's ranges.
+         *
+         * If using with multiple threads, each thread should have its own BsonTemplateEvaluator
+         * instance so that the sequence state remains separate.
+         *
+         * If 'mod: <num>' is specified, then modulo <num> is applied to each value of the
+         * arithmetic sequence.
+         *
+         * Ex. { a: { #SEQ_INT: { seq_id: 0, start: 4, step: 3 } } } will generate
+         *    { a: 4 }, { a: 7 }, { a: 10 }, etc.
+         */
+        static Status evalSeqInt(BsonTemplateEvaluator* btl, const char* fieldName,
+                                 const BSONObj& in, BSONObjBuilder& out);
         /*
          * Operator method to support #RAND_STRING : { key : { #RAND_STRING: [12] } }
          * The array argument to RAND_STRING is the length of the string that is desired.
          * This will evaluate to something like { key : "randomstring" }
          */
         static Status evalRandString(BsonTemplateEvaluator* btl, const char* fieldName,
-                                     const BSONObj in, BSONObjBuilder& out);
+                                     const BSONObj& in, BSONObjBuilder& out);
         /*
          * Operator method to support #CONCAT : { key : { #CONCAT: ["hello", " ", "world", 2012] } }
          * The array argument to CONCAT are the strings to be concatenated. If the argument is not
@@ -143,7 +181,14 @@ namespace mongo {
          * This will evaluate to { key : "hello world2012" }
          */
         static Status evalConcat(BsonTemplateEvaluator* btl, const char* fieldName,
-                                 const BSONObj in, BSONObjBuilder& out);
+                                 const BSONObj& in, BSONObjBuilder& out);
+        /*
+         * Operator method to support #OID : { _id : { #OID: 1 } }
+         * The 'key' field is required to be _id, but the argument to OID does not matter,
+         * and will be neither examined nor validated.
+         */
+        static Status evalObjId(BsonTemplateEvaluator* btl, const char* fieldName,
+                                const BSONObj& in, BSONObjBuilder& out);
 
     };
 

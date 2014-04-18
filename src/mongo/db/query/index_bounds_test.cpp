@@ -35,10 +35,15 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/text.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongo;
 
 namespace {
+
+    using std::string;
+    using std::vector;
 
     //
     // Validation
@@ -713,6 +718,133 @@ namespace {
         ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
         ASSERT_EQUALS(keyEltsToUse, 1);
         ASSERT(movePastKeyElts);
+    }
+
+    //
+    // IndexBoundsChecker::findIntervalForField
+    //
+
+    /**
+     * Returns string representation of IndexBoundsChecker::Location.
+     */
+    string toString(IndexBoundsChecker::Location location) {
+        switch(location) {
+        case IndexBoundsChecker::BEHIND: return "BEHIND";
+        case IndexBoundsChecker::WITHIN: return "WITHIN";
+        case IndexBoundsChecker::AHEAD: return "AHEAD";
+        }
+        invariant(0);
+    }
+
+    /**
+     * Test function for findIntervalForField.
+     * Constructs a list of point intervals from 'points' and searches for 'key'
+     * using findIntervalForField(). Verifies expected location and index (if expectedLocation
+     * is BEHIND or WITHIN).
+     * 'points' is provided in BSON format: {points: [pt1, pt2, pt4, ...]
+     */
+    void testFindIntervalForField(int key, const BSONObj& pointsObj, const int expectedDirection,
+                                  IndexBoundsChecker::Location expectedLocation,
+                                  size_t expectedIntervalIndex) {
+        // Create key BSONElement.
+        BSONObj keyObj = BSON("" << key);
+        BSONElement keyElt = keyObj.firstElement();
+
+        // Construct point intervals.
+        OrderedIntervalList oil("foo");
+        BSONObjIterator i(pointsObj.getObjectField("points"));
+        while (i.more()) {
+            BSONElement e = i.next();
+            int j = e.numberInt();
+            oil.intervals.push_back(Interval(BSON("" << j << "" << j), true, true));
+        }
+        size_t intervalIndex = 0;
+        IndexBoundsChecker::Location location =
+            IndexBoundsChecker::findIntervalForField(keyElt, oil, expectedDirection, &intervalIndex);
+        if (expectedLocation != location) {
+            mongoutils::str::stream ss;
+            ss << "Unexpected location from findIntervalForField: key=" << keyElt
+               << "; intervals=" << oil.toString() << "; direction=" << expectedDirection
+               << ". Expected: " << toString(expectedLocation)
+               << ". Actual: " << toString(location);
+            FAIL(ss);
+        }
+        // Check interval index if location is BEHIND or WITHIN.
+        if ((IndexBoundsChecker::BEHIND == expectedLocation ||
+             IndexBoundsChecker::WITHIN == expectedLocation) &&
+            expectedIntervalIndex != intervalIndex) {
+            mongoutils::str::stream ss;
+            ss << "Unexpected interval index from findIntervalForField: key=" << keyElt
+               << "; intervals=" << oil.toString() << "; direction=" << expectedDirection
+               << "; location= " << toString(location)
+               << ". Expected: " << expectedIntervalIndex
+               << ". Actual: " << intervalIndex;
+            FAIL(ss);
+        }
+    }
+
+    TEST(IndexBoundsCheckerTest, FindIntervalForField) {
+        // No intervals
+        BSONObj pointsObj = fromjson("{points: []}");
+        testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
+        testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
+
+        // One interval
+        pointsObj = fromjson("{points: [5]}");
+        testFindIntervalForField(4, pointsObj, 1, IndexBoundsChecker::BEHIND, 0U);
+        testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::WITHIN, 0U);
+        testFindIntervalForField(6, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
+
+        // One interval - reverse direction
+        pointsObj = fromjson("{points: [5]}");
+        testFindIntervalForField(6, pointsObj, -1, IndexBoundsChecker::BEHIND, 0U);
+        testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::WITHIN, 0U);
+        testFindIntervalForField(4, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
+
+        // Two intervals
+        // Verifies off-by-one handling in upper bound of binary search.
+        pointsObj = fromjson("{points: [5, 7]}");
+        testFindIntervalForField(4, pointsObj, 1, IndexBoundsChecker::BEHIND, 0U);
+        testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::WITHIN, 0U);
+        testFindIntervalForField(6, pointsObj, 1, IndexBoundsChecker::BEHIND, 1U);
+        testFindIntervalForField(7, pointsObj, 1, IndexBoundsChecker::WITHIN, 1U);
+        testFindIntervalForField(8, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
+
+        // Two intervals - reverse direction
+        // Verifies off-by-one handling in upper bound of binary search.
+        pointsObj = fromjson("{points: [7, 5]}");
+        testFindIntervalForField(8, pointsObj, -1, IndexBoundsChecker::BEHIND, 0U);
+        testFindIntervalForField(7, pointsObj, -1, IndexBoundsChecker::WITHIN, 0U);
+        testFindIntervalForField(6, pointsObj, -1, IndexBoundsChecker::BEHIND, 1U);
+        testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::WITHIN, 1U);
+        testFindIntervalForField(4, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
+
+        // Multiple intervals - odd number of intervals.
+        pointsObj = fromjson("{points: [1, 3, 5, 7, 9]}");
+        testFindIntervalForField(0, pointsObj, 1, IndexBoundsChecker::BEHIND, 0U);
+        testFindIntervalForField(1, pointsObj, 1, IndexBoundsChecker::WITHIN, 0U);
+        testFindIntervalForField(2, pointsObj, 1, IndexBoundsChecker::BEHIND, 1U);
+        testFindIntervalForField(3, pointsObj, 1, IndexBoundsChecker::WITHIN, 1U);
+        testFindIntervalForField(4, pointsObj, 1, IndexBoundsChecker::BEHIND, 2U);
+        testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::WITHIN, 2U);
+        testFindIntervalForField(6, pointsObj, 1, IndexBoundsChecker::BEHIND, 3U);
+        testFindIntervalForField(7, pointsObj, 1, IndexBoundsChecker::WITHIN, 3U);
+        testFindIntervalForField(8, pointsObj, 1, IndexBoundsChecker::BEHIND, 4U);
+        testFindIntervalForField(9, pointsObj, 1, IndexBoundsChecker::WITHIN, 4U);
+        testFindIntervalForField(10, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
+
+        // Multiple intervals - even number of intervals, reverse direction
+        // Interval order has to match direction.
+        pointsObj = fromjson("{points: [7, 5, 3, 1]}");
+        testFindIntervalForField(8, pointsObj, -1, IndexBoundsChecker::BEHIND, 0U);
+        testFindIntervalForField(7, pointsObj, -1, IndexBoundsChecker::WITHIN, 0U);
+        testFindIntervalForField(6, pointsObj, -1, IndexBoundsChecker::BEHIND, 1U);
+        testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::WITHIN, 1U);
+        testFindIntervalForField(4, pointsObj, -1, IndexBoundsChecker::BEHIND, 2U);
+        testFindIntervalForField(3, pointsObj, -1, IndexBoundsChecker::WITHIN, 2U);
+        testFindIntervalForField(2, pointsObj, -1, IndexBoundsChecker::BEHIND, 3U);
+        testFindIntervalForField(1, pointsObj, -1, IndexBoundsChecker::WITHIN, 3U);
+        testFindIntervalForField(0, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
     }
 
 }  // namespace

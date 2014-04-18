@@ -75,7 +75,7 @@ namespace mongo {
               _runCalled( false ) {
         }
         
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
 
         virtual void help( stringstream& help ) const {

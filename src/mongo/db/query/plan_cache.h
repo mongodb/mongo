@@ -46,14 +46,6 @@ namespace mongo {
     struct QuerySolutionNode;
 
     /**
-     * TODO HK notes
-
-     * cache should be LRU with some cap on size
-
-     * {x:1} and {x:{$gt:7}} not same shape for now -- operator matters
-     */
-
-    /**
      * When the CachedPlanRunner runs a cached query, it can provide feedback to the cache.  This
      * feedback is available to anyone who retrieves that query in the future.
      */
@@ -244,7 +236,9 @@ namespace mongo {
         // used to produce a backup solution in the case of a blocking sort.
         boost::optional<size_t> backupSoln;
 
-        // XXX: Replace with copy of canonical query?
+        // TODO: Do we really want to just hold a copy of the CanonicalQuery?  For now we just
+        // extract the data we need.
+        //
         // Used by the plan cache commands to display an example query
         // of the appropriate shape.
         BSONObj query;
@@ -269,15 +263,9 @@ namespace mongo {
         // The standard deviation of the scores from stored as feedback.
         boost::optional<double> stddevScore;
 
-        // Determines the amount of feedback that we are willing to store. Must be >= 1.
-        // TODO: how do we tune this?
-        static const size_t kMaxFeedback;
-
-        // The number of standard deviations which must be exceeded
-        // in order to determine that the cache entry should be removed.
-        // Must be positive. TODO how do we tune this?
-        static const double kStdDevThreshold;
-
+        // In order to justify eviction, the deviation from the mean must exceed a
+        // minimum threshold.
+        static const double kMinDeviation;
     };
 
     /**
@@ -290,17 +278,6 @@ namespace mongo {
     private:
         MONGO_DISALLOW_COPYING(PlanCache);
     public:
-        /**
-         * Flush cache when the number of write operations since last
-         * clear() reaches this limit.
-         */
-        static const int kPlanCacheMaxWriteOperations;
-
-        /**
-         * The maximum number of plan cache entries allowed.
-         */
-        static const int kMaxCacheSize;
-
         /**
          * We don't want to cache every possible query. This function
          * encapsulates the criteria for what makes a canonical query

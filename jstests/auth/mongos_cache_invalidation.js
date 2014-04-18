@@ -4,6 +4,11 @@
  */
 
 var authzErrorCode = 13;
+var hasAuthzError = function (result) {
+    assert(result.hasWriteError());
+    assert.eq(authzErrorCode, result.getWriteError().code);
+};
+
 var st = new ShardingTest({ shards: 2,
                             config: 3,
                             mongos: [{},
@@ -53,31 +58,26 @@ db3.auth('spencer', 'pwd');
 (function testGrantingPrivileges() {
      jsTestLog("Testing propagation of granting privileges");
 
-     db1.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db1, authzErrorCode);
-     db2.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db2, authzErrorCode);
-     db3.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db3, authzErrorCode);
+     hasAuthzError(db1.foo.update({}, { $inc: { a: 1 }}));
+     hasAuthzError(db2.foo.update({}, { $inc: { a: 1 }}));
+     hasAuthzError(db3.foo.update({}, { $inc: { a: 1 }}));
 
      assert.eq(1, db1.foo.findOne().a);
      assert.eq(1, db2.foo.findOne().a);
      assert.eq(1, db3.foo.findOne().a);
-
 
      db1.getSiblingDB('admin').grantPrivilegesToRole("myRole",
                                                      [{resource: {db: 'test', collection: ''},
                                                        actions: ['update']}]);
 
      // s0/db1 should update its cache instantly
-     db1.foo.update({}, {$inc: {a:1}});
-     assert.gleSuccess(db1);
+     assert.writeOK(db1.foo.update({}, { $inc: { a: 1 }}));
      assert.eq(2, db1.foo.findOne().a);
 
      // s1/db2 should update its cache in 30 seconds.
      assert.soon(function() {
-                     db2.foo.update({}, {$inc: {a:1}});
-                     if (db2.getLastError()) {
+                     var res = db2.foo.update({}, { $inc: { a: 1 }});
+                     if (res.hasWriteError()) {
                          return false;
                      }
                      return db2.foo.findOne().a == 3;
@@ -87,8 +87,7 @@ db3.auth('spencer', 'pwd');
 
      // We manually invalidate the cache on s2/db3.
      db3.adminCommand("invalidateUserCache");
-     db3.foo.update({}, {$inc: {a:1}});
-     assert.gleSuccess(db3);
+     assert.writeOK(db3.foo.update({}, { $inc: { a: 1 }}));
      assert.eq(4, db3.foo.findOne().a);
 
  })();
@@ -101,53 +100,43 @@ db3.auth('spencer', 'pwd');
                                                           actions: ['update']}]);
 
      // s0/db1 should update its cache instantly
-     db1.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db1, authzErrorCode);
+     hasAuthzError(db1.foo.update({}, { $inc: { a: 1 }}));
 
      // s1/db2 should update its cache in 30 seconds.
      assert.soon(function() {
-                     db2.foo.update({}, {$inc: {a:1}});
-                     return db2.getLastErrorObj().code == authzErrorCode;
+                     var res = db2.foo.update({}, { $inc: { a: 1 }});
+                     return res.hasWriteError() && res.getWriteError().code == authzErrorCode;
                  },
                  "Mongos did not update its user cache after 30 seconds",
                  31 * 1000); // Give an extra 1 second to avoid races
 
      // We manually invalidate the cache on s1/db3.
      db3.adminCommand("invalidateUserCache");
-     db3.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db3, authzErrorCode);
-
+     hasAuthzError(db3.foo.update({}, { $inc: { a: 1 }}));
  })();
 
 (function testModifyingUser() {
      jsTestLog("Testing propagation modifications to a user, rather than to a role");
 
-     db1.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db1, authzErrorCode);
-     db2.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db2, authzErrorCode);
-     db3.foo.update({}, {$inc: {a:1}});
-     assert.gleErrorCode(db3, authzErrorCode);
+     hasAuthzError(db1.foo.update({}, { $inc: { a: 1 }}));
+     hasAuthzError(db2.foo.update({}, { $inc: { a: 1 }}));
+     hasAuthzError(db3.foo.update({}, { $inc: { a: 1}}));
 
      db1.getSiblingDB('test').grantRolesToUser("spencer", ['readWrite']);
 
      // s0/db1 should update its cache instantly
-     db1.foo.update({}, {$inc: {a:1}});
-     assert.gleSuccess(db1);
+     assert.writeOK(db1.foo.update({}, { $inc: { a: 1 }}));
 
      // s1/db2 should update its cache in 30 seconds.
      assert.soon(function() {
-                     db2.foo.update({}, {$inc: {a:1}});
-                     return !db2.getLastError();
+                     return !db2.foo.update({}, { $inc: { a: 1 }}).hasWriteError();
                  },
                  "Mongos did not update its user cache after 30 seconds",
                  31 * 1000); // Give an extra 1 second to avoid races
 
      // We manually invalidate the cache on s1/db3.
      db3.adminCommand("invalidateUserCache");
-     db3.foo.update({}, {$inc: {a:1}});
-     assert.gleSuccess(db3);
-
+     assert.writeOK(db3.foo.update({}, { $inc: { a: 1 }}));
  })();
 
 (function testDroppingUser() {

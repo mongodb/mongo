@@ -36,6 +36,8 @@
 
 namespace {
 
+    using namespace mongo;
+
     std::string getPathPrefix(std::string path) {
         if (mongoutils::str::contains(path, '.')) {
             return mongoutils::str::before(path, '.');
@@ -43,6 +45,15 @@ namespace {
         else {
             return path;
         }
+    }
+
+    /**
+     * Returns true if either 'node' or a descendent of 'node'
+     * is a predicate that is required to use an index.
+     */
+    bool isIndexMandatory(const MatchExpression* node) {
+        return CanonicalQuery::countNodes(node, MatchExpression::GEO_NEAR) > 0
+            || CanonicalQuery::countNodes(node, MatchExpression::TEXT) > 0;
     }
 
 } // namespace
@@ -54,6 +65,7 @@ namespace mongo {
         : _root(params.root),
           _indices(params.indices),
           _ixisect(params.intersect),
+          _orLimit(params.maxSolutionsPerOr),
           _intersectLimit(params.maxIntersectPerAnd) { }
 
     PlanEnumerator::~PlanEnumerator() {
@@ -64,8 +76,6 @@ namespace mongo {
     }
 
     Status PlanEnumerator::init() {
-        QLOG() << "enumerator received root:\n" << _root->toString() << endl;
-
         // Fill out our memo structure from the tagged _root.
         _done = !prepMemo(_root, PrepMemoContext());
 
@@ -75,43 +85,47 @@ namespace mongo {
         return Status::OK();
     }
 
-    void PlanEnumerator::dumpMemo() {
+    std::string PlanEnumerator::dumpMemo() {
+        mongoutils::str::stream ss;
         for (size_t i = 0; i < _memo.size(); ++i) {
-            QLOG() << "[Node #" << i << "]: " << _memo[i]->toString() << endl;
+            ss << "[Node #" << i << "]: " << _memo[i]->toString() << "\n";
         }
+        return ss;
     }
 
     string PlanEnumerator::NodeAssignment::toString() const {
         if (NULL != pred) {
             mongoutils::str::stream ss;
-            ss << "predicate, first indices: [";
+            ss << "predicate\n";
+            ss << "\tfirst indices: [";
             for (size_t i = 0; i < pred->first.size(); ++i) {
                 ss << pred->first[i];
                 if (i < pred->first.size() - 1)
                     ss << ", ";
             }
-            ss << "], pred: " << pred->expr->toString();
-            ss << " indexToAssign: " << pred->indexToAssign;
+            ss << "]\n";
+            ss << "\tpred: " << pred->expr->toString();
+            ss << "\tindexToAssign: " << pred->indexToAssign;
             return ss;
         }
         else if (NULL != andAssignment) {
             mongoutils::str::stream ss;
             ss << "AND enumstate counter " << andAssignment->counter;
             for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
-                ss << "\nchoice " << i << ":\n";
+                ss << "\n\tchoice " << i << ":\n";
                 const AndEnumerableState& state = andAssignment->choices[i];
-                ss << "\tsubnodes: ";
+                ss << "\t\tsubnodes: ";
                 for (size_t j = 0; j < state.subnodesToIndex.size(); ++j) {
                     ss << state.subnodesToIndex[j] << " ";
                 }
                 ss << '\n';
                 for (size_t j = 0; j < state.assignments.size(); ++j) {
                     const OneIndexAssignment& oie = state.assignments[j];
-                    ss << "\tidx[" << oie.index << "]\n";
+                    ss << "\t\tidx[" << oie.index << "]\n";
 
                     for (size_t k = 0; k < oie.preds.size(); ++k) {
-                        ss << "\t\tpos " << oie.positions[k]
-                           << " pred " << oie.preds[k]->toString() << '\n';
+                        ss << "\t\t\tpos " << oie.positions[k]
+                           << " pred " << oie.preds[k]->toString();
                     }
                 }
             }
@@ -119,9 +133,9 @@ namespace mongo {
         }
         else if (NULL != arrayAssignment) {
             mongoutils::str::stream ss;
-            ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [";
+            ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [ ";
             for (size_t i = 0; i < arrayAssignment->subnodes.size(); ++i) {
-                ss << " " << arrayAssignment->subnodes[i];
+                ss << arrayAssignment->subnodes[i] << " ";
             }
             ss << "]";
             return ss;
@@ -129,9 +143,9 @@ namespace mongo {
         else {
             verify(NULL != orAssignment);
             mongoutils::str::stream ss;
-            ss << "ALL OF: [";
+            ss << "ALL OF: [ ";
             for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
-                ss << " " << orAssignment->subnodes[i];
+                ss << orAssignment->subnodes[i] << " ";
             }
             ss << "]";
             return ss;
@@ -149,11 +163,8 @@ namespace mongo {
         sortUsingTags(*tree);
 
         _root->resetTag();
-        QLOG() << "Enumerator: memo right before moving:\n";
-        dumpMemo();
+        QLOG() << "Enumerator: memo just before moving:" << endl << dumpMemo();
         _done = nextMemo(_nodeToId[_root]);
-        QLOG() << "Enumerator: memo right after moving:\n";
-        dumpMemo();
         return true;
     }
 
@@ -249,24 +260,42 @@ namespace mongo {
         }
         else if (MatchExpression::AND == node->matchType()) {
             // Map from idx id to children that have a pred over it.
-            // XXX: The index intersection logic could be simplified if we could
-            // iterate over these maps in a known order. Currently when iterating
-            // over these maps we have to impose an ordering on each individual
-            // pair of indices in order to make sure that the enumeration results
-            // are order-independent. See SERVER-12196.
+
+            // TODO: The index intersection logic could be simplified if we could iterate over these
+            // maps in a known order. Currently when iterating over these maps we have to impose an
+            // ordering on each individual pair of indices in order to make sure that the
+            // enumeration results are order-independent. See SERVER-12196.
             IndexToPredMap idxToFirst;
             IndexToPredMap idxToNotFirst;
 
-            // Children that aren't predicates.
+            // Children that aren't predicates, and which do not necessarily need
+            // to use an index.
             vector<MemoID> subnodes;
+
+            // Children that aren't predicates, but which *must* use an index.
+            // (e.g. an OR which contains a TEXT child).
+            vector<MemoID> mandatorySubnodes;
 
             // A list of predicates contained in the subtree rooted at 'node'
             // obtained by traversing deeply through $and and $elemMatch children.
             vector<MatchExpression*> indexedPreds;
 
-            // Partition the childen into the children that aren't predicates
-            // ('subnodes'), and children that are predicates ('indexedPreds').
-            partitionPreds(node, childContext, &indexedPreds, &subnodes);
+            // Partition the childen into the children that aren't predicates which may or may
+            // not be indexed ('subnodes'), children that aren't predicates which must use the
+            // index ('mandatorySubnodes'). and children that are predicates ('indexedPreds').
+            //
+            // We have to get the subnodes with mandatory assignments rather than adding the
+            // mandatory preds to 'indexedPreds'. Adding the mandatory preds directly to
+            // 'indexedPreds' would lead to problems such as pulling a predicate beneath an OR
+            // into a set joined by an AND.
+            if (!partitionPreds(node, childContext, &indexedPreds,
+                                &subnodes, &mandatorySubnodes)) {
+                return false;
+            }
+
+            if (mandatorySubnodes.size() > 1) {
+                return false;
+            }
 
             // Indices we *must* use.  TEXT or GEO.
             set<IndexID> mandatoryIndices;
@@ -278,8 +307,7 @@ namespace mongo {
 
                 invariant(Indexability::nodeCanUseIndexOnOwnField(child));
 
-                bool childRequiresIndex = (child->matchType() == MatchExpression::GEO_NEAR
-                                        || child->matchType() == MatchExpression::TEXT);
+                bool childRequiresIndex = isIndexMandatory(child);
 
                 RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
 
@@ -302,7 +330,11 @@ namespace mongo {
             }
 
             // If none of our children can use indices, bail out.
-            if (idxToFirst.empty() && (subnodes.size() == 0)) { return false; }
+            if (idxToFirst.empty()
+                && (subnodes.size() == 0)
+                && (mandatorySubnodes.size() == 0)) {
+                return false;
+            }
 
             // At least one child can use an index, so we can create a memo entry.
             AndAssignment* andAssignment = new AndAssignment();
@@ -312,6 +344,15 @@ namespace mongo {
             allocateAssignment(node, &nodeAssignment, &myMemoID);
             // Takes ownership.
             nodeAssignment->andAssignment.reset(andAssignment);
+
+            // Predicates which must use an index might be buried inside
+            // a subnode. Handle that case here.
+            if (1 == mandatorySubnodes.size()) {
+                AndEnumerableState aes;
+                aes.subnodesToIndex.push_back(mandatorySubnodes[0]);
+                andAssignment->choices.push_back(aes);
+                return true;
+            }
 
             // Only near queries and text queries have mandatory indices.
             // In this case there's no point to enumerating anything here; both geoNear
@@ -480,15 +521,19 @@ namespace mongo {
         //   0. Impose an ordering (idx1, idx2) using the key patterns.
         //   (*See note below.)
         //   1. Assign predicates which prefix idx1 to idx1.
-        //   2. Add assigned indices to a set of indices---the "already
+        //   2. Add assigned predicates to a set of predicates---the "already
         //   assigned set".
         //   3. Assign predicates which prefix idx2 to idx2, as long as they
-        //   been assigned to idx1 already. Add newly assigned indices to
+        //   been assigned to idx1 already. Add newly assigned predicates to
         //   the "already assigned set".
         //   4. Try to assign predicates to idx1 by compounding.
         //   5. Add any predicates assigned to idx1 by compounding to the
         //   "already assigned set",
         //   6. Try to assign predicates to idx2 by compounding.
+        //   7. Determine if we have already assigned all predicates in
+        //   the "already assigned set" to a single index. If so, then
+        //   don't generate an ixisect solution, as compounding will
+        //   be better. Otherwise, output the ixisect assignments.
         //
         // *NOTE on ordering. Suppose we have two indices A and B, and a
         // predicate P1 which is over the prefix of both indices A and B.
@@ -522,6 +567,14 @@ namespace mongo {
             // have at least 2 scans (one predicate per scan as the planner can't
             // intersect bounds when the index is multikey), so we stop here.
             if (oneIndex.multikey && oneAssign.preds.size() > 1) {
+                // One could imagine an enormous auto-generated $all query with too many clauses to
+                // have an ixscan per clause.
+                static const size_t kMaxSelfIntersections = 10;
+                if (oneAssign.preds.size() > kMaxSelfIntersections) {
+                    // Only take the first kMaxSelfIntersections preds.
+                    oneAssign.preds.resize(kMaxSelfIntersections);
+                    oneAssign.positions.resize(kMaxSelfIntersections);
+                }
                 AndEnumerableState state;
                 state.assignments.push_back(oneAssign);
                 andAssignment->choices.push_back(state);
@@ -676,6 +729,25 @@ namespace mongo {
                     }
                 }
 
+                // Add predicates in 'secondAssign' to the set of all assigned predicates.
+                for (size_t i = 0; i < secondAssign.preds.size(); ++i) {
+                    if (predsAssigned.end() == predsAssigned.find(secondAssign.preds[i])) {
+                        predsAssigned.insert(secondAssign.preds[i]);
+                    }
+                }
+
+                //
+                // Step #7:
+                // Make sure we haven't already assigned this set of predicates by compounding.
+                // If we have, then bail out for this pair of indices.
+                //
+                if (alreadyCompounded(predsAssigned, andAssignment)) {
+                    // There is no need to add either 'firstAssign' or 'secondAssign'
+                    // to 'andAssignment' in this case because we have already performed
+                    // assignments to single indices in enumerateOneIndex(...).
+                    continue;
+                }
+
                 // We're done with this particular pair of indices; output
                 // the resulting assignments.
                 AndEnumerableState state;
@@ -685,14 +757,13 @@ namespace mongo {
             }
         }
 
-        // XXX: Do we just want one subnode at a time?  We can use far more than 2 indices
-        // at once doing this very easily.  If we want to restrict the # of indices the
-        // children use, when we memoize the subtree above we can restrict it to 1 index at
-        // a time.  This can get tricky if we want both an intersection and a 1-index memo
-        // entry, since our state change is simple and we don't traverse the memo in any
-        // targeted way.  Should also verify that having a one-to-many mapping of
-        // MatchExpression to MemoID doesn't break anything.  This approach errors on the
-        // side of "too much indexing."
+        // TODO: Do we just want one subnode at a time?  We can use far more than 2 indices at once
+        // doing this very easily.  If we want to restrict the # of indices the children use, when
+        // we memoize the subtree above we can restrict it to 1 index at a time.  This can get
+        // tricky if we want both an intersection and a 1-index memo entry, since our state change
+        // is simple and we don't traverse the memo in any targeted way.  Should also verify that
+        // having a one-to-many mapping of MatchExpression to MemoID doesn't break anything.  This
+        // approach errors on the side of "too much indexing."
         for (size_t i = 0; i < subnodes.size(); ++i) {
             for (size_t j = i + 1; j < subnodes.size(); ++j) {
                 AndEnumerableState state;
@@ -703,10 +774,11 @@ namespace mongo {
         }
     }
 
-    void PlanEnumerator::partitionPreds(MatchExpression* node,
+    bool PlanEnumerator::partitionPreds(MatchExpression* node,
                                         PrepMemoContext context,
                                         vector<MatchExpression*>* indexOut,
-                                        vector<MemoID>* subnodesOut) {
+                                        vector<MemoID>* subnodesOut,
+                                        vector<MemoID>* mandatorySubnodes) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
             MatchExpression* child = node->getChild(i);
             if (Indexability::nodeCanUseIndexOnOwnField(child)) {
@@ -728,17 +800,19 @@ namespace mongo {
                 indexOut->push_back(child);
             }
             else if (Indexability::isBoundsGeneratingNot(child)) {
-                partitionPreds(child, context, indexOut, subnodesOut);
+                partitionPreds(child, context, indexOut, subnodesOut, mandatorySubnodes);
             }
             else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
                 PrepMemoContext childContext;
                 childContext.elemMatchExpr = child;
-                partitionPreds(child, childContext, indexOut, subnodesOut);
+                partitionPreds(child, childContext, indexOut, subnodesOut, mandatorySubnodes);
             }
             else if (MatchExpression::AND == child->matchType()) {
-                partitionPreds(child, context, indexOut, subnodesOut);
+                partitionPreds(child, context, indexOut, subnodesOut, mandatorySubnodes);
             }
             else {
+                bool mandatory = isIndexMandatory(child);
+
                 // Recursively prepMemo for the subnode. We fall through
                 // to this case for logical nodes other than AND (e.g. OR)
                 // and for array nodes other than ELEM_MATCH_OBJECT or
@@ -748,10 +822,22 @@ namespace mongo {
                     size_t childID = _nodeToId[child];
 
                     // Output the subnode.
-                    subnodesOut->push_back(childID);
+                    if (mandatory) {
+                        mandatorySubnodes->push_back(childID);
+                    }
+                    else {
+                        subnodesOut->push_back(childID);
+                    }
+                }
+                else if (mandatory) {
+                    // The subnode is mandatory but cannot be indexed. This means
+                    // that the entire AND cannot be indexed either.
+                    return false;
                 }
             }
         }
+
+        return true;
     }
 
     void PlanEnumerator::getMultikeyCompoundablePreds(const MatchExpression* assigned,
@@ -829,6 +915,48 @@ namespace mongo {
                 }
             }
         }
+    }
+
+    bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssigned,
+                                           const AndAssignment* andAssignment) {
+        for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
+            const AndEnumerableState& state = andAssignment->choices[i];
+
+            // We cannot have assigned this set of predicates already by
+            // compounding unless this is an assignment to a single index.
+            if (state.assignments.size() != 1) {
+                continue;
+            }
+
+            // If the set of preds in 'ixisectAssigned' is a subset of 'oneAssign.preds',
+            // then all the preds can be used by compounding on a single index.
+            const OneIndexAssignment& oneAssign = state.assignments[0];
+
+            // If 'ixisectAssigned' is larger than 'oneAssign.preds', then
+            // it can't be a subset.
+            if (ixisectAssigned.size() > oneAssign.preds.size()) {
+                continue;
+            }
+
+            // Check for subset by counting the number of elements in 'oneAssign.preds'
+            // that are contained in 'ixisectAssigned'. The elements of both 'oneAssign.preds'
+            // and 'ixisectAssigned' are unique (no repeated elements).
+            size_t count = 0;
+            for (size_t j = 0; j < oneAssign.preds.size(); ++j) {
+                if (ixisectAssigned.end() != ixisectAssigned.find(oneAssign.preds[j])) {
+                    ++count;
+                }
+            }
+
+            if (ixisectAssigned.size() == count) {
+                return true;
+            }
+
+            // We cannot assign the preds by compounding on 'oneAssign'.
+            // Move on to the next index.
+        }
+
+        return false;
     }
 
     void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
@@ -933,9 +1061,16 @@ namespace mongo {
             return false;
         }
         else if (NULL != assign->orAssignment) {
-            // OR doesn't have any enumeration state.  It just walks through telling its children to
-            // move forward.
             OrAssignment* oa = assign->orAssignment.get();
+
+            // Limit the number of OR enumerations
+            oa->counter++;
+            if (oa->counter >= _orLimit) {
+                return true;
+            }
+
+            // OR just walks through telling its children to
+            // move forward.
             for (size_t i = 0; i < oa->subnodes.size(); ++i) {
                 // If there's no carry, we just stop.  If there's a carry, we move the next child
                 // forward.

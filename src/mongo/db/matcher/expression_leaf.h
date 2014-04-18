@@ -204,6 +204,8 @@ namespace mongo {
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
+        void shortDebugString( StringBuilder& debug ) const;
+
         virtual bool equivalent( const MatchExpression* other ) const;
 
         const string& getString() const { return _regex; }
@@ -295,6 +297,8 @@ namespace mongo {
         bool equivalent( const ArrayFilterEntries& other ) const;
 
         void copyTo( ArrayFilterEntries& toFillIn ) const;
+
+        void debugString( StringBuilder& debug ) const;
 
     private:
         bool _hasNull; // if _equalities has a jstNULL element in it

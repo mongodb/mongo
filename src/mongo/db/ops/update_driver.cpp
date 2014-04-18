@@ -361,7 +361,7 @@ namespace mongo {
             }
 
             // If we require a replication oplog entry for this update, go ahead and generate one.
-            if (_logOp && logOpRec) {
+            if (!execInfo.noOp && _logOp && logOpRec) {
                 status = (*it)->log(&logBuilder);
                 if (!status.isOK()) {
                     return status;

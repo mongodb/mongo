@@ -61,7 +61,7 @@ namespace mongo {
 
         static int HeaderSize() { return sizeof(Extent)-4; }
 
-        bool validates(const DiskLoc diskLoc, BSONArrayBuilder* errors = NULL);
+        bool validates(const DiskLoc diskLoc, std::vector<string>* errors = NULL);
 
         BSONObj dump();
 

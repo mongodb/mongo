@@ -37,59 +37,22 @@
 
 #pragma once
 
-#include "mongo/db/client.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/diskloc.h"
-#include "mongo/db/storage/data_file.h"
-#include "mongo/db/storage/durable_mapped_file.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/structure/catalog/namespace_details-inl.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pdfile_version.h"
-#include "mongo/platform/cstdint.h"
-#include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
-    class DataFileHeader;
-    class Extent;
-    class OpDebug;
-    class Record;
+    class Database;
 
-    void dropDatabase(const std::string& db);
-    bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
+    void dropDatabase(Database* db);
 
-    bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
+    Status userCreateNS( Database* db,
+                         const StringData& ns,
+                         BSONObj options,
+                         bool logForReplication,
+                         bool createDefaultIndexes = true );
 
-    /*---------------------------------------------------------------------*/
-
-    boost::intmax_t dbSize( const char *database );
-
-    inline NamespaceIndex* nsindex(const StringData& ns) {
-        Database *database = cc().database();
-        verify( database );
-        DEV {
-            StringData dbname = nsToDatabaseSubstring( ns );
-            if ( database->name() != dbname ) {
-                out() << "ERROR: attempt to write to wrong database\n";
-                out() << " ns:" << ns << '\n';
-                out() << " database->name:" << database->name() << endl;
-                verify( database->name() == dbname );
-            }
-        }
-        return &database->namespaceIndex();
-    }
-
-    inline NamespaceDetails* nsdetails(const StringData& ns) {
-        // if this faults, did you set the current db first?  (Client::Context + dblock)
-        return nsindex(ns)->details(ns);
-    }
-
-    BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
-
-    inline BSONObj BSONObj::make(const Record* r ) {
-        return BSONObj( r->data() );
-    }
 
 } // namespace mongo

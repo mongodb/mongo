@@ -55,7 +55,7 @@ namespace mongo {
     public:
         BasicDriverHelper( const char * name ) : Command( name ) {}
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
     };

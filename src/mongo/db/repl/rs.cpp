@@ -124,7 +124,7 @@ namespace {
                 continue;
 
             Client::Context ctx(*it);
-            cc().database()->clearTmpCollections();
+            ctx.db()->clearTmpCollections();
         }
     }
 }
@@ -537,6 +537,20 @@ namespace {
             sleepsecs(30);
             dbexit( EXIT_REPLICATION_ERROR );
             return;
+        }
+
+        // initialize _me in SyncSourceFeedback
+        bool meEnsured = false;
+        while (!inShutdown() && !meEnsured) {
+            try {
+                theReplSet->syncSourceFeedback.ensureMe();
+                meEnsured = true;
+            }
+            catch (const DBException& e) {
+                warning() << "failed to write to local.me: " << e.what()
+                          << " trying again in one second";
+                sleepsecs(1);
+            }
         }
 
         changeState(MemberState::RS_STARTUP2);
@@ -1015,14 +1029,23 @@ namespace {
         return OpTime();
     }
 
-    void ReplSetImpl::registerSlave(const BSONObj& rid, const int memberId) {
+    bool ReplSetImpl::registerSlave(const BSONObj& rid, const int memberId) {
         // To prevent race conditions with clearing the cache at reconfig time,
         // we lock the replset mutex here.
+        Member* member = NULL;
         {
             lock lk(this);
             ghost->associateSlave(rid, memberId);
+            member = getMutableMember(memberId);
         }
-        syncSourceFeedback.associateMember(rid, memberId);
+
+        // it is possible that a node that was removed in a reconfig tried to handshake this node
+        // in that case, the Member will no longer be in the _members List and member will be NULL
+        if (!member) {
+            return false;
+        }
+        syncSourceFeedback.associateMember(rid, member);
+        return true;
     }
 
     class ReplIndexPrefetch : public ServerParameter {

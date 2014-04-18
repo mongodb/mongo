@@ -106,7 +106,14 @@ namespace mongo {
          *
          * Returns !OK with message if the full collection could not be targeted.
          */
-        virtual Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const = 0;
+        virtual Status targetCollection( std::vector<ShardEndpoint*>* endpoints ) const = 0;
+
+        /**
+         * Returns a vector of ShardEndpoints for all shards.
+         *
+         * Returns !OK with message if all shards could not be targeted.
+         */
+        virtual Status targetAllShards( std::vector<ShardEndpoint*>* endpoints ) const = 0;
 
         /**
          * Informs the targeter that a targeting failure occurred during one of the last targeting

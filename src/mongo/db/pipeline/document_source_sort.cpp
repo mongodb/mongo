@@ -246,7 +246,7 @@ namespace mongo {
 
         bool more() { return _cursor->more(); }
         Data next() {
-            const Document doc = Document::fromBsonWithMetaData(_cursor->next());
+            const Document doc = DocumentSourceMergeCursors::nextSafeFrom(_cursor);
             return make_pair(_sorter->extractKey(doc), doc);
         }
     private:

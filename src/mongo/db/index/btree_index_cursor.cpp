@@ -44,11 +44,12 @@ namespace mongo {
 
     // Go forward by default.
     BtreeIndexCursor::BtreeIndexCursor(const IndexCatalogEntry* btreeState,
+                                       const DiskLoc head,
                                        BtreeInterface *interface)
         : _direction(1),
           _btreeState(btreeState),
           _interface(interface),
-          _bucket(btreeState->head()),
+          _bucket(head),
           _keyOffset(0) {
 
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);

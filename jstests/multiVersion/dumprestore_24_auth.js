@@ -54,11 +54,6 @@ function multiVersionDumpRestoreTest(opts) {
 }
 
 multiVersionDumpRestoreTest({mongodSourceVersion: "2.4",
-                             mongodDestVersion: "latest",
-                             mongoDumpVersion: "latest",
-                             mongoRestoreVersion: "latest"});
-
-multiVersionDumpRestoreTest({mongodSourceVersion: "2.4",
                              mongodDestVersion: "2.4",
                              mongoDumpVersion: "latest",
                              mongoRestoreVersion: "latest"});

@@ -4,7 +4,12 @@
  * index build restarts after secondary restarts
  */
 
-var replTest = new ReplSetTest({ name: 'fgIndex', nodes: 3 });
+var replTest = new ReplSetTest({
+    name: 'fgIndex',
+    nodes: 3,
+    oplogSize: 100, // This test inserts enough data to wrap the default 40MB oplog.
+});
+
 var nodes = replTest.nodeList();
 
 // We need an arbiter to ensure that the primary doesn't step down when we restart the secondary
@@ -26,9 +31,11 @@ var secondDB = second.getDB('fgIndexSec');
 var size = 500000;
 
 jsTest.log("creating test data " + size + " documents");
+var bulk = masterDB.jstests_fgsec.initializeUnorderedBulkOp();
 for(var i = 0; i < size; ++i) {
-    masterDB.jstests_fgsec.save( {i:i} );
+    bulk.insert({ i: i });
 }
+assert.writeOK(bulk.execute());
 
 jsTest.log("Creating index");
 masterDB.jstests_fgsec.ensureIndex( {i:1} );

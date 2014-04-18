@@ -61,9 +61,11 @@ namespace {
     }
 
     /**
-     * Retrieves a collection's query settings from the database.
+     * Retrieves a collection's query settings and plan cache from the database.
      */
-    Status getQuerySettings(Database* db, const string& ns, QuerySettings** querySettingsOut) {
+    Status getQuerySettingsAndPlanCache(Database* db, const string& ns,
+                                        QuerySettings** querySettingsOut,
+                                        PlanCache** planCacheOut) {
         invariant(db);
 
         Collection* collection = db->getCollection(ns);
@@ -79,27 +81,11 @@ namespace {
 
         *querySettingsOut = querySettings;
 
-        return Status::OK();
-    }
-
-    /**
-     * Retrieves a collection's plan cache from the database.
-     */
-    Status getPlanCache(Database* db, const string& ns, PlanCache** planCacheOut) {
-        invariant(db);
-
-        Collection* collection = db->getCollection(ns);
-        if (NULL == collection) {
-            return Status(ErrorCodes::BadValue, "no such collection");
-        }
-
-        CollectionInfoCache* infoCache = collection->infoCache();
-        invariant(infoCache);
-
         PlanCache* planCache = infoCache->getPlanCache();
         invariant(planCache);
 
         *planCacheOut = planCache;
+
         return Status::OK();
     }
 
@@ -146,9 +132,7 @@ namespace mongo {
         return true;
     }
 
-    Command::LockType IndexFilterCommand::locktype() const {
-        return NONE;
-    }
+    bool IndexFilterCommand::isWriteCommandForConfigServer() const { return false; }
 
     bool IndexFilterCommand::slaveOk() const {
         return false;
@@ -178,9 +162,13 @@ namespace mongo {
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
-        Status status = getQuerySettings(ctx.db(), ns, &querySettings);
+        PlanCache* unused;
+        Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &unused);
         if (!status.isOK()) {
-            return status;
+            // No collection - return empty array of filters.
+            BSONArrayBuilder hintsBuilder(bob->subarrayStart("filters"));
+            hintsBuilder.doneFast();
+            return Status::OK();
         }
         return list(*querySettings, bob);
     }
@@ -233,14 +221,11 @@ namespace mongo {
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
-        Status status = getQuerySettings(ctx.db(), ns, &querySettings);
-        if (!status.isOK()) {
-            return status;
-        }
         PlanCache* planCache;
-        status = getPlanCache(ctx.db(), ns, &planCache);
+        Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
-            return status;
+            // No collection - do nothing.
+            return Status::OK();
         }
         return clear(querySettings, planCache, ns, cmdObj);
     }
@@ -321,12 +306,8 @@ namespace mongo {
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
-        Status status = getQuerySettings(ctx.db(), ns, &querySettings);
-        if (!status.isOK()) {
-            return status;
-        }
         PlanCache* planCache;
-        status = getPlanCache(ctx.db(), ns, &planCache);
+        Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
             return status;
         }

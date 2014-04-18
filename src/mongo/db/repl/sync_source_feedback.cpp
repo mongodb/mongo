@@ -43,11 +43,12 @@ namespace mongo {
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    void SyncSourceFeedback::associateMember(const BSONObj& id, const int memberId) {
+    void SyncSourceFeedback::associateMember(const BSONObj& id, Member* member) {
+        invariant(member);
         const OID rid = id["_id"].OID();
         boost::unique_lock<boost::mutex> lock(_mtx);
         _handshakeNeeded = true;
-        _members[rid] = theReplSet->getMutableMember(memberId);
+        _members[rid] = member;
         _cond.notify_all();
     }
 
@@ -79,6 +80,8 @@ namespace mongo {
                 _me = b.obj();
                 Helpers::putSingleton("local.me", _me);
             }
+            // _me is used outside of a read lock, so we must copy it out of the mmap
+            _me = _me.getOwned();
         }
     }
 
@@ -97,7 +100,8 @@ namespace mongo {
         try {
             if (!_connection->runCommand("admin", cmd.obj(), res)) {
                 if (res["errmsg"].str().find("no such cmd") != std::string::npos) {
-                    log() << "upstream updater is unsupported on this version";
+                    LOG(1) << "upstream updater is not supported by the member from which we"
+                              " are syncing, using oplogreader-based updating instead";
                     _supportsUpdater = false;
                 }
                 resetConnection();
@@ -149,6 +153,7 @@ namespace mongo {
         if (hasConnection()) {
             return true;
         }
+        log() << "replset setting syncSourceFeedback to " << hostName << rsLog;
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
         if (!_connection->connect(hostName.c_str(), errmsg) ||
@@ -208,7 +213,6 @@ namespace mongo {
 
     void SyncSourceFeedback::updateMap(const mongo::OID& rid, const OpTime& ot) {
         boost::unique_lock<boost::mutex> lock(_mtx);
-        LOG(1) << "replSet last: " << _slaveMap[rid].toString() << " to " << ot.toString() << endl;
         // only update if ot is newer than what we have already
         if (ot > _slaveMap[rid]) {
             _slaveMap[rid] = ot;

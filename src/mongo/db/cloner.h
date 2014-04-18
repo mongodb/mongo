@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 

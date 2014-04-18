@@ -33,10 +33,8 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/commands/server_status.h"
@@ -58,7 +56,7 @@ namespace mongo {
                                                     &prefetchDocStats );
 
     // prefetch for an oplog operation
-    void prefetchPagesForReplicatedOp(const BSONObj& op) {
+    void prefetchPagesForReplicatedOp(Database* db, const BSONObj& op) {
         const char *opField;
         const char *opType = op.getStringField("op");
         switch (*opType) {
@@ -76,10 +74,6 @@ namespace mongo {
 
         BSONObj obj = op.getObjectField(opField);
         const char *ns = op.getStringField("ns");
-
-        Database* db = cc().database();
-        if ( !db )
-            return;
 
         Collection* collection = db->getCollection( ns );
         if ( !collection )
@@ -115,7 +109,7 @@ namespace mongo {
         if ((*opType == 'u') &&
             // do not prefetch the data for capped collections because
             // they typically do not have an _id index for findById() to use.
-            !collection->details()->isCapped()) {
+            !collection->isCapped()) {
             prefetchRecordPages(ns, obj);
         }
     }
@@ -187,12 +181,12 @@ namespace mongo {
                 // we can probably use Client::Context here instead of ReadContext as we
                 // have locked higher up the call stack already
                 Client::ReadContext ctx( ns );
-                if( Helpers::findById(cc(), ns, builder.done(), result) ) {
+                if( Helpers::findById(ctx.ctx().db(), ns, builder.done(), result) ) {
                     // do we want to use Record::touch() here?  it's pretty similar.
                     volatile char _dummy_char = '\0';
                     // Touch the first word on every page in order to fault it into memory
-                    for (int i = 0; i < result.objsize(); i += g_minOSPageSizeBytes) {                        
-                        _dummy_char += *(result.objdata() + i); 
+                    for (int i = 0; i < result.objsize(); i += g_minOSPageSizeBytes) {
+                        _dummy_char += *(result.objdata() + i);
                     }
                     // hit the last page, in case we missed it above
                     _dummy_char += *(result.objdata() + result.objsize() - 1);

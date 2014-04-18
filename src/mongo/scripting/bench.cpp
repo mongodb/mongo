@@ -308,8 +308,8 @@ namespace mongo {
         return b.obj();
     }
 
-    BenchRunWorker::BenchRunWorker(const BenchRunConfig *config, BenchRunState *brState)
-        : _config(config), _brState(brState) {
+    BenchRunWorker::BenchRunWorker(size_t id, const BenchRunConfig *config, BenchRunState *brState)
+        : _id(id), _config(config), _brState(brState) {
     }
 
     BenchRunWorker::~BenchRunWorker() {}
@@ -330,6 +330,7 @@ namespace mongo {
         mongo::Timer timer;
 
         BsonTemplateEvaluator bsonTemplateEvaluator;
+        invariant(bsonTemplateEvaluator.setId(_id) == BsonTemplateEvaluator::StatusSuccess);
 
         while ( !shouldStop() ) {
             BSONObjIterator i( _config->ops );
@@ -538,23 +539,24 @@ namespace mongo {
                         {
                             BenchRunEventTrace _bret(&_stats.insertCounter);
 
+                            BSONObjBuilder builder;
+                            builder.append("insert",
+                                nsToCollectionSubstring(ns));
+                            BSONArrayBuilder docBuilder(
+                                builder.subarrayStart("documents"));
+                            docBuilder.append(fixQuery(e["doc"].Obj(),
+                                bsonTemplateEvaluator));
+                            docBuilder.done();
+                            BSONObj insertObj = builder.obj();
+
                             if (useWriteCmd) {
                                 // TODO: Replace after SERVER-11774.
-                                BSONObjBuilder builder;
-                                builder.append("insert",
-                                    nsToCollectionSubstring(ns));
-                                BSONArrayBuilder docBuilder(
-                                    builder.subarrayStart("documents"));
-                                docBuilder.append(fixQuery(e["doc"].Obj(),
-                                    bsonTemplateEvaluator));
-                                docBuilder.done();
                                 conn->runCommand(
                                     nsToDatabaseSubstring(ns).toString(),
-                                    builder.obj(), result);
+                                    insertObj, result);
                             }
                             else {
-                                conn->insert(ns, fixQuery(e["doc"].Obj(),
-                                    bsonTemplateEvaluator));
+                                conn->insert(ns, insertObj);
                                 if (safe)
                                     result = conn->getLastErrorDetailed();
                             }
@@ -766,7 +768,7 @@ namespace mongo {
 
          // Start threads
          for ( unsigned i = 0; i < _config->parallel; i++ ) {
-             BenchRunWorker *worker = new BenchRunWorker(_config.get(), &_brState);
+             BenchRunWorker *worker = new BenchRunWorker(i, _config.get(), &_brState);
              worker->start();
              _workers.push_back(worker);
          }

@@ -63,7 +63,8 @@ namespace mongo {
 
            Note: does nothing if collection does not yet exist.
         */
-        static void ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name);
+        static void ensureIndex(Collection* collection,
+                                BSONObj keyPattern, bool unique, const char *name);
 
         /* fetch a single object from collection ns that matches query.
            set your db SavedContext first.
@@ -76,8 +77,10 @@ namespace mongo {
 
            @return true if object found
         */
-        static bool findOne(const StringData& ns, const BSONObj &query, BSONObj& result, bool requireIndex = false);
-        static DiskLoc findOne(const StringData& ns, const BSONObj &query, bool requireIndex);
+        static bool findOne(Collection* collection, const BSONObj &query,
+                            BSONObj& result, bool requireIndex = false);
+        static DiskLoc findOne(Collection* collection, const BSONObj &query,
+                               bool requireIndex);
 
         /**
          * have to be locked already
@@ -88,8 +91,8 @@ namespace mongo {
          * @param foundIndex if passed in will be set to 1 if ns and index found
          * @return true if object found
          */
-        static bool findById(Client&, const char *ns, BSONObj query, BSONObj& result ,
-                             bool * nsFound = 0 , bool * indexFound = 0 );
+        static bool findById(Database* db, const char *ns, BSONObj query, BSONObj& result,
+                             bool* nsFound = 0, bool* indexFound = 0 );
 
         /* TODO: should this move into Collection?
          * uasserts if no _id index.

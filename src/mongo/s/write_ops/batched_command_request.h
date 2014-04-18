@@ -48,7 +48,7 @@ namespace mongo {
     public:
 
         // Maximum number of write ops supported per batch
-        static const int kMaxWriteBatchSize = 1000;
+        static const size_t kMaxWriteBatchSize;
 
         enum BatchType {
             BatchType_Insert, BatchType_Update, BatchType_Delete, BatchType_Unknown
@@ -107,6 +107,7 @@ namespace mongo {
         // Index creation is also an insert, but a weird one.
         bool isInsertIndexRequest() const;
         bool isUniqueIndexRequest() const;
+        bool isValidIndexRequest( std::string* errMsg ) const;
         std::string getTargetingNS() const;
         BSONObj getIndexKeyPattern() const;
 
@@ -137,6 +138,16 @@ namespace mongo {
         void unsetMetadata();
         bool isMetadataSet() const;
         BatchedRequestMetadata* getMetadata() const;
+
+        //
+        // Helpers for batch pre-processing
+        //
+
+        /**
+         * Generates a new request, the same as the old, but with insert _ids if required.
+         * Returns NULL if this is not an insert request or all inserts already have _ids.
+         */
+        static BatchedCommandRequest* cloneWithIds(const BatchedCommandRequest& origCmdRequest);
 
         //
         // Helpers for auth pre-parsing
@@ -204,6 +215,17 @@ namespace mongo {
         const BatchedDeleteDocument* getDelete() const {
             dassert( _itemIndex < static_cast<int>( _request->sizeWriteOps() ) );
             return _request->getDeleteRequest()->getDeletesAt( _itemIndex );
+        }
+
+        BSONObj toBSON() const {
+            switch ( getOpType() ) {
+            case BatchedCommandRequest::BatchType_Insert:
+                return getDocument();
+            case BatchedCommandRequest::BatchType_Update:
+                return getUpdate()->toBSON();
+            default:
+                return getDelete()->toBSON();
+            }
         }
 
     private:

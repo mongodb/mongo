@@ -108,7 +108,7 @@ namespace mongo {
 
         Client::ReadContext ctx(collectionName.ns());
         BSONObj found;
-        if (Helpers::findOne(collectionName.ns(),
+        if (Helpers::findOne(ctx.ctx().db()->getCollection(collectionName),
                              query,
                              found)) {
             *result = found.getOwned();

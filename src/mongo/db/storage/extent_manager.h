@@ -42,7 +42,6 @@
 namespace mongo {
 
     class DataFile;
-    class NamespaceDetails;
 
     /**
      * ExtentManager basics
@@ -85,34 +84,19 @@ namespace mongo {
         size_t numFiles() const;
         long long fileSize() const;
 
+        // TODO: make private
         DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false );
 
-        DataFile* addAFile( int sizeNeeded, bool preallocateNextFile );
-
-        void preallocateAFile() { getFile( numFiles() , 0, true ); }// XXX-ERH
+        // TODO(ERH): remove?
+        void preallocateAFile() { getFile( numFiles() , 0, true ); }
 
         void flushFiles( bool sync );
 
-        /* allocate a new Extent, does not check free list
-         * @param maxFileNoForQuota - 0 for unlimited
-        */
-        DiskLoc createExtent( int approxSize, int maxFileNoForQuota );
-
-        /**
-         * will return NULL if nothing suitable in free list
-         */
-        DiskLoc allocFromFreeList( int approxSize, bool capped );
-
-        /**
-         * @param details - this is for the collection we're adding space to
-         * @param quotaMax 0 == no limit
-         * TODO: this isn't quite in the right spot
-         *  really need the concept of a NamespaceStructure in the current paradigm
-         */
-        Extent* increaseStorageSize( const string& ns,
-                                     NamespaceDetails* details,
-                                     int size,
-                                     int quotaMax );
+        // must call Extent::reuse on the returned extent
+        DiskLoc allocateExtent( const string& ns,
+                                bool capped,
+                                int size,
+                                int quotaMax );
 
         /**
          * firstExt has to be == lastExt or a chain
@@ -125,16 +109,19 @@ namespace mongo {
 
         /**
          * @param loc - has to be for a specific Record
+         * TODO(ERH): remove this - only RecordStore can do this
          */
         Record* recordFor( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
+         * TODO(ERH): remove this - only RecordStore can do this
          */
         Extent* extentFor( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
+         * TODO(ERH): remove this - only RecordStore can do this
          */
         DiskLoc extentLocFor( const DiskLoc& loc ) const;
 
@@ -150,14 +137,18 @@ namespace mongo {
         // these WILL cross Extent boundaries
         // * @param loc - has to be the DiskLoc for a Record
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getNextRecord( const DiskLoc& loc ) const;
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getPrevRecord( const DiskLoc& loc ) const;
 
         // does NOT traverse extent boundaries
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getNextRecordInExtent( const DiskLoc& loc ) const;
 
+        // * TODO(ERH): remove this - only RecordStore can do this
         DiskLoc getPrevRecordInExtent( const DiskLoc& loc ) const;
 
         /**
@@ -166,6 +157,18 @@ namespace mongo {
         static int quantizeExtentSize( int size );
 
     private:
+
+        /**
+         * will return NULL if nothing suitable in free list
+         */
+        DiskLoc _allocFromFreeList( int approxSize, bool capped );
+
+        /* allocate a new Extent, does not check free list
+         * @param maxFileNoForQuota - 0 for unlimited
+        */
+        DiskLoc _createExtent( int approxSize, int maxFileNoForQuota );
+
+        DataFile* _addAFile( int sizeNeeded, bool preallocateNextFile );
 
         DiskLoc _getFreeListStart() const;
         DiskLoc _getFreeListEnd() const;

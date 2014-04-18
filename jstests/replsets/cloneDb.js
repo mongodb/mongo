@@ -17,13 +17,11 @@ doTest = function( signal ) {
     var db1 = master.getDB('test')
     
     print("Insert data");
+    var bulk = db1['foo'].initializeUnorderedBulkOp();
     for (var i = 0; i < N; i++) {
-        db1['foo'].insert({x: i, text: Text})
-        var le = db1.getLastErrorObj(2, 1000);  // wait to be copied to at least one secondary
-        if (le.err) {
-            printjson(le);
-        }
+        bulk.insert({ x: i, text: Text });
     }
+    assert.writeOK(bulk.execute());
     
     print("Create single server");
     var solo = new Server ('singleTarget')
@@ -41,10 +39,12 @@ doTest = function( signal ) {
     print("Now test the reverse direction");
     db1 = master.getDB('test2')
     db2 = soloConn.getDB('test2')
+
+    bulk = db2['foo'].initializeUnorderedBulkOp();
     for (var i = 0; i < N; i++) {
-        db2['foo'].insert({x: i, text: Text})
-        db2.getLastError()
+        bulk.insert({ x: i, text: Text });
     }
+    assert.writeOK(bulk.execute());
     db1.cloneDatabase (solo.host())
     assert.eq (Text, db2['foo'] .findOne({x: N-1}) ['text'], 'cloneDatabase failed (test2)')
 

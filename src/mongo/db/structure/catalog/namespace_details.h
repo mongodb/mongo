@@ -28,31 +28,18 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-#include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/structure/catalog/index_details.h"
-#include "mongo/db/index_names.h"
-#include "mongo/db/index_set.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/db/structure/catalog/namespace_index.h"
-#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
     class Collection;
-    class IndexCatalogEntry;
     class Database;
     class IndexCatalog;
-
-    /** @return true if a client can modify this namespace even though it is under ".system."
-        For example <dbname>.system.users is ok for regular clients to update.
-        @param write used when .system.js
-    */
-    bool legalClientSystemNS( const StringData& ns , bool write );
+    class IndexCatalogEntry;
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.
@@ -141,7 +128,7 @@ namespace mongo {
                 return ((char *) this) - ((char *) d);
             }
             void init() { memset(this, 0, sizeof(Extra)); }
-            Extra* next(NamespaceDetails *d) {
+            Extra* next(const NamespaceDetails *d) const {
                 if( _next == 0 ) return 0;
                 return (Extra*) (((char *) d) + _next);
             }
@@ -151,13 +138,18 @@ namespace mongo {
                 _next = 0;
             }
         };
-        Extra* extra() {
+        Extra* extra() const {
             if( _extraOffset == 0 ) return 0;
             return (Extra *) (((char *) this) + _extraOffset);
         }
         /* add extra space for indexes when more than 10 */
-        Extra* allocExtra(const char *ns, int nindexessofar);
-        void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
+        Extra* allocExtra( const StringData& ns,
+                           NamespaceIndex& ni,
+                           int nindexessofar );
+
+        void copyingFrom( const char* thisns,
+                          NamespaceIndex& ni,
+                          NamespaceDetails *src); // must be called when renaming a NS to fix up extra
 
     public:
         const DiskLoc& capExtent() const { return _capExtent; }
@@ -166,13 +158,7 @@ namespace mongo {
         DiskLoc& capExtent() { return _capExtent; }
         DiskLoc& capFirstNewRecord() { return _capFirstNewRecord; }
 
-    private:
-        Extent *theCapExtent() const { return _capExtent.ext(); }
-        void advanceCapExtent( const StringData& ns );
-        DiskLoc __capAlloc(int len);
-        DiskLoc cappedAlloc(Collection* collection, const StringData& ns, int len);
-        DiskLoc &cappedFirstDeletedInCurExtent();
-        bool nextIsInCapExtent( const DiskLoc &dl ) const;
+        bool capLooped() const { return _capFirstNewRecord.isValid(); }
 
     public:
 
@@ -217,21 +203,6 @@ namespace mongo {
          */
         static bool validMaxCappedDocs( long long* max );
 
-        DiskLoc& cappedListOfAllDeletedRecords() { return _deletedList[0]; }
-        DiskLoc& cappedLastDelRecLastExtent()    { return _deletedList[1]; }
-        bool capLooped() const { return _isCapped && _capFirstNewRecord.isValid();  }
-        bool inCapExtent( const DiskLoc &dl ) const;
-        void cappedCheckMigrate();
-        /**
-         * Truncate documents newer than the document at 'end' from the capped
-         * collection.  The collection cannot be completely emptied using this
-         * function.  An assertion will be thrown if that is attempted.
-         * @param inclusive - Truncate 'end' as well iff true
-         */
-        void cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive);
-        /** Remove all documents from the capped collection */
-        void emptyCappedCollection(const char *ns);
-
         /* when a background index build is in progress, we don't count the index in nIndexes until
            complete, yet need to still use it in _indexRecord() - thus we use this function for that.
         */
@@ -253,20 +224,21 @@ namespace mongo {
         };
 
         IndexDetails& idx(int idxNo, bool missingExpected = false );
+        const IndexDetails& idx(int idxNo, bool missingExpected = false ) const;
 
         class IndexIterator {
         public:
             int pos() { return i; } // note this is the next one to come
             bool more() { return i < n; }
-            IndexDetails& next() { return d->idx(i++); }
+            const IndexDetails& next() { return d->idx(i++); }
         private:
             friend class NamespaceDetails;
             int i, n;
-            NamespaceDetails *d;
-            IndexIterator(NamespaceDetails *_d, bool includeBackgroundInProgress);
+            const NamespaceDetails *d;
+            IndexIterator(const NamespaceDetails *_d, bool includeBackgroundInProgress);
         };
 
-        IndexIterator ii( bool includeBackgroundInProgress = false ) {
+        IndexIterator ii( bool includeBackgroundInProgress = false ) const {
             return IndexIterator(this, includeBackgroundInProgress);
         }
 
@@ -285,7 +257,7 @@ namespace mongo {
          * This fetches the IndexDetails for the next empty index slot. The caller must populate
          * returned object.  This handles allocating extra index space, if necessary.
          */
-        IndexDetails& getNextIndexDetails(const char* thisns);
+        IndexDetails& getNextIndexDetails(Collection* collection);
 
         /**
          * @return the actual size to create
@@ -374,15 +346,7 @@ namespace mongo {
          */
         static int quantizePowerOf2AllocationSpace(int allocSize);
 
-        /** allocate space for a new record from deleted lists.
-            @param lenToAlloc is WITH header
-            @return null diskloc if no room - allocate a new extent then
-        */
-        DiskLoc alloc(Collection* collection, const StringData& ns, int lenToAlloc);
-
-        /* add a given record to the deleted chains for this NS */
-        void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
-
+    public:
         // Start from firstExtent by default.
         DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
         // Start from lastExtent by default.
@@ -394,10 +358,11 @@ namespace mongo {
         /** Make all linked Extra objects writeable as well */
         NamespaceDetails *writingWithExtra();
 
-    private:
         // @return offset in indexes[]
         int _catalogFindIndexByName( const StringData& name,
-                                     bool includeBackgroundInProgress = false);
+                                     bool includeBackgroundInProgress = false) const;
+
+    private:
 
         void _removeIndexFromMe( int idx );
 
@@ -408,28 +373,19 @@ namespace mongo {
          */
         void swapIndex( int a, int b );
 
-        DiskLoc _alloc(Collection* collection, const StringData& ns, int len);
         void maybeComplain( const StringData& ns, int len ) const;
-        DiskLoc __stdAlloc(int len, bool willBeAt);
-        void compact(); // combine adjacent deleted records
 
         friend class Database;
         friend class NamespaceIndex;
         friend class IndexCatalog;
         friend class IndexCatalogEntry;
+        friend class SimpleRecordStoreV1;
+        friend class CappedRecordStoreV1;
 
-        struct ExtraOld {
-            // note we could use this field for more chaining later, so don't waste it:
-            unsigned long long reserved1;
-            IndexDetails details[NIndexesExtra];
-            unsigned reserved2;
-            unsigned reserved3;
-        };
         /** Update cappedLastDelRecLastExtent() after capExtent changed in cappedTruncateAfter() */
         void cappedTruncateLastDelUpdate();
         BOOST_STATIC_ASSERT( NIndexesMax <= NIndexesBase + NIndexesExtra*2 );
         BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
-        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::ExtraOld) == 496 );
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) == 496 );
     }; // NamespaceDetails
 #pragma pack()

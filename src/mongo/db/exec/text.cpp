@@ -61,20 +61,41 @@ namespace mongo {
         ++_commonStats.works;
 
         if (isEOF()) { return PlanStage::IS_EOF; }
+        invariant(_internalState != DONE);
+
+        PlanStage::StageState stageState = PlanStage::IS_EOF;
 
         switch (_internalState) {
         case INIT_SCANS:
-            return initScans(out);
+            stageState = initScans(out);
+            break;
         case READING_TERMS:
-            return readFromSubScanners(out);
+            stageState = readFromSubScanners(out);
+            break;
         case RETURNING_RESULTS:
-            return returnResults(out);
+            stageState = returnResults(out);
+            break;
         case DONE:
-            return PlanStage::IS_EOF;
+            // Handled above.
+            break;
         }
 
-        // Not reached.
-        return PlanStage::IS_EOF;
+        // Increment common stats counters that are specific to the return value of work().
+        switch (stageState) {
+        case PlanStage::ADVANCED:
+            ++_commonStats.advanced;
+            break;
+        case PlanStage::NEED_TIME:
+            ++_commonStats.needTime;
+            break;
+        case PlanStage::NEED_FETCH:
+            ++_commonStats.needFetch;
+            break;
+        default:
+            break;
+        }
+
+        return stageState;
     }
 
     void TextStage::prepareToYield() {
@@ -122,6 +143,8 @@ namespace mongo {
 
     PlanStage::StageState TextStage::initScans(WorkingSetID* out) {
         invariant(0 == _scanners.size());
+
+        _specificStats.parsedTextQuery = _params.query.toBSON();
 
         // Get all the index scans for each term in our query.
         for (size_t i = 0; i < _params.query.getTerms().size(); i++) {
@@ -191,6 +214,15 @@ namespace mongo {
             if (PlanStage::FAILURE == childState) {
                 // Propagate failure from below.
                 *out = id;
+                // If a stage fails, it may create a status WSM to indicate why it
+                // failed, in which case 'id' is valid.  If ID is invalid, we
+                // create our own error message.
+                if (WorkingSet::INVALID_ID == id) {
+                    mongoutils::str::stream ss;
+                    ss << "text stage failed to read in results from child";
+                    Status status(ErrorCodes::InternalError, ss);
+                    *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                }
             }
             return childState;
         }

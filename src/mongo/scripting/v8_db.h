@@ -106,6 +106,9 @@ namespace mongo {
     // HexData constructor
     v8::Handle<v8::Value> hexDataInit(V8Scope* scope, const v8::Arguments& args);
 
+    // Object.invalidForStorage()
+    v8::Handle<v8::Value> v8ObjectInvalidForStorage(V8Scope* scope, const v8::Arguments& args);
+
     // Object.bsonsize()
     v8::Handle<v8::Value> bsonsize(V8Scope* scope, const v8::Arguments& args);
 

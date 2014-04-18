@@ -86,8 +86,10 @@ namespace mongo {
             int n = 0;
             list<BSONObj> src;
             {
-                Client::ReadContext ctx("local.sources", storageGlobalParams.dbpath);
-                auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
+                const char* localSources = "local.sources";
+                Client::ReadContext ctx(localSources, storageGlobalParams.dbpath);
+                auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
+                                                                        ctx.ctx().db()->getCollection(localSources)));
                 BSONObj obj;
                 Runner::RunnerState state;
                 while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -181,7 +183,7 @@ namespace mongo {
             help << "Check if this server is primary for a replica pair/set; also if it is --master or --slave in simple master/slave setups.\n";
             help << "{ isMaster : 1 }";
         }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required

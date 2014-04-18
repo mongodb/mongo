@@ -31,21 +31,35 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace OplogStartTests {
+
+    static const char* kCollscanFetchFpName = "collscanInMemorySucceed";
 
     class Base {
     public:
         Base() : _context(ns()) {
             Collection* c = _context.db()->getCollection(ns());
             if (!c) {
-                c = _context.db()->createCollection(ns(), false, NULL, true);
+                c = _context.db()->createCollection(ns());
             }
             c->getIndexCatalog()->ensureHaveIdIndex();
+
+            // We want everything in the collscan to be in memory to avoid spurious fetch
+            // requests.
+            FailPointRegistry* registry = getGlobalFailPointRegistry();
+            FailPoint* failPoint = registry->getFailPoint(kCollscanFetchFpName);
+            failPoint->setMode(FailPoint::alwaysOn);
         }
 
         ~Base() {
             client()->dropCollection(ns());
+
+            // Undo fail point set in ctor.
+            FailPointRegistry* registry = getGlobalFailPointRegistry();
+            FailPoint* failPoint = registry->getFailPoint(kCollscanFetchFpName);
+            failPoint->setMode(FailPoint::off);
         }
 
     protected:
@@ -59,6 +73,10 @@ namespace OplogStartTests {
             return "oplogstarttests";
         }
 
+        Collection* collection() {
+            return _context.db()->getCollection( ns() );
+        }
+
         DBDirectClient *client() const { return &_client; }
 
         void setupFromQuery(const BSONObj& query) {
@@ -67,7 +85,7 @@ namespace OplogStartTests {
             ASSERT(s.isOK());
             _cq.reset(cq);
             _oplogws.reset(new WorkingSet());
-            _stage.reset(new OplogStart(_cq->ns(), _cq->root(), _oplogws.get()));
+            _stage.reset(new OplogStart(collection(), _cq->root(), _oplogws.get()));
         }
 
         void assertWorkingSetMemberHasId(WorkingSetID id, int expectedId) {

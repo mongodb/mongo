@@ -32,6 +32,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -64,6 +65,7 @@ namespace {
 }
 
     boost::shared_ptr<Runner> PipelineD::prepareCursorSource(
+            Collection* collection,
             const intrusive_ptr<Pipeline>& pPipeline,
             const intrusive_ptr<ExpressionContext>& pExpCtx) {
         // get the full "namespace" name
@@ -147,7 +149,6 @@ namespace {
         // cursor.  Either way, we can then apply other optimizations there
         // are tickets for, such as SERVER-4507.
         const size_t runnerOptions = QueryPlannerParams::DEFAULT
-                                   | QueryPlannerParams::INCLUDE_COLLSCAN
                                    | QueryPlannerParams::INCLUDE_SHARD_FILTER
                                    | QueryPlannerParams::NO_BLOCKING_SORT
                                    ;
@@ -162,7 +163,7 @@ namespace {
                                              projectionForQuery,
                                              &cq);
             Runner* rawRunner;
-            if (status.isOK() && getRunner(cq, &rawRunner, runnerOptions).isOK()) {
+            if (status.isOK() && getRunner(collection, cq, &rawRunner, runnerOptions).isOK()) {
                 // success: The Runner will handle sorting for us using an index.
                 runner.reset(rawRunner);
                 sortInRunner = true;
@@ -186,7 +187,7 @@ namespace {
                                              &cq));
 
             Runner* rawRunner;
-            uassertStatusOK(getRunner(cq, &rawRunner, runnerOptions));
+            uassertStatusOK(getRunner(collection, cq, &rawRunner, runnerOptions));
             runner.reset(rawRunner);
         }
 

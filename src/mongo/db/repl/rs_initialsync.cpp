@@ -41,6 +41,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -132,7 +133,7 @@ namespace mongo {
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;
-        collection->details()->emptyCappedCollection(rsoplog);
+        uassertStatusOK( collection->truncate() );
     }
 
     bool Member::syncable() const {

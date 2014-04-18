@@ -102,6 +102,7 @@ namespace mongo {
         };
 
     public:
+
         class ScopedLock : boost::noncopyable {
         public:
             virtual ~ScopedLock();
@@ -187,16 +188,6 @@ namespace mongo {
             DBWrite(const StringData& dbOrNs);
             virtual ~DBWrite();
 
-            class UpgradeToExclusive : private boost::noncopyable {
-            public:
-                UpgradeToExclusive();
-                ~UpgradeToExclusive();
-
-                bool gotUpgrade() const { return _gotUpgrade; }
-            private:
-                bool _gotUpgrade;
-            };
-
         private:
             bool _locked_w;
             bool _locked_W;
@@ -229,6 +220,20 @@ namespace mongo {
             
         };
 
+        /**
+         * Acquires a previously acquired intent-X (lower-case 'w') GlobalWrite lock to upper-case
+         * 'W' lock. Effectively means "stop the world".
+         */
+        class UpgradeGlobalLockToExclusive : private boost::noncopyable {
+        public:
+            UpgradeGlobalLockToExclusive();
+            ~UpgradeGlobalLockToExclusive();
+
+            bool gotUpgrade() const { return _gotUpgrade; }
+
+        private:
+            bool _gotUpgrade;
+        };
     };
 
     class readlocktry : boost::noncopyable {

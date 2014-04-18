@@ -43,7 +43,7 @@ namespace mongo {
         AppendOplogNoteCmd() : Command( "appendOplogNote" ) {}
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const {
             help << "Adds a no-op entry to the oplog";
         }

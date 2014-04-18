@@ -428,7 +428,11 @@ namespace optionenvironment {
                 }
 
                 if (YAMLNode.IsMap() && !OptionIsStringMap(options_vector, dottedName)) {
-                    addYAMLNodesToEnvironment(YAMLNode, options, dottedName, environment);
+                    Status ret = addYAMLNodesToEnvironment(YAMLNode, options, dottedName,
+                                                           environment);
+                    if (!ret.isOK()) {
+                        return ret;
+                    }
                 }
                 else {
                     Value optionValue;

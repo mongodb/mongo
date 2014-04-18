@@ -31,6 +31,7 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/instance.h"
@@ -38,7 +39,10 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/storage/extent.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace QueryStageCollectionScan {
 
@@ -58,14 +62,13 @@ namespace QueryStageCollectionScan {
             stringstream spec;
             spec << "{\"capped\":true,\"size\":2000,\"$nExtents\":" << nExtents() << "}";
 
-            string err;
-            ASSERT( userCreateNS( ns(), fromjson( spec.str() ), err, false ) );
+            ASSERT( userCreateNS( db(), ns(), fromjson( spec.str() ), false ).isOK() );
 
             // Tell the test to add data/extents/etc.
             insertTestData();
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = collection();
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
             params.start = DiskLoc();
@@ -149,7 +152,9 @@ namespace QueryStageCollectionScan {
 
         static const char *ns() { return "unittests.QueryStageCollectionScanCapped"; }
 
-        static NamespaceDetails *nsd() { return nsdetails(ns()); }
+        Database* db() { return _context.db(); }
+        Collection* collection() { return db()->getCollection( ns() ); }
+        NamespaceDetails *nsd() { return collection()->detailsWritable(); }
 
     private:
         Lock::GlobalWrite lk_;
@@ -316,7 +321,7 @@ namespace QueryStageCollectionScan {
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( ns() );
             params.direction = direction;
             params.tailable = false;
 
@@ -336,11 +341,13 @@ namespace QueryStageCollectionScan {
             return count;
         }
 
-        void getLocs(CollectionScanParams::Direction direction, vector<DiskLoc>* out) {
+        void getLocs(Collection* collection,
+                     CollectionScanParams::Direction direction,
+                     vector<DiskLoc>* out) {
             WorkingSet ws;
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = collection;
             params.direction = direction;
             params.tailable = false;
 
@@ -422,7 +429,7 @@ namespace QueryStageCollectionScan {
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( ns() );
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
@@ -452,7 +459,7 @@ namespace QueryStageCollectionScan {
             Client::ReadContext ctx(ns());
 
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = ctx.ctx().db()->getCollection( ns() );
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
@@ -480,13 +487,15 @@ namespace QueryStageCollectionScan {
         void run() {
             Client::WriteContext ctx(ns());
 
+            Collection* coll = ctx.ctx().db()->getCollection( ns() );
+
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
-            getLocs(CollectionScanParams::FORWARD, &locs);
+            getLocs(coll, CollectionScanParams::FORWARD, &locs);
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
@@ -539,14 +548,15 @@ namespace QueryStageCollectionScan {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            Collection* coll = ctx.ctx().db()->getCollection(ns());
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
-            getLocs(CollectionScanParams::BACKWARD, &locs);
+            getLocs(coll, CollectionScanParams::BACKWARD, &locs);
 
             // Configure the scan.
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = coll;
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
@@ -590,6 +600,73 @@ namespace QueryStageCollectionScan {
         }
     };
 
+    class QueryStageCollscanFetch : public QueryStageCollectionScanBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(ns());
+            Collection* coll = ctx.ctx().db()->getCollection(ns());
+
+            // We want every result from our collscan to NOT be in memory, at least
+            // the first time around.
+            const char* kCollscanFetchFpName = "collscanInMemoryFail";
+            FailPointRegistry* registry = getGlobalFailPointRegistry();
+            FailPoint* failPoint = registry->getFailPoint(kCollscanFetchFpName);
+            ASSERT(NULL != failPoint);
+
+            // Get the DiskLocs that would be returned by an in-order scan.
+            vector<DiskLoc> locs;
+            getLocs(coll, CollectionScanParams::FORWARD, &locs);
+
+            // Configure the scan.
+            CollectionScanParams params;
+            params.collection = coll;
+            params.direction = CollectionScanParams::FORWARD;
+            params.tailable = false;
+
+            WorkingSet ws;
+            scoped_ptr<CollectionScan> scan(new CollectionScan(params, &ws, NULL));
+            failPoint->setMode(FailPoint::alwaysOn);
+
+            // Expect the first result to be a fetch request for the first object (after
+            // some NEEDS_TIME initialization).
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state;
+            do {
+                state = scan->work(&id);
+            } while (PlanStage::NEED_FETCH != state);
+
+            // Make sure we're fetching the first thing in the scan.
+            WorkingSetMember* member = ws.get(id);
+            ASSERT_EQUALS(locs[0], member->loc);
+
+            // Delete the thing we're fetching.
+            scan->prepareToYield();
+            scan->invalidate(locs[0], INVALIDATION_DELETION);
+            remove(locs[0].obj());
+            scan->recoverFromYield();
+
+            // Turn fetches off.
+            failPoint->setMode(FailPoint::off);
+
+            // Make sure we get the rest of the docs but NOT the one we just nuked mid-fetch.
+            // We start at 1 to bypass the document we just deleted.
+            int count = 1;
+            while (!scan->isEOF()) {
+                WorkingSetID id = WorkingSet::INVALID_ID;
+                PlanStage::StageState state = scan->work(&id);
+                if (PlanStage::ADVANCED == state) {
+                    WorkingSetMember* member = ws.get(id);
+                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                                  member->obj["foo"].numberInt());
+                    ++count;
+                }
+            }
+
+            ASSERT_EQUALS(numObj(), count);
+        }
+    };
+
+
     class All : public Suite {
     public:
         All() : Suite( "QueryStageCollectionScan" ) {}
@@ -618,6 +695,7 @@ namespace QueryStageCollectionScan {
             add<QueryStageCollscanObjectsInOrderBackward>();
             add<QueryStageCollscanInvalidateUpcomingObject>();
             add<QueryStageCollscanInvalidateUpcomingObjectBackward>();
+            add<QueryStageCollscanFetch>();
         }
     } all;
 

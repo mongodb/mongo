@@ -30,8 +30,7 @@ masterDB.temp2.ensureIndex({x:1});
 masterDB.runCommand({create: 'keep1', temp: false});
 masterDB.runCommand({create: 'keep2', temp: 0});
 masterDB.runCommand({create: 'keep3'});
-masterDB.keep4.insert({});
-masterDB.getLastError(2);
+assert.writeOK(masterDB.keep4.insert({}, { writeConcern: { w: 2 }}));
 
 // make sure they exist on primary and secondary
 assert.eq(masterDB.system.namespaces.count({name: /temp\d$/}) , 2); // collections

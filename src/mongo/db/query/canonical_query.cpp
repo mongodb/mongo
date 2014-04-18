@@ -29,6 +29,7 @@
 #include "mongo/db/query/canonical_query.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/query_planner_common.h"
 
@@ -37,6 +38,35 @@ namespace {
     using std::auto_ptr;
     using std::string;
     using namespace mongo;
+
+    // Delimiters for cache key encoding.
+    const char kEncodeChildrenBegin = '[';
+    const char kEncodeChildrenEnd = ']';
+    const char kEncodeChildrenSeparator = ',';
+    const char kEncodeSortSection = '~';
+    const char kEncodeProjectionSection = '|';
+
+    /**
+     * Encode user-provided string. Cache key delimiters seen in the
+     * user string are escaped with a backslash.
+     */
+    void encodeUserString(const StringData& s, mongoutils::str::stream* os) {
+        for (size_t i = 0; i < s.size(); ++i) {
+            char c = s[i];
+            switch (c) {
+            case kEncodeChildrenBegin:
+            case kEncodeChildrenEnd:
+            case kEncodeChildrenSeparator:
+            case kEncodeSortSection:
+            case kEncodeProjectionSection:
+            case '\\':
+                  *os << '\\';
+                // Fall through to default case.
+            default:
+                *os << c;
+            }
+        }
+    }
 
     void encodePlanCacheKeyTree(const MatchExpression* tree, mongoutils::str::stream* os);
 
@@ -109,11 +139,63 @@ namespace {
         case MatchExpression::ALWAYS_FALSE: return "af"; break;
         case MatchExpression::GEO_NEAR: return "gn"; break;
         case MatchExpression::TEXT: return "te"; break;
+        default: verify(0); return "";
         }
-        // Unreachable code.
-        // All MatchType values have been handled in switch().
-        verify(0);
-        return "";
+    }
+
+    /**
+     * Encodes GEO match expression.
+     * Encoding includes:
+     * - type of geo query (within/intersect/near)
+     * - geometry type
+     * - CRS (flat or spherical)
+     */
+    void encodeGeoMatchExpression(const GeoMatchExpression* tree, mongoutils::str::stream* os) {
+        const GeoQuery& geoQuery = tree->getGeoQuery();
+
+        // Type of geo query.
+        switch (geoQuery.getPred()) {
+        case GeoQuery::WITHIN: *os << "wi"; break;
+        case GeoQuery::INTERSECT: *os << "in"; break;
+        case GeoQuery::INVALID: *os << "id"; break;
+        }
+
+        // Geometry type.
+        // Only one of the shared_ptrs in GeoContainer may be non-NULL.
+        const GeometryContainer& geoContainer = geoQuery.getGeometry();
+        if (NULL != geoContainer._point) { *os << "pt"; }
+        else if (NULL != geoContainer._line) { *os << "ln"; }
+        else if (NULL != geoContainer._polygon) { *os << "pl"; }
+        else if (NULL != geoContainer._cap ) { *os << "cc"; }
+        else if (NULL != geoContainer._multiPoint) { *os << "mp"; }
+        else if (NULL != geoContainer._multiLine) { *os << "ml"; }
+        else if (NULL != geoContainer._multiPolygon) { *os << "my"; }
+        else if (NULL != geoContainer._geometryCollection) { *os << "gc"; }
+        else { invariant(NULL != geoContainer._box); *os << "bx"; }
+
+        // CRS (flat or spherical)
+        if (geoContainer.hasFlatRegion()) { *os << "fl"; }
+        else { invariant(geoContainer.hasS2Region()); *os << "sp"; }
+    }
+
+    /**
+     * Encodes GEO_NEAR match expression.
+     * Encode:
+     * - isNearSphere
+     * - CRS (flat or spherical)
+     */
+    void encodeGeoNearMatchExpression(const GeoNearMatchExpression* tree,
+                                      mongoutils::str::stream* os) {
+        const NearQuery& nearQuery = tree->getData();
+
+        // isNearSphere
+        *os << (nearQuery.isNearSphere ? "ns" : "nr");
+
+        // CRS (flat or spherical)
+        switch (nearQuery.centroid.crs) {
+        case FLAT: *os << "fl"; break;
+        case SPHERE: *os << "sp"; break;
+        }
     }
 
     /**
@@ -123,10 +205,32 @@ namespace {
      */
     void encodePlanCacheKeyTree(const MatchExpression* tree, mongoutils::str::stream* os) {
         // Encode match type and path.
-        *os << encodeMatchType(tree->matchType()) << tree->path();
+        *os << encodeMatchType(tree->matchType());
+
+        encodeUserString(tree->path(), os);
+
+        // GEO and GEO_NEAR require additional encoding.
+        if (MatchExpression::GEO == tree->matchType()) {
+            encodeGeoMatchExpression(static_cast<const GeoMatchExpression*>(tree), os);
+        }
+        else if (MatchExpression::GEO_NEAR == tree->matchType()) {
+            encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree), os);
+        }
+
         // Traverse child nodes.
+        // Enclose children in [].
+        if (tree->numChildren() > 0) {
+            *os << kEncodeChildrenBegin;
+        }
+        // Use comma to separate children encoding.
         for (size_t i = 0; i < tree->numChildren(); ++i) {
+            if (i > 0) {
+                *os << kEncodeChildrenSeparator;
+            }
             encodePlanCacheKeyTree(tree->getChild(i), os);
+        }
+        if (tree->numChildren() > 0) {
+            *os << kEncodeChildrenEnd;
         }
     }
 
@@ -136,6 +240,12 @@ namespace {
      * LiteParsedQuery.
      */
     void encodePlanCacheKeySort(const BSONObj& sortObj, mongoutils::str::stream* os) {
+        if (sortObj.isEmpty()) {
+            return;
+        }
+
+        *os << kEncodeSortSection;
+
         BSONObjIterator it(sortObj);
         while (it.more()) {
             BSONElement elt = it.next();
@@ -151,7 +261,7 @@ namespace {
             else {
                 *os << "d";
             }
-            *os << elt.fieldName();
+            encodeUserString(elt.fieldName(), os);
         }
     }
 
@@ -159,6 +269,7 @@ namespace {
      * Encodes parsed projection into cache key.
      * Does a simple toString() on each projected field
      * in the BSON object.
+     * Orders the encoded elements in the projection by field name.
      * This handles all the special projection types ($meta, $elemMatch, etc.)
      */
     void encodePlanCacheKeyProj(const BSONObj& projObj, mongoutils::str::stream* os) {
@@ -166,16 +277,27 @@ namespace {
             return;
         }
 
-        *os << "p";
+        *os << kEncodeProjectionSection;
+
+        // Sorts the BSON elements by field name using a map.
+        std::map<StringData, BSONElement> elements;
 
         BSONObjIterator it(projObj);
         while (it.more()) {
             BSONElement elt = it.next();
+            StringData fieldName = elt.fieldNameStringData();
+            elements[fieldName] = elt;
+        }
+
+        // Read elements in order of field name
+        for (std::map<StringData, BSONElement>::const_iterator i = elements.begin();
+             i != elements.end(); ++i) {
+            const BSONElement& elt = (*i).second;
             // BSONElement::toString() arguments
             // includeFieldName - skip field name (appending after toString() result). false.
             // full: choose less verbose representation of child/data values. false.
-            *os << elt.toString(false, false);
-            *os << elt.fieldName();
+            encodeUserString(elt.toString(false, false), os);
+            encodeUserString(elt.fieldName(), os);
         }
     }
 
@@ -183,19 +305,9 @@ namespace {
 
 namespace mongo {
 
-    // static
-    Status CanonicalQuery::canonicalize(const QueryMessage& qm, CanonicalQuery** out) {
-        LiteParsedQuery* lpq;
-        Status parseStatus = LiteParsedQuery::make(qm, &lpq);
-        if (!parseStatus.isOK()) { return parseStatus; }
-
-        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq);
-        if (!initStatus.isOK()) { return initStatus; }
-
-        *out = cq.release();
-        return Status::OK();
-    }
+    //
+    // These all punt to the many-argumented canonicalize below.
+    //
 
     // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
@@ -236,7 +348,69 @@ namespace mongo {
                                         CanonicalQuery** out) {
         BSONObj emptyObj;
         return CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
-                                            emptyObj, emptyObj, false, out);
+                                            emptyObj, emptyObj,
+                                            false, // snapshot
+                                            false, // explain
+                                            out);
+    }
+
+    //
+    // These actually call init() on the CQ.
+    //
+
+    // static
+    Status CanonicalQuery::canonicalize(const QueryMessage& qm, CanonicalQuery** out) {
+        // Make LiteParsedQuery.
+        LiteParsedQuery* lpq;
+        Status parseStatus = LiteParsedQuery::make(qm, &lpq);
+        if (!parseStatus.isOK()) { return parseStatus; }
+
+        // Make MatchExpression.
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter());
+        if (!swme.isOK()) {
+            delete lpq;
+            return swme.getStatus();
+        }
+
+        // Make the CQ we'll hopefully return.
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        // Takes ownership of lpq and the MatchExpression* in swme.
+        Status initStatus = cq->init(lpq, swme.getValue());
+
+        if (!initStatus.isOK()) { return initStatus; }
+        *out = cq.release();
+        return Status::OK();
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(const CanonicalQuery& baseQuery,
+                                        MatchExpression* root,
+                                        CanonicalQuery** out) {
+
+        LiteParsedQuery* lpq;
+
+        // Pass empty sort and projection.
+        BSONObj emptyObj;
+        // 0, 0, 0 is 'ntoskip', 'ntoreturn', and 'queryoptions'
+        // false, false is 'snapshot' and 'explain'
+        Status parseStatus = LiteParsedQuery::make(baseQuery.ns(),
+                                                   0, 0, 0,
+                                                   baseQuery.getParsed().getFilter(),
+                                                   baseQuery.getParsed().getProj(),
+                                                   baseQuery.getParsed().getSort(),
+                                                   emptyObj, emptyObj, emptyObj,
+                                                   false, false, &lpq);
+        if (!parseStatus.isOK()) {
+            return parseStatus;
+        }
+
+        // Make the CQ we'll hopefully return.
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        Status initStatus = cq->init(lpq, root->shallowClone());
+
+        if (!initStatus.isOK()) { return initStatus; }
+        *out = cq.release();
+        return Status::OK();
     }
 
     // static
@@ -245,36 +419,72 @@ namespace mongo {
                                         long long skip, long long limit,
                                         const BSONObj& hint,
                                         const BSONObj& minObj, const BSONObj& maxObj,
-                                        bool snapshot, CanonicalQuery** out) {
+                                        bool snapshot,
+                                        bool explain,
+                                        CanonicalQuery** out) {
         LiteParsedQuery* lpq;
         // Pass empty sort and projection.
         BSONObj emptyObj;
         Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort,
-                                                   hint, minObj, maxObj, snapshot, &lpq);
-        if (!parseStatus.isOK()) { return parseStatus; }
+                                                   hint, minObj, maxObj, snapshot, explain, &lpq);
+        if (!parseStatus.isOK()) {
+            return parseStatus;
+        }
 
+        // Build a parse tree from the BSONObj in the parsed query.
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter());
+        if (!swme.isOK()) {
+            delete lpq;
+            return swme.getStatus();
+        }
+
+        // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq);
-        if (!initStatus.isOK()) { return initStatus; }
+        // Takes ownership of lpq and the MatchExpression* in swme.
+        Status initStatus = cq->init(lpq, swme.getValue());
 
+        if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
         return Status::OK();
     }
+
+    Status CanonicalQuery::init(LiteParsedQuery* lpq, MatchExpression* root) {
+        _pq.reset(lpq);
+
+        // Normalize, sort and validate tree.
+        root = normalizeTree(root);
+
+        sortTree(root);
+        _root.reset(root);
+        Status validStatus = isValid(root, *_pq);
+        if (!validStatus.isOK()) {
+            return validStatus;
+        }
+
+        this->generateCacheKey();
+
+        // Validate the projection if there is one.
+        if (!_pq->getProj().isEmpty()) {
+            ParsedProjection* pp;
+            Status projStatus = ParsedProjection::make(_pq->getProj(), _root.get(), &pp);
+            if (!projStatus.isOK()) {
+                return projStatus;
+            }
+            _proj.reset(pp);
+        }
+
+        return Status::OK();
+    }
+
 
     // static
     bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
         bool hasID = false;
 
-        // Must have _id field, and optionally can have either
-        // $isolated or $atomic.
-        if (query.nFields() > 2) {
-            return false;
-        }
-
         BSONObjIterator it(query);
         while (it.more()) {
             BSONElement elt = it.next();
-            if (mongoutils::str::equals("_id", elt.fieldName())) {
+            if (mongoutils::str::equals("_id", elt.fieldName() ) ) {
                 // Verify that the query on _id is a simple equality.
                 hasID = true;
 
@@ -291,8 +501,12 @@ namespace mongo {
                     return false;
                 }
             }
-            else if (!(mongoutils::str::equals("$isolated", elt.fieldName()) ||
-                       mongoutils::str::equals("$atomic", elt.fieldName()))) {
+            else if (elt.fieldName()[0] == '$' &&
+                     (mongoutils::str::equals("$isolated", elt.fieldName())||
+                      mongoutils::str::equals("$atomic", elt.fieldName()))) {
+                // ok, passthrough
+            }
+            else {
                 // If the field is not _id, it must be $isolated/$atomic.
                 return false;
             }
@@ -382,7 +596,9 @@ namespace mongo {
         }
     }
 
-    size_t countNodes(MatchExpression* root, MatchExpression::MatchType type) {
+    // static
+    size_t CanonicalQuery::countNodes(const MatchExpression* root,
+                                      MatchExpression::MatchType type) {
         size_t sum = 0;
         if (type == root->matchType()) {
             sum = 1;
@@ -482,39 +698,56 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status CanonicalQuery::init(LiteParsedQuery* lpq) {
-        _pq.reset(lpq);
-
-        // Build a parse tree from the BSONObj in the parsed query.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(_pq->getFilter());
-        if (!swme.isOK()) { return swme.getStatus(); }
-
-        // Normalize, sort and validate tree.
-        MatchExpression* root = swme.getValue();
-        root = normalizeTree(root);
-        sortTree(root);
-        Status validStatus = isValid(root, *_pq);
-        if (!validStatus.isOK()) {
-            return validStatus;
+    // static
+    // XXX TODO: This does not belong here at all.
+    MatchExpression* CanonicalQuery::logicalRewrite(MatchExpression* tree) {
+        // Only thing we do is pull an OR up at the root.
+        if (MatchExpression::AND != tree->matchType()) {
+            return tree;
         }
-        _root.reset(root);
 
-        this->generateCacheKey();
-
-        // Validate the projection if there is one.
-        if (!_pq->getProj().isEmpty()) {
-            ParsedProjection* pp;
-            Status projStatus = ParsedProjection::make(_pq->getProj(), _root.get(), &pp);
-            if (!projStatus.isOK()) {
-                return projStatus;
+        // We want to bail out ASAP if we have nothing to do here.
+        size_t numOrs = 0;
+        for (size_t i = 0; i < tree->numChildren(); ++i) {
+            if (MatchExpression::OR == tree->getChild(i)->matchType()) {
+                ++numOrs;
             }
-            _proj.reset(pp);
         }
 
-        return Status::OK();
+        // Only do this for one OR right now.
+        if (1 != numOrs) {
+            return tree;
+        }
+
+        // Detach the OR from the root.
+        invariant(NULL != tree->getChildVector());
+        vector<MatchExpression*>& rootChildren = *tree->getChildVector();
+        MatchExpression* orChild = NULL;
+        for (size_t i = 0; i < rootChildren.size(); ++i) {
+            if (MatchExpression::OR == rootChildren[i]->matchType()) {
+                orChild = rootChildren[i];
+                rootChildren.erase(rootChildren.begin() + i);
+                break;
+            }
+        }
+
+        // AND the existing root with each or child.
+        invariant(NULL != orChild);
+        invariant(NULL != orChild->getChildVector());
+        vector<MatchExpression*>& orChildren = *orChild->getChildVector();
+        for (size_t i = 0; i < orChildren.size(); ++i) {
+            AndMatchExpression* ama = new AndMatchExpression();
+            ama->add(orChildren[i]);
+            ama->add(tree->shallowClone());
+            orChildren[i] = ama;
+        }
+        delete tree;
+
+        // Clean up any consequences from this tomfoolery.
+        return normalizeTree(orChild);
     }
 
-    string CanonicalQuery::toString() const {
+    std::string CanonicalQuery::toString() const {
         mongoutils::str::stream ss;
         ss << "ns=" << _pq->ns() << " limit=" << _pq->getNumToReturn()
            << " skip=" << _pq->getSkip() << '\n';
@@ -522,6 +755,14 @@ namespace mongo {
         ss << "Tree: " << _root->toString();
         ss << "Sort: " << _pq->getSort().toString() << '\n';
         ss << "Proj: " << _pq->getProj().toString() << '\n';
+        return ss;
+    }
+
+    std::string CanonicalQuery::toStringShort() const {
+        mongoutils::str::stream ss;
+        ss << "query: " << _pq->getFilter().toString()
+           << " sort: " << _pq->getSort().toString()
+           << " projection: " << _pq->getProj().toString();
         return ss;
     }
 

@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
@@ -60,9 +61,10 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/pdfile_version.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
@@ -70,6 +72,7 @@
 #include "mongo/db/startup_warnings.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
+#include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
@@ -87,7 +90,7 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/signal_win32.h"
+#include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
@@ -107,15 +110,13 @@ namespace mongo {
     extern int diagLogging;
     extern int lockFile;
 
-    static void setupSignalHandlers();
-    static void startSignalProcessingThread();
     void exitCleanly( ExitCode code );
 
 #ifdef _WIN32
     ntservice::NtServiceDefaultStrings defaultServiceStrings = {
         L"MongoDB",
-        L"Mongo DB",
-        L"Mongo DB Server"
+        L"MongoDB",
+        L"MongoDB Server"
     };
 #endif
 
@@ -296,7 +297,7 @@ namespace mongo {
     }
 
 
-    bool doDBUpgrade( const string& dbName , string errmsg , DataFileHeader * h ) {
+    void doDBUpgrade( const string& dbName, DataFileHeader* h ) {
         static DBDirectClient db;
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
@@ -310,18 +311,17 @@ namespace mongo {
                 BSONObj out;
                 bool ok = db.runCommand( dbName , BSON( "reIndex" << c.substr( dbName.size() + 1 ) ) , out );
                 if ( ! ok ) {
-                    errmsg = "reindex failed";
-                    log() << "\t\t reindex failed: " << out << endl;
-                    return false;
+                    log() << "\t\t reindex failed: " << out;
+                    fassertFailed( 17393 );
                 }
             }
 
             getDur().writingInt(h->versionMinor) = 5;
-            return true;
+            return;
         }
 
         // do this in the general case
-        return repairDatabase( dbName.c_str(), errmsg );
+        fassert( 17401, repairDatabase( dbName ) );
     }
 
     void checkForIdIndexes( Database* db ) {
@@ -352,8 +352,8 @@ namespace mongo {
                   << "' lacks a unique index on _id."
                   << " This index is needed for replication to function properly"
                   << startupWarningsLog;
-            log() << "\t To fix this, on the primary run 'db." << i->substr(i->find('.')+1)
-                  << ".createIndex({_id: 1}, {unique: true})'"
+            log() << "\t To fix this, you need to create a unique index on _id."
+                  << " See http://dochub.mongodb.org/core/build-replica-set-indexes"
                   << startupWarningsLog;
         }
     }
@@ -402,8 +402,7 @@ namespace mongo {
 
                 if (mongodGlobalParams.upgrade) {
                     // QUESTION: Repair even if file format is higher version than code?
-                    string errmsg;
-                    verify( doDBUpgrade( dbName , errmsg , h ) );
+                    doDBUpgrade( dbName, h );
                 }
                 else {
                     log() << "\t Not upgrading, exiting" << endl;
@@ -415,8 +414,9 @@ namespace mongo {
                 }
             }
             else {
-                const string systemIndexes = cc().database()->name() + ".system.indexes";
-                auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
+                const string systemIndexes = ctx.db()->name() + ".system.indexes";
+                Collection* coll = ctx.db()->getCollection( systemIndexes );
+                auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes,coll));
                 BSONObj index;
                 Runner::RunnerState state;
                 while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
@@ -434,7 +434,7 @@ namespace mongo {
                               << startupWarningsLog;
                     }
 
-                    const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                    const Status keyStatus = validateKeyPattern(key);
                     if (!keyStatus.isOK()) {
                         log() << "Problem with index " << index << ": " << keyStatus.reason()
                               << " This index can still be used however it cannot be rebuilt."
@@ -935,8 +935,34 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType,
 }
 #endif
 
+#if defined(_WIN32)
+namespace mongo {
+    // the hook for mongoAbort
+    extern void (*reportEventToSystem)(const char *msg);
+    static void reportEventToSystemImpl(const char *msg) {
+        static ::HANDLE hEventLog = RegisterEventSource( NULL, TEXT("mongod") );
+        if( hEventLog ) {
+            std::wstring s = toNativeString(msg);
+            LPCTSTR txt = s.c_str();
+            BOOL ok = ReportEvent(
+              hEventLog, EVENTLOG_ERROR_TYPE,
+              0, 0, NULL,
+              1,
+              0,
+              &txt,
+              0);
+            wassert(ok);
+        }
+    }
+} // namespace mongo
+#endif  // if defined(_WIN32)
+
 static int mongoDbMain(int argc, char* argv[], char **envp) {
     static StaticObserver staticObserver;
+
+#if defined(_WIN32)
+    mongo::reportEventToSystem = &mongo::reportEventToSystemImpl;
+#endif
 
     getcurns = ourgetns;
 
@@ -988,246 +1014,3 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     dbexit(EXIT_CLEAN);
     return 0;
 }
-
-namespace mongo {
-
-    string getDbContext();
-
-#undef out
-
-
-#if !defined(_WIN32)
-
-} // namespace mongo
-
-#include <signal.h>
-#include <string.h>
-
-namespace mongo {
-
-    void abruptQuit(int x) {
-        ostringstream ossSig;
-        ossSig << "Got signal: " << x << " (" << strsignal( x ) << ")." << endl;
-        rawOut( ossSig.str() );
-
-        /*
-        ostringstream ossOp;
-        ossOp << "Last op: " << currentOp.infoNoauth() << endl;
-        rawOut( ossOp.str() );
-        */
-
-        ostringstream oss;
-        oss << "Backtrace:" << endl;
-        printStackTrace( oss );
-        rawOut( oss.str() );
-
-        // Don't go through normal shutdown procedure. It may make things worse.
-        ::_exit(EXIT_ABRUPT);
-
-    }
-
-    void abruptQuitWithAddrSignal( int signal, siginfo_t *siginfo, void * ) {
-        ostringstream oss;
-        oss << "Invalid";
-        if ( signal == SIGSEGV || signal == SIGBUS ) {
-            oss << " access";
-        } else {
-            oss << " operation";
-        }
-        oss << " at address: " << siginfo->si_addr << " from thread: " << getThreadName() << endl;
-        rawOut( oss.str() );
-        abruptQuit( signal );
-    }
-
-    sigset_t asyncSignals;
-    // The signals in asyncSignals will be processed by this thread only, in order to
-    // ensure the db and log mutexes aren't held.
-    void signalProcessingThread() {
-        while (true) {
-            int actualSignal = 0;
-            int status = sigwait( &asyncSignals, &actualSignal );
-            fassert(16781, status == 0);
-            switch (actualSignal) {
-            case SIGUSR1:
-                // log rotate signal
-                fassert(16782, rotateLogs());
-                logProcessDetailsForLogRotate();
-                break;
-            default:
-                // interrupt/terminate signal
-                Client::initThread( "signalProcessingThread" );
-                log() << "got signal " << actualSignal << " (" << strsignal( actualSignal )
-                      << "), will terminate after current cmd ends" << endl;
-                exitCleanly( EXIT_CLEAN );
-                break;
-            }
-        }
-    }
-
-    // this will be called in certain c++ error cases, for example if there are two active
-    // exceptions
-    void myterminate() {
-        rawOut( "terminate() called, printing stack (if implemented for platform):" );
-        printStackTrace();
-        ::abort();
-    }
-
-    // this gets called when new fails to allocate memory
-    void my_new_handler() {
-        rawOut( "out of memory, printing stack and exiting:" );
-        printStackTrace();
-        ::_exit(EXIT_ABRUPT);
-    }
-
-    void setupSignals_ignoreHelper( int signal ) {}
-
-    void setupSignalHandlers() {
-        setupCoreSignals();
-
-        struct sigaction addrSignals;
-        memset( &addrSignals, 0, sizeof( struct sigaction ) );
-        addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
-        sigemptyset( &addrSignals.sa_mask );
-        addrSignals.sa_flags = SA_SIGINFO;
-
-        verify( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
-        verify( sigaction(SIGBUS, &addrSignals, 0) == 0 );
-        verify( sigaction(SIGILL, &addrSignals, 0) == 0 );
-        verify( sigaction(SIGFPE, &addrSignals, 0) == 0 );
-
-        verify( signal(SIGABRT, abruptQuit) != SIG_ERR );
-        verify( signal(SIGQUIT, abruptQuit) != SIG_ERR );
-        verify( signal(SIGPIPE, SIG_IGN) != SIG_ERR );
-
-        setupSIGTRAPforGDB();
-
-        // asyncSignals is a global variable listing the signals that should be handled by the
-        // interrupt thread, once it is started via startSignalProcessingThread().
-        sigemptyset( &asyncSignals );
-        sigaddset( &asyncSignals, SIGHUP );
-        sigaddset( &asyncSignals, SIGINT );
-        sigaddset( &asyncSignals, SIGTERM );
-        sigaddset( &asyncSignals, SIGUSR1 );
-        sigaddset( &asyncSignals, SIGXCPU );
-
-        set_terminate( myterminate );
-        set_new_handler( my_new_handler );
-    }
-
-    void startSignalProcessingThread() {
-        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
-        boost::thread it( signalProcessingThread );
-    }
-
-#else   // WIN32
-    void consoleTerminate( const char* controlCodeName ) {
-        Client::initThread( "consoleTerminate" );
-        log() << "got " << controlCodeName << ", will terminate after current cmd ends" << endl;
-        exitCleanly( EXIT_KILL );
-    }
-
-    BOOL WINAPI CtrlHandler( DWORD fdwCtrlType ) {
-
-        switch( fdwCtrlType ) {
-
-        case CTRL_C_EVENT:
-            rawOut( "Ctrl-C signal" );
-            consoleTerminate( "CTRL_C_EVENT" );
-            return TRUE ;
-
-        case CTRL_CLOSE_EVENT:
-            rawOut( "CTRL_CLOSE_EVENT signal" );
-            consoleTerminate( "CTRL_CLOSE_EVENT" );
-            return TRUE ;
-
-        case CTRL_BREAK_EVENT:
-            rawOut( "CTRL_BREAK_EVENT signal" );
-            consoleTerminate( "CTRL_BREAK_EVENT" );
-            return TRUE;
-
-        case CTRL_LOGOFF_EVENT:
-            // only sent to services, and only in pre-Vista Windows; FALSE means ignore
-            return FALSE;
-
-        case CTRL_SHUTDOWN_EVENT:
-            rawOut( "CTRL_SHUTDOWN_EVENT signal" );
-            consoleTerminate( "CTRL_SHUTDOWN_EVENT" );
-            return TRUE;
-
-        default:
-            return FALSE;
-        }
-    }
-
-    // called by mongoAbort()
-    extern void (*reportEventToSystem)(const char *msg);
-    void reportEventToSystemImpl(const char *msg) {
-        static ::HANDLE hEventLog = RegisterEventSource( NULL, TEXT("mongod") );
-        if( hEventLog ) {
-            std::wstring s = toNativeString(msg);
-            LPCTSTR txt = s.c_str();
-            BOOL ok = ReportEvent(
-              hEventLog, EVENTLOG_ERROR_TYPE,
-              0, 0, NULL,
-              1,
-              0,
-              &txt,
-              0);
-            wassert(ok);
-        }
-    }
-
-    void myPurecallHandler() {
-        printStackTrace();
-        mongoAbort("pure virtual");
-    }
-
-    void setupSignalHandlers() {
-        reportEventToSystem = reportEventToSystemImpl;
-        setWindowsUnhandledExceptionFilter();
-        massert(10297,
-                "Couldn't register Windows Ctrl-C handler",
-                SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
-        _set_purecall_handler( myPurecallHandler );
-    }
-
-    void eventProcessingThread() {
-        std::string eventName = getShutdownSignalName(ProcessId::getCurrent().asUInt32());
-
-        HANDLE event = CreateEventA(NULL, TRUE, FALSE, eventName.c_str());
-        if (event == NULL) {
-            warning() << "eventProcessingThread CreateEvent failed: "
-                << errnoWithDescription();
-            return;
-        }
-
-        ON_BLOCK_EXIT(CloseHandle, event);
-
-        int returnCode = WaitForSingleObject(event, INFINITE);
-        if (returnCode != WAIT_OBJECT_0) {
-            if (returnCode == WAIT_FAILED) {
-                warning() << "eventProcessingThread WaitForSingleObject failed: "
-                    << errnoWithDescription();
-                return;
-            }
-            else {
-                warning() << "eventProcessingThread WaitForSingleObject failed: "
-                    << errnoWithDescription(returnCode);
-                return;
-            }
-        }
-
-        Client::initThread("eventTerminate");
-        log() << "shutdown event signaled, will terminate after current cmd ends";
-        exitCleanly(EXIT_CLEAN);
-    }
-
-    void startSignalProcessingThread() {
-        if (Command::testCommandsEnabled) {
-            boost::thread it(eventProcessingThread);
-        }
-    }
-
-#endif  // if !defined(_WIN32)
-
-} // namespace mongo

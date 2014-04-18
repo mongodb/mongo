@@ -28,6 +28,8 @@
 
 #include "mongo/db/exec/2d.h"
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/catalog/collection.h"
@@ -36,7 +38,8 @@ namespace mongo {
 
     TwoD::TwoD(const TwoDParams& params, WorkingSet* ws)
         : _params(params), _workingSet(ws), _initted(false),
-          _descriptor(NULL), _am(NULL) { }
+          _descriptor(NULL), _am(NULL) {
+    }
 
     TwoD::~TwoD() { }
 
@@ -50,19 +53,16 @@ namespace mongo {
         if (!_initted) {
             _initted = true;
 
-            Database* database = cc().database();
-            if ( !database )
+            if ( !_params.collection )
                 return PlanStage::IS_EOF;
 
-            Collection* collection = database->getCollection( _params.ns );
-            if ( !collection )
-                return PlanStage::IS_EOF;
+            IndexCatalog* indexCatalog = _params.collection->getIndexCatalog();
 
-            _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+            _descriptor = indexCatalog->findIndexByKeyPattern(_params.indexKeyPattern);
             if ( _descriptor == NULL )
                 return PlanStage::IS_EOF;
 
-            _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
+            _am = static_cast<TwoDAccessMethod*>( indexCatalog->getIndex( _descriptor ) );
             verify( _am );
 
             if (NULL != _params.gq.getGeometry()._cap.get()) {
@@ -75,13 +75,22 @@ namespace mongo {
                 verify(NULL != _params.gq.getGeometry()._box.get());
                 _browse.reset(new twod_exec::GeoBoxBrowse(_params, _am));
             }
+
+            // Fill out static portion of plan stats.
+            // We will retrieve the geo hashes used by the geo browser
+            // when the search is complete.
             _specificStats.type = _browse->_type;
+            _specificStats.field = _params.gq.getField();
+            _specificStats.converterParams = _browse->_converter->getParams();
+
             return PlanStage::NEED_TIME;
         }
 
         verify(NULL != _browse.get());
 
         if (!_browse->ok()) {
+            // Grab geo hashes before disposing geo browser.
+            _specificStats.expPrefixes.swap(_browse->_expPrefixes);
             _browse.reset();
             return PlanStage::IS_EOF;
         }

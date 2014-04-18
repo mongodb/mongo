@@ -44,7 +44,7 @@ namespace {
 
     void* saslOurCalloc(SaslAllocSize count, SaslAllocSize size) {
         void* ptr = calloc(count, size);
-        if (!ptr) printStackAndExit(0);
+        if (!ptr) abort();
         return ptr;
     }
 

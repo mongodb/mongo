@@ -29,6 +29,7 @@
 #include "mongo/tools/mongorestore_options.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
@@ -84,6 +85,20 @@ namespace mongo {
         options->addOptionChaining("restoreDbUsersAndRoles", "restoreDbUsersAndRoles", moe::Switch,
                 "Restore user and role definitions for the given database")
                         .requires("db").incompatibleWith("collection");
+
+        options->addOptionChaining(
+                "tempUsersCollection", "tempUsersCollection", moe::String,
+                        "Collection in which to temporarily store user data during the restore")
+                .hidden()
+                .setDefault(moe::Value(
+                        AuthorizationManager::defaultTempUsersCollectionNamespace.toString()));
+
+        options->addOptionChaining(
+                "tempRolesCollection", "tempRolesCollection", moe::String,
+                       "Collection in which to temporarily store role data during the restore")
+                .hidden()
+                .setDefault(moe::Value(
+                        AuthorizationManager::defaultTempRolesCollectionNamespace.toString()));
 
         options->addOptionChaining("w", "w", moe::Int, "minimum number of replicas per write")
                                   .setDefault(moe::Value(0));
@@ -142,6 +157,8 @@ namespace mongo {
         mongoRestoreGlobalParams.w = getParam( "w" , 0 );
         mongoRestoreGlobalParams.oplogReplay = hasParam("oplogReplay");
         mongoRestoreGlobalParams.oplogLimit = getParam("oplogLimit", "");
+        mongoRestoreGlobalParams.tempUsersColl = getParam("tempUsersCollection");
+        mongoRestoreGlobalParams.tempRolesColl = getParam("tempRolesCollection");
 
         // Make the default db "" if it was not explicitly set
         if (!params.count("db")) {

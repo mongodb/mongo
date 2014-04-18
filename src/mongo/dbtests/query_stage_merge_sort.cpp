@@ -36,7 +36,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/collection_iterator.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -71,7 +70,7 @@ namespace QueryStageMergeSortTests {
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            CollectionIterator* it = coll->getIterator(DiskLoc(), false,
+            RecordIterator* it = coll->getIterator(DiskLoc(), false,
                                                        CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();

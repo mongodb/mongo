@@ -49,7 +49,7 @@
         replTest.initiate( config , 'replSetReconfig' );
     }
     catch(e) {
-        print(e);
+        print( "*** exception doing reconfig: " + e);
     }
 
     // Make sure that a new master comes up
@@ -61,7 +61,7 @@
         master.getDB("local").system.replset.findOne();
     }
     catch (e) {
-        print (e);
+        print( "*** error getting config: " + e);
     }
 
     // Do a status check on each node
@@ -82,4 +82,6 @@
         var stat = slaves[0].getDB("admin").runCommand({replSetGetStatus: 1});
         return stat.members.length == 2;
     }, "Wrong number of members", 60000);
+    replTest.stopSet();
 }());
+

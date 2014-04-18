@@ -12,7 +12,6 @@ d = s.getDB( "test" );
 for( i = 0; i < 100; ++i ) {
     d.data.insert( { _id:i, i:i%10 } )
 }
-d.getLastError();
 
 // Split the data into 3 chunks.
 s.adminCommand( { split:"test.data", middle:{ _id:33 } } );

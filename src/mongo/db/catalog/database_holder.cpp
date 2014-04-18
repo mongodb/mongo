@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/d_concurrency.h"
 
 namespace mongo {
 

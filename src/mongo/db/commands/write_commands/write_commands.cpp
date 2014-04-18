@@ -36,7 +36,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/ops/insert.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 
@@ -84,8 +83,7 @@ namespace mongo {
     // Slaves can't perform writes.
     bool WriteCmd::slaveOk() const { return false; }
 
-    // Write commands acquire write lock, but not for entire length of execution.
-    Command::LockType WriteCmd::locktype() const { return NONE; }
+    bool WriteCmd::isWriteCommandForConfigServer() const { return false; }
 
     Status WriteCmd::checkAuthForCommand( ClientBasic* client,
                                           const std::string& dbname,
@@ -131,20 +129,11 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNS(nss.ns());
 
-        Status status = userAllowedWriteNS( nss );
-        if ( !status.isOK() )
-            return appendCommandStatus( result, status );
-
         BSONObj defaultWriteConcern;
         // This is really bad - it's only safe because we leak the defaults by overriding them with
         // new defaults and because we never reset to an empty default.
         // TODO: fix this for sane behavior where we query repl set object
         if ( getLastErrorDefault ) defaultWriteConcern = *getLastErrorDefault;
-        if ( defaultWriteConcern.isEmpty() ) {
-            BSONObjBuilder b;
-            b.append( "w", 1 );
-            defaultWriteConcern = b.obj();
-        }
 
         WriteBatchExecutor writeBatchExecutor(defaultWriteConcern,
                                               &cc(),

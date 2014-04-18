@@ -36,6 +36,8 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/data_file.h"
+#include "mongo/db/storage/extent.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {
@@ -46,16 +48,16 @@ namespace PdfileTests {
             Base() : _context( ns() ) {
             }
             virtual ~Base() {
-                if ( !nsd() )
+                if ( !collection() )
                     return;
                 _context.db()->dropCollection( ns() );
             }
         protected:
-            static const char *ns() {
+            const char *ns() {
                 return "unittests.pdfiletests.Insert";
             }
-            static NamespaceDetails *nsd() {
-                return nsdetails( ns() );
+            Collection* collection() {
+                return _context.db()->getCollection( ns() );
             }
 
             Lock::GlobalWrite lk_;
@@ -167,6 +169,31 @@ namespace PdfileTests {
         }
     };
 
+    class CollectionOptionsRoundTrip {
+    public:
+
+        void check( const CollectionOptions& options1 ) {
+            CollectionOptions options2;
+            options2.parse( options1.toBSON() );
+            ASSERT_EQUALS( options1.toBSON(), options2.toBSON() );
+        }
+
+        void run() {
+            CollectionOptions options;
+            check( options );
+
+            options.capped = true;
+            options.cappedSize = 10240;
+            options.cappedMaxDocs = 1111;
+            check( options );
+
+            options.setNoIdIndex();
+            options.flags = 5;
+            check( options );
+
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "pdfile" ) {}
@@ -176,6 +203,7 @@ namespace PdfileTests {
             add< Insert::UpdateDate >();
             add< Insert::ValidId >();
             add< ExtentSizing >();
+            add< CollectionOptionsRoundTrip >();
         }
     } myall;
 

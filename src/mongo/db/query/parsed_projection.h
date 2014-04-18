@@ -83,6 +83,10 @@ namespace mongo {
             return _wantGeoNearPoint;
         }
 
+        bool wantIndexKey() const {
+            return _returnKey;
+        }
+
     private:
         /**
          * Must go through ::make
@@ -106,7 +110,7 @@ namespace mongo {
         static bool _hasPositionalOperatorMatch(const MatchExpression* const query,
                                                 const std::string& matchfield);
 
-        // XXX stringdata?
+        // TODO: stringdata?
         vector<string> _requiredFields;
 
         bool _requiresDocument;
@@ -116,6 +120,8 @@ namespace mongo {
         bool _wantGeoNearDistance;
 
         bool _wantGeoNearPoint;
+
+        bool _returnKey;
     };
 
 }  // namespace mongo

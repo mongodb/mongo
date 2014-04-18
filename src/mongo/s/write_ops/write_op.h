@@ -100,6 +100,11 @@ namespace mongo {
         ~WriteOp();
 
         /**
+         * Returns the write item for this operation
+         */
+        const BatchItemRef& getWriteItem() const;
+
+        /**
          * Returns the op's current state.
          */
         WriteOpState getWriteState() const;
@@ -123,6 +128,11 @@ namespace mongo {
          */
         Status targetWrites( const NSTargeter& targeter,
                              std::vector<TargetedWrite*>* targetedWrites );
+
+        /**
+         * Returns the number of child writes that were last targeted.
+         */
+        size_t getNumTargeted();
 
         /**
          * Resets the state of this write op to _Ready and stops waiting for any outstanding

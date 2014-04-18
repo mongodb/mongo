@@ -68,6 +68,13 @@ namespace mongo {
                             TypeExplain** explain);
 
     /**
+     * Returns a short plan summary string describing the leaves of the query solution.
+     *
+     * Used for logging.
+     */
+    std::string getPlanSummary(const QuerySolution& soln);
+
+    /**
      * If the out-parameter 'info' is non-null, fills in '*infoOut' with information
      * from the query solution tree 'soln' that can be determined before the query is done
      * running. Whereas 'explainPlan(...)' above is for collecting runtime debug information,
@@ -79,5 +86,7 @@ namespace mongo {
     void getPlanInfo(const QuerySolution& soln, PlanInfo** infoOut);
 
     void statsToBSON(const PlanStageStats& stats, BSONObjBuilder* bob);
+
+    BSONObj statsToBSON(const PlanStageStats& stats);
 
 } // namespace mongo

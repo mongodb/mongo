@@ -32,19 +32,23 @@
 
 namespace mongo {
 
+    class Collection;
+
     struct CollectionScanParams {
         enum Direction {
             FORWARD = 1,
             BACKWARD = -1,
         };
 
-        CollectionScanParams() : start(DiskLoc()),
+        CollectionScanParams() : collection(NULL),
+                                 start(DiskLoc()),
                                  direction(FORWARD),
                                  tailable(false),
                                  maxScan(0) { }
 
         // What collection?
-        string ns;
+        // not owned
+        Collection* collection;
 
         // isNull by default.  If you specify any value for this, you're responsible for the DiskLoc
         // not being invalidated before the first call to work(...).

@@ -50,7 +50,7 @@ namespace mongo {
     class GroupCommand : public Command {
     public:
         GroupCommand() : Command("group") {}
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual void help( stringstream &help ) const {
@@ -87,7 +87,7 @@ namespace mongo {
             return obj.extractFields( keyPattern , true ).getOwned();
         }
 
-        bool group( const std::string& realdbname,
+        bool group( Database* db,
                     const std::string& ns,
                     const BSONObj& query,
                     BSONObj keyPattern,
@@ -101,7 +101,7 @@ namespace mongo {
 
             const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
                                                               ->getAuthenticatedUserNamesToken();
-            auto_ptr<Scope> s = globalScriptEngine->getPooledScope(realdbname, "group" + userToken);
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope(db->name(), "group" + userToken);
 
             if ( reduceScope )
                 s->init( reduceScope );
@@ -131,7 +131,7 @@ namespace mongo {
             double keysize = keyPattern.objsize() * 3;
             double keynum = 1;
 
-            Collection* collection = cc().database()->getCollection( ns );
+            Collection* collection = db->getCollection( ns );
 
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
@@ -144,7 +144,7 @@ namespace mongo {
                 }
 
                 Runner* rawRunner;
-                if (!getRunner(cq, &rawRunner).isOK()) {
+                if (!getRunner(collection, cq, &rawRunner).isOK()) {
                     uasserted(17213, "Can't get runner for query " + query.toString());
                     return 0;
                 }
@@ -219,8 +219,6 @@ namespace mongo {
             else
                 q = getQuery( p );
 
-            string ns = parseNs(dbname, jsobj);
-
             BSONObj key;
             string keyf;
             if ( p["key"].type() == Object ) {
@@ -254,7 +252,10 @@ namespace mongo {
             if (p["finalize"].type())
                 finalize = p["finalize"]._asCode();
 
-            return group( dbname , ns , q ,
+            const string ns = parseNs(dbname, jsobj);
+            Client::ReadContext ctx(ns);
+
+            return group( ctx.ctx().db() , ns , q ,
                           key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,
                           initial.embeddedObject() , finalize ,
                           errmsg , result );

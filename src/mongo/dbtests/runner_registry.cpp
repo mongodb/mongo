@@ -32,6 +32,7 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/instance.h"
@@ -62,7 +63,7 @@ namespace RunnerRegistry {
         Runner* getCollscan() {
             auto_ptr<WorkingSet> ws(new WorkingSet());
             CollectionScanParams params;
-            params.ns = ns();
+            params.collection = collection();
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
             auto_ptr<CollectionScan> scan(new CollectionScan(params, ws.get(), NULL));
@@ -85,6 +86,10 @@ namespace RunnerRegistry {
         }
 
         int N() { return 50; }
+
+        Collection* collection() {
+            return _ctx->ctx().db()->getCollection( ns() );
+        }
 
         static const char* ns() { return "unittests.RunnerRegistryDiskLocInvalidation"; }
         static DBDirectClient _client;

@@ -118,7 +118,7 @@ namespace mongo {
               maxDistance(std::numeric_limits<double>::max()),
               isNearSphere(false) { }
 
-        bool parseFrom(const BSONObj &obj);
+        Status parseFrom(const BSONObj &obj);
 
         // The name of the field that contains the geometry.
         string field;
@@ -146,7 +146,7 @@ namespace mongo {
 
     private:
         bool parseLegacyQuery(const BSONObj &obj);
-        bool parseNewQuery(const BSONObj &obj);
+        Status parseNewQuery(const BSONObj &obj);
     };
 
     // This represents either a $within or a $geoIntersects.

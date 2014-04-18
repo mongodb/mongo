@@ -457,6 +457,59 @@ namespace {
     }
 
     //
+    // $exists tests
+    //
+
+    TEST(IndexBoundsBuilderTest, ExistsTrue) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$exists: true}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                      oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(IndexBoundsBuilderTest, ExistsFalse) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$exists: false}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': null, '': null}"), true, true)));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    TEST(IndexBoundsBuilderTest, ExistsTrueSparse) {
+        IndexEntry testIndex = IndexEntry(BSONObj(),
+                                          false,
+                                          true,
+                                          "exists_true_sparse",
+                                          BSONObj());
+        BSONObj obj = fromjson("{a: {$exists: true}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                      oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    //
     // Union tests
     //
 

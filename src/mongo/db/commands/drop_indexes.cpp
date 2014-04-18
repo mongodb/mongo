@@ -34,7 +34,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
@@ -48,7 +50,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "drop indexes for a collection";
         }
@@ -60,14 +62,11 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
-            std::string toDeleteNs = dbname+"."+cmdObj.firstElement().valuestr();
-            BSONObjBuilder builder;
-            builder.append("ns", systemIndexes);
-            builder.append("op", "insert");
-            builder.append("insert.ns", toDeleteNs);
+            std::string toDeleteNs = db->name() + "." + cmdObj.firstElement().valuestr();
+            Collection* collection = db->getCollection(toDeleteNs);
+            IndexCatalog::IndexKillCriteria criteria;
 
             // Get index name to drop
             BSONElement toDrop = cmdObj.getField("index");
@@ -75,21 +74,19 @@ namespace mongo {
             if (toDrop.type() == String) {
                 // Kill all in-progress indexes
                 if (strcmp("*", toDrop.valuestr()) == 0) {
-                    BSONObj criteria = builder.done();
-                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                    criteria.ns = toDeleteNs;
+                    return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
                 }
                 // Kill an in-progress index by name
                 else {
-                    builder.append("insert.name", toDrop.valuestr());
-                    BSONObj criteria = builder.done();
-                    return IndexBuilder::killMatchingIndexBuilds(criteria);
+                    criteria.name = toDrop.valuestr();
+                    return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
                 }
             }
             // Kill an in-progress index build by index key
             else if (toDrop.type() == Object) {
-                builder.append("insert.key", toDrop.Obj());
-                BSONObj criteria = builder.done();
-                return IndexBuilder::killMatchingIndexBuilds(criteria);
+                criteria.key = toDrop.Obj();
+                return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
             }
 
             return std::vector<BSONObj>();
@@ -98,18 +95,22 @@ namespace mongo {
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
             BSONElement e = jsobj.firstElement();
-            string toDeleteNs = dbname + '.' + e.valuestr();
+            const string toDeleteNs = dbname + '.' + e.valuestr();
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
 
-            Collection* collection = cc().database()->getCollection( toDeleteNs );
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(toDeleteNs);
+            Database* db = ctx.db();
+
+            Collection* collection = db->getCollection( toDeleteNs );
             if ( ! collection ) {
                 errmsg = "ns not found";
                 return false;
             }
 
-            stopIndexBuilds(dbname, jsobj);
+            stopIndexBuilds(db, jsobj);
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             anObjBuilder.appendNumber("nIndexesWas", indexCatalog->numIndexesTotal() );
@@ -182,7 +183,7 @@ namespace mongo {
     public:
         virtual bool logTheOp() { return false; } // only reindexes on the one node
         virtual bool slaveOk() const { return true; }    // can reindex on a secondary
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "re-index a collection";
         }
@@ -195,13 +196,12 @@ namespace mongo {
         }
         CmdReIndex() : Command("reIndex") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname + ".system.indexes";
-            std::string ns = dbname + '.' + cmdObj["reIndex"].valuestrsafe();
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
-
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            std::string ns = db->name() + '.' + cmdObj["reIndex"].valuestrsafe();
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
@@ -212,7 +212,10 @@ namespace mongo {
 
             MONGO_TLOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
-            Collection* collection = cc().database()->getCollection( toDeleteNs );
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(toDeleteNs);
+
+            Collection* collection = ctx.db()->getCollection( toDeleteNs );
 
             if ( !collection ) {
                 errmsg = "ns not found";
@@ -221,7 +224,7 @@ namespace mongo {
 
             BackgroundOperation::assertNoBgOpInProgForNs( toDeleteNs );
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(dbname, jsobj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(ctx.db(), jsobj);
 
             list<BSONObj> all;
             auto_ptr<DBClientCursor> i = db.query( dbname + ".system.indexes" , BSON( "ns" << toDeleteNs ) , 0 , 0 , 0 , QueryOption_SlaveOk );
@@ -229,11 +232,10 @@ namespace mongo {
             while ( i->more() ) {
                 const BSONObj spec = i->next().removeField("v").getOwned();
                 const BSONObj key = spec.getObjectField("key");
-                const Status keyStatus = IndexCatalog::validateKeyPattern(key);
+                const Status keyStatus = validateKeyPattern(key);
                 if (!keyStatus.isOK()) {
                     errmsg = str::stream()
-                        << "Cannot compact collection due to invalid index " << spec << ": "
-                        << keyStatus.reason()
+                        << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
                         << " For more info see http://dochub.mongodb.org/core/index-validation";
                     return false;
                 }

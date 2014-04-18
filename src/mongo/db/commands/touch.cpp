@@ -35,19 +35,21 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/d_concurrency.h"
-#include "mongo/db/curop-inl.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/structure/catalog/index_details.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/storage/extent.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
@@ -90,7 +92,7 @@ namespace mongo {
         for ( std::vector< touch_location >::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
             touch_pages( it->root, it->length );
             pm.hit();
-            killCurrentOp.checkForInterrupt(false);
+            killCurrentOp.checkForInterrupt();
         }
         pm.finished();
 
@@ -99,7 +101,7 @@ namespace mongo {
 
     class TouchCmd : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool adminOnly() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool maintenanceMode() const { return true; }
@@ -169,13 +171,15 @@ namespace mongo {
                 std::vector< std::string > indexes;
                 {
                     Client::ReadContext ctx(ns);
-                    NamespaceDetails *nsd = nsdetails(ns);
-                    massert( 16153, "namespace does not exist", nsd );
+                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    massert( 16153, "namespace does not exist", collection );
 
-                    NamespaceDetails::IndexIterator ii = nsd->ii(); 
+                    IndexCatalog::IndexIterator ii =
+                        collection->getIndexCatalog()->getIndexIterator( false );
+
                     while ( ii.more() ) {
-                        IndexDetails& idx = ii.next();
-                        indexes.push_back( idx.indexNamespace() );
+                        IndexDescriptor* desc = ii.next();
+                        indexes.push_back( desc->indexNamespace() );
                     }
                 }
 

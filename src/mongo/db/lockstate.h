@@ -127,9 +127,11 @@ namespace mongo {
         SimpleRWLock rw;
         SimpleMutex m;
         bool sharedLatching;
+        LockStat stats;
     public:
         string name() const { return rw.name; }
-        LockStat stats;
+        LockStat& getStats() { return stats; }
+
         WrapperForRWLock(const StringData& name)
             : rw(name), m(name) {
             // For the local datbase, all operations are short,

@@ -300,4 +300,20 @@ namespace {
         ASSERT_TRUE(checkDoc(doc, mongo::fromjson("{x : [ 1, 2, 3, 4 ]}")));
     }
 
+    TEST(FullNameTest, RootField) {
+        Document doc(mongo::fromjson("{ x : 1 }"));
+        ASSERT_EQUALS("x", getFullName(doc.root().leftChild()));
+    }
+
+    TEST(FullNameTest, OneLevel) {
+        Document doc(mongo::fromjson("{ x : { y: 1 } }"));
+        ASSERT_EQUALS("x.y", getFullName(doc.root().leftChild().leftChild()));
+    }
+
+    TEST(FullNameTest, InsideArray) {
+        Document doc(mongo::fromjson("{ x : { y: [ 1 , 2 ] } }"));
+        ASSERT_EQUALS("x.y.1",
+                      getFullName(doc.root().leftChild().leftChild().leftChild().rightSibling()));
+    }
+
 } // namespace

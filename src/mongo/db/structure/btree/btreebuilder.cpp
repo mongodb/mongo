@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+    void keyTooLongAssert( int code, const string& msg );
+
     /* --- BtreeBuilder --- */
 
     template<class V>
@@ -92,9 +94,7 @@ namespace mongo {
                                        << _btreeState->descriptor()->indexNamespace()
                                        << ' ' << key->dataSize() << ' ' << key->toString();
             problem() << msg << endl;
-            if ( isMaster( NULL ) ) {
-                uasserted( 17282, msg );
-            }
+            keyTooLongAssert( 17282, msg );
             return;
         }
 
@@ -137,12 +137,12 @@ namespace mongo {
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) {
-                killCurrentOp.checkForInterrupt( !mayInterrupt );
 
                 if ( getDur().commitIfNeeded() ) {
                     b = _getModifiableBucket( cur );
                     up = _getModifiableBucket( upLoc );
                 }
+                RARELY if ( mayInterrupt ) killCurrentOp.checkForInterrupt();
 
                 BtreeBucket<V> *x = _getModifiableBucket( xloc );
                 Key k;

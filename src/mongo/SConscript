@@ -12,7 +12,6 @@ Import("testEnv")
 Import("has_option")
 Import("get_option")
 Import("usev8")
-Import("installSetup")
 Import("enforce_glibc")
 Import("darwin windows solaris linux nix")
 
@@ -47,7 +46,6 @@ env.Library('foundation',
               'util/file.cpp',
               'util/log.cpp',
               'util/platform_init.cpp',
-              'util/signal_handlers.cpp',
               'util/text.cpp',
               'util/time_support.cpp',
               'util/timer.cpp',
@@ -243,6 +241,17 @@ env.Library('network', [
                      'server_options_core',
             ])
 
+env.Library(
+    target='index_key_validate',
+    source=[
+        "db/catalog/index_key_validate.cpp",
+    ],
+    LIBDEPS=[
+        'bson',
+        'db/common',
+        'index_names',
+    ])
+
 env.Library('clientdriver', [
             "client/connpool.cpp",
             "client/dbclient.cpp",
@@ -278,6 +287,7 @@ env.Library('version',
                 '$BUILD_DIR/mongo/base/base'
             ])
 commonFiles = [ "pch.cpp",
+                "db/namespace_string.cpp",
                 "db/structure/catalog/namespace.cpp",
                 "shell/mongo.cpp",
                 "util/intrusive_counter.cpp",
@@ -409,7 +419,6 @@ env.Library("coredb", [
         "db/commands/mr_common.cpp",
         "db/commands/rename_collection_common.cpp",
         "db/commands/server_status.cpp",
-        "db/commands/shutdown.cpp",
         "db/commands/parameters.cpp",
         "db/commands/user_management_commands.cpp",
         "db/commands/write_commands/write_commands_common.cpp",
@@ -474,6 +483,7 @@ coreServerFiles = [ "db/client_basic.cpp",
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
                     "db/log_process_details.cpp",
+                    "db/conn_pool_options.cpp"
                     ]
 
 env.Library('ntservice', ['util/ntservice.cpp'],
@@ -544,6 +554,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/dur_journal.cpp",
                     "db/introspect.cpp",
                     "db/structure/btree/btree.cpp",
+                    "db/structure/btree/btree_interface.cpp",
+                    "db/structure/btree/btree_logic.cpp",
                     "db/structure/btree/btree_stats.cpp",
                     "db/clientcursor.cpp",
                     "db/tests.cpp",
@@ -578,6 +590,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/index/btree_based_access_method.cpp",
                     "db/index/btree_index_cursor.cpp",
                     "db/index/btree_interface.cpp",
+                    "db/index/index_descriptor.cpp",
                     "db/index/fts_access_method.cpp",
                     "db/index/hash_access_method.cpp",
                     "db/index/haystack_access_method.cpp",
@@ -585,7 +598,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/cloner.cpp",
                     "db/structure/catalog/namespace_details.cpp",
                     "db/structure/catalog/namespace_index.cpp",
-                    "db/structure/catalog/cap.cpp",
                     "db/dbeval.cpp",
                     "db/dbhelpers.cpp",
                     "db/instance.cpp",
@@ -598,15 +610,20 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/structure/collection_compact.cpp",
                     "db/catalog/collection_cursor_cache.cpp",
                     "db/catalog/collection_info_cache.cpp",
-                    "db/structure/collection_iterator.cpp",
                     "db/catalog/database_holder.cpp",
                     "db/background.cpp",
                     "db/pdfile.cpp",
+                    "db/repair_database.cpp",
                     "db/storage/data_file.cpp",
                     "db/storage/extent.cpp",
                     "db/storage/extent_manager.cpp",
                     "db/structure/catalog/index_details.cpp",
                     "db/structure/record_store.cpp",
+                    "db/structure/record_store_v1_base.cpp",
+                    "db/structure/record_store_v1_capped.cpp",
+                    "db/structure/record_store_v1_capped_iterator.cpp",
+                    "db/structure/record_store_v1_simple.cpp",
+                    "db/structure/record_store_v1_simple_iterator.cpp",
                     "db/extsort.cpp",
                     "db/index_builder.cpp",
                     "db/index_rebuilder.cpp",
@@ -616,6 +633,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/geo/s2common.cpp",
                     "db/ops/count.cpp",
                     "db/ops/delete.cpp",
+                    "db/ops/delete_executor.cpp",
                     "db/ops/insert.cpp",
                     "db/ops/update.cpp",
                     "db/ops/update_executor.cpp",
@@ -868,6 +886,7 @@ env.Library("serveronly", serverOnlyFiles,
                      "defaultversion",
                      "geoparser",
                      "geoquery",
+                     "index_key_validate",
                      "index_set",
                      'range_deleter',
                      's/metadata',
@@ -885,6 +904,7 @@ mongodAndMongosFiles = [
     "db/initialize_server_global_state.cpp",
     "db/server_extra_log_context.cpp",
     "db/dbwebserver.cpp",
+    "util/signal_handlers.cpp",
     ]
 env.Library("mongodandmongos", mongodAndMongosFiles,
             LIBDEPS=["message_server_port"])
@@ -949,9 +969,10 @@ env.Library("alltools",
                      "coreserver",
                      "coredb",
                      "$BUILD_DIR/mongo/util/options_parser/options_parser",
-                     "$BUILD_DIR/mongo/db/auth/authmocks"])
+                     "$BUILD_DIR/mongo/db/auth/authmocks",
+                     "$BUILD_DIR/mongo/db/auth/authmongod"])
 
-normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog", "admin" ]
+normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
 for name in normalTools:
     env.Install( '#/', env.Program("mongo" + name,
@@ -1067,9 +1088,19 @@ if darwin or env["_HAVEPCAP"]:
 
 # if you add a file here, you need to add it in scripting/engine.cpp and shell/createCPPfromJavaScriptFiles.js as well
 env.JSHeader("shell/mongo.cpp",
-             ["shell/assert.js", "shell/types.js", "shell/utils.js", "shell/utils_sh.js",
-              "shell/db.js", "shell/mongo.js", "shell/mr.js", "shell/query.js",
-              "shell/collection.js", "shell/bulk_api.js"])
+             [
+                 "shell/assert.js",
+                 "shell/bulk_api.js",
+                 "shell/collection.js",
+                 "shell/db.js",
+                 "shell/mongo.js",
+                 "shell/mr.js",
+                 "shell/query.js",
+                 "shell/types.js",
+                 "shell/upgrade_check.js",
+                 "shell/utils.js",
+                 "shell/utils_sh.js",
+              ])
 
 # if you add a file here, you need to add it in shell/shell_utils.cpp and shell/createCPPfromJavaScriptFiles.js as well
 env.JSHeader("shell/mongo-server.cpp",
@@ -1088,6 +1119,8 @@ coreShellFiles = [ "shell/shell_utils.cpp",
 if shellEnv is not None:
     env.Library("shell_core", coreShellFiles,
                 LIBDEPS=['clientandshell',
+                         'db/index/external_key_generator',
+                         'index_key_validate',
                          'scripting',
                          'mongocommon'])
     # mongo shell options
@@ -1137,10 +1170,6 @@ def installBinary( e, name ):
         e.AddPostAction(name, 'strip $TARGET')
 
     distBinaries.append(name)
-
-    if not installSetup.binaries:
-        return
-
     inst = e.Install( "$INSTALL_DIR/bin", name )
 
     if nix:

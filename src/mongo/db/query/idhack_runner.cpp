@@ -28,10 +28,10 @@
 
 #include "mongo/db/query/idhack_runner.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/exec/projection_exec.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
@@ -41,6 +41,30 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
+
+namespace {
+
+    using namespace mongo;
+
+    /**
+     * Does the query contain a projection on {_id: 1}?
+     */
+    bool hasIDProjection(const CanonicalQuery* query) {
+        // We don't know the answer if the query is NULL.
+        if (!query) {
+            return false;
+        }
+        // No projection means not covered.
+        if (!query->getProj()) {
+            return false;
+        }
+        // Since the only supported projection is {_id: 1},
+        // a valid ParsedProjection is enough to indicate that
+        // we have a covered query.
+        return true;
+     }
+
+} // namespace
 
 namespace mongo {
 
@@ -83,18 +107,33 @@ namespace mongo {
         // Look up the key by going directly to the Btree.
         DiskLoc loc = accessMethod->findSingle( _key );
 
-        _done = true;
-
         // Key not found.
         if (loc.isNull()) {
+            _done = true;
             return Runner::RUNNER_EOF;
         }
 
         _nscanned++;
 
         // Set out parameters and note that we're done w/lookup.
-        if (NULL != objOut) {
-            Record* record = loc.rec();
+        if (NULL == objOut) {
+            // No object requested - nothing to do.
+        }
+        else if (hasIDProjection(_query.get())) {
+            // Covered query on _id field only.
+            // Set object to search key.
+            // Search key is retrieved from the canonical query at
+            // construction and always contains the _id field name.
+            // It is possible to construct the ID hack runner with just the collection
+            // and the key object (which could be {"": my_obj_id}) but _query would be null
+            // in that case and the query would never be seen as covered.
+            *objOut = _key.getOwned();
+        }
+        else {
+            invariant(!hasIDProjection(_query.get()));
+
+            // Fetch object from storage.
+            Record* record = _collection->getRecordStore()->recordFor( loc );
 
             _nscannedObjects++;
 
@@ -110,6 +149,7 @@ namespace mongo {
                     ClientCursor::staticYield(micros, "", record);
                     // This can happen when we're yielded for various reasons (e.g. db/idx dropped).
                     if (_killed) {
+                        _done = true;
                         return Runner::RUNNER_DEAD;
                     }
                 }
@@ -125,17 +165,10 @@ namespace mongo {
                     KeyPattern kp(m->getKeyPattern());
                     if (!m->keyBelongsToMe( kp.extractSingleKey(*objOut))) {
                         // We have something with a matching _id but it doesn't belong to me.
+                        _done = true;
                         return Runner::RUNNER_EOF;
                     }
                 }
-            }
-
-            // If there is a projection...
-            if (_query && _query->getProj()) {
-                // Create something to execute it.
-                auto_ptr<ProjectionExec> projExec(new ProjectionExec(_query->getParsed().getProj(),
-                                                                     _query->root()));
-                projExec->transform(*objOut, objOut);
             }
         }
 
@@ -144,6 +177,7 @@ namespace mongo {
             *dlOut = loc;
         }
 
+        _done = true;
         return Runner::RUNNER_ADVANCED;
     }
 
@@ -193,6 +227,8 @@ namespace mongo {
             BSONElement keyElt = _key.firstElement();
             BSONObj indexBounds = BSON("_id" << BSON_ARRAY( BSON_ARRAY( keyElt << keyElt ) ) );
             (*explain)->setIndexBounds(indexBounds);
+            // Covered projection is only one supported.
+            (*explain)->setIndexOnly(hasIDProjection(_query.get()));
         }
         else if (NULL != planInfo) {
             *planInfo = new PlanInfo();
@@ -200,6 +236,42 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    // static
+    bool IDHackRunner::supportsQuery(const CanonicalQuery& query) {
+        return !query.getParsed().showDiskLoc()
+            && query.getParsed().getHint().isEmpty()
+            && 0 == query.getParsed().getSkip()
+            && canUseProjection(query)
+            && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
+            && !query.getParsed().hasOption(QueryOption_CursorTailable);
+    }
+
+    // static
+    bool IDHackRunner::canUseProjection(const CanonicalQuery& query) {
+        const ParsedProjection* proj = query.getProj();
+
+        // No projection is OK - ID Hack will fetch entire document.
+        if (!proj) {
+            return true;
+        }
+
+        // If there is a projection, it has to be a covered projection on
+        // the _id field only.
+        if (proj->requiresDocument()) {
+            return false;
+        }
+        const std::vector<std::string>& requiredFields = proj->getRequiredFields();
+        if (1U != requiredFields.size()) {
+            return false;
+        }
+        if ("_id" != requiredFields[0]) {
+            return false;
+        }
+
+        // Can use this projection with ID Hack.
+        return true;
     }
 
 } // namespace mongo

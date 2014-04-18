@@ -366,13 +366,4 @@ namespace mongo {
         return true;
     }
 
-    static void ignoreSignal( int sig ) {}
-
-    void setupCoreSignals() {
-#if !defined(_WIN32)
-        verify( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
-        verify( signal(SIGUSR2, ignoreSignal ) != SIG_ERR );
-#endif
-    }
-
 }  // namespace mongo

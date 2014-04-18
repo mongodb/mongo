@@ -52,6 +52,10 @@ namespace mongo {
          * tree, otherwise returns false.
          */
         static bool solutionMatches(const BSONObj& testSoln, const QuerySolutionNode* trueSoln);
+
+        static bool solutionMatches(const string& testSoln, const QuerySolutionNode* trueSoln) {
+            return solutionMatches(fromjson(testSoln), trueSoln);
+        }
     };
 
 }  // namespace mongo

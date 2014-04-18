@@ -856,9 +856,10 @@ namespace mongo {
 
             // Main codepath to acquire lock
 
-            LOG( logLvl ) << "about to acquire distributed lock '" << lockName << ":\n"
-                          <<  lockDetails.jsonString(Strict, true) << "\n"
-                          << query.jsonString(Strict, true) << endl;
+            LOG( logLvl ) << "about to acquire distributed lock '" << lockName << "'";
+
+            LOG( logLvl + 1 ) << "trying to acquire lock " << query.toString( false, true )
+                              << " with details " << lockDetails.toString( false, true ) << endl;
 
             conn->update( LocksType::ConfigNS , query , whatIWant );
 
@@ -963,11 +964,6 @@ namespace mongo {
             }
             else {
                 LOG( logLvl - 1 ) << "lock update lost, lock '" << lockName << "' not propagated." << endl;
-
-                // Register the lock for deletion, to speed up failover
-                // Not strictly necessary, but helpful
-                distLockPinger.addUnlockOID( lockDetails[LocksType::lockID()].OID() );
-
                 gotLock = false;
             }
         }

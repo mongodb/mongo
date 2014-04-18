@@ -457,6 +457,10 @@ namespace mongo {
                     /* succeeded. */
                     LOG(1) << "replSet election succeeded, assuming primary role" << rsLog;
                     success = true;
+                    {
+                        mutex::scoped_lock lk(OpTime::m);
+                        setElectionTime(OpTime::now(lk));
+                    }
                     rs.assumePrimary();
                 }
             }

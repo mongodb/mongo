@@ -35,6 +35,7 @@
 namespace mongo {
 
     class GeoHash;
+    class Box;
     struct Point;
     std::ostream& operator<<(std::ostream &s, const GeoHash &h);
 
@@ -153,6 +154,12 @@ namespace mongo {
 
         GeoHashConverter(const Parameters &params);
 
+        /**
+         * Return converter parameterss which can be used to
+         * construct an copy of this converter.
+         */
+        const Parameters& getParams() const { return _params; }
+
         int getBits() const { return _params.bits; }
         double getError() const { return _error; }
         double getErrorSphere() const { return _errorSphere ;}
@@ -180,6 +187,7 @@ namespace mongo {
          * Convert from a hash to the following types:
          * double, double
          * Point
+         * Box
          * BSONObj
          */
         // XXX: these should have consistent naming
@@ -187,6 +195,14 @@ namespace mongo {
         Point unhashToPoint(const BSONElement &e) const;
         BSONObj unhashToBSONObj(const GeoHash& h) const;
         void unhash(const GeoHash &h, double *x, double *y) const;
+
+        /**
+         * Generates bounding box from geo hash using converter.
+         * Used in GeoBrowse::fillStack and db/query/explain_plan.cpp
+         * to generate index bounds from
+         * geo hashes in plan stats.
+         */
+        Box unhashToBox(const GeoHash &h) const;
 
         double sizeOfDiag(const GeoHash& a) const;
         // XXX: understand/clean this.

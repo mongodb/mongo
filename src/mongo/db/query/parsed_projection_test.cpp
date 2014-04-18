@@ -110,6 +110,14 @@ namespace {
         ASSERT_EQUALS(fields[0], "a");
     }
 
+    TEST(ParsedProjectionTest, MakeSingleFieldIDCovered) {
+        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 1}"));
+        ASSERT(!parsedProj->requiresDocument());
+        const vector<string>& fields = parsedProj->getRequiredFields();
+        ASSERT_EQUALS(fields.size(), 1U);
+        ASSERT_EQUALS(fields[0], "_id");
+    }
+
     // boolean support is undocumented
     TEST(ParsedProjectionTest, MakeSingleFieldCoveredBoolean) {
         auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 0, a: true}"));

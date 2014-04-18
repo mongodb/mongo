@@ -41,18 +41,23 @@ namespace mongo {
         }
     }
 
-    void PoolForHost::done( DBConnectionPool * pool, DBClientBase * c ) {
-        if (c->isFailed()) {
-            reportBadConnectionAt(c->getSockCreationMicroSec());
-            pool->onDestroy(c);
-            delete c;
-        }
-        else if (_pool.size() >= _maxPerHost ||
-                c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec) {
+    void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
+
+        bool isFailed = c->isFailed();
+
+        // Remember that this host had a broken connection for later
+        if (isFailed) reportBadConnectionAt(c->getSockCreationMicroSec());
+
+        if (isFailed ||
+            // Another (later) connection was reported as broken to this host
+            (c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec) ||
+            // We have a pool size that we need to enforce
+            (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize)) {
             pool->onDestroy(c);
             delete c;
         }
         else {
+            // The connection is probably fine, save for later
             _pool.push(c);
         }
     }
@@ -166,16 +171,17 @@ namespace mongo {
         }
     }
 
-    unsigned PoolForHost::_maxPerHost = 50;
-
     // ------ DBConnectionPool ------
 
     DBConnectionPool pool;
 
-    DBConnectionPool::DBConnectionPool() 
+    const int PoolForHost::kPoolSizeUnlimited(-1);
+
+    DBConnectionPool::DBConnectionPool()
         : _mutex("DBConnectionPool") , 
           _name( "dbconnectionpool" ) , 
-          _hooks( new list<DBConnectionHook*>() ) { 
+          _maxPoolSize(PoolForHost::kPoolSizeUnlimited) ,
+          _hooks( new list<DBConnectionHook*>() ) {
     }
 
     DBClientBase* DBConnectionPool::_get(const string& ident , double socketTimeout ) {
@@ -183,6 +189,7 @@ namespace mongo {
                 !inShutdown());
         scoped_lock L(_mutex);
         PoolForHost& p = _pools[PoolKey(ident,socketTimeout)];
+        p.setMaxPoolSize(_maxPoolSize);
         p.initializeHostName(ident);
         return p.get( this , socketTimeout );
     }
@@ -191,6 +198,7 @@ namespace mongo {
         {
             scoped_lock L(_mutex);
             PoolForHost& p = _pools[PoolKey(host,socketTimeout)];
+            p.setMaxPoolSize(_maxPoolSize);
             p.initializeHostName(host);
             p.createdOne( conn );
         }

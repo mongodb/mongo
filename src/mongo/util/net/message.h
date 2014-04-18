@@ -29,7 +29,7 @@ namespace mongo {
     /**
      * Maximum accepted message size on the wire protocol.
      */
-    const int MaxMessageSizeBytes = 48 * 1000 * 1000;
+    const size_t MaxMessageSizeBytes = 48 * 1000 * 1000;
 
     class Message;
     class MessagingPort;

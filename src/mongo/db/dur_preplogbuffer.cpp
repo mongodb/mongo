@@ -80,7 +80,7 @@ namespace mongo {
                 // tag this mmf as needed a remap of its private view later.
                 // usually it will already be dirty/already set, so we do the if above first
                 // to avoid possibility of cpu cache line contention
-                mmf->willNeedRemap() = true;
+                mmf->setWillNeedRemap();
             }
 
             // since we have already looked up the mmf, we go ahead and remember the write view location

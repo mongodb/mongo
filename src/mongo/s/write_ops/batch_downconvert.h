@@ -72,6 +72,12 @@ namespace mongo {
                                             const StringData& dbName,
                                             const BSONObj& writeConcern,
                                             BSONObj* gleResponse ) = 0;
+
+        /**
+         * Clears the error information on this connection.
+         */
+        virtual Status clearErrors( DBClientBase* conn,
+                                    const StringData& dbName ) = 0;
     };
 
     /**

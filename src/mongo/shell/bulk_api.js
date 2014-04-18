@@ -2,7 +2,8 @@
 // Scope for the function
 //
 var _bulk_api_module = (function() {
-  // Insert types
+
+  // Batch types
   var NONE = 0;
   var INSERT = 1;
   var UPDATE = 2;
@@ -30,36 +31,84 @@ var _bulk_api_module = (function() {
   }
 
   /**
-   * getLastErrorMethod that supports all write concerns
+   * Shell representation of WriteConcern, possibly includes:
+   *  j: write waits for journal
+   *  w: write waits until replicated to number of servers (including primary), or mode (string)
+   *  wtimeout: how long to wait for "w" replication
+   *  fsync: waits for data flush (either journal, nor database files depending on server conf)
+   *
+   * Accepts { w : x, j : x, wtimeout : x, fsync: x } or w, wtimeout, j
    */
-  var executeGetLastError = function(db, options) {
-    var cmd = { getlasterror : 1 };
-    options = options || {};
+  var WriteConcern = function(wValue, wTimeout, jValue) {
 
-    // Add write concern options to the command
-    if(typeof(options.w) != 'undefined') cmd.w = options.w;
-    if(typeof(options.wtimeout) != 'undefined') cmd.wtimeout = options.wtimeout;
-    if(options.j) cmd.j = options.j;
-    if(options.fsync) cmd.fsync = options.fsync;
+    if(!(this instanceof WriteConcern)) 
+      return new WriteConcern(wValue, wTimeout, jValue);
+      
+    var opts = {};
+    if (typeof wValue == 'object') {
+      if (arguments.length == 1)
+        opts = Object.merge(wValue);
+      else
+        throw Error("If the first arg is an Object then no additional args are allowed!")
+    } else {
+      if (typeof wValue != 'undefined')
+        opts.w = wValue;
+      if (typeof wTimeout != 'undefined')
+        opts.wtimeout = wTimeout;
+      if (typeof jValue != 'undefined')
+        opts.j = jValue;
+    }
 
-    // Execute the getLastErrorCommand
-    return db.runCommand( cmd );
+    // Do basic validation.
+    if (typeof opts.w != 'undefined' && typeof opts.w != 'number' && typeof opts.w != 'string')
+      throw Error("w value must be a number or string but was found to be a " + typeof opts.w)
+    if (typeof opts.w == 'number' && NumberInt( opts.w ).toNumber() < 0)
+      throw Error("Numeric w value must be equal to or larger than 0, not " + opts.w);
+
+    if (typeof opts.wtimeout != 'undefined') {
+      if (typeof opts.wtimeout != 'number')
+        throw Error("wtimeout must be a number, not " + opts.wtimeout);
+      if (NumberInt( opts.wtimeout ).toNumber() < 0)
+        throw Error("wtimeout must be a number greater than 0, not " + opts.wtimeout);
+    }
+
+    if (typeof opts.j != 'undefined' && typeof opts.j != 'boolean')
+      throw Error("j value must be true or false if defined, not " + opts.j);
+
+    this._wc = opts;
+    
+    this.toJSON = function() {
+      return Object.merge({}, this._wc);
+    };
+    
+    /**
+     * @return {string}
+     */
+    this.tojson = function(indent, nolint) {
+      return tojson(this.toJSON(), indent, nolint);
+    };
+    
+    this.toString = function() {
+      return "WriteConcern(" + this.tojson() + ")";
+    };
+    
+    this.shellPrint = function() {
+      return this.toString();
+    };
+    
   };
-
-  var enforceWriteConcern = function(db, options) {
-    // Reset previous errors so we can apply the write concern no matter what
-    // as long as it is valid.
-    db.runCommand({ resetError: 1 });
-    return executeGetLastError(db, options);
-  };
-
+  
   /**
    * Wraps the result for write commands and presents a convenient api for accessing
    * single results & errors (returns the last one if there are multiple).
-   * singleBatch is passed in on bulk operations consisting of a single batch and
-   * are used to filter the SingleWriteResult to only include relevant result fields.
+   * singleBatchType is passed in on bulk operations consisting of a single batch and
+   * are used to filter the WriteResult to only include relevant result fields.
    */
-  var SingleWriteResult = function(bulkResult, singleBatch) {
+  var WriteResult = function(bulkResult, singleBatchType, writeConcern) {
+
+    if(!(this instanceof WriteResult)) 
+      return new WriteResult(bulkResult, singleBatchType, writeConcern);
+      
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
@@ -82,20 +131,28 @@ var _bulk_api_module = (function() {
       return bulkResult;
     };
 
-    this.hasWriteErrors = function() {
-      return bulkResult.writeErrors.length > 0;
-    };
-
     this.getWriteError = function() {
-      return bulkResult.writeErrors[bulkResult.writeErrors.length - 1];
+      if (bulkResult.writeErrors.length == 0) {
+        return null;
+      } else {
+        return bulkResult.writeErrors[bulkResult.writeErrors.length - 1];
+      }
     };
 
+    this.hasWriteError = function() {
+      return this.getWriteError() != null;
+    };
+        
     this.getWriteConcernError = function() {
       if (bulkResult.writeConcernErrors.length == 0) {
         return null;
       } else {
         return bulkResult.writeConcernErrors[0];
       }
+    };
+    
+    this.hasWriteConcernError = function() {
+      return this.getWriteConcernError() != null;
     };
 
     /**
@@ -104,14 +161,16 @@ var _bulk_api_module = (function() {
     this.tojson = function(indent, nolint) {
       var result = {}
 
-      if(singleBatch && singleBatch.batchType == INSERT) {
+      if(singleBatchType == INSERT) {
         result.nInserted = this.nInserted;
       }
 
-      if(singleBatch && singleBatch.batchType == UPDATE) {
+      if(singleBatchType == UPDATE) {
         result.nMatched = this.nMatched;
         result.nUpserted = this.nUpserted;
-        result.nModified = this.nModified;
+
+        if(this.nModified != undefined)
+            result.nModified = this.nModified;
 
         if(Array.isArray(bulkResult.upserted)
             && bulkResult.upserted.length == 1) {
@@ -119,7 +178,7 @@ var _bulk_api_module = (function() {
         }
       }
 
-      if(singleBatch && singleBatch.batchType == REMOVE) {
+      if(singleBatchType == REMOVE) {
         result.nRemoved = bulkResult.nRemoved;
       }
 
@@ -137,22 +196,26 @@ var _bulk_api_module = (function() {
     };
 
     this.toString = function() {
-      return this.tojson();
+      // Suppress all output for the write concern w:0, since the client doesn't care.
+      if(writeConcern && writeConcern.w == 0) {
+        return "WriteResult(" + tojson({}) + ")";;
+      }
+      return "WriteResult(" + this.tojson() + ")";
     };
 
     this.shellPrint = function() {
-      return "WriteResult(" + this.toString() + ")";
-    };
-
-    this.isOK = function() {
-      return bulkResult.ok == 1;
+      return this.toString();
     };
   };
 
   /**
    * Wraps the result for the commands
    */
-  var BulkWriteResult = function(bulkResult, singleBatch) {
+  var BulkWriteResult = function(bulkResult, singleBatchType, writeConcern) {
+    
+    if(!(this instanceof BulkWriteResult) && !(this instanceof BulkWriteError))
+      return new BulkWriteResult(bulkResult, singleBatchType, writeConcern);
+      
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
     defineReadOnlyProperty(this, "nInserted", bulkResult.nInserted);
@@ -196,6 +259,10 @@ var _bulk_api_module = (function() {
       return bulkResult.writeErrors;
     }
 
+    this.hasWriteConcernError = function() {
+      return bulkResult.writeConcernErrors.length > 0;
+    }
+
     this.getWriteConcernError = function() {
       if(bulkResult.writeConcernErrors.length == 0) {
         return null;
@@ -227,28 +294,148 @@ var _bulk_api_module = (function() {
     }
 
     this.toString = function() {
-      return "BulkWriteResult(" + tojson(bulkResult) + ")";
+      // Suppress all output for the write concern w:0, since the client doesn't care.
+      if(writeConcern && writeConcern.w == 0) {
+        return "BulkWriteResult(" + tojson({}) + ")";;
+      }
+      return "BulkWriteResult(" + this.tojson() + ")";
     }
 
     this.shellPrint = function() {
       return this.toString();
     }
 
-    this.isOK = function() {
-      return bulkResult.ok == 1;
-    };
+    this.hasErrors = function() {
+      return this.hasWriteErrors() || this.hasWriteConcernError();
+    }
+
+    this.toError = function() {
+      if (this.hasErrors()) {
+        
+        // Create a combined error message
+        var message = "";
+        var numWriteErrors = this.getWriteErrorCount();
+        if (numWriteErrors == 1) {
+          message += "write error at item " + this.getWriteErrors()[0].index;
+        }
+        else if (numWriteErrors > 1) {
+          message += numWriteErrors + " write errors";
+        }
+
+        var hasWCError = this.hasWriteConcernError();
+        if (numWriteErrors > 0 && hasWCError) {
+          message += " and ";
+        }
+
+        if (hasWCError) {
+          message += "problem enforcing write concern";
+        }
+        message += " in bulk operation";
+          
+        return new BulkWriteError(bulkResult, singleBatchType, writeConcern, message);
+      }
+      else {
+        throw Error("batch was successful, cannot create BulkWriteError");
+      }
+    }
 
     /**
-     * @return {SingleWriteResult} the simplified results condensed into one.
+     * @return {WriteResult} the simplified results condensed into one.
      */
     this.toSingleResult = function() {
-      if(singleBatch == null) throw "Cannot output SingleWriteResult from multiple batch result";
-      return new SingleWriteResult(bulkResult, singleBatch);
+      if(singleBatchType == null) throw Error(
+          "Cannot output single WriteResult from multiple batch result");
+      return new WriteResult(bulkResult, singleBatchType, writeConcern);
     }
   };
 
   /**
-   * Wraps the error
+   * Represents a bulk write error, identical to a BulkWriteResult but thrown
+   */
+  var BulkWriteError = function(bulkResult, singleBatchType, writeConcern, message) {
+      
+    if(!(this instanceof BulkWriteError))
+        return new BulkWriteError(bulkResult, singleBatchType, writeConcern, message);
+      
+    Error.captureStackTrace(this, this.constructor);
+    this.name = 'BulkWriteError';
+    this.message = message || 'unknown bulk write error';
+      
+    // Bulk errors are basically bulk results with additional error information
+    BulkWriteResult.apply(this, arguments);
+      
+    // Override some particular methods
+    delete this.toError;
+      
+    this.toString = function() {
+      return "BulkWriteError(" + this.tojson() + ")";
+    }
+
+    this.toResult = function() {
+      return new BulkWriteResult(bulkResult, singleBatchType, writeConcern);
+    }
+  }
+
+  BulkWriteError.prototype = new Error();
+  BulkWriteError.prototype.constructor = BulkWriteError;
+
+  var getEmptyBulkResult = function() {
+    return {
+        writeErrors: []
+      , writeConcernErrors: []
+      , nInserted: 0
+      , nUpserted: 0
+      , nMatched: 0
+      , nModified: 0
+      , nRemoved: 0
+      , upserted: []
+    };
+  }
+
+  /**
+   * Wraps a command error
+   */
+  var WriteCommandError = function(commandError) {
+      
+    if(!(this instanceof WriteCommandError)) return new WriteCommandError(commandError);
+
+    // Define properties
+    defineReadOnlyProperty(this, "code", commandError.code);
+    defineReadOnlyProperty(this, "errmsg", commandError.errmsg);
+
+    Error.captureStackTrace(this, this.constructor);
+    this.name = 'WriteCommandError';
+    this.message = this.errmsg;
+
+    /**
+     * @return {string}
+     */
+    this.tojson = function(indent, nolint) {
+      return tojson(commandError, indent, nolint);
+    }
+
+    this.toString = function() {
+      return "WriteCommandError(" + this.tojson() + ")";
+    }
+
+    this.shellPrint = function() {
+      return this.toString();
+    }
+
+    this.toSingleResult = function() {
+      // This is *only* safe to do with a WriteCommandError from the bulk api when the bulk is
+      // known to be of size == 1
+      var bulkResult = getEmptyBulkResult();
+      bulkResult.writeErrors.push({ code : this.code, index : 0, errmsg : this.errmsg });
+      return new BulkWriteResult(bulkResult, NONE).toSingleResult();
+    }
+  }
+
+  WriteCommandError.prototype = new Error();
+  WriteCommandError.prototype.constructor = WriteCommandError;
+  
+  /**
+   * Wraps an error for a single write
    */
   var WriteError = function(err) {
     if(!(this instanceof WriteError)) return new WriteError(err);
@@ -308,7 +495,7 @@ var _bulk_api_module = (function() {
   }
 
   /**
-   * Keeps the state of a unordered batch so we can rewrite the results
+   * Keeps the state of an unordered batch so we can rewrite the results
    * correctly after command execution
    */
   var Batch = function(batchType, originalZeroIndex) {
@@ -318,25 +505,14 @@ var _bulk_api_module = (function() {
   }
 
   /**
-   * Wraps a legacy operation so we can correctly rewrite it's error
+   * Wraps a legacy operation so we can correctly rewrite its error
    */
   var LegacyOp = function(batchType, operation, index) {
     this.batchType = batchType;
     this.index = index;
     this.operation = operation;
   }
-
-  /***********************************************************
-   * Adds the initializers of bulk operations to the db collection
-   ***********************************************************/
-  DBCollection.prototype.initializeUnorderedBulkOp = function() {
-    return new Bulk(this, false);
-  }
-
-  DBCollection.prototype.initializeOrderedBulkOp = function() {
-    return new Bulk(this, true);
-  }
-
+  
   /***********************************************************
    * Wraps the operations done for the batch
    ***********************************************************/
@@ -352,16 +528,7 @@ var _bulk_api_module = (function() {
     var currentOp;
 
     // Final results
-    var bulkResult = {
-        writeErrors: []
-      , writeConcernErrors: []
-      , nInserted: 0
-      , nUpserted: 0
-      , nMatched: 0
-      , nModified: 0
-      , nRemoved: 0
-      , upserted: []
-    };
+    var bulkResult = getEmptyBulkResult();
 
     // Current batch
     var currentBatch = null;
@@ -413,39 +580,44 @@ var _bulk_api_module = (function() {
       return batches;
     }
 
-    // Add to internal list of documents
-    var addToOperationsList = function(docType, document) {
-      // Get the bsonSize
-      var bsonSize = Object.bsonsize(document);
-      // Create a new batch object if we don't have a current one
-      if(currentBatch == null) currentBatch = new Batch(docType, currentIndex);
-
-      // Update current batch size
-      currentBatchSize = currentBatchSize + 1;
-      currentBatchSizeBytes = currentBatchSizeBytes + bsonSize;
-
-      // Check if we need to create a new batch
-      if((currentBatchSize >= maxNumberOfDocsInBatch)
-        || (currentBatchSizeBytes >= maxBatchSizeBytes)
-        || (currentBatch.batchType != docType)) {
+    var finalizeBatch = function(newDocType) {
         // Save the batch to the execution stack
         batches.push(currentBatch);
 
         // Create a new batch
-        currentBatch = new Batch(docType, currentIndex);
+        currentBatch = new Batch(newDocType, currentIndex);
 
         // Reset the current size trackers
         currentBatchSize = 0;
         currentBatchSizeBytes = 0;
+    };
+
+    // Add to internal list of documents
+    var addToOperationsList = function(docType, document) {
+      
+      if (Array.isArray(document))
+        throw Error("operation passed in cannot be an Array");
+
+      // Get the bsonSize
+      var bsonSize = Object.bsonsize(document);
+      
+      // Create a new batch object if we don't have a current one
+      if(currentBatch == null) currentBatch = new Batch(docType, currentIndex);
+
+      // Finalize and create a new batch if this op would take us over the
+      // limits *or* if this op is of a different type
+      if(currentBatchSize + 1 > maxNumberOfDocsInBatch
+         || (currentBatchSize > 0 && 
+             currentBatchSizeBytes + bsonSize >= maxBatchSizeBytes)
+         || currentBatch.batchType != docType) {
+        finalizeBatch(docType);
       }
 
-      // We have an array of documents
-      if(Array.isArray(document)) {
-        throw new "operation passed in cannot be an Array";
-      } else {
-        currentBatch.operations.push(document)
-        currentIndex = currentIndex + 1;
-      }
+      currentBatch.operations.push(document);
+      currentIndex = currentIndex + 1;
+      // Update current batch size
+      currentBatchSize = currentBatchSize + 1;
+      currentBatchSizeBytes = currentBatchSizeBytes + bsonSize;
     };
 
     /**
@@ -531,7 +703,7 @@ var _bulk_api_module = (function() {
       removeOne: function() {
         collection._validateRemoveDoc(currentOp.selector);
 
-        // Establish the update command
+        // Establish the removeOne command
         var document = {
             q: currentOp.selector
           , limit: 1
@@ -546,7 +718,7 @@ var _bulk_api_module = (function() {
       remove: function() {
         collection._validateRemoveDoc(currentOp.selector);
 
-        // Establish the update command
+        // Establish the remove command
         var document = {
             q: currentOp.selector
           , limit: 0
@@ -562,6 +734,7 @@ var _bulk_api_module = (function() {
     //
     // Start of update and remove operations
     this.find = function(selector) {
+      if (selector == undefined) throw Error("find() requires query criteria");
       // Save a current selector
       currentOp = {
         selector: selector
@@ -574,22 +747,13 @@ var _bulk_api_module = (function() {
     //
     // Merge write command result into aggregated results object
     var mergeBatchResults = function(batch, bulkResult, result) {
-      //
-      // NEEDED to pass tests as some write errors are
-      // returned as write concern errors (j write on non journal mongod)
-      // also internal error code 75 is still making it out as a write concern error
-      //
-      if(ordered && result && result.writeConcernError
-        && (result.writeConcernError.code == 2 || result.writeConcernError.code == 75)) {
-        throw "legacy batch failed, cannot aggregate results: " + result.writeConcernError.errmsg;
-      }
 
       // If we have an insert Batch type
       if(batch.batchType == INSERT) {
         bulkResult.nInserted = bulkResult.nInserted + result.n;
       }
 
-      // If we have an insert Batch type
+      // If we have a remove batch type
       if(batch.batchType == REMOVE) {
         bulkResult.nRemoved = bulkResult.nRemoved + result.n;
       }
@@ -619,10 +783,13 @@ var _bulk_api_module = (function() {
 
       // If we have an update Batch type
       if(batch.batchType == UPDATE) {
-        var nModified = ('nModified' in result)? result.nModified: 0;
         bulkResult.nUpserted = bulkResult.nUpserted + nUpserted;
         bulkResult.nMatched = bulkResult.nMatched + (result.n - nUpserted);
-        bulkResult.nModified = bulkResult.nModified + nModified;
+        if(result.nModified == undefined) {
+            bulkResult.nModified = undefined;
+        } else if(bulkResult.nModified != undefined) {
+            bulkResult.nModified = bulkResult.nModified + result.nModified;
+        }
       }
 
       if(Array.isArray(result.writeErrors)) {
@@ -643,7 +810,7 @@ var _bulk_api_module = (function() {
         bulkResult.writeConcernErrors.push(new WriteConcernError(result.writeConcernError));
       }
     }
-
+    
     //
     // Execute the batch
     var executeBatch = function(batch) {
@@ -681,13 +848,13 @@ var _bulk_api_module = (function() {
                            0 /* flags */).next();
 
       if(result.ok == 0) {
-        throw "batch failed, cannot aggregate results: " + result.errmsg;
+        throw new WriteCommandError(result);
       }
 
       // Merge the results
       mergeBatchResults(batch, bulkResult, result);
     }
-
+    
     // Execute a single legacy op
     var executeLegacyOp = function(_legacyOp) {
       // Handle the different types of operation types
@@ -742,7 +909,7 @@ var _bulk_api_module = (function() {
       var code = gleResponse.code;
       var timeout = gleResponse.wtimeout? true : false;
 
-      var extractedErr = { writeError: null, wcError: null };
+      var extractedErr = { writeError: null, wcError: null, unknownError: null };
 
       if (err == 'norepl' || err == 'noreplset') {
         // Know this is legacy gle and the repl not enforced - write concern error in 2.4.
@@ -786,7 +953,11 @@ var _bulk_api_module = (function() {
         };
       }
       else if (!isOK) {
-        throw Error('Unexpected error from getLastError: ' + tojson(gleResponse));
+        // This is a GLE failure we don't understand
+        extractedErr.unknownError = {
+            code: code
+          , errmsg: errMsg
+        }
       }
       else if (err != '') {
         extractedErr.writeError = {
@@ -805,17 +976,26 @@ var _bulk_api_module = (function() {
       return extractedErr;
     };
 
+    /**
+     * getLastErrorMethod that supports all write concerns
+     */
+    var executeGetLastError = function(db, options) {
+      var cmd = { getlasterror : 1 };
+      cmd = Object.extend(cmd, options);
+      // Execute the getLastErrorCommand
+      return db.runCommand( cmd );
+    };
+    
     // Execute the operations, serially
     var executeBatchWithLegacyOps = function(batch) {
 
       var batchResult = {
           n: 0
-        , nModified: 0
         , writeErrors: []
         , upserted: []
       };
 
-      var extractedError = null;
+      var extractedErr = null;
 
       var totalToExecute = batch.operations.length;
       // Run over all the operations
@@ -827,14 +1007,22 @@ var _bulk_api_module = (function() {
         executeLegacyOp(_legacyOp);
 
         var result = executeGetLastError(collection.getDB(), { w: 1 });
-        extractedError = extractGLEErrors(result);
+        extractedErr = extractGLEErrors(result);
+        
+        if (extractedErr.unknownError) {
+          throw new WriteCommandError({
+              ok : 0.0
+            , code : extractedErr.unknownError.code
+            , errmsg : extractedErr.unknownError.errmsg 
+          });
+        }
 
-        if (extractedError.writeError != null) {
+        if (extractedErr.writeError != null) {
           // Create the emulated result set
           var errResult = {
               index: _legacyOp.index
-            , code: extractedError.writeError.code
-            , errmsg: extractedError.writeError.errmsg
+            , code: extractedErr.writeError.code
+            , errmsg: extractedErr.writeError.errmsg
             , op: batch.operations[_legacyOp.index]
           };
 
@@ -862,16 +1050,37 @@ var _bulk_api_module = (function() {
         }
       }
 
-      // The write concern may have not been enforced if we did it earlier and a write
-      // error occurs, so we apply the actual write concern at the end.
-      if (batchResult.writeErrors.length == 0 ||
-              !ordered && (batchResult.writeErrors.length < batch.operations.length)) {
-        result = enforceWriteConcern(collection.getDB(), writeConcern);
-        extractedError = extractGLEErrors(result);
+      var needToEnforceWC = writeConcern != null &&
+            bsonWoCompare(writeConcern, { w: 1 }) != 0 &&
+            bsonWoCompare(writeConcern, { w: 0 }) != 0;
+
+      extractedErr = null;
+      if (needToEnforceWC &&
+            (batchResult.writeErrors.length == 0 ||
+              (!ordered &&
+               // not all errored.
+               batchResult.writeErrors.length < batch.operations.length))) {
+
+          // if last write errored
+          if( batchResult.writeErrors.length > 0 &&
+              batchResult.writeErrors[batchResult.writeErrors.length - 1].index ==
+              (batch.operations.length - 1)) {
+              // Reset previous errors so we can apply the write concern no matter what
+              // as long as it is valid.
+              collection.getDB().runCommand({ resetError: 1 });
+          }
+
+          result = executeGetLastError(collection.getDB(), writeConcern);
+          extractedErr = extractGLEErrors(result);
+          
+          if (extractedErr.unknownError) {
+            // Report as a wc failure
+            extractedErr.wcError = extractedErr.unknownError;
+          }
       }
 
-      if (extractedError != null && extractedError.wcError != null) {
-        bulkResult.writeConcernErrors.push(extractedError.wcError);
+      if (extractedErr != null && extractedErr.wcError != null) {
+        bulkResult.writeConcernErrors.push(extractedErr.wcError);
       }
 
       // Merge the results
@@ -881,10 +1090,12 @@ var _bulk_api_module = (function() {
     //
     // Execute the batch
     this.execute = function(_writeConcern) {
-      if(executed) throw "operations cannot be re-executed";
+      if(executed) throw Error("A bulk operation cannot be re-executed");
 
       // If writeConcern set, use it, else get from collection (which will inherit from db/mongo)
       writeConcern = _writeConcern ? _writeConcern : coll.getWriteConcern();
+      if (writeConcern instanceof WriteConcern)
+          writeConcern = writeConcern.toJSON();
 
       // If we have current batch
       if(currentBatch) batches.push(currentBatch);
@@ -898,7 +1109,8 @@ var _bulk_api_module = (function() {
       for(var i = 0; i < batches.length; i++) {
 
         // Execute the batch
-        if(useWriteCommands) {
+        if(collection.getMongo().hasWriteCommands() &&
+           collection.getMongo().writeMode() == "commands") {
           executeBatch(batches[i]);
         } else {
           executeBatchWithLegacyOps(batches[i]);
@@ -916,84 +1128,50 @@ var _bulk_api_module = (function() {
       // Set as executed
       executed = true;
 
-      if(batches.length == 1) {
-        return new BulkWriteResult(bulkResult, batches[0]);
+      // Create final result object
+      typedResult = new BulkWriteResult(bulkResult,
+                                        batches.length == 1 ? batches[0].batchType : null,
+                                        writeConcern);
+      // Throw on error
+      if (typedResult.hasErrors()) {
+        throw typedResult.toError();
       }
 
-      // Execute the batch and return the final results
-      return new BulkWriteResult(bulkResult);
+      return typedResult;
     }
   }
+
+  //
+  // Exports
+  //
+
+  module = {};
+  module.WriteConcern = WriteConcern;
+  module.WriteResult = WriteResult;
+  module.BulkWriteResult = BulkWriteResult;
+  module.BulkWriteError = BulkWriteError;
+  module.WriteCommandError = WriteCommandError;
+  module.initializeUnorderedBulkOp = function() {
+    return new Bulk(this, false);
+  };
+  module.initializeOrderedBulkOp = function() {
+      return new Bulk(this, true);
+  };
+
+  return module;
+
 })();
 
-if ( ( typeof WriteConcern ) == 'undefined' ){
+// Globals
+WriteConcern = _bulk_api_module.WriteConcern;
+WriteResult = _bulk_api_module.WriteResult;
+BulkWriteResult = _bulk_api_module.BulkWriteResult;
+BulkWriteError = _bulk_api_module.BulkWriteError;
+WriteCommandError = _bulk_api_module.WriteCommandError;
 
-    /**
-     * Shell representation of WriteConcern, possibly includes:
-     *  j: write waits for journal
-     *  w: write waits for replicated to number of servers (including primary), or mode (string)
-     *  wtimeout: how long to wait for "w" replication
-     *  fsync: waits for data flush (either journal, nor database files depending on server conf)
-     *
-     * Accepts { w : x, j : x, wtimeout : x, fsync: x } or w, wtimeout, j
-     */
-    WriteConcern = function(wValue, wTimeout, jValue) {
+/***********************************************************
+ * Adds the initializers of bulk operations to the db collection
+ ***********************************************************/
+DBCollection.prototype.initializeUnorderedBulkOp = _bulk_api_module.initializeUnorderedBulkOp;
+DBCollection.prototype.initializeOrderedBulkOp = _bulk_api_module.initializeOrderedBulkOp;
 
-        var opts = {};
-        if (typeof wValue == 'object') {
-            if (typeof jValue == 'undefined' && typeof wTimeout == 'undefined')
-                opts = Object.merge(wValue);
-            else
-                throw Error("If the first arg is an Object then no additional args are allowed!")
-        } else {
-          if (typeof wValue != 'undefined')
-            opts.w = wValue;
-          if (typeof wTimeout != 'undefined')
-            opts.wtimeout = wTimeout;
-          if (typeof jValue != 'undefined')
-            opts.j = jValue;
-        }
-
-        // Do basic validation.
-        if (typeof opts.w != 'undefined' && typeof opts.w != 'number' && typeof opts.w != 'string')
-            throw Error("w value must be a number or string but was found to be a " + typeof opts.w)
-        if (typeof opts.w == 'number' && NumberInt( opts.w ).toNumber() < 0)
-            throw Error("Numeric w value must be equal to or larger than 0, not " + opts.w);
-
-        if (typeof opts.wtimeout != 'undefined') {
-            if (typeof opts.wtimeout != 'number')
-                throw Error("wtimeout must be a number, not " + opts.wtimeout);
-            if (NumberInt( opts.wtimeout ).toNumber() < 0)
-                throw Error("wtimeout must be a number greater than 0, not " + opts.wtimeout);
-        }
-        
-        if (typeof opts.j != 'undefined' && typeof opts.j != 'boolean')
-            throw Error("j value must either true or false if defined, not " + opts.j);
-        
-        this._wc = opts;
-    };
-
-    /**
-     * @return {object} the object representation of this object. Use tojson (small caps) to get
-     *     the string representation instead.
-     */
-    WriteConcern.prototype.toJSON = function() {
-        return this._wc;
-    };
-
-    /**
-     * @return {string} the string representation of this object. Use toJSON (capitalized) to get
-     *     the object representation instead.
-     */
-    WriteConcern.prototype.tojson = function(indent, nolint) {
-        return tojson(this.toJSON(), indent, nolint);
-    };
-
-    WriteConcern.prototype.toString = function() {
-        return "WriteConcern(" + this.tojson() + ")";
-    };
-
-    WriteConcern.prototype.shellPrint = function() {
-        return this.toString();
-    };
-}

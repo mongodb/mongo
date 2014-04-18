@@ -986,7 +986,7 @@ static void ReportLargeAlloc(Length num_pages, void* result) {
   static const int N = 1000;
   char buffer[N];
   TCMalloc_Printer printer(buffer, N);
-  printer.printf("tcmalloc: large alloc %"PRIu64" bytes == %p @ ",
+  printer.printf("tcmalloc: large alloc %" PRIu64 " bytes == %p @ ",
                  static_cast<uint64>(num_pages) << kPageShift,
                  result);
   for (int i = 0; i < stack.depth; i++) {

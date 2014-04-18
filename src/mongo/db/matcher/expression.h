@@ -63,6 +63,9 @@ namespace mongo {
 
             // Things that we parse but cannot be answered without an index.
             GEO_NEAR, TEXT,
+
+            // Expressions that are only created internally
+            INTERNAL_GEO_S2_KEYCHECK
         };
 
         MatchExpression( MatchType type );

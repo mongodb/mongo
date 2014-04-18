@@ -52,10 +52,6 @@ namespace mongo {
         return dbexitCalled;
     }
 
-    string getDbContext() {
-        return "in client only mode";
-    }
-
     bool haveLocalShardingInfo( const string& ns ) {
         return false;
     }

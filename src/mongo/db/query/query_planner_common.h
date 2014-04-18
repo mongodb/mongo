@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/query_solution.h"
@@ -104,7 +106,7 @@ namespace mongo {
                 }
 
                 if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
-                    QLOG() << "invalid bounds: " << isn->bounds.toString() << endl;
+                    QLOG() << "Invalid bounds: " << isn->bounds.toString() << endl;
                     verify(0);
                 }
 

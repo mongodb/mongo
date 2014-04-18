@@ -51,6 +51,7 @@ namespace mongo {
                            const BSONObj& minObj,
                            const BSONObj& maxObj,
                            bool snapshot,
+                           bool explain,
                            LiteParsedQuery** out);
 
         /**
@@ -85,6 +86,12 @@ namespace mongo {
          * 3. isTextScoreMeta
          */
         static bool isValidSortOrder(const BSONObj& sortObj);
+
+        /**
+         * Returns true if the query described by "query" should execute
+         * at an elevated level of isolation (i.e., $isolated was specified).
+         */
+        static bool isQueryIsolated(const BSONObj& query);
 
         /**
          * Helper function to create a normalized sort object.

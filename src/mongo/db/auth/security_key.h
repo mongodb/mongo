@@ -40,10 +40,9 @@ namespace mongo {
 
     /**
      * This method initializes the internalSecurity object with authentication
-     * credentials to be used by authenticateInternalUser. This method should 
-     * only be called once when setting up authentication method for the system.
+     * credentials to be used by authenticateInternalUser. 
      */
-    extern bool setInternalUserAuthParams(BSONObj authParams);
+    extern void setInternalUserAuthParams(const BSONObj& authParamsIn);
 
     /**
      * This method authenticates to another cluster member using appropriate

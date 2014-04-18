@@ -132,6 +132,17 @@ namespace mongo {
         _currentCursor = _cursors.begin();
     }
 
+    Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
+        const BSONObj next = cursor->next();
+        if (next.hasField("$err")) {
+            const int code = next.hasField("code") ? next["code"].numberInt() : 17029;
+            uasserted(code, str::stream() << "Received error in response from "
+                                          << cursor->originalHost()
+                                          << ": " << next);
+        }
+        return Document::fromBsonWithMetaData(next);
+    }
+
     boost::optional<Document> DocumentSourceMergeCursors::getNext() {
         if (_unstarted)
             start();
@@ -146,17 +157,13 @@ namespace mongo {
         if (_cursors.empty())
             return boost::none;
 
-        BSONObj next = (*_currentCursor)->cursor.next();
-        uassert(17029, str::stream() << "Received error in response from "
-                                     << (*_currentCursor)->connection->toString()
-                                     << ": " << next,
-                !next.hasField("$err"));
+        const Document next = nextSafeFrom(&((*_currentCursor)->cursor));
 
         // advance _currentCursor, wrapping if needed
         if (++_currentCursor == _cursors.end())
             _currentCursor = _cursors.begin();
 
-        return Document::fromBsonWithMetaData(next);
+        return next;
     }
 
     void DocumentSourceMergeCursors::dispose() {

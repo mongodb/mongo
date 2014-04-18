@@ -32,10 +32,10 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
 
+    class RecordIterator;
     class WorkingSet;
 
     /**
@@ -58,20 +58,29 @@ namespace mongo {
         virtual void recoverFromYield();
 
         virtual PlanStageStats* getStats();
-
     private:
+        /**
+         * Returns true if the record 'loc' references is in memory, false otherwise.
+         */
+        bool diskLocInMemory(DiskLoc loc);
+
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;
 
         // The filter is not owned by us.
         const MatchExpression* _filter;
 
-        scoped_ptr<CollectionIterator> _iter;
+        scoped_ptr<RecordIterator> _iter;
 
         CollectionScanParams _params;
 
-        // True if nsdetails(_ns) == NULL on our first call to work.
+        // True if Database::getCollection(_ns) == NULL on our first call to work.
         bool _nsDropped;
+
+        // If we want to return a DiskLoc and it points at something that's not in memory, we return
+        // a a "please page this in" result.  We allocate one WSM for this purpose at construction
+        // and reuse it for any future fetch requests, changing the DiskLoc as appropriate.
+        WorkingSetID _wsidForFetch;
 
         // Stats
         CommonStats _commonStats;

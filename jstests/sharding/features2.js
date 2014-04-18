@@ -26,12 +26,7 @@ assert( a.foo.distinct("x").length == 0 || b.foo.distinct("x").length == 0 , "di
 
 assert.eq( 1 , s.onNumShards( "foo" ) , "A1" );
 
-s.shardGo( "foo" , { x : 1 } , { x : 2 } , { x : 3 } );
-
-assert.soon( function(){
-    print( "Waiting for migration cleanup to occur..." );
-    return db.foo.count() == db.foo.find().itcount();
-})
+s.shardGo( "foo" , { x : 1 } , { x : 2 } , { x : 3 }, null, true /* waitForDelete */ );
 
 assert.eq( 2 , s.onNumShards( "foo" ) , "A2" );
 
@@ -140,7 +135,7 @@ doMR = function( n ){
 doMR( "before" );
 
 assert.eq( 1 , s.onNumShards( "mr" ) , "E1" );
-s.shardGo( "mr" , { x : 1 } , { x : 2 } , { x : 3 } );
+s.shardGo( "mr" , { x : 1 } , { x : 2 } , { x : 3 }, null, true /* waitForDelete */ );
 assert.eq( 2 , s.onNumShards( "mr" ) , "E1" );
 
 doMR( "after" );

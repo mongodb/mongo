@@ -86,25 +86,44 @@ namespace mongo {
         /** Sets the current interval to the given values (see constructor) */
         void init(BSONObj base, bool startIncluded, bool endIncluded);
 
-        /** Returns true if an empty-constructed interval hasn't been init()-ialized yet */
+        /**
+         * Returns true if an empty-constructed interval hasn't been init()-ialized yet
+         */
         bool isEmpty() const;
 
-        bool isPoint() const {
-            return startInclusive && endInclusive && 0 == start.woCompare(end, false);
-        }
+        /**
+         * Does this interval represent exactly one point?
+         */
+        bool isPoint() const;
 
-        /** Returns true if start is same as end and interval is open at either end */
-        bool isNull() const {
-            return (!startInclusive || !endInclusive) && 0 == start.woCompare(end, false);
-        }
+        /**
+         * Returns true if start is same as end and interval is open at either end
+         */
+        bool isNull() const;
 
-        /** Returns true if 'this' is the same interval as 'other' */
+        //
+        // Comparison with other intervals
+        //
+
+        /**
+         * Returns true if 'this' is the same interval as 'other'
+         */
         bool equals(const Interval& other) const;
 
         /**
-         * Swap start and end points of interval.
+         * Returns true if 'this' overlaps with 'other', false otherwise.
          */
-        void reverse();
+        bool intersects(const Interval& rhs) const;
+
+        /**
+         * Returns true if 'this' is within 'other', false otherwise.
+         */
+        bool within(const Interval& other) const;
+
+        /**
+         * Returns true if 'this' is located before 'other', false otherwise.
+         */
+        bool precedes(const Interval& other) const;
 
         /** Returns how 'this' compares to 'other' */
         enum IntervalComparison {
@@ -147,6 +166,15 @@ namespace mongo {
          * toString for IntervalComparison
          */
         static string cmpstr(IntervalComparison c);
+
+        //
+        // Mutation of intervals
+        //
+
+        /**
+         * Swap start and end points of interval.
+         */
+        void reverse();
 
         /**
          * Updates 'this' with the intersection of 'this' and 'other'. If 'this' and 'other'

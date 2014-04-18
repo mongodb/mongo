@@ -48,6 +48,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/s/chunk.h" // for static genID only
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
@@ -63,7 +64,7 @@ namespace mongo {
     public:
         CmdMedianKey() : Command( "medianKey" ) {}
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const {
             help << "Deprecated internal command. Use splitVector command instead. \n";
         }
@@ -81,7 +82,7 @@ namespace mongo {
     public:
         CheckShardingIndex() : Command( "checkShardingIndex" , false ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const {
             help << "Internal command.\n";
         }
@@ -212,7 +213,7 @@ namespace mongo {
     public:
         SplitVector() : Command( "splitVector" , false ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const {
             help <<
                  "Internal command.\n"
@@ -284,8 +285,6 @@ namespace mongo {
                     return false;
                 }
 
-                const NamespaceDetails* d = collection->details();
-
                 // Allow multiKey based on the invariant that shard keys must be single-valued.
                 // Therefore, any multi-key index prefixed by shard key cannot be multikey over
                 // the shard key fields.
@@ -308,8 +307,8 @@ namespace mongo {
                     max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
                 }
 
-                const long long recCount = d->numRecords();
-                const long long dataSize = d->dataSize();
+                const long long recCount = collection->numRecords();
+                const long long dataSize = collection->dataSize();
 
                 //
                 // 1.b Now that we have the size estimate, go over the remaining parameters and apply any maximum size
@@ -520,7 +519,7 @@ namespace mongo {
 
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
@@ -739,6 +738,15 @@ namespace mongo {
             for ( vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it ) {
                 BSONObj endKey = *it;
 
+                if ( endKey.woCompare( startKey ) == 0) {
+                    errmsg = str::stream() << "split on the lower bound of chunk "
+                                           << "[" << min << ", " << max << ")"
+                                           << " is not allowed";
+
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
                 // splits only update the 'minor' portion of version
                 myVersion.incMinor();
 
@@ -813,10 +821,17 @@ namespace mongo {
                 msgasserted( 13593 , ss.str() );
             }
 
-            // install chunk metadata with knowledge about newly split chunks in this shard's state
+            //
+            // Install chunk metadata with knowledge about newly split chunks in this shard's state
+            //
+
             splitKeys.pop_back(); // 'max' was used as sentinel
             maxVersion.incMinor();
-            shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
+            
+            {
+                Lock::DBWrite writeLk( ns );
+                shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
+            }
 
             //
             // 5. logChanges

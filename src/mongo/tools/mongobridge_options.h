@@ -46,9 +46,10 @@ namespace mongo {
     struct MongoBridgeGlobalParams {
         int port;
         int delay;
+        int connectTimeoutSec;
         string destUri;
 
-        MongoBridgeGlobalParams() : port(0), delay(0) { }
+        MongoBridgeGlobalParams() : port(0), delay(0), connectTimeoutSec(15) {}
     };
 
     extern MongoBridgeGlobalParams mongoBridgeGlobalParams;

@@ -47,9 +47,11 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/catalog/collection.h"
@@ -109,72 +111,100 @@ namespace mongo {
             return Status::OK();
         }
 
+        /**
+         * Validates an element that has a field name which starts with a dollar sign ($).
+         * In the case of a DBRef field ($id, $ref, [$db]) these fields may be valid in
+         * the correct order/context only.
+         */
+        Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep) {
+            mb::ConstElement curr = elem;
+            StringData currName = elem.getFieldName();
+
+            // Found a $db field
+            if (currName == "$db") {
+                if (curr.getType() != String) {
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  str::stream() << "The DBRef $db field must be a String, not a "
+                                  << typeName(curr.getType()));
+                }
+                curr = curr.leftSibling();
+
+                if (!curr.ok() || (curr.getFieldName() != "$id"))
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  "Found $db field without a $id before it, which is invalid.");
+
+                currName = curr.getFieldName();
+            }
+
+            // Found a $id field
+            if (currName == "$id") {
+                Status s = storageValidChildren(curr, deep);
+                if (!s.isOK())
+                    return s;
+
+                curr = curr.leftSibling();
+                if (!curr.ok() || (curr.getFieldName() != "$ref")) {
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  "Found $id field without a $ref before it, which is invalid.");
+                }
+
+                currName = curr.getFieldName();
+            }
+
+            if (currName == "$ref") {
+                if (curr.getType() != String) {
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  str::stream() << "The DBRef $ref field must be a String, not a "
+                                  << typeName(curr.getType()));
+                }
+
+                if (!curr.rightSibling().ok() || curr.rightSibling().getFieldName() != "$id")
+                    return Status(ErrorCodes::InvalidDBRef,
+                                  str::stream() << "The DBRef $ref field must be "
+                                  "following by a $id field");
+            }
+            else {
+                // not an okay, $ prefixed field name.
+                return Status(ErrorCodes::DollarPrefixedFieldName,
+                              str::stream() << "The dollar ($) prefixed field '"
+                                            << elem.getFieldName() << "' in '"
+                                            << mb::getFullName(elem)
+                                            << "' is not valid for storage.");
+
+            }
+
+            return Status::OK();
+        }
+
         Status storageValid(const mb::ConstElement& elem, const bool deep = true) {
             if (!elem.ok())
                 return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
 
-            StringData fieldName = elem.getFieldName();
-            // Cannot start with "$", unless dbref which must start with ($ref, $id)
-            if (fieldName[0] == '$') {
-                // Check if it is a DBRef has this field {$ref, $id, [$db]}
-                mb::ConstElement curr = elem;
-                StringData currName = fieldName;
+            // Field names of elements inside arrays are not meaningful in mutable bson,
+            // so we do not want to validate them.
+            //
+            // TODO: Revisit how mutable handles array field names. We going to need to make
+            // this better if we ever want to support ordered updates that can alter the same
+            // element repeatedly; see SERVER-12848.
+            const bool childOfArray = elem.parent().ok() ?
+                (elem.parent().getType() == mongo::Array) : false;
 
-                // Found a $db field
-                if (currName == "$db") {
-                    if (curr.getType() != String) {
-                        return Status(ErrorCodes::InvalidDBRef,
-                                str::stream() << "The DBRef $db field must be a String, not a "
-                                              << typeName(curr.getType()));
-                    }
-                    curr = curr.leftSibling();
-
-                    if (!curr.ok() || (curr.getFieldName() != "$id"))
-                        return Status(ErrorCodes::InvalidDBRef,
-                                      "Found $db field without a $id before it, which is invalid.");
-
-                    currName = curr.getFieldName();
+            if (!childOfArray) {
+                StringData fieldName = elem.getFieldName();
+                // Cannot start with "$", unless dbref
+                if (fieldName[0] == '$') {
+                    Status status = validateDollarPrefixElement(elem, deep);
+                    if (!status.isOK())
+                        return status;
                 }
-
-                // Found a $id field
-                if (currName == "$id") {
-                    Status s = storageValidChildren(curr, deep);
-                    if (!s.isOK())
-                        return s;
-
-                    curr = curr.leftSibling();
-                    if (!curr.ok() || (curr.getFieldName() != "$ref")) {
-                        return Status(ErrorCodes::InvalidDBRef,
-                                     "Found $id field without a $ref before it, which is invalid.");
-                    }
-
-                    currName = curr.getFieldName();
+                else if (fieldName.find(".") != string::npos) {
+                    // Field name cannot have a "." in it.
+                    return Status(ErrorCodes::DottedFieldName,
+                                  str::stream() << "The dotted field '"
+                                                << elem.getFieldName() << "' in '"
+                                                << mb::getFullName(elem)
+                                                << "' is not valid for storage.");
                 }
-
-                if (currName == "$ref") {
-                    if (curr.getType() != String) {
-                        return Status(ErrorCodes::InvalidDBRef,
-                                str::stream() << "The DBRef $ref field must be a String, not a "
-                                              << typeName(curr.getType()));
-                    }
-
-                    if (!curr.rightSibling().ok() || curr.rightSibling().getFieldName() != "$id")
-                        return Status(ErrorCodes::InvalidDBRef,
-                                str::stream() << "The DBRef $ref field must be "
-                                                 "following by a $id field");
-                }
-                else {
-                    // not an okay, $ prefixed field name.
-                    return Status(ErrorCodes::DollarPrefixedFieldName,
-                                  str::stream() << elem.getFieldName()
-                                                << " is not valid for storage.");
-                }
-            }
-
-            // Field name cannot have a "." in it.
-            if (fieldName.find(".") != string::npos) {
-                return Status(ErrorCodes::DottedFieldName,
-                              str::stream() << elem.getFieldName() << " is not valid for storage.");
             }
 
             // Check children if there are any.
@@ -359,16 +389,23 @@ namespace mongo {
             return Status::OK();
         }
 
-        Status recoverFromYield(UpdateLifecycle* lifecycle,
+        Status recoverFromYield(const UpdateRequest& request,
                                 UpdateDriver* driver,
-                                Collection* collection,
-                                const NamespaceString& nsString) {
+                                Collection* collection) {
+
+            const NamespaceString& nsString(request.getNamespaceString());
             // We yielded and recovered OK, and our cursor is still good. Details about
             // our namespace may have changed while we were yielded, so we re-acquire
             // them here. If we can't do so, escape the update loop. Otherwise, refresh
             // the driver so that it knows about what is currently indexed.
+
+            if (request.shouldCallLogOp() && !isMasterNs(nsString.ns().c_str())) {
+                return Status(ErrorCodes::NotMaster, mongoutils::str::stream() <<
+                              "Demoted from primary while performing update on " << nsString.ns());
+            }
+
             Collection* oldCollection = collection;
-            collection = cc().database()->getCollection(nsString.ns());
+            collection = cc().getContext()->db()->getCollection(nsString.ns());
 
             // We should not get a new pointer to the same collection...
             if (oldCollection && (oldCollection != collection))
@@ -398,8 +435,8 @@ namespace mongo {
                               "Update aborted due to invalid state transitions after yield -- "
                               "IndexCatalog not ok().");
 
-            if (lifecycle) {
-
+            if (request.getLifecycle()) {
+                UpdateLifecycle* lifecycle = request.getLifecycle();
                 lifecycle->setCollection(collection);
 
                 if (!lifecycle->canContinue()) {
@@ -451,18 +488,6 @@ namespace mongo {
         return executor.execute();
     }
 
-    static bool isQueryIsolated(const BSONObj& query) {
-        BSONObjIterator iter(query);
-        while (iter.more()) {
-            BSONElement elt = iter.next();
-            if (str::equals(elt.fieldName(), "$isolated") && elt.trueValue())
-                return true;
-            if (str::equals(elt.fieldName(), "$atomic") && elt.trueValue())
-                return true;
-        }
-        return false;
-    }
-
     UpdateResult update(
             const UpdateRequest& request,
             OpDebug* opDebug,
@@ -475,7 +500,7 @@ namespace mongo {
         const NamespaceString& nsString = request.getNamespaceString();
         UpdateLifecycle* lifecycle = request.getLifecycle();
         const CurOp* curOp = cc().curop();
-        Collection* collection = cc().database()->getCollection(nsString.ns());
+        Collection* collection = cc().getContext()->db()->getCollection(nsString.ns());
 
         validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
@@ -509,7 +534,7 @@ namespace mongo {
         // yield while evaluating the update loop below.
         const bool isolated =
             (cq && QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC)) ||
-            isQueryIsolated(request.getQuery());
+            LiteParsedQuery::isQueryIsolated(request.getQuery());
 
         //
         // We'll start assuming we have one or more documents for this update. (Otherwise,
@@ -521,8 +546,18 @@ namespace mongo {
 
         int numMatched = 0;
 
-        // NOTE: When doing a multi-update, we only store the locs of moved docs, since the
-        // runner will keep track of the rest.
+        // If the update was in-place, we may see it again.  This only matters if we're doing
+        // a multi-update; if we're not doing a multi-update we stop after one update and we
+        // won't see any more docs.
+        //
+        // For example: If we're scanning an index {x:1} and performing {$inc:{x:5}}, we'll keep
+        // moving the document forward and it will continue to reappear in our index scan.
+        // Unless the index is multikey, the underlying query machinery won't de-dup.
+        //
+        // If the update wasn't in-place we may see it again.  Our query may return the new
+        // document and we wouldn't want to update that.
+        //
+        // So, no matter what, we keep track of where the doc wound up.
         typedef unordered_set<DiskLoc, DiskLoc::Hasher> DiskLocSet;
         const scoped_ptr<DiskLocSet> updatedLocs(request.isMulti() ? new DiskLocSet : NULL);
 
@@ -531,6 +566,7 @@ namespace mongo {
         // reflecting only the actions taken locally. In particlar, we must have the no-op
         // counter reset so that we can meaningfully comapre it with numMatched above.
         opDebug->nscanned = 0;
+        opDebug->nscannedObjects = 0;
         opDebug->nModified = 0;
 
         // Get the cached document from the update driver.
@@ -548,6 +584,10 @@ namespace mongo {
 
         // Keep track of yield count so we can see if one happens on the getNext() calls below
         int oldYieldCount = curOp->numYields();
+
+        uassert(ErrorCodes::NotMaster,
+                mongoutils::str::stream() << "Not primary while updating " << nsString.ns(),
+                !request.shouldCallLogOp() || isMasterNs(nsString.ns().c_str()));
 
         while (true) {
             // See if we have a write in isolation mode
@@ -569,7 +609,7 @@ namespace mongo {
             if (state != Runner::RUNNER_ADVANCED) {
                 if (state == Runner::RUNNER_EOF) {
                     if (didYield)
-                        uassertStatusOK(recoverFromYield(lifecycle, driver, collection, nsString));
+                        uassertStatusOK(recoverFromYield(request, driver, collection));
 
                     // We have reached the logical end of the loop, so do yielding recovery
                     break;
@@ -583,10 +623,9 @@ namespace mongo {
 
             // Refresh things after a yield.
             if (didYield)
-                uassertStatusOK(recoverFromYield(lifecycle, driver, collection, nsString));
+                uassertStatusOK(recoverFromYield(request, driver, collection));
 
             // We fill this with the new locs of moved doc so we don't double-update.
-            // NOTE: The runner will de-dup non-moved things.
             if (updatedLocs && updatedLocs->count(loc) > 0) {
                 continue;
             }
@@ -594,10 +633,11 @@ namespace mongo {
             // We count how many documents we scanned even though we may skip those that are
             // deemed duplicated. The final 'numMatched' and 'nscanned' numbers may differ for
             // that reason.
-            // XXX: pull this out of the plan.
+            // TODO: Do we want to pull this out of the underlying query plan?
             opDebug->nscanned++;
 
             // Found a matching document
+            opDebug->nscannedObjects++;
             numMatched++;
 
             // Ask the driver to apply the mods. It may be that the driver can apply those "in
@@ -685,7 +725,7 @@ namespace mongo {
                     // Broadcast the mutation so that query results stay correct.
                     collection->cursorCache()->invalidateDocument(loc, INVALIDATION_MUTATION);
 
-                    collection->details()->paddingFits();
+                    collection->detailsWritable()->paddingFits();
 
                     // All updates were in place. Apply them via durability and writing pointer.
                     mutablebson::DamageVector::const_iterator where = damages.begin();
@@ -700,28 +740,33 @@ namespace mongo {
                     docWasModified = true;
                     opDebug->fastmod = true;
                 }
+
                 newObj = oldObj;
             }
             else {
 
                 // The updates were not in place. Apply them through the file manager.
                 newObj = doc.getObject();
+                uassert(17419,
+                        str::stream() << "Resulting document after update is larger than "
+                                      << BSONObjMaxUserSize,
+                        newObj.objsize() <= BSONObjMaxUserSize);
                 StatusWith<DiskLoc> res = collection->updateDocument(loc,
                                                                      newObj,
                                                                      true,
                                                                      opDebug);
                 uassertStatusOK(res.getStatus());
                 DiskLoc newLoc = res.getValue();
+                docWasModified = true;
 
-                // If we are tracking updated DiskLocs because we are doing a multi-update, and
-                // if we've moved this object to a new location, make sure we don't apply that
-                // update again if our traversal picks the object again. NOTE: The runner takes
-                // care of deduping non-moved docs.
-                if (updatedLocs && (newLoc != loc)) {
+                // If the document moved, we might see it again in a collection scan (maybe it's
+                // a document after our current document).
+                //
+                // If the document is indexed and the mod changes an indexed value, we might see it
+                // again.  For an example, see the comment above near declaration of updatedLocs.
+                if (updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
                     updatedLocs->insert(newLoc);
                 }
-
-                docWasModified = true;
             }
 
             // Restore state after modification
@@ -730,12 +775,10 @@ namespace mongo {
                     runner->restoreState());
 
             // Call logOp if requested.
-            if (request.shouldCallLogOp()) {
-                if (driver->isDocReplacement() || !logObj.isEmpty()) {
-                    BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
-                    logOp("u", nsString.ns().c_str(), logObj , &idQuery,
-                          NULL, request.isFromMigration(), &newObj);
-                }
+            if (request.shouldCallLogOp() && !logObj.isEmpty()) {
+                BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
+                logOp("u", nsString.ns().c_str(), logObj , &idQuery,
+                      NULL, request.isFromMigration(), &newObj);
             }
 
             // Only record doc modifications if they wrote (exclude no-ops)
@@ -785,6 +828,9 @@ namespace mongo {
         // creates the base of the update for the inserterd doc (because upsert was true)
         if (cq) {
             uassertStatusOK(driver->populateDocumentWithQueryFields(cq, doc));
+            // Validate the base doc, as taken from the query -- no fields means validate all.
+            FieldRefSet noFields;
+            uassertStatusOK(validate(BSONObj(), noFields, doc, NULL, driver->modOptions()));
             if (!driver->isDocReplacement()) {
                 opDebug->fastmodinsert = true;
                 // We need all the fields from the query to compare against for validation below.
@@ -818,6 +864,7 @@ namespace mongo {
             if (lifecycle)
                 immutableFields = lifecycle->getImmutableFields();
 
+            // This will only validate the modified fields if not a replacement.
             uassertStatusOK(validate(original,
                                      updatedFields,
                                      doc,
@@ -827,14 +874,19 @@ namespace mongo {
 
         // Only create the collection if the doc will be inserted.
         if (!collection) {
-            collection = cc().database()->getCollection(request.getNamespaceString().ns());
+            Database* db = cc().getContext()->db();
+            collection = db->getCollection(request.getNamespaceString().ns());
             if (!collection) {
-                collection = cc().database()->createCollection(request.getNamespaceString().ns());
+                collection = db->createCollection(request.getNamespaceString().ns());
             }
         }
 
         // Insert the doc
         BSONObj newObj = doc.getObject();
+        uassert(17420,
+                str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
+                newObj.objsize() <= BSONObjMaxUserSize);
+
         StatusWith<DiskLoc> newLoc = collection->insertDocument(newObj,
                                                                 !request.isGod() /*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());

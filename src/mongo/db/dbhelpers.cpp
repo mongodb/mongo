@@ -52,6 +52,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
 
@@ -59,17 +60,11 @@ namespace mongo {
 
     const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
 
-    void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
-        Database* db = cc().database();
-        verify(db);
-
-        Collection* collection = db->getCollection( ns );
-        if ( !collection )
-            return;
-
+    void Helpers::ensureIndex(Collection* collection,
+                              BSONObj keyPattern, bool unique, const char *name) {
         BSONObjBuilder b;
         b.append("name", name);
-        b.append("ns", ns);
+        b.append("ns", collection->ns());
         b.append("key", keyPattern);
         b.appendBool("unique", unique);
         BSONObj o = b.done();
@@ -83,8 +78,8 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    bool Helpers::findOne(const StringData& ns, const BSONObj &query, BSONObj& result, bool requireIndex) {
-        DiskLoc loc = findOne( ns, query, requireIndex );
+    bool Helpers::findOne(Collection* collection, const BSONObj &query, BSONObj& result, bool requireIndex) {
+        DiskLoc loc = findOne( collection, query, requireIndex );
         if ( loc.isNull() )
             return false;
         result = loc.obj();
@@ -94,15 +89,18 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
+    DiskLoc Helpers::findOne(Collection* collection, const BSONObj &query, bool requireIndex) {
+        if ( !collection )
+            return DiskLoc();
+
         CanonicalQuery* cq;
         massert(17244, "Could not canonicalize " + query.toString(),
-                CanonicalQuery::canonicalize(ns.toString(), query, &cq).isOK());
+                CanonicalQuery::canonicalize(collection->ns(), query, &cq).isOK());
 
         Runner* rawRunner;
         size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
         massert(17245, "Could not get runner for query " + query.toString(),
-                getRunner(cq, &rawRunner, options).isOK());
+                getRunner(collection, cq, &rawRunner, options).isOK());
 
         auto_ptr<Runner> runner(rawRunner);
         Runner::RunnerState state;
@@ -113,11 +111,10 @@ namespace mongo {
         return DiskLoc();
     }
 
-    bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
+    bool Helpers::findById(Database* database, const char *ns, BSONObj query, BSONObj& result ,
                            bool* nsFound , bool* indexFound ) {
         Lock::assertAtLeastReadLocked(ns);
-        Database *database = c.database();
-        verify( database );
+        invariant( database );
 
         Collection* collection = database->getCollection( ns );
         if ( !collection ) {
@@ -168,7 +165,7 @@ namespace mongo {
 
         Runner* rawRunner;
         uassert(17237, "Could not get runner for query " + query.toString(),
-                getRunner(cq, &rawRunner).isOK());
+                getRunner(ctx.db()->getCollection( ns ), cq, &rawRunner).isOK());
 
         vector<BSONObj> all;
 
@@ -184,7 +181,8 @@ namespace mongo {
 
     bool Helpers::isEmpty(const char *ns) {
         Client::Context context(ns, storageGlobalParams.dbpath);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
+                                                                context.db()->getCollection(ns)));
         return Runner::RUNNER_EOF == runner->getNext(NULL, NULL);
     }
 
@@ -195,7 +193,8 @@ namespace mongo {
     */
     bool Helpers::getSingleton(const char *ns, BSONObj& result) {
         Client::Context context(ns);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
+                                                                context.db()->getCollection(ns)));
         Runner::RunnerState state = runner->getNext(&result, NULL);
         context.getClient()->curop()->done();
         return Runner::RUNNER_ADVANCED == state;
@@ -203,7 +202,10 @@ namespace mongo {
 
     bool Helpers::getLast(const char *ns, BSONObj& result) {
         Client::Context ctx(ns);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns, InternalPlanner::BACKWARD));
+        Collection* coll = ctx.db()->getCollection( ns );
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
+                                                                coll,
+                                                                InternalPlanner::BACKWARD));
         Runner::RunnerState state = runner->getNext(&result, NULL);
         return Runner::RUNNER_ADVANCED == state;
     }
@@ -281,11 +283,11 @@ namespace mongo {
         return kpBuilder.obj();
     }
 
-    bool findShardKeyIndexPattern_inlock( const string& ns,
-                                          const BSONObj& shardKeyPattern,
-                                          BSONObj* indexPattern ) {
-        verify( Lock::isLocked() );
-        Collection* collection = cc().database()->getCollection( ns );
+    bool findShardKeyIndexPattern( const string& ns,
+                                   const BSONObj& shardKeyPattern,
+                                   BSONObj* indexPattern ) {
+        Client::ReadContext context( ns );
+        Collection* collection = context.ctx().db()->getCollection( ns );
         if ( !collection )
             return false;
 
@@ -300,13 +302,6 @@ namespace mongo {
             return false;
         *indexPattern = idx->keyPattern().getOwned();
         return true;
-    }
-
-    bool findShardKeyIndexPattern( const string& ns,
-                                   const BSONObj& shardKeyPattern,
-                                   BSONObj* indexPattern ) {
-        Client::ReadContext context( ns );
-        return findShardKeyIndexPattern_inlock( ns, shardKeyPattern, indexPattern );
     }
 
     long long Helpers::removeRange( const KeyRange& range,
@@ -358,7 +353,8 @@ namespace mongo {
             {
                 Client::WriteContext ctx(ns);
                 Collection* collection = ctx.ctx().db()->getCollection( ns );
-                if ( !collection ) break;
+                if ( !collection )
+                    break;
 
                 IndexDescriptor* desc =
                     collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
@@ -369,7 +365,6 @@ namespace mongo {
                                                                    InternalPlanner::IXSCAN_FETCH));
 
                 runner->setYieldPolicy(Runner::YIELD_AUTO);
-
                 DiskLoc rloc;
                 BSONObj obj;
                 Runner::RunnerState state;
@@ -408,12 +403,11 @@ namespace mongo {
                         break;
                     }
                 }
-
                 if ( callback )
                     callback->goingToDelete( obj );
 
                 logOp("d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
-                c.database()->getCollection( ns )->deleteDocument( rloc );
+                collection->deleteDocument( rloc );
                 numDeleted++;
             }
 
@@ -480,7 +474,7 @@ namespace mongo {
         const long long totalDocsInNS = collection->numRecords();
         if ( totalDocsInNS > 0 ) {
             // TODO: Figure out what's up here
-            avgDocSizeBytes = collection->details()->dataSize() / totalDocsInNS;
+            avgDocSizeBytes = collection->dataSize() / totalDocsInNS;
             avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
             avgDocsWhenFull = std::min( kMaxDocsPerChunk + 1,
                                         130 * avgDocsWhenFull / 100 /* slack */);

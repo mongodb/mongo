@@ -36,10 +36,13 @@
 #include <fstream>
 #include <set>
 
+#include "mongo/base/init.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/json.h"
@@ -56,13 +59,24 @@ namespace {
     const char* OPLOG_SENTINEL = "$oplog";  // compare by ptr not strcmp
 }
 
+MONGO_INITIALIZER_WITH_PREREQUISITES(RestoreAuthExternalState, ("ToolAuthExternalState"))(
+        InitializerContext* context) {
+    // Give restore the mongod implementation of AuthorizationManager so that it can run
+    // the _mergeAuthzCollections command directly against the data files
+    clearGlobalAuthorizationManager();
+    setGlobalAuthorizationManager(new AuthorizationManager(
+            new AuthzManagerExternalStateMongod()));
+
+    return Status::OK();
+}
+
 class Restore : public BSONTool {
 public:
 
     string _curns;
     string _curdb;
     string _curcoll;
-    string _userDBFieldName;
+    string _serverBinVersion; // Version identifier of the server we're restoring to
     set<UserName> _users; // Holds users that are already in the cluster when restoring with --drop
     set<RoleName> _roles; // Holds roles that are already in the cluster when restoring with --drop
     scoped_ptr<Matcher> _opmatcher; // For oplog replay
@@ -72,7 +86,8 @@ public:
     int _serverAuthzVersion; // authSchemaVersion of the cluster being restored into.
     int _dumpFileAuthzVersion; // version extracted from admin.system.version file in dump.
     bool _serverAuthzVersionDocExists; // Whether the remote cluster has an admin.system.version doc
-    Restore() : BSONTool() { }
+    Restore() : BSONTool(), _oplogEntrySkips(0), _oplogEntryApplies(0), _serverAuthzVersion(0),
+            _dumpFileAuthzVersion(0), _serverAuthzVersionDocExists(false) { }
 
     virtual void printHelp(ostream& out) {
         printMongoRestoreHelp(&out);
@@ -94,11 +109,6 @@ public:
         _serverAuthzVersionDocExists = !conn().findOne(
                 AuthorizationManager::versionCollectionNamespace,
                 AuthorizationManager::versionDocumentQuery).isEmpty();
-
-        // Now that we know the schema version of the server we can pick whether to use
-        // "userSource" or "db" to identify users.
-        _userDBFieldName = _serverAuthzVersion == AuthorizationManager::schemaVersion26Final ?
-                "db" : "userSource";
     }
 
     virtual int doRun() {
@@ -115,20 +125,43 @@ public:
             return -1;
         }
 
+        {
+            // Store server's version
+            BSONObj out;
+            if (! conn().simpleCommand("admin", &out, "buildinfo")) {
+                toolError() << "buildinfo command failed: "
+                        << out["errmsg"].String() << std::endl;
+                return -1;
+            }
+
+            _serverBinVersion = out["version"].String();
+        }
+
         if (mongoRestoreGlobalParams.restoreUsersAndRoles) {
             storeRemoteAuthzVersion(); // populate _serverAuthzVersion
+
+            if (_serverAuthzVersion == AuthorizationManager::schemaVersion26Final) {
+                uassert(17410,
+                        mongoutils::str::stream() << mongoRestoreGlobalParams.tempUsersColl <<
+                                " collection already exists, but is needed to restore user data.  "
+                                "Drop this collection or specify a different collection (via "
+                                "--tempUsersColl) to use to temporarily hold user data during the "
+                                "restore process",
+                        !conn().exists(mongoRestoreGlobalParams.tempUsersColl));
+                uassert(17411,
+                        mongoutils::str::stream() << mongoRestoreGlobalParams.tempRolesColl <<
+                                " collection already exists, but is needed to restore role data.  "
+                                "Drop this collection or specify a different collection (via "
+                                "--tempRolesColl) to use to temporarily hold role data during the "
+                                "restore process",
+                        !conn().exists(mongoRestoreGlobalParams.tempRolesColl));
+            }
 
             if (toolGlobalParams.db.empty() && toolGlobalParams.coll.empty() &&
                     exists(root / "admin" / "system.version.bson")) {
                 // Will populate _dumpFileAuthzVersion
                 processFileAndMetadata(root / "admin" / "system.version.bson",
                                        "admin.system.version");
-                uassert(17371,
-                        mongoutils::str::stream() << "Server's authorization data schema version "
-                                "does not match that of the data in the dump file.  Server's schema"
-                                " version: " << _serverAuthzVersion << ", schema version in dump: "
-                                << _dumpFileAuthzVersion,
-                        _serverAuthzVersion == _dumpFileAuthzVersion);
             } else if (!toolGlobalParams.db.empty()) {
                 // DB-specific restore
                 if (exists(root / "$admin.system.users.bson")) {
@@ -172,15 +205,7 @@ public:
                 return -1;
             }
 
-
-            BSONObj out;
-            if (! conn().simpleCommand("admin", &out, "buildinfo")) {
-                toolError() << "buildinfo command failed: " << out["errmsg"].String() << std::endl;
-                return -1;
-            }
-
-            StringData version = out["version"].valuestr();
-            if (versionCmp(version, "1.7.4-pre-") < 0) {
+            if (versionCmp(_serverBinVersion, "1.7.4-pre-") < 0) {
                 toolError() << "Can only replay oplog to server version >= 1.7.4" << std::endl;
                 return -1;
             }
@@ -430,29 +455,25 @@ public:
         // system.roles collection
         if (mongoRestoreGlobalParams.drop) {
             if (_curcoll == "system.users") {
-                // Create map of the users currently in the DB
-                BSONObj fields = BSON("user" << 1 << _userDBFieldName << 1);
-                scoped_ptr<DBClientCursor> cursor(conn().query(_curns, Query(), 0, 0, &fields));
-                while (cursor->more()) {
-                    BSONObj user = cursor->next();
-                    string userDB;
-                    uassertStatusOK(bsonExtractStringFieldWithDefault(user,
-                                                                      _userDBFieldName,
-                                                                      _curdb,
-                                                                      &userDB));
-                    _users.insert(UserName(user["user"].String(), userDB));
+                if (_serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
+                            _curdb != "admin") {
+                    // Restoring 2.4-style user docs so can't use the _mergeAuthzCollections command
+                    // Create map of the users currently in the DB so the ones that don't show up in
+                    // the dump file can be removed later.
+                    BSONObj fields = BSON("user" << 1 << "userSource" << 1);
+                    scoped_ptr<DBClientCursor> cursor(conn().query(_curns, Query(), 0, 0, &fields));
+                    while (cursor->more()) {
+                        BSONObj user = cursor->next();
+                        string userDB;
+                        uassertStatusOK(bsonExtractStringFieldWithDefault(user,
+                                                                          "userSource",
+                                                                          _curdb,
+                                                                          &userDB));
+                        _users.insert(UserName(user["user"].String(), userDB));
+                    }
                 }
             }
-            else if (_curns == "admin.system.roles") {
-                // Create map of the roles currently in the DB
-                BSONObj fields = BSON("role" << 1 << "db" << 1);
-                scoped_ptr<DBClientCursor> cursor(conn().query(_curns, Query(), 0, 0, &fields));
-                while (cursor->more()) {
-                    BSONObj role = cursor->next();
-                    _roles.insert(RoleName(role["role"].String(), role["db"].String()));
-                }
-            }
-            else {
+            else if (!startsWith(_curcoll, "system.")) { // Can't drop system collections
                 toolInfoLog() << "\t dropping" << std::endl;
                 conn().dropCollection( ns );
             }
@@ -495,37 +516,63 @@ public:
 
         // 4) If running with --drop, remove any users/roles that were in the system at the
         // beginning of the restore but weren't found in the dump file
-        if (mongoRestoreGlobalParams.drop && _curcoll == "system.users") {
-            // Delete any users that used to exist but weren't in the dump file
-            for (set<UserName>::iterator it = _users.begin(); it != _users.end(); ++it) {
-                const UserName& name = *it;
-                string dbFieldName = _userDBFieldName;
-                if (_curdb != "admin") {
-                    // Always use userSource when restoring to the legacy system.users collections
-                    // found in non-admin databases, even if the system is otherwise upgrade to v3.
-                    dbFieldName = "userSource";
+        if (_curcoll == "system.users") {
+            if ((_serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
+                    _curdb != "admin")) {
+                // Restoring 2.4 style user docs so don't use the _mergeAuthzCollections command
+                if (mongoRestoreGlobalParams.drop) {
+                    // Delete any users that used to exist but weren't in the dump file
+                    for (set<UserName>::iterator it = _users.begin(); it != _users.end(); ++it) {
+                        const UserName& name = *it;
+                        BSONObjBuilder queryBuilder;
+                        queryBuilder << "user" << name.getUser();
+                        if (name.getDB() == _curdb) {
+                            // userSource field won't be present for v1 users docs in the same db as
+                            // the user is defined on.
+                            queryBuilder << "userSource" << BSONNULL;
+                        } else {
+                            queryBuilder << "userSource" << name.getDB();
+                        }
+                        conn().remove(_curns, Query(queryBuilder.done()));
+                    }
+                    _users.clear();
                 }
+            } else {
+                // Use _mergeAuthzCollections command to move into admin.system.users the user
+                // docs that were restored into the temp user collection
+                BSONObj res;
+                conn().runCommand("admin",
+                                  BSON("_mergeAuthzCollections" << 1 <<
+                                       "tempUsersCollection" <<
+                                               mongoRestoreGlobalParams.tempUsersColl <<
+                                       "drop" << mongoRestoreGlobalParams.drop <<
+                                       "writeConcern" << BSON("w" << mongoRestoreGlobalParams.w)),
+                                  res);
+                uassert(17412,
+                        mongoutils::str::stream() << "Cannot restore users because the "
+                                "_mergeAuthzCollections command failed: " << res.toString(),
+                        res["ok"].trueValue());
 
-                BSONObjBuilder queryBuilder;
-                queryBuilder << "user" << name.getUser();
-                if (dbFieldName == "userSource" && name.getDB() == _curdb) {
-                    // userSource field won't be present for v1 users docs in the same db as the
-                    // user is defined on.
-                    queryBuilder << "userSource" << BSONNULL;
-                } else {
-                    queryBuilder << dbFieldName << name.getDB();
-                }
-                conn().remove(_curns, Query(queryBuilder.done()));
+                conn().dropCollection(mongoRestoreGlobalParams.tempUsersColl);
             }
-            _users.clear();
         }
-        if (mongoRestoreGlobalParams.drop && _curns == "admin.system.roles") {
-            // Delete any roles that used to exist but weren't in the dump file
-            for (set<RoleName>::iterator it = _roles.begin(); it != _roles.end(); ++it) {
-                const RoleName& name = *it;
-                conn().remove(ns, Query(BSON("role" << name.getRole() << "db" << name.getDB())));
-            }
-            _roles.clear();
+        if (_curns == "admin.system.roles") {
+            // Use _mergeAuthzCollections command to move into admin.system.roles the role
+            // docs that were restored into the temp roles collection
+            BSONObj res;
+            conn().runCommand("admin",
+                              BSON("_mergeAuthzCollections" << 1 <<
+                                   "tempRolesCollection" <<
+                                           mongoRestoreGlobalParams.tempRolesColl <<
+                                   "drop" << mongoRestoreGlobalParams.drop <<
+                                   "writeConcern" << BSON("w" << mongoRestoreGlobalParams.w)),
+                              res);
+            uassert(17413,
+                    mongoutils::str::stream() << "Cannot restore roles because the "
+                            "_mergeAuthzCollections command failed: " << res.toString(),
+                    res["ok"].trueValue());
+
+            conn().dropCollection(mongoRestoreGlobalParams.tempRolesColl);
         }
 
         // 5) Restore indexes
@@ -569,48 +616,67 @@ public:
         if (nsToCollectionSubstring(_curns) == "system.indexes") {
             createIndex(obj, true);
         }
-        else if (mongoRestoreGlobalParams.drop &&
-                 _curns == "admin.system.roles" &&
-                 _roles.count(RoleName(obj["role"].String(), obj["db"].String()))) {
-            // Since system collections can't be dropped, we have to manually
-            // replace the contents of the system.roles collection
-            BSONObj roleMatch = BSON("role" << obj["role"].String() << "db" << obj["db"].String());
-            conn().update(_curns, Query(roleMatch), obj);
-            _roles.erase(RoleName(obj["role"].String(), obj["db"].String()));
+        else if (_curns == "admin.system.roles") {
+            // To prevent modifying roles when other role modifications may be going on, restore
+            // the roles to a temporary collection and merge them into admin.system.roles later
+            // using the _mergeAuthzCollections command.
+            conn().insert(mongoRestoreGlobalParams.tempRolesColl, obj);
         }
         else if (_curcoll == "system.users") {
-            string userDB;
-            uassertStatusOK(bsonExtractStringFieldWithDefault(obj,
-                                                              _userDBFieldName,
-                                                              _curdb,
-                                                              &userDB));
+            uassert(17416,
+                    mongoutils::str::stream() << "Cannot modify user data on a server with version "
+                            "greater than or equal to 2.5.4 that has not yet updated the "
+                            "authorization data to schema version " <<
+                            AuthorizationManager::schemaVersion26Final <<
+                            ". Found server version " << _serverBinVersion << " with "
+                            "authorization schema version " << _serverAuthzVersion,
+                    _curdb != "admin" ||
+                    versionCmp(_serverBinVersion, "2.5.4") < 0 ||
+                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
 
-            if (_curdb == "admin" && obj.hasField("credentials")) { // Treat non-admin db like 2.4
+            if (obj.hasField("credentials")) {
                 if (_serverAuthzVersion == AuthorizationManager::schemaVersion24) {
                     // v3 user, v1 system
-                    toolError() << "Server has authorization schema version " <<
-                            AuthorizationManager::schemaVersion24 << ", but found a schema "
-                            "version " << AuthorizationManager::schemaVersion26Final << " user: " <<
-                            obj.toString() << endl;
-                    exit(EXIT_FAILURE);
+                    uasserted(17407,
+                              mongoutils::str::stream()
+                                      << "Server has authorization schema version "
+                                      << AuthorizationManager::schemaVersion24
+                                      << ", but found a schema version "
+                                      << AuthorizationManager::schemaVersion26Final << " user: "
+                                      << obj.toString());
                 } else {
                     // v3 user, v3 system
-                    if (mongoRestoreGlobalParams.drop && _users.count(UserName(obj["user"].String(),
-                                                                               userDB))) {
-                        // Since system collections can't be dropped, we have to manually
-                        // replace the contents of the system.users collection
-                        BSONObj userMatch = BSON("user" << obj["user"].String() << "db" << userDB);
-                        conn().update(_curns, Query(userMatch), obj);
-                        _users.erase(UserName(obj["user"].String(), userDB));
-                    } else {
-                        conn().insert(_curns, obj);
-                    }
+                    uassert(17414,
+                            mongoutils::str::stream() << "Found a schema version " <<
+                                    AuthorizationManager::schemaVersion26Final <<
+                                    " user when restoring to a non-admin db system.users "
+                                    "collection: " << obj.toString(),
+                            _curdb == "admin");
+                    // To prevent modifying users when other user modifications may be going on,
+                    // restore the users to a temporary collection and merge them into
+                    // admin.system.users later using the _mergeAuthzCollections command.
+                    conn().insert(mongoRestoreGlobalParams.tempUsersColl, obj);
                 }
             } else {
+                if (_curdb == "admin" &&
+                        _serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
+                        !_serverAuthzVersionDocExists) {
+                    // server with schemaVersion26Final implies it is running 2.5.4 or greater.
+                    uasserted(17415,
+                              mongoutils::str::stream() << "Cannot restore users with schema " <<
+                                      "version " << AuthorizationManager::schemaVersion24 <<
+                                      " to a system with server version 2.5.4 or greater");
+                }
+
                 if (_serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
-                        _curdb != "admin" || // Restoring 2.4 schema users to non-admin dbs is OK
-                        !_serverAuthzVersionDocExists) { // Clean 2.6 system can have 2.4 users
+                        _curdb != "admin") { // Restoring 2.4 schema users to non-admin dbs is OK)
                     // v1 user, v1 system
+                    string userDB;
+                    uassertStatusOK(bsonExtractStringFieldWithDefault(obj,
+                                                                      "userSource",
+                                                                      _curdb,
+                                                                      &userDB));
+
                     if (mongoRestoreGlobalParams.drop && _users.count(UserName(obj["user"].String(),
                                                                                userDB))) {
                         // Since system collections can't be dropped, we have to manually
@@ -626,11 +692,13 @@ public:
                     // v1 user, v3 system
                     // TODO(spencer): SERVER-12491 Rather than failing here, we should convert the
                     // v1 user to an equivalent v3 schema user
-                    toolError() << "Server has authorization schema version " <<
-                            AuthorizationManager::schemaVersion26Final << ", but found a schema "
-                            "version " << AuthorizationManager::schemaVersion24 << " user: " <<
-                            obj.toString() << endl;
-                    exit(EXIT_FAILURE);
+                    uasserted(17408,
+                              mongoutils::str::stream()
+                                      << "Server has authorization schema version "
+                                      << AuthorizationManager::schemaVersion26Final
+                                      << ", but found a schema version "
+                                      << AuthorizationManager::schemaVersion24 << " user: "
+                                      << obj.toString());
                 }
             }
         }
@@ -641,6 +709,12 @@ public:
                                                         AuthorizationManager::schemaVersionFieldName,
                                                         &authVersion));
                 _dumpFileAuthzVersion = static_cast<int>(authVersion);
+                uassert(17371,
+                        mongoutils::str::stream() << "Server's authorization data schema version "
+                                "does not match that of the data in the dump file.  Server's schema"
+                                " version: " << _serverAuthzVersion << ", schema version in dump: "
+                                << _dumpFileAuthzVersion,
+                    _serverAuthzVersion == _dumpFileAuthzVersion);
             }
             conn().insert(_curns, obj);
         }

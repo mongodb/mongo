@@ -49,7 +49,7 @@ namespace mongo {
             bool slaveOk() const { return true; }
             bool slaveOverrideOk() const { return true; }
 
-            LockType locktype() const;
+            virtual bool isWriteCommandForConfigServer() const { return false; }
 
             void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

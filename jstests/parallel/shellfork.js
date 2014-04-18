@@ -1,3 +1,5 @@
+load('jstests/libs/parallelTester.js')
+
 a = fork( function( a, b ) { return a / b; }, 10, 2 );
 a.start();
 b = fork( function( a, b, c ) { return a + b + c; }, 18, " is a ", "multiple of 3" );
@@ -13,6 +15,7 @@ assert.eq( "18 is a multiple of 3", b.returnData() );
 assert.eq( "paisley ha ha!", c.returnData() );
 
 z = fork( function( a ) {
+         load('jstests/libs/parallelTester.js');
          var y = fork( function( a ) {
                       return a + 1; }, 5 );
          y.start();

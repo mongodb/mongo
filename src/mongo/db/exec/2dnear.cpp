@@ -28,6 +28,8 @@
 
 #include "mongo/db/exec/2dnear.h"
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
@@ -52,17 +54,15 @@ namespace mongo {
         if (!_initted) {
             _initted = true;
 
-            Database* db = cc().database();
-            if ( !db )
-                return PlanStage::IS_EOF;
-            Collection* collection = db->getCollection( _params.ns );
-            if ( !collection )
+            if ( !_params.collection )
                 return PlanStage::IS_EOF;
 
-            IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+            IndexCatalog* indexCatalog = _params.collection->getIndexCatalog();
+
+            IndexDescriptor* desc = indexCatalog->findIndexByKeyPattern(_params.indexKeyPattern);
             if ( desc == NULL )
                 return PlanStage::IS_EOF;
-            TwoDAccessMethod* am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( desc ) );
+            TwoDAccessMethod* am = static_cast<TwoDAccessMethod*>( indexCatalog->getIndex( desc ) );
 
             auto_ptr<twod_exec::GeoSearch> search;
             search.reset(new twod_exec::GeoSearch(am,

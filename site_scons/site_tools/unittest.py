@@ -8,10 +8,6 @@ def register_unit_test(env, test):
     env._UnitTestList('$UNITTEST_LIST', test)
     env.Alias('$UNITTEST_ALIAS', test)
 
-def register_module_test(env, test):
-    env._UnitTestList('$MODULETEST_LIST', test)
-    env.Alias('$MODULETEST_ALIAS', test)
-
 def unit_test_list_builder_action(env, target, source):
     print "Generating " + str(target[0])
     ofile = open(str(target[0]), 'wb')
@@ -25,7 +21,7 @@ def unit_test_list_builder_action(env, target, source):
 def build_cpp_unit_test(env, target, source, **kwargs):
     libdeps = kwargs.get('LIBDEPS', [])
     libdeps.append( '$BUILD_DIR/mongo/unittest/unittest_main' )
-    
+
     includeCrutch = True
     if "NO_CRUTCH" in kwargs:
         includeCrutch = not kwargs["NO_CRUTCH"]
@@ -47,8 +43,4 @@ def generate(env):
     env.Append(BUILDERS=dict(_UnitTestList=unit_test_list_builder))
     env.AddMethod(register_unit_test, 'RegisterUnitTest')
     env.AddMethod(build_cpp_unit_test, 'CppUnitTest')
-    env.AddMethod(register_module_test, 'RegisterModuleTest')
     env.Alias('$UNITTEST_ALIAS', '$UNITTEST_LIST')
-    env.Alias('$MODULETEST_ALIAS', '$MODULETEST_LIST')
-    env.RegisterUnitTest([])
-    env.RegisterModuleTest([])

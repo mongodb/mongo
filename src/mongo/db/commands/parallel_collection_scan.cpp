@@ -33,6 +33,8 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/storage/extent.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
@@ -165,7 +167,7 @@ namespace mongo {
 
         ParallelCollectionScanCmd() : Command( "parallelCollectionScan" ){}
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
 
@@ -186,21 +188,25 @@ namespace mongo {
 
             NamespaceString ns( dbname, cmdObj[name].String() );
 
-            Database* db = cc().database();
+            Client::ReadContext ctx(ns.ns());
+
+            Database* db = ctx.ctx().db();
             Collection* collection = db->getCollection( ns );
 
-            if ( !collection ) {
-                errmsg = "ns does not exist";
-                return false;
-            }
-
+            if ( !collection )
+                return appendCommandStatus( result,
+                                            Status( ErrorCodes::NamespaceNotFound,
+                                                    str::stream() <<
+                                                    "ns does not exist: " << ns.ns() ) );
 
             size_t numCursors = static_cast<size_t>( cmdObj["numCursors"].numberInt() );
 
-            if ( numCursors == 0 || numCursors > 10000 ) {
-                errmsg = "numCursors has to be between 1 and 10000";
-                return false;
-            }
+            if ( numCursors == 0 || numCursors > 10000 )
+                return appendCommandStatus( result,
+                                            Status( ErrorCodes::BadValue,
+                                                    str::stream() <<
+                                                    "numCursors has to be between 1 and 10000" <<
+                                                    " was: " << numCursors ) );
 
             vector< vector<ExtentInfo> > buckets;
 

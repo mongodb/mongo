@@ -356,7 +356,20 @@ namespace mongo {
             BSONElement el = testSoln["andHash"];
             if (el.eoo() || !el.isABSONObj()) { return false; }
             BSONObj andHashObj = el.Obj();
-            // XXX: andHashObj can have filter
+
+            BSONElement filter = andHashObj["filter"];
+            if (!filter.eoo()) {
+                if (filter.isNull()) {
+                    if (NULL != ahn->filter) { return false; }
+                }
+                else if (!filter.isABSONObj()) {
+                    return false;
+                }
+                else if (!filterMatches(filter.Obj(), trueSoln)) {
+                    return false;
+                }
+            }
+
             return childrenMatch(andHashObj, ahn);
         }
         else if (STAGE_AND_SORTED == trueSoln->getType()) {
@@ -364,7 +377,20 @@ namespace mongo {
             BSONElement el = testSoln["andSorted"];
             if (el.eoo() || !el.isABSONObj()) { return false; }
             BSONObj andSortedObj = el.Obj();
-            // XXX: anSortedObj can have filter too
+
+            BSONElement filter = andSortedObj["filter"];
+            if (!filter.eoo()) {
+                if (filter.isNull()) {
+                    if (NULL != asn->filter) { return false; }
+                }
+                else if (!filter.isABSONObj()) {
+                    return false;
+                }
+                else if (!filterMatches(filter.Obj(), trueSoln)) {
+                    return false;
+                }
+            }
+
             return childrenMatch(andSortedObj, asn);
         }
         else if (STAGE_PROJECTION == trueSoln->getType()) {
@@ -395,8 +421,9 @@ namespace mongo {
             BSONElement child = sortObj["node"];
             if (child.eoo() || !child.isABSONObj()) { return false; }
 
+            size_t expectedLimit = limitEl.numberInt();
             return (patternEl.Obj() == sn->pattern)
-                   && (limitEl.numberInt() == sn->limit)
+                   && (expectedLimit == sn->limit)
                    && solutionMatches(child.Obj(), sn->children[0]);
         }
         else if (STAGE_SORT_MERGE == trueSoln->getType()) {

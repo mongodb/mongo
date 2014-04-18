@@ -998,6 +998,22 @@ namespace mongo {
         return v8::String::New(ret.c_str());
     }
 
+    v8::Handle<v8::Value> v8ObjectInvalidForStorage(V8Scope* scope, const v8::Arguments& args) {
+        argumentCheck(args.Length() == 1, "invalidForStorage needs 1 argument")
+        if (args[0]->IsNull()) {
+            return v8::Null();
+        }
+        argumentCheck(args[0]->IsObject(), "argument to invalidForStorage has to be an object")
+        Status validForStorage = scope->v8ToMongo(args[0]->ToObject()).storageValid(true);
+        if (validForStorage.isOK()) {
+            return v8::Null();
+        }
+
+        std::string errmsg = str::stream() << validForStorage.codeString()
+                                           << ": "<< validForStorage.reason();
+        return v8::String::New(errmsg.c_str());
+    }
+
     v8::Handle<v8::Value> bsonsize(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 1, "bsonsize needs 1 argument")
         if (args[0]->IsNull()) {

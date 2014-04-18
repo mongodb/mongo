@@ -8,12 +8,13 @@
            UpgradeCode="$(var.UpgradeCode)">
 
     <Package InstallerVersion="405" Compressed="yes" Platform="x64"/>
+
     <?if $(var.Flavor) = 2008R2Plus?>
-      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
+      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Edition)"/>
     <?else?>
-      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition) Legacy"/>
+      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBMajorVersion) $(var.Edition) Legacy"/>
     <?endif?>
-      
+
     <?if $(var.Edition) = Enterprise ?>
       <?if $(var.Flavor) = 2008R2Plus?>
         <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) Enterprise (64 bit)" />
@@ -27,11 +28,15 @@
         <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) (64 bit)" />
       <?endif?>
     <?endif?>
-    
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
+
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
           <Directory Id="BIN" Name="bin" />
+          <Directory Id="SNMP" Name="snmp" />
         </Directory>
       </Directory>
     </Directory>
@@ -47,8 +52,14 @@
   More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
     -->
 
-    <FeatureGroupRef Id="fg_MongoDBAll" />
+    <Property Id="ARPPRODUCTICON" Value="MongoDBIcon" />
+    <Property Id="ARPHELPLINK" Value="http://www.mongodb.org/" />
+    <Property Id="ARPURLINFOABOUT" Value="http://www.mongodb.org/" />
+
+    <Icon Id="MongoDBIcon" SourceFile="$(var.ProjectDir)Installer_Icon_32x32.ico" />
     
+    <FeatureGroupRef Id="fg_MongoDBAll" />
+
     <UIRef Id="WixUI_Mondo" />
     <UIRef Id="WixUI_ErrorProgressText" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />

@@ -35,11 +35,11 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/dur.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-
-#include "mongo/db/pdfile.h"
+#include "mongo/db/storage/record.h"
 
 namespace mongo {
 
@@ -131,10 +131,9 @@ namespace mongo {
             while ( n >= (int) _files.size() ) {
                 verify(this);
                 if( !Lock::isWriteLocked(_dbname) ) {
-                    log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
-                    log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
-                    log() << "       context ns: " << cc().ns() << endl;
-                    verify(false);
+                    log() << "error: getFile() called in a read lock, yet file to return is not yet open";
+                    log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string();
+                    invariant(false);
                 }
                 _files.push_back(0);
             }
@@ -152,7 +151,12 @@ namespace mongo {
             if ( sizeNeeded + DataFileHeader::HeaderSize > minSize )
                 minSize = sizeNeeded + DataFileHeader::HeaderSize;
             try {
+                Timer t;
                 p->open( fullNameString.c_str(), minSize, preallocateOnly );
+                if ( t.seconds() > 1 ) {
+                    log() << "ExtentManager took " << t.seconds()
+                          << " seconds to open: " << fullNameString;
+                }
             }
             catch ( AssertionException& ) {
                 delete p;
@@ -166,7 +170,7 @@ namespace mongo {
         return preallocateOnly ? 0 : p;
     }
 
-    DataFile* ExtentManager::addAFile( int sizeNeeded, bool preallocateNextFile ) {
+    DataFile* ExtentManager::_addAFile( int sizeNeeded, bool preallocateNextFile ) {
         DEV Lock::assertWriteLocked( _dbname );
         int n = (int) _files.size();
         DataFile *ret = getFile( n, sizeNeeded );
@@ -247,7 +251,7 @@ namespace mongo {
         while ( 1 ) {
             if ( e->xnext.isNull() )
                 return DiskLoc(); // end of collection
-            e = e->xnext.ext();
+            e = getExtent( e->xnext );
             if ( !e->firstRecord.isNull() )
                 break;
             // entire extent could be empty, keep looking
@@ -276,7 +280,7 @@ namespace mongo {
         while ( 1 ) {
             if ( e->xprev.isNull() )
                 return DiskLoc(); // end of collection
-            e = e->xprev.ext();
+            e = getExtent( e->xprev );
             if ( !e->firstRecord.isNull() )
                 break;
             // entire extent could be empty, keep looking
@@ -329,7 +333,7 @@ namespace mongo {
         size = ExtentManager::quantizeExtentSize( size );
 
         if ( maxFileNoForQuota > 0 && fileNo - 1 >= maxFileNoForQuota ) {
-            if ( cc().hasWrittenThisPass() ) {
+            if ( cc().hasWrittenSinceCheckpoint() ) {
                 warning() << "quota exceeded, but can't assert" << endl;
             }
             else {
@@ -351,7 +355,7 @@ namespace mongo {
     }
 
 
-    DiskLoc ExtentManager::createExtent( int size, int maxFileNoForQuota ) {
+    DiskLoc ExtentManager::_createExtent( int size, int maxFileNoForQuota ) {
         size = quantizeExtentSize( size );
 
         if ( size > Extent::maxSize() )
@@ -368,7 +372,7 @@ namespace mongo {
 
         if ( maxFileNoForQuota > 0 &&
              static_cast<int>( numFiles() ) >= maxFileNoForQuota &&
-             !cc().hasWrittenThisPass() ) {
+             !cc().hasWrittenSinceCheckpoint() ) {
             _quotaExceeded();
         }
 
@@ -376,7 +380,7 @@ namespace mongo {
         // no space in an existing file
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
-            DataFile* f = addAFile( size, false );
+            DataFile* f = _addAFile( size, false );
 
             if ( f->getHeader()->unusedLength >= size ) {
                 return _createExtentInFile( numFiles() - 1, f, size, maxFileNoForQuota );
@@ -388,7 +392,7 @@ namespace mongo {
         msgasserted(14810, "couldn't allocate space for a new extent" );
     }
 
-    DiskLoc ExtentManager::allocFromFreeList( int approxSize, bool capped ) {
+    DiskLoc ExtentManager::_allocFromFreeList( int approxSize, bool capped ) {
         // setup extent constraints
 
         int low, high;
@@ -420,7 +424,7 @@ namespace mongo {
             Timer t;
             DiskLoc L = _getFreeListStart();
             while( !L.isNull() ) {
-                Extent * e = L.ext();
+                Extent* e = getExtent( L );
                 if ( e->length >= low && e->length <= high ) {
                     int diff = abs(e->length - approxSize);
                     if ( diff < bestDiff ) {
@@ -471,54 +475,28 @@ namespace mongo {
         return best->myLoc;
     }
 
-
-    Extent* ExtentManager::increaseStorageSize( const string& ns,
-                                                NamespaceDetails* details,
-                                                int size,
-                                                int quotaMax ) {
+    DiskLoc ExtentManager::allocateExtent( const string& ns,
+                                           bool capped,
+                                           int size,
+                                           int quotaMax ) {
 
         bool fromFreeList = true;
-        DiskLoc eloc = allocFromFreeList( size, details->isCapped() );
+        DiskLoc eloc = _allocFromFreeList( size, capped );
         if ( eloc.isNull() ) {
             fromFreeList = false;
-            eloc = createExtent( size, quotaMax );
+            eloc = _createExtent( size, quotaMax );
         }
 
-        verify( !eloc.isNull() );
-        verify( eloc.isValid() );
+        invariant( !eloc.isNull() );
+        invariant( eloc.isValid() );
 
-        LOG(1) << "ExtentManager::increaseStorageSize"
+        LOG(1) << "ExtentManager::allocateExtent"
                << " ns:" << ns
                << " desiredSize:" << size
                << " fromFreeList: " << fromFreeList
                << " eloc: " << eloc;
 
-        Extent *e = getExtent( eloc, false );
-        verify( e );
-
-        DiskLoc emptyLoc = getDur().writing(e)->reuse( ns,
-                                                       details->isCapped() );
-
-        if ( details->lastExtent().isNull() ) {
-            verify( details->firstExtent().isNull() );
-            details->setFirstExtent( eloc );
-            details->setLastExtent( eloc );
-            getDur().writingDiskLoc( details->capExtent() ) = eloc;
-            verify( e->xprev.isNull() );
-            verify( e->xnext.isNull() );
-        }
-        else {
-            verify( !details->firstExtent().isNull() );
-            getDur().writingDiskLoc(e->xprev) = details->lastExtent();
-            getDur().writingDiskLoc(details->lastExtent().ext()->xnext) = eloc;
-            details->setLastExtent( eloc );
-        }
-
-        details->setLastExtentSize( e->length );
-
-        details->addDeletedRec(emptyLoc.drec(), emptyLoc);
-
-        return e;
+        return eloc;
     }
 
     void ExtentManager::freeExtents(DiskLoc firstExt, DiskLoc lastExt) {

@@ -579,7 +579,7 @@ static void TestHugeAllocations(AllocatorState* rnd) {
 static void TestCalloc(size_t n, size_t s, bool ok) {
   char* p = reinterpret_cast<char*>(calloc(n, s));
   if (FLAGS_verbose)
-    fprintf(LOGSTREAM, "calloc(%"PRIxS", %"PRIxS"): %p\n", n, s, p);
+    fprintf(LOGSTREAM, "calloc(%" PRIxS ", %" PRIxS "): %p\n", n, s, p);
   if (!ok) {
     CHECK(p == NULL);  // calloc(n, s) should not succeed
   } else {

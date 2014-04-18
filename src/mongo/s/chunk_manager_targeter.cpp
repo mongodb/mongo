@@ -307,7 +307,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ChunkManagerTargeter::targetAll( vector<ShardEndpoint*>* endpoints ) const {
+
+
+    Status ChunkManagerTargeter::targetCollection( vector<ShardEndpoint*>* endpoints ) const {
 
         if ( !_primary && !_manager ) {
             return Status( ErrorCodes::NamespaceNotFound,
@@ -325,6 +327,28 @@ namespace mongo {
         }
 
         for ( set<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
+            endpoints->push_back( new ShardEndpoint( it->getName(),
+                                                     _manager ?
+                                                         _manager->getVersion( *it ) :
+                                                         ChunkVersion::UNSHARDED() ) );
+        }
+
+        return Status::OK();
+    }
+
+    Status ChunkManagerTargeter::targetAllShards( vector<ShardEndpoint*>* endpoints ) const {
+
+        if ( !_primary && !_manager ) {
+            return Status( ErrorCodes::NamespaceNotFound,
+                           str::stream() << "could not target every shard with versions for "
+                                         << getNS().ns()
+                                         << "; metadata not found" );
+        }
+
+        vector<Shard> shards;
+        Shard::getAllShards( shards );
+
+        for ( vector<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
             endpoints->push_back( new ShardEndpoint( it->getName(),
                                                      _manager ?
                                                          _manager->getVersion( *it ) :
@@ -496,10 +520,24 @@ namespace mongo {
             remoteShardVersion = ChunkVersion::fromBSON( staleInfo, "vWanted" );
         }
 
-        // We assume here that we can't have more than one stale config per-shard
-        dassert( _remoteShardVersions.find( endpoint.shardName ) == _remoteShardVersions.end() );
-
-        _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
+        ShardVersionMap::iterator it = _remoteShardVersions.find( endpoint.shardName );
+        if ( it == _remoteShardVersions.end() ) {
+            _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
+        }
+        else {
+            ChunkVersion& previouslyNotedVersion = it->second;
+            if ( previouslyNotedVersion.hasCompatibleEpoch( remoteShardVersion )) {
+                if ( previouslyNotedVersion.isOlderThan( remoteShardVersion )) {
+                    remoteShardVersion.cloneTo( &previouslyNotedVersion );
+                }
+            }
+            else {
+                // Epoch changed midway while applying the batch so set the version to
+                // something unique and non-existent to force a reload when
+                // refreshIsNeeded is called.
+                ChunkVersion::IGNORED().cloneTo( &previouslyNotedVersion );
+            }
+        }
     }
 
     void ChunkManagerTargeter::noteCouldNotTarget() {

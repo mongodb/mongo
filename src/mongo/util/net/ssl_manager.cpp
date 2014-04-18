@@ -589,7 +589,7 @@ namespace mongo {
 
         X509* x509 = PEM_read_bio_X509(in, NULL, &SSLManager::password_cb, this);
         if (NULL == x509) {
-            error() << "cannot retreive certificate from keyfile: " << keyFile << ' ' <<
+            error() << "cannot retrieve certificate from keyfile: " << keyFile << ' ' <<
                 getSSLErrorMessage(ERR_get_error()) << endl; 
             return false;
         }

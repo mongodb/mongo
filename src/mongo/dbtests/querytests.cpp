@@ -63,7 +63,7 @@ namespace QueryTests {
             if ( _collection ) {
                 _database->dropCollection( ns() );
             }
-            _collection = _database->createCollection( ns(), false, NULL, true );
+            _collection = _database->createCollection( ns() );
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
@@ -115,10 +115,10 @@ namespace QueryTests {
             BSONObj query = fromjson( "{$or:[{b:2},{c:3}]}" );
             BSONObj ret;
             // Check findOne() returning object.
-            ASSERT( Helpers::findOne( ns(), query, ret, true ) );
+            ASSERT( Helpers::findOne( _collection, query, ret, true ) );
             ASSERT_EQUALS( string( "b" ), ret.firstElement().fieldName() );
             // Cross check with findOne() returning location.
-            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, true ).obj() );
+            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, true ).obj() );
         }
     };
     
@@ -130,20 +130,20 @@ namespace QueryTests {
             BSONObj ret;
 
             // Check findOne() returning object, allowing unindexed scan.
-            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            ASSERT( Helpers::findOne( _collection, query, ret, false ) );
             // Check findOne() returning location, allowing unindexed scan.
-            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, false ).obj() );
             
             // Check findOne() returning object, requiring indexed scan without index.
-            ASSERT_THROWS( Helpers::findOne( ns(), query, ret, true ), MsgAssertionException );
+            ASSERT_THROWS( Helpers::findOne( _collection, query, ret, true ), MsgAssertionException );
             // Check findOne() returning location, requiring indexed scan without index.
-            ASSERT_THROWS( Helpers::findOne( ns(), query, true ), MsgAssertionException );
+            ASSERT_THROWS( Helpers::findOne( _collection, query, true ), MsgAssertionException );
 
             addIndex( BSON( "b" << 1 ) );
             // Check findOne() returning object, requiring indexed scan with index.
-            ASSERT( Helpers::findOne( ns(), query, ret, true ) );
+            ASSERT( Helpers::findOne( _collection, query, ret, true ) );
             // Check findOne() returning location, requiring indexed scan with index.
-            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, true ).obj() );
+            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, true ).obj() );
         }
     };
     
@@ -160,8 +160,7 @@ namespace QueryTests {
                 _collection = NULL;
                 db->dropCollection( ns() );
             }
-            BSONObj options = BSON("autoIndexId" << 0 );
-            _collection = db->createCollection( ns(), false, &options );
+            _collection = db->createCollection( ns(), CollectionOptions(), true, false );
             ASSERT( _collection );
 
             DBDirectClient cl;
@@ -172,9 +171,9 @@ namespace QueryTests {
             insert( BSONObj() );
             BSONObj query;
             BSONObj ret;
-            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            ASSERT( Helpers::findOne( _collection, query, ret, false ) );
             ASSERT( ret.isEmpty() );
-            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, false ).obj() );
         }
     };
     
@@ -342,7 +341,7 @@ namespace QueryTests {
             {
                 Client::ReadContext ctx( ns );
                 ASSERT( 1 == ctx.ctx().db()->getCollection( ns )->cursorCache()->numCursors() );
-                ASSERT( ctx.ctx().db()->getCollection( ns )->cursorCache()->find( cursorId ) );
+                ASSERT( ctx.ctx().db()->getCollection( ns )->cursorCache()->find( cursorId, false ) );
             }
 
             // Check that the cursor can be iterated until all documents are returned.
@@ -603,6 +602,31 @@ namespace QueryTests {
             
             ClientCursorPin clientCursor( ctx.db()->getCollection( ns ), cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
+        }
+    };
+
+    class OplogReplayExplain : public ClientBase {
+    public:
+        ~OplogReplayExplain() {
+            client().dropCollection( "unittests.querytests.OplogReplayExplain" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.OplogReplayExplain";
+            insert( ns, BSON( "ts" << 0 ) );
+            insert( ns, BSON( "ts" << 1 ) );
+            insert( ns, BSON( "ts" << 2 ) );
+            auto_ptr< DBClientCursor > c = client().query(
+                ns, QUERY( "ts" << GT << 1 ).hint( BSON( "$natural" << 1 ) ).explain(),
+                0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( c->more() );
+
+            // Check number of results and filterSet flag in explain.
+            // filterSet is not available in oplog replay mode.
+            BSONObj explainObj = c->next();
+            ASSERT_EQUALS( 1, explainObj.getIntField( "n" ) );
+            ASSERT_FALSE( explainObj.hasField( "filterSet" ) );
+
+            ASSERT( !c->more() );
         }
     };
 
@@ -1020,7 +1044,7 @@ namespace QueryTests {
             Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
-            ASSERT_EQUALS( "unittests", cc().database()->name() );
+            ASSERT_EQUALS( "unittests", ctx.db()->name() );
         }
         const char *ns;
     };
@@ -1147,7 +1171,8 @@ namespace QueryTests {
             Client::WriteContext ctx( "unittests" );
 
             // note that extents are always at least 4KB now - so this will get rounded up a bit.
-            ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
+            ASSERT( userCreateNS( ctx.ctx().db(), ns(),
+                                  fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
             for ( int i=0; i<200; i++ ) {
                 insertNext();
 //                cout << count() << endl;
@@ -1202,13 +1227,14 @@ namespace QueryTests {
             ASSERT_EQUALS( 50 , count() );
 
             BSONObj res;
-            ASSERT( Helpers::findOne( ns() , BSON( "_id" << 20 ) , res , true ) );
+            ASSERT( Helpers::findOne( ctx.ctx().db()->getCollection( ns() ),
+                                      BSON( "_id" << 20 ) , res , true ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( Helpers::findById( cc(), ns() , BSON( "_id" << 20 ) , res ) );
+            ASSERT( Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( ! Helpers::findById( cc(), ns() , BSON( "_id" << 200 ) , res ) );
+            ASSERT( ! Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 200 ) , res ) );
 
             unsigned long long slow , fast;
 
@@ -1217,14 +1243,15 @@ namespace QueryTests {
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findOne( ns() , BSON( "_id" << 20 ) , res , true ) );
+                    ASSERT( Helpers::findOne( ctx.ctx().db()->getCollection(ns()),
+                                              BSON( "_id" << 20 ), res, true ) );
                 }
                 slow = t.micros();
             }
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findById( cc(), ns() , BSON( "_id" << 20 ) , res ) );
+                    ASSERT( Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
                 }
                 fast = t.micros();
             }
@@ -1252,7 +1279,7 @@ namespace QueryTests {
 
             BSONObj res;
             for ( int i=0; i<1000; i++ ) {
-                bool found = Helpers::findById( cc(), ns() , BSON( "_id" << i ) , res );
+                bool found = Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << i ) , res );
                 ASSERT_EQUALS( i % 2 , int(found) );
             }
 
@@ -1539,6 +1566,7 @@ namespace QueryTests {
             add< TailableQueryOnId >();
             add< OplogReplayMode >();
             add< OplogReplaySlaveReadTill >();
+            add< OplogReplayExplain >();
             add< ArrayId >();
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();

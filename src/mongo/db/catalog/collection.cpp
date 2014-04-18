@@ -36,14 +36,15 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/record_store_v1_capped.h"
+#include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/structure/collection_iterator.h"
 
-#include "mongo/db/pdfile.h" // XXX-ERH
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
 namespace mongo {
@@ -128,16 +129,14 @@ namespace mongo {
         return true;
     }
 
-    CollectionIterator* Collection::getIterator( const DiskLoc& start, bool tailable,
+    RecordIterator* Collection::getIterator( const DiskLoc& start, bool tailable,
                                                      const CollectionScanParams::Direction& dir) const {
-        verify( ok() );
-        if ( _details->isCapped() )
-            return new CappedIterator( this, start, tailable, dir );
-        return new FlatIterator( this, start, dir );
+        invariant( ok() );
+        return _recordStore->getIterator( start, tailable, dir );
     }
 
     int64_t Collection::countTableScan( const MatchExpression* expression ) {
-        scoped_ptr<CollectionIterator> iterator( getIterator( DiskLoc(),
+        scoped_ptr<RecordIterator> iterator( getIterator( DiskLoc(),
                                                               false,
                                                               CollectionScanParams::FORWARD ) );
         int64_t count = 0;
@@ -153,7 +152,7 @@ namespace mongo {
 
     BSONObj Collection::docFor( const DiskLoc& loc ) {
         Record* rec = getExtentManager()->recordFor( loc );
-        return BSONObj::make( rec->accessed() );
+        return BSONObj( rec->accessed()->data() );
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( const DocWriter* doc, bool enforceQuota ) {
@@ -191,15 +190,37 @@ namespace mongo {
         return status;
     }
 
-    StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
+    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& doc,
+                                                    MultiIndexBlock& indexBlock ) {
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord( doc.objdata(),
+                                                              doc.objsize(),
+                                                              0 );
+
+        if ( !loc.isOK() )
+            return loc;
+
+        InsertDeleteOptions indexOptions;
+        indexOptions.logIfError = false;
+        indexOptions.dupsAllowed = true; // in repair we should be doing no checking
+
+        Status status = indexBlock.insert( doc, loc.getValue(), indexOptions );
+        if ( !status.isOK() )
+            return StatusWith<DiskLoc>( status );
+
+        return loc;
+    }
+
+
+    StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert,
+                                                     bool enforceQuota ) {
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
 
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( docToInsert.objdata(),
-                                                             docToInsert.objsize(),
-                                                            enforceQuota ? largestFileNumberInQuota() : 0 );
+                                                              docToInsert.objsize(),
+                                                              enforceQuota ? largestFileNumberInQuota() : 0 );
         if ( !loc.isOK() )
             return loc;
 
@@ -261,7 +282,7 @@ namespace mongo {
                                                     OpDebug* debug ) {
 
         Record* oldRecord = getExtentManager()->recordFor( oldLocation );
-        BSONObj objOld = BSONObj::make( oldRecord );
+        BSONObj objOld( oldRecord->accessed()->data() );
 
         if ( objOld.hasElement( "_id" ) ) {
             BSONElement oldId = objOld["_id"];
@@ -407,11 +428,8 @@ namespace mongo {
         return &_database->getExtentManager();
     }
 
-    Extent* Collection::increaseStorageSize( int size, bool enforceQuota ) {
-        return getExtentManager()->increaseStorageSize( _ns,
-                                                        _details,
-                                                        size,
-                                                        enforceQuota ? largestFileNumberInQuota() : 0 );
+    void Collection::increaseStorageSize( int size, bool enforceQuota ) {
+        _recordStore->increaseStorageSize( size, enforceQuota ? largestFileNumberInQuota() : 0 );
     }
 
     int Collection::largestFileNumberInQuota() const {
@@ -437,6 +455,110 @@ namespace mongo {
 
     uint64_t Collection::dataSize() const {
         return _details->dataSize();
+    }
+
+    /**
+     * order will be:
+     * 1) store index specs
+     * 2) drop indexes
+     * 3) truncate record store
+     * 4) re-write indexes
+     */
+    Status Collection::truncate() {
+        massert( 17431, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
+
+        // 1) store index specs
+        vector<BSONObj> indexSpecs;
+        {
+            IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( false );
+            while ( ii.more() ) {
+                const IndexDescriptor* idx = ii.next();
+                indexSpecs.push_back( idx->infoObj().getOwned() );
+            }
+        }
+
+        // 2) drop indexes
+        Status status = _indexCatalog.dropAllIndexes( true );
+        if ( !status.isOK() )
+            return status;
+        _cursorCache.invalidateAll( false );
+        _infoCache.reset();
+
+        // 3) truncate record store
+        status = _recordStore->truncate();
+        if ( !status.isOK() )
+            return status;
+
+        // 4) re-create indexes
+        for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
+            status = _indexCatalog.createIndex( indexSpecs[i], false );
+            if ( !status.isOK() )
+                return status;
+        }
+
+        return Status::OK();
+    }
+
+    void Collection::temp_cappedTruncateAfter( DiskLoc end, bool inclusive) {
+        invariant( isCapped() );
+        reinterpret_cast<CappedRecordStoreV1*>(_recordStore.get())->temp_cappedTruncateAfter( end, inclusive );
+    }
+
+    namespace {
+        class MyValidateAdaptor : public ValidateAdaptor {
+        public:
+            virtual ~MyValidateAdaptor(){}
+
+            virtual Status validate( Record* record, size_t* dataSize ) {
+                BSONObj obj = BSONObj( record->data() );
+                const Status status = validateBSON(obj.objdata(), obj.objsize());
+                if ( status.isOK() )
+                    *dataSize = obj.objsize();
+                return Status::OK();
+            }
+
+        };
+    }
+
+    Status Collection::validate( bool full, bool scanData,
+                                 ValidateResults* results, BSONObjBuilder* output ){
+
+        MyValidateAdaptor adaptor;
+        Status status = _recordStore->validate( full, scanData, &adaptor, results, output );
+        if ( !status.isOK() )
+            return status;
+
+        { // indexes
+            output->append("nIndexes", _indexCatalog.numIndexesReady() );
+            int idxn = 0;
+            try  {
+                BSONObjBuilder indexes; // not using subObjStart to be exception safe
+                IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(false);
+                while( i.more() ) {
+                    const IndexDescriptor* descriptor = i.next();
+                    log() << "validating index " << descriptor->indexNamespace() << endl;
+                    IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
+                    invariant( iam );
+
+                    int64_t keys;
+                    iam->validate(&keys);
+                    indexes.appendNumber(descriptor->indexNamespace(),
+                                         static_cast<long long>(keys));
+                    idxn++;
+                }
+                output->append("keysPerIndex", indexes.done());
+            }
+            catch ( DBException& exc ) {
+                string err = str::stream() <<
+                    "exception during index validate idxn "<<
+                    BSONObjBuilder::numStr(idxn) <<
+                    ": " << exc.toString();
+                results->errors.push_back( err );
+                results->valid = false;
+            }
+        }
+
+        return Status::OK();
     }
 
 }

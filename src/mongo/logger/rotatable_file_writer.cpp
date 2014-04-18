@@ -17,6 +17,7 @@
 
 #include "mongo/logger/rotatable_file_writer.h"
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/scoped_array.hpp>
 #include <cstdio>
 #include <fstream>
@@ -211,6 +212,19 @@ namespace {
     Status RotatableFileWriter::Use::rotate(const std::string& renameTarget) {
         if (_writer->_stream) {
             _writer->_stream->flush();
+            try {
+                if (boost::filesystem::exists(renameTarget)) {
+                    return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                  "Renaming file " << _writer->_fileName << " to " <<
+                                  renameTarget << " failed; destination already exists");
+                }
+            } catch (const std::exception& e) {
+                    return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
+                                  "Renaming file " << _writer->_fileName << " to " <<
+                                  renameTarget << " failed; Cannot verify whether destination "
+                                  "already exists: " << e.what());
+            }
+
             if (0 != renameFile(_writer->_fileName, renameTarget)) {
                 return Status(ErrorCodes::FileRenameFailed, mongoutils::str::stream() <<
                               "Failed  to rename \"" << _writer->_fileName << "\" to \"" <<

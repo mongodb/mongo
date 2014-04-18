@@ -163,7 +163,7 @@ namespace mongo {
 
     class CmdReplSetInitiate : public ReplSetCommand {
     public:
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         CmdReplSetInitiate() : ReplSetCommand("replSetInitiate") { }
         virtual void help(stringstream& h) const {
             h << "Initiate/christen a replica set.";

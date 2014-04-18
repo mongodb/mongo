@@ -33,9 +33,11 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
@@ -51,7 +53,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
@@ -82,7 +84,7 @@ namespace mongo {
        we need to fix up the value in the "ns" parameter so that the name prefix is correct on a
        copy to a new name.
     */
-    BSONObj fixindex(BSONObj o) {
+    BSONObj fixindex(const string& newDbName, BSONObj o) {
         BSONObjBuilder b;
         BSONObjIterator i(o);
         while ( i.moreWithEOO() ) {
@@ -99,7 +101,7 @@ namespace mongo {
                 uassert( 10024 , "bad ns field for index during dbcopy", e.type() == String);
                 const char *p = strchr(e.valuestr(), '.');
                 uassert( 10025 , "bad ns field for index during dbcopy [2]", p);
-                string newname = cc().database()->name() + p;
+                string newname = newDbName + p;
                 b.append("ns", newname);
             }
             else
@@ -172,7 +174,7 @@ namespace mongo {
                 BSONObj js = tmp;
                 if ( isindex ) {
                     verify(nsToCollectionSubstring(from_collection) == "system.indexes");
-                    js = fixindex(tmp);
+                    js = fixindex(context.db()->name(), tmp);
                     indexesToBuild->push_back( js.getOwned() );
                     continue;
                 }
@@ -312,9 +314,13 @@ namespace mongo {
         // config
         string temp = ctx.ctx().db()->name() + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
-        if (config["options"].isABSONObj())
-            if (!userCreateNS(ns.c_str(), config["options"].Obj(), errmsg, logForRepl, 0))
+        if (config["options"].isABSONObj()) {
+            Status status = userCreateNS(ctx.ctx().db(), ns, config["options"].Obj(), logForRepl, 0);
+            if ( !status.isOK() ) {
+                errmsg = status.toString();
                 return false;
+            }
+        }
 
         // main data
         copy(ctx.ctx(),
@@ -345,13 +351,13 @@ namespace mongo {
         }
         massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
-        string todb = cc().database()->name();
+        string todb = context.db()->name();
         stringstream a,b;
         a << "localhost:" << serverGlobalParams.port;
         b << "127.0.0.1:" << serverGlobalParams.port;
         bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
         if ( masterSameProcess ) {
-            if (opts.fromDB == todb && cc().database()->path() == storageGlobalParams.dbpath) {
+            if (opts.fromDB == todb && context.db()->path() == storageGlobalParams.dbpath) {
                 // guard against an "infinite" loop
                 /* if you are replicating, the local.sources config may be wrong if you get this */
                 errmsg = "can't clone from self (localhost).";
@@ -461,12 +467,9 @@ namespace mongo {
             verify(p);
             string to_name = todb + p;
 
-            bool wantIdIndex = false;
             {
-                string err;
-                const char *toname = to_name.c_str();
                 /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(toname, options, err, opts.logForRepl, &wantIdIndex);
+                userCreateNS(context.db(), to_name, options, opts.logForRepl, false);
             }
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
@@ -475,14 +478,14 @@ namespace mongo {
             copy(context,from_name, to_name.c_str(), false, opts.logForRepl, masterSameProcess,
                  opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, q);
 
-            if( wantIdIndex ) {
+            {
                 /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
                    that occur during the initial sync.  inDBRepair makes dropDups be true.
                    */
                 bool old = inDBRepair;
                 try {
                     inDBRepair = true;
-                    Collection* c = cc().database()->getCollection( to_name );
+                    Collection* c = context.db()->getCollection( to_name );
                     if ( c )
                         c->getIndexCatalog()->ensureHaveIdIndex();
                     inDBRepair = old;
@@ -536,7 +539,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream &help ) const {
             help << "clone this database from an instance of the db on another host\n";
             help << "{ clone : \"host13\" }";
@@ -576,6 +579,8 @@ namespace mongo {
             }
 
             set<string> clonedColls;
+
+            Lock::DBWrite dbXLock(dbname);
             Client::Context context( dbname );
 
             Cloner cloner;
@@ -596,7 +601,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         CmdCloneCollection() : Command("cloneCollection") { }
 
         virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
@@ -665,9 +670,13 @@ namespace mongo {
 
 
     // SERVER-4328 todo review for concurrency
-    thread_specific_ptr< DBClientConnection > authConn_;
+    thread_specific_ptr< DBClientBase > authConn_;
     /* Usage:
-     admindb.$cmd.findOne( { copydbgetnonce: 1, fromhost: <hostname> } );
+     * admindb.$cmd.findOne( { copydbgetnonce: 1, fromhost: <connection string> } );
+     *
+     * Run against the mongod that is the intended target for the "copydb" command.  Used to get a
+     * nonce from the source of a "copydb" operation for authentication purposes.  See the
+     * description of the "copydb" command below.
      */
     class CmdCopyDbGetNonce : public Command {
     public:
@@ -678,7 +687,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -694,16 +703,18 @@ namespace mongo {
                 ss << "localhost:" << serverGlobalParams.port;
                 fromhost = ss.str();
             }
-            authConn_.reset( new DBClientConnection() );
             BSONObj ret;
-            {
-                dbtemprelease t;
-                if ( !authConn_->connect( fromhost, errmsg ) )
-                    return false;
-                if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
-                    errmsg = "couldn't get nonce " + ret.toString();
-                    return false;
-                }
+            ConnectionString cs = ConnectionString::parse(fromhost, errmsg);
+            if (!cs.isValid()) {
+                return false;
+            }
+            authConn_.reset(cs.connect(errmsg));
+            if (!authConn_.get()) {
+                return false;
+            }
+            if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
+                errmsg = "couldn't get nonce " + ret.toString();
+                return false;
             }
             result.appendElements( ret );
             return true;
@@ -711,8 +722,43 @@ namespace mongo {
     } cmdCopyDBGetNonce;
 
     /* Usage:
-       admindb.$cmd.findOne( { copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
-    */
+     * admindb.$cmd.findOne( { copydb: 1, fromhost: <connection string>, fromdb: <db>,
+     *                         todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
+     *
+     * The "copydb" command is used to copy a database.  Note that this is a very broad definition.
+     * This means that the "copydb" command can be used in the following ways:
+     *
+     * 1. To copy a database within a single node
+     * 2. To copy a database within a sharded cluster, possibly to another shard
+     * 3. To copy a database from one cluster to another
+     *
+     * Note that in all cases both the target and source database must be unsharded.
+     *
+     * The "copydb" command gets sent by the client or the mongos to the destination of the copy
+     * operation.  The node, cluster, or shard that recieves the "copydb" command must then query
+     * the source of the database to be copied for all the contents and metadata of the database.
+     *
+     *
+     *
+     * When used with auth, there are two different considerations.
+     *
+     * The first is authentication with the target.  The only entity that needs to authenticate with
+     * the target node is the client, so authentication works there the same as it would with any
+     * other command.
+     *
+     * The second is the authentication of the target with the source, which is needed because the
+     * target must query the source directly for the contents of the database.  To do this, the
+     * client must use the "copydbgetnonce" command, in which the target will get a nonce from the
+     * source and send it back to the client.  The client can then hash its password with the nonce,
+     * send it to the target when it runs the "copydb" command, which can then use that information
+     * to authenticate with the source.
+     *
+     * NOTE: mongos doesn't know how to call or handle the "copydbgetnonce" command.  See
+     * SERVER-6427.
+     *
+     * NOTE: Since internal cluster auth works differently, "copydb" currently doesn't work between
+     * shards in a cluster when auth is enabled.  See SERVER-13080.
+     */
     class CmdCopyDb : public Command {
     public:
         CmdCopyDb() : Command("copydb") { }
@@ -722,7 +768,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
@@ -730,7 +776,8 @@ namespace mongo {
         }
         virtual void help( stringstream &help ) const {
             help << "copy a database from another host to this host\n";
-            help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
+            help << "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
+                 << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
@@ -753,7 +800,8 @@ namespace mongo {
 
             string todb = cmdObj.getStringField("todb");
             if ( fromhost.empty() || todb.empty() || cloneOptions.fromDB.empty() ) {
-                errmsg = "parms missing - {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
+                errmsg = "parms missing - {copydb: 1, fromhost: <connection string>, "
+                         "fromdb: <db>, todb: <db>}";
                 return false;
             }
 
@@ -783,11 +831,15 @@ namespace mongo {
             else if (!fromSelf) {
                 // If fromSelf leave the cloner's conn empty, it will use a DBDirectClient instead.
 
-                DBClientConnection* conn = new DBClientConnection();
-                cloner.setConnection(conn);
-                if (!conn->connect(fromhost, errmsg)) {
+                ConnectionString cs = ConnectionString::parse(fromhost, errmsg);
+                if (!cs.isValid()) {
                     return false;
                 }
+                DBClientBase* conn = cs.connect(errmsg);
+                if (!conn) {
+                    return false;
+                }
+                cloner.setConnection(conn);
             }
             Client::Context ctx(todb);
             return cloner.go(ctx, fromhost, cloneOptions, NULL, errmsg );

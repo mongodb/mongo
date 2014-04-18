@@ -33,12 +33,18 @@
 namespace mongo {
 
     /**
-     * Obtains the log file handler and writes the current thread's stack trace to
-     * it. This call issues an exit(). The function can safely be called from within a
-     * signal handler.
+     * Sets up handlers for signals and other events like terminate and new_handler.
      *
-     * @param signal that this hadler is called for
+     * This must be called very early in main, before runGlobalInitializers().
      */
-    void printStackAndExit( int signalNum );
+    void setupSignalHandlers();
+
+    /**
+     * Starts the thread to handle asynchronous signals.
+     *
+     * This must be the first thread started from the main thread. Call this immediately after
+     * initializeServerGlobalState().
+     */
+    void startSignalProcessingThread();
 
 } // namespace mongo

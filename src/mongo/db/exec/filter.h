@@ -46,7 +46,7 @@ namespace mongo {
         // This is only called by a $where query.  The query system must be smart enough to realize
         // that it should do a fetch beforehand.
         BSONObj toBSON() const {
-            verify(_wsm->hasObj());
+            invariant(_wsm->hasObj());
             return _wsm->obj;
         }
 
@@ -67,7 +67,7 @@ namespace mongo {
 
                 while (keyPatternIt.more()) {
                     BSONElement keyPatternElt = keyPatternIt.next();
-                    verify(keyDataIt.more());
+                    invariant(keyDataIt.more());
                     BSONElement keyDataElt = keyDataIt.next();
 
                     if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
@@ -96,6 +96,53 @@ namespace mongo {
         WorkingSetMember* _wsm;
     };
 
+    class IndexKeyMatchableDocument : public MatchableDocument {
+    public:
+        IndexKeyMatchableDocument(const BSONObj& key,
+                                  const BSONObj& keyPattern)
+            : _keyPattern(keyPattern), _key(key) { }
+
+        BSONObj toBSON() const {
+            // Planning shouldn't let this happen.
+            invariant(0);
+        }
+
+        virtual ElementIterator* allocateIterator(const ElementPath* path) const {
+            BSONObjIterator keyPatternIt(_keyPattern);
+            BSONObjIterator keyDataIt(_key);
+
+            while (keyPatternIt.more()) {
+                BSONElement keyPatternElt = keyPatternIt.next();
+                invariant(keyDataIt.more());
+                BSONElement keyDataElt = keyDataIt.next();
+
+                if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
+                    if (Array == keyDataElt.type()) {
+                        return new SimpleArrayElementIterator(keyDataElt, true);
+                    }
+                    else {
+                        return new SingleElementElementIterator(keyDataElt);
+                    }
+                }
+            }
+
+            // Planning should not let this happen.
+            massert(17409,
+                    "trying to match on unknown field: " + path->fieldRef().dottedField().toString(),
+                    0);
+
+            return new SingleElementElementIterator(BSONElement());
+        }
+
+        virtual void releaseIterator(ElementIterator* iterator) const {
+            delete iterator;
+        }
+
+    private:
+        BSONObj _keyPattern;
+        BSONObj _key;
+    };
+
     /**
      * Used by every stage with a filter.
      */
@@ -108,6 +155,15 @@ namespace mongo {
         static bool passes(WorkingSetMember* wsm, const MatchExpression* filter) {
             if (NULL == filter) { return true; }
             WorkingSetMatchableDocument doc(wsm);
+            return filter->matches(&doc, NULL);
+        }
+
+        static bool passes(const BSONObj& keyData,
+                           const BSONObj& keyPattern,
+                           const MatchExpression* filter) {
+
+            if (NULL == filter) { return true; }
+            IndexKeyMatchableDocument doc(keyData, keyPattern);
             return filter->matches(&doc, NULL);
         }
     };

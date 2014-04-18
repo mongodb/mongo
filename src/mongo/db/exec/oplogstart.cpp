@@ -28,19 +28,24 @@
 
 #include "mongo/db/exec/oplogstart.h"
 
-#include "mongo/db/pdfile.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/record.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
     // Does not take ownership.
-    OplogStart::OplogStart(const string& ns, MatchExpression* filter, WorkingSet* ws)
+    OplogStart::OplogStart(Collection* collection, MatchExpression* filter, WorkingSet* ws)
         : _needInit(true),
           _backwardsScanning(false),
           _extentHopping(false),
           _done(false),
+          _collection(collection),
+          _nsd(NULL),
           _workingSet(ws),
-          _ns(ns),
           _filter(filter) { }
 
     OplogStart::~OplogStart() { }
@@ -49,10 +54,10 @@ namespace mongo {
         // We do our (heavy) init in a work(), where work is expected.
         if (_needInit) {
             CollectionScanParams params;
-            params.ns = _ns;
+            params.collection = _collection;
             params.direction = CollectionScanParams::BACKWARD;
             _cs.reset(new CollectionScan(params, _workingSet, NULL));
-            _nsd = nsdetails(_ns.c_str());
+            _nsd = _collection->details();
             _needInit = false;
             _backwardsScanning = true;
             _timer.reset();
@@ -109,7 +114,7 @@ namespace mongo {
 
         // Set up our extent hopping state.  Get the start of the extent that we were collection
         // scanning.
-        Extent* e = _curloc.rec()->myExtent(_curloc);
+        Extent* e = _curloc.rec()->myExtentLoc(_curloc).ext();
         if (!_nsd->capLooped() || (e->myLoc != _nsd->capExtent())) {
             _curloc = e->firstRecord;
         }
@@ -181,8 +186,8 @@ namespace mongo {
     }
 
     // static
-    DiskLoc OplogStart::prevExtentFirstLoc(NamespaceDetails* nsd, const DiskLoc& rec ) {
-        Extent *e = rec.rec()->myExtent( rec );
+    DiskLoc OplogStart::prevExtentFirstLoc(const NamespaceDetails* nsd, const DiskLoc& rec ) {
+        Extent *e = rec.rec()->myExtentLoc( rec ).ext();
         if (nsd->capLooped() ) {
             while( true ) {
                 // Advance e to preceding extent (looping to lastExtent if necessary).

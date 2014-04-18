@@ -30,7 +30,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/hash_access_method.h"
+#include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
@@ -72,25 +72,12 @@ namespace mongo {
             // alter the data format).  Additionally, in certain places the hashed index code and
             // the index bound calculation code assume null and missing are indexed identically.
             BSONObj nullObj = BSON("" << BSONNULL);
-            return BSON("" << HashAccessMethod::makeSingleKey(nullObj.firstElement(), seed,
-                                                              hashVersion));
+            return BSON("" << ExpressionKeysPrivate::makeSingleHashKey(nullObj.firstElement(), seed, hashVersion));
         }
         else {
             BSONObjBuilder b;
             b.appendNull("");
             return b.obj();
-        }
-    }
-
-    // static
-    void IndexLegacy::postBuildHook(Collection* collection, const BSONObj& keyPattern) {
-        // If it's an FTS index, we want to set the power of 2 flag.
-        string pluginName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
-        if (IndexNames::TEXT == pluginName) {
-            NamespaceDetails* nsd = collection->details();
-            if (nsd->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes)) {
-                nsd->syncUserFlags(collection->ns().ns());
-            }
         }
     }
 

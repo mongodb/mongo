@@ -42,7 +42,7 @@ namespace mongo {
         SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
                               _syncTarget(NULL),
                               _oplogReader(new OplogReader()),
-                              _supportsUpdater(false),
+                              _supportsUpdater(true),
                               _positionChanged(false),
                               _handshakeNeeded(false) {}
 
@@ -50,8 +50,8 @@ namespace mongo {
             delete _oplogReader;
         }
 
-        /// Adds an entry to _member for a secondary that has connected to us.
-        void associateMember(const BSONObj& id, const int memberId);
+        /// Adds an entry to _members for a secondary that has connected to us.
+        void associateMember(const BSONObj& id, Member* member);
 
         /// Ensures local.me is populated and populates it if not.
         void ensureMe();
@@ -131,6 +131,15 @@ namespace mongo {
         void tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields=0) {
             _oplogReader->tailingQueryGTE(ns, t, fields);
         }
+
+        /** 
+        * this mutex protects the _conn field of _oplogReader in that we cannot mix the functions
+        * which check _conn for null (commonConnect() and connect() do this) with the function that
+        * sets the pointer to null (resetConnection()). All other uses of the _oplogReader's _conn
+        * do not need the mutex locked, due to the threading logic that prevents _connect()
+        * from being called concurrently.
+        */
+        boost::mutex oplock;
 
     private:
         /**

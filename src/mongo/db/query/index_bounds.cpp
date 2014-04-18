@@ -28,7 +28,12 @@
 
 #include "mongo/db/query/index_bounds.h"
 
+#include <algorithm>
+#include <utility>
+
 namespace mongo {
+
+    using std::vector;
 
     namespace {
 
@@ -37,6 +42,26 @@ namespace mongo {
             if (i == 0)
                 return 0;
             return i > 0 ? 1 : -1;
+        }
+
+        /**
+         * Returns BEHIND if the key is behind the interval.
+         * Returns WITHIN if the key is within the interval.
+         * Returns AHEAD if the key is ahead the interval.
+         *
+         * All directions are oriented along 'direction'.
+         */
+        IndexBoundsChecker::Location intervalCmp(const Interval& interval, const BSONElement& key,
+                                                 const int expectedDirection) {
+            int cmp = sgn(key.woCompare(interval.start, false));
+            bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
+            if (!startOK) { return IndexBoundsChecker::BEHIND; }
+
+            cmp = sgn(key.woCompare(interval.end, false));
+            bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
+            if (!endOK) { return IndexBoundsChecker::AHEAD; }
+
+            return IndexBoundsChecker::WITHIN;
         }
 
     }  // namespace
@@ -493,38 +518,50 @@ namespace mongo {
         return VALID;
     }
 
-    // static
-    IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& interval,
-                                                                   const BSONElement& key,
-                                                                   const int expectedDirection) {
-        int cmp = sgn(key.woCompare(interval.start, false));
-        bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
-        if (!startOK) { return BEHIND; }
+    namespace {
 
-        cmp = sgn(key.woCompare(interval.end, false));
-        bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
-        if (!endOK) { return AHEAD; }
+        /**
+         * Returns true if key (first member of pair) is AHEAD of interval
+         * along 'direction' (second member of pair).
+         */
+        bool isKeyAheadOfInterval(const Interval& interval,
+                                  const std::pair<BSONElement, int>& keyAndDirection) {
+            const BSONElement& elt = keyAndDirection.first;
+            int expectedDirection = keyAndDirection.second;
+            IndexBoundsChecker::Location where = intervalCmp(interval, elt, expectedDirection);
+            return IndexBoundsChecker::AHEAD == where;
+        }
 
-        return WITHIN;
-    }
+    } // namespace
 
     // static
     IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(const BSONElement& elt,
             const OrderedIntervalList& oil, const int expectedDirection, size_t* newIntervalIndex) {
+        // Binary search for interval.
+        // Intervals are ordered in the same direction as our keys.
+        // Key behind all intervals: [BEHIND, ..., BEHIND]
+        // Key ahead of all intervals: [AHEAD, ..., AHEAD]
+        // Key within one interval: [AHEAD, ..., WITHIN, BEHIND, ...]
+        // Key not in any inteval: [AHEAD, ..., AHEAD, BEHIND, ...]
 
-        for (size_t i = 0; i < oil.intervals.size(); ++i) {
-            Location where = intervalCmp(oil.intervals[i], elt, expectedDirection);
+        // Find left-most BEHIND/WITHIN interval.
+        vector<Interval>::const_iterator i =
+            std::lower_bound(oil.intervals.begin(), oil.intervals.end(),
+                             std::make_pair(elt, expectedDirection), isKeyAheadOfInterval);
 
-            // Intervals are ordered in the same direction as our keys.  The first interval we
-            // aren't ahead of is the one we're looking for.
-            if (AHEAD != where) {
-                *newIntervalIndex = i;
-                return where;
-            }
+        // Key ahead of all intervals.
+        if (i == oil.intervals.end()) {
+            return AHEAD;
         }
 
-        // If we're here, we're ahead of all intervals.
-        return AHEAD;
+        // Found either interval containing key or left-most BEHIND interval.
+        *newIntervalIndex = std::distance(oil.intervals.begin(), i);
+
+        // Additional check to determine if interval contains key.
+        Location where = intervalCmp(*i, elt, expectedDirection);
+        invariant(BEHIND == where || WITHIN == where);
+
+        return where;
     }
 
 }  // namespace mongo

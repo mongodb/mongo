@@ -116,7 +116,7 @@ var testWriteBatches = function (coll) {
     assert.eq(1, coll.count());
 
     // GLE behavior change in 2.6
-    if (coll === coll26 || coll === collMixed) {
+    if (coll === coll26) {
 
         //
         // Basic no journal insert, command error with nojournal in 2.6 and mixed
@@ -125,9 +125,33 @@ var testWriteBatches = function (coll) {
                               documents: [{_id: -1, a:1},{_id: 1, a:1}],
                               writeConcern: {j:true}});
         printjson( result = coll.runCommand(request) );
-        assert(!result.ok);
-        // Explicitly *not* true when command fails totally
-        // assert.eq(0, coll.count());
+        // Reported as a batch failure in 2.6 - which is wrapped in a
+        // write error via mongos like other batch failures
+        assert(result.ok);
+        assert.eq(0, result.n);
+        assert.eq(result.writeErrors.length, 1);
+        assert.eq(result.writeErrors[0].index, 0);
+        assert.eq(0, coll.count());
+    }
+    else if (coll === collMixed) {
+        
+        //
+        // Basic no journal insert, command error with nojournal in 2.6 and mixed
+        coll.remove({});
+        printjson( request = {insert : coll.getName(),
+                              documents: [{_id: -1, a:1},{_id: 1, a:1}],
+                              writeConcern: {j:true}});
+        printjson( result = coll.runCommand(request) );
+        // Reported as a batch failure in 2.6 - which is wrapped in a
+        // write error via mongos like other batch failures
+        // The 2.4 shard reports a write concern error, but with the batch 
+        // failure against the 2.6 shard the client must assume the wc was
+        // not applied and so this is suppressed. 
+        assert(result.ok);
+        assert.eq(1, result.n);
+        assert.eq(result.writeErrors.length, 1); 
+        assert.eq(result.writeErrors[0].index, 1); 
+        assert.eq(1, coll.count());
     }
     else {
 

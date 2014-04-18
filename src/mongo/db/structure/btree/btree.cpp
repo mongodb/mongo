@@ -45,6 +45,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/server.h"
 #include "mongo/util/startup_test.h"
@@ -53,6 +54,24 @@ namespace mongo {
 
     BOOST_STATIC_ASSERT( Record::HeaderSize == 16 );
     BOOST_STATIC_ASSERT( Record::HeaderSize + BtreeData_V1::BucketSize == 8192 );
+
+    MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
+
+
+    void keyTooLongAssert( int code, const string& msg ) {
+
+        if ( !isMaster( NULL ) ) {
+            // on secondaries, we do old behavior
+            return;
+        }
+
+        if ( !failIndexKeyTooLong ) {
+            // user doesn't want this
+            return;
+        }
+
+        uasserted( code, msg );
+    }
 
     NOINLINE_DECL void checkFailed(unsigned line) {
         static time_t last;
@@ -1796,10 +1815,9 @@ namespace mongo {
             string msg = str::stream() << "ERROR: key too large len:" << key.dataSize()
                                        << " max:" << getKeyMax() << ' ' << key.dataSize()
                                        << ' ' << btreeState->descriptor()->indexNamespace();
+
             problem() << msg << endl;
-            if ( isMaster( NULL ) ) {
-                uasserted( 17281, msg );
-            }
+            keyTooLongAssert( 17281, msg );
             return 2;
         }
         verify( key.dataSize() > 0 );
@@ -1887,9 +1905,7 @@ namespace mongo {
                                            << btreeState->descriptor()->indexNamespace() << ' '
                                            << key.dataSize() << ' ' << key.toString();
                 problem() << msg << endl;
-                if ( isMaster( NULL ) ) {
-                    uasserted( 17280, msg );
-                }
+                keyTooLongAssert( 17280, msg );
                 return 3;
             }
         }

@@ -326,7 +326,12 @@ namespace mongo {
 
         private:
 
-            CommandResult( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn );
+            CommandResult( const string& server,
+                           const string& db,
+                           const BSONObj& cmd,
+                           int options,
+                           DBClientBase * conn,
+                           bool useShardedConn );
             void init();
 
             string _server;
@@ -334,7 +339,8 @@ namespace mongo {
             int _options;
             BSONObj _cmd;
             DBClientBase * _conn;
-            scoped_ptr<ScopedDbConnection> _connHolder; // used if not provided a connection
+            scoped_ptr<AScopedConnection> _connHolder; // used if not provided a connection
+            bool _useShardConn;
 
             scoped_ptr<DBClientCursor> _cursor;
 
@@ -351,8 +357,14 @@ namespace mongo {
          * @param db db name
          * @param cmd cmd to exec
          * @param conn optional connection to use.  will use standard pooled if non-specified
+         * @param useShardConn use ShardConnection
          */
-        static shared_ptr<CommandResult> spawnCommand( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn = 0 );
+        static shared_ptr<CommandResult> spawnCommand( const string& server,
+                                                       const string& db,
+                                                       const BSONObj& cmd,
+                                                       int options,
+                                                       DBClientBase * conn = 0,
+                                                       bool useShardConn = false );
     };
 
 

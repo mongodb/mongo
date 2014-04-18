@@ -64,7 +64,7 @@ namespace mongo {
 
         verify(_nearFieldIndex < _params.indexKeyPattern.nFields());
 
-        // FLAT implies the distances are in radians.  Convert to meters.
+        // FLAT implies the input distances are in radians.  Convert to meters.
         if (FLAT == _params.nearQuery.centroid.crs) {
             _params.nearQuery.minDistance *= kRadiusOfEarthInMeters;
             _params.nearQuery.maxDistance *= kRadiusOfEarthInMeters;
@@ -80,19 +80,13 @@ namespace mongo {
         _outerRadiusInclusive = false;
 
         // Grab the IndexDescriptor.
-        Database* db = cc().database();
-        if (!db) {
+        if ( !_params.collection ) {
             _failed = true;
             return;
         }
 
-        Collection* collection = db->getCollection(_params.ns);
-        if (!collection) {
-            _failed = true;
-            return;
-        }
-
-        _descriptor = collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
+        _descriptor =
+            _params.collection->getIndexCatalog()->findIndexByKeyPattern(_params.indexKeyPattern);
         if (NULL == _descriptor) {
             _failed = true;
             return;
@@ -170,6 +164,66 @@ namespace mongo {
         return PlanStage::NEED_TIME;
     }
 
+    /**
+     * A MatchExpression for seeing if an S2Cell-in-a-key is within an annulus.
+     */
+    class GeoS2KeyMatchExpression : public MatchExpression {
+    public:
+        /**
+         * 'annulus' must outlive 'this'.
+         */
+        GeoS2KeyMatchExpression(S2RegionIntersection* annulus,
+                                StringData nearFieldPath)
+            : MatchExpression(INTERNAL_GEO_S2_KEYCHECK),
+              _annulus(annulus) {
+
+            _elementPath.init(nearFieldPath);
+        }   
+
+        virtual ~GeoS2KeyMatchExpression(){}
+
+        virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const {
+            MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
+
+            while (cursor->more()) {
+                ElementIterator::Context e = cursor->next();
+                if (matchesSingleElement(e.element())) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        virtual bool matchesSingleElement(const BSONElement& e) const {
+            // Something has gone terribly wrong if this doesn't hold.
+            invariant(String == e.type());
+            S2Cell keyCell = S2Cell(S2CellId::FromString(e.str()));
+            return _annulus->MayIntersect(keyCell);
+        }
+
+        //
+        // These won't be called.
+        //
+
+        virtual void debugString( StringBuilder& debug, int level = 0 ) const {
+        }
+
+        virtual bool equivalent( const MatchExpression* other ) const {
+            return false;
+        }
+
+        virtual MatchExpression* shallowClone() const {
+            return NULL;
+        }
+
+    private:
+        // Not owned here.
+        S2RegionIntersection* _annulus;
+
+        ElementPath _elementPath;
+    };
+
     void S2NearStage::nextAnnulus() {
         // Step 1: Grow the annulus.
         _innerRadius = _outerRadius;
@@ -208,10 +262,21 @@ namespace mongo {
 
         params.bounds = _params.baseBounds;
         params.direction = 1;
-        IndexScan* scan = new IndexScan(params, _ws, NULL);
+        // We use a filter on the key.  The filter rejects keys that don't intersect with the
+        // annulus.  An object that is in the annulus might have a key that's not in it and a key
+        // that's in it.  As such we can't just look at one key per object.
+        //
+        // This does force us to do our own deduping of results, though.
+        params.doNotDedup = true;
+
+        // Owns geo filter.
+        _keyGeoFilter.reset(new GeoS2KeyMatchExpression(
+            &_annulus, _params.baseBounds.fields[_nearFieldIndex].name));
+        IndexScan* scan = new IndexScan(params, _ws, _keyGeoFilter.get());
 
         // Owns 'scan'.
         _child.reset(new FetchStage(_ws, scan, _params.filter));
+        _seenInScan.clear();
     }
 
     PlanStage::StageState S2NearStage::addResultToQueue(WorkingSetID* out) {
@@ -220,6 +285,7 @@ namespace mongo {
         // All done reading from _child.
         if (PlanStage::IS_EOF == state) {
             _child.reset();
+            _keyGeoFilter.reset();
 
             // Adjust the annulus size depending on how many results we got.
             if (_results.empty()) {
@@ -237,28 +303,36 @@ namespace mongo {
         // Nothing to do unless we advance.
         if (PlanStage::ADVANCED != state) { return state; }
 
-        // TODO Speed improvements:
-        //
-        // 0. Modify fetch to preserve key data and test for intersection w/annulus.
-        //
-        // 1. keep track of what we've seen in this scan and possibly ignore it.
-        //
-        // 2. keep track of results we've returned before and ignore them.
-
         WorkingSetMember* member = _ws->get(*out);
         // Must have an object in order to get geometry out of it.
         verify(member->hasObj());
 
+        // The scans we use don't dedup so we must dedup them ourselves.  We only put locs into here
+        // if we know for sure whether or not we'll return them in this annulus.
+        if (member->hasLoc()) {
+            if (_seenInScan.end() != _seenInScan.find(member->loc)) {
+                return PlanStage::NEED_TIME;
+            }
+        }
+
         // Get all the fields with that name from the document.
         BSONElementSet geom;
         member->obj.getFieldsDotted(_params.nearQuery.field, geom, false);
-        if (geom.empty()) {return PlanStage::NEED_TIME; }
+        if (geom.empty()) {
+            return PlanStage::NEED_TIME;
+        }
 
         // Some value that any distance we can calculate will be less than.
         double minDistance = numeric_limits<double>::max();
         BSONObj minDistanceObj;
         for (BSONElementSet::iterator git = geom.begin(); git != geom.end(); ++git) {
-            if (!git->isABSONObj()) { return PlanStage::FAILURE; }
+            if (!git->isABSONObj()) {
+                mongoutils::str::stream ss;
+                ss << "s2near stage read invalid geometry element " << *git << " from child";
+                Status status(ErrorCodes::InternalError, ss);
+                *out = WorkingSetCommon::allocateStatusMember( _ws, status);
+                return PlanStage::FAILURE;
+            }
             BSONObj obj = git->Obj();
 
             double distToObj;
@@ -273,13 +347,26 @@ namespace mongo {
             }
         }
 
+        // If we're here we'll either include the doc in this annulus or reject it.  It's safe to
+        // ignore it if it pops up again in this annulus.
+        if (member->hasLoc()) {
+            _seenInScan.insert(member->loc);
+        }
+
         // If the distance to the doc satisfies our distance criteria, add it to our buffered
         // results.
         if (minDistance >= _innerRadius &&
             (_outerRadiusInclusive ? minDistance <= _outerRadius : minDistance < _outerRadius)) {
             _results.push(Result(*out, minDistance));
             if (_params.addDistMeta) {
-                member->addComputed(new GeoDistanceComputedData(minDistance));
+                // FLAT implies the output distances are in radians.  Convert to meters.
+                if (FLAT == _params.nearQuery.centroid.crs) {
+                    member->addComputed(new GeoDistanceComputedData(minDistance
+                                                                    / kRadiusOfEarthInMeters));
+                }
+                else {
+                    member->addComputed(new GeoDistanceComputedData(minDistance));
+                }
             }
             if (_params.addPointMeta) {
                 member->addComputed(new GeoNearPointComputedData(minDistanceObj));

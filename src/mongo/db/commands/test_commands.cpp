@@ -34,9 +34,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
@@ -47,7 +47,7 @@ namespace mongo {
         virtual bool adminOnly() const { return false; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         // No auth needed because it only works when enabled via command line.
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -81,7 +81,7 @@ namespace mongo {
     /* for diagnostic / testing purposes. Enabled via command line. */
     class CmdSleep : public Command {
     public:
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
@@ -129,7 +129,7 @@ namespace mongo {
     public:
         CapTrunc() : Command( "captrunc" ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         // No auth needed because it only works when enabled via command line.
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -137,22 +137,24 @@ namespace mongo {
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "captrunc" ].valuestrsafe();
             uassert( 13416, "captrunc must specify a collection", !coll.empty() );
-            string ns = dbname + "." + coll;
+            NamespaceString nss( dbname, coll );
             int n = cmdObj.getIntField( "n" );
+            bool inc = cmdObj.getBoolField( "inc" ); // inclusive range?
 
-            // inclusive range?
-            bool inc = cmdObj.getBoolField( "inc" );
-            NamespaceDetails *nsd = nsdetails( ns );
-            massert( 13417, "captrunc collection not found or empty", nsd);
+            Client::WriteContext ctx( nss.ns() );
+            Collection* collection = ctx.ctx().db()->getCollection( nss.ns() );
+            massert( 13417, "captrunc collection not found or empty", collection);
 
-            boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(ns, InternalPlanner::BACKWARD));
+            boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(nss.ns(),
+                                                                             collection,
+                                                                             InternalPlanner::BACKWARD));
             DiskLoc end;
             // We remove 'n' elements so the start is one past that
             for( int i = 0; i < n + 1; ++i ) {
                 Runner::RunnerState state = runner->getNext(NULL, &end);
                 massert( 13418, "captrunc invalid n", Runner::RUNNER_ADVANCED == state);
             }
-            nsd->cappedTruncateAfter( ns.c_str(), end, inc );
+            collection->temp_cappedTruncateAfter( end, inc );
             return true;
         }
     };
@@ -162,33 +164,38 @@ namespace mongo {
     public:
         EmptyCapped() : Command( "emptycapped" ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool logTheOp() { return true; }
         // No auth needed because it only works when enabled via command line.
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, 
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname + ".system.indexes";
             std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
-            std::string ns = dbname + '.' + coll;
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+            std::string ns = db->name() + '.' + coll;
 
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
-            string ns = dbname + "." + coll;
-            NamespaceDetails *nsd = nsdetails( ns );
-            massert( 13429, "emptycapped no such collection", nsd );
+            NamespaceString nss( dbname, coll );
 
-            std::vector<BSONObj> indexes = stopIndexBuilds(dbname, cmdObj);
+            Client::WriteContext ctx( nss.ns() );
+            Database* db = ctx.ctx().db();
+            Collection* collection = db->getCollection( nss.ns() );
+            massert( 13429, "emptycapped no such collection", collection );
 
-            nsd->emptyCappedCollection( ns.c_str() );
+            std::vector<BSONObj> indexes = stopIndexBuilds(db, cmdObj);
+
+            Status status = collection->truncate();
+            if ( !status.isOK() )
+                return appendCommandStatus( result, status );
 
             IndexBuilder::restoreIndexes(indexes);
 

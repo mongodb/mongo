@@ -227,7 +227,7 @@ namespace {
 
     TEST(PlanCacheCommandsTest, planCacheClearUnknownKey) {
         PlanCache planCache;
-        ASSERT_NOT_OK(PlanCacheClear::clear(&planCache, ns, fromjson("{query: {a: 1}}")));
+        ASSERT_OK(PlanCacheClear::clear(&planCache, ns, fromjson("{query: {a: 1}}")));
     }
 
     TEST(PlanCacheCommandsTest, planCacheClearOneKey) {
@@ -337,8 +337,7 @@ namespace {
         PlanCache planCache;
 
         BSONObjBuilder ignored;
-        ASSERT_NOT_OK(PlanCacheListPlans::list(planCache, ns, fromjson("{query: {a: 1}}"),
-                                               &ignored));
+        ASSERT_OK(PlanCacheListPlans::list(planCache, ns, fromjson("{query: {a: 1}}"), &ignored));
     }
 
     TEST(PlanCacheCommandsTest, planCacheListPlansOnlyOneSolutionTrue) {

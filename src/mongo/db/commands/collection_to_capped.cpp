@@ -30,16 +30,12 @@
 
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h" // XXX-remove
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/instance.h" // XXX-remove
 #include "mongo/db/pdfile.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/extent.h"
 
 namespace mongo {
 
@@ -70,41 +66,24 @@ namespace mongo {
             if ( temp )
                 spec.appendBool( "temp", true );
 
-            string errmsg;
-            if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, logForReplication ) )
-                return Status( ErrorCodes::InternalError, errmsg );
-        }
-
-        auto_ptr<Runner> runner;
-
-        {
-            const NamespaceDetails* details = fromCollection->details();
-            DiskLoc extent = details->firstExtent();
-
-            // datasize and extentSize can't be compared exactly, so add some padding to 'size'
-            long long excessSize =
-                static_cast<long long>( fromCollection->dataSize() - size * 2 );
-
-            // skip ahead some extents since not all the data fits,
-            // so we have to chop a bunch off
-            for( ;
-                 excessSize > extent.ext()->length && extent != details->lastExtent();
-                 extent = extent.ext()->xnext ) {
-
-                excessSize -= extent.ext()->length;
-                LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size "
-                         << extent.ext()->length << endl;
-                LOG( 6 ) << "excessSize: " << excessSize << endl;
-            }
-            DiskLoc startLoc = extent.ext()->firstRecord;
-
-            runner.reset( InternalPlanner::collectionScan(fromNs,
-                                                          InternalPlanner::FORWARD,
-                                                          startLoc) );
+            Status status = userCreateNS( ctx.db(), toNs, spec.done(), logForReplication );
+            if ( !status.isOK() )
+                return status;
         }
 
         Collection* toCollection = db->getCollection( toNs );
-        verify( toCollection );
+        invariant( toCollection ); // we created above
+
+        // how much data to ignore because it won't fit anyway
+        // datasize and extentSize can't be compared exactly, so add some padding to 'size'
+        long long excessSize =
+            static_cast<long long>( fromCollection->dataSize() -
+                                    ( toCollection->storageSize() * 2 ) );
+
+        scoped_ptr<Runner> runner( InternalPlanner::collectionScan(fromNs,
+                                                                   fromCollection,
+                                                                   InternalPlanner::FORWARD ) );
+
 
         while ( true ) {
             BSONObj obj;
@@ -119,6 +98,11 @@ namespace mongo {
             case Runner::RUNNER_ERROR:
                 return Status( ErrorCodes::InternalError, "runner error while iterating" );
             case Runner::RUNNER_ADVANCED:
+                if ( excessSize > 0 ) {
+                    excessSize -= ( 4 * obj.objsize() ); // 4x is for padding, power of 2, etc...
+                    continue;
+                }
+
                 toCollection->insertDocument( obj, true );
                 if ( logForReplication )
                     logOp( "i", toNs.c_str(), obj );
@@ -126,7 +110,7 @@ namespace mongo {
             }
         }
 
-        verify( false ); // unreachable
+        invariant( false ); // unreachable
     }
 
     /* convertToCapped seems to use this */
@@ -134,7 +118,7 @@ namespace mongo {
     public:
         CmdCloneCollectionAsCapped() : Command( "cloneCollectionAsCapped" ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream &help ) const {
             help << "{ cloneCollectionAsCapped:<fromName>, toCollection:<toName>, size:<sizeInBytes> }";
         }
@@ -167,7 +151,10 @@ namespace mongo {
                 return false;
             }
 
-            Status status = cloneCollectionAsCapped( cc().database(), from, to, size, temp, true );
+            Lock::DBWrite dbXLock(dbname);
+            Client::Context ctx(dbname);
+
+            Status status = cloneCollectionAsCapped( ctx.db(), from, to, size, temp, true );
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -181,9 +168,7 @@ namespace mongo {
     public:
         CmdConvertToCapped() : Command( "convertToCapped" ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return WRITE; }
-        // calls renamecollection which does a global lock, so we must too:
-        virtual bool lockGlobally() const { return true; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual bool logTheOp() {
             // see CmdRenameCollection::logTheOp as to why this is best
             return true;
@@ -199,19 +184,25 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname,
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string systemIndexes = dbname+".system.indexes";
             std::string coll = cmdObj.firstElement().valuestr();
-            std::string ns = dbname + "." + coll;
-            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
+            std::string ns = db->name() + "." + coll;
 
-            return IndexBuilder::killMatchingIndexBuilds(criteria);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = ns;
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            // calls renamecollection which does a global lock, so we must too:
+            //
+            Lock::GlobalWrite globalWriteLock;
+            Client::Context ctx(dbname);
 
-            stopIndexBuilds(dbname, jsobj);
+            Database* db = ctx.db();
+
+            stopIndexBuilds(db, jsobj);
             BackgroundOperation::assertNoBgOpInProgForDb(dbname.c_str());
 
             string shortSource = jsobj.getStringField( "convertToCapped" );
@@ -225,8 +216,6 @@ namespace mongo {
 
             string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
             string longTmpName = str::stream() << dbname << "." << shortTmpName;
-
-            Database* db = cc().database();
 
             if ( db->getCollection( longTmpName ) ) {
                 Status status = db->dropCollection( longTmpName );

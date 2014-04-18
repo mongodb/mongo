@@ -299,8 +299,18 @@ namespace mongo {
 
             // See if it's the order we're looking for.
             BSONObj possibleSort = resultingSortBob.obj();
-            if (0 != possibleSort.woCompare(desiredSort)) {
-                return false;
+            if (!desiredSort.isPrefixOf(possibleSort)) {
+                // We can't get the sort order from the index scan. See if we can
+                // get the sort by reversing the scan.
+                BSONObj reversePossibleSort = QueryPlannerCommon::reverseSortObj(possibleSort);
+                if (!desiredSort.isPrefixOf(reversePossibleSort)) {
+                    // Can't get the sort order from the reversed index scan either. Give up.
+                    return false;
+                }
+                else {
+                    // We can get the sort order we need if we reverse the scan.
+                    QueryPlannerCommon::reverseScans(isn);
+                }
             }
 
             // Do some bookkeeping to see how many ixscans we'll create total.
@@ -367,7 +377,7 @@ namespace mongo {
         BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
         if (sorts.end() != sorts.find(reverseSort)) {
             QueryPlannerCommon::reverseScans(solnRoot);
-            QLOG() << "Reversing ixscan to provide sort.  Result: "
+            QLOG() << "Reversing ixscan to provide sort. Result: "
                    << solnRoot->toString() << endl;
             return solnRoot;
         }
@@ -387,8 +397,9 @@ namespace mongo {
             return NULL;
         }
 
-        // Add a fetch stage so we have the full object when we hit the sort stage.  XXX TODO: Can
-        // we pull values out of the key and if so in what cases?  (covered_index_sort_3.js)
+        // Add a fetch stage so we have the full object when we hit the sort stage.  TODO: Can we
+        // pull the values that we sort by out of the key and if so in what cases?  Perhaps we can
+        // avoid a fetch.
         if (!solnRoot->fetched()) {
             FetchNode* fetch = new FetchNode();
             fetch->children.push_back(solnRoot);
@@ -399,18 +410,54 @@ namespace mongo {
         SortNode* sort = new SortNode();
         sort->pattern = sortObj;
         sort->query = query.getParsed().getFilter();
+        sort->children.push_back(solnRoot);
+        solnRoot = sort;
         // When setting the limit on the sort, we need to consider both
         // the limit N and skip count M. The sort should return an ordered list
         // N + M items so that the skip stage can discard the first M results.
         if (0 != query.getParsed().getNumToReturn()) {
-            sort->limit = query.getParsed().getNumToReturn() +
-                          query.getParsed().getSkip();
+            // Overflow here would be bad and could cause a nonsense limit. Cast
+            // skip and limit values to unsigned ints to make sure that the
+            // sum is never stored as signed. (See SERVER-13537).
+            sort->limit = size_t(query.getParsed().getNumToReturn()) +
+                          size_t(query.getParsed().getSkip());
+
+            // This is a SORT with a limit. The wire protocol has a single quantity
+            // called "numToReturn" which could mean either limit or batchSize.
+            // We have no idea what the client intended. One way to handle the ambiguity
+            // of a limited OR stage is to use the SPLIT_LIMITED_SORT hack.
+            //
+            // If numToReturn is really a limit, then we want to add a limit to this
+            // SORT stage, and hence perform a topK.
+            //
+            // If numToReturn is really a batchSize, then we want to perform a regular
+            // blocking sort.
+            //
+            // Since we don't know which to use, just join the two options with an OR,
+            // with the topK first. If the client wants a limit, they'll get the efficiency
+            // of topK. If they want a batchSize, the other OR branch will deliver the missing
+            // results. The OR stage handles deduping.
+            if (params.options & QueryPlannerParams::SPLIT_LIMITED_SORT
+                && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
+                && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO)
+                && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+                // If we're here then the SPLIT_LIMITED_SORT hack is turned on,
+                // and the query is of a type that allows the hack.
+                //
+                // Not allowed for geo or text, because we assume elsewhere that those
+                // stages appear just once.
+                OrNode* orn = new OrNode();
+                orn->children.push_back(sort);
+                SortNode* sortClone = static_cast<SortNode*>(sort->clone());
+                sortClone->limit = 0;
+                orn->children.push_back(sortClone);
+                solnRoot = orn;
+            }
         }
         else {
             sort->limit = 0;
         }
-        sort->children.push_back(solnRoot);
-        solnRoot = sort;
+
         *blockingSortOut = true;
 
         return solnRoot;
@@ -418,12 +465,11 @@ namespace mongo {
 
     // static
     QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& query,
-                                                   const QueryPlannerParams& params,
-                                                   QuerySolutionNode* solnRoot) {
+                                                           const QueryPlannerParams& params,
+                                                           QuerySolutionNode* solnRoot) {
         auto_ptr<QuerySolution> soln(new QuerySolution());
         soln->filterData = query.getQueryObj();
         verify(soln->filterData.isOwned());
-        soln->ns = query.ns();
         soln->indexFilterApplied = params.indexFiltersApplied;
 
         solnRoot->computeProperties();
@@ -432,9 +478,9 @@ namespace mongo {
         // data.
 
         // If we're answering a query on a sharded system, we need to drop documents that aren't
-        // logically part of our shard (XXX GREG elaborate more precisely)
+        // logically part of our shard.
         if (params.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            // XXX TODO: use params.shardKey to do fetch analysis instead of always fetching.
+            // TODO: We could use params.shardKey to do fetch analysis instead of always fetching.
             if (!solnRoot->fetched()) {
                 FetchNode* fetch = new FetchNode();
                 fetch->children.push_back(solnRoot);
@@ -445,9 +491,16 @@ namespace mongo {
             solnRoot = sfn;
         }
 
-        solnRoot = analyzeSort(query, params, solnRoot, &soln->hasSortStage);
+        bool hasSortStage = false;
+        solnRoot = analyzeSort(query, params, solnRoot, &hasSortStage);
+
         // This can happen if we need to create a blocking sort stage and we're not allowed to.
         if (NULL == solnRoot) { return NULL; }
+
+        // A solution can be blocking if it has a blocking sort stage or
+        // a hashed AND stage.
+        bool hasAndHashStage = hasNode(solnRoot, STAGE_AND_HASH);
+        soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
         // If we can (and should), add the keep mutations stage.
 
@@ -461,17 +514,19 @@ namespace mongo {
         // the document at the right place.
         //
         // 3. There is an index-provided sort.  Ditto above comment about merging.
-        // XXX; do we want some kind of static init for a set of stages we care about & pass that
-        // set into hasNode?
+        //
+        // TODO: do we want some kind of pre-planning step where we look for certain nodes and cache
+        // them?  We do lookups in the tree a few times.  This may not matter as most trees are
+        // shallow in terms of query nodes.
         bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT)
                               || hasNode(solnRoot, STAGE_GEO_NEAR_2D)
                               || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE)
-                              || (!query.getParsed().getSort().isEmpty() && !soln->hasSortStage);
+                              || (!query.getParsed().getSort().isEmpty() && !hasSortStage);
 
         // Only these stages can produce flagged results.  A stage has to hold state past one call
         // to work(...) in order to possibly flag a result.
         bool couldProduceFlagged = hasNode(solnRoot, STAGE_GEO_2D)
-                                || hasNode(solnRoot, STAGE_AND_HASH)
+                                || hasAndHashStage
                                 || hasNode(solnRoot, STAGE_AND_SORTED)
                                 || hasNode(solnRoot, STAGE_FETCH);
 
@@ -499,6 +554,10 @@ namespace mongo {
         if (NULL != query.getProj()) {
             QLOG() << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
             QLOG() << "PROJECTION: Current plan is:\n" << solnRoot->toString() << endl;
+
+            ProjectionNode::ProjectionType projType = ProjectionNode::DEFAULT;
+            BSONObj coveredKeyObj;
+
             if (query.getProj()->requiresDocument()) {
                 QLOG() << "PROJECTION: claims to require doc adding fetch.\n";
                 // If the projection requires the entire document, somebody must fetch.
@@ -508,25 +567,66 @@ namespace mongo {
                     solnRoot = fetch;
                 }
             }
-            else {
+            else if (!query.getProj()->wantIndexKey()) {
+                // The only way we're here is if it's a simple projection.  That is, we can pick out
+                // the fields we want to include and they're not dotted.  So we want to execute the
+                // projection in the fast-path simple fashion.  Just don't know which fast path yet.
                 QLOG() << "PROJECTION: requires fields\n";
                 const vector<string>& fields = query.getProj()->getRequiredFields();
                 bool covered = true;
                 for (size_t i = 0; i < fields.size(); ++i) {
                     if (!solnRoot->hasField(fields[i])) {
-                        QLOG() << "PROJECTION: not covered cuz doesn't have field "
+                        QLOG() << "PROJECTION: not covered due to field "
                              << fields[i] << endl;
                         covered = false;
                         break;
                     }
                 }
+
                 QLOG() << "PROJECTION: is covered?: = " << covered << endl;
+
                 // If any field is missing from the list of fields the projection wants,
                 // a fetch is required.
                 if (!covered) {
                     FetchNode* fetch = new FetchNode();
                     fetch->children.push_back(solnRoot);
                     solnRoot = fetch;
+
+                    // It's simple but we'll have the full document and we should just iterate
+                    // over that.
+                    projType = ProjectionNode::SIMPLE_DOC;
+                    QLOG() << "PROJECTION: not covered, fetching.";
+                }
+                else {
+                    if (solnRoot->fetched()) {
+                        // Fetched implies hasObj() so let's run with that.
+                        projType = ProjectionNode::SIMPLE_DOC;
+                        QLOG() << "PROJECTION: covered via FETCH, using SIMPLE_DOC fast path";
+                    }
+                    else {
+                        // If we're here we're not fetched so we're covered.  Let's see if we can
+                        // get out of using the default projType.  If there's only one leaf
+                        // underneath and it's giving us index data we can use the faster covered
+                        // impl.
+                        vector<QuerySolutionNode*> leafNodes;
+                        getLeafNodes(solnRoot, &leafNodes);
+
+                        if (1 == leafNodes.size()) {
+                            // Both the IXSCAN and DISTINCT stages provide covered key data.
+                            if (STAGE_IXSCAN == leafNodes[0]->getType()) {
+                                projType = ProjectionNode::COVERED_ONE_INDEX;
+                                IndexScanNode* ixn = static_cast<IndexScanNode*>(leafNodes[0]);
+                                coveredKeyObj = ixn->indexKeyPattern;
+                                QLOG() << "PROJECTION: covered via IXSCAN, using COVERED fast path";
+                            }
+                            else if (STAGE_DISTINCT == leafNodes[0]->getType()) {
+                                projType = ProjectionNode::COVERED_ONE_INDEX;
+                                DistinctNode* dn = static_cast<DistinctNode*>(leafNodes[0]);
+                                coveredKeyObj = dn->indexKeyPattern;
+                                QLOG() << "PROJECTION: covered via DISTINCT, using COVERED fast path";
+                            }
+                        }
+                    }
                 }
             }
 
@@ -535,6 +635,8 @@ namespace mongo {
             projNode->children.push_back(solnRoot);
             projNode->fullExpression = query.root();
             projNode->projection = query.getParsed().getProj();
+            projNode->projType = projType;
+            projNode->coveredKeyObj = coveredKeyObj;
             solnRoot = projNode;
         }
         else {
@@ -558,7 +660,7 @@ namespace mongo {
         // Otherwise, we need to limit the results in the case of a hard limit
         // (ie. limit in raw query is negative)
         if (0 != query.getParsed().getNumToReturn() &&
-            !soln->hasSortStage &&
+            !hasSortStage &&
             !query.getParsed().wantMore()) {
 
             LimitNode* limit = new LimitNode();

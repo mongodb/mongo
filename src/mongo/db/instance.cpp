@@ -65,7 +65,8 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/count.h"
-#include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/delete_executor.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
@@ -80,6 +81,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
+#include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/gcov.h"
@@ -329,10 +331,11 @@ namespace mongo {
         return ok;
     }
 
+    // Mongod on win32 defines a value for this function. In all other executables it is NULL.
     void (*reportEventToSystem)(const char *msg) = 0;
 
-    void mongoAbort(const char *msg) { 
-        if( reportEventToSystem ) 
+    void mongoAbort(const char *msg) {
+        if( reportEventToSystem )
             reportEventToSystem(msg);
         severe() << msg;
         ::abort();
@@ -612,10 +615,6 @@ namespace mongo {
 
         Lock::DBWrite lk(ns.ns());
 
-        // void ReplSetImpl::relinquish() uses big write lock so this is thus
-        // synchronized given our lock above.
-        uassert( 17010 ,  "not master", isMasterNs( ns.ns().c_str() ) );
-
         // if this ever moves to outside of lock, need to adjust check
         // Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
@@ -651,18 +650,21 @@ namespace mongo {
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
+                DeleteRequest request(ns);
+                request.setQuery(pattern);
+                request.setMulti(!justOne);
+                request.setUpdateOpLog(true);
+                DeleteExecutor executor(&request);
+                uassertStatusOK(executor.prepare());
                 Lock::DBWrite lk(ns.ns());
-                
-                // writelock is used to synchronize stepdowns w/ writes
-                uassert( 10056 ,  "not master", isMasterNs( ns.ns().c_str() ) );
-                
+
                 // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
                 if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
                     return;
-                
+
                 Client::Context ctx(ns);
-                
-                long long n = deleteObjects(ns.ns(), pattern, justOne, true);
+
+                long long n = executor.execute();
                 lastError.getSafe()->recordDelete( n );
                 op.debug().ndeleted = n;
                 break;
@@ -818,6 +820,7 @@ namespace mongo {
             // operation might not support interrupts.
             bool mayInterrupt = cc().curop()->parent() == NULL;
 
+            cc().curop()->setQuery(js);
             Status status = collection->getIndexCatalog()->createIndex( js, mayInterrupt );
 
             if ( status.code() == ErrorCodes::IndexAlreadyExists )
@@ -1037,27 +1040,19 @@ namespace {
         return new DBDirectClient();
     }
 
+    MONGO_INITIALIZER(CreateJSDirectClient)
+        (InitializerContext* context) {
+
+        directDBClient = createDirectClient();
+
+        return Status::OK();
+    }
+
     mongo::mutex exitMutex("exit");
     AtomicUInt numExitCalls = 0;
 
     bool inShutdown() {
         return numExitCalls > 0;
-    }
-
-    void tryToOutputFatal( const string& s ) {
-        try {
-            rawOut( s );
-            return;
-        }
-        catch ( ... ) {}
-
-        try {
-            cerr << s << endl;
-            return;
-        }
-        catch ( ... ) {}
-
-        // uh - oh, not sure there is anything else we can do...
     }
 
     static void shutdownServer() {
@@ -1156,25 +1151,19 @@ namespace {
                     // this means something horrible has happened
                     ::_exit( rc );
                 }
-                stringstream ss;
-                ss << "dbexit: " << why << "; exiting immediately";
-                tryToOutputFatal( ss.str() );
+                log() << "dbexit: " << why << "; exiting immediately";
                 if ( c ) c->shutdown();
                 ::_exit( rc );
             }
         }
 
-        {
-            stringstream ss;
-            ss << "dbexit: " << why;
-            tryToOutputFatal( ss.str() );
-        }
+        log() << "dbexit: " << why;
 
         try {
             shutdownServer(); // gracefully shutdown instance
         }
         catch ( ... ) {
-            tryToOutputFatal( "shutdown failed with exception" );
+            severe() << "shutdown failed with exception";
         }
 
 #if defined(_DEBUG)
@@ -1197,7 +1186,7 @@ namespace {
             return;
         }
 #endif
-        tryToOutputFatal( "dbexit: really exiting now\n" );
+        log() << "dbexit: really exiting now";
         if ( c ) c->shutdown();
         ::_exit(rc);
     }

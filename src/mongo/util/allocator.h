@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "mongo/util/signal_handlers.h"
+#include <stdlib.h>
 
 // we need the "real" malloc here
 #include "mongo/client/undef_macros.h"
@@ -26,13 +26,13 @@ namespace mongo {
 
     inline void * ourmalloc(size_t size) {
         void *x = malloc(size);
-        if ( x == 0 ) printStackAndExit(0);
+        if ( x == 0 ) abort();
         return x;
     }
 
     inline void * ourrealloc(void *ptr, size_t size) {
         void *x = realloc(ptr, size);
-        if ( x == 0 ) printStackAndExit(0);
+        if ( x == 0 ) abort();
         return x;
     }
 

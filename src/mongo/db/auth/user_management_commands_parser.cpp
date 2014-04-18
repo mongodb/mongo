@@ -643,6 +643,52 @@ namespace auth {
         return Status::OK();
     }
 
+    Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
+                                             MergeAuthzCollectionsArgs* parsedArgs) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("_mergeAuthzCollections");
+        validFieldNames.insert("tempUsersCollection");
+        validFieldNames.insert("tempRolesCollection");
+        validFieldNames.insert("drop");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "_mergeAuthzCollections", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractStringFieldWithDefault(cmdObj,
+                                                   "tempUsersCollection",
+                                                   "",
+                                                   &parsedArgs->usersCollName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractStringFieldWithDefault(cmdObj,
+                                                   "tempRolesCollection",
+                                                   "",
+                                                   &parsedArgs->rolesCollName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = bsonExtractBooleanFieldWithDefault(cmdObj,
+                                                   "drop",
+                                                   false,
+                                                   &parsedArgs->drop);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
+
     Status parseAuthSchemaUpgradeStepCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
                                              int* maxSteps,

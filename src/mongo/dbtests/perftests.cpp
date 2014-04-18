@@ -225,9 +225,9 @@ namespace PerfTests {
     public:
         virtual unsigned batchSize() { return 50; }
 
-        void say(unsigned long long n, int ms, string s) {
-            unsigned long long rps = n*1000/ms;
-            cout << "stats " << setw(42) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << ms << "ms ";
+        void say(unsigned long long n, int us, string s) {
+            unsigned long long rps = (n*1000*1000)/(us > 0 ? us : 1);
+            cout << "stats " << setw(42) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << us/1000 << "ms ";
             if( showDurStats() )
                 cout << dur::stats.curr->_asCSV();
             cout << endl;
@@ -277,7 +277,7 @@ namespace PerfTests {
                     b.appendTimeT("when", time(0));
                     b.append("test", s);
                     b.append("rps", (int) rps);
-                    b.append("millis", ms);
+                    b.append("millis", us/1000);
                     b.appendBool("dur", storageGlobalParams.dur);
                     if (showDurStats() && storageGlobalParams.dur)
                         b.append("durStats", dur::stats.curr->_asObj());
@@ -349,9 +349,8 @@ namespace PerfTests {
             }
 
             client().getLastError(); // block until all ops are finished
-            int ms = t.millis();
 
-            say(n, ms, name());
+            say(n, t.micros(), name());
 
             post();
 
@@ -369,8 +368,7 @@ namespace PerfTests {
                         if( t.millis() > hlm )
                             break;
                     }
-                    int ms = t.millis();
-                    say(n, ms, test2name);
+                    say(n, t.micros(), test2name);
                 }
             }
 
@@ -379,8 +377,7 @@ namespace PerfTests {
                 //cout << "testThreaded nThreads:" << nThreads << endl;
                 mongo::Timer t;
                 const unsigned long long result = launchThreads(nThreads);
-                const int ms = t.millis();
-                say(result/nThreads, ms, test2name+"-threaded");
+                say(result/nThreads, t.micros(), test2name+"-threaded");
             }
         }
 

@@ -110,9 +110,6 @@ namespace mongo {
         bool _hitEnd;
 
         bool _shouldDedup;
-
-        // Stats
-        CommonStats _commonStats;
     };
 
 }  // namespace mongo

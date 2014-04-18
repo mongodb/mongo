@@ -94,7 +94,6 @@ namespace mongo {
 
         friend class twod_internal::TwoDGeoNearRunner;
 
-        BtreeInterface* getInterface() { return _interface; }
         const IndexDescriptor* getDescriptor() { return _descriptor; }
         TwoDIndexingParams& getParams() { return _params; }
 
@@ -103,11 +102,6 @@ namespace mongo {
 
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        // This is called by the two getKeys above.
-        void getKeys(const BSONObj &obj, BSONObjSet* keys, vector<BSONObj>* locs) const;
-
-        BSONObj _nullObj;
-        BSONElement _nullElt;
         TwoDIndexingParams _params;
     };
 

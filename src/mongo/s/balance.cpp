@@ -210,6 +210,13 @@ namespace mongo {
         //
 
         auto_ptr<DBClientCursor> cursor = conn.query(CollectionType::ConfigNS, BSONObj());
+
+        if ( NULL == cursor.get() ) {
+            warning() << "could not query " << CollectionType::ConfigNS
+                      << " while trying to balance" << endl;
+            return;
+        }
+
         vector< string > collections;
         while ( cursor->more() ) {
             BSONObj col = cursor->nextSafe();
@@ -484,6 +491,7 @@ namespace mongo {
                         conn.done();
                         warning() << "Skipping balancing round because data inconsistency"
                                   << " was detected amongst the config servers." << endl;
+                        sleepsecs( sleepTime );
                         continue;
                     }
 

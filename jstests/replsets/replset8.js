@@ -17,28 +17,31 @@ var mdc = md[ 'c' ];
 //       documents to be increasing size.
 //       this should result in the updates moving the docs backwards.
 
-var doccount = 10000;
+var doccount = 5000;
 // Avoid empty extent issues
 mdc.insert( { _id:-1, x:"dummy" } );
 
 print ("inserting bigstrings");
+var bulk = mdc.initializeUnorderedBulkOp();
 for( i = 0; i < doccount; ++i ) {
-    mdc.insert( { _id:i, x:bigstring } );
+    bulk.insert( { _id:i, x:bigstring } );
     bigstring += "a";
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
 
 print ("inserting x");
+bulk = mdc.initializeUnorderedBulkOp();
 for( i = doccount; i < doccount*2; ++i ) {
-    mdc.insert( { _id:i, x:i } );
+    bulk.insert( { _id:i, x:i } );
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
 
 print ("deleting bigstrings");
+bulk = mdc.initializeUnorderedBulkOp();
 for( i = 0; i < doccount; ++i ) {
-    mdc.remove( { _id:i } );
+    bulk.find({ _id: i }).remove();
 }
-md.getLastError();
+assert.writeOK(bulk.execute());
 
 // add a secondary
 var slave = rt.add();
@@ -50,9 +53,9 @@ sleep(25000);
 print ("updating documents backwards");
 // Move all documents to the beginning by growing them to sizes that should
 // fit the holes we made in phase 1
+bulk = mdc.initializeUnorderedBulkOp();
 for (i = doccount*2; i > doccount; --i) {
     mdc.update( { _id:i, x:i }, { _id:i, x:bigstring } );
-    md.getLastError();
     bigstring = bigstring.slice(0, -1); // remove last char
 }
 print ("finished");

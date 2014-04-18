@@ -143,7 +143,7 @@ namespace mongo {
         // and roles if --dumpDbUsersAndRoles provided or you're dumping the admin db.
         mongoDumpGlobalParams.dumpUsersAndRoles = hasParam("dumpDbUsersAndRoles") ||
                 (toolGlobalParams.db.empty() && toolGlobalParams.coll.empty()) ||
-                (toolGlobalParams.db == "admin" && toolGlobalParams.coll.empty());
+                toolGlobalParams.db == "admin";
 
         if (mongoDumpGlobalParams.outputDirectory == "-") {
             // write output to standard error to avoid mangling output

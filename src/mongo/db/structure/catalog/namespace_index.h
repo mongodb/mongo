@@ -53,7 +53,7 @@ namespace mongo {
         bool exists() const;
 
         void init() {
-            if( !_ht )
+            if ( !_ht.get() )
                 _init();
         }
 
@@ -66,7 +66,7 @@ namespace mongo {
 
         void kill_ns(const StringData& ns);
 
-        bool allocated() const { return _ht != 0; }
+        bool allocated() const { return _ht.get() != 0; }
 
         void getNamespaces( std::list<std::string>& tofill , bool onlyCollections = true ) const;
 
@@ -79,7 +79,7 @@ namespace mongo {
         void maybeMkdir() const;
 
         DurableMappedFile _f;
-        HashTable<Namespace,NamespaceDetails> *_ht;
+        auto_ptr<HashTable<Namespace,NamespaceDetails> > _ht;
         std::string _dir;
         std::string _database;
     };

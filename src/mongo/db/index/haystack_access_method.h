@@ -66,11 +66,6 @@ namespace mongo {
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        // Helper methods called by getKeys:
-        int hash(const BSONElement& e) const;
-        string makeString(int hashedX, int hashedY) const;
-        void addKey(const string& root, const BSONElement& e, BSONObjSet* keys) const;
-
         string _geoField;
         vector<string> _otherFields;
         double _bucketSize;

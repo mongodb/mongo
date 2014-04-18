@@ -21,6 +21,7 @@
 
 #include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace mutablebson {
@@ -262,5 +263,27 @@ namespace mutablebson {
         return element.countChildren();
     }
 
+    /** Return the full (path) name of this element separating each name with the delim string. */
+    template<typename ElementType>
+    std::string getFullName(ElementType element, char delim = '.') {
+        std::vector<StringData> names;
+        ElementType curr = element;
+        while(curr.ok() && curr.parent().ok()) {
+            names.push_back(curr.getFieldName());
+            curr = curr.parent();
+        }
+
+        mongoutils::str::stream name;
+        bool first = true;
+        for(std::vector<StringData>::reverse_iterator it = names.rbegin();
+                                                      it != names.rend();
+                                                      ++it) {
+            if (!first)
+                name << delim;
+            name << *it;
+            first = false;
+        }
+        return name;
+    }
 } // namespace mutablebson
 } // namespace mongo

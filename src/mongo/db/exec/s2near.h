@@ -44,7 +44,8 @@
 namespace mongo {
 
     struct S2NearParams {
-        string ns;
+        S2NearParams() : collection(NULL) { }
+        Collection* collection;
         BSONObj indexKeyPattern;
         NearQuery nearQuery;
         IndexBounds baseBounds;
@@ -91,6 +92,9 @@ namespace mongo {
         // bounds for the various annuluses/annuli.
         int _nearFieldIndex;
 
+        // Geo filter in index scan (which is owned by fetch stage in _child).
+        scoped_ptr<MatchExpression> _keyGeoFilter;
+
         scoped_ptr<PlanStage> _child;
 
         // The S2 machinery that represents the search annulus.  We keep this around after bounds
@@ -112,6 +116,10 @@ namespace mongo {
             WorkingSetID id;
             double distance;
         };
+
+        // Our index scans aren't deduped so we might see the same doc twice in a given
+        // annulus.
+        unordered_set<DiskLoc, DiskLoc::Hasher> _seenInScan;
 
         // We compute an annulus of results and cache it here.
         priority_queue<Result> _results;

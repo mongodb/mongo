@@ -35,6 +35,7 @@
 #include <iostream>
 
 #include "mongo/base/initializer.h"
+#include "mongo/base/init.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -65,10 +66,14 @@ namespace mongo {
             delete _conn;
     }
 
+    MONGO_INITIALIZER(ToolAuthExternalState)(InitializerContext*) {
+        setGlobalAuthorizationManager(new AuthorizationManager(
+                new AuthzManagerExternalStateMock()));
+        return Status::OK();
+    }
+
     int Tool::main( int argc , char ** argv, char ** envp ) {
         static StaticObserver staticObserver;
-
-        setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
 
         mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
@@ -245,11 +250,23 @@ namespace mongo {
             return;
         }
 
-        _conn->auth(BSON(saslCommandUserDBFieldName << getAuthenticationDatabase() <<
-                         saslCommandUserFieldName << toolGlobalParams.username <<
-                         saslCommandPasswordFieldName << toolGlobalParams.password  <<
-                         saslCommandMechanismFieldName <<
-                         toolGlobalParams.authenticationMechanism));
+        BSONObjBuilder authParams;
+        authParams <<
+            saslCommandUserDBFieldName << getAuthenticationDatabase() <<
+            saslCommandUserFieldName << toolGlobalParams.username <<
+            saslCommandPasswordFieldName << toolGlobalParams.password  <<
+            saslCommandMechanismFieldName <<
+            toolGlobalParams.authenticationMechanism;
+
+        if (!toolGlobalParams.gssapiServiceName.empty()) {
+            authParams << saslCommandServiceNameFieldName << toolGlobalParams.gssapiServiceName;
+        }
+
+        if (!toolGlobalParams.gssapiHostName.empty()) {
+            authParams << saslCommandServiceHostnameFieldName << toolGlobalParams.gssapiHostName;
+        }
+
+        _conn->auth(authParams.obj());
     }
 
     BSONTool::BSONTool() : Tool() { }

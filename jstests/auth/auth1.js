@@ -64,9 +64,8 @@ assert.eq( 1000, tRO.count() , "B1" );
 assert.eq( 1000, tRO.find().toArray().length , "B2" ); // make sure we have a getMore in play
 assert.commandWorked( dbRO.runCommand( {ismaster:1} ) , "B3" );
 
-assert( !dbRO.getLastError() , "B4" );
-tRO.save( {} ); // fail
-assert( dbRO.getLastError() , "B5: " + tojson( dbRO.getLastErrorObj() ) );
+assert.writeError(tRO.save({}));
+
 assert.eq( 1000, tRO.count() , "B6" );
 
 assert.eq( 1000, tRO.group( p ).length , "C1" );

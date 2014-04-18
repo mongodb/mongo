@@ -631,6 +631,12 @@ namespace mongo {
          */
         vector<DBClientCursor*> getCursors();
 
+        /**
+         * Returns the next object from the cursor, throwing an appropriate exception if the cursor
+         * reported an error. This is a better form of DBClientCursor::nextSafe.
+         */
+        static Document nextSafeFrom(DBClientCursor* cursor);
+
     private:
 
         struct CursorAndConnection {

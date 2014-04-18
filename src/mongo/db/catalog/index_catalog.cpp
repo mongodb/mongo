@@ -34,13 +34,13 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/index_legacy.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/btree_based_access_method.h"
@@ -50,16 +50,18 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/data_file.h"
-#include "mongo/db/structure/catalog/namespace_details-inl.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -91,7 +93,7 @@ namespace mongo {
 
         NamespaceDetails::IndexIterator ii = _details->ii(true);
         while ( ii.more() ) {
-            IndexDetails& id = ii.next();
+            const IndexDetails& id = ii.next();
             int idxNo = ii.pos() - 1;
 
             if ( idxNo >= _details->getCompletedIndexCount() ) {
@@ -99,8 +101,11 @@ namespace mongo {
                 continue;
             }
 
+            BSONObj ownedInfoObj = id.info.obj().getOwned();
+            BSONObj keyPattern = ownedInfoObj.getObjectField("key");
             IndexDescriptor* descriptor = new IndexDescriptor( _collection,
-                                                               id.info.obj().getOwned() );
+                                                               _getAccessMethodName(keyPattern),
+                                                               ownedInfoObj );
             IndexCatalogEntry* entry = _setupInMemoryStructures( descriptor );
 
             fassert( 17340, entry->isReady()  );
@@ -144,6 +149,24 @@ namespace mongo {
 
         invariant( save == _entries.find( descriptor ) );
         invariant( save == _entries.find( descriptor->indexName() ) );
+
+        // check index to see if wants us to do special things
+
+        { // power of 2
+            bool requirePowerOf2 = false;
+            if ( IndexNames::findPluginName( descriptor->keyPattern() ) == IndexNames::TEXT )
+                requirePowerOf2 = true;
+
+            if ( descriptor->getInfoElement("expireAfterSeconds").isNumber() )
+                requirePowerOf2 = true;
+
+            if ( requirePowerOf2 ) {
+                if ( _details->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes) ) {
+                    _details->syncUserFlags( _collection->ns().ns() );
+                }
+            }
+        }
+
         return save;
     }
 
@@ -217,6 +240,12 @@ namespace mongo {
     // ---------------------------
 
     Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName ) {
+
+        // first check if requested index requires pdfile minor version to be bumped
+        if ( IndexNames::existedBefore24(newPluginName) ) {
+            return Status::OK();
+        }
+
         Database* db = _collection->_database;
 
         DataFileHeader* dfh = db->getExtentManager().getFile(0)->getHeader();
@@ -226,7 +255,8 @@ namespace mongo {
 
         fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
 
-        auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName ) );
+        auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName,
+                                                                  db->getCollection( db->_indexesName ) ) );
 
         BSONObj index;
         Runner::RunnerState state;
@@ -254,6 +284,25 @@ namespace mongo {
         return Status::OK();
     }
 
+    StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate( const BSONObj& original ) const {
+        Status status = _isSpecOk( original );
+        if ( !status.isOK() )
+            return StatusWith<BSONObj>( status );
+
+        BSONObj fixed = _fixIndexSpec( original );
+
+        // we double check with new index spec
+        status = _isSpecOk( fixed );
+        if ( !status.isOK() )
+            return StatusWith<BSONObj>( status );
+
+        status = _doesSpecConflictWithExisting( fixed );
+        if ( !status.isOK() )
+            return StatusWith<BSONObj>( status );
+
+        return StatusWith<BSONObj>( fixed );
+    }
+
     Status IndexCatalog::createIndex( BSONObj spec,
                                       bool mayInterrupt,
                                       ShutdownBehavior shutdownBehavior ) {
@@ -263,16 +312,11 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        status = okToAddIndex( spec );
+        StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate( spec );
+        status = statusWithSpec.getStatus();
         if ( !status.isOK() )
             return status;
-
-        spec = fixIndexSpec( spec );
-
-        // we double check with new index spec
-        status = okToAddIndex( spec );
-        if ( !status.isOK() )
-            return status;
+        spec = statusWithSpec.getValue();
 
         string pluginName = IndexNames::findPluginName( spec["key"].Obj() );
         if ( pluginName.size() ) {
@@ -299,15 +343,19 @@ namespace mongo {
         invariant( _details->_catalogFindIndexByName( idxName, true ) >= 0 );
 
         try {
-            // Set curop description before setting indexBuildInProg, so that there's something
-            // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
-            // killable index, so we don't overwrite commands in currentOp.
-            if ( mayInterrupt ) {
-                cc().curop()->setQuery( spec );
-            }
+            Client& client = cc();
 
+            _inProgressIndexes[descriptor] = &client;
+
+            // buildAnIndex can yield.  During a yield, the Collection that owns this
+            // IndexCatalog can be dropped, which means both the Collection and IndexCatalog
+            // can be destructed out from under us.  The runner used by the index build will
+            // throw a particular exception when it detects that this occurred.
             buildAnIndex( _collection, entry, mayInterrupt );
             indexBuildBlock.success();
+
+            InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
+            _inProgressIndexes.erase(it);
 
             // sanity check
             int idxNo = _details->_catalogFindIndexByName( idxName, true );
@@ -316,16 +364,25 @@ namespace mongo {
             return Status::OK();
         }
         catch ( const AssertionException& exc ) {
-            log() << "index build failed."
-                  << " spec: " << spec
-                  << " error: " << exc;
+            // At this point, *this may have been destructed, if we dropped the collection
+            // while we were yielding.  indexBuildBlock will not touch an invalid _collection
+            // pointer if you call abort() on it.
+
+            log() << "index build failed." << " spec: " << spec << " error: " << exc;
 
             if ( shutdownBehavior == SHUTDOWN_LEAVE_DIRTY &&
-                 exc.getCode() == InterruptedAtShutdown ) {
+                 exc.getCode() == ErrorCodes::InterruptedAtShutdown ) {
+                indexBuildBlock.abort();
+            }
+            else if ( exc.getCode() == ErrorCodes::CursorNotFound ) {
+                // The cursor was killed because the collection was dropped. No need to clean up.
                 indexBuildBlock.abort();
             }
             else {
                 indexBuildBlock.fail();
+
+                InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
+                _inProgressIndexes.erase(it);            
             }
 
             ErrorCodes::Error codeToUse = ErrorCodes::fromInt( exc.getCode() );
@@ -352,7 +409,10 @@ namespace mongo {
         invariant( _inProgress == false );
 
         // need this first for names, etc...
-        IndexDescriptor* descriptor = new IndexDescriptor( _collection, _spec );
+        BSONObj keyPattern = _spec.getObjectField("key");
+        IndexDescriptor* descriptor = new IndexDescriptor( _collection, 
+                                                           IndexNames::findPluginName(keyPattern),
+                                                           _spec );
         auto_ptr<IndexDescriptor> descriptorCleaner( descriptor );
 
         _indexName = descriptor->indexName();
@@ -372,7 +432,7 @@ namespace mongo {
             return systemIndexesEntry.getStatus();
 
         // 2) collection's NamespaceDetails
-        IndexDetails& indexDetails = _collection->details()->getNextIndexDetails( _ns.c_str() );
+        IndexDetails& indexDetails = _collection->detailsWritable()->getNextIndexDetails( _collection );
 
         try {
             getDur().writingDiskLoc( indexDetails.info ) = systemIndexesEntry.getValue();
@@ -386,7 +446,7 @@ namespace mongo {
 
         int before = _collection->details()->_indexBuildsInProgress;
         try {
-            getDur().writingInt( _collection->details()->_indexBuildsInProgress ) += 1;
+            getDur().writingInt( _collection->detailsWritable()->_indexBuildsInProgress ) += 1;
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
@@ -436,6 +496,9 @@ namespace mongo {
             return;
         }
 
+        Client::Context context( _collection->ns().ns(),
+                                 _collection->_database );
+
         // if we're here, the index build failed or was interrupted
 
         _inProgress = false; // defensive
@@ -469,7 +532,7 @@ namespace mongo {
 
         fassert( 17207, _catalog->_collection->ok() );
 
-        NamespaceDetails* nsd = _collection->details();
+        NamespaceDetails* nsd = _collection->detailsWritable();
 
         int idxNo = nsd->_catalogFindIndexByName( _indexName, true );
         fassert( 17202, idxNo >= 0 );
@@ -498,13 +561,10 @@ namespace mongo {
 
         entry->setIsReady( true );
 
-        IndexLegacy::postBuildHook( _catalog->_collection,
-                                    _catalog->findIndexByName( _indexName )->keyPattern() );
     }
 
 
-
-    Status IndexCatalog::okToAddIndex( const BSONObj& spec ) const {
+    Status IndexCatalog::_isSpecOk( const BSONObj& spec ) const {
 
         const NamespaceString& nss = _collection->ns();
 
@@ -527,7 +587,7 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex,
                            "the index spec needs a 'ns' field'" );
 
-        if ( _collection->ns() != specNamespace )
+        if ( nss.ns() != specNamespace )
             return Status( ErrorCodes::CannotCreateIndex,
                            "the index spec ns does not match" );
 
@@ -536,7 +596,7 @@ namespace mongo {
         if ( !name[0] )
             return Status( ErrorCodes::CannotCreateIndex, "no index name specified" );
 
-        string indexNamespace = IndexDetails::indexNamespaceFromObj(spec);
+        string indexNamespace = IndexDescriptor::makeIndexNamespace( specNamespace, name );
         if ( indexNamespace.length() > Namespace::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
                            str::stream() << "namespace name generated from index name \"" <<
@@ -557,7 +617,7 @@ namespace mongo {
                                          << "not allow document removal." );
         }
 
-        if ( !IndexDetails::isIdIndexPattern( key ) ) {
+        if ( !IndexDescriptor::isIdIndexPattern( key ) ) {
             // for non _id indexes, we check to see if replication has turned off all indexes
             // we _always_ created _id index
             if( theReplSet && !theReplSet->buildIndexes() ) {
@@ -566,24 +626,33 @@ namespace mongo {
             }
         }
 
+        return Status::OK();
+    }
+
+    Status IndexCatalog::_doesSpecConflictWithExisting( const BSONObj& spec ) const {
+        const char *name = spec.getStringField("name");
+        invariant( name[0] );
+
+        const BSONObj key = spec.getObjectField("key");
 
         {
             // Check both existing and in-progress indexes (2nd param = true)
-            const int idx = _details->_catalogFindIndexByName(name, true);
-            if (idx >= 0) {
-                // index already exists.
-                const IndexDetails& indexSpec( _details->idx(idx) );
-                BSONObj existingKeyPattern(indexSpec.keyPattern());
+            const IndexDescriptor* desc = findIndexByName( name, true );
+            if ( desc ) {
+                // index already exists with same name
 
-                if ( !existingKeyPattern.equal( key ) )
-                    return Status( ErrorCodes::CannotCreateIndex,
+                if ( !desc->keyPattern().equal( key ) )
+                    return Status( ErrorCodes::IndexKeySpecsConflict,
                                    str::stream() << "Trying to create an index "
                                    << "with same name " << name
                                    << " with different key spec " << key
-                                   << " vs existing spec " << existingKeyPattern );
+                                   << " vs existing spec " << desc->keyPattern() );
 
-                if ( !indexSpec.areIndexOptionsEquivalent( spec ) )
-                    return Status( ErrorCodes::CannotCreateIndex,
+                IndexDescriptor temp( _collection,
+                                      _getAccessMethodName( key ),
+                                      spec );
+                if ( !desc->areIndexOptionsEquivalent( &temp ) )
+                    return Status( ErrorCodes::IndexOptionsConflict,
                                    str::stream() << "Index with name: " << name
                                    << " already exists with different options" );
 
@@ -600,8 +669,11 @@ namespace mongo {
                 LOG(2) << "index already exists with diff name " << name
                         << ' ' << key << endl;
 
-                if ( !_getIndexDetails(desc)->areIndexOptionsEquivalent( spec ) )
-                    return Status( ErrorCodes::CannotCreateIndex,
+                IndexDescriptor temp( _collection,
+                                      _getAccessMethodName( key ),
+                                      spec );
+                if ( !desc->areIndexOptionsEquivalent( &temp ) )
+                    return Status( ErrorCodes::IndexOptionsConflict,
                                    str::stream() << "Index with pattern: " << key
                                    << " already exists with different options" );
 
@@ -627,7 +699,7 @@ namespace mongo {
                 return Status( ErrorCodes::CannotCreateIndex,
                                str::stream() << "only one text index per collection allowed, "
                                << "found existing text index \"" << textIndexes[0]->indexName()
-                               << "\"");
+                               << "\"" );
             }
         }
         return Status::OK();
@@ -721,7 +793,7 @@ namespace mongo {
         }
         else {
             if ( numIndexesTotal() || numSystemIndexesEntries || _entries.size() ) {
-                error() << "about to fassert - "
+                error() << "About to fassert - "
                         << " numIndexesTotal(): " << numIndexesTotal()
                         << " numSystemIndexesEntries: " << numSystemIndexesEntries
                         << " _entries.size(): " << _entries.size()
@@ -855,7 +927,8 @@ namespace mongo {
         for ( size_t i = 0; i < toReturn.size(); i++ ) {
             BSONObj spec = toReturn[i];
 
-            IndexDescriptor desc( _collection, spec );
+            BSONObj keyPattern = spec.getObjectField("key");
+            IndexDescriptor desc( _collection, _getAccessMethodName(keyPattern), spec );
 
             int idxNo = _details->_catalogFindIndexByName( desc.indexName(), true );
             invariant( idxNo >= 0 );
@@ -1036,14 +1109,18 @@ namespace mongo {
     }
 
     const IndexAccessMethod* IndexCatalog::getIndex( const IndexDescriptor* desc ) const {
+        return getEntry( desc )->accessMethod();
+    }
+
+    const IndexCatalogEntry* IndexCatalog::getEntry( const IndexDescriptor* desc ) const {
         const IndexCatalogEntry* entry = _entries.find( desc );
         massert( 17357, "cannot find index entry", entry );
-        return entry->accessMethod();
+        return entry;
     }
 
     IndexAccessMethod* IndexCatalog::_createAccessMethod( const IndexDescriptor* desc,
                                                           IndexCatalogEntry* entry ) {
-        string type = _getAccessMethodName(desc->keyPattern());
+        const string& type = desc->getAccessMethodName();
 
         if (IndexNames::HASHED == type)
             return new HashAccessMethod( entry );
@@ -1063,7 +1140,7 @@ namespace mongo {
         if (IndexNames::GEO_2D == type)
             return new TwoDAccessMethod( entry );
 
-        log() << "Can't find index for keypattern " << desc->keyPattern();
+        log() << "Can't find index for keyPattern " << desc->keyPattern();
         invariant(0);
         return NULL;
     }
@@ -1190,77 +1267,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::validateKeyPattern( const BSONObj& key ) {
-        const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
-
-        if ( key.objsize() > 2048 )
-            return Status(code, "Index key pattern too large.");
-
-        if ( key.isEmpty() )
-            return Status(code, "Index keys cannot be empty.");
-
-        // Ensures that the fields on which we are building the index are valid: a field must not
-        // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
-        // contain an empty field. If a field cannot be created or updated, it should not be
-        // indexable.
-        BSONObjIterator it( key );
-        while ( it.more() ) {
-            BSONElement keyElement = it.next();
-
-            if( keyElement.type() == Object || keyElement.type() == Array )
-                return Status(code, "Index keys cannot be Objects or Arrays.");
-
-            FieldRef keyField( keyElement.fieldName() );
-
-            const size_t numParts = keyField.numParts();
-            if ( numParts == 0 ) {
-                return Status(code, "Index keys cannot be an empty field.");
-            }
-
-            // "$**" is acceptable for a text index.
-            if ( str::equals( keyElement.fieldName(), "$**" ) &&
-                 keyElement.valuestrsafe() == IndexNames::TEXT )
-                continue;
-
-
-            for ( size_t i = 0; i != numParts; ++i ) {
-                const StringData part = keyField.getPart(i);
-
-                // Check if the index key path contains an empty field.
-                if ( part.empty() ) {
-                    return Status(code, "Index keys cannot contain an empty field.");
-                }
-
-                if ( part[0] != '$' )
-                    continue;
-
-                // Check if the '$'-prefixed field is part of a DBRef: since we don't have the
-                // necessary context to validate whether this is a proper DBRef, we allow index
-                // creation on '$'-prefixed names that match those used in a DBRef.
-                const bool mightBePartOfDbRef = (i != 0) &&
-                                                (part == "$db" ||
-                                                 part == "$id" ||
-                                                 part == "$ref");
-
-                if ( !mightBePartOfDbRef ) {
-                    return Status(code, "Index key contains an illegal field name: "
-                                        "field name starts with '$'.");
-                }
-            }
-        }
-
-        string pluginName = IndexNames::findPluginName( key );
-        if ( pluginName.size() ) {
-            if ( !IndexNames::isKnownName( pluginName ) )
-                return Status(code,
-                              str::stream() << "Unknown index plugin '" << pluginName << '\'');
-        }
-
-        return Status::OK();
-    }
-
     BSONObj IndexCatalog::fixIndexKey( const BSONObj& key ) {
-        if ( IndexDetails::isIdIndexPattern( key ) ) {
+        if ( IndexDescriptor::isIdIndexPattern( key ) ) {
             return _idObj;
         }
         if ( key["_id"].type() == Bool && key.nFields() == 1 ) {
@@ -1269,8 +1277,7 @@ namespace mongo {
         return key;
     }
 
-
-    BSONObj IndexCatalog::fixIndexSpec( const BSONObj& spec ) {
+    BSONObj IndexCatalog::_fixIndexSpec( const BSONObj& spec ) {
         BSONObj o = IndexLegacy::adjustIndexSpecObject( spec );
 
         BSONObjBuilder b;
@@ -1294,7 +1301,7 @@ namespace mongo {
         b.append( "key", key );
 
         string name = o["name"].String();
-        if ( IndexDetails::isIdIndexPattern( key ) ) {
+        if ( IndexDescriptor::isIdIndexPattern( key ) ) {
             name = "_id_";
         }
         b.append( "name", name );
@@ -1322,5 +1329,42 @@ namespace mongo {
         }
 
         return b.obj();
+    }
+
+    std::vector<BSONObj> 
+    IndexCatalog::killMatchingIndexBuilds(const IndexCatalog::IndexKillCriteria& criteria) {
+        verify(Lock::somethingWriteLocked());
+        std::vector<BSONObj> indexes;
+        for (InProgressIndexesMap::iterator it = _inProgressIndexes.begin();
+             it != _inProgressIndexes.end();
+             it++) {
+            // check criteria
+            IndexDescriptor* desc = it->first;
+            Client* client = it->second;
+            if (!criteria.ns.empty() && (desc->parentNS() != criteria.ns)) {
+                continue;
+            }
+            if (!criteria.name.empty() && (desc->indexName() != criteria.name)) {
+                continue;
+            }
+            if (!criteria.key.isEmpty() && (desc->keyPattern() != criteria.key)) {
+                continue;
+            }
+            indexes.push_back(desc->keyPattern());
+            CurOp* op = client->curop();
+            log() << "halting index build: " << desc->keyPattern();
+            // Note that we can only be here if the background index build in question is
+            // yielding.  The bg index code is set up specially to check for interrupt
+            // immediately after it recovers from yield, such that no further work is done
+            // on the index build.  Thus this thread does not have to synchronize with the
+            // bg index operation; we can just assume that it is safe to proceed.
+            killCurrentOp.kill(op->opNum());
+        }
+
+        if (indexes.size() > 0) {
+            log() << "halted " << indexes.size() << " index build(s)" << endl;
+        }
+
+        return indexes;
     }
 }

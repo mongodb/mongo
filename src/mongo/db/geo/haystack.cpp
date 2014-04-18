@@ -38,7 +38,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details-inl.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
@@ -57,7 +56,7 @@ namespace mongo {
     public:
         GeoHaystackSearchCommand() : Command("geoSearch") {}
 
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
 
@@ -71,9 +70,10 @@ namespace mongo {
 
         bool run(const string& dbname, BSONObj& cmdObj, int,
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string ns = dbname + "." + cmdObj.firstElement().valuestr();
+            const string ns = dbname + "." + cmdObj.firstElement().valuestr();
+            Client::ReadContext ctx(ns);
 
-            Database* db = cc().database();
+            Database* db = ctx.ctx().db();
             if ( !db ) {
                 errmsg = "can't find ns";
                 return false;

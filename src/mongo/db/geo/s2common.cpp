@@ -43,36 +43,6 @@ namespace mongo {
         return ss.str();
     }
 
-    static void keysFromRegion(S2RegionCoverer *coverer, const S2Region &region,
-                               vector<string> *out) {
-        vector<S2CellId> covering;
-        coverer->GetCovering(region, &covering);
-        for (size_t i = 0; i < covering.size(); ++i) {
-            out->push_back(covering[i].toString());
-        }
-    }
-
-    bool S2SearchUtil::getKeysForObject(const BSONObj& obj, const S2IndexingParams& params,
-                                        vector<string>* out) {
-        S2RegionCoverer coverer;
-        params.configureCoverer(&coverer);
-
-        GeometryContainer geoContainer;
-        if (!geoContainer.parseFrom(obj)) { return false; }
-
-        // Only certain geometries can be indexed in the old index format S2_INDEX_VERSION_1.  See
-        // definition of S2IndexVersion for details.
-        if (params.indexVersion == S2_INDEX_VERSION_1 && !geoContainer.isSimpleContainer()) {
-            return false;
-        }
-
-        if (!geoContainer.hasS2Region()) { return false; }
-
-        keysFromRegion(&coverer, geoContainer.getRegion(), out);
-
-        return true;
-    }
-
     double dist(const S2Point& a, const S2Point& b) {
         S1Angle angle(a, b);
         return angle.radians();

@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <boost/cstdint.hpp>
 #include <string>
 
 #include "mongo/platform/basic.h"
@@ -44,7 +43,7 @@ namespace mongo {
         void truncate(fileofs size);
         void write(fileofs o, const char* data, unsigned len);
 
-        static boost::intmax_t freeSpace(const std::string& path);
+        static intmax_t freeSpace(const std::string& path);
 
     private:
         bool _bad;

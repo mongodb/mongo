@@ -118,6 +118,12 @@ namespace optionenvironment {
              */
             Status set(const Key& key, const Value& value);
 
+            /** Remove the Value from this Environment with the given Key.  If "validate" has
+             * already been called on this Environment, runs all Constraints on the new Environment.
+             * If any of the Constraints fail, reverts to the old Environment and returns an error
+             */
+            Status remove(const Key& key);
+
             /** Add a default Value to this Environment with the given Key.  Fails if validate has
              *  already been called on our environment.  The get functions will return the default
              *  if one exists and the value has not been explicitly set.
@@ -136,10 +142,11 @@ namespace optionenvironment {
             template <typename T>
             Status get(const Key& key, T* value_contents) const;
 
-            /** Runs all registered Constraints and returns the result.  On success, marks this as a
-             *  valid Environment so that any modifications will re run all Constraints
+            /** Runs all registered Constraints and returns the result.  If "setValid" is true and
+             * validation succeeds, marks this as a valid Environment so that any modifications will
+             * re run all Constraints
              */
-            Status validate();
+            Status validate(bool setValid=true);
 
             /** Sets all variables in the given Environment in this Environment.  Does not add
              *  Constraints

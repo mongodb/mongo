@@ -51,7 +51,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
-#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands/server_status.h"
@@ -68,6 +67,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
@@ -80,27 +80,14 @@ _ disallow system* manipulations from the database.
 #include "mongo/util/processinfo.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
-    // TODO SERVER-4328
-    bool inDBRepair = false;
-    struct doingRepair {
-        doingRepair() {
-            verify( ! inDBRepair );
-            inDBRepair = true;
-        }
-        ~doingRepair() {
-            inDBRepair = false;
-        }
-    };
-
     /* ----------------------------------------- */
-    const char FREELIST_NS[] = ".$freelist";
     string pidfilepath;
 
     DatabaseHolder _dbHolder;
-    int MAGIC = 0x1000;
 
     DatabaseHolder& dbHolderUnchecked() {
         return _dbHolder;
@@ -113,201 +100,52 @@ namespace mongo {
         uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
     }
 
-    string getDbContext() {
-        stringstream ss;
-        Client * c = currentClient.get();
-        if ( c ) {
-            Client::Context * cx = c->getContext();
-            if ( cx ) {
-                Database *database = cx->db();
-                if ( database ) {
-                    ss << database->name() << ' ';
-                    ss << cx->ns() << ' ';
-                }
-            }
-        }
-        return ss.str();
-    }
-
     /*---------------------------------------------------------------------*/
 
-    // inheritable class to implement an operation that may be applied to all
-    // files in a database using _applyOpToDataFiles()
-    class FileOp {
-    public:
-        virtual ~FileOp() {}
-        // Return true if file exists and operation successful
-        virtual bool apply( const boost::filesystem::path &p ) = 0;
-        virtual const char * op() const = 0;
-    };
+    /** { ..., capped: true, size: ..., max: ... }
+     * @param createDefaultIndexes - if false, defers id (and other) index creation.
+     * @return true if successful
+    */
+    Status userCreateNS( Database* db,
+                         const StringData& ns,
+                         BSONObj options,
+                         bool logForReplication,
+                         bool createDefaultIndexes ) {
 
-    void _applyOpToDataFiles(const char *database, FileOp &fo, bool afterAllocator = false,
-                             const string& path = storageGlobalParams.dbpath);
+        invariant( db );
 
-    void _deleteDataFiles(const char *database) {
-        if (storageGlobalParams.directoryperdb) {
-            FileAllocator::get()->waitUntilFinished();
-            MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(
-                    boost::filesystem::remove_all(
-                        boost::filesystem::path(storageGlobalParams.dbpath) / database),
-                                                "delete data files with a directoryperdb");
-            return;
-        }
-        class : public FileOp {
-            virtual bool apply( const boost::filesystem::path &p ) {
-                return boost::filesystem::remove( p );
-            }
-            virtual const char * op() const {
-                return "remove";
-            }
-        } deleter;
-        _applyOpToDataFiles( database, deleter, true );
-    }
+        LOG(1) << "create collection " << ns << ' ' << options;
 
-    bool _userCreateNS(const char *ns, const BSONObj& options, string& err, bool *deferIdIndex) {
-        LOG(1) << "create collection " << ns << ' ' << options << endl;
-
-        Database* db = cc().database();
+        if ( !NamespaceString::validCollectionComponent(ns) )
+            return Status( ErrorCodes::InvalidNamespace,
+                           str::stream() << "invalid ns: " << ns );
 
         Collection* collection = db->getCollection( ns );
 
-        if ( collection ) {
-            err = "collection already exists";
-            return false;
-        }
+        if ( collection )
+            return Status( ErrorCodes::NamespaceExists,
+                           "collection already exists" );
 
-        long long size = Extent::initialSize(128);
-        {
-            BSONElement e = options.getField("size");
-            if ( e.isNumber() ) {
-                size = e.numberLong();
-                uassert( 10083 , "create collection invalid size spec", size >= 0 );
+        CollectionOptions collectionOptions;
+        Status status = collectionOptions.parse( options );
+        if ( !status.isOK() )
+            return status;
 
-                size += 0xff;
-                size &= 0xffffffffffffff00LL;
-                if ( size < Extent::minSize() )
-                    size = Extent::minSize();
-            }
-        }
+        invariant( db->createCollection( ns, collectionOptions, true, createDefaultIndexes ) );
 
-        bool newCapped = false;
-        long long mx = 0;
-        if( options["capped"].trueValue() ) {
-            newCapped = true;
-            BSONElement e = options.getField("max");
-            if ( e.isNumber() ) {
-                mx = e.numberLong();
-                uassert( 16495,
-                         "max in a capped collection has to be < 2^31 or not set",
-                         NamespaceDetails::validMaxCappedDocs(&mx) );
-            }
-        }
-
-
-        collection = db->createCollection( ns,
-                                           options["capped"].trueValue(),
-                                           &options,
-                                           false ); // we do it ourselves below
-        verify( collection );
-
-        // $nExtents just for debug/testing.
-        BSONElement e = options.getField( "$nExtents" );
-
-        if ( e.type() == Array ) {
-            // We create one extent per array entry, with size specified
-            // by the array value.
-            BSONObjIterator i( e.embeddedObject() );
-            while( i.more() ) {
-                BSONElement e = i.next();
-                int size = int( e.number() );
-                verify( size <= 0x7fffffff );
-                // $nExtents is just for testing - always allocate new extents
-                // rather than reuse existing extents so we have some predictibility
-                // in the extent size used by our tests
-                collection->increaseStorageSize( (int)size, false );
-            }
-        }
-        else if ( int( e.number() ) > 0 ) {
-            // We create '$nExtents' extents, each of size 'size'.
-            int nExtents = int( e.number() );
-            verify( size <= 0x7fffffff );
-            for ( int i = 0; i < nExtents; ++i ) {
-                verify( size <= 0x7fffffff );
-                // $nExtents is just for testing - always allocate new extents
-                // rather than reuse existing extents so we have some predictibility
-                // in the extent size used by our tests
-                collection->increaseStorageSize( (int)size, false );
-            }
-        }
-        else {
-            // This is the non test case, where we don't have a $nExtents spec.
-            while ( size > 0 ) {
-                const int max = Extent::maxSize();
-                const int min = Extent::minSize();
-                int desiredExtentSize = static_cast<int> (size > max ? max : size);
-                desiredExtentSize = static_cast<int> (desiredExtentSize < min ? min : desiredExtentSize);
-
-                desiredExtentSize &= 0xffffff00;
-                Extent* e = collection->increaseStorageSize( (int)desiredExtentSize, true );
-                size -= e->length;
-            }
-        }
-
-        NamespaceDetails *d = nsdetails(ns);
-        verify(d);
-
-        bool ensure = true;
-
-        // respect autoIndexId if set. otherwise, create an _id index for all colls, except for
-        // capped ones in local w/o autoIndexID (reason for the exception is for the oplog and
-        //  non-replicated capped colls)
-        if( options.hasField( "autoIndexId" ) ||
-            (newCapped && nsToDatabase( ns ) == "local" ) ) {
-            ensure = options.getField( "autoIndexId" ).trueValue();
-        }
-
-        if( ensure ) {
-            if( deferIdIndex )
-                *deferIdIndex = true;
-            else
-                ensureIdIndexForNewNs( collection );
-        }
-
-        if ( mx > 0 )
-            d->setMaxCappedDocs( mx );
-
-        return true;
-    }
-
-    /** { ..., capped: true, size: ..., max: ... }
-        @param deferIdIndex - if not not, defers id index creation.  sets the bool value to true if we wanted to create the id index.
-        @return true if successful
-    */
-    bool userCreateNS(const char *ns, BSONObj options, string& err, bool logForReplication, bool *deferIdIndex) {
-        const char *coll = strchr( ns, '.' ) + 1;
-        massert(10356 ,
-                str::stream() << "invalid ns: " << ns,
-                NamespaceString::validCollectionComponent(ns));
-
-        bool ok = _userCreateNS(ns, options, err, deferIdIndex);
-        if ( logForReplication && ok ) {
+        if ( logForReplication ) {
             if ( options.getField( "create" ).eoo() ) {
                 BSONObjBuilder b;
-                b << "create" << coll;
+                b << "create" << nsToCollectionSubstring( ns );
                 b.appendElements( options );
                 options = b.obj();
             }
             string logNs = nsToDatabase(ns) + ".$cmd";
             logOp("c", logNs.c_str(), options);
         }
-        return ok;
+
+        return Status::OK();
     }
-
-}
-
-#include "clientcursor.h"
-
-namespace mongo {
 
     void dropAllDatabasesExceptLocal() {
         Lock::GlobalWrite lk;
@@ -319,21 +157,22 @@ namespace mongo {
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
                 Client::Context ctx(*i);
-                dropDatabase(*i);
+                dropDatabase(ctx.db());
             }
         }
     }
 
-    void dropDatabase(const std::string& db) {
-        LOG(1) << "dropDatabase " << db << endl;
-        Lock::assertWriteLocked(db);
-        Database *d = cc().database();
-        verify( d );
-        verify( d->name() == db );
+    void dropDatabase(Database* db ) {
+        invariant( db );
 
-        BackgroundOperation::assertNoBgOpInProgForDb(d->name().c_str());
+        string name = db->name(); // just to have safe
+        LOG(1) << "dropDatabase " << name << endl;
 
-        audit::logDropDatabase( currentClient.get(), db );
+        Lock::assertWriteLocked( name );
+
+        BackgroundOperation::assertNoBgOpInProgForDb(name.c_str());
+
+        audit::logDropDatabase( currentClient.get(), name );
 
         // Not sure we need this here, so removed.  If we do, we need to move it down
         // within other calls both (1) as they could be called from elsewhere and
@@ -344,234 +183,10 @@ namespace mongo {
 
         getDur().syncDataAndTruncateJournal();
 
-        Database::closeDatabase( d->name(), d->path() );
-        d = 0; // d is now deleted
+        Database::closeDatabase( name, db->path() );
+        db = 0; // d is now deleted
 
-        _deleteDataFiles( db.c_str() );
-    }
-
-    typedef boost::filesystem::path Path;
-
-    void boostRenameWrapper( const Path &from, const Path &to ) {
-        try {
-            boost::filesystem::rename( from, to );
-        }
-        catch ( const boost::filesystem::filesystem_error & ) {
-            // boost rename doesn't work across partitions
-            boost::filesystem::copy_file( from, to);
-            boost::filesystem::remove( from );
-        }
-    }
-
-    // back up original database files to 'temp' dir
-    void _renameForBackup( const char *database, const Path &reservedPath ) {
-        Path newPath( reservedPath );
-        if (storageGlobalParams.directoryperdb)
-            newPath /= database;
-        class Renamer : public FileOp {
-        public:
-            Renamer( const Path &newPath ) : newPath_( newPath ) {}
-        private:
-            const boost::filesystem::path &newPath_;
-            virtual bool apply( const Path &p ) {
-                if ( !boost::filesystem::exists( p ) )
-                    return false;
-                boostRenameWrapper( p, newPath_ / ( p.leaf().string() + ".bak" ) );
-                return true;
-            }
-            virtual const char * op() const {
-                return "renaming";
-            }
-        } renamer( newPath );
-        _applyOpToDataFiles( database, renamer, true );
-    }
-
-    // move temp files to standard data dir
-    void _replaceWithRecovered( const char *database, const char *reservedPathString ) {
-        Path newPath(storageGlobalParams.dbpath);
-        if (storageGlobalParams.directoryperdb)
-            newPath /= database;
-        class Replacer : public FileOp {
-        public:
-            Replacer( const Path &newPath ) : newPath_( newPath ) {}
-        private:
-            const boost::filesystem::path &newPath_;
-            virtual bool apply( const Path &p ) {
-                if ( !boost::filesystem::exists( p ) )
-                    return false;
-                boostRenameWrapper( p, newPath_ / p.leaf() );
-                return true;
-            }
-            virtual const char * op() const {
-                return "renaming";
-            }
-        } replacer( newPath );
-        _applyOpToDataFiles( database, replacer, true, reservedPathString );
-    }
-
-    // generate a directory name for storing temp data files
-    Path uniqueReservedPath( const char *prefix ) {
-        Path repairPath = Path(storageGlobalParams.repairpath);
-        Path reservedPath;
-        int i = 0;
-        bool exists = false;
-        do {
-            stringstream ss;
-            ss << prefix << "_repairDatabase_" << i++;
-            reservedPath = repairPath / ss.str();
-            MONGO_ASSERT_ON_EXCEPTION( exists = boost::filesystem::exists( reservedPath ) );
-        }
-        while ( exists );
-        return reservedPath;
-    }
-
-    boost::intmax_t dbSize( const char *database ) {
-        class SizeAccumulator : public FileOp {
-        public:
-            SizeAccumulator() : totalSize_( 0 ) {}
-            boost::intmax_t size() const {
-                return totalSize_;
-            }
-        private:
-            virtual bool apply( const boost::filesystem::path &p ) {
-                if ( !boost::filesystem::exists( p ) )
-                    return false;
-                totalSize_ += boost::filesystem::file_size( p );
-                return true;
-            }
-            virtual const char *op() const {
-                return "checking size";
-            }
-            boost::intmax_t totalSize_;
-        };
-        SizeAccumulator sa;
-        _applyOpToDataFiles( database, sa );
-        return sa.size();
-    }
-
-    bool repairDatabase( string dbNameS , string &errmsg,
-                         bool preserveClonedFilesOnFailure, bool backupOriginalFiles ) {
-        doingRepair dr;
-        dbNameS = nsToDatabase( dbNameS );
-        const char * dbName = dbNameS.c_str();
-
-        stringstream ss;
-        ss << "localhost:" << serverGlobalParams.port;
-        string localhost = ss.str();
-
-        problem() << "repairDatabase " << dbName << endl;
-        verify( cc().database()->name() == dbName );
-        verify(cc().database()->path() == storageGlobalParams.dbpath);
-
-        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
-
-        getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
-
-        boost::intmax_t totalSize = dbSize( dbName );
-        boost::intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
-        if ( freeSize > -1 && freeSize < totalSize ) {
-            stringstream ss;
-            ss << "Cannot repair database " << dbName << " having size: " << totalSize
-               << " (bytes) because free disk space is: " << freeSize << " (bytes)";
-            errmsg = ss.str();
-            problem() << errmsg << endl;
-            return false;
-        }
-
-        killCurrentOp.checkForInterrupt();
-
-        Path reservedPath =
-            uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
-                                "backup" : "_tmp" );
-        MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
-        string reservedPathString = reservedPath.string();
-
-        bool res;
-        {
-            // clone to temp location, which effectively does repair
-            Client::Context ctx( dbName, reservedPathString );
-            verify( ctx.justCreated() );
-
-
-            CloneOptions cloneOptions;
-            cloneOptions.fromDB = dbName;
-            cloneOptions.logForRepl = false;
-            cloneOptions.slaveOk = false;
-            cloneOptions.useReplAuth = false;
-            cloneOptions.snapshot = false;
-            cloneOptions.mayYield = false;
-            cloneOptions.mayBeInterrupted = true;
-            res = Cloner::cloneFrom(ctx, localhost, cloneOptions, errmsg );
-
-            Database::closeDatabase( dbName, reservedPathString.c_str() );
-        }
-
-        getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
-        MongoFile::flushAll(true); // need both in case journaling is disabled
-
-        if ( !res ) {
-            errmsg = str::stream() << "clone failed for " << dbName << " with error: " << errmsg;
-            problem() << errmsg << endl;
-
-            if ( !preserveClonedFilesOnFailure )
-                MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
-
-            return false;
-        }
-
-        Client::Context ctx( dbName );
-        Database::closeDatabase(dbName, storageGlobalParams.dbpath);
-
-        if ( backupOriginalFiles ) {
-            _renameForBackup( dbName, reservedPath );
-        }
-        else {
-            _deleteDataFiles( dbName );
-            MONGO_ASSERT_ON_EXCEPTION(
-                    boost::filesystem::create_directory(Path(storageGlobalParams.dbpath) / dbName));
-        }
-
-        _replaceWithRecovered( dbName, reservedPathString.c_str() );
-
-        if ( !backupOriginalFiles )
-            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
-
-        return true;
-    }
-
-    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator, const string& path ) {
-        if ( afterAllocator )
-            FileAllocator::get()->waitUntilFinished();
-        string c = database;
-        c += '.';
-        boost::filesystem::path p(path);
-        if (storageGlobalParams.directoryperdb)
-            p /= database;
-        boost::filesystem::path q;
-        q = p / (c+"ns");
-        bool ok = false;
-        MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply( q ) );
-        if ( ok ) {
-            LOG(2) << fo.op() << " file " << q.string() << endl;
-        }
-        int i = 0;
-        int extra = 10; // should not be necessary, this is defensive in case there are missing files
-        while ( 1 ) {
-            verify( i <= DiskLoc::MaxFiles );
-            stringstream ss;
-            ss << c << i;
-            q = p / ss.str();
-            MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply(q) );
-            if ( ok ) {
-                if ( extra != 10 ) {
-                    LOG(1) << fo.op() << " file " << q.string() << endl;
-                    log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
-                }
-            }
-            else if ( --extra <= 0 )
-                break;
-            i++;
-        }
+        _deleteDataFiles( name );
     }
 
 } // namespace mongo

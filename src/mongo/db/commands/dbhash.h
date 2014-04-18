@@ -46,7 +46,7 @@ namespace mongo {
         DBHashCmd();
 
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return READ; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out);
@@ -59,7 +59,7 @@ namespace mongo {
 
         bool isCachable( const StringData& ns ) const;
 
-        string hashCollection( const string& fullCollectionName, bool* fromCache );
+        string hashCollection( Database* db, const string& fullCollectionName, bool* fromCache );
 
         map<string,string> _cachedHashed;
         mutex _cachedHashedMutex;

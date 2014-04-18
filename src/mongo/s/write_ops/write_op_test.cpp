@@ -137,16 +137,17 @@ namespace {
         std::sort( writes->begin(), writes->end(), EndpointComp() );
     }
 
-    TEST(WriteOpTests, TargetMulti) {
+    TEST(WriteOpTests, TargetMultiOneShard) {
 
         //
-        // Multi-endpoint targeting test
+        // Multi-write targeting test where our query goes to one shard
         //
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED() );
-        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED() );
+        ShardEndpoint endpointA( "shardA", ChunkVersion(10, 0, OID()) );
+        ShardEndpoint endpointB( "shardB", ChunkVersion(20, 0, OID()) );
+        ShardEndpoint endpointC( "shardB", ChunkVersion(20, 0, OID()) );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpointA,
@@ -156,6 +157,63 @@ namespace {
         mockRanges.push_back( new MockRange( endpointB,
                                              nss,
                                              BSON( "x" << 0 ),
+                                             BSON( "x" << 10 ) ) );
+        mockRanges.push_back( new MockRange( endpointC,
+                                             nss,
+                                             BSON( "x" << 10 ),
+                                             BSON( "x" << MAXKEY ) ) );
+
+        BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
+        request.setNS( nss.ns() );
+        // Only hits first shard
+        BSONObj query = BSON( "x" << GTE << -2 << LT << -1 );
+        request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << query ) ) );
+
+        WriteOp writeOp( BatchItemRef( &request, 0 ) );
+        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
+
+        MockNSTargeter targeter;
+        targeter.init( mockRanges );
+
+        OwnedPointerVector<TargetedWrite> targetedOwned;
+        vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+        Status status = writeOp.targetWrites( targeter, &targeted );
+
+        ASSERT( status.isOK() );
+        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
+        ASSERT_EQUALS( targeted.size(), 1u );
+        assertEndpointsEqual( targeted.front()->endpoint, endpointA );
+
+        writeOp.noteWriteComplete( *targeted.front() );
+
+        ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Completed );
+
+    }
+
+    TEST(WriteOpTests, TargetMultiAllShards) {
+
+        //
+        // Multi-write targeting test where our write goes to more than one shard
+        //
+
+        NamespaceString nss( "foo.bar" );
+
+        ShardEndpoint endpointA( "shardA", ChunkVersion(10, 0, OID()) );
+        ShardEndpoint endpointB( "shardB", ChunkVersion(20, 0, OID()) );
+        ShardEndpoint endpointC( "shardB", ChunkVersion(20, 0, OID()) );
+
+        vector<MockRange*> mockRanges;
+        mockRanges.push_back( new MockRange( endpointA,
+                                             nss,
+                                             BSON( "x" << MINKEY ),
+                                             BSON( "x" << 0 ) ) );
+        mockRanges.push_back( new MockRange( endpointB,
+                                             nss,
+                                             BSON( "x" << 0 ),
+                                             BSON( "x" << 10 ) ) );
+        mockRanges.push_back( new MockRange( endpointC,
+                                             nss,
+                                             BSON( "x" << 10 ),
                                              BSON( "x" << MAXKEY ) ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
@@ -177,13 +235,19 @@ namespace {
 
         ASSERT( status.isOK() );
         ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Pending );
-        ASSERT_EQUALS( targeted.size(), 2u );
+        ASSERT_EQUALS( targeted.size(), 3u );
         sortByEndpoint( &targeted );
-        assertEndpointsEqual( targeted.front()->endpoint, endpointA );
-        assertEndpointsEqual( targeted.back()->endpoint, endpointB );
+        ASSERT_EQUALS( targeted[0]->endpoint.shardName, endpointA.shardName );
+        ASSERT( ChunkVersion::isIgnoredVersion( targeted[0]->endpoint.shardVersion ) );
+        ASSERT_EQUALS( targeted[1]->endpoint.shardName, endpointB.shardName );
+        ASSERT( ChunkVersion::isIgnoredVersion( targeted[1]->endpoint.shardVersion ) );
+        ASSERT_EQUALS( targeted[2]->endpoint.shardName, endpointC.shardName );
+        ASSERT( ChunkVersion::isIgnoredVersion( targeted[2]->endpoint.shardVersion ) );
 
-        writeOp.noteWriteComplete( *targeted.front() );
-        writeOp.noteWriteComplete( *targeted.back() );
+        writeOp.noteWriteComplete( *targeted[0] );
+        writeOp.noteWriteComplete( *targeted[1] );
+        writeOp.noteWriteComplete( *targeted[2] );
+
         ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Completed );
     }
 

@@ -99,9 +99,8 @@ var CLUSTER_PERM = { killOp: 1, currentOp: 1, fsync_unlock: 1, killCursor: 1, pr
  *
  * @param shouldPass {Boolean} true means that the operation should succeed.
  * @param opFunc {function()} a function object which contains the operation to perform.
- * @param db {DB?} an optional parameter that will be used to call getLastError if present.
  */
-var checkErr = function(shouldPass, opFunc, db) {
+var checkErr = function(shouldPass, opFunc) {
     var success = true;
 
     var exception = null;
@@ -112,17 +111,10 @@ var checkErr = function(shouldPass, opFunc, db) {
         success = false;
     }
 
-    var gle = null;
-    if (db != null) {
-        gle = db.getLastError();
-        success = success && (gle == null);
-    }
-
     assert(success == shouldPass, 'expected shouldPass: ' + shouldPass +
         ', got: ' + success +
         ', op: ' + tojson(opFunc) +
-        ', exception: ' + tojson(exception) +
-        ', gle: ' + tojson(gle));
+        ', exception: ' + tojson(exception));
 };
 
 /**
@@ -138,16 +130,19 @@ var checkErr = function(shouldPass, opFunc, db) {
  */
 var testOps = function(db, allowedActions) {
     checkErr(allowedActions.hasOwnProperty('insert'), function() {
-        db.user.insert({ y: 1 });
-    }, db);
+        var res = db.user.insert({ y: 1 });
+        if (res.hasWriteError()) throw Error("insert failed: " + tojson(res.getRawResponse()));
+    });
 
     checkErr(allowedActions.hasOwnProperty('update'), function() {
-        db.user.update({ y: 1 }, { z: 3 });
-    }, db);
+        var res = db.user.update({ y: 1 }, { z: 3 });
+        if (res.hasWriteError()) throw Error("update failed: " + tojson(res.getRawResponse()));
+    });
 
     checkErr(allowedActions.hasOwnProperty('remove'), function() {
-        db.user.remove({ y: 1 });
-    }, db);
+        var res = db.user.remove({ y: 1 });
+        if (res.hasWriteError()) throw Error("remove failed: " + tojson(res.getRawResponse()));
+    });
 
     checkErr(allowedActions.hasOwnProperty('query'), function() {
         db.user.findOne({ y: 1 });
@@ -174,16 +169,22 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('index_w'), function() {
-        db.user.ensureIndex({ x: 1 });
-    }, db);
+        var res = db.user.ensureIndex({ x: 1 });
+        if (res.code == 13) { // Unauthorized
+            throw 'unauthorized currentOp';
+        }
+    });
 
     checkErr(allowedActions.hasOwnProperty('profile_r'), function() {
         db.system.profile.findOne();
     });
 
     checkErr(allowedActions.hasOwnProperty('profile_w'), function() {
-        db.system.profile.insert({ x: 1 });
-    }, db);
+        var res = db.system.profile.insert({ x: 1 });
+        if (res.hasWriteError()) {
+            throw Error("profile insert failed: " + tojson(res.getRawResponse()));
+        }
+    });
 
     checkErr(allowedActions.hasOwnProperty('user_r'), function() {
         var result = db.runCommand({usersInfo: 1});
@@ -194,8 +195,8 @@ var testOps = function(db, allowedActions) {
 
     checkErr(allowedActions.hasOwnProperty('user_w'), function() {
         db.createUser({user:'a', pwd: 'a', roles: jsTest.basicUserRoles});
-        db.dropUser('a');
-    }, db);
+        assert(db.dropUser('a'));
+    });
 
     // Test for kill cursor
     (function() {

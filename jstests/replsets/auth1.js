@@ -39,7 +39,6 @@ m = startMongodTest( port[0], name+"-0", 0 );
 m.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
 m.getDB("test").createUser({user: "bar", pwd: "baz", roles: jsTest.basicUserRoles});
 print("make sure user is written before shutting down");
-m.getDB("test").getLastError();
 stopMongod(port[0]);
 
 print("start up rs");
@@ -63,9 +62,7 @@ wait(function() {
         return status.members && status.members[1].state == 2 && status.members[2].state == 2;
     });
 
-master.foo.insert({x:1});
-master.runCommand({getlasterror:1, w:3, wtimeout:60000});
-
+master.foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }});
 
 print("try some legal and illegal reads");
 var r = master.foo.findOne();
@@ -108,11 +105,11 @@ assert.eq(r.x, 1);
 
 print("add some data");
 master.auth("bar", "baz");
+var bulk = master.foo.initializeUnorderedBulkOp();
 for (var i=0; i<1000; i++) {
-    master.foo.insert({x:i, foo : "bar"});
+    bulk.insert({ x: i, foo: "bar" });
 }
-master.runCommand({getlasterror:1, w:3, wtimeout:60000});
-
+assert.writeOK(bulk.execute({ w: 3, wtimeout: 60000 }));
 
 print("fail over");
 rs.stop(0);
@@ -149,11 +146,11 @@ rs.restart(0, {"keyFile" : path+"key1"});
 
 
 print("add some more data 2");
+var bulk = master.foo.initializeUnorderedBulkOp();
 for (var i=0; i<1000; i++) {
-    master.foo.insert({x:i, foo : "bar"});
+    bulk.insert({ x: i, foo: "bar" });
 }
-master.runCommand({getlasterror:1, w:3, wtimeout:60000});
-
+bulk.execute({ w:3, wtimeout:60000 });
 
 print("add member with wrong key");
 var conn = new MongodRunner(port[3], MongoRunner.dataPath+name+"-3", null, null, ["--replSet","rs_auth1","--rest","--oplogSize","2", "--keyFile", path+"key2"], {no_bind : true});

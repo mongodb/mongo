@@ -13,8 +13,7 @@ if (doSharded) {
     testDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
 }
 
-testDB.user.insert({ x: 10 });
-testDB.runCommand({ getLastError: 1, w: NODES });
+testDB.user.insert({ x: 10 }, { writeConcern: { w: NODES }});
 testDB.setSlaveOk(true);
 
 var secNode = st.rs0.getSecondary();

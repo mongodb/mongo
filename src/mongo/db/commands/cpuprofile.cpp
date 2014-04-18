@@ -58,6 +58,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 
@@ -85,7 +86,7 @@ namespace mongo {
             // This is an abuse of the global dbmutex.  We only really need to
             // ensure that only one cpuprofiler command runs at once; it would
             // be fine for it to run concurrently with other operations.
-            virtual LockType locktype() const { return WRITE; }
+            virtual bool isWriteCommandForConfigServer() const { return true; }
         };
 
         /**
@@ -131,6 +132,8 @@ namespace mongo {
                                            string &errmsg,
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
+            Lock::DBWrite dbXLock(db);
+            Client::Context ctx(db);
 
             std::string profileFilename = cmdObj[commandName]["profileFilename"].String();
             if ( ! ::ProfilerStart( profileFilename.c_str() ) ) {
@@ -146,6 +149,9 @@ namespace mongo {
                                           string &errmsg,
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
+            Lock::DBWrite dbXLock(db);
+            Client::Context ctx(db);
+
             ::ProfilerStop();
             return true;
         }

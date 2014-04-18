@@ -39,9 +39,10 @@
 namespace mongo {
 
     class Collection;
+    class HeadManager;
+    class IndexAccessMethod;
     class IndexDescriptor;
     class RecordStore;
-    class IndexAccessMethod;
 
     class IndexCatalogEntry {
         MONGO_DISALLOW_COPYING( IndexCatalogEntry );
@@ -62,10 +63,6 @@ namespace mongo {
         IndexAccessMethod* accessMethod() { return _accessMethod; }
         const IndexAccessMethod* accessMethod() const { return _accessMethod; }
 
-        IndexAccessMethod* forcedBtreeIndex() { return _forcedBtreeIndex; }
-        // ownership passes
-        void setForcedBtreeIndex( IndexAccessMethod* iam ) { _forcedBtreeIndex = iam; }
-
         RecordStore* recordStore() { return _recordStore; }
         const RecordStore* recordStore() const { return _recordStore; }
 
@@ -78,6 +75,8 @@ namespace mongo {
         void setHead( DiskLoc newHead );
 
         void setIsReady( bool newIsReady );
+
+        HeadManager* headManager() const { return _headManager; }
 
         // --
 
@@ -105,7 +104,9 @@ namespace mongo {
         RecordStore* _recordStore; // owned here
 
         IndexAccessMethod* _accessMethod; // owned here
-        IndexAccessMethod* _forcedBtreeIndex; // owned here
+
+        // Owned here.
+        HeadManager* _headManager;
 
         // cached stuff
 

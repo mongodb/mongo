@@ -37,6 +37,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/structure/btree/btree_interface.h"
 
 namespace mongo {
 
@@ -117,6 +118,8 @@ namespace mongo {
 
     private:
         bool removeOneKey(const BSONObj& key, const DiskLoc& loc);
+
+        scoped_ptr<transition::BtreeInterface> _newInterface;
     };
 
     /**

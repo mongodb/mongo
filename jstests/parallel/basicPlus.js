@@ -1,4 +1,5 @@
 // perform basic js tests in parallel & some other tasks as well
+load('jstests/libs/parallelTester.js')
 
 var c = db.jstests_parallel_basicPlus;
 c.drop();

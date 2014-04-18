@@ -35,11 +35,11 @@
 namespace mongo {
 
     struct TwoDParams {
-        TwoDParams() : filter(NULL) { }
+        TwoDParams() : filter(NULL), collection(NULL) { }
         GeoQuery gq;
         MatchExpression* filter;
         BSONObj indexKeyPattern;
-        string ns;
+        Collection* collection; // not owned
     };
 
     class TwoD : public PlanStage {

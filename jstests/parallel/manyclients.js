@@ -1,4 +1,5 @@
 // perform inserts in parallel from a large number of clients
+load('jstests/libs/parallelTester.js')
 
 f = db.jstests_parallel_manyclients;
 f.drop();

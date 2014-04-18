@@ -431,7 +431,10 @@ namespace mongo {
             if (cmdObj.hasField("handshake")) {
                 // we have received a handshake, not an update message
                 // handshakes are done here to ensure the receiving end supports the update command
-                cc().gotHandshake(cmdObj["handshake"].embeddedObject());
+                if (!cc().gotHandshake(cmdObj["handshake"].embeddedObject())) {
+                    errmsg = "node could not be found in replica set config during handshake";
+                    return false;
+                }
                 // if we aren't primary, pass the handshake along
                 if (!theReplSet->isPrimary() && theReplSet->syncSourceFeedback.supportsUpdater()) {
                     theReplSet->syncSourceFeedback.forwardSlaveHandshake();
@@ -442,7 +445,11 @@ namespace mongo {
             uassert(16888, "optimes field should be an array with an object for each secondary",
                     cmdObj["optimes"].type() == Array);
             BSONArray newTimes = BSONArray(cmdObj["optimes"].Obj());
-            return updateSlaveLocations(newTimes);
+            if (!updateSlaveLocations(newTimes)) {
+                errmsg = "could not update position upstream; will retry";
+                return false;
+            }
+            return true;
         }
     } cmdReplSetUpdatePosition;
 

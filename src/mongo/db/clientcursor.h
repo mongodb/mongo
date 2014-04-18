@@ -149,8 +149,8 @@ namespace mongo {
 
     private:
         friend class ClientCursorMonitor;
-        friend class ClientCursorPin;
         friend class CmdCursorInfo;
+        friend class CollectionCursorCache;
 
         /**
          * Initialization common between both constructors for the ClientCursor.

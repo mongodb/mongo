@@ -33,6 +33,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/invalidation_type.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 
@@ -92,10 +93,19 @@ namespace mongo {
         CursorId registerCursor( ClientCursor* cc );
         void deregisterCursor( ClientCursor* cc );
 
+        bool eraseCursor( CursorId id, bool checkAuth );
+
         void getCursorIds( std::set<CursorId>* openCursors );
         std::size_t numCursors();
 
-        ClientCursor* find( CursorId id );
+        /**
+         * @param pin - if true, will try to pin cursor
+         *                  if pinned already, will assert
+         *                  otherwise will pin
+         */
+        ClientCursor* find( CursorId id, bool pin );
+
+        void unpin( ClientCursor* cursor );
 
         // ----------------------
 
@@ -113,7 +123,7 @@ namespace mongo {
         CursorId _allocateCursorId_inlock();
         void _deregisterCursor_inlock( ClientCursor* cc );
 
-        string _ns;
+        NamespaceString _nss;
         unsigned _collectionCacheRuntimeId;
         scoped_ptr<PseudoRandom> _random;
 

@@ -39,7 +39,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
 
@@ -52,8 +51,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool lockGlobally() const { return true; }
+        virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual bool logTheOp() {
             return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
         }
@@ -66,15 +64,16 @@ namespace mongo {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname,
+        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
 
-            BSONObj criteria = BSON("op" << "insert" << "ns" << dbname+".system.indexes" <<
-                                    "insert.ns" << source);
+            IndexCatalog::IndexKillCriteria criteria;
+            criteria.ns = source;
+            std::vector<BSONObj> prelim = 
+                IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
 
-            std::vector<BSONObj> prelim = IndexBuilder::killMatchingIndexBuilds(criteria);
             std::vector<BSONObj> indexes;
 
             for (int i = 0; i < static_cast<int>(prelim.size()); i++) {
@@ -127,6 +126,8 @@ namespace mongo {
             long long size = 0;
             std::vector<BSONObj> indexesInProg;
 
+            Lock::GlobalWrite globalWriteLock;
+
             {
                 Client::Context srcCtx( source );
                 Collection* sourceColl = srcCtx.db()->getCollection( source );
@@ -161,12 +162,12 @@ namespace mongo {
                 }
 
                 {
-                    const NamespaceDetails *nsd = nsdetails( source );
-                    indexesInProg = stopIndexBuilds( dbname, cmdObj );
-                    capped = nsd->isCapped();
-                    if ( capped )
-                        for( DiskLoc i = nsd->firstExtent(); !i.isNull(); i = i.ext()->xnext )
-                            size += i.ext()->length;
+
+                    indexesInProg = stopIndexBuilds( srcCtx.db(), cmdObj );
+                    capped = sourceColl->isCapped();
+                    if ( capped ) {
+                        size = sourceColl->storageSize();
+                    }
                 }
             }
 
@@ -181,7 +182,7 @@ namespace mongo {
                         return false;
                     }
 
-                    Status s = cc().database()->dropCollection( target );
+                    Status s = ctx.db()->dropCollection( target );
                     if ( !s.isOK() ) {
                         errmsg = s.toString();
                         restoreIndexBuildsOnSource( indexesInProg, source );
@@ -208,19 +209,18 @@ namespace mongo {
                 // Create the target collection.
                 Collection* targetColl = NULL;
                 if ( capped ) {
-                    BSONObjBuilder spec;
-                    spec.appendBool( "capped", true );
-                    spec.append( "size", double( size ) );
-                    spec.appendBool( "autoIndexId", false );
-                    userCreateNS( target.c_str(), spec.obj(), errmsg, false );
-                    targetColl = ctx.db()->getCollection( target );
+                    CollectionOptions options;
+                    options.capped = true;
+                    options.cappedSize = size;
+                    options.setNoIdIndex();
+
+                    targetColl = ctx.db()->createCollection( target, options );
                 }
                 else {
-                    BSONObjBuilder spec;
-                    spec.appendBool( "autoIndexId", false );
-                    const BSONObj options = spec.obj();
+                    CollectionOptions options;
+                    options.setNoIdIndex();
                     // No logOp necessary because the entire renameCollection command is one logOp.
-                    targetColl = ctx.db()->createCollection( target, false, &options, true );
+                    targetColl = ctx.db()->createCollection( target, options );
                 }
                 if ( !targetColl ) {
                     errmsg = "Failed to create target collection.";
@@ -231,7 +231,7 @@ namespace mongo {
 
             // Copy over all the data from source collection to target collection.
             bool insertSuccessful = true;
-            boost::scoped_ptr<CollectionIterator> sourceIt;
+            boost::scoped_ptr<RecordIterator> sourceIt;
 
             {
                 Client::Context srcCtx( source );

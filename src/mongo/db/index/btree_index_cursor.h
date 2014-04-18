@@ -95,8 +95,18 @@ namespace mongo {
         static unordered_set<BtreeIndexCursor*> _activeCursors;
         static SimpleMutex _activeCursorsMutex;
 
-        // Go forward by default.
-        BtreeIndexCursor(const IndexCatalogEntry* btreeState, BtreeInterface *interface);
+        /**
+         * btreeState is the ICE of the Btree that we're going to traverse.
+         * head is the head of the Btree.
+         * interface is an abstraction to hide the fact that we have two types of Btrees.
+         *
+         * Go forward by default.
+         *
+         * Intentionally private, we're friends with the only class allowed to call it.
+         */
+        BtreeIndexCursor(const IndexCatalogEntry* btreeState,
+                         const DiskLoc head,
+                         BtreeInterface *interface);
 
         void skipUnusedKeys();
 

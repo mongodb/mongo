@@ -230,4 +230,21 @@ namespace {
         ASSERT_EQUALS(fromjson("{ $unset : { b : true } }"), logDoc);
     }
 
+    TEST(Prepare, MissingArrayElementPath) {
+        Document doc(fromjson("{ a : [1, 2] }"));
+        Mod mod(fromjson("{ $pullAll : { 'a.2' : [1] } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_TRUE(execInfo.noOp);
+    }
+
+    TEST(Prepare, FromArrayElementPath) {
+        Document doc(fromjson("{ a : [1, 2] }"));
+        Mod mod(fromjson("{ $pullAll : { 'a.0' : [1] } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_NOT_OK(mod.prepare(doc.root(), "", &execInfo));
+    }
+
 } // namespace

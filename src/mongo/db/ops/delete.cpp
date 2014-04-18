@@ -28,15 +28,8 @@
 
 #include "mongo/db/ops/delete.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/query/get_runner.h"
-#include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/catalog/collection.h"
-
+#include "mongo/db/ops/delete_executor.h"
+#include "mongo/db/ops/delete_request.h"
 
 namespace mongo {
 
@@ -46,93 +39,14 @@ namespace mongo {
        god:     allow access to system namespaces, and don't yield
     */
     long long deleteObjects(const StringData& ns, BSONObj pattern, bool justOne, bool logop, bool god) {
-        if (!god) {
-            if (ns.find( ".system.") != string::npos) {
-                // note a delete from system.indexes would corrupt the db if done here, as there are
-                // pointers into those objects in NamespaceDetails.
-                uassert(12050, "cannot delete from system namespace", legalClientSystemNS( ns, true ) );
-            }
-
-            if (ns.find('$') != string::npos) {
-                log() << "cannot delete from collection with reserved $ in name: " << ns << endl;
-                uasserted( 10100, "cannot delete from collection with reserved $ in name" );
-            }
-        }
-
-        Collection* collection = currentClient.get()->database()->getCollection(ns);
-        if (NULL == collection) {
-            return 0;
-        }
-
-        uassert(10101,
-                str::stream() << "can't remove from a capped collection: " << ns,
-                !collection->isCapped());
-
-        string nsForLogOp = ns.toString(); // XXX-ERH
-
-        long long nDeleted = 0;
-
-        CanonicalQuery* cq;
-        if (!CanonicalQuery::canonicalize(ns.toString(), pattern, &cq).isOK()) {
-            uasserted(17218, "Can't canonicalize query " + pattern.toString());
-            return 0;
-        }
-
-        bool canYield = !god && !QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC);
-
-        Runner* rawRunner;
-        if (!getRunner(cq, &rawRunner).isOK()) {
-            uasserted(17219, "Can't get runner for query " + pattern.toString());
-            return 0;
-        }
-
-        auto_ptr<Runner> runner(rawRunner);
-        auto_ptr<ScopedRunnerRegistration> safety;
-
-        if (canYield) {
-            safety.reset(new ScopedRunnerRegistration(runner.get()));
-            runner->setYieldPolicy(Runner::YIELD_AUTO);
-        }
-
-        DiskLoc rloc;
-        Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &rloc))) {
-
-            BSONObj toDelete;
-
-            // TODO: do we want to buffer docs and delete them in a group rather than
-            // saving/restoring state repeatedly?
-            runner->saveState();
-            collection->deleteDocument(rloc, false, false, logop ? &toDelete : NULL );
-            runner->restoreState();
-
-            nDeleted++;
-
-            if (logop) {
-                if ( toDelete.isEmpty() ) {
-                    problem() << "deleted object without id, not logging" << endl;
-                }
-                else {
-                    bool replJustOne = true;
-                    logOp("d", nsForLogOp.c_str(), toDelete, 0, &replJustOne);
-                }
-            }
-
-            if (justOne) {
-                break;
-            }
-
-            if (!god) {
-                getDur().commitIfNeeded();
-            }
-
-            if (debug && god && nDeleted == 100) {
-                log() << "warning high number of deletes with god=true "
-                      << " which could use significant memory b/c we don't commit journal";
-            }
-        }
-
-        return nDeleted;
+        NamespaceString nsString(ns);
+        DeleteRequest request(nsString);
+        request.setQuery(pattern);
+        request.setMulti(!justOne);
+        request.setUpdateOpLog(logop);
+        request.setGod(god);
+        DeleteExecutor executor(&request);
+        return executor.execute();
     }
 
 }  // namespace mongo

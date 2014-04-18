@@ -90,7 +90,8 @@ namespace mongo {
      * @param convertUpdateToUpsert convert some updates to upserts for idempotency reasons
      * Returns if the op was an update that could not be applied (true on failure)
      */
-    bool applyOperation_inlock(const BSONObj& op, 
-                               bool fromRepl = true, 
+    bool applyOperation_inlock(Database* db,
+                               const BSONObj& op,
+                               bool fromRepl = true,
                                bool convertUpdateToUpsert = false);
 }

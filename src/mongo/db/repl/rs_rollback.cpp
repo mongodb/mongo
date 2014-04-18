@@ -41,6 +41,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 
 /* Scenarios
 
@@ -228,8 +229,9 @@ namespace mongo {
         verify( Lock::isLocked() );
         Client::Context c(rsoplog);
 
-        boost::scoped_ptr<Runner> runner(
-            InternalPlanner::collectionScan(rsoplog, InternalPlanner::BACKWARD));
+        boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(rsoplog,
+                                                                         c.db()->getCollection(rsoplog),
+                                                                         InternalPlanner::BACKWARD));
 
         BSONObj ourObj;
         DiskLoc ourLoc;
@@ -495,7 +497,7 @@ namespace mongo {
 
                 // Add the doc to our rollback file
                 BSONObj obj;
-                bool found = Helpers::findOne(d.ns, pattern, obj, false);
+                bool found = Helpers::findOne(c.db()->getCollection(d.ns), pattern, obj, false);
                 if ( found ) {
                     rs->goingToDelete( obj );
                 } else {
@@ -516,19 +518,18 @@ namespace mongo {
                                 /** todo: IIRC cappedTruncateAfter does not handle completely empty.  todo. */
                                 // this will crazy slow if no _id index.
                                 long long start = Listener::getElapsedTimeMillis();
-                                DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
+                                DiskLoc loc = Helpers::findOne(collection, pattern, false);
                                 if( Listener::getElapsedTimeMillis() - start > 200 )
                                     log() << "replSet warning roll back slow no _id index for " << d.ns << " perhaps?" << rsLog;
-                                NamespaceDetails* nsd = collection->details();
                                 //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
                                 if( !loc.isNull() ) {
                                     try {
-                                        nsd->cappedTruncateAfter(d.ns, loc, true);
+                                        collection->temp_cappedTruncateAfter(loc, true);
                                     }
                                     catch(DBException& e) {
                                         if( e.getCode() == 13415 ) {
                                             // hack: need to just make cappedTruncate do this...
-                                            nsd->emptyCappedCollection(d.ns);
+                                            uassertStatusOK( collection->truncate() );
                                         }
                                         else {
                                             throw;
@@ -552,12 +553,12 @@ namespace mongo {
                         // did we just empty the collection?  if so let's check if it even exists on the source.
                         if( collection->numRecords() == 0 ) {
                             try {
-                                string sys = cc().database()->name() + ".system.namespaces";
+                                string sys = c.db()->name() + ".system.namespaces";
                                 bo o = them->findOne(sys, QUERY("name"<<d.ns));
                                 if( o.isEmpty() ) {
                                     // we should drop
                                     try {
-                                        cc().database()->dropCollection(d.ns);
+                                        c.db()->dropCollection(d.ns);
                                     }
                                     catch(...) {
                                         log() << "replset error rolling back collection " << d.ns << rsLog;
@@ -605,7 +606,7 @@ namespace mongo {
         // clean up oplog
         LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
         // todo: fatal error if this throws?
-        oplogCollection->details()->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
+        oplogCollection->temp_cappedTruncateAfter(h.commonPointOurDiskloc, false);
 
         Status status = getGlobalAuthorizationManager()->initialize();
         if (!status.isOK()) {

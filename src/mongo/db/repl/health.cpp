@@ -447,6 +447,11 @@ namespace mongo {
                 string s = theReplSet->hbmsg();
                 if( !s.empty() )
                     bb.append("infoMessage", s);
+
+                if (myState == MemberState::RS_PRIMARY) {
+                    bb.appendTimestamp("electionTime", theReplSet->getElectionTime().asDate());
+                    bb.appendDate("electionDate", theReplSet->getElectionTime().getSecs() * 1000LL);
+                }
             }
             bb.append("self", true);
             v.push_back(bb.obj());
@@ -486,6 +491,11 @@ namespace mongo {
             string syncingTo = m->hbinfo().syncingTo;
             if (!syncingTo.empty()) {
                 bb.append("syncingTo", syncingTo);
+            }
+
+            if (m->state() == MemberState::RS_PRIMARY) {
+                bb.appendTimestamp("electionTime", m->hbinfo().electionTime.asDate());
+                bb.appendDate("electionDate", m->hbinfo().electionTime.getSecs() * 1000LL);
             }
 
             v.push_back(bb.obj());

@@ -81,6 +81,28 @@ namespace optionenvironment {
         return Status::OK();
     }
 
+    /** Removes a Value from our Environment */
+    Status Environment::remove(const Key& remove_key) {
+
+        // 1. Save old values
+        std::map <Key, Value> old_values = values;
+
+        // 2. Remove value to be removed
+        values.erase(remove_key);
+
+        // 3. Validate only if our environment is already valid
+        if (valid) {
+            Status ret = validate();
+            if (!ret.isOK()) {
+                // 4. Revert to old values if this was invalid
+                values = old_values;
+                return ret;
+            }
+        }
+
+        return Status::OK();
+    }
+
     /** Set the default Value for the given Key in our Environment.  Always disallow empty values */
     Status Environment::setDefault(const Key& add_key, const Value& add_value) {
 
@@ -131,7 +153,7 @@ namespace optionenvironment {
     /** Validate the Environment by iterating over all our constraints and calling them on our
      *  Environment
      */
-    Status Environment::validate() {
+    Status Environment::validate(bool setValid) {
 
         // 1. Iterate and check all KeyConstraints
         typedef std::vector<KeyConstraint*>::iterator it_keyConstraint;
@@ -153,8 +175,10 @@ namespace optionenvironment {
             }
         }
 
-        // 3. Our Environment is now valid.  Record this and return success
-        valid = true;
+        // 3. Our Environment is now valid.  Record this if we should and return success
+        if (setValid) {
+            valid = true;
+        }
         return Status::OK();
     }
 

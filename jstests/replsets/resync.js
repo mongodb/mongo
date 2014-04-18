@@ -26,16 +26,16 @@ assert(master == conns[0], "conns[0] assumed to be master");
 assert(a_conn.host == master.host);
 
 // create an oplog entry with an insert
-A.foo.insert({x:1});
-A.foo.runCommand({getLastError : 1, w : 3, wtimeout : 60000});
+assert.writeOK( A.foo.insert({ x: 1 }, { writeConcern: { w: 3, wtimeout: 60000 }}));
 replTest.stop(BID);
 
 // insert enough to cycle oplog
+var bulk = A.foo.initializeUnorderedBulkOp();
 for (i=2; i < 10000; i++) {
-    A.foo.insert({x:i});
+    bulk.insert({x:i});
 }
 // wait for secondary to also have its oplog cycle
-A.foo.runCommand({getLastError : 1, w : 2, wtimeout : 60000});
+assert.writeOK(bulk.execute({ w: 2, wtimeout : 60000 }));
 
 // bring node B and it will enter recovery mode because its newest oplog entry is too old
 replTest.restart(BID);

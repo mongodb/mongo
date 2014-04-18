@@ -150,8 +150,8 @@ load('jstests/multiVersion/libs/multi_rs.js');
         upgrade : "",
         keyFile: keyfile
     });
-    assert.neq(null, mongos);
-    MongoRunner.stopMongos(mongos);
+    assert.eq(null, mongos);
+
     shardingTest.upgradeCluster(newVersion, { upgradeMetadata: true });
     asClusterAdmin(shardingTest.config.getMongo(), function restartBalancerAsAdmin() {
         shardingTest.startBalancer();

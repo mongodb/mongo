@@ -34,7 +34,6 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_exception.h"
@@ -69,6 +68,8 @@ namespace mongo {
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
+    extern int maxSyncSourceLagSecs;
+
     class ReplSetCmdline;
 
     // Main entry point for replica sets
@@ -196,6 +197,8 @@ namespace mongo {
         // This is a unique id that is changed each time we transition to PRIMARY, as the
         // result of an election.
         OID _electionId;
+        // PRIMARY server's time when the election to primary occurred
+        OpTime _electionTime;
     public:
         Consensus(ReplSetImpl *t) : rs(*t) {
             sleptLast = false;
@@ -216,6 +219,8 @@ namespace mongo {
 
         OID getElectionId() const { return _electionId; }
         void setElectionId(OID oid) { _electionId = oid; }
+        OpTime getElectionTime() const { return _electionTime; }
+        void setElectionTime(OpTime electionTime) { _electionTime = electionTime; }
     };
 
     /**
@@ -393,6 +398,7 @@ namespace mongo {
         void goStale(const Member* m, const BSONObj& o);
 
         OID getElectionId() const { return elect.getElectionId(); }
+        OpTime getElectionTime() const { return elect.getElectionTime(); }
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
@@ -538,7 +544,7 @@ namespace mongo {
         bool setMaintenanceMode(const bool inc);
 
         // Records a new slave's id in the GhostSlave map, at handshake time.
-        void registerSlave(const BSONObj& rid, const int memberId);
+        bool registerSlave(const BSONObj& rid, const int memberId);
     private:
         Member* head() const { return _members.head(); }
     public:
@@ -598,8 +604,6 @@ namespace mongo {
         static const int replPrefetcherThreadCount;
         threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
-
-        static const int maxSyncSourceLagSecs;
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
@@ -711,7 +715,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool logTheOp() { return false; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const { help << "internal"; }
 
         bool check(string& errmsg, BSONObjBuilder& result) {

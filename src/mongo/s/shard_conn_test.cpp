@@ -51,7 +51,7 @@ namespace mongo_test {
     class ShardConnFixture: public mongo::unittest::Test {
     public:
         void setUp() {
-            _maxPoolSizePerHost = mongo::PoolForHost::getMaxPerHost();
+            _maxPoolSizePerHost = mongo::shardConnectionPool.getMaxPoolSize();
 
             mongo::ConnectionString::setConnectionHook(
                     mongo::MockConnRegistry::get()->getConnStrHook());
@@ -68,7 +68,7 @@ namespace mongo_test {
             mongo::MockConnRegistry::get()->removeServer(_dummyServer->getServerAddress());
             delete _dummyServer;
 
-            mongo::PoolForHost::setMaxPerHost(_maxPoolSizePerHost);
+            mongo::shardConnectionPool.setMaxPoolSize(_maxPoolSizePerHost);
 
             mongo::clearGlobalAuthorizationManager();
         }
@@ -251,7 +251,7 @@ namespace mongo_test {
     }
 
     TEST_F(ShardConnFixture, InvalidateBadConnEvenWhenPoolIsFull) {
-        mongo::PoolForHost::setMaxPerHost(2);
+        mongo::shardConnectionPool.setMaxPoolSize(2);
 
         ShardConnection conn1(TARGET_HOST, "test.user");
         ShardConnection conn2(TARGET_HOST, "test.user");

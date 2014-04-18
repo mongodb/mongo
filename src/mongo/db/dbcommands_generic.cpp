@@ -55,6 +55,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/server.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/lruishmap.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/processinfo.h"
@@ -94,7 +96,7 @@ namespace mongo {
         CmdCloud() : Command( "cloud" ) { }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream &help ) const {
             help << "internal command facilitating running in certain cloud computing environments";
         }
@@ -121,7 +123,7 @@ namespace mongo {
         CmdBuildInfo() : Command( "buildInfo", true, "buildinfo" ) {}
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -149,7 +151,7 @@ namespace mongo {
         PingCommand() : Command( "ping" ) {}
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream &help ) const { help << "a way to check that the server is alive. responds immediately even if server is in a db lock."; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -164,7 +166,7 @@ namespace mongo {
         FeaturesCmd() : Command( "features", true ) {}
         void help(stringstream& h) const { h << "return build level feature settings"; }
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -191,7 +193,7 @@ namespace mongo {
             return true;
         }
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual void help( stringstream& help ) const {
             help << "returns information about the daemon's host";
@@ -230,7 +232,7 @@ namespace mongo {
     class LogRotateCmd : public Command {
     public:
         LogRotateCmd() : Command( "logRotate" ) {}
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -253,7 +255,7 @@ namespace mongo {
     public:
         virtual void help( stringstream &help ) const { help << "get a list of all db commands"; }
         ListCommandsCmd() : Command( "listCommands", false ) {}
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -288,7 +290,28 @@ namespace mongo {
 
     } listCommandsCmd;
 
+    namespace {
+        MONGO_FP_DECLARE(crashOnShutdown);
+
+        int* volatile illegalAddress;
+    }  // namespace
+
+    void CmdShutdown::addRequiredPrivileges(const std::string& dbname,
+        const BSONObj& cmdObj,
+        std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::shutdown);
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    }
+
     bool CmdShutdown::shutdownHelper() {
+        MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
+            const std::string crashHow = crashBlock.getData()["how"].str();
+            if (crashHow == "fault") {
+                ++*illegalAddress;
+            }
+            ::abort();
+        }
         Client * c = currentClient.get();
         if ( c ) {
             c->shutdown();
@@ -313,7 +336,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -328,7 +351,7 @@ namespace mongo {
     public:
         AvailableQueryOptions() : Command( "availableQueryOptions" , false , "availablequeryoptions" ) {}
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -343,7 +366,7 @@ namespace mongo {
         GetLogCmd() : Command( "getLog" ){}
 
         virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool adminOnly() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -393,7 +416,7 @@ namespace mongo {
     public:
         CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
         void help(stringstream& h) const { h << "get argv"; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,

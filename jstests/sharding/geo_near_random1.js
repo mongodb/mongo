@@ -29,7 +29,7 @@ for (var i = (test.nPts/10); i < test.nPts; i+= (test.nPts/10)){
 }
 
 // Turn balancer back on, for actual tests
-s.setBalancer( true )
+// s.setBalancer( true ) // SERVER-13365
 
 printShardingSizes()
 

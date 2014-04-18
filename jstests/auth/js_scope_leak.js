@@ -12,7 +12,6 @@ var test = conn.getDB("test");
 
 // insert a single document and add two test users
 test.foo.insert({a:1});
-test.getLastError();
 assert.eq(1, test.foo.findOne().a);
 test.createUser({user:'a', pwd: 'a', roles: jsTest.basicUserRoles});
 test.createUser({user:'b', pwd: 'b', roles: jsTest.basicUserRoles});

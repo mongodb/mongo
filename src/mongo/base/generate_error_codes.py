@@ -158,6 +158,8 @@ header_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/string_data.h"
 #include "mongo/client/export_macros.h"
 
@@ -177,19 +179,19 @@ namespace mongo {
             MaxError
         };
 
-        static const char* errorString(Error err);
+        static std::string errorString(Error err);
 
         /**
-         * Parse an Error from its "name".  Returns UnknownError if "name" is unrecognized.
+         * Parses an Error from its "name".  Returns UnknownError if "name" is unrecognized.
          *
          * NOTE: Also returns UnknownError for the string "UnknownError".
          */
         static Error fromString(const StringData& name);
 
         /**
-         * Parse an Error from its "code".  Returns UnknownError if "code" is unrecognized.
-         *
-         * NOTE: Also returns UnknownError for the integer code for UnknownError.
+         * Casts an integer "code" to an Error.  Unrecognized codes are preserved, meaning
+         * that the result of a call to fromInt() may not be one of the values in the
+         * Error enumeration.
          */
         static Error fromInt(int code);
 
@@ -218,13 +220,16 @@ source_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 
 #include "mongo/base/error_codes.h"
 
-#include <cstring>
+#include <boost/static_assert.hpp>
+
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    const char* ErrorCodes::errorString(Error err) {
+
+    std::string ErrorCodes::errorString(Error err) {
         switch (err) {
         %(symbol_to_string_cases)s;
-        default: return "Unknown error code";
+        default: return mongoutils::str::stream() << "Location" << err;
         }
     }
 
@@ -234,14 +239,14 @@ namespace mongo {
     }
 
     ErrorCodes::Error ErrorCodes::fromInt(int code) {
-        switch (code) {
-        %(int_to_symbol_cases)s;
-        default:
-            return UnknownError;
-        }
+        return static_cast<Error>(code);
     }
 
     %(error_code_class_predicate_definitions)s
+
+namespace {
+    BOOST_STATIC_ASSERT(sizeof(ErrorCodes::Error) == sizeof(int));
+}  // namespace
 }  // namespace mongo
 '''
 

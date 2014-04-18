@@ -106,7 +106,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     TEST(Normal, ComplexDoc){
@@ -123,7 +123,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     TEST(Normal, OnlyIdField){
@@ -140,7 +140,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     // These updates have to do with updates without an _id field
@@ -159,7 +159,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     TEST(IdLeft, EmptyDoc){
@@ -176,7 +176,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     TEST(IdLeft, SingleFieldAddition){
@@ -193,7 +193,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     TEST(IdLeft, SingleFieldReplaced){
@@ -210,7 +210,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(mod.obj(), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     TEST(IdLeft, SwapFields){
@@ -227,7 +227,7 @@ namespace {
         Document logDoc;
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
-        ASSERT_EQUALS(fromjson("{b:1}"), logDoc);
+        ASSERT_EQUALS(doc, logDoc);
     }
 
     TEST(IdImmutable, ReplaceIdNumber){

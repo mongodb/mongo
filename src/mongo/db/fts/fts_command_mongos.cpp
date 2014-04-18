@@ -54,10 +54,6 @@ namespace mongo {
             double score;
         };
 
-
-        // all grid commands are designed not to lock
-        Command::LockType FTSCommand::locktype() const { return NONE; }
-
         bool FTSCommand::_run(const string& dbName,
                               BSONObj& cmdObj,
                               int cmdOptions,

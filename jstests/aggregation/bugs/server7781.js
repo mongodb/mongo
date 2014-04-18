@@ -66,10 +66,12 @@ function test(db, sharded, indexType) {
 
     // insert points
     var numPts = 10*1000;
+    var bulk = db[coll].initializeUnorderedBulkOp();
     for (var i=0; i < numPts; i++) {
-        db[coll].insert({rand:Math.random(), loc: pointMaker.mkPt()});
+        bulk.insert({ rand: Math.random(), loc: pointMaker.mkPt() });
     }
-    db.getLastError();
+    assert.writeOK(bulk.execute());
+
     assert.eq(db[coll].count(), numPts);
 
     db[coll].ensureIndex({loc: indexType});

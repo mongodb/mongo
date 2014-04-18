@@ -66,6 +66,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -87,6 +88,9 @@
 using namespace std;
 
 namespace mongo {
+
+    MONGO_FP_DECLARE(failMigrationCommit);
+    MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
 
     Tee* migrateLog = RamLog::get("migrate");
 
@@ -184,7 +188,7 @@ namespace mongo {
         }
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
 
     };
 
@@ -316,7 +320,8 @@ namespace mongo {
                 break;
 
             case 'u':
-                if ( ! Helpers::findById( cc() , _ns.c_str() , ide.wrap() , it ) ) {
+                Client::Context ctx( _ns );
+                if ( ! Helpers::findById( ctx.db(), _ns.c_str(), ide.wrap(), it ) ) {
                     warning() << "logOpForSharding couldn't find: " << ide << " even though should have" << migrateLog;
                     return;
                 }
@@ -331,7 +336,7 @@ namespace mongo {
             _memoryUsed += ide.size() + 5;
         }
 
-        void xfer( list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ) {
+        void xfer( Database* db, list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ) {
             const long long maxSize = 1024 * 1024;
 
             if ( l->size() == 0 || size > maxSize )
@@ -345,7 +350,7 @@ namespace mongo {
                 BSONObj t = *i;
                 if ( explode ) {
                     BSONObj it;
-                    if ( Helpers::findById( cc() , _ns.c_str() , t, it ) ) {
+                    if ( Helpers::findById( db , _ns.c_str() , t, it ) ) {
                         arr.append( it );
                         size += it.objsize();
                     }
@@ -375,8 +380,8 @@ namespace mongo {
             {
                 Client::ReadContext cx( _ns );
 
-                xfer( &_deleted , b , "deleted" , size , false );
-                xfer( &_reload , b , "reload" , size , true );
+                xfer( cx.ctx().db(), &_deleted, b, "deleted", size, false );
+                xfer( cx.ctx().db(), &_reload, b, "reload", size, true );
             }
 
             b.append( "size" , size );
@@ -430,7 +435,7 @@ namespace mongo {
             long long avgRecSize;
             const long long totalRecs = collection->numRecords();
             if ( totalRecs > 0 ) {
-                avgRecSize = collection->details()->dataSize() / totalRecs;
+                avgRecSize = collection->dataSize() / totalRecs;
                 maxRecsWhenFull = maxChunkSize / avgRecSize;
                 maxRecsWhenFull = std::min( (unsigned long long)(Chunk::MaxObjectPerChunk + 1) , 130 * maxRecsWhenFull / 100 /* slack */ );
             }
@@ -502,22 +507,26 @@ namespace mongo {
 
                 {
                     Client::ReadContext ctx( _ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( _ns );
+
                     scoped_spinlock lk( _trackerLocks );
                     set<DiskLoc>::iterator i = _cloneLocs.begin();
                     for ( ; i!=_cloneLocs.end(); ++i ) {
                         if (tracker.intervalHasElapsed()) // should I yield?
                             break;
                         
+                        invariant( collection );
+
                         DiskLoc dl = *i;
                         
-                        Record* r = dl.rec();
+                        Record* r = collection->getRecordStore()->recordFor( dl );
                         if ( ! r->likelyInPhysicalMemory() ) {
                             fileLock.reset( new LockMongoFilesShared() );
                             recordToTouch = r;
                             break;
                         }
                         
-                        BSONObj o = dl.obj();
+                        BSONObj o = collection->docFor( dl );
 
                         // use the builder size instead of accumulating 'o's size so that we take into consideration
                         // the overhead of BSONArray indices, and *always* append one doc
@@ -777,7 +786,7 @@ namespace mongo {
 
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
@@ -1046,9 +1055,9 @@ namespace mongo {
 
             // 3.
 
-            CollectionMetadataPtr collMetadata = shardingState.getCollectionMetadata( ns );
-            verify( collMetadata != NULL );
-            BSONObj shardKeyPattern = collMetadata->getKeyPattern();
+            const CollectionMetadataPtr origCollMetadata( shardingState.getCollectionMetadata( ns ) );
+            verify( origCollMetadata != NULL );
+            BSONObj shardKeyPattern = origCollMetadata->getKeyPattern();
             if ( shardKeyPattern.isEmpty() ){
                 errmsg = "no shard key found";
                 return false;
@@ -1255,7 +1264,7 @@ namespace mongo {
                     ok = false;
                 }
 
-                if ( !ok ) {
+                if ( !ok || MONGO_FAIL_POINT(failMigrationCommit) ) {
                     log() << "moveChunk migrate commit not accepted by TO-shard: " << res
                           << " resetting shard version to: " << startingVersion << migrateLog;
                     {
@@ -1266,7 +1275,7 @@ namespace mongo {
 
                         // revert the chunk manager back to the state before "forgetting" about the
                         // chunk
-                        shardingState.undoDonateChunk( ns, collMetadata );
+                        shardingState.undoDonateChunk( ns, origCollMetadata );
                     }
                     log() << "Shard version successfully reset to clean up failed migration"
                           << endl;
@@ -1321,13 +1330,14 @@ namespace mongo {
                 // if we have chunks left on the FROM shard, update the version of one of them as
                 // well.  we can figure that out by grabbing the metadata installed on 5.a
 
-                collMetadata = shardingState.getCollectionMetadata( ns );
-                if( collMetadata->getNumChunks() > 0 ) {
+                const CollectionMetadataPtr bumpedCollMetadata( shardingState.getCollectionMetadata( ns ) );
+                if( bumpedCollMetadata->getNumChunks() > 0 ) {
 
                     // get another chunk on that shard
                     ChunkType bumpChunk;
-                    bool result = collMetadata->getNextChunk( collMetadata->getMinKey(),
-                                                              &bumpChunk );
+                    bool result = 
+                        bumpedCollMetadata->getNextChunk( bumpedCollMetadata->getMinKey(),
+                                                          &bumpChunk );
                     BSONObj bumpMin = bumpChunk.getMin();
                     BSONObj bumpMax = bumpChunk.getMax();
 
@@ -1391,6 +1401,13 @@ namespace mongo {
                 ok = false;
                 BSONObj cmdResult;
                 try {
+                    
+                    // For testing migration failures
+                    if ( MONGO_FAIL_POINT(failMigrationConfigWritePrepare) ) {
+                        throw DBException( "mock migration failure before config write",
+                                           PrepareConfigsFailedCode );
+                    }
+
                     ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
                     ok = conn->runCommand( "config" , cmd , cmdResult );
                     conn.done();
@@ -1421,7 +1438,7 @@ namespace mongo {
 
                         // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
-                        shardingState.undoDonateChunk( ns, collMetadata );
+                        shardingState.undoDonateChunk( ns, origCollMetadata );
                     }
 
                     log() << "Shard version successfully reset to clean up failed migration" << endl;
@@ -1636,16 +1653,14 @@ namespace mongo {
                     string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
                     if ( entry["options"].isABSONObj() ) {
-                        string errmsg;
-                        if ( ! userCreateNS( ns.c_str(), entry["options"].Obj(), errmsg, true, 0 ) )
-                            warning() << "failed to create collection with options: " << errmsg
-                                      << endl;
+                        Status status = userCreateNS( db, ns, entry["options"].Obj(), true, 0 );
+                        if ( !status.isOK() ) {
+                            warning() << "failed to create collection [" << ns << "] "
+                                      << " with options: " << status;
+                        }
                     }
                     else {
-                        db->createCollection( ns,
-                                              false /* capped */,
-                                              NULL /* options */,
-                                              true /* allocateDefaultSpace */ );
+                        db->createCollection( ns );
                     }
                 }
             }
@@ -1679,7 +1694,6 @@ namespace mongo {
                         errmsg = str::stream() << "failed to create index before migrating data. "
                                                << " idx: " << idx
                                                << " error: " << status.toString();
-                        errmsg = str::stream() << "collection dropped during migration: " << ns;
                         warning() << errmsg;
                         state = FAIL;
                         return;
@@ -1765,7 +1779,7 @@ namespace mongo {
                                     Client::WriteContext cx( ns );
 
                                     BSONObj localDoc;
-                                    if ( willOverrideLocalId( o, &localDoc ) ) {
+                                    if ( willOverrideLocalId( cx.ctx().db(), o, &localDoc ) ) {
                                         string errMsg =
                                             str::stream() << "cannot migrate chunk, local document "
                                                           << localDoc
@@ -1968,7 +1982,7 @@ namespace mongo {
 
                     // do not apply deletes if they do not belong to the chunk being migrated
                     BSONObj fullObj;
-                    if ( Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
+                    if ( Helpers::findById( cx.ctx().db(), ns.c_str(), id, fullObj ) ) {
                         if ( ! isInRange( fullObj , min , max , shardKeyPattern ) ) {
                             log() << "not applying out of range deletion: " << fullObj << migrateLog;
 
@@ -2001,7 +2015,7 @@ namespace mongo {
                     BSONObj it = i.next().Obj();
 
                     BSONObj localDoc;
-                    if ( willOverrideLocalId( it, &localDoc ) ) {
+                    if ( willOverrideLocalId( cx.ctx().db(), it, &localDoc ) ) {
                         string errMsg =
                             str::stream() << "cannot migrate chunk, local document "
                                           << localDoc
@@ -2031,10 +2045,10 @@ namespace mongo {
          * Must be in WriteContext to avoid races and DBHelper errors.
          * TODO: Could optimize this check out if sharding on _id.
          */
-        bool willOverrideLocalId( BSONObj remoteDoc, BSONObj* localDoc ) {
+        bool willOverrideLocalId( Database* db, BSONObj remoteDoc, BSONObj* localDoc ) {
 
             *localDoc = BSONObj();
-            if ( Helpers::findById( cc(), ns.c_str(), remoteDoc, *localDoc ) ) {
+            if ( Helpers::findById( db, ns.c_str(), remoteDoc, *localDoc ) ) {
                 return !isInRange( *localDoc , min , max , shardKeyPattern );
             }
 
@@ -2167,7 +2181,7 @@ namespace mongo {
         void help(stringstream& h) const { h << "internal"; }
         RecvChunkStartCommand() : ChunkCommandHelper( "_recvChunkStart" ) {}
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {

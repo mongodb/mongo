@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
@@ -61,13 +62,13 @@ namespace mongo {
                  dbName < dbNames.end();
                  dbName++) {
                 Client::ReadContext ctx(*dbName);
-                Database* db = cc().database();
+                Database* db = ctx.ctx().db();
                 db->namespaceIndex().getNamespaces(collNames, /* onlyCollections */ true);
             }
             checkNS(collNames);
         }
-        catch (const DBException&) {
-            warning() << "index rebuilding did not complete" << endl;
+        catch (const DBException& e) {
+            warning() << "Index rebuilding did not complete: " << e.what() << endl;
         }
         boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
         ReplSet::rss.indexRebuildDone = true;
@@ -95,7 +96,7 @@ namespace mongo {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
             if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
-                warning() << ns << " had ilegal indexes, removing";
+                warning() << ns << " had illegal indexes, removing";
                 indexCatalog->dropAllIndexes( true );
                 continue;
             }

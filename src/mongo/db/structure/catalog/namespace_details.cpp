@@ -45,6 +45,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/extent.h"
 #include "mongo/db/structure/catalog/hashtab.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/startup_test.h"
@@ -52,18 +53,6 @@
 
 namespace mongo {
 
-    static Counter64 freelistAllocs;
-    static Counter64 freelistBucketExhausted;
-    static Counter64 freelistIterations;
-
-    static ServerStatusMetricField<Counter64> dFreelist1( "storage.freelist.search.requests",
-                                                          &freelistAllocs );
-
-    static ServerStatusMetricField<Counter64> dFreelist2( "storage.freelist.search.bucketExhausted",
-                                                          &freelistBucketExhausted );
-
-    static ServerStatusMetricField<Counter64> dFreelist3( "storage.freelist.search.scanned",
-                                                          &freelistIterations );
 
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
@@ -93,8 +82,10 @@ namespace mongo {
         // Signal that we are on first allocation iteration through extents.
         _capFirstNewRecord.setInvalid();
         // For capped case, signal that we are doing initial extent allocation.
-        if ( capped )
-            cappedLastDelRecLastExtent().setInvalid();
+        if ( capped ) {
+            // WAS: cappedLastDelRecLastExtent().setInvalid();
+            _deletedList[1].setInvalid();
+        }
         verify( sizeof(_dataFileVersion) == 2 );
         _dataFileVersion = 0;
         _indexFileVersion = 0;
@@ -103,44 +94,6 @@ namespace mongo {
         _extraOffset = 0;
         _indexBuildsInProgress = 0;
         memset(_reserved, 0, sizeof(_reserved));
-    }
-
-    void NamespaceDetails::addDeletedRec(DeletedRecord *d, DiskLoc dloc) {
-        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
-
-        {
-            Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
-            d = &r->asDeleted();
-            // defensive code: try to make us notice if we reference a deleted record
-            reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
-        }
-        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
-        if ( isCapped() ) {
-            if ( !cappedLastDelRecLastExtent().isValid() ) {
-                // Initial extent allocation.  Insert at end.
-                d->nextDeleted() = DiskLoc();
-                if ( cappedListOfAllDeletedRecords().isNull() )
-                    getDur().writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
-                else {
-                    DiskLoc i = cappedListOfAllDeletedRecords();
-                    for (; !i.drec()->nextDeleted().isNull(); i = i.drec()->nextDeleted() )
-                        ;
-                    i.drec()->nextDeleted().writing() = dloc;
-                }
-            }
-            else {
-                d->nextDeleted() = cappedFirstDeletedInCurExtent();
-                getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
-                // always compact() after this so order doesn't matter
-            }
-        }
-        else {
-            int b = bucket(d->lengthWithHeaders());
-            DiskLoc& list = _deletedList[b];
-            DiskLoc oldHead = list;
-            getDur().writingDiskLoc(list) = dloc;
-            d->nextDeleted() = oldHead;
-        }
     }
 
     /* @return the size for an allocated record quantized to 1/16th of the BucketSize
@@ -171,164 +124,6 @@ namespace mongo {
             allocationSize = 1 + ( allocSize | ( ( 1 << 20 ) - 1 ) );
         }
         return allocationSize;
-    }
-
-    /** allocate space for a new record from deleted lists.
-        @param lenToAlloc is WITH header
-        @return null diskloc if no room - allocate a new extent then
-    */
-    DiskLoc NamespaceDetails::alloc(Collection* collection, const StringData& ns, int lenToAlloc) {
-        // if we are capped, collection must be non-NULL
-        invariant( !isCapped() || collection );
-
-        {
-            // align very slightly.
-            lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
-        }
-
-        DiskLoc loc = _alloc(collection, ns, lenToAlloc);
-        if ( loc.isNull() )
-            return loc;
-
-        DeletedRecord *r = loc.drec();
-        //r = getDur().writing(r);
-
-        /* note we want to grab from the front so our next pointers on disk tend
-        to go in a forward direction which is important for performance. */
-        int regionlen = r->lengthWithHeaders();
-        verify( r->extentOfs() < loc.getOfs() );
-
-        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << endl;
-
-        int left = regionlen - lenToAlloc;
-        if ( ! isCapped() ) {
-            if ( left < 24 || left < (lenToAlloc >> 3) ) {
-                // you get the whole thing.
-                return loc;
-            }
-        }
-
-        // don't quantize:
-        //   - capped collections: just wastes space
-        //   - $ collections (indexes) as we already have those aligned the way we want SERVER-8425
-        if ( !isCapped() && NamespaceString::normal( ns ) ) {
-            // we quantize here so that it only impacts newly sized records
-            // this prevents oddities with older records and space re-use SERVER-8435
-            lenToAlloc = std::min( r->lengthWithHeaders(),
-                                   NamespaceDetails::quantizeAllocationSpace( lenToAlloc ) );
-            left = regionlen - lenToAlloc;
-
-            if ( left < 24 ) {
-                // you get the whole thing.
-                return loc;
-            }
-        }
-
-        /* split off some for further use. */
-        getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
-        DiskLoc newDelLoc = loc;
-        newDelLoc.inc(lenToAlloc);
-        DeletedRecord* newDel = newDelLoc.drec();
-        DeletedRecord* newDelW = getDur().writing(newDel);
-        newDelW->extentOfs() = r->extentOfs();
-        newDelW->lengthWithHeaders() = left;
-        newDelW->nextDeleted().Null();
-
-        addDeletedRec(newDel, newDelLoc);
-
-        return loc;
-    }
-
-    /* for non-capped collections.
-       @param peekOnly just look up where and don't reserve
-       returned item is out of the deleted list upon return
-    */
-    DiskLoc NamespaceDetails::__stdAlloc(int len, bool peekOnly) {
-        freelistAllocs.increment();
-        DiskLoc *prev;
-        DiskLoc *bestprev = 0;
-        DiskLoc bestmatch;
-        int bestmatchlen = 0x7fffffff;
-        int b = bucket(len);
-        DiskLoc cur = _deletedList[b];
-        prev = &_deletedList[b];
-        int extra = 5; // look for a better fit, a little.
-        int chain = 0;
-        while ( 1 ) {
-            { // defensive check
-                int fileNumber = cur.a();
-                int fileOffset = cur.getOfs();
-                if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
-                    StringBuilder sb;
-                    sb << "Deleted record list corrupted in bucket " << b
-                       << ", link number " << chain
-                       << ", invalid link is " << cur.toString()
-                       << ", throwing Fatal Assertion";
-                    problem() << sb.str() << endl;
-                    fassertFailed(16469);
-                }
-            }
-            if ( cur.isNull() ) {
-                // move to next bucket.  if we were doing "extra", just break
-                if ( bestmatchlen < 0x7fffffff )
-                    break;
-
-                if ( chain > 0 ) {
-                    // if we looked at things in the right bucket, but they were not suitable
-                    freelistBucketExhausted.increment();
-                }
-
-                b++;
-                if ( b > MaxBucket ) {
-                    // out of space. alloc a new extent.
-                    freelistIterations.increment( 1 + chain );
-                    return DiskLoc();
-                }
-                cur = _deletedList[b];
-                prev = &_deletedList[b];
-                continue;
-            }
-            DeletedRecord *r = cur.drec();
-            if ( r->lengthWithHeaders() >= len &&
-                 r->lengthWithHeaders() < bestmatchlen ) {
-                bestmatchlen = r->lengthWithHeaders();
-                bestmatch = cur;
-                bestprev = prev;
-                if (r->lengthWithHeaders() == len)
-                    // exact match, stop searching
-                    break;
-            }
-            if ( bestmatchlen < 0x7fffffff && --extra <= 0 )
-                break;
-            if ( ++chain > 30 && b < MaxBucket ) {
-                // too slow, force move to next bucket to grab a big chunk
-                //b++;
-                freelistIterations.increment( chain );
-                chain = 0;
-                cur.Null();
-            }
-            else {
-                /*this defensive check only made sense for the mmap storage engine:
-                  if ( r->nextDeleted.getOfs() == 0 ) {
-                    problem() << "~~ Assertion - bad nextDeleted " << r->nextDeleted.toString() <<
-                    " b:" << b << " chain:" << chain << ", fixing.\n";
-                    r->nextDeleted.Null();
-                }*/
-                cur = r->nextDeleted();
-                prev = &r->nextDeleted();
-            }
-        }
-
-        /* unlink ourself from the deleted list */
-        if( !peekOnly ) {
-            DeletedRecord *bmr = bestmatch.drec();
-            *getDur().writing(bestprev) = bmr->nextDeleted();
-            bmr->nextDeleted().writing().setInvalid(); // defensive.
-            verify(bmr->extentOfs() < bestmatch.getOfs());
-        }
-
-        freelistIterations.increment( 1 + chain );
-        return bestmatch;
     }
 
     DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
@@ -367,33 +162,25 @@ namespace mongo {
         }
     }
 
-    /* alloc with capped table handling. */
-    DiskLoc NamespaceDetails::_alloc(Collection* collection, const StringData& ns, int len) {
-        if ( ! isCapped() )
-            return __stdAlloc(len, false);
-
-        return cappedAlloc(collection, ns,len);
-    }
-
-    NamespaceDetails::Extra* NamespaceDetails::allocExtra(const char *ns, int nindexessofar) {
+    NamespaceDetails::Extra* NamespaceDetails::allocExtra( const StringData& ns,
+                                                           NamespaceIndex& ni,
+                                                           int nindexessofar) {
         Lock::assertWriteLocked(ns);
-
-        NamespaceIndex *ni = nsindex(ns);
 
         int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
         verify( i >= 0 && i <= 1 );
 
-        Namespace fullns(ns);
-        Namespace extrans(fullns.extraName(i)); // throws userexception if ns name too long
+        Namespace fullns( ns );
+        Namespace extrans( fullns.extraName(i) ); // throws UserException if ns name too long
 
-        massert( 10350 ,  "allocExtra: base ns missing?", this );
-        massert( 10351 ,  "allocExtra: extra already exists", ni->details(extrans) == 0 );
+        massert( 10350, "allocExtra: base ns missing?", this );
+        massert( 10351, "allocExtra: extra already exists", ni.details(extrans) == 0 );
 
         Extra temp;
         temp.init();
 
-        ni->add_ns( extrans, reinterpret_cast<NamespaceDetails*>( &temp ) );
-        Extra* e = reinterpret_cast<NamespaceDetails::Extra*>( ni->details( extrans ) );
+        ni.add_ns( extrans, reinterpret_cast<NamespaceDetails*>( &temp ) );
+        Extra* e = reinterpret_cast<NamespaceDetails::Extra*>( ni.details( extrans ) );
 
         long ofs = e->ofsFrom(this);
         if( i == 0 ) {
@@ -436,13 +223,15 @@ namespace mongo {
         return true;
     }
 
-    IndexDetails& NamespaceDetails::getNextIndexDetails(const char* thisns) {
+    IndexDetails& NamespaceDetails::getNextIndexDetails(Collection* collection) {
         IndexDetails *id;
         try {
             id = &idx(getTotalIndexCount(), true);
         }
         catch(DBException&) {
-            allocExtra(thisns, getTotalIndexCount());
+            allocExtra(collection->ns().ns(),
+                       collection->_database->namespaceIndex(),
+                       getTotalIndexCount());
             id = &idx(getTotalIndexCount(), false);
         }
         return *id;
@@ -472,19 +261,54 @@ namespace mongo {
         return e->details[i];
     }
 
+
+    const IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected) const {
+        if( idxNo < NIndexesBase ) {
+            const IndexDetails& id = _indexes[idxNo];
+            return id;
+        }
+        const Extra *e = extra();
+        if ( ! e ) {
+            if ( missingExpected )
+                throw MsgAssertionException( 17421 , "Missing Extra" );
+            massert(17422, "missing Extra", e);
+        }
+        int i = idxNo - NIndexesBase;
+        if( i >= NIndexesExtra ) {
+            e = e->next(this);
+            if ( ! e ) {
+                if ( missingExpected )
+                    throw MsgAssertionException( 17423 , "missing extra" );
+                massert(17424, "missing Extra", e);
+            }
+            i -= NIndexesExtra;
+        }
+        return e->details[i];
+    }
+
+
+    NamespaceDetails::IndexIterator::IndexIterator(const NamespaceDetails *_d,
+                                                   bool includeBackgroundInProgress) {
+        d = _d;
+        i = 0;
+        n = includeBackgroundInProgress ? d->getTotalIndexCount() : d->_nIndexes;
+    }
+
     // must be called when renaming a NS to fix up extra
-    void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) {
+    void NamespaceDetails::copyingFrom( const char* thisns,
+                                        NamespaceIndex& ni,
+                                        NamespaceDetails* src) {
         _extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
         Extra *se = src->extra();
         int n = NIndexesBase;
         if( se ) {
-            Extra *e = allocExtra(thisns, n);
+            Extra *e = allocExtra(thisns, ni, n);
             while( 1 ) {
                 n += NIndexesExtra;
                 e->copy(this, *se);
                 se = se->next(src);
                 if( se == 0 ) break;
-                Extra *nxt = allocExtra(thisns, n);
+                Extra *nxt = allocExtra(thisns, ni, n);
                 e->setNext( nxt->ofsFrom(this) );
                 e = nxt;
             }
@@ -589,11 +413,11 @@ namespace mongo {
         Lock::assertWriteLocked( ns );
 
         string system_namespaces = nsToDatabaseSubstring(ns).toString() + ".system.namespaces";
+        Collection* coll = cc().getContext()->db()->getCollection( system_namespaces );
 
-        DiskLoc oldLocation = Helpers::findOne( system_namespaces, BSON( "name" << ns ), false );
+        DiskLoc oldLocation = Helpers::findOne( coll, BSON( "name" << ns ), false );
         fassert( 17247, !oldLocation.isNull() );
 
-        Collection* coll = cc().database()->getCollection( system_namespaces );
         BSONObj oldEntry = coll->docFor( oldLocation );
 
         BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
@@ -713,7 +537,7 @@ namespace mongo {
     }
 
     int NamespaceDetails::_catalogFindIndexByName(const StringData& name,
-                                                  bool includeBackgroundInProgress) {
+                                                  bool includeBackgroundInProgress) const {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
             if ( name == i.next().info.obj().getStringField("name") )
@@ -723,26 +547,6 @@ namespace mongo {
     }
 
     /* ------------------------------------------------------------------------- */
-
-    bool legalClientSystemNS( const StringData& ns , bool write ) {
-        if( ns == "local.system.replset" ) return true;
-
-        if ( ns.find( ".system.users" ) != string::npos )
-            return true;
-
-        if ( ns == "admin.system.roles" ) return true;
-        if ( ns == "admin.system.version" ) return true;
-        if ( ns == "admin.system.new_users" ) return true;
-        if ( ns == "admin.system.backup_users" ) return true;
-
-        if ( ns.find( ".system.js" ) != string::npos ) {
-            if ( write )
-                Scope::storedFuncMod();
-            return true;
-        }
-
-        return false;
-    }
 
     class IndexUpdateTest : public StartupTest {
     public:

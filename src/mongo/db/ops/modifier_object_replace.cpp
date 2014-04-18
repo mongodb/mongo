@@ -179,9 +179,13 @@ namespace mongo {
         Status status = logBuilder->getReplacementObject(&replacementObject);
 
         if (status.isOK()) {
-            BSONObjIterator it(_val);
-            while (status.isOK() && it.more())
-                status = replacementObject.appendElement(it.next());
+            mutablebson::Element current = _preparedState->doc.root().leftChild();
+            while (current.ok()) {
+                status = replacementObject.appendElement(current.getValue());
+                if (!status.isOK())
+                    return status;
+                current = current.rightSibling();
+            }
         }
 
         return status;

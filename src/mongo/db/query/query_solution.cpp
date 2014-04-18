@@ -79,6 +79,19 @@ namespace mongo {
         addCommon(ss, indent);
     }
 
+    QuerySolutionNode* TextNode::clone() const {
+        TextNode* copy = new TextNode();
+        cloneBaseData(copy);
+
+        copy->_sort = this->_sort;
+        copy->indexKeyPattern = this->indexKeyPattern;
+        copy->query = this->query;
+        copy->language = this->language;
+        copy->indexPrefix = this->indexPrefix;
+
+        return copy;
+    }
+
     //
     // CollectionScanNode
     //
@@ -92,9 +105,22 @@ namespace mongo {
         *ss <<  "ns = " << name << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString();
+            *ss << "filter = " << filter->toString();
         }
         addCommon(ss, indent);
+    }
+
+    QuerySolutionNode* CollectionScanNode::clone() const {
+        CollectionScanNode* copy = new CollectionScanNode();
+        cloneBaseData(copy);
+
+        copy->_sort = this->_sort;
+        copy->name = this->name;
+        copy->tailable = this->tailable;
+        copy->direction = this->direction;
+        copy->maxScan = this->maxScan;
+
+        return copy;
     }
 
     //
@@ -142,6 +168,15 @@ namespace mongo {
         return false;
     }
 
+    QuerySolutionNode* AndHashNode::clone() const {
+        AndHashNode* copy = new AndHashNode();
+        cloneBaseData(copy);
+
+        copy->_sort = this->_sort;
+
+        return copy;
+    }
+
     //
     // AndSortedNode
     //
@@ -185,6 +220,15 @@ namespace mongo {
             }
         }
         return false;
+    }
+
+    QuerySolutionNode* AndSortedNode::clone() const {
+        AndSortedNode* copy = new AndSortedNode();
+        cloneBaseData(copy);
+
+        copy->_sort = this->_sort;
+
+        return copy;
     }
 
     //
@@ -237,6 +281,16 @@ namespace mongo {
         return true;
     }
 
+    QuerySolutionNode* OrNode::clone() const {
+        OrNode* copy = new OrNode();
+        cloneBaseData(copy);
+
+        copy->_sort = this->_sort;
+        copy->dedup = this->dedup;
+
+        return copy;
+    }
+
     //
     // MergeSortNode
     //
@@ -287,6 +341,17 @@ namespace mongo {
         return true;
     }
 
+    QuerySolutionNode* MergeSortNode::clone() const {
+        MergeSortNode* copy = new MergeSortNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+        copy->dedup = this->dedup;
+        copy->sort = this->sort;
+
+        return copy;
+    }
+
     //
     // FetchNode
     //
@@ -309,6 +374,15 @@ namespace mongo {
         children[0]->appendToString(ss, indent + 2);
     }
 
+    QuerySolutionNode* FetchNode::clone() const {
+        FetchNode* copy = new FetchNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+
+        return copy;
+    }
+
     //
     // IndexScanNode
     //
@@ -323,14 +397,12 @@ namespace mongo {
         *ss << "keyPattern = " << indexKeyPattern << '\n';
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter= " << filter->toString() << '\n';
+            *ss << "filter = " << filter->toString();
         }
         addIndent(ss, indent + 1);
         *ss << "direction = " << direction << '\n';
         addIndent(ss, indent + 1);
         *ss << "bounds = " << bounds.toString() << '\n';
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << '\n';
         addCommon(ss, indent);
     }
 
@@ -443,26 +515,53 @@ namespace mongo {
         // Since this involves a powerset, we only remove point intervals that the prior sort
         // planning code removed, namely the contiguous prefix of the key pattern.
         BSONObjIterator it(sortPattern);
-        BSONObjBuilder prefixBob;
+        BSONObjBuilder suffixBob;
         while (it.more()) {
             BSONElement elt = it.next();
-            // XXX string slowness.  fix when bounds are stringdata not string.
+            // TODO: string slowness.  fix when bounds are stringdata not string.
             if (equalityFields.end() == equalityFields.find(string(elt.fieldName()))) {
-                prefixBob.append(elt);
+                suffixBob.append(elt);
                 // This field isn't a point interval, can't drop.
                 break;
             }
         }
 
         while (it.more()) {
-            prefixBob.append(it.next());
+            suffixBob.append(it.next());
         }
 
-        // If we have an index {a:1} and an equality on 'a' don't append an empty sort order.
-        BSONObj filterPointsObj = prefixBob.obj();
-        if (!filterPointsObj.isEmpty()) {
-            _sorts.insert(filterPointsObj);
+        // We've found the suffix following the contiguous prefix of equality fields.
+        //   Ex. For index {a: 1, b: 1, c: 1, d: 1} and query {a: 3, b: 5}, this suffix
+        //   of the key pattern is {c: 1, d: 1}.
+        //
+        // Now we have to add all prefixes of this suffix as possible sort orders.
+        //   Ex. Continuing the example from above, we have to include sort orders
+        //   {c: 1} and {c: 1, d: 1}.
+        BSONObj filterPointsObj = suffixBob.obj();
+        for (int i = 0; i < filterPointsObj.nFields(); ++i) {
+            // Make obj out of fields [0,i]
+            BSONObjIterator it(filterPointsObj);
+            BSONObjBuilder prefixBob;
+            for (int j = 0; j <= i; ++j) {
+                prefixBob.append(it.next());
+            }
+            _sorts.insert(prefixBob.obj());
         }
+    }
+
+    QuerySolutionNode* IndexScanNode::clone() const {
+        IndexScanNode* copy = new IndexScanNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+        copy->indexKeyPattern = this->indexKeyPattern;
+        copy->indexIsMultiKey = this->indexIsMultiKey;
+        copy->direction = this->direction;
+        copy->maxScan = this->maxScan;
+        copy->addKeyMetadata = this->addKeyMetadata;
+        copy->bounds = this->bounds;
+
+        return copy;
     }
 
     //
@@ -474,9 +573,35 @@ namespace mongo {
         *ss << "PROJ\n";
         addIndent(ss, indent + 1);
         *ss << "proj = " << projection.toString() << '\n';
+        addIndent(ss, indent + 1);
+        if (DEFAULT == projType) {
+            *ss << "type = DEFAULT\n";
+        }
+        else if (COVERED_ONE_INDEX == projType) {
+            *ss << "type = COVERED_ONE_INDEX\n";
+        }
+        else {
+            invariant(SIMPLE_DOC == projType);
+            *ss << "type = SIMPLE_DOC\n";
+        }
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
+    }
+
+    QuerySolutionNode* ProjectionNode::clone() const {
+        ProjectionNode* copy = new ProjectionNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+        copy->fullExpression = this->fullExpression;
+
+        // This MatchExpression* is owned by the canonical query, not by the
+        // ProjectionNode. Just copying the pointer is fine.
+        copy->projection = this->projection;
+
+        return copy;
     }
 
     //
@@ -493,8 +618,21 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "limit = " << limit << '\n';
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
+    }
+
+    QuerySolutionNode* SortNode::clone() const {
+        SortNode* copy = new SortNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+        copy->pattern = this->pattern;
+        copy->query = this->query;
+        copy->limit = this->limit;
+
+        return copy;
     }
 
     //
@@ -509,8 +647,18 @@ namespace mongo {
         *ss << "limit = " << limit << '\n';
         addIndent(ss, indent + 1);
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
+    }
+
+    QuerySolutionNode* LimitNode::clone() const {
+        LimitNode* copy = new LimitNode();
+        cloneBaseData(copy);
+
+        copy->limit = this->limit;
+
+        return copy;
     }
 
     //
@@ -523,8 +671,18 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "skip= " << skip << '\n';
         addCommon(ss, indent);
+        addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
+    }
+
+    QuerySolutionNode* SkipNode::clone() const {
+        SkipNode* copy = new SkipNode();
+        cloneBaseData(copy);
+
+        copy->skip = this->skip;
+
+        return copy;
     }
 
     //
@@ -544,6 +702,20 @@ namespace mongo {
         }
     }
 
+    QuerySolutionNode* GeoNear2DNode::clone() const {
+        GeoNear2DNode* copy = new GeoNear2DNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+        copy->nq = this->nq;
+        copy->numWanted = this->numWanted;
+        copy->indexKeyPattern = this->indexKeyPattern;
+        copy->addPointMeta = this->addPointMeta;
+        copy->addDistMeta = this->addDistMeta;
+
+        return copy;
+    }
+
     //
     // GeoNear2DSphereNode
     //
@@ -561,6 +733,20 @@ namespace mongo {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();
         }
+    }
+
+    QuerySolutionNode* GeoNear2DSphereNode::clone() const {
+        GeoNear2DSphereNode* copy = new GeoNear2DSphereNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+        copy->nq = this->nq;
+        copy->baseBounds = this->baseBounds;
+        copy->indexKeyPattern = this->indexKeyPattern;
+        copy->addPointMeta = this->addPointMeta;
+        copy->addDistMeta = this->addDistMeta;
+
+        return copy;
     }
 
     //
@@ -585,6 +771,17 @@ namespace mongo {
         return false;
     }
 
+    QuerySolutionNode* Geo2DNode::clone() const {
+        Geo2DNode* copy = new Geo2DNode();
+        cloneBaseData(copy);
+
+        copy->_sorts = this->_sorts;
+        copy->indexKeyPattern = this->indexKeyPattern;
+        copy->gq = this->gq;
+
+        return copy;
+    }
+
     //
     // ShardingFilterNode
     //
@@ -603,6 +800,12 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "Child:" << '\n';
         children[0]->appendToString(ss, indent + 2);
+    }
+
+    QuerySolutionNode* ShardingFilterNode::clone() const {
+        ShardingFilterNode* copy = new ShardingFilterNode();
+        cloneBaseData(copy);
+        return copy;
     }
 
     //
@@ -625,6 +828,15 @@ namespace mongo {
         children[0]->appendToString(ss, indent + 2);
     }
 
+    QuerySolutionNode* KeepMutationsNode::clone() const {
+        KeepMutationsNode* copy = new KeepMutationsNode();
+        cloneBaseData(copy);
+
+        copy->sorts = this->sorts;
+
+        return copy;
+    }
+
     //
     // DistinctNode
     //
@@ -640,6 +852,19 @@ namespace mongo {
         *ss << "bounds = " << bounds.toString() << '\n';
     }
 
+    QuerySolutionNode* DistinctNode::clone() const {
+        DistinctNode* copy = new DistinctNode();
+        cloneBaseData(copy);
+
+        copy->sorts = this->sorts;
+        copy->indexKeyPattern = this->indexKeyPattern;
+        copy->direction = this->direction;
+        copy->bounds = this->bounds;
+        copy->fieldNo = this->fieldNo;
+
+        return copy;
+    }
+
     //
     // CountNode
     //
@@ -653,6 +878,20 @@ namespace mongo {
         *ss << "startKey = " << startKey << '\n';
         addIndent(ss, indent + 1);
         *ss << "endKey = " << endKey << '\n';
+    }
+
+    QuerySolutionNode* CountNode::clone() const {
+        CountNode* copy = new CountNode();
+        cloneBaseData(copy);
+
+        copy->sorts = this->sorts;
+        copy->indexKeyPattern = this->indexKeyPattern;
+        copy->startKey = this->startKey;
+        copy->startKeyInclusive = this->startKeyInclusive;
+        copy->endKey = this->endKey;
+        copy->endKeyInclusive = this->endKeyInclusive;
+
+        return copy;
     }
 
 }  // namespace mongo

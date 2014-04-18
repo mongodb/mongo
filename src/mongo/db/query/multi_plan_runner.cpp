@@ -28,7 +28,9 @@
 
 #include "mongo/db/query/multi_plan_runner.h"
 
+#include <algorithm>
 #include <memory>
+
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/diskloc.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/catalog/collection.h"
@@ -54,6 +57,7 @@ namespace mongo {
           _failureCount(0),
           _policy(Runner::YIELD_MANUAL),
           _query(query),
+          _bestChild(numeric_limits<size_t>::max()),
           _backupSolution(NULL),
           _backupPlan(NULL) { }
 
@@ -123,10 +127,14 @@ namespace mongo {
         if (_failure || _killed) { return false; }
 
         if (NULL != _bestPlan) {
-            return _bestPlan->restoreState();
+            bool best = _bestPlan->restoreState();
+            // backup plan is OK by default.  Only can be set to not-OK if it exists and fails.
+            bool backup = true;
             if (NULL != _backupPlan) {
-                _backupPlan->restoreState();
+                backup = _backupPlan->restoreState();
             }
+            // We're OK to continue if the best plan and the backup plan are OK.
+            return best && backup;
         }
         else {
             allPlansRestoreState();
@@ -211,6 +219,7 @@ namespace mongo {
         _killed = true;
         _collection = NULL;
         if (NULL != _bestPlan) { _bestPlan->kill(); }
+        if (NULL != _backupPlan) { _backupPlan->kill(); }
     }
 
     Runner::RunnerState MultiPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
@@ -219,11 +228,12 @@ namespace mongo {
 
         // If we haven't picked the best plan yet...
         if (NULL == _bestPlan) {
-            if (!pickBestPlan(NULL)) {
+            if (!pickBestPlan(NULL, objOut)) {
                 verify(_failure || _killed);
                 if (_killed) { return Runner::RUNNER_DEAD; }
                 if (_failure) { return Runner::RUNNER_ERROR; }
             }
+            cacheBestPlan();
         }
 
         // Look for an already produced result that provides the data the caller wants.
@@ -275,7 +285,7 @@ namespace mongo {
         RunnerState state = _bestPlan->getNext(objOut, dlOut);
 
         if (Runner::RUNNER_ERROR == state && (NULL != _backupSolution)) {
-            QLOG() << "Best plan errored out switching to backup\n";
+            QLOG() << "Best plan errored out; switching to backup.\n";
             // Uncache the bad solution if we fall back
             // on the backup solution.
             //
@@ -283,23 +293,26 @@ namespace mongo {
             // cached plan runner to fall back on a different solution
             // if the best solution fails. Alternatively we could try to
             // defer cache insertion to be after the first produced result.
-            Database* db = cc().database();
+            Database* db = cc().getContext()->db();
             verify(NULL != db);
             Collection* collection = db->getCollection(_query->ns());
             verify(NULL != collection);
             PlanCache* cache = collection->infoCache()->getPlanCache();
             cache->remove(*_query);
 
+            // Move the backup info into the bestPlan info and clear the backup
+            // info.
             _bestPlan.reset(_backupPlan);
             _backupPlan = NULL;
             _bestSolution.reset(_backupSolution);
             _backupSolution = NULL;
             _alreadyProduced = _backupAlreadyProduced;
+            _backupAlreadyProduced.clear();
             return getNext(objOut, dlOut);
         }
 
         if (NULL != _backupSolution && Runner::RUNNER_ADVANCED == state) {
-            QLOG() << "Best plan had a blocking sort, became unblocked, deleting backup plan\n";
+            QLOG() << "Best plan had a blocking sort, became unblocked; deleting backup plan.\n";
             delete _backupSolution;
             delete _backupPlan;
             _backupSolution = NULL;
@@ -311,12 +324,23 @@ namespace mongo {
         return state;
     }
 
-    bool MultiPlanRunner::pickBestPlan(size_t* out) {
-        static const int timesEachPlanIsWorked = 100;
+    bool MultiPlanRunner::pickBestPlan(size_t* out, BSONObj* objOut) {
+        // Run each plan some number of times. This number is at least as great as
+        // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
+        size_t numWorks = internalQueryPlanEvaluationWorks;
+        if (NULL != _collection) {
+            // For large collections, the number of works is set to be this
+            // fraction of the collection size.
+            double fraction = internalQueryPlanEvaluationCollFraction;
 
-        // Run each plan some number of times.
-        for (int i = 0; i < timesEachPlanIsWorked; ++i) {
-            bool moreToDo = workAllPlans();
+            numWorks = std::max(size_t(internalQueryPlanEvaluationWorks),
+                                size_t(fraction * _collection->numRecords()));
+        }
+
+        // Work the plans, stopping when a plan hits EOF or returns some
+        // fixed number of results.
+        for (size_t i = 0; i < numWorks; ++i) {
+            bool moreToDo = workAllPlans(objOut);
             if (!moreToDo) { break; }
         }
 
@@ -324,28 +348,36 @@ namespace mongo {
 
         // After picking best plan, ranking will own plan stats from
         // candidate solutions (winner and losers).
-        std::auto_ptr<PlanRankingDecision> ranking(new PlanRankingDecision);
-        size_t bestChild = PlanRanker::pickBestPlan(_candidates, ranking.get());
+        _ranking.reset(new PlanRankingDecision());
+        _bestChild = PlanRanker::pickBestPlan(_candidates, _ranking.get());
+        if (NULL != out) { *out = _bestChild; }
+        return true;
+    }
+
+    void MultiPlanRunner::cacheBestPlan() {
+        // Must call pickBestPlan before.
+        verify(_bestChild != numeric_limits<size_t>::max());
 
         // Copy candidate order. We will need this to sort candidate stats for explain
         // after transferring ownership of 'ranking' to plan cache.
-        std::vector<size_t> candidateOrder = ranking->candidateOrder;
+        std::vector<size_t> candidateOrder = _ranking->candidateOrder;
 
         // Run the best plan.  Store it.
-        _bestPlan.reset(new PlanExecutor(_candidates[bestChild].ws,
-                                         _candidates[bestChild].root));
+        _bestPlan.reset(new PlanExecutor(_candidates[_bestChild].ws,
+                                         _candidates[_bestChild].root));
         _bestPlan->setYieldPolicy(_policy);
-        _alreadyProduced = _candidates[bestChild].results;
-        _bestSolution.reset(_candidates[bestChild].solution);
+        _alreadyProduced = _candidates[_bestChild].results;
+        _bestSolution.reset(_candidates[_bestChild].solution);
 
         QLOG() << "Winning solution:\n" << _bestSolution->toString() << endl;
+        LOG(2) << "Winning plan: " << getPlanSummary(*_bestSolution);
 
-        size_t backupChild = bestChild;
-        if (_bestSolution->hasSortStage && (0 == _alreadyProduced.size())) {
-            QLOG() << "Winner has blocked sort, looking for backup plan...\n";
+        size_t backupChild = _bestChild;
+        if (_bestSolution->hasBlockingStage && (0 == _alreadyProduced.size())) {
+            QLOG() << "Winner has blocking stage, looking for backup plan.\n";
             for (size_t i = 0; i < _candidates.size(); ++i) {
-                if (!_candidates[i].solution->hasSortStage) {
-                    QLOG() << "Candidate " << i << " is backup child\n";
+                if (!_candidates[i].solution->hasBlockingStage) {
+                    QLOG() << "Candidate " << i << " is backup child.\n";
                     backupChild = i;
                     _backupSolution = _candidates[i].solution;
                     _backupAlreadyProduced = _candidates[i].results;
@@ -356,9 +388,16 @@ namespace mongo {
             }
         }
 
-        // Store the choice we just made in the cache.
-        if (PlanCache::shouldCacheQuery(*_query)) {
-            Database* db = cc().database();
+        // Store the choice we just made in the cache. We do
+        // not cache the query if:
+        //   1) The query is of a type that is not safe to cache, or
+        //   2) the winning plan did not actually produce any results,
+        //   without hitting EOF. In this case, we have no information to
+        //   suggest that this plan is good.
+        const PlanStageStats* bestStats = _ranking->stats.vector()[0];
+        if (PlanCache::shouldCacheQuery(*_query)
+            && (!_alreadyProduced.empty() || bestStats->common.isEOF)) {
+            Database* db = cc().getContext()->db();
             verify(NULL != db);
             Collection* collection = db->getCollection(_query->ns());
             verify(NULL != collection);
@@ -389,7 +428,7 @@ namespace mongo {
             }
 
             if (validSolutions) {
-                cache->add(*_query, solutions, ranking.release());
+                cache->add(*_query, solutions, _ranking.release());
             }
         }
 
@@ -400,7 +439,7 @@ namespace mongo {
             // index into candidates/ranking
             size_t i = candidateOrder[orderingIndex];
 
-            if (i == bestChild) { continue; }
+            if (i == _bestChild) { continue; }
             if (i == backupChild) { continue; }
 
             delete _candidates[i].solution;
@@ -419,12 +458,14 @@ namespace mongo {
         }
 
         _candidates.clear();
-        if (NULL != out) { *out = bestChild; }
-        return true;
     }
 
-    bool MultiPlanRunner::workAllPlans() {
-        bool planHitEOF = false;
+    bool MultiPlanRunner::hasBackupPlan() const {
+        return NULL != _backupPlan;
+    }
+
+    bool MultiPlanRunner::workAllPlans(BSONObj* objOut) {
+        bool doneWorking = false;
 
         for (size_t i = 0; i < _candidates.size(); ++i) {
             CandidatePlan& candidate = _candidates[i];
@@ -444,6 +485,12 @@ namespace mongo {
             if (PlanStage::ADVANCED == state) {
                 // Save result for later.
                 candidate.results.push_back(id);
+
+                // Once a plan returns enough results, stop working.
+                if (candidate.results.size()
+                    >= size_t(internalQueryPlanEvaluationMaxResults)) {
+                    doneWorking = true;
+                }
             }
             else if (PlanStage::NEED_TIME == state) {
                 // Fall through to yield check at end of large conditional.
@@ -485,7 +532,7 @@ namespace mongo {
             else if (PlanStage::IS_EOF == state) {
                 // First plan to hit EOF wins automatically.  Stop evaluating other plans.
                 // Assumes that the ranking will pick this plan.
-                planHitEOF = true;
+                doneWorking = true;
             }
             else {
                 // FAILURE or DEAD.  Do we want to just tank that plan and try the rest?  We
@@ -494,6 +541,11 @@ namespace mongo {
                 candidate.failed = true;
                 ++_failureCount;
 
+                // Propage most recent seen failure to parent.
+                if (PlanStage::FAILURE == state && (NULL != objOut)) {
+                    WorkingSetCommon::getStatusMemberObject(*candidate.ws, id, objOut);
+                }
+
                 if (_failureCount == _candidates.size()) {
                     _failure = true;
                     return false;
@@ -501,7 +553,7 @@ namespace mongo {
             }
         }
 
-        return !planHitEOF;
+        return !doneWorking;
     }
 
     void MultiPlanRunner::allPlansSaveState() {

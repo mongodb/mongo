@@ -126,7 +126,7 @@ namespace mongo {
                     BSONObj elemMatchObj = e.wrap();
                     verify(elemMatchObj.isOwned());
 
-                    // XXX this is wasteful and slow.
+                    // TODO: Is there a faster way of validating the elemMatchObj?
                     StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj);
                     if (!swme.isOK()) {
                         return swme.getStatus();
@@ -237,13 +237,7 @@ namespace mongo {
         // Save the raw spec.  It should be owned by the LiteParsedQuery.
         verify(spec.isOwned());
         pp->_source = spec;
-
-        // returnKey clobbers everything.
-        if (hasIndexKeyProjection) {
-            pp->_requiresDocument = false;
-            *out = pp.release();
-            return Status::OK();
-        }
+        pp->_returnKey = hasIndexKeyProjection;
 
         // Dotted fields aren't covered, non-simple require match details, and as for include, "if
         // we default to including then we can't use an index because we don't know what we're
@@ -266,10 +260,19 @@ namespace mongo {
             BSONObjIterator srcIt(spec);
             while (srcIt.more()) {
                 BSONElement elt = srcIt.next();
+                // We've already handled the _id field before entering this loop.
+                if (includeID && mongoutils::str::equals(elt.fieldName(), "_id")) {
+                    continue;
+                }
                 if (elt.trueValue()) {
                     pp->_requiredFields.push_back(elt.fieldName());
                 }
             }
+        }
+
+        // returnKey clobbers everything.
+        if (hasIndexKeyProjection) {
+            pp->_requiresDocument = false;
         }
 
         *out = pp.release();

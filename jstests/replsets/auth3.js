@@ -20,10 +20,7 @@ var checkValidState = function(i) {
 var safeInsert = function() {
     master = rs.getMaster();
     master.getDB("admin").auth("foo", "bar");
-    master.getDB("foo").bar.insert({x:1});
-    var insertWorked = master.getDB("foo").runCommand({getlasterror:1});
-    printjson(insertWorked);
-    assert.eq(insertWorked.ok, 1);
+    assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 }
 
 print("authing");

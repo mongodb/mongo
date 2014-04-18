@@ -865,11 +865,11 @@ function getUserObjString(userObj) {
  */
 DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
     var c = this.getCollection( "system.users" );
-    var oldPwd;
+    userObj = Object.extend({}, userObj); // Prevent modifications to userObj from getting to caller
     if (userObj.pwd != null) {
-        oldPwd = userObj.pwd;
         userObj.pwd = _hashPassword(userObj.user, userObj.pwd);
     }
+
     try {
         c.save(userObj);
     } catch (e) {
@@ -882,9 +882,6 @@ DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
         } else {
             throw "Could not insert into system.users: " + tojson(e);
         }
-    } finally {
-        if (userObj.pwd != null)
-            userObj.pwd = oldPwd;
     }
     print("Successfully added user: " + getUserObjString(userObj));
 
@@ -1008,6 +1005,10 @@ DB.prototype._createUser = function(userObj, writeConcern) {
 }
 
 function _hashPassword(username, password) {
+    if (typeof password != 'string') {
+        throw Error("User passwords must be of type string. Was given password with type: " +
+                    typeof(password));
+    }
     return hex_md5(username + ":mongo:" + password);
 }
 
@@ -1178,6 +1179,7 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
 }
 
 DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+DB.prototype._defaultGssapiServiceName = null;
 
 DB.prototype._authOrThrow = function () {
     var params;
@@ -1199,6 +1201,13 @@ DB.prototype._authOrThrow = function () {
 
     if (params.db !== undefined) {
         throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");
+    }
+
+    if (params.mechanism == "GSSAPI" &&
+        params.serviceName == null &&
+        this._defaultGssapiServiceName != null) {
+
+        params.serviceName = this._defaultGssapiServiceName;
     }
 
     params.db = this.getName();
@@ -1243,17 +1252,20 @@ DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
     }
 }
 
-DB.prototype.getUser = function(username) {
+DB.prototype.getUser = function(username, args) {
     if (typeof username != "string") {
         throw Error("User name for getUser shell helper must be a string");
     }
-    var res = this.runCommand({usersInfo: username});
+    var cmdObj = {usersInfo: username};
+    Object.extend(cmdObj, args);
+
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
 
     if (res.users.length == 0) {
-        throw Error("User " + username + "@" + db.getName() + " not found");
+        return null;
     }
     return res.users[0];
 }
@@ -1263,6 +1275,13 @@ DB.prototype.getUsers = function(args) {
     Object.extend(cmdObj, args);
     var res = this.runCommand(cmdObj);
     if (!res.ok) {
+        var authSchemaIncompatibleCode = 69;
+        if (res.code == authSchemaIncompatibleCode ||
+                (res.code == null && res.errmsg == "no such cmd: usersInfo")) {
+            // Working with 2.4 schema user data
+            return this.system.users.find({}).toArray();
+        }
+
         throw Error(res.errmsg);
     }
 
@@ -1373,7 +1392,7 @@ DB.prototype.getRole = function(rolename, args) {
     }
 
     if (res.roles.length == 0) {
-        throw Error("Role " + rolename + "@" + db.getName() + " not found");
+        return null;
     }
     return res.roles[0];
 }

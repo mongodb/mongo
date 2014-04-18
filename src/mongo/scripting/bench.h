@@ -305,8 +305,10 @@ namespace mongo {
          * Create a new worker, performing one thread's worth of the activity described in
          * "config", and part of the larger activity with state "brState".  Both "config"
          * and "brState" must exist for the life of this object.
+         *
+         * "id" is a positive integer which should uniquely identify the worker.
          */
-        BenchRunWorker(const BenchRunConfig *config, BenchRunState *brState);
+        BenchRunWorker(size_t id, const BenchRunConfig *config, BenchRunState *brState);
         ~BenchRunWorker();
 
         /**
@@ -332,6 +334,7 @@ namespace mongo {
         /// Predicate, used to decide whether or not it's time to terminate the worker.
         bool shouldStop() const;
 
+        size_t _id;
         const BenchRunConfig *_config;
         BenchRunState *_brState;
         BenchRunStats _stats;

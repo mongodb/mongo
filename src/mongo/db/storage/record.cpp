@@ -526,21 +526,16 @@ namespace mongo {
     Record* DiskLoc::rec() const {
         // XXX-ERH
         verify(a() != -1);
-        return cc().database()->getExtentManager().recordFor( *this );
-    }
-
-    DeletedRecord* DiskLoc::drec() const {
-        verify( _a != -1 );
-        return reinterpret_cast<DeletedRecord*>(rec());
+        return cc().getContext()->db()->getExtentManager().recordFor( *this );
     }
 
     Extent* DiskLoc::ext() const {
         verify( a() != -1 );
-        return cc().database()->getExtentManager().getExtent(*this);
+        return cc().getContext()->db()->getExtentManager().getExtent(*this);
     }
 
     BSONObj DiskLoc::obj() const {
-        return BSONObj::make(rec()->accessed());
+        return BSONObj( rec()->accessed()->data() );
     }
 
     void Record::_accessing() const {
@@ -548,7 +543,7 @@ namespace mongo {
             return;
 
         const Client& client = cc();
-        Database* db = client.database();
+        Database* db = client.getContext()->db();
         
         recordStats.accessesNotInMemory.fetchAndAdd(1);
         if ( db )
@@ -563,6 +558,8 @@ namespace mongo {
             return;
         }
 
+        // note you can infer how many throws weren't allowed by subtracting:
+        //   accessesNotInMemory - pageFaultExceptionsThrown
         recordStats.pageFaultExceptionsThrown.fetchAndAdd(1);
         if ( db )
             db->recordStats().pageFaultExceptionsThrown.fetchAndAdd(1);

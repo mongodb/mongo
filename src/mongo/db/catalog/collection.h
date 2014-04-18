@@ -48,8 +48,9 @@ namespace mongo {
     class ExtentManager;
     class NamespaceDetails;
     class IndexCatalog;
+    class MultiIndexBlock;
 
-    class CollectionIterator;
+    class RecordIterator;
     class FlatIterator;
     class CappedIterator;
 
@@ -114,7 +115,7 @@ namespace mongo {
 
         bool ok() const { return _magic == 1357924; }
 
-        NamespaceDetails* details() { return _details; } // TODO: remove
+        NamespaceDetails* detailsWritable() { return _details; } // TODO: remove
         const NamespaceDetails* details() const { return _details; }
 
         CollectionInfoCache* infoCache() { return &_infoCache; }
@@ -124,6 +125,8 @@ namespace mongo {
 
         const IndexCatalog* getIndexCatalog() const { return &_indexCatalog; }
         IndexCatalog* getIndexCatalog() { return &_indexCatalog; }
+
+        const RecordStore* getRecordStore() const { return _recordStore.get(); }
 
         CollectionCursorCache* cursorCache() const { return &_cursorCache; }
 
@@ -136,8 +139,9 @@ namespace mongo {
          * canonical to get all would be
          * getIterator( DiskLoc(), false, CollectionScanParams::FORWARD )
          */
-        CollectionIterator* getIterator( const DiskLoc& start, bool tailable,
-                                         const CollectionScanParams::Direction& dir) const;
+        RecordIterator* getIterator( const DiskLoc& start = DiskLoc(),
+                                     bool tailable = false,
+                                     const CollectionScanParams::Direction& dir = CollectionScanParams::FORWARD ) const;
 
 
         /**
@@ -160,6 +164,8 @@ namespace mongo {
 
         StatusWith<DiskLoc> insertDocument( const DocWriter* doc, bool enforceQuota );
 
+        StatusWith<DiskLoc> insertDocument( const BSONObj& doc, MultiIndexBlock& indexBlock );
+
         /**
          * updates the document @ oldLocation with newDoc
          * if the document fits in the old space, it is put there
@@ -177,6 +183,32 @@ namespace mongo {
 
         StatusWith<CompactStats> compact( const CompactOptions* options );
 
+        /**
+         * removes all documents as fast as possible
+         * indexes before and after will be the same
+         * as will other characteristics
+         */
+        Status truncate();
+
+        /**
+         * @param full - does more checks
+         * @param scanData - scans each document
+         * @return OK if the validate run successfully
+         *         OK will be returned even if corruption is found
+         *         deatils will be in result
+         */
+        Status validate( bool full, bool scanData,
+                         ValidateResults* results, BSONObjBuilder* output );
+
+        /**
+         * Truncate documents newer than the document at 'end' from the capped
+         * collection.  The collection cannot be completely emptied using this
+         * function.  An assertion will be thrown if that is attempted.
+         * @param inclusive - Truncate 'end' as well iff true
+         * XXX: this will go away soon, just needed to move for now
+         */
+        void temp_cappedTruncateAfter( DiskLoc end, bool inclusive );
+
         // -----------
 
 
@@ -184,7 +216,7 @@ namespace mongo {
         // this will add a new extent the collection
         // the new extent will be returned
         // it will have been added to the linked list already
-        Extent* increaseStorageSize( int size, bool enforceQuota );
+        void increaseStorageSize( int size, bool enforceQuota );
 
         //
         // Stats
@@ -209,10 +241,11 @@ namespace mongo {
          *  - some user error checks
          *  - adjust padding
          */
-        StatusWith<DiskLoc> _insertDocument( const BSONObj& doc, bool enforceQuota );
+        StatusWith<DiskLoc> _insertDocument( const BSONObj& doc,
+                                             bool enforceQuota );
 
         void _compactExtent(const DiskLoc diskloc, int extentNumber,
-                            vector<IndexAccessMethod*>& indexesToInsertTo,
+                            MultiIndexBlock& indexesToInsertTo,
                             const CompactOptions* compactOptions, CompactStats* stats );
 
         // @return 0 for inf., otherwise a number of files
@@ -239,6 +272,7 @@ namespace mongo {
         friend class FlatIterator;
         friend class CappedIterator;
         friend class IndexCatalog;
+        friend class NamespaceDetails;
     };
 
 }

@@ -33,11 +33,10 @@
 #include "mongo/db/storage/extent.h"
 
 #include "mongo/db/dur.h"
+#include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/util/mongoutils/str.h"
-
-// XXX-ERH
-#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
@@ -180,14 +179,14 @@ namespace mongo {
         return emptyLoc;
     }
 
-    bool Extent::validates(const DiskLoc diskLoc, BSONArrayBuilder* errors) {
+    bool Extent::validates(const DiskLoc diskLoc, vector<string>* errors) {
         bool extentOk = true;
         if (magic != extentSignature) {
             if (errors) {
                 StringBuilder sb;
                 sb << "bad extent signature " << integerToHex(magic)
                     << " in extent " << diskLoc.toString();
-                *errors << sb.str();
+                errors->push_back( sb.str() );
             }
             extentOk = false;
         }
@@ -196,7 +195,7 @@ namespace mongo {
                 StringBuilder sb;
                 sb << "extent " << diskLoc.toString()
                     << " self-pointer is " << myLoc.toString();
-                *errors << sb.str();
+                errors->push_back( sb.str() );
             }
             extentOk = false;
         }
@@ -213,7 +212,7 @@ namespace mongo {
                         << ", firstRecord is " << firstRecord.toString()
                         << " but lastRecord is null";
                 }
-                *errors << sb.str();
+                errors->push_back( sb.str() );
             }
             extentOk = false;
         }
@@ -223,7 +222,7 @@ namespace mongo {
                 sb << "length of extent " << diskLoc.toString()
                     << " is " << length
                     << ", which is less than minimum length of " << minSize();
-                *errors << sb.str();
+                errors->push_back( sb.str() );
             }
             extentOk = false;
         }

@@ -66,4 +66,13 @@ namespace mongo {
         GeoNearMatchExpression* gnexp = static_cast<GeoNearMatchExpression*>(exp);
         ASSERT_EQUALS(gnexp->getData().maxDistance, 100);
     }
+
+    // $near must be the only field in the expression object.
+    TEST( MatchExpressionParserGeoNear, ParseNearExtraField ) {
+        BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
+                                 "$geometry:{type:\"Point\", coordinates:[0,0]}}, foo: 1}}");
+
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+    }
 }

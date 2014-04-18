@@ -31,11 +31,14 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryUtilTests {
@@ -1584,8 +1587,7 @@ namespace QueryUtilTests {
             Client::Context _ctx;
         public:
             IndexBase() : _lk(ns()), _ctx( ns() ) , indexNum_( 0 ) {
-                string err;
-                userCreateNS( ns(), BSONObj(), err, false );
+                userCreateNS( _ctx.db(), ns(), BSONObj(), false );
             }
             ~IndexBase() {
                 if ( !nsd() )
@@ -1594,31 +1596,28 @@ namespace QueryUtilTests {
             }
         protected:
             static const char *ns() { return "unittests.FieldRangeSetPairTests"; }
-            static NamespaceDetails *nsd() { return nsdetails( ns() ); }
             Client::Context* ctx() { return &_ctx; }
-            IndexDetails *index( const BSONObj &key, int* indexNoOut = NULL ) {
+            Database* db() { return _ctx.db(); }
+            Collection* collection() { return db()->getCollection( ns() ); }
+            NamespaceDetails *nsd() { return collection()->detailsWritable(); }
+
+            int indexno( const BSONObj &key ) {
                 stringstream ss;
                 ss << indexNum_++;
                 string name = ss.str();
                 client_.resetIndexCache();
                 client_.ensureIndex( ns(), key, false, name.c_str() );
-                NamespaceDetails *d = nsd();
-                for( int i = 0; i < d->getCompletedIndexCount(); ++i ) {
-                    if ( d->idx(i).keyPattern() == key /*indexName() == name*/ ||
-                         ( d->idx(i).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) ) {
-                        if ( indexNoOut )
-                            *indexNoOut = i;
-                        return &d->idx(i);
-                    }
-                }
-                verify( false );
-                return 0;
+
+                IndexCatalog* catalog = collection()->getIndexCatalog();
+                IndexDescriptor* desc = catalog->findIndexByKeyPattern( key );
+                invariant( desc );
+
+                int x = nsd()->_catalogFindIndexByName( desc->indexName() );
+                invariant( x >= 0 );
+
+                return x;
             }
-            int indexno( const BSONObj &key ) {
-                int idxNo;
-                ASSERT( index(key, &idxNo) );
-                return idxNo;
-            }
+
             static DBDirectClient client_;
         private:
             int indexNum_;

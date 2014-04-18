@@ -86,7 +86,6 @@ namespace mongo {
             }
         }
 
-        // QLOG() << "Outputting collscan " << soln->toString() << endl;
         return csn;
     }
 
@@ -96,7 +95,6 @@ namespace mongo {
                                                         size_t pos,
                                                         MatchExpression* expr,
                                                         IndexBoundsBuilder::BoundsTightness* tightnessOut) {
-        // QLOG() << "making leaf node for " << expr->toString() << endl;
         // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
         // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
         // This saves our bacon when we have {foo: 1, bar: "2dsphere"} and the predicate on bar is a
@@ -148,8 +146,6 @@ namespace mongo {
             return ret;
         }
         else {
-            // QLOG() << "making ixscan for " << expr->toString() << endl;
-
             // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
             // because expr might be inside an array operator that provides a path prefix.
             IndexScanNode* isn = new IndexScanNode();
@@ -172,7 +168,6 @@ namespace mongo {
             IndexBoundsBuilder::translate(expr, keyElt, index, &isn->bounds.fields[pos],
                                           tightnessOut);
 
-            // QLOG() << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
             return isn;
         }
     }
@@ -189,10 +184,42 @@ namespace mongo {
         const StageType type = node->getType();
         verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type || STAGE_TEXT == type ||
-            STAGE_GEO_NEAR_2DSPHERE == type) {
-            return true;
+        const MatchExpression::MatchType exprType = expr->matchType();
+
+        //
+        // First handle special solution tree leaf types. In general, normal index bounds
+        // building is not used for special leaf types, and hence we cannot merge leaves.
+        //
+        // This rule is always true for OR, but there are exceptions for AND.
+        // Specifically, we can often merge a predicate with a special leaf type
+        // by adding a filter to the special leaf type.
+        //
+
+        if (STAGE_GEO_2D == type) {
+            // Don't merge GEO with a geo leaf. Instead, we will generate an AND_HASH solution
+            // with two separate leaves.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::GEO != exprType;
         }
+
+        if (STAGE_TEXT == type) {
+            // Currently only one text predicate is allowed, but to be safe, make sure that we
+            // do not try to merge two text predicates.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::TEXT != exprType;
+        }
+
+        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+            // Currently only one GEO_NEAR is allowed, but to be safe, make sure that we
+            // do not try to merge two GEO_NEAR predicates.
+            return MatchExpression::AND == mergeType
+                && MatchExpression::GEO_NEAR != exprType;
+        }
+
+        //
+        // If we're here, then we're done checking for special leaf nodes, and the leaf
+        // must be a regular index scan.
+        //
 
         invariant(type == STAGE_IXSCAN);
         IndexScanNode* scan = static_cast<IndexScanNode*>(node);
@@ -406,9 +433,6 @@ namespace mongo {
             bounds = &scan->bounds;
         }
 
-        // XXX: this currently fills out minkey/maxkey bounds for near queries, fix that.  just
-        // set the field name of the near query field when starting a near scan.
-
         // Find the first field in the scan's bounds that was not filled out.
         // TODO: could cache this.
         size_t firstEmptyField = 0;
@@ -543,12 +567,12 @@ namespace mongo {
                         invariant(NULL != emChild->getTag());
                         IndexTag* innerTag = static_cast<IndexTag*>(emChild->getTag());
 
-                        if (NULL != currentScan.get() && (currentIndexNumber == ixtag->index) &&
+                        if (NULL != currentScan.get() && (currentIndexNumber == innerTag->index) &&
                             shouldMergeWithLeaf(emChild, indices[currentIndexNumber], innerTag->pos,
                                                 currentScan.get(), root->matchType())) {
                             // The child uses the same index we're currently building a scan for.  Merge
                             // the bounds and filters.
-                            verify(currentIndexNumber == ixtag->index);
+                            verify(currentIndexNumber == innerTag->index);
 
                             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
                             mergeWithLeafNode(emChild, indices[currentIndexNumber], innerTag->pos, &tightness,
@@ -573,7 +597,7 @@ namespace mongo {
                                 verify(IndexTag::kNoIndex == currentIndexNumber);
                             }
 
-                            currentIndexNumber = ixtag->index;
+                            currentIndexNumber = innerTag->index;
 
                             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::INEXACT_FETCH;
                             currentScan.reset(makeLeafNode(query, indices[currentIndexNumber], innerTag->pos,
@@ -943,7 +967,8 @@ namespace mongo {
                     }
                 }
 
-                // XXX: consider reversing?
+                // TODO: If we're looking for the reverse of one of these sort orders we could
+                // possibly reverse the ixscan nodes.
                 shouldMergeSort = (sharedSortOrders.end() != sharedSortOrders.find(desiredSort));
             }
 
@@ -987,6 +1012,9 @@ namespace mongo {
             }
             else {
                 // Can't do anything with negated logical nodes index-wise.
+                if (!inArrayOperator) {
+                    delete root;
+                }
                 return NULL;
             }
         }
@@ -1076,7 +1104,9 @@ namespace mongo {
                     // The child is an AND.
                     verify(1 == root->numChildren());
                     solution = buildIndexedDataAccess(query, root->getChild(0), true, indices);
-                    if (NULL == solution) { return NULL; }
+                    if (NULL == solution) {
+                        return NULL;
+                    }
                 }
 
                 // There may be an array operator above us.
@@ -1089,6 +1119,10 @@ namespace mongo {
                 fetch->children.push_back(solution);
                 return fetch;
             }
+        }
+
+        if (!inArrayOperator) {
+            delete root;
         }
 
         return NULL;
@@ -1118,7 +1152,6 @@ namespace mongo {
 
         // If it's find({}) remove the no-op root.
         if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-            // XXX wasteful fix
             delete filter;
             solnRoot = isn;
         }
@@ -1190,7 +1223,6 @@ namespace mongo {
 
         // If it's find({}) remove the no-op root.
         if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-            // XXX wasteful fix
             delete filter;
             solnRoot = isn;
         }

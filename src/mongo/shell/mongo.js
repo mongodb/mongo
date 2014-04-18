@@ -155,30 +155,59 @@ connect = function(url, user, pass) {
     return db;
 }
 
+/** deprecated, use writeMode below
+ * 
+ */
+Mongo.prototype.useWriteCommands = function() {
+	return (this.writeMode() != "legacy");
+}
+
+Mongo.prototype.forceWriteMode = function( mode ) {
+    this._writeMode = mode;
+}
+
+Mongo.prototype.hasWriteCommands = function() {
+    if ( !('_hasWriteCommands' in this) ) {
+        var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
+        this._hasWriteCommands = (isMaster.ok && 
+                                  'minWireVersion' in isMaster &&
+                                  isMaster.minWireVersion <= 2 && 
+                                  2 <= isMaster.maxWireVersion );
+    }
+    
+    return this._hasWriteCommands;
+}
+
 /**
- * {Boolean} If true, uses the write commands instead of the legacy write ops.
+ * {String} Returns the current mode set. Will be commands/legacy/compatibility
  * 
  * Sends isMaster to determine if the connection is capable of using bulk write operations, and
  * caches the result.
  */
-Mongo.prototype.useWriteCommands = function() {
 
-    if ( '_useWriteCommands' in this ) {
-        return this._useWriteCommands;
+Mongo.prototype.writeMode = function() {
+
+    if ( '_writeMode' in this ) {
+        return this._writeMode;
     }
 
-    // always use legacy write commands against old servers
-    var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
-    if ( isMaster.ok && 'minWireVersion' in isMaster &&
-         isMaster.minWireVersion <= 2 && 2 <= isMaster.maxWireVersion ) {
-        this._useWriteCommands = _useWriteCommandsDefault();
+    // get default from shell params
+    if ( _writeMode )
+        this._writeMode = _writeMode();
+    
+    // can't use "commands" mode unless server version is good.
+    if ( this.hasWriteCommands() ) {
+        // good with whatever is already set
     }
-    else {
-        this._useWriteCommands = false;
+    else if ( this._writeMode == "commands" ) {
+        print("Cannot use commands write mode, degrading to compatability mode");
+        this._writeMode = "compatibility";
     }
     
-    return this._useWriteCommands;
+    return this._writeMode;
 };
+
+
 
 //
 // Write Concern can be set at the connection level, and is used for all write operations unless

@@ -50,10 +50,15 @@ namespace mongo {
      * if its too big for the buffer, says "too big"
      * useful for keeping a copy around indefinitely without wasting a lot of space or doing malloc
      */
-    class CachedBSONObj {
+    class CachedBSONObjBase {
+    public:
+        static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
+    };
+
+    template <size_t BUFFER_SIZE>
+    class CachedBSONObj : public CachedBSONObjBase {
     public:
         enum { TOO_BIG_SENTINEL = 1 } ;
-        static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
 
         CachedBSONObj() {
             _size = (int*)_buf;
@@ -79,6 +84,7 @@ namespace mongo {
 
         int size() const { return *_size; }
         bool have() const { return size() > 0; }
+        bool tooBig() const { return size() == TOO_BIG_SENTINEL; }
 
         BSONObj get() const {
             scoped_spinlock lk(_lock);
@@ -107,7 +113,7 @@ namespace mongo {
 
         mutable SpinLock _lock;
         int * _size;
-        char _buf[512];
+        char _buf[BUFFER_SIZE];
     };
 
     /* lifespan is different than CurOp because of recursives with DBDirectClient */
@@ -155,6 +161,7 @@ namespace mongo {
 
         // debugging/profile info
         long long nscanned;
+        long long nscannedObjects;
         bool idhack;         // indicates short circuited code path on an update to make the update faster
         bool scanAndOrder;   // scanandorder query plan aspect was used
         long long  nMatched; // number of records that match the query
@@ -170,7 +177,7 @@ namespace mongo {
 
         // New Query Framework debugging/profiling info
         // TODO: should this really be an opaque BSONObj?  Not sure.
-        CachedBSONObj execStats;
+        CachedBSONObj<4096> execStats;
 
         // error handling
         ExceptionInfo exceptionInfo;
@@ -342,7 +349,7 @@ namespace mongo {
         AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
         char _ns[Namespace::MaxNsLen+2];
         HostAndPort _remote;             // CAREFUL here with thread safety
-        CachedBSONObj _query;            // CachedBSONObj is thread safe
+        CachedBSONObj<512> _query;       // CachedBSONObj is thread safe
         OpDebug _debug;
         ThreadSafeString _message;
         ProgressMeter _progressMeter;

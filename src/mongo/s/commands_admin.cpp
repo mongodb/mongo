@@ -87,7 +87,7 @@ namespace mongo {
             }
 
             // all grid commands are designed not to lock
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
 
             bool okForConfigChanges( string& errmsg ) {
                 string e;
@@ -790,7 +790,8 @@ namespace mongo {
                     ChunkPtr currentChunk = chunkManager->findIntersectingChunk( allSplits[0] );
                     vector<BSONObj> subSplits;
                     for ( unsigned i = 0 ; i <= allSplits.size(); i++){
-                        if ( i == allSplits.size() || ! currentChunk->containsPoint( allSplits[i] ) ) {
+                        if ( i == allSplits.size() ||
+                                ! currentChunk->containsPoint( allSplits[i] ) ) {
                             if ( ! subSplits.empty() ){
                                 BSONObj splitResult;
                                 if ( ! currentChunk->multiSplit( subSplits , splitResult ) ){
@@ -804,7 +805,13 @@ namespace mongo {
                             if ( i < allSplits.size() )
                                 currentChunk = chunkManager->findIntersectingChunk( allSplits[i] );
                         } else {
-                            subSplits.push_back( allSplits[i] );
+                            BSONObj splitPoint(allSplits[i]);
+                            if ( currentChunk->getMin().woCompare( splitPoint ) == 0 ) {
+                                // Do not split on the boundaries.
+                                continue;
+                            }
+
+                            subSplits.push_back( splitPoint );
                         }
                     }
 
@@ -1424,7 +1431,7 @@ namespace mongo {
 
         class IsDbGridCmd : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1441,7 +1448,7 @@ namespace mongo {
 
         class CmdIsMaster : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1479,7 +1486,7 @@ namespace mongo {
             virtual bool slaveOk() const {
                 return true;
             }
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
@@ -1495,7 +1502,7 @@ namespace mongo {
 
         class CmdShardingGetPrevError : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1514,7 +1521,7 @@ namespace mongo {
 
         class CmdShardingGetLastError : public Command {
         public:
-            virtual LockType locktype() const { return NONE; }
+            virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1672,7 +1679,7 @@ namespace mongo {
     public:
         CmdShardingResetError() : Command( "resetError" , false , "reseterror" ) {}
 
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const {
             return true;
         }
@@ -1708,7 +1715,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const { help << "list databases on cluster"; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -1836,7 +1843,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const { help << "Not supported sharded"; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -1859,7 +1866,7 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return NONE; }
+        virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,

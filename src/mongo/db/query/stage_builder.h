@@ -48,7 +48,10 @@ namespace mongo {
          *
          * Returns false otherwise.  *rootOut and *wsOut are invalid.
          */
-        static bool build(const QuerySolution& solution, PlanStage** rootOut, WorkingSet** wsOut);
+        static bool build(Collection* collection,
+                          const QuerySolution& solution,
+                          PlanStage** rootOut,
+                          WorkingSet** wsOut);
     };
 
 }  // namespace mongo

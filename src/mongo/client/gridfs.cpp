@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-    const unsigned DEFAULT_CHUNK_SIZE = 256 * 1024;
+    const unsigned DEFAULT_CHUNK_SIZE = 255 * 1024;
 
     GridFSChunk::GridFSChunk( BSONObj o ) {
         _data = o;

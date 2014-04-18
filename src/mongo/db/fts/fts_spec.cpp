@@ -369,22 +369,6 @@ namespace mongo {
                              "weight for text index needs numeric type",
                              e.isNumber() );
                     m[e.fieldName()] = e.numberInt();
-
-                    // Verify weight refers to a valid field.
-                    if ( str::equals( e.fieldName(), "$**" ) ) {
-                        continue;
-                    }
-                    FieldRef keyField( e.fieldName() );
-                    uassert( 17294,
-                             "weight cannot be on an empty field",
-                             keyField.numParts() != 0 );
-                    for ( size_t i = 0; i < keyField.numParts(); i++ ) {
-                        StringData part = keyField.getPart(i);
-                        uassert( 17291, "weight cannot have empty path component", !part.empty() );
-                        uassert( 17292,
-                                 "weight cannot have path component with $ prefix",
-                                 !part.startsWith( "$" ) );
-                    }
                 }
             }
             else if ( spec["weights"].str() == WILDCARD ) {
@@ -400,6 +384,24 @@ namespace mongo {
                 for ( map<string,int>::iterator i = m.begin(); i != m.end(); ++i ) {
                     uassert( 16674, "score for word too high",
                              i->second > 0 && i->second < MAX_WORD_WEIGHT );
+
+                    // Verify weight refers to a valid field.
+                    if ( i->first != "$**" ) {
+                        FieldRef keyField( i->first );
+                        uassert( 17294,
+                                 "weight cannot be on an empty field",
+                                 keyField.numParts() != 0 );
+                        for ( size_t partNum = 0; partNum < keyField.numParts(); partNum++ ) {
+                            StringData part = keyField.getPart(partNum);
+                            uassert( 17291,
+                                     "weight cannot have empty path component",
+                                     !part.empty() );
+                            uassert( 17292,
+                                     "weight cannot have path component with $ prefix",
+                                     !part.startsWith( "$" ) );
+                        }
+                    }
+
                     b.append( i->first, i->second );
                 }
                 weights = b.obj();

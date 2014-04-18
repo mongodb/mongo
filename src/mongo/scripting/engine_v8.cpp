@@ -1201,9 +1201,6 @@ namespace mongo {
             // install db access functions in the global object
             installDBAccess();
 
-            // add global load() helper
-            injectV8Function("load", load);
-
             // install the Mongo function object and instantiate the 'db' global
             _MongoFT = FTPtr::New(getMongoFunctionTemplate(this, true));
             injectV8Function("Mongo", MongoFT(), _global);
@@ -1293,6 +1290,9 @@ namespace mongo {
         _global->Get(strLitToV8("Object"))->ToObject()->ForceSet(
                             strLitToV8("bsonsize"),
                             createV8Function(bsonsize)->GetFunction());
+        _global->Get(strLitToV8("Object"))->ToObject()->ForceSet(
+                            strLitToV8("invalidForStorage"),
+                            createV8Function(v8ObjectInvalidForStorage)->GetFunction());
     }
 
 
@@ -1693,8 +1693,8 @@ namespace mongo {
         const int sizeWithEOO = b.len() + 1/*EOO*/ - 4/*BSONObj::Holder ref count*/;
         uassert(17260, str::stream() << "Converting from JavaScript to BSON failed: "
                                      << "Object size " << sizeWithEOO << " exceeds limit of "
-                                     << BSONObjMaxUserSize << " bytes.",
-                sizeWithEOO <= BSONObjMaxUserSize);
+                                     << BSONObjMaxInternalSize << " bytes.",
+                sizeWithEOO <= BSONObjMaxInternalSize);
 
         return b.obj(); // Would give an uglier error than above for oversized objects.
     }

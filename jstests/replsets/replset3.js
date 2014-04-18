@@ -20,8 +20,7 @@ doTest = function (signal) {
 
     // Write some data to master
     // NOTE: this test fails unless we write some data.
-    master.getDB("foo").foo.save({ a: 1 });
-    master.getDB("foo").runCommand({ getlasterror: 1, w: 3, wtimeout: 20000 });
+    master.getDB("foo").foo.insert({ a: 1 }, { writeConcern: { w: 3, wtimeout: 20000 }});
 
     var phase = 1;
 

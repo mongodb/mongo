@@ -874,7 +874,7 @@ namespace mongo {
                         << " remote host " << remoteString() << ")" << endl;
                 DEV {
                     std::string hex = hexdump(testBuf, recvd);
-                    error() << "Hex Dump of stale log data: " << hex << endl;
+                    error() << "Hex dump of stale log data: " << hex << endl;
                 }
                 dassert( false );
             }
