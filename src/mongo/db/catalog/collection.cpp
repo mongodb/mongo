@@ -151,7 +151,7 @@ namespace mongo {
     }
 
     BSONObj Collection::docFor( const DiskLoc& loc ) {
-        Record* rec = getExtentManager()->recordFor( loc );
+        Record* rec = _recordStore->recordFor( loc );
         return BSONObj( rec->accessed()->data() );
     }
 
@@ -281,7 +281,7 @@ namespace mongo {
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
 
-        Record* oldRecord = getExtentManager()->recordFor( oldLocation );
+        Record* oldRecord = _recordStore->recordFor( oldLocation );
         BSONObj objOld( oldRecord->accessed()->data() );
 
         if ( objOld.hasElement( "_id" ) ) {

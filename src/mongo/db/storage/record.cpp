@@ -526,7 +526,7 @@ namespace mongo {
     Record* DiskLoc::rec() const {
         // XXX-ERH
         verify(a() != -1);
-        return cc().getContext()->db()->getExtentManager().recordFor( *this );
+        return cc().getContext()->db()->getExtentManager().recordForV1( *this );
     }
 
     Extent* DiskLoc::ext() const {

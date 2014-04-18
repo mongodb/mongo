@@ -96,10 +96,10 @@ namespace mongo {
         // Move to the next thing.
         if (!isEOF()) {
             if (CollectionScanParams::FORWARD == _direction) {
-                _curr = _recordStore->_extentManager->getNextRecord( _curr );
+                _curr = _recordStore->getNextRecord( _curr );
             }
             else {
-                _curr = _recordStore->_extentManager->getPrevRecord( _curr );
+                _curr = _recordStore->getPrevRecord( _curr );
             }
         }
 

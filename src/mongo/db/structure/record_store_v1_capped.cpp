@@ -210,15 +210,13 @@ namespace mongo {
     }
 
     Status CappedRecordStoreV1::truncate() {
-        fassert( 17439, _details->getTotalIndexCount() == 0 );
-
         getDur().writingDiskLoc(cappedLastDelRecLastExtent()) = DiskLoc();
         getDur().writingDiskLoc(cappedListOfAllDeletedRecords()) = DiskLoc();
 
         // preserve firstExtent/lastExtent
         getDur().writingDiskLoc(_details->capExtent()) = _details->firstExtent();
         _details->setStats( 0, 0 );
-        // lastExtentSize preserve
+        // preserve lastExtentSize
         // nIndexes preserve 0
         // capped preserve true
         // max preserve
@@ -229,8 +227,6 @@ namespace mongo {
         getDur().writingDiskLoc(cappedLastDelRecLastExtent()).setInvalid();
         // dataFileVersion preserve
         // indexFileVersion preserve
-        for ( int i = 0; i < NamespaceDetails::NIndexesMax; i++ )
-            _details->setIndexIsMultikey( i, false );
 
         // Reset all existing extents and recreate the deleted list.
         for( DiskLoc ext = _details->firstExtent();

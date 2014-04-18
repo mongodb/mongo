@@ -346,7 +346,7 @@ namespace mongo {
             if( !L.isNull() ) {
                 while( 1 ) {
                     Record *recOld = recordFor(L);
-                    L = _extentManager->getNextRecordInExtent(L);
+                    L = getNextRecordInExtent(L);
 
                     if ( compactOptions->validateDocuments && !adaptor->isDataValid(recOld) ) {
                         // object is corrupt!

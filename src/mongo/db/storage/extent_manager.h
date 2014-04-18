@@ -109,21 +109,24 @@ namespace mongo {
 
         /**
          * @param loc - has to be for a specific Record
-         * TODO(ERH): remove this - only RecordStore can do this
+         * Note(erh): this sadly cannot be removed.
+         * A Record DiskLoc has an offset from a file, while a RecordStore really wants an offset
+         * from an extent.  This intrinsically links an original record store to the original extent
+         * manager.
          */
-        Record* recordFor( const DiskLoc& loc ) const;
+        Record* recordForV1( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
-         * TODO(ERH): remove this - only RecordStore can do this
+         * Note(erh) see comment on recordFor
          */
-        Extent* extentFor( const DiskLoc& loc ) const;
+        Extent* extentForV1( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
-         * TODO(ERH): remove this - only RecordStore can do this
+         * Note(erh) see comment on recordFor
          */
-        DiskLoc extentLocFor( const DiskLoc& loc ) const;
+        DiskLoc extentLocForV1( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Extent

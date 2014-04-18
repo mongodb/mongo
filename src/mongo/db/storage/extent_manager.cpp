@@ -199,7 +199,7 @@ namespace mongo {
         }
     }
 
-    Record* ExtentManager::recordFor( const DiskLoc& loc ) const {
+    Record* ExtentManager::recordForV1( const DiskLoc& loc ) const {
         loc.assertOk();
         const DataFile* df = _getOpenFile( loc.a() );
 
@@ -211,13 +211,13 @@ namespace mongo {
         return reinterpret_cast<Record*>( df->p() + ofs );
     }
 
-    DiskLoc ExtentManager::extentLocFor( const DiskLoc& loc ) const {
-        Record* record = recordFor( loc );
+    DiskLoc ExtentManager::extentLocForV1( const DiskLoc& loc ) const {
+        Record* record = recordForV1( loc );
         return DiskLoc( loc.a(), record->extentOfs() );
     }
 
-    Extent* ExtentManager::extentFor( const DiskLoc& loc ) const {
-        DiskLoc extentLoc = extentLocFor( loc );
+    Extent* ExtentManager::extentForV1( const DiskLoc& loc ) const {
+        DiskLoc extentLoc = extentLocForV1( loc );
         return getExtent( extentLoc );
     }
 
@@ -231,7 +231,7 @@ namespace mongo {
 
 
     DiskLoc ExtentManager::getNextRecordInExtent( const DiskLoc& loc ) const {
-        int nextOffset = recordFor( loc )->nextOfs();
+        int nextOffset = recordForV1( loc )->nextOfs();
 
         if ( nextOffset == DiskLoc::NullOfs )
             return DiskLoc();
@@ -247,7 +247,7 @@ namespace mongo {
 
         // now traverse extents
 
-        Extent *e = extentFor(loc);
+        Extent *e = extentForV1(loc);
         while ( 1 ) {
             if ( e->xnext.isNull() )
                 return DiskLoc(); // end of collection
@@ -260,7 +260,7 @@ namespace mongo {
     }
 
     DiskLoc ExtentManager::getPrevRecordInExtent( const DiskLoc& loc ) const {
-        int prevOffset = recordFor( loc )->prevOfs();
+        int prevOffset = recordForV1( loc )->prevOfs();
 
         if ( prevOffset == DiskLoc::NullOfs )
             return DiskLoc();
@@ -276,7 +276,7 @@ namespace mongo {
 
         // now traverse extents
 
-        Extent *e = extentFor(loc);
+        Extent *e = extentForV1(loc);
         while ( 1 ) {
             if ( e->xprev.isNull() )
                 return DiskLoc(); // end of collection

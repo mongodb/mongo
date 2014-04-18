@@ -227,11 +227,11 @@ namespace mongo {
     }
 
     DiskLoc CappedRecordStoreV1Iterator::_getNextRecord( const DiskLoc& loc ) {
-        return _recordStore->_extentManager->getNextRecord( loc );
+        return _recordStore->getNextRecord( loc );
     }
 
     DiskLoc CappedRecordStoreV1Iterator::_getPrevRecord( const DiskLoc& loc ) {
-        return _recordStore->_extentManager->getPrevRecord( loc );
+        return _recordStore->getPrevRecord( loc );
     }
 
 }  // namespace mongo

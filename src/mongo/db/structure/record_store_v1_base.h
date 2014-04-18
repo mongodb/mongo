@@ -76,6 +76,14 @@ namespace mongo {
          */
         int getRecordAllocationSize( int minRecordSize ) const;
 
+        DiskLoc getExtentLocForRecord( const DiskLoc& loc ) const;
+
+        DiskLoc getNextRecord( const DiskLoc& loc ) const;
+        DiskLoc getPrevRecord( const DiskLoc& loc ) const;
+
+        DiskLoc getNextRecordInExtent( const DiskLoc& loc ) const;
+        DiskLoc getPrevRecordInExtent( const DiskLoc& loc ) const;
+
     protected:
 
         virtual bool isCapped() const = 0;
@@ -90,6 +98,14 @@ namespace mongo {
 
         // just a haper for _extentManager->getExtent( loc );
         Extent* _getExtent( const DiskLoc& loc ) const;
+
+        DiskLoc _getExtentLocForRecord( const DiskLoc& loc ) const;
+
+        DiskLoc _getNextRecord( const DiskLoc& loc ) const;
+        DiskLoc _getPrevRecord( const DiskLoc& loc ) const;
+
+        DiskLoc _getNextRecordInExtent( const DiskLoc& loc ) const;
+        DiskLoc _getPrevRecordInExtent( const DiskLoc& loc ) const;
 
         /** add a record to the end of the linked list chain within this extent.
             require: you must have already declared write intent for the record header.

@@ -55,7 +55,7 @@ namespace mongo {
     }
 
     Record* RecordStoreV1Base::recordFor( const DiskLoc& loc ) const {
-        return _extentManager->recordFor( loc );
+        return _extentManager->recordForV1( loc );
     }
 
     const DeletedRecord* RecordStoreV1Base::deletedRecordFor( const DiskLoc& loc ) const {
@@ -71,6 +71,72 @@ namespace mongo {
     Extent* RecordStoreV1Base::_getExtent( const DiskLoc& loc ) const {
         return _extentManager->getExtent( loc );
     }
+
+    DiskLoc RecordStoreV1Base::_getExtentLocForRecord( const DiskLoc& loc ) const {
+        return _extentManager->extentLocForV1( loc );
+    }
+
+
+    DiskLoc RecordStoreV1Base::getNextRecord( const DiskLoc& loc ) const {
+        DiskLoc next = getNextRecordInExtent( loc );
+        if ( !next.isNull() )
+            return next;
+
+        // now traverse extents
+
+        Extent* e = _getExtent( _getExtentLocForRecord(loc) );
+        while ( 1 ) {
+            if ( e->xnext.isNull() )
+                return DiskLoc(); // end of collection
+            e = _getExtent( e->xnext );
+            if ( !e->firstRecord.isNull() )
+                break;
+            // entire extent could be empty, keep looking
+        }
+        return e->firstRecord;
+    }
+
+    DiskLoc RecordStoreV1Base::getPrevRecord( const DiskLoc& loc ) const {
+        DiskLoc prev = getPrevRecordInExtent( loc );
+        if ( !prev.isNull() )
+            return prev;
+
+        // now traverse extents
+
+        Extent *e = _getExtent(_getExtentLocForRecord(loc));
+        while ( 1 ) {
+            if ( e->xprev.isNull() )
+                return DiskLoc(); // end of collection
+            e = _getExtent( e->xprev );
+            if ( !e->firstRecord.isNull() )
+                break;
+            // entire extent could be empty, keep looking
+        }
+        return e->lastRecord;
+
+    }
+
+    DiskLoc RecordStoreV1Base::getNextRecordInExtent( const DiskLoc& loc ) const {
+        int nextOffset = recordFor( loc )->nextOfs();
+
+        if ( nextOffset == DiskLoc::NullOfs )
+            return DiskLoc();
+
+        fassert( 17441, abs(nextOffset) >= 8 ); // defensive
+        return DiskLoc( loc.a(), nextOffset );
+    }
+
+    DiskLoc RecordStoreV1Base::getPrevRecordInExtent( const DiskLoc& loc ) const {
+        int prevOffset = recordFor( loc )->prevOfs();
+
+        if ( prevOffset == DiskLoc::NullOfs )
+            return DiskLoc();
+
+        fassert( 17442, abs(prevOffset) >= 8 ); // defensive
+        return DiskLoc( loc.a(), prevOffset );
+
+    }
+
 
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( const DocWriter* doc, int quotaMax ) {
         int lenWHdr = doc->documentSize() + Record::HeaderSize;
@@ -124,13 +190,13 @@ namespace mongo {
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
-                DiskLoc prev = _extentManager->getPrevRecordInExtent( dl );
+                DiskLoc prev = getPrevRecordInExtent( dl );
                 Record* prevRecord = recordFor( prev );
                 getDur().writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
             }
 
             if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
-                DiskLoc next = _extentManager->getNextRecord( dl );
+                DiskLoc next = getNextRecord( dl );
                 Record* nextRecord = recordFor( next );
                 getDur().writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
             }
@@ -138,7 +204,7 @@ namespace mongo {
 
         /* remove ourself from extent pointers */
         {
-            Extent *e = getDur().writing( _extentManager->extentFor( dl ) );
+            Extent *e = getDur().writing( _getExtent( _getExtentLocForRecord( dl ) ) );
             if ( e->firstRecord == dl ) {
                 if ( todelete->nextOfs() == DiskLoc::NullOfs )
                     e->firstRecord.Null();
@@ -179,7 +245,7 @@ namespace mongo {
 
     void RecordStoreV1Base::_addRecordToRecListInExtent(Record *r, DiskLoc loc) {
         dassert( recordFor(loc) == r );
-        Extent *e = _extentManager->extentFor( loc );
+        Extent *e = _getExtent( _getExtentLocForRecord( loc ) );
         if ( e->lastRecord.isNull() ) {
             Extent::FL *fl = getDur().writing(e->fl());
             fl->firstRecord = fl->lastRecord = loc;
