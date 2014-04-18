@@ -95,7 +95,7 @@ namespace mongo {
         // Get the diff query required
         Query diffQuery = configDiffQuery( extraMinorVersions );
 
-        ScopedDbConnection conn(config);
+        ScopedDbConnection conn(config, 30.0);
 
         try {
 
