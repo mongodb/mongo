@@ -35,12 +35,11 @@
 
 #include <map>
 #include <set>
-#include <string>
-#include <sstream>
+#include <iosfwd>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -54,13 +53,16 @@ namespace mongo {
        It's assumed this is not for super-high RPS things, so we don't do
        anything special in the implementation here to be fast.
     */
-    class BackgroundOperation : public boost::noncopyable {
+    class BackgroundOperation {
+        MONGO_DISALLOW_COPYING(BackgroundOperation);
     public:
         static bool inProgForDb(const StringData& db);
         static bool inProgForNs(const StringData& ns);
         static void assertNoBgOpInProgForDb(const StringData& db);
         static void assertNoBgOpInProgForNs(const StringData& ns);
-        static void dump(std::stringstream&);
+        static void awaitNoBgOpInProgForDb(const StringData& db);
+        static void awaitNoBgOpInProgForNs(const StringData& ns);
+        static void dump(std::ostream&);
 
         /* check for in progress before instantiating */
         BackgroundOperation(const StringData& ns);
@@ -69,9 +71,6 @@ namespace mongo {
 
     private:
         NamespaceString _ns;
-        static std::map<std::string, unsigned> dbsInProg;
-        static std::set<std::string> nsInProg;
-        static SimpleMutex m;
     };
 
 } // namespace mongo
