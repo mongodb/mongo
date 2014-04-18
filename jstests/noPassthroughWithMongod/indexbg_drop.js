@@ -47,12 +47,15 @@ for( i = 0; i < size; ++i ) {
 }
 
 jsTest.log("Starting background indexing for test of: " + tojson(dc));
+// Add another index to be sure the drop command works.
+masterDB.getCollection(collection).ensureIndex({b:1});
+
 masterDB.getCollection(collection).ensureIndex( {i:1}, {background:true} );
-assert.eq(2, masterDB.system.indexes.count( {ns:dbname + "." + collection}, {background:true} ) );
+assert.eq(3, masterDB.system.indexes.count( {ns:dbname + "." + collection}, {background:true} ) );
 
 // Wait for the secondary to get the index entry
 assert.soon( 
-    function() { return 2 == secondDB.system.indexes.count( {ns:dbname + "." + collection} ); }, 
+    function() { return 3 == secondDB.system.indexes.count( {ns:dbname + "." + collection} ); }, 
     "index not created on secondary (prior to drop)", 120000, 50 );
 
 jsTest.log("Index created and system.indexes entry exists on secondary");
