@@ -29,10 +29,10 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/db/repl/manager.h"
 
-#include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/client.h"
 
 namespace mongo {

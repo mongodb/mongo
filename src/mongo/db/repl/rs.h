@@ -36,6 +36,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/consensus.h"
 #include "mongo/db/repl/heartbeat_info.h"
+#include "mongo/db/repl/manager.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
@@ -82,28 +83,6 @@ namespace mongo {
         boost::mutex mtx;
         bool indexRebuildDone;
         boost::condition cond;
-    };
-
-    class Manager : public task::Server {
-        ReplSetImpl *rs;
-        bool busyWithElectSelf;
-        int _primary;
-
-        /** @param two - if true two primaries were seen.  this can happen transiently, in addition to our
-                         polling being only occasional.  in this case null is returned, but the caller should
-                         not assume primary itself in that situation.
-        */
-        const Member* findOtherPrimary(bool& two);
-
-        void noteARemoteIsPrimary(const Member *);
-        void checkElectableSet();
-        void checkAuth();
-        virtual void starting();
-    public:
-        Manager(ReplSetImpl *rs);
-        virtual ~Manager();
-        void msgReceivedNewConfig(BSONObj);
-        void msgCheckNewState();
     };
 
     class GhostSync : public task::Server {
