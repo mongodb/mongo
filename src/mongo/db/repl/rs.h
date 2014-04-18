@@ -569,41 +569,6 @@ namespace mongo {
     };
 
     /**
-     * Base class for repl set commands.  Checks basic things such if we're in
-     * rs mode before the command does its real work.
-     */
-    class ReplSetCommand : public Command {
-    protected:
-        ReplSetCommand(const char * s, bool show=false) : Command(s, show) { }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool logTheOp() { return false; }
-        virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream &help ) const { help << "internal"; }
-
-        bool check(string& errmsg, BSONObjBuilder& result) {
-            if( !replSet ) {
-                errmsg = "not running with --replSet";
-                if (serverGlobalParams.configsvr) {
-                    result.append("info", "configsvr"); // for shell prompt
-                }
-                return false;
-            }
-
-            if( theReplSet == 0 ) {
-                result.append("startupStatus", ReplSet::startupStatus);
-                string s;
-                errmsg = ReplSet::startupStatusMsg.empty() ? "replset unknown error 2" : ReplSet::startupStatusMsg.get();
-                if( ReplSet::startupStatus == 3 )
-                    result.append("info", "run rs.initiate(...) if not yet done for the set");
-                return false;
-            }
-
-            return true;
-        }
-    };
-
-    /**
      * does local authentication
      * directly authorizes against AuthenticationInfo
      */
