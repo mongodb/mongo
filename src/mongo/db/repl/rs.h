@@ -65,6 +65,7 @@ namespace mongo {
     class Cloner;
     class DBClientConnection;
     struct HowToFixUp;
+    class GhostSync;
     class ReplSetImpl;
     struct Target;
     extern bool replSet; // true if using repl sets
@@ -83,48 +84,6 @@ namespace mongo {
         boost::mutex mtx;
         bool indexRebuildDone;
         boost::condition cond;
-    };
-
-    class GhostSync : public task::Server {
-        struct GhostSlave : boost::noncopyable {
-            GhostSlave() : last(0), slave(0), init(false) { }
-            OplogReader reader;
-            OpTime last;
-            Member* slave;
-            bool init;
-        };
-        /**
-         * This is a cache of ghost slaves
-         */
-        typedef map< mongo::OID,shared_ptr<GhostSlave> > MAP;
-        MAP _ghostCache;
-        RWLock _lock; // protects _ghostCache
-        ReplSetImpl *rs;
-        virtual void starting();
-    public:
-        GhostSync(ReplSetImpl *_rs) : task::Server("rsGhostSync"), _lock("GhostSync"), rs(_rs) {}
-        ~GhostSync() {
-            log() << "~GhostSync() called" << rsLog;
-        }
-
-        /**
-         * Replica sets can sync in a hierarchical fashion, which throws off w
-         * calculation on the master.  percolate() faux-syncs from an upstream
-         * node so that the primary will know what the slaves are up to.
-         *
-         * We can't just directly sync to the primary because it could be
-         * unreachable, e.g., S1--->S2--->S3--->P.  S2 should ghost sync from S3
-         * and S3 can ghost sync from the primary.
-         *
-         * Say we have an S1--->S2--->P situation and this node is S2.  rid
-         * would refer to S1.  S2 would create a ghost slave of S1 and connect
-         * it to P (_currentSyncTarget). Then it would use this connection to
-         * pretend to be S1, replicating off of P.
-         */
-        void percolate(const mongo::OID& rid, const OpTime& last);
-        void associateSlave(const BSONObj& rid, const int memberId);
-        bool updateSlave(const mongo::OID& id, const OpTime& last);
-        void clearCache();
     };
 
     /**

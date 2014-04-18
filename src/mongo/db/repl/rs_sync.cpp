@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
@@ -57,11 +58,6 @@
 namespace mongo {
 
     using namespace bson;
-
-    // For testing network failures in percolate() for chaining
-    MONGO_FP_DECLARE(rsChaining1);
-    MONGO_FP_DECLARE(rsChaining2);
-    MONGO_FP_DECLARE(rsChaining3);
 
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxSyncSourceLagSecs, int, 30);
     MONGO_INITIALIZER(maxSyncSourceLagSecsCheck) (InitializerContext*) {
@@ -290,11 +286,6 @@ namespace mongo {
         cc().shutdown();
     }
 
-    void GhostSync::starting() {
-        Client::initThread("rsGhostSync");
-        replLocalAuth();
-    }
-
     void ReplSetImpl::blockSync(bool block) {
         // RS lock is already taken in Manager::checkAuth
         _blockSync = block;
@@ -302,153 +293,6 @@ namespace mongo {
             // syncing is how we get into SECONDARY state, so we'll be stuck in
             // RECOVERING until we unblock
             changeState(MemberState::RS_RECOVERING);
-        }
-    }
-
-    void GhostSync::clearCache() {
-        rwlock lk(_lock, true);
-        _ghostCache.clear();
-    }
-
-    void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
-        const OID rid = id["_id"].OID();
-        rwlock lk( _lock , true );
-        shared_ptr<GhostSlave> &g = _ghostCache[rid];
-        if( g.get() == 0 ) {
-            g.reset( new GhostSlave() );
-            wassert( _ghostCache.size() < 10000 );
-        }
-        GhostSlave &slave = *g;
-        if (slave.init) {
-            LOG(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
-            return;
-        }
-
-        slave.slave = (Member*)rs->findById(memberId);
-        if (slave.slave != 0) {
-            slave.init = true;
-        }
-        else {
-            log() << "replset couldn't find a slave with id " << memberId
-                  << ", not tracking " << rid << rsLog;
-        }
-    }
-
-    bool GhostSync::updateSlave(const mongo::OID& rid, const OpTime& last) {
-        rwlock lk( _lock , false );
-        MAP::iterator i = _ghostCache.find( rid );
-        if ( i == _ghostCache.end() ) {
-            OCCASIONALLY warning() << "couldn't update position of the secondary with replSet _id '"
-                                   << rid << "' because we have no entry for it" << rsLog;
-            return false;
-        }
-
-        GhostSlave& slave = *(i->second);
-        if (!slave.init) {
-            OCCASIONALLY log() << "couldn't update position of the secondary with replSet _id '"
-                               << rid << "' because it has not been initialized" << rsLog;
-            return false;
-        }
-
-        ((ReplSetConfig::MemberCfg)slave.slave->config()).updateGroups(last);
-        return true;
-    }
-
-    void GhostSync::percolate(const mongo::OID& rid, const OpTime& last) {
-        shared_ptr<GhostSlave> slave;
-        {
-            rwlock lk( _lock , false );
-
-            MAP::iterator i = _ghostCache.find( rid );
-            if ( i == _ghostCache.end() ) {
-                OCCASIONALLY log() << "couldn't percolate slave " << rid << " no entry" << rsLog;
-                return;
-            }
-
-            slave = i->second;
-            if (!slave->init) {
-                OCCASIONALLY log() << "couldn't percolate slave " << rid << " not init" << rsLog;
-                return;
-            }
-        }
-        verify(slave->slave);
-
-        // Keep trying to update until we either succeed or we become primary.
-        // Note that this can block the ghostsync thread for quite a while if there
-        // are connection problems to the current sync source ("sync target")
-        while (true) {
-            const Member *target = replset::BackgroundSync::get()->getSyncTarget();
-            if (!target || rs->box.getState().primary()
-                // we are currently syncing from someone who's syncing from us
-                // the target might end up with a new Member, but s.slave never
-                // changes so we'll compare the names
-                || target == slave->slave || target->fullName() == slave->slave->fullName()) {
-                LOG(1) << "replica set ghost target no good" << endl;
-                return;
-            }
-
-            try {
-                if (MONGO_FAIL_POINT(rsChaining1)) {
-                    mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                        setMode(FailPoint::nTimes, 1);
-                }
-
-                // haveCursor() does not necessarily tell us if we have a non-dead cursor, 
-                // so we check tailCheck() as well; see SERVER-8420
-                slave->reader.tailCheck();
-                if (!slave->reader.haveCursor()) {
-                    if (!slave->reader.connect(rid, slave->slave->id(), target->fullName())) {
-                        // error message logged in OplogReader::connect
-                        sleepsecs(1);
-                        continue;
-                    }
-
-                    if (MONGO_FAIL_POINT(rsChaining2)) {
-                        mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                            setMode(FailPoint::nTimes, 1);
-                    }
-
-                    slave->reader.ghostQueryGTE(rsoplog, last);
-                    // if we lose the connection between connecting and querying, the cursor may not
-                    // exist so we have to check again before using it.
-                    if (!slave->reader.haveCursor()) {
-                        sleepsecs(1);
-                        continue;
-                    }
-                }
-
-                LOG(5) << "replSet secondary " << slave->slave->fullName()
-                       << " syncing progress updated from " << slave->last.toStringPretty()
-                       << " to " << last.toStringPretty() << rsLog;
-                if (slave->last > last) {
-                    // Nothing to do; already up to date.
-                    return;
-                }
-
-                while (slave->last <= last) {
-                    if (MONGO_FAIL_POINT(rsChaining3)) {
-                        mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
-                            setMode(FailPoint::nTimes, 1);
-                    }
-
-                    if (!slave->reader.more()) {
-                        // Hit the end of the oplog on the sync source; we're fully up to date now.
-                        return;
-                    }
-
-                    BSONObj o = slave->reader.nextSafe();
-                    slave->last = o["ts"]._opTime();
-                }
-                LOG(2) << "now last is " << slave->last.toString() << rsLog;
-                // We moved the cursor forward enough; we're done.
-                return;
-            }
-            catch (const DBException& e) {
-                // This captures SocketExceptions as well.
-                log() << "replSet ghost sync error: " << e.what() << " for "
-                      << slave->slave->fullName() << rsLog;
-                slave->reader.resetConnection();
-            }
         }
     }
 }

@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/util/background.h"
 #include "mongo/util/mongoutils/str.h"
