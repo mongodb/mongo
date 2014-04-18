@@ -29,3 +29,14 @@ env.Library(
             '$BUILD_DIR/mongo/bson',
         ],
 )
+
+env.CppUnitTest(
+        target='btree_key_generator_test',
+        source=[
+            'btree_key_generator_test.cpp',
+        ],
+        LIBDEPS=[
+            'key_generator',
+            '$BUILD_DIR/mongo/mongohasher',
+        ],
+)
