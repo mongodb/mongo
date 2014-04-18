@@ -480,7 +480,7 @@ namespace mongo {
 
     void NamespaceDetails::orphanDeletedList() {
         for( int i = 0; i < Buckets; i++ ) {
-            _deletedList[i].writing().Null();
+            getDur().writingDiskLoc(_deletedList[i]).Null();
         }
     }
 

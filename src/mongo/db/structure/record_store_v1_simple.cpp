@@ -157,7 +157,7 @@ namespace mongo {
             // unlink ourself from the deleted list
             DeletedRecord *bmr = drec(bestmatch);
             *getDur().writing(bestprev) = bmr->nextDeleted();
-            bmr->nextDeleted().writing().setInvalid(); // defensive.
+            getDur().writingDiskLoc(bmr->nextDeleted()).setInvalid(); // defensive.
             invariant(bmr->extentOfs() < bestmatch.getOfs());
 
             freelistIterations.increment( 1 + chain );
@@ -399,7 +399,7 @@ namespace mongo {
                     bool stopping = false;
                     RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
                     if( stopping || getDur().isCommitNeeded() ) {
-                        e->firstRecord.writing() = L;
+                        getDur().writingDiskLoc(e->firstRecord) = L;
                         Record *r = recordFor(L);
                         getDur().writingInt(r->prevOfs()) = DiskLoc::NullOfs;
                         getDur().commitIfNeeded();
@@ -411,8 +411,8 @@ namespace mongo {
             invariant( _details->firstExtent() == diskloc );
             invariant( _details->lastExtent() != diskloc );
             DiskLoc newFirst = e->xnext;
-            _details->firstExtent().writing() = newFirst;
-            _extentManager->getExtent( newFirst )->xprev.writing().Null();
+            getDur().writingDiskLoc(_details->firstExtent()) = newFirst;
+            getDur().writingDiskLoc(_extentManager->getExtent( newFirst )->xprev).Null();
             getDur().writing(e)->markEmpty();
             _extentManager->freeExtents( diskloc, diskloc );
 

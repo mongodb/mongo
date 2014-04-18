@@ -166,7 +166,7 @@ namespace mongo {
         int offset = header()->unused.getOfs();
 
         DataFileHeader *h = header();
-        h->unused.writing().set( fileNo, offset + size );
+        getDur().writingDiskLoc(h->unused).set( fileNo, offset + size );
         getDur().writingInt(h->unusedLength) = h->unusedLength - size;
 
         return DiskLoc( fileNo, offset );

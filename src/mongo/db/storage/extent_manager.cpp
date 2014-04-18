@@ -464,9 +464,9 @@ namespace mongo {
 
         // remove from the free list
         if ( !best->xprev.isNull() )
-            getExtent( best->xprev )->xnext.writing() = best->xnext;
+            getDur().writingDiskLoc(getExtent( best->xprev )->xnext) = best->xnext;
         if ( !best->xnext.isNull() )
-            getExtent( best->xnext )->xprev.writing() = best->xprev;
+            getDur().writingDiskLoc(getExtent( best->xnext )->xprev) = best->xprev;
         if ( _getFreeListStart() == best->myLoc )
             _setFreeListStart( best->xnext );
         if ( _getFreeListEnd() == best->myLoc )

@@ -112,7 +112,7 @@ namespace mongo {
         NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         IndexDetails& id = nsd->idx( idxNo );
-        id.head.writing() = newHead;
+        getDur().writingDiskLoc(id.head) = newHead;
         _head = newHead;
     }
 
