@@ -300,13 +300,19 @@ namespace mongo {
                     _conns[i]->query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
                 if ( cursor.get() )
                     return cursor;
-                log() << "query failed to: " << _conns[i]->toString() << " no data" << endl;
+
+                log() << "query on " << ns << ": " << query.toString() << " failed to: "
+                      << _conns[i]->toString() << " no data" << endl;
             }
             catch ( std::exception& e ) {
-                log() << "query failed to: " << _conns[i]->toString() << " exception: " << e.what() << endl;
+
+                log() << "query on " << ns << ": " << query.toString() << " failed to: "
+                      << _conns[i]->toString() << " exception: " << e.what() << endl;
             }
             catch ( ... ) {
-                log() << "query failed to: " << _conns[i]->toString() << " exception" << endl;
+
+                log() << "query on " << ns << ": " << query.toString() << " failed to: "
+                      << _conns[i]->toString() << " exception" << endl;
             }
         }
         throw UserException( 8002 , str::stream() << "all servers down/unreachable when querying: " << _address );
