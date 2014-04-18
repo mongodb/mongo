@@ -55,9 +55,7 @@ namespace mongo {
         //
 
         // TODO: Unordered map?
-        typedef OwnedPointerMap<ConnectionString,
-                                TargetedWriteBatch,
-                                ConnectionStringComp> OwnedHostBatchMap;
+        typedef OwnedPointerMap<ConnectionString, TargetedWriteBatch> OwnedHostBatchMap;
     }
 
     static void buildErrorFrom( const Status& status, WriteErrorDetail* error ) {
