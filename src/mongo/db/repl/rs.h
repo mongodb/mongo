@@ -34,6 +34,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/repl/consensus.h"
 #include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
@@ -176,51 +177,6 @@ namespace mongo {
         void associateSlave(const BSONObj& rid, const int memberId);
         bool updateSlave(const mongo::OID& id, const OpTime& last);
         void clearCache();
-    };
-
-    class Consensus {
-    private:
-        ReplSetImpl &rs;
-        struct LastYea {
-            LastYea() : when(0), who(0xffffffff) { }
-            time_t when;
-            unsigned who;
-        };
-        static SimpleMutex lyMutex;
-        Guarded<LastYea,lyMutex> ly;
-        unsigned yea(unsigned memberId); // throws VoteException
-        void electionFailed(unsigned meid);
-        void _electSelf();
-        bool weAreFreshest(bool& allUp, int& nTies);
-        bool sleptLast; // slept last elect() pass
-
-        // This is a unique id that is changed each time we transition to PRIMARY, as the
-        // result of an election.
-        OID _electionId;
-        // PRIMARY server's time when the election to primary occurred
-        OpTime _electionTime;
-    public:
-        Consensus(ReplSetImpl *t) : rs(*t) {
-            sleptLast = false;
-            steppedDown = 0;
-        }
-
-        /* if we've stepped down, this is when we are allowed to try to elect ourself again.
-           todo: handle possible weirdnesses at clock skews etc.
-        */
-        time_t steppedDown;
-
-        int totalVotes() const;
-        bool aMajoritySeemsToBeUp() const;
-        bool shouldRelinquish() const;
-        void electSelf();
-        void electCmdReceived(BSONObj, BSONObjBuilder*);
-        void multiCommand(BSONObj cmd, list<Target>& L);
-
-        OID getElectionId() const { return _electionId; }
-        void setElectionId(OID oid) { _electionId = oid; }
-        OpTime getElectionTime() const { return _electionTime; }
-        void setElectionTime(OpTime electionTime) { _electionTime = electionTime; }
     };
 
     /**

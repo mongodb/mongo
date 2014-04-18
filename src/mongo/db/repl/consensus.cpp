@@ -30,7 +30,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/multicmd.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/consensus.h"
 
 namespace mongo {
 
