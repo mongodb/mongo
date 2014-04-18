@@ -75,7 +75,7 @@ namespace mongo {
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( const DocWriter* doc, int quotaMax ) {
         int lenWHdr = doc->documentSize() + Record::HeaderSize;
         if ( doc->addPadding() )
-            lenWHdr = _details->getRecordAllocationSize( lenWHdr );
+            lenWHdr = getRecordAllocationSize( lenWHdr );
 
         StatusWith<DiskLoc> loc = allocRecord( lenWHdr, quotaMax );
         if ( !loc.isOK() )
@@ -96,7 +96,7 @@ namespace mongo {
 
 
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( const char* data, int len, int quotaMax ) {
-        int lenWHdr = _details->getRecordAllocationSize( len + Record::HeaderSize );
+        int lenWHdr = getRecordAllocationSize( len + Record::HeaderSize );
         fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
 
         StatusWith<DiskLoc> loc = allocRecord( lenWHdr, quotaMax );
@@ -196,7 +196,7 @@ namespace mongo {
 
     void RecordStoreV1Base::increaseStorageSize( int size, int quotaMax ) {
         DiskLoc eloc = _extentManager->allocateExtent( _ns,
-                                                       _details->isCapped(),
+                                                       isCapped(),
                                                        size,
                                                        quotaMax );
 
@@ -204,7 +204,7 @@ namespace mongo {
 
         invariant( e );
 
-        DiskLoc emptyLoc = getDur().writing(e)->reuse( _ns, _details->isCapped() );
+        DiskLoc emptyLoc = getDur().writing(e)->reuse( _ns, isCapped() );
 
         if ( _details->lastExtent().isNull() ) {
             verify( _details->firstExtent().isNull() );
@@ -477,7 +477,7 @@ namespace mongo {
                         ndel++;
 
                         if ( loc.questionable() ) {
-                            if( _details->isCapped() && !loc.isValid() && i == 1 ) {
+                            if( isCapped() && !loc.isValid() && i == 1 ) {
                                 /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
                                    see comments in namespace.h
                                 */
@@ -526,6 +526,22 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    int RecordStoreV1Base::getRecordAllocationSize( int minRecordSize ) const {
+
+        if ( isCapped() )
+            return minRecordSize;
+
+        invariant( _details->paddingFactor() >= 1 );
+
+        if ( _details->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
+            // quantize to the nearest bucketSize (or nearest 1mb boundary for large sizes).
+            return _details->quantizePowerOf2AllocationSpace(minRecordSize);
+        }
+
+        // adjust for padding factor
+        return static_cast<int>(minRecordSize * _details->paddingFactor());
     }
 
 }

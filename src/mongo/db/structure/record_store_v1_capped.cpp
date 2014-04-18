@@ -153,7 +153,7 @@ namespace mongo {
                         firstEmptyExtent = _details->_capExtent;
                     advanceCapExtent( _ns );
                     if ( firstEmptyExtent == _details->_capExtent ) {
-                        _details->maybeComplain( _ns, lenToAlloc );
+                        _maybeComplain( lenToAlloc );
                         return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                                     "no space in capped collection" );
                     }
@@ -587,6 +587,59 @@ namespace mongo {
                                          const CompactOptions* options,
                                          CompactStats* stats ) {
         invariant(false);
+    }
+
+    void CappedRecordStoreV1::_maybeComplain( int len ) const {
+        RARELY {
+            std::stringstream buf;
+            buf << "couldn't make room for record len: " << len << " in capped ns " << _ns << '\n';
+            int i = 0;
+            for ( DiskLoc e = _details->firstExtent();
+                  !e.isNull();
+                  e = _extentManager->getExtent( e )->xnext, ++i ) {
+                buf << "  Extent " << i;
+                if ( e == _details->capExtent() )
+                    buf << " (capExtent)";
+                buf << '\n';
+
+                buf << "    magic: " << hex << _extentManager->getExtent( e )->magic << dec
+                    << " extent->ns: " << _extentManager->getExtent( e )->nsDiagnostic.toString()
+                    << '\n';
+                buf << "    fr: " << _extentManager->getExtent( e )->firstRecord.toString()
+                    << " lr: " << _extentManager->getExtent( e )->lastRecord.toString()
+                    << " extent->len: " << _extentManager->getExtent( e )->length << '\n';
+            }
+
+            warning() << buf.str();
+
+            // assume it is unusually large record; if not, something is broken
+            fassert( 17438, len * 5 > _details->lastExtentSize() );
+        }
+    }
+
+    DiskLoc CappedRecordStoreV1::firstRecord( const DiskLoc &startExtent ) const {
+        for (DiskLoc i = startExtent.isNull() ? _details->firstExtent() : startExtent;
+                !i.isNull();
+             i = _extentManager->getExtent( i )->xnext ) {
+
+            Extent* e = _extentManager->getExtent( i );
+
+            if ( !e->firstRecord.isNull() )
+                return e->firstRecord;
+        }
+        return DiskLoc();
+    }
+
+    DiskLoc CappedRecordStoreV1::lastRecord( const DiskLoc &startExtent ) const {
+        for (DiskLoc i = startExtent.isNull() ? _details->lastExtent() : startExtent;
+                !i.isNull();
+             i = _extentManager->getExtent( i )->xprev ) {
+
+            Extent* e = _extentManager->getExtent( i );
+            if ( !e->lastRecord.isNull() )
+                return e->lastRecord;
+        }
+        return DiskLoc();
     }
 
 }

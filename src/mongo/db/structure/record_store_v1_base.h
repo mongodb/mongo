@@ -68,6 +68,14 @@ namespace mongo {
         virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
         const NamespaceDetails* details() const { return _details; }
+
+        /**
+         * @return the actual size to create
+         *         will be >= oldRecordSize
+         *         based on padding and any other flags
+         */
+        int getRecordAllocationSize( int minRecordSize ) const;
+
     protected:
 
         virtual bool isCapped() const = 0;

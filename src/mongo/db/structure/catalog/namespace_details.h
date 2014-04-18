@@ -259,13 +259,6 @@ namespace mongo {
          */
         IndexDetails& getNextIndexDetails(Collection* collection);
 
-        /**
-         * @return the actual size to create
-         *         will be >= oldRecordSize
-         *         based on padding and any other flags
-         */
-        int getRecordAllocationSize( int minRecordSize );
-
         double paddingFactor() const { return _paddingFactor; }
 
         void setPaddingFactor( double paddingFactor );
@@ -347,11 +340,6 @@ namespace mongo {
         static int quantizePowerOf2AllocationSpace(int allocSize);
 
     public:
-        // Start from firstExtent by default.
-        DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
-        // Start from lastExtent by default.
-        DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
-
         NamespaceDetails *writingWithoutExtra() {
             return ( NamespaceDetails* ) getDur().writingPtr( this, sizeof( NamespaceDetails ) );
         }
@@ -372,8 +360,6 @@ namespace mongo {
          * must have a lock on the entire collection to do this
          */
         void swapIndex( int a, int b );
-
-        void maybeComplain( const StringData& ns, int len ) const;
 
         friend class Database;
         friend class NamespaceIndex;

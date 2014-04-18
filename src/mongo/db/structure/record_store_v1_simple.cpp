@@ -66,8 +66,14 @@ namespace mongo {
                                               ExtentManager* em,
                                               bool isSystemIndexes )
         : RecordStoreV1Base( ns, details, em, isSystemIndexes ) {
+
         invariant( !details->isCapped() );
         _normalCollection = NamespaceString::normal( ns );
+        if ( _details->paddingFactor() == 0 ) {
+            warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
+            _details->setPaddingFactor(1.0);
+        }
+
     }
 
     SimpleRecordStoreV1::~SimpleRecordStoreV1() {

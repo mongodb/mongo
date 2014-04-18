@@ -65,12 +65,14 @@ namespace mongo {
         /**
          * Internal collection navigation helper methods.
          */
-        static DiskLoc getNextCapped(const NamespaceDetails* nsd, const ExtentManager* em,
-                                     const DiskLoc& dl, CollectionScanParams::Direction direction );
-        static DiskLoc prevLoop(const NamespaceDetails* nsd, const ExtentManager* em,
-                                const DiskLoc& curr);
-        static DiskLoc nextLoop(const NamespaceDetails* nsd, const ExtentManager* em,
-                                const DiskLoc& prev);
+        DiskLoc getNextCapped(const DiskLoc& dl);
+        DiskLoc prevLoop(const DiskLoc& curr);
+        DiskLoc nextLoop(const DiskLoc& prev);
+
+        // some helpers - these move to RecordStore probably
+        Extent* _getExtent( const DiskLoc& loc );
+        DiskLoc _getNextRecord( const DiskLoc& loc );
+        DiskLoc _getPrevRecord( const DiskLoc& loc );
 
         // The collection we're iterating over.
         const CappedRecordStoreV1* _recordStore;

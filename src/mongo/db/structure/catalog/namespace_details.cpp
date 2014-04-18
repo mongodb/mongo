@@ -126,42 +126,6 @@ namespace mongo {
         return allocationSize;
     }
 
-    DiskLoc NamespaceDetails::firstRecord( const DiskLoc &startExtent ) const {
-        for (DiskLoc i = startExtent.isNull() ? _firstExtent : startExtent;
-                !i.isNull(); i = i.ext()->xnext ) {
-            if ( !i.ext()->firstRecord.isNull() )
-                return i.ext()->firstRecord;
-        }
-        return DiskLoc();
-    }
-
-    DiskLoc NamespaceDetails::lastRecord( const DiskLoc &startExtent ) const {
-        for (DiskLoc i = startExtent.isNull() ? _lastExtent : startExtent;
-                !i.isNull(); i = i.ext()->xprev ) {
-            if ( !i.ext()->lastRecord.isNull() )
-                return i.ext()->lastRecord;
-        }
-        return DiskLoc();
-    }
-
-    int n_complaints_cap = 0;
-    void NamespaceDetails::maybeComplain( const StringData& ns, int len ) const {
-        if ( ++n_complaints_cap < 8 ) {
-            out() << "couldn't make room for new record (len: " << len << ") in capped ns " << ns << '\n';
-            int i = 0;
-            for ( DiskLoc e = _firstExtent; !e.isNull(); e = e.ext()->xnext, ++i ) {
-                out() << "  Extent " << i;
-                if ( e == _capExtent )
-                    out() << " (capExtent)";
-                out() << '\n';
-                out() << "    magic: " << hex << e.ext()->magic << dec << " extent->ns: " << e.ext()->nsDiagnostic.toString() << '\n';
-                out() << "    fr: " << e.ext()->firstRecord.toString() <<
-                      " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
-            }
-            verify( len * 5 > _lastExtentSize ); // assume it is unusually large record; if not, something is broken
-        }
-    }
-
     NamespaceDetails::Extra* NamespaceDetails::allocExtra( const StringData& ns,
                                                            NamespaceIndex& ni,
                                                            int nindexessofar) {
@@ -464,26 +428,6 @@ namespace mongo {
             return;
 
         *getDur().writing(&_paddingFactor) = paddingFactor;
-    }
-
-    int NamespaceDetails::getRecordAllocationSize( int minRecordSize ) {
-
-        if ( isCapped() )
-            return minRecordSize;
-
-        if ( _paddingFactor == 0 ) {
-            warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
-            setPaddingFactor(1.0);
-        }
-        verify( _paddingFactor >= 1 );
-
-        if ( isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
-            // quantize to the nearest bucketSize (or nearest 1mb boundary for large sizes).
-            return quantizePowerOf2AllocationSpace(minRecordSize);
-        }
-
-        // adjust for padding factor
-        return static_cast<int>(minRecordSize * _paddingFactor);
     }
 
     /* remove bit from a bit array - actually remove its slot, not a clear

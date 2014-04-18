@@ -71,6 +71,11 @@ namespace mongo {
                                 const CompactOptions* options,
                                 CompactStats* stats );
 
+        // Start from firstExtent by default.
+        DiskLoc firstRecord( const DiskLoc &startExtent = DiskLoc() ) const;
+        // Start from lastExtent by default.
+        DiskLoc lastRecord( const DiskLoc &startExtent = DiskLoc() ) const;
+
     protected:
 
         virtual bool isCapped() const { return true; }
@@ -101,6 +106,8 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          */
         void cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive);
+
+        void _maybeComplain( int len ) const;
 
         // -- end copy from cap.cpp --
 

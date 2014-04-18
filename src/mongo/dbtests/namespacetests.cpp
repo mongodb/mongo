@@ -1083,6 +1083,16 @@ namespace NamespaceTests {
                     return NULL;
                 return c->detailsWritable()->writingWithExtra();
             }
+            const RecordStore* recordStore() const {
+                Collection* c = collection();
+                if ( !c )
+                    return NULL;
+                return c->getRecordStore();
+            }
+            const RecordStoreV1Base* cheatRecordStore() const {
+                return dynamic_cast<const RecordStoreV1Base*>( recordStore() );
+            }
+
             Database* db() const {
                 return _context.db();
             }
@@ -1371,7 +1381,7 @@ namespace NamespaceTests {
                 create();
                 ASSERT( nsd()->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 ASSERT_EQUALS( 1.0, nsd()->paddingFactor() );
-                ASSERT_EQUALS( 300, nsd()->getRecordAllocationSize( 300 ) );
+                ASSERT_EQUALS( 300, cheatRecordStore()->getRecordAllocationSize( 300 ) );
             }
             virtual string spec() const { return ""; }
         };
@@ -1386,7 +1396,7 @@ namespace NamespaceTests {
                 ASSERT( nsd()->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 ASSERT_EQUALS( paddingFactor, nsd()->paddingFactor() );
                 ASSERT_EQUALS( static_cast<int>( 300 * paddingFactor ),
-                               nsd()->getRecordAllocationSize( 300 ) );
+                               cheatRecordStore()->getRecordAllocationSize( 300 ) );
             }
             virtual string spec() const { return ""; }
         };
@@ -1400,7 +1410,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
-                ASSERT_EQUALS( 512, nsd()->getRecordAllocationSize( 300 ) );
+                ASSERT_EQUALS( 512, cheatRecordStore()->getRecordAllocationSize( 300 ) );
             }
             virtual string spec() const { return ""; }
         };
@@ -1417,7 +1427,7 @@ namespace NamespaceTests {
                 ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 nsd()->setPaddingFactor( 2.0 );
                 ASSERT_EQUALS( 2.0, nsd()->paddingFactor() );
-                ASSERT_EQUALS( 512, nsd()->getRecordAllocationSize( 300 ) );
+                ASSERT_EQUALS( 512, cheatRecordStore()->getRecordAllocationSize( 300 ) );
             }
             virtual string spec() const { return ""; }
         };

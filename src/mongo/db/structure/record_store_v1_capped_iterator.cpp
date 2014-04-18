@@ -49,7 +49,6 @@ namespace mongo {
         if (_curr.isNull()) {
 
             const NamespaceDetails* nsd = _recordStore->details();
-            const ExtentManager* em = _recordStore->_extentManager;
 
             // If a start position isn't specified, we fill one out from the start of the
             // collection.
@@ -57,16 +56,16 @@ namespace mongo {
                 // Going forwards.
                 if (!nsd->capLooped()) {
                     // If our capped collection doesn't loop around, the first record is easy.
-                    _curr = nsd->firstRecord();
+                    _curr = collection->firstRecord();
                 }
                 else {
                     // Our capped collection has "looped' around.
                     // Copied verbatim from ForwardCappedCursor::init.
                     // TODO ELABORATE
-                    _curr = em->getExtent( nsd->capExtent() )->firstRecord;
+                    _curr = _getExtent( nsd->capExtent() )->firstRecord;
                     if (!_curr.isNull() && _curr == nsd->capFirstNewRecord()) {
-                        _curr = em->getExtent( nsd->capExtent() )->lastRecord;
-                        _curr = nextLoop(nsd,em,_curr);
+                        _curr = _getExtent( nsd->capExtent() )->lastRecord;
+                        _curr = nextLoop(_curr);
                     }
                 }
             }
@@ -74,10 +73,10 @@ namespace mongo {
                 // Going backwards
                 if (!nsd->capLooped()) {
                     // Start at the end.
-                    _curr = nsd->lastRecord();
+                    _curr = collection->lastRecord();
                 }
                 else {
-                    _curr = em->getExtent( nsd->capExtent() )->lastRecord;
+                    _curr = _getExtent( nsd->capExtent() )->lastRecord;
                 }
             }
         }
@@ -90,24 +89,21 @@ namespace mongo {
     DiskLoc CappedRecordStoreV1Iterator::getNext() {
         DiskLoc ret = _curr;
 
-        const NamespaceDetails* nsd = _recordStore->details();
-        const ExtentManager* em = _recordStore->_extentManager;
-
         // Move to the next thing.
         if (!isEOF()) {
             _prev = _curr;
-            _curr = getNextCapped(nsd, em, _curr, _direction);
+            _curr = getNextCapped(_curr);
         }
         else if (_tailable && !_prev.isNull()) {
             // If we're tailable, there COULD have been something inserted even though we were
             // previously EOF.  Look at the next thing from 'prev' and see.
-            DiskLoc newCurr = getNextCapped(nsd, em, _prev, _direction);
+            DiskLoc newCurr = getNextCapped(_prev);
 
             if (!newCurr.isNull()) {
                 // There's something new to return.  _curr always points to the next thing to
                 // return.  Update it, and move _prev to the thing we just returned.
                 _prev = ret = newCurr;
-                _curr = getNextCapped(nsd, em, _prev, _direction);
+                _curr = getNextCapped(_prev);
             }
         }
 
@@ -142,86 +138,100 @@ namespace mongo {
         return true;
     }
 
-    DiskLoc CappedRecordStoreV1Iterator::getNextCapped(const NamespaceDetails* nsd, const ExtentManager* em,
-                                          const DiskLoc& dl,
-                                          CollectionScanParams::Direction direction ) {
-        verify(!dl.isNull());
+    DiskLoc CappedRecordStoreV1Iterator::getNextCapped(const DiskLoc& dl) {
+        invariant(!dl.isNull());
+        NamespaceDetails* details = _recordStore->_details;
 
-        if (CollectionScanParams::FORWARD == direction) {
+        if (CollectionScanParams::FORWARD == _direction) {
             // If it's not looped, it's easy.
-            if (!nsd->capLooped()) { return em->getNextRecord( dl ); }
+            if (!_recordStore->details()->capLooped()) {
+                return _getNextRecord( dl );
+            }
 
             // TODO ELABORATE
             // EOF.
-            if (dl == em->getExtent( nsd->capExtent() )->lastRecord) { return DiskLoc(); }
+            if (dl == _getExtent( details->capExtent() )->lastRecord) {
+                return DiskLoc();
+            }
 
-            DiskLoc ret = nextLoop(nsd,em,dl);
+            DiskLoc ret = nextLoop(dl);
 
             // If we become capFirstNewRecord from same extent, advance to next extent.
-            if (ret == nsd->capFirstNewRecord() && ret != em->getExtent( nsd->capExtent() )->firstRecord) {
-                ret = nextLoop(nsd,em,em->getExtent( nsd->capExtent() )->lastRecord);
+            if (ret == details->capFirstNewRecord() && ret != _getExtent( details->capExtent() )->firstRecord) {
+                ret = nextLoop(_getExtent( details->capExtent() )->lastRecord);
             }
 
             // If we have just gotten to beginning of capExtent, skip to capFirstNewRecord
-            if (ret == em->getExtent( nsd->capExtent() )->firstRecord) { ret = nsd->capFirstNewRecord(); }
+            if (ret == _getExtent( details->capExtent() )->firstRecord) { ret = details->capFirstNewRecord(); }
 
             return ret;
         }
         else {
-            if (!nsd->capLooped()) { return em->getPrevRecord( dl ); }
+            if (!details->capLooped()) { return _getPrevRecord( dl ); }
 
             // TODO ELABORATE
             // Last record
-            if (nsd->capFirstNewRecord() == em->getExtent( nsd->capExtent() )->firstRecord) {
-                if (dl == nextLoop(nsd,em,em->getExtent( nsd->capExtent() )->lastRecord)) {
+            if (details->capFirstNewRecord() == _getExtent( details->capExtent() )->firstRecord) {
+                if (dl == nextLoop(_getExtent( details->capExtent() )->lastRecord)) {
                     return DiskLoc();
                 }
             }
             else {
-                if (dl == em->getExtent( nsd->capExtent() )->firstRecord) { return DiskLoc(); }
+                if (dl == _getExtent( details->capExtent() )->firstRecord) { return DiskLoc(); }
             }
 
             DiskLoc ret;
             // If we are capFirstNewRecord, advance to prev extent, otherwise just get prev.
-            if (dl == nsd->capFirstNewRecord()) {
-                ret = prevLoop(nsd, em, em->getExtent( nsd->capExtent() )->firstRecord);
+            if (dl == details->capFirstNewRecord()) {
+                ret = prevLoop(_getExtent( details->capExtent() )->firstRecord);
             }
             else {
-                ret = prevLoop(nsd, em, dl);
+                ret = prevLoop(dl);
             }
 
             // If we just became last in cap extent, advance past capFirstNewRecord
             // (We know ext(capExtent)->firstRecord != capFirstNewRecord, since would
             // have returned DiskLoc() earlier otherwise.)
-            if (ret == em->getExtent( nsd->capExtent() )->lastRecord) {
-                ret = em->getPrevRecord( nsd->capFirstNewRecord() );
+            if (ret == _getExtent( details->capExtent() )->lastRecord) {
+                ret = _getPrevRecord( details->capFirstNewRecord() );
             }
 
             return ret;
         }
     }
 
-    DiskLoc CappedRecordStoreV1Iterator::nextLoop(const NamespaceDetails* nsd, const ExtentManager* em,
-                                     const DiskLoc& prev) {
+    DiskLoc CappedRecordStoreV1Iterator::nextLoop(const DiskLoc& prev) {
         // TODO ELABORATE
-        verify(nsd->capLooped());
-        DiskLoc next = em->getNextRecord( prev );
-        if (!next.isNull()) { return next; }
-        return nsd->firstRecord();
+        DiskLoc next = _getNextRecord( prev );
+        if (!next.isNull()) {
+            return next;
+        }
+        return _recordStore->firstRecord();
     }
 
-    DiskLoc CappedRecordStoreV1Iterator::prevLoop(const NamespaceDetails* nsd, const ExtentManager* em,
-                                     const DiskLoc& curr) {
+    DiskLoc CappedRecordStoreV1Iterator::prevLoop(const DiskLoc& curr) {
         // TODO ELABORATE
-        verify(nsd->capLooped());
-        DiskLoc prev = em->getPrevRecord( curr );
-        if (!prev.isNull()) { return prev; }
-        return nsd->lastRecord();
+        DiskLoc prev = _getPrevRecord( curr );
+        if (!prev.isNull()) {
+            return prev;
+        }
+        return _recordStore->lastRecord();
     }
 
     const Record* CappedRecordStoreV1Iterator::recordFor( const DiskLoc& loc ) const {
         return _recordStore->recordFor( loc );
     }
 
+    Extent* CappedRecordStoreV1Iterator::_getExtent( const DiskLoc& loc ) {
+        return _recordStore->_extentManager->getExtent( loc );
+    }
+
+    DiskLoc CappedRecordStoreV1Iterator::_getNextRecord( const DiskLoc& loc ) {
+        return _recordStore->_extentManager->getNextRecord( loc );
+    }
+
+    DiskLoc CappedRecordStoreV1Iterator::_getPrevRecord( const DiskLoc& loc ) {
+        return _recordStore->_extentManager->getPrevRecord( loc );
+    }
 
 }  // namespace mongo
