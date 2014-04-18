@@ -191,6 +191,7 @@ namespace mongo {
      */
     class MONGO_CLIENT_API ConnectionString {
     public:
+
         enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC, CUSTOM };
 
         ConnectionString() {
@@ -293,6 +294,11 @@ namespace mongo {
         static ConnectionHook* getConnectionHook() {
             scoped_lock lk( _connectHookMutex );
             return _connectHook;
+        }
+
+        // Allows ConnectionStrings to be stored more easily in sets/maps
+        bool operator<(const ConnectionString& other) const {
+            return _string < other._string;
         }
 
         //

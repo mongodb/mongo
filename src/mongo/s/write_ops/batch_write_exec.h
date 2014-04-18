@@ -96,14 +96,6 @@ namespace mongo {
         auto_ptr<BatchWriteExecStats> _stats;
     };
 
-    // Useful comparator for using connection strings in ordered sets and maps
-    struct ConnectionStringComp {
-        bool operator()( const ConnectionString& connStrA,
-                         const ConnectionString& connStrB ) const {
-            return connStrA.toString().compare( connStrB.toString() ) < 0;
-        }
-    };
-
     struct HostOpTime {
         HostOpTime(OpTime ot, OID e) : opTime(ot), electionId(e) {};
         HostOpTime() {};
@@ -111,7 +103,7 @@ namespace mongo {
         OID electionId;
     };
 
-    typedef std::map<ConnectionString, HostOpTime, ConnectionStringComp> HostOpTimeMap;
+    typedef std::map<ConnectionString, HostOpTime> HostOpTimeMap;
 
     class BatchWriteExecStats {
     public:
