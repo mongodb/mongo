@@ -31,6 +31,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/d_concurrency.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -53,6 +54,8 @@ namespace mongo {
         LOG(2) << "IndexBuilder building index " << _index;
 
         Client::initThread(name().c_str());
+        Lock::ParallelBatchWriterMode::iAmABatchParticipant();
+
         replLocalAuth();
 
         cc().curop()->reset(HostAndPort(), dbInsert);

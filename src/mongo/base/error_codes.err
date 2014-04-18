@@ -94,6 +94,8 @@ error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
 error_code("OutOfDiskSpace", 14031 )
 error_code("KeyTooLong", 17280);
+error_code("BackgroundOperationInProgressForDatabase", 12586);
+error_code("BackgroundOperationInProgressForNamespace", 12587);
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
 error_class("Interruption", ["Interrupted", "InterruptedAtShutdown", "ExceededTimeLimit"])

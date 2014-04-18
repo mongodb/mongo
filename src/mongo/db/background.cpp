@@ -97,7 +97,7 @@ namespace {
 
     void recordEndAndRemove(BgInfoMap* bgiMap, const StringData& key) {
         BgInfoMapIterator iter = bgiMap->find(key);
-        fassert(0, iter != bgiMap->end());
+        fassert(17443, iter != bgiMap->end());
         if (0 == iter->second->recordEnd()) {
             bgiMap->erase(iter);
         }
