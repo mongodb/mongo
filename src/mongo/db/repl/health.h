@@ -1,5 +1,3 @@
-// replset.h
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -33,6 +31,9 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+    // helper functions needed by member.cpp
+    std::string ago(time_t t);
 
     /* throws */
     bool requestHeartbeat(const std::string& setname,

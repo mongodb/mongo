@@ -1,4 +1,3 @@
-// @file rsmember.h
 /*
  *    Copyright (C) 2010 10gen Inc.
  *

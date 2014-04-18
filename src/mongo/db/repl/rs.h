@@ -36,12 +36,12 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/consensus.h"
 #include "mongo/db/repl/heartbeat_info.h"
+#include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_exception.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/sync_source_feedback.h"
-#include "mongo/util/concurrency/list.h"
 #include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/value.h"
@@ -82,37 +82,6 @@ namespace mongo {
         boost::mutex mtx;
         bool indexRebuildDone;
         boost::condition cond;
-    };
-
-    /* member of a replica set */
-    class Member : public List1<Member>::Base {
-    private:
-        ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
-        Member(const Member&); 
-    public:
-        Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
-
-        string fullName() const { return h().toString(); }
-        const ReplSetConfig::MemberCfg& config() const { return _config; }
-        ReplSetConfig::MemberCfg& configw() { return _config; }
-        const HeartbeatInfo& hbinfo() const { return _hbinfo; }
-        HeartbeatInfo& get_hbinfo() { return _hbinfo; }
-        string lhb() const { return _hbinfo.lastHeartbeatMsg; }
-        MemberState state() const { return _hbinfo.hbstate; }
-        const HostAndPort& h() const { return _h; }
-        unsigned id() const { return _hbinfo.id(); }
-
-        bool potentiallyHot() const { return _config.potentiallyHot(); } // not arbiter, not priority 0
-        void summarizeMember(stringstream& s) const;
-        // If we could sync from this member.  This doesn't tell us anything about the quality of
-        // this member, just if they are a possible sync target.
-        bool syncable() const;
-
-    private:
-        friend class ReplSetImpl;
-        ReplSetConfig::MemberCfg _config;
-        const HostAndPort _h;
-        HeartbeatInfo _hbinfo;
     };
 
     class Manager : public task::Server {
@@ -703,13 +672,6 @@ namespace mongo {
     void replLocalAuth();
 
     /** inlines ----------------- */
-
-    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
-        _config(*c), _h(h), _hbinfo(ord) {
-        verify(c);
-        if( self )
-            _hbinfo.health = 1.0;
-    }
 
     inline bool ignoreUniqueIndex(const IndexDescriptor* idx) {
         if (!idx->unique()) {

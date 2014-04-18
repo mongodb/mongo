@@ -36,6 +36,7 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/bson/optime.h"
@@ -134,11 +135,6 @@ namespace mongo {
 
         LOG(1) << "replSet empty oplog" << rsLog;
         uassertStatusOK( collection->truncate() );
-    }
-
-    bool Member::syncable() const {
-        bool buildIndexes = theReplSet ? theReplSet->buildIndexes() : true;
-        return hbinfo().up() && (config().buildIndexes || !buildIndexes) && state().readable();
     }
 
     const Member* ReplSetImpl::getMemberToSyncTo() {

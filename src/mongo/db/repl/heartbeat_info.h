@@ -31,7 +31,7 @@
 #include <climits>
 
 #include "mongo/bson/optime.h"
-#include "mongo/db/repl/rs_member.h"
+#include "mongo/db/repl/member_state.h"
 
 namespace mongo {
 

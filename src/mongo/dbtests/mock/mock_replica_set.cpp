@@ -15,7 +15,7 @@
 
 #include "mongo/dbtests/mock/mock_replica_set.h"
 
-#include "mongo/db/repl/rs_member.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/util/map_util.h"
