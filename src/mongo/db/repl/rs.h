@@ -42,6 +42,7 @@
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rs_exception.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/state_box.h"
 #include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -142,62 +143,6 @@ namespace mongo {
     };
 
     class ReplSetHealthPollTask;
-
-    /* safe container for our state that keeps member pointer and state variables always aligned */
-    class StateBox : boost::noncopyable {
-    public:
-        struct SP { // SP is like pair<MemberState,const Member *> but nicer
-            SP() : state(MemberState::RS_STARTUP), primary(0) { }
-            MemberState state;
-            const Member *primary;
-        };
-        const SP get() {
-            rwlock lk(m, false);
-            return sp;
-        }
-        MemberState getState() const {
-            rwlock lk(m, false);
-            return sp.state;
-        }
-        const Member* getPrimary() const {
-            rwlock lk(m, false);
-            return sp.primary;
-        }
-        void change(MemberState s, const Member *self) {
-            rwlock lk(m, true);
-            if( sp.state != s ) {
-                log() << "replSet " << s.toString() << rsLog;
-            }
-            sp.state = s;
-            if( s.primary() ) {
-                sp.primary = self;
-            }
-            else {
-                if( self == sp.primary )
-                    sp.primary = 0;
-            }
-        }
-        void set(MemberState s, const Member *p) {
-            rwlock lk(m, true);
-            sp.state = s;
-            sp.primary = p;
-        }
-        void setSelfPrimary(const Member *self) { change(MemberState::RS_PRIMARY, self); }
-        void setOtherPrimary(const Member *mem) {
-            rwlock lk(m, true);
-            verify( !sp.state.primary() );
-            sp.primary = mem;
-        }
-        void noteRemoteIsPrimary(const Member *remote) {
-            rwlock lk(m, true);
-            verify(!sp.state.primary());
-            sp.primary = remote;
-        }
-        StateBox() : m("StateBox") { }
-    private:
-        RWLock m;
-        SP sp;
-    };
 
     void parseReplsetCmdLine(const std::string& cfgString,
                              string& setname,
