@@ -327,6 +327,10 @@ namespace mongo {
         getDur().writingInt(_systemFlags) &= ~flag;
     }
 
+    void NamespaceDetails::clearSystemFlags() {
+        getDur().writingInt(_systemFlags) = 0;
+    }
+
     void NamespaceDetails::setLastExtentSize( int newMax ) {
         if ( _lastExtentSize == newMax )
             return;

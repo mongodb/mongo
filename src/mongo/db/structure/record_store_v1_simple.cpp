@@ -91,8 +91,8 @@ namespace mongo {
             DiskLoc bestmatch;
             int bestmatchlen = 0x7fffffff;
             int b = _details->bucket(lenToAlloc);
-            DiskLoc cur = _details->_deletedList[b];
-            prev = &_details->_deletedList[b];
+            DiskLoc cur = _details->deletedListEntry(b);
+            prev = &_details->deletedListEntry(b);
             int extra = 5; // look for a better fit, a little.
             int chain = 0;
             while ( 1 ) {
@@ -125,8 +125,8 @@ namespace mongo {
                         freelistIterations.increment( 1 + chain );
                         return DiskLoc();
                     }
-                    cur = _details->_deletedList[b];
-                    prev = &_details->_deletedList[b];
+                    cur = _details->deletedListEntry(b);
+                    prev = &_details->deletedListEntry(b);
                     continue;
                 }
                 DeletedRecord *r = drec(cur);
@@ -267,7 +267,7 @@ namespace mongo {
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
 
         int b = _details->bucket(d->lengthWithHeaders());
-        DiskLoc& list = _details->_deletedList[b];
+        DiskLoc& list = _details->deletedListEntry(b);
         DiskLoc oldHead = list;
         getDur().writingDiskLoc(list) = dloc;
         d->nextDeleted() = oldHead;

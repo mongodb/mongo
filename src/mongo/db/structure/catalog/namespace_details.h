@@ -297,6 +297,7 @@ namespace mongo {
         bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }
         void setSystemFlag( int flag );
         void clearSystemFlag( int flag );
+        void clearSystemFlags();
 
         const int userFlags() const { return _userFlags; }
         bool isUserFlagSet( int flag ) const { return _userFlags & flag; }
@@ -361,12 +362,8 @@ namespace mongo {
          */
         void swapIndex( int a, int b );
 
-        friend class Database;
-        friend class NamespaceIndex;
         friend class IndexCatalog;
         friend class IndexCatalogEntry;
-        friend class SimpleRecordStoreV1;
-        friend class CappedRecordStoreV1;
 
         /** Update cappedLastDelRecLastExtent() after capExtent changed in cappedTruncateAfter() */
         void cappedTruncateLastDelUpdate();
