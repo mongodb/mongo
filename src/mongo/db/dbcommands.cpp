@@ -985,7 +985,7 @@ namespace mongo {
             auto_ptr<Runner> runner;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
-                    result.appendNumber( "size" , collection->dataSize() );
+                    result.appendNumber( "size" , static_cast<long long>(collection->dataSize()) );
                     result.appendNumber( "numObjects",
                                          static_cast<long long>( collection->numRecords() ) );
                     result.append( "millis" , timer.millis() );
