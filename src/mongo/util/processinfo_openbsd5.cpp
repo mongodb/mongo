@@ -97,17 +97,17 @@ namespace mongo {
                 sizeof(kinfo_proc), &cnt);
         kvm_close(kd);
         return ((task->p_vm_dsize + task->p_vm_ssize + task->p_vm_tsize) *
-		sysconf( _SC_PAGESIZE )) / 1048576;
+               sysconf( _SC_PAGESIZE )) / 1048576;
     }
 
     int ProcessInfo::getResidentSize() {
         kvm_t *kd = NULL;
         int cnt = 0;
-	char err[_POSIX2_LINE_MAX] = {0};
+        char err[_POSIX2_LINE_MAX] = {0};
         if ((kd = kvm_openfiles(NULL, NULL, NULL, KVM_NO_FILES, err)) == NULL) {
-	    log() << "Unable to get res mem size: " << err << endl;
+            log() << "Unable to get res mem size: " << err << endl;
             return -1;
-	}
+        }
         kinfo_proc * task = kvm_getprocs(kd, KERN_PROC_PID, _pid.toNative(),
                 sizeof(kinfo_proc), &cnt);
         kvm_close(kd);
