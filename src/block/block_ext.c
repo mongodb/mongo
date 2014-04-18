@@ -932,8 +932,8 @@ __block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 	 * for a simple extension.  If that doesn't work, allocate a new list
 	 * structure, and append it.
 	 */
-	 ext = __block_off_srch_last(el->off, astack);
-	 if (ext != NULL && ext->off + ext->size == off)
+	ext = __block_off_srch_last(el->off, astack);
+	if (ext != NULL && ext->off + ext->size == off)
 		ext->size += size;
 	else {
 		/* Assert we're appending to the list. */
