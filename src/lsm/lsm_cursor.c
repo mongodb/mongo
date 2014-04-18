@@ -1358,7 +1358,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len != 0)
 		WT_RET_MSG(session, EINVAL,
-		    "LSM does not yet support zero-length data items");
+		    "LSM does not support opening by checkpoint");
 
 	/* Get the LSM tree. */
 	WT_WITH_SCHEMA_LOCK(session,
