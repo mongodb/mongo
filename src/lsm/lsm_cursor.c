@@ -35,7 +35,7 @@
 	CURSOR_UPDATE_API_END(session, ret);				\
 	WT_TRET(__clsm_leave(clsm))
 
-static int __clsm_lookup(WT_CURSOR_LSM *);
+static int __clsm_lookup(WT_CURSOR_LSM *, WT_ITEM *);
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_reset_cursors(WT_CURSOR_LSM *, WT_CURSOR *);
 
@@ -836,20 +836,31 @@ err:	API_END(session);
  *	Position an LSM cursor.
  */
 static int
-__clsm_lookup(WT_CURSOR_LSM *clsm)
+__clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 {
 	WT_BLOOM *bloom;
 	WT_BLOOM_HASH bhash;
 	WT_CURSOR *c, *cursor;
 	WT_DECL_RET;
+	WT_ITEM _value;
 	WT_SESSION_IMPL *session;
 	u_int i;
-	int have_hash;
+	int have_hash, local_value;
 
 	c = NULL;
 	cursor = &clsm->iface;
 	have_hash = 0;
 	session = (WT_SESSION_IMPL *)cursor->session;
+
+	/*
+	 * Our caller chooses if we're using a local buffer to store the value,
+	 * that way it can avoid overwriting an application's value.
+	 */
+	local_value = value == NULL;
+	if (local_value) {
+		value = &_value;
+		WT_CLEAR_INLINE(WT_ITEM, *value);
+	}
 
 	WT_FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
@@ -874,8 +885,8 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search(c)) == 0) {
 			WT_ERR(c->get_key(c, &cursor->key));
-			WT_ERR(c->get_value(c, &cursor->value));
-			if (__clsm_deleted(clsm, &cursor->value))
+			WT_ERR(c->get_value(c, value));
+			if (__clsm_deleted(clsm, value))
 				ret = WT_NOTFOUND;
 			goto done;
 		}
@@ -902,6 +913,10 @@ err:	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	}
 
+	/* Free any locally allocated buffer memory. */
+	if (local_value)
+		__wt_free(session, value->mem);
+
 	return (ret);
 }
 
@@ -919,7 +934,7 @@ __clsm_search(WT_CURSOR *cursor)
 	WT_LSM_ENTER(clsm, cursor, session, search, 1);
 	WT_CURSOR_NEEDKEY(cursor);
 
-	ret = __clsm_lookup(clsm);
+	ret = __clsm_lookup(clsm, &cursor->value);
 
 err:	WT_LSM_LEAVE(session);
 	return (ret);
@@ -1223,7 +1238,7 @@ __clsm_insert(WT_CURSOR *cursor)
 	WT_LSM_NEEDVALUE(cursor);
 
 	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-	    (ret = __clsm_lookup(clsm)) != WT_NOTFOUND) {
+	    (ret = __clsm_lookup(clsm, NULL)) != WT_NOTFOUND) {
 		if (ret == 0)
 			ret = WT_DUPLICATE_KEY;
 		return (ret);
@@ -1244,19 +1259,16 @@ __clsm_update(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
-	WT_ITEM value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, update);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_LSM_NEEDVALUE(cursor);
 
-	/* Take a copy of the value: __clsm_lookup overwrites it. */
-	value = cursor->value;
-
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm)) == 0)
-		ret = __clsm_put(session, clsm, &cursor->key, &value, 1);
+	    (ret = __clsm_lookup(clsm, NULL)) == 0)
+		ret = __clsm_put(
+		    session, clsm, &cursor->key, &cursor->value, 1);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
@@ -1277,7 +1289,7 @@ __clsm_remove(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm)) == 0)
+	    (ret = __clsm_lookup(clsm, NULL)) == 0)
 		ret = __clsm_put(
 		    session, clsm, &cursor->key, &__lsm_tombstone, 1);
 
