@@ -68,6 +68,13 @@ namespace mongo {
             }
         }
 
+        // The user-provided point can be flat.  We need to make sure that it's in bounds.
+        if (isNearSphere) {
+            uassert(17444,
+                    "Legacy point is out of bounds for spherical query",
+                    centroid.flatUpgradedToSphere || (SPHERE == centroid.crs));
+        }
+
         return hasGeometry;
     }
 
