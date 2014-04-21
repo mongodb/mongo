@@ -100,45 +100,38 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 8 ) ) );
     }
 
-    TEST( MatchExpressionParserTreeTest, MaximumTreeDepth ) {
-        // This match tree is about 60 levels deep, which exceeds
-        // the maximum allowed depth.
-        BSONObj query = fromjson(
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2},"
-            "{$and: [{a: 3}, {$or: [{b: 2}, {b: 4}]}]}"
-            "]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]"
-            "}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}"
-            "]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]});"
-        );
+    // Test a deep match tree that is not deep enough to hit the maximum depth limit.
+    TEST( MatchExpressionParserTreeTest, MaximumTreeDepthNotExceed ) {
+        static const int depth = 60;
 
+        std::stringstream ss;
+        for (int i = 0; i < depth/2; i++) {
+            ss << "{$and: [{a: 3}, {$or: [{b: 2},";
+        }
+        ss << "{b: 4}";
+        for (int i = 0; i < depth/2; i++) {
+            ss << "]}]}";
+        }
+
+        BSONObj query = fromjson( ss.str() );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT( result.isOK() );
+    }
+
+    // Test a tree that exceeds the maximum depth limit.
+    TEST( MatchExpressionParserTreeTest, MaximumTreeDepthExceed ) {
+        static const int depth = 105;
+
+        std::stringstream ss;
+        for (int i = 0; i < depth/2; i++) {
+            ss << "{$and: [{a: 3}, {$or: [{b: 2},";
+        }
+        ss << "{b: 4}";
+        for (int i = 0; i < depth/2; i++) {
+            ss << "]}]}";
+        }
+
+        BSONObj query = fromjson( ss.str() );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_FALSE( result.isOK() );
     }

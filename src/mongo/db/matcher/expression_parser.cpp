@@ -274,8 +274,10 @@ namespace mongo {
 
     StatusWithMatchExpression MatchExpressionParser::_parse( const BSONObj& obj, int level ) {
         if (level > kMaximumTreeDepth) {
-            return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                              "exceeded maximum query tree depth" );
+            mongoutils::str::stream ss;
+            ss << "exceeded maximum query tree depth of " << kMaximumTreeDepth
+               << " at " << obj.toString();
+            return StatusWithMatchExpression( ErrorCodes::BadValue, ss );
         }
 
         std::auto_ptr<AndMatchExpression> root( new AndMatchExpression() );

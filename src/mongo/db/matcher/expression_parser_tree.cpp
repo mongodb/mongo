@@ -43,13 +43,11 @@
 namespace mongo {
 
     // static
-    const int MatchExpressionParser::kMaximumTreeDepth = 20;
+    const int MatchExpressionParser::kMaximumTreeDepth = 100;
 
     Status MatchExpressionParser::_parseTreeList( const BSONObj& arr,
                                                   ListOfMatchExpression* out,
                                                   int level ) {
-        level++;
-
         if ( arr.isEmpty() )
             return Status( ErrorCodes::BadValue,
                            "$and/$or/$nor must be a nonempty array" );
