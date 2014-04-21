@@ -86,13 +86,12 @@ namespace mongo {
         freelistAllocs.increment();
         DiskLoc loc;
         {
-            DiskLoc *prev;
+            DiskLoc *prev = 0;
             DiskLoc *bestprev = 0;
             DiskLoc bestmatch;
             int bestmatchlen = 0x7fffffff;
             int b = _details->bucket(lenToAlloc);
             DiskLoc cur = _details->deletedListEntry(b);
-            prev = &_details->deletedListEntry(b);
             int extra = 5; // look for a better fit, a little.
             int chain = 0;
             while ( 1 ) {
@@ -126,7 +125,7 @@ namespace mongo {
                         return DiskLoc();
                     }
                     cur = _details->deletedListEntry(b);
-                    prev = &_details->deletedListEntry(b);
+                    prev = 0;
                     continue;
                 }
                 DeletedRecord *r = drec(cur);
@@ -156,7 +155,15 @@ namespace mongo {
 
             // unlink ourself from the deleted list
             DeletedRecord *bmr = drec(bestmatch);
-            *getDur().writing(bestprev) = bmr->nextDeleted();
+            if ( bestprev ) {
+                *getDur().writing(bestprev) = bmr->nextDeleted();
+            }
+            else {
+                // should be the front of a free-list
+                int bucket = _details->bucket(bmr->lengthWithHeaders());
+                invariant( _details->deletedListEntry(bucket) == bestmatch );
+                _details->setDeletedListEntry(bucket, bmr->nextDeleted());
+            }
             getDur().writingDiskLoc(bmr->nextDeleted()).setInvalid(); // defensive.
             invariant(bmr->extentOfs() < bestmatch.getOfs());
 
@@ -267,10 +274,8 @@ namespace mongo {
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
 
         int b = _details->bucket(d->lengthWithHeaders());
-        DiskLoc& list = _details->deletedListEntry(b);
-        DiskLoc oldHead = list;
-        getDur().writingDiskLoc(list) = dloc;
-        d->nextDeleted() = oldHead;
+        d->nextDeleted() = _details->deletedListEntry(b);
+        _details->setDeletedListEntry(b, dloc);
     }
 
     RecordIterator* SimpleRecordStoreV1::getIterator( const DiskLoc& start, bool tailable,
@@ -411,7 +416,7 @@ namespace mongo {
             invariant( _details->firstExtent() == diskloc );
             invariant( _details->lastExtent() != diskloc );
             DiskLoc newFirst = e->xnext;
-            getDur().writingDiskLoc(_details->firstExtent()) = newFirst;
+            _details->setFirstExtent( newFirst );
             getDur().writingDiskLoc(_extentManager->getExtent( newFirst )->xprev).Null();
             getDur().writing(e)->markEmpty();
             _extentManager->freeExtents( diskloc, diskloc );

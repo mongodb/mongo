@@ -106,7 +106,7 @@ namespace mongo {
 
             // signal done allocating new extents.
             if ( !cappedLastDelRecLastExtent().isValid() )
-                getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
+                setLastDelRecLastExtent( DiskLoc() );
 
             invariant( lenToAlloc < 400000000 );
             int passes = 0;
@@ -210,8 +210,8 @@ namespace mongo {
     }
 
     Status CappedRecordStoreV1::truncate() {
-        getDur().writingDiskLoc(cappedLastDelRecLastExtent()) = DiskLoc();
-        getDur().writingDiskLoc(cappedListOfAllDeletedRecords()) = DiskLoc();
+        setLastDelRecLastExtent( DiskLoc() );
+        setListOfAllDeletedRecords( DiskLoc() );
 
         // preserve firstExtent/lastExtent
         _details->setCapExtent( _details->firstExtent() );
@@ -223,7 +223,7 @@ namespace mongo {
         _details->setPaddingFactor( 1.0 );
         _details->clearSystemFlags();
         _details->setCapFirstNewRecord( DiskLoc().setInvalid() );
-        getDur().writingDiskLoc(cappedLastDelRecLastExtent()).setInvalid();
+        setLastDelRecLastExtent( DiskLoc().setInvalid() );
         // dataFileVersion preserve
         // indexFileVersion preserve
 
@@ -256,7 +256,7 @@ namespace mongo {
         DDD( "CappedRecordStoreV1::compact enter" );
 
         vector<DiskLoc> drecs;
-        
+
         // Pull out capExtent's DRs from deletedList
         DiskLoc i = cappedFirstDeletedInCurExtent();
         for (; !i.isNull() && inCapExtent( i ); i = deletedRecordFor( i )->nextDeleted() ) {
@@ -264,8 +264,8 @@ namespace mongo {
             drecs.push_back( i );
         }
 
-        getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = i;
-        
+        setFirstDeletedInCurExtent( i );
+
         std::sort( drecs.begin(), drecs.end() );
         DDD( "\t drecs.size(): " << drecs.size() );
 
@@ -300,11 +300,18 @@ namespace mongo {
 
     }
 
-    DiskLoc &CappedRecordStoreV1::cappedFirstDeletedInCurExtent() {
+    const DiskLoc &CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
         if ( cappedLastDelRecLastExtent().isNull() )
             return cappedListOfAllDeletedRecords();
         else
             return drec(cappedLastDelRecLastExtent())->nextDeleted();
+    }
+
+    void CappedRecordStoreV1::setFirstDeletedInCurExtent( const DiskLoc& loc ) const {
+        if ( cappedLastDelRecLastExtent().isNull() )
+            setListOfAllDeletedRecords( loc );
+        else
+            getDur().writingDiskLoc( drec(cappedLastDelRecLastExtent())->nextDeleted() ) = loc;
     }
 
     void CappedRecordStoreV1::cappedCheckMigrate() {
@@ -319,8 +326,8 @@ namespace mongo {
                 DiskLoc last = first;
                 for (; !drec(last)->nextDeleted().isNull(); last = drec(last)->nextDeleted() );
                 getDur().writingDiskLoc(drec(last)->nextDeleted()) = cappedListOfAllDeletedRecords();
-                getDur().writingDiskLoc(cappedListOfAllDeletedRecords()) = first;
-                getDur().writingDiskLoc(_details->deletedListEntry(i)) = DiskLoc();
+                setListOfAllDeletedRecords( first );
+                _details->setDeletedListEntry(i,DiskLoc());
             }
             // NOTE cappedLastDelRecLastExtent() set to DiskLoc() in above
 
@@ -355,11 +362,11 @@ namespace mongo {
         // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
         // (or DiskLoc() if new capExtent == firstExtent)
         if ( _details->capExtent() == _details->lastExtent() )
-            getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
+            setLastDelRecLastExtent( DiskLoc() );
         else {
             DiskLoc i = cappedFirstDeletedInCurExtent();
             for (; !i.isNull() && nextIsInCapExtent( i ); i = drec(i)->nextDeleted() );
-            getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = i;
+            setLastDelRecLastExtent( i );
         }
 
         _details->setCapExtent( theCapExtent()->xnext.isNull() ?
@@ -388,7 +395,7 @@ namespace mongo {
         /* unlink ourself from the deleted list */
         if ( !ret.isNull() ) {
             if ( prev.isNull() )
-                getDur().writingDiskLoc(cappedListOfAllDeletedRecords()) = drec(ret)->nextDeleted();
+                setListOfAllDeletedRecords( drec(ret)->nextDeleted() );
             else
                 getDur().writingDiskLoc(drec(prev)->nextDeleted()) = drec(ret)->nextDeleted();
             getDur().writingDiskLoc(drec(ret)->nextDeleted()).setInvalid(); // defensive.
@@ -403,7 +410,7 @@ namespace mongo {
             // Only one extent of the collection is in use, so there
             // is no deleted record in a previous extent, so nullify
             // cappedLastDelRecLastExtent().
-            getDur().writingDiskLoc(cappedLastDelRecLastExtent()) = DiskLoc();
+            setLastDelRecLastExtent( DiskLoc() );
         }
         else {
             // Scan through all deleted records in the collection
@@ -420,7 +427,7 @@ namespace mongo {
             // record.  (We expect that there will be deleted records in the new
             // capExtent as well.)
             invariant( !drec(i)->nextDeleted().isNull() );
-            getDur().writingDiskLoc(cappedLastDelRecLastExtent()) = i;
+            setLastDelRecLastExtent( i );
         }
     }
 
@@ -520,12 +527,20 @@ namespace mongo {
         }
     }
 
-    DiskLoc& CappedRecordStoreV1::cappedListOfAllDeletedRecords() {
+    const DiskLoc& CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
         return _details->deletedListEntry(0);
     }
 
-    DiskLoc& CappedRecordStoreV1::cappedLastDelRecLastExtent() {
+    void CappedRecordStoreV1::setListOfAllDeletedRecords( const DiskLoc& loc ) const {
+        return _details->setDeletedListEntry(0,loc);
+    }
+
+    const DiskLoc& CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
         return _details->deletedListEntry(1);
+    }
+
+    void CappedRecordStoreV1::setLastDelRecLastExtent( const DiskLoc& loc ) const {
+        return _details->setDeletedListEntry(1,loc);
     }
 
     bool CappedRecordStoreV1::capLooped() const {
@@ -552,7 +567,7 @@ namespace mongo {
             // Initial extent allocation.  Insert at end.
             d->nextDeleted() = DiskLoc();
             if ( cappedListOfAllDeletedRecords().isNull() )
-                getDur().writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
+                setListOfAllDeletedRecords( dloc );
             else {
                 DiskLoc i = cappedListOfAllDeletedRecords();
                 for (; !drec(i)->nextDeleted().isNull(); i = drec(i)->nextDeleted() )
@@ -562,7 +577,7 @@ namespace mongo {
         }
         else {
             d->nextDeleted() = cappedFirstDeletedInCurExtent();
-            getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
+            setFirstDeletedInCurExtent( dloc );
             // always compact() after this so order doesn't matter
         }
     }

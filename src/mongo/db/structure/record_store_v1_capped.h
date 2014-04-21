@@ -87,12 +87,15 @@ namespace mongo {
     private:
         // -- start copy from cap.cpp --
         void compact();
-        DiskLoc& cappedFirstDeletedInCurExtent();
+        const DiskLoc& cappedFirstDeletedInCurExtent() const;
+        void setFirstDeletedInCurExtent( const DiskLoc& loc ) const;
         void cappedCheckMigrate();
         DiskLoc __capAlloc( int len );
         bool inCapExtent( const DiskLoc &dl ) const;
-        DiskLoc& cappedListOfAllDeletedRecords();
-        DiskLoc& cappedLastDelRecLastExtent();
+        const DiskLoc& cappedListOfAllDeletedRecords() const;
+        const DiskLoc& cappedLastDelRecLastExtent() const;
+        void setListOfAllDeletedRecords( const DiskLoc& loc ) const;
+        void setLastDelRecLastExtent( const DiskLoc& loc ) const;
         bool capLooped() const;
         Extent *theCapExtent() const;
         bool nextIsInCapExtent( const DiskLoc &dl ) const;

@@ -163,13 +163,10 @@ namespace mongo {
     public:
 
         const DiskLoc& firstExtent() const { return _firstExtent; }
+        void setFirstExtent( const DiskLoc& loc );
+
         const DiskLoc& lastExtent() const { return _lastExtent; }
-
-        DiskLoc& firstExtent() { return _firstExtent; }
-        DiskLoc& lastExtent() { return _lastExtent; }
-
-        void setFirstExtent( DiskLoc newFirstExtent );
-        void setLastExtent( DiskLoc newLastExtent );
+        void setLastExtent( const DiskLoc& loc );
 
         void setFirstExtentInvalid();
         void setLastExtentInvalid();
@@ -193,7 +190,7 @@ namespace mongo {
         void setLastExtentSize( int newMax );
 
         const DiskLoc& deletedListEntry( int bucket ) const { return _deletedList[bucket]; }
-        DiskLoc& deletedListEntry( int bucket ) { return _deletedList[bucket]; }
+        void setDeletedListEntry( int bucket, const DiskLoc& loc );
 
         void orphanDeletedList();
 

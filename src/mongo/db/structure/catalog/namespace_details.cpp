@@ -353,6 +353,13 @@ namespace mongo {
         s->nrecords = numRecords;
     }
 
+    void NamespaceDetails::setFirstExtent( const DiskLoc& loc ) {
+        getDur().writingDiskLoc( _firstExtent ) = loc;
+    }
+
+    void NamespaceDetails::setLastExtent( const DiskLoc& loc ) {
+        getDur().writingDiskLoc( _lastExtent ) = loc;
+    }
 
     void NamespaceDetails::setCapExtent( const DiskLoc& loc ) {
         getDur().writingDiskLoc( _capExtent ) = loc;
@@ -360,14 +367,6 @@ namespace mongo {
 
     void NamespaceDetails::setCapFirstNewRecord( const DiskLoc& loc ) {
         getDur().writingDiskLoc( _capFirstNewRecord ) = loc;
-    }
-
-    void NamespaceDetails::setFirstExtent( DiskLoc newFirstExtent ) {
-        getDur().writingDiskLoc( _firstExtent ) = newFirstExtent;
-    }
-
-    void NamespaceDetails::setLastExtent( DiskLoc newLastExtent ) {
-        getDur().writingDiskLoc( _lastExtent ) = newLastExtent;
     }
 
     void NamespaceDetails::setFirstExtentInvalid() {
@@ -378,6 +377,9 @@ namespace mongo {
         getDur().writingDiskLoc( _lastExtent ).setInvalid();
     }
 
+    void NamespaceDetails::setDeletedListEntry( int bucket, const DiskLoc& loc ) {
+        getDur().writingDiskLoc( _deletedList[bucket] ) = loc;
+    }
 
     /**
      * // TODO: this should move to Collection
