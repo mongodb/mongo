@@ -198,14 +198,14 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
  *	Encode empty values and values that are in the encoded name space.
  */
 static inline int
-__clsm_deleted_encode(WT_SESSION_IMPL *session,
-    WT_ITEM *value, const WT_ITEM **valuep, WT_ITEM **tmpp)
+__clsm_deleted_encode(
+    WT_SESSION_IMPL *session, WT_ITEM *value, WT_ITEM **valuep)
 {
 	WT_ITEM *tmp;
 
 	/* Check for an empty value. */
 	if (value->size == 0) {
-		*valuep = &__lsm_empty;
+		*valuep = (WT_ITEM *)&__lsm_empty;
 		return (0);
 	}
 
@@ -218,16 +218,15 @@ __clsm_deleted_encode(WT_SESSION_IMPL *session,
 	 * byte we appended before returning to the application.
 	 */
 	if (((uint8_t *)value->data)[0] == WT_DC4_BYTE) {
-		WT_RET(__wt_scr_alloc(session, value->size + 1, tmpp));
-		*valuep = tmp = *tmpp;
+		WT_RET(__wt_scr_alloc(session, value->size + 1, valuep));
+		tmp = *valuep;
 
 		memcpy(tmp->mem, value->data, value->size);
 		((uint8_t *)tmp->mem)[value->size] = WT_DC4_BYTE;
 		tmp->size = value->size + 1;
-		return (0);
-	}
+	} else
+		*valuep = value;
 
-	*valuep = value;
 	return (0);
 }
 
@@ -901,25 +900,14 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 	WT_BLOOM_HASH bhash;
 	WT_CURSOR *c, *cursor;
 	WT_DECL_RET;
-	WT_ITEM _value;
 	WT_SESSION_IMPL *session;
 	u_int i;
-	int have_hash, local_value;
+	int have_hash;
 
 	c = NULL;
 	cursor = &clsm->iface;
 	have_hash = 0;
 	session = (WT_SESSION_IMPL *)cursor->session;
-
-	/*
-	 * Our caller chooses if we're using a local buffer to store the value,
-	 * that way it can avoid overwriting an application's value.
-	 */
-	local_value = value == NULL;
-	if (local_value) {
-		value = &_value;
-		WT_CLEAR_INLINE(WT_ITEM, *value);
-	}
 
 	WT_FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
@@ -971,10 +959,6 @@ err:	if (ret == 0) {
 			WT_TRET(c->reset(c));
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	}
-
-	/* Free any locally allocated buffer memory. */
-	if (local_value)
-		__wt_free(session, value->mem);
 
 	return (ret);
 }
@@ -1293,28 +1277,28 @@ static int
 __clsm_insert(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
-	WT_DECL_ITEM(tmp);
+	WT_DECL_ITEM(encoded_value);
 	WT_DECL_RET;
-	const WT_ITEM *value;
+	WT_ITEM tmp_value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, insert);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &tmp));
+	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &encoded_value));
 
 	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-	    (ret = __clsm_lookup(clsm, NULL)) != WT_NOTFOUND) {
+	    (ret = __clsm_lookup(clsm, &tmp_value)) != WT_NOTFOUND) {
 		if (ret == 0)
 			ret = WT_DUPLICATE_KEY;
 		return (ret);
 	}
 
-	ret = __clsm_put(session, clsm, &cursor->key, value, 0);
+	ret = __clsm_put(session, clsm, &cursor->key, encoded_value, 0);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 
-	__wt_scr_free(&tmp);
+	__wt_scr_free(&encoded_value);
 	return (ret);
 }
 
@@ -1326,23 +1310,23 @@ static int
 __clsm_update(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
-	WT_DECL_ITEM(tmp);
+	WT_DECL_ITEM(encoded_value);
 	WT_DECL_RET;
-	const WT_ITEM *value;
+	WT_ITEM tmp_value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, update);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &tmp));
+	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &encoded_value));
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm, NULL)) == 0)
-		ret = __clsm_put(session, clsm, &cursor->key, value, 1);
+	    (ret = __clsm_lookup(clsm, &tmp_value)) == 0)
+		ret = __clsm_put(session, clsm, &cursor->key, encoded_value, 1);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 
-	__wt_scr_free(&tmp);
+	__wt_scr_free(&encoded_value);
 	return (ret);
 }
 
@@ -1355,13 +1339,14 @@ __clsm_remove(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
+	WT_ITEM tmp_value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, remove);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm, NULL)) == 0)
+	    (ret = __clsm_lookup(clsm, &tmp_value)) == 0)
 		ret = __clsm_put(
 		    session, clsm, &cursor->key, &__lsm_tombstone, 1);
 
