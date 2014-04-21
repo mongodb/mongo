@@ -4560,11 +4560,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
+#if 0
 		/*
 		 * Display the actual split keys: not turned on because it's a
 		 * lot of output and not generally useful.
 		 */
-		if (0 && WT_VERBOSE_ISSET(session, split)) {
+		if (WT_VERBOSE_ISSET(session, split)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;
 			uint32_t i;
@@ -4597,7 +4598,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 err:			__wt_scr_free(&tkey);
 			WT_RET(ret);
 		}
-
+#endif
 		if (r->bnd_next > r->bnd_next_max) {
 			r->bnd_next_max = r->bnd_next;
 			WT_STAT_FAST_DATA_SET(
