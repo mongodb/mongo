@@ -684,7 +684,13 @@ namespace mongo {
                 mergeWithLeafNode(child, indices[currentIndexNumber], ixtag->pos, &tightness,
                                   currentScan.get(), root->matchType());
 
-                if (tightness == IndexBoundsBuilder::EXACT) {
+                if (inArrayOperator) {
+                    // We're inside an array operator. The entire array operator expression
+                    // should always be affixed as a filter. We keep 'curChild' in the $and
+                    // for affixing later.
+                    ++curChild;
+                }
+                else if (tightness == IndexBoundsBuilder::EXACT) {
                     root->getChildVector()->erase(root->getChildVector()->begin()
                                                   + curChild);
                     delete child;
@@ -748,7 +754,13 @@ namespace mongo {
                 currentScan.reset(makeLeafNode(query, indices[currentIndexNumber], ixtag->pos,
                                                 child, &tightness));
 
-                if (tightness == IndexBoundsBuilder::EXACT && !inArrayOperator) {
+                if (inArrayOperator) {
+                    // We're inside an array operator. The entire array operator expression
+                    // should always be affixed as a filter. We keep 'curChild' in the $and
+                    // for affixing later.
+                    ++curChild;
+                }
+                else if (tightness == IndexBoundsBuilder::EXACT) {
                     // The bounds answer the predicate, and we can remove the expression from the
                     // root.  NOTE(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe
                     // optimize later.
