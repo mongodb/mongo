@@ -281,6 +281,20 @@ namespace mongo {
         return new SimpleRecordStoreV1Iterator( this, start, dir );
     }
 
+    vector<RecordIterator*> SimpleRecordStoreV1::getManyIterators() const {
+        OwnedPointerVector<RecordIterator> iterators;
+        const Extent* ext;
+        for (DiskLoc extLoc = details()->firstExtent(); !extLoc.isNull(); extLoc = ext->xnext) {
+            ext = _getExtent(extLoc);
+            if (ext->firstRecord.isNull())
+                continue;
+
+            iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord, this));
+        }
+
+        return iterators.release();
+    }
+
     class CompactDocWriter : public DocWriter {
     public:
         /**

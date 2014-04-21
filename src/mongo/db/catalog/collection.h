@@ -143,6 +143,13 @@ namespace mongo {
                                      bool tailable = false,
                                      const CollectionScanParams::Direction& dir = CollectionScanParams::FORWARD ) const;
 
+        /**
+         * Returns many iterators that partition the Collection into many disjoint sets. Iterating
+         * all returned iterators is equivalent to Iterating the full collection.
+         * Caller owns all pointers in the vector.
+         */
+        std::vector<RecordIterator*> getManyIterators() const;
+
 
         /**
          * does a table scan to do a count

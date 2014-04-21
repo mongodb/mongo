@@ -121,6 +121,12 @@ namespace mongo {
          */
         virtual RecordIterator* getIteratorForRepair() const = 0;
 
+        /**
+         * Returns many iterators that partition the RecordStore into many disjoint sets. Iterating
+         * all returned iterators is equivalent to Iterating the full store.
+         */
+        virtual std::vector<RecordIterator*> getManyIterators() const = 0;
+
         // higher level
 
 

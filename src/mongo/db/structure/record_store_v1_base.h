@@ -92,6 +92,8 @@ namespace mongo {
 
     class RecordStoreV1Base : public RecordStore {
     public:
+        class IntraExtentIterator;
+
         RecordStoreV1Base( const StringData& ns,
                            RecordStoreV1MetaData* details,
                            ExtentManager* em,
@@ -147,7 +149,7 @@ namespace mongo {
         // TODO: another sad one
         virtual DeletedRecord* drec( const DiskLoc& loc ) const;
 
-        // just a haper for _extentManager->getExtent( loc );
+        // just a wrapper for _extentManager->getExtent( loc );
         Extent* _getExtent( const DiskLoc& loc ) const;
 
         DiskLoc _getExtentLocForRecord( const DiskLoc& loc ) const;
@@ -168,6 +170,36 @@ namespace mongo {
         bool _isSystemIndexes;
 
         friend class RecordStoreV1RepairIterator;
+    };
+
+    /**
+     * Iterates over all records within a single extent.
+     *
+     * EOF at end of extent, even if there are more extents.
+     */
+    class RecordStoreV1Base::IntraExtentIterator : public RecordIterator {
+    public:
+        IntraExtentIterator(DiskLoc start, const RecordStore* rs, bool forward = true)
+            : _curr(start), _rs(rs), _forward(forward) {}
+
+        virtual bool isEOF() { return _curr.isNull(); }
+
+        virtual DiskLoc curr() { return _curr; }
+
+        virtual DiskLoc getNext();
+
+        virtual void invalidate(const DiskLoc& dl);
+
+        virtual void prepareToYield() {}
+
+        virtual bool recoverFromYield() { return true; }
+
+        virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }
+
+    private:
+        DiskLoc _curr;
+        const RecordStore* _rs;
+        bool _forward;
     };
 
 }

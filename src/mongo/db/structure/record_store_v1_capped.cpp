@@ -585,6 +585,58 @@ namespace mongo {
         return new CappedRecordStoreV1Iterator( this, start, tailable, dir );
     }
 
+    vector<RecordIterator*> CappedRecordStoreV1::getManyIterators() const {
+        OwnedPointerVector<RecordIterator> iterators;
+
+        if (!capLooped()) {
+            // if we haven't looped yet, just spit out all extents (same as non-capped impl)
+            const Extent* ext;
+            for (DiskLoc extLoc = details()->firstExtent(); !extLoc.isNull(); extLoc = ext->xnext) {
+                ext = _getExtent(extLoc);
+                if (ext->firstRecord.isNull())
+                    continue;
+
+                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord,
+                                                                               this));
+            }
+        }
+        else {
+            // if we've looped we need to iterate the extents, starting and ending with the
+            // capExtent
+            const DiskLoc capExtent = details()->capExtent();
+            invariant(!capExtent.isNull());
+            invariant(capExtent.isValid());
+
+            // First do the "old" portion of capExtent if there is any
+            DiskLoc extLoc = capExtent;
+            {
+                const Extent* ext = _getExtent(extLoc);
+                if (ext->firstRecord != details()->capFirstNewRecord()) {
+                    // this means there is old data in capExtent
+                    iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord,
+                                                                                   this));
+                }
+
+                extLoc = ext->xnext.isNull() ? details()->firstExtent() : ext->xnext;
+            }
+
+            // Next handle all the other extents
+            while (extLoc != capExtent) {
+                const Extent* ext = _getExtent(extLoc);
+                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(ext->firstRecord,
+                                                                               this));
+
+                extLoc = ext->xnext.isNull() ? details()->firstExtent() : ext->xnext;
+            }
+
+            // Finally handle the "new" data in the capExtent
+            iterators.push_back(
+                new RecordStoreV1Base::IntraExtentIterator(details()->capFirstNewRecord(), this));
+        }
+
+        return iterators.release();
+    }
+
     Status CappedRecordStoreV1::compact( RecordStoreCompactAdaptor* adaptor,
                                          const CompactOptions* options,
                                          CompactStats* stats ) {

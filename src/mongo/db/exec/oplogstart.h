@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -79,9 +80,6 @@ namespace mongo {
         bool isExtentHopping() { return _extentHopping; }
         bool isBackwardsScanning() { return _backwardsScanning; }
     private:
-        // Copied verbatim.
-        static DiskLoc prevExtentFirstLoc(const NamespaceDetails* nsd, const DiskLoc& rec);
-
         StageState workBackwardsScan(WorkingSetID* out);
 
         void switchToExtentHopping();
@@ -91,9 +89,9 @@ namespace mongo {
         // If we're backwards scanning we just punt to a collscan.
         scoped_ptr<CollectionScan> _cs;
 
-        // What's our current DiskLoc?  Set by both collscan and extent hopping.
-        // Only written by collscan, read and written by extent hopping.
-        DiskLoc _curloc;
+        // This is only used for the extent hopping scan.
+        typedef OwnedPointerVector<RecordIterator> SubIterators;
+        SubIterators _subIterators;
 
         // Have we done our heavy init yet?
         bool _needInit;

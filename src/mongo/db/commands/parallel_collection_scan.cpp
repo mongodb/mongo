@@ -51,59 +51,67 @@ namespace mongo {
             size_t size;
         };
 
-        class ExtentRunner : public Runner {
+        class MultiIteratorRunner : public Runner {
         public:
-            ExtentRunner( const StringData& ns,
-                          Database* db,
-                          Collection* collection,
-                          const vector<ExtentInfo>& extents )
+            MultiIteratorRunner( const StringData& ns, Collection* collection )
                 : _ns( ns.toString() ),
-                  _collection( collection ),
-                  _extents( extents ),
-                  _extentManager( db->getExtentManager() ) {
-
-                invariant( _extents.size() > 0 );
-
-                _touchExtent( 0 );
-                _currentExtent = 0;
-                _currentRecord = _getExtent( _currentExtent )->firstRecord;
-                if ( _currentRecord.isNull() )
-                    _advance();
+                  _collection( collection ) {
             }
-            ~ExtentRunner() {
+            ~MultiIteratorRunner() {
+            }
+
+            // takes ownership of it
+            void addIterator(RecordIterator* it) {
+                _iterators.push_back(it);
             }
 
             virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
                 if ( _collection == NULL )
                     return RUNNER_DEAD;
-                if ( _currentRecord.isNull() )
+
+                DiskLoc next = _advance();
+                if (next.isNull())
                     return RUNNER_EOF;
 
                 if ( objOut )
-                    *objOut = _collection->docFor( _currentRecord );
+                    *objOut = _collection->docFor( next );
                 if ( dlOut )
-                    *dlOut = _currentRecord;
-                _advance();
+                    *dlOut = next;
                 return RUNNER_ADVANCED;
             }
 
             virtual bool isEOF() {
-                return _collection == NULL || _currentRecord.isNull();
+                return _collection == NULL || _iterators.empty();
             }
             virtual void kill() {
                 _collection = NULL;
+                _iterators.clear();
             }
             virtual void setYieldPolicy(YieldPolicy policy) {
                 invariant( false );
             }
-            virtual void saveState() {}
-            virtual bool restoreState() { return true;}
+            virtual void saveState() {
+                for (size_t i = 0; i < _iterators.size(); i++) {
+                    _iterators[i]->prepareToYield();
+                }
+            }
+            virtual bool restoreState() {
+                for (size_t i = 0; i < _iterators.size(); i++) {
+                    if (!_iterators[i]->recoverFromYield()) {
+                        kill();
+                        return false;
+                    }
+                }
+                return true;
+            }
+
             virtual const string& ns() { return _ns; }
             virtual void invalidate(const DiskLoc& dl, InvalidationType type) {
                 switch ( type ) {
                 case INVALIDATION_DELETION:
-                    if ( dl == _currentRecord )
-                        _advance();
+                    for (size_t i = 0; i < _iterators.size(); i++) {
+                        _iterators[i]->invalidate(dl);
+                    }
                     break;
                 case INVALIDATION_MUTATION:
                     // no-op
@@ -121,46 +129,21 @@ namespace mongo {
             /**
              * @return if more data
              */
-            bool _advance() {
+            DiskLoc _advance() {
+                while (!_iterators.empty()) {
+                    DiskLoc out = _iterators.back()->getNext();
+                    if (!out.isNull())
+                        return out;
 
-                while ( _currentRecord.isNull() ) {
-                    // need to move to next extent
-                    if ( _currentExtent + 1 >= _extents.size() )
-                        return false;
-                    _currentExtent++;
-                    _touchExtent( _currentExtent );
-                    _currentRecord = _getExtent( _currentExtent )->firstRecord;
-                    if ( !_currentRecord.isNull() )
-                        return true;
-                    // if we're here, the extent was empty, keep looking
+                    _iterators.popAndDeleteBack();
                 }
 
-                // we're in an extent, advance
-                _currentRecord = _extentManager.getNextRecordInExtent( _currentRecord );
-                if ( _currentRecord.isNull() ) {
-                    // finished this extent, need to move to the next one
-                    return _advance();
-                }
-                return true;
-            }
-
-            Extent* _getExtent( size_t offset ) {
-                DiskLoc dl = _extents[offset].diskLoc;
-                return _extentManager.getExtent( dl );
-            }
-
-            void _touchExtent( size_t offset ) {
-                Extent* e = _getExtent( offset );
-                touch_pages( reinterpret_cast<const char*>(e), e->length );
+                return DiskLoc();
             }
 
             string _ns;
             Collection* _collection;
-            vector<ExtentInfo> _extents;
-            ExtentManager& _extentManager;
-
-            size_t _currentExtent;
-            DiskLoc _currentRecord;
+            OwnedPointerVector<RecordIterator> _iterators;
         };
 
         // ------------------------------------------------
@@ -208,38 +191,29 @@ namespace mongo {
                                                     "numCursors has to be between 1 and 10000" <<
                                                     " was: " << numCursors ) );
 
-            vector< vector<ExtentInfo> > buckets;
+            OwnedPointerVector<RecordIterator> iterators(collection->getManyIterators());
 
-            const ExtentManager& extentManager = db->getExtentManager();
+            if (iterators.size() < numCursors) {
+                numCursors = iterators.size();
+            }
+
+            OwnedPointerVector<MultiIteratorRunner> runners;
+            for ( size_t i = 0; i < numCursors; i++ ) {
+                runners.push_back(new MultiIteratorRunner(ns.ns(), collection));
+            }
+
+            // transfer iterators to runners using a round-robin distribution.
+            // TODO consider using a common work queue once invalidation issues go away.
+            for (size_t i = 0; i < iterators.size(); i++) {
+                runners[i % runners.size()]->addIterator(iterators.releaseAt(i));
+            }
 
             {
-                DiskLoc extentDiskLoc = collection->details()->firstExtent();
-                int extentNumber = 0;
-                while (!extentDiskLoc.isNull()) {
-
-                    Extent* thisExtent = extentManager.getExtent( extentDiskLoc );
-                    ExtentInfo info( extentDiskLoc, thisExtent->length );
-                    if ( buckets.size() < numCursors ) {
-                        vector<ExtentInfo> v;
-                        v.push_back( info );
-                        buckets.push_back( v );
-                    }
-                    else {
-                        buckets[ extentNumber % buckets.size() ].push_back( info );
-                    }
-
-                    extentDiskLoc = thisExtent->xnext;
-                    extentNumber++;
-                }
-
                 BSONArrayBuilder bucketsBuilder;
-                for ( size_t i = 0; i < buckets.size(); i++ ) {
-
-                    auto_ptr<Runner> runner( new ExtentRunner( ns.ns(),
-                                                               db,
-                                                               collection,
-                                                               buckets[i] ) );
-                    ClientCursor* cc = new ClientCursor( collection, runner.release() );
+                for (size_t i = 0; i < runners.size(); i++) {
+                    // transfer ownership of a runner to the ClientCursor (which manages its own
+                    // lifetime).
+                    ClientCursor* cc = new ClientCursor( collection, runners.releaseAt(i) );
 
                     // we are mimicking the aggregation cursor output here
                     // that is why there are ns, ok and empty firstBatch

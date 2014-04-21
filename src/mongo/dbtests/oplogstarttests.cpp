@@ -179,13 +179,7 @@ namespace OplogStartTests {
             // ensure that we go into extent hopping mode immediately
             _stage->setBackwardsScanTime(0);
 
-            // collection scan needs to initialize itself
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            // collection scan finds the first diskloc in
-            // the backwards scan
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            ASSERT(_stage->isBackwardsScanning());
-            // Now we switch to extent hopping mode, and
+            // We immediately switch to extent hopping mode, and
             // should find the beginning of the extent
             ASSERT_EQUALS(_stage->work(&id), PlanStage::ADVANCED);
             ASSERT(_stage->isExtentHopping());
@@ -212,12 +206,6 @@ namespace OplogStartTests {
             // ensure that we go into extent hopping mode immediately
             _stage->setBackwardsScanTime(0);
 
-            // collection scan needs to initialize itself
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            // collection scan finds the first diskloc in
-            // the backwards scan
-            ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);
-            ASSERT(_stage->isBackwardsScanning());
             // hop back extent by extent
             for (int i = 0; i < numHops(); i++) {
                 ASSERT_EQUALS(_stage->work(&id), PlanStage::NEED_TIME);

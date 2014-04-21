@@ -614,4 +614,19 @@ namespace mongo {
         return static_cast<int>(minRecordSize * _details->paddingFactor());
     }
 
+    DiskLoc RecordStoreV1Base::IntraExtentIterator::getNext() {
+        if (_curr.isNull())
+            return DiskLoc();
+
+        const DiskLoc out = _curr; // we always return where we were, not where we will be.
+        const Record* rec = recordFor(_curr);
+        const int nextOfs = _forward ? rec->nextOfs() : rec->prevOfs();
+        _curr = (nextOfs == DiskLoc::NullOfs ? DiskLoc() : DiskLoc(_curr.a(), nextOfs));
+        return out;
+    }
+
+    void RecordStoreV1Base::IntraExtentIterator::invalidate(const DiskLoc& dl) {
+        if (dl == _curr)
+            getNext();
+    }
 }

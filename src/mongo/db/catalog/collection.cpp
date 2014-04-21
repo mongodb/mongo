@@ -136,6 +136,10 @@ namespace mongo {
         return _recordStore->getIterator( start, tailable, dir );
     }
 
+    vector<RecordIterator*> Collection::getManyIterators() const {
+        return _recordStore->getManyIterators();
+    }
+
     int64_t Collection::countTableScan( const MatchExpression* expression ) {
         scoped_ptr<RecordIterator> iterator( getIterator( DiskLoc(),
                                                               false,

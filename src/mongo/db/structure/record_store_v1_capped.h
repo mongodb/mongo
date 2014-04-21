@@ -65,6 +65,8 @@ namespace mongo {
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
 
+        virtual std::vector<RecordIterator*> getManyIterators() const;
+
         virtual bool compactSupported() const { return false; }
 
         virtual Status compact( RecordStoreCompactAdaptor* adaptor,
