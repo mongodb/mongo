@@ -118,6 +118,7 @@ namespace mongo {
 
         OwnedPointerVector<MAdvise> _extentAdvice;
 
+        friend class CappedRecordStoreV1Iterator;
     };
 
 

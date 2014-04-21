@@ -35,7 +35,6 @@
 
 namespace mongo {
 
-    class CappedRecordStoreV1Iterator;
     class DocWriter;
     class ExtentManager;
     class Record;
@@ -108,6 +107,8 @@ namespace mongo {
 
         StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax );
 
+        virtual RecordIterator* getIteratorForRepair() const;
+
         void increaseStorageSize( int size, int quotaMax );
 
         virtual Status validate( bool full, bool scanData,
@@ -166,7 +167,7 @@ namespace mongo {
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
 
-        friend class CappedRecordStoreV1Iterator;
+        friend class RecordStoreV1RepairIterator;
     };
 
 }

@@ -37,6 +37,7 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/record_store_v1_repair_iterator.h"
 
 namespace mongo {
 
@@ -240,6 +241,10 @@ namespace mongo {
             }
         }
 
+    }
+
+    RecordIterator* RecordStoreV1Base::getIteratorForRepair() const {
+        return new RecordStoreV1RepairIterator(this);
     }
 
     void RecordStoreV1Base::_addRecordToRecListInExtent(Record *r, DiskLoc loc) {

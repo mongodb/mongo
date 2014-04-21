@@ -114,6 +114,13 @@ namespace mongo {
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const = 0;
 
+        /**
+         * Constructs an iterator over a potentially corrupted store, which can be used to salvage
+         * damaged records. The iterator might return every record in the store if all of them 
+         * are reachable and not corrupted.
+         */
+        virtual RecordIterator* getIteratorForRepair() const = 0;
+
         // higher level
 
 
