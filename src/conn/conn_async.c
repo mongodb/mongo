@@ -24,8 +24,6 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	uint64_t cfg_hash, uri_hash;
 	int have_cursor;
 
-	session = conn->default_session;
-	wt_session = &session->iface;
 	async = conn->async;
 	op->format = NULL;
 	have_cursor = 0;
@@ -51,8 +49,11 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	}
 	/*
 	 * We didn't find one in the cache.  Allocate and initialize one.
-	 * Insert it at the head expecting LRU usage.
+	 * Insert it at the head expecting LRU usage.  We need a real session
+	 * for the cursor.
 	 */
+	session = NULL;
+	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
 	__wt_spin_lock(session, &async->ops_lock);
 	WT_ERR(__wt_calloc_def(session, 1, &af));
 	WT_ERR(__wt_strdup(session, uri, &af->uri));
@@ -63,6 +64,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * Get the key_format and value_format for this URI and store
 	 * it in the structure so that async->set_key/value work.
 	 */
+	wt_session = &session->iface;
 	WT_ERR(wt_session->open_cursor(wt_session, uri, NULL, NULL, &c));
 	have_cursor = 1;
 	WT_ERR(__wt_strdup(session, c->key_format, &af->key_format));
@@ -72,6 +74,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 
 	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
 	__wt_spin_unlock(session, &async->ops_lock);
+	WT_ERR(wt_session->close(wt_session, NULL));
 
 setup:	op->format = af;
 	/*
