@@ -28,8 +28,8 @@
 
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/dur.h"
-#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/storage/mmap1/dur.h"
+#include "mongo/db/storage/mmap1/dur_commitjob.h"
 #include "mongo/db/index/btree_index_cursor.h"  // for aboutToDeleteBucket
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/record.h"

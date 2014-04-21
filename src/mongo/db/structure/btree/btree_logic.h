@@ -30,7 +30,7 @@
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/dur.h"
+#include "mongo/db/storage/mmap1/dur.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/btree/btree_ondisk.h"

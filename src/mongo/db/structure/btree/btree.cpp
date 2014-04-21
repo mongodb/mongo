@@ -39,7 +39,7 @@
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/storage/mmap1/dur_commitjob.h"
 #include "mongo/db/index/btree_index_cursor.h"  // for aboutToDeleteBucket
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"

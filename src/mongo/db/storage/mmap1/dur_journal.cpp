@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/dur_journal.h"
+#include "mongo/db/storage/mmap1/dur_journal.h"
 
 #include <boost/static_assert.hpp>
 #include <boost/filesystem.hpp>
@@ -38,9 +38,9 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
-#include "mongo/db/dur_journalformat.h"
-#include "mongo/db/dur_journalimpl.h"
-#include "mongo/db/dur_stats.h"
+#include "mongo/db/storage/mmap1/dur_journalformat.h"
+#include "mongo/db/storage/mmap1/dur_journalimpl.h"
+#include "mongo/db/storage/mmap1/dur_stats.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/server.h"

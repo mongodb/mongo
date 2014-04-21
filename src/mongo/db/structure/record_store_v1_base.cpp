@@ -31,7 +31,7 @@
 #include "mongo/db/structure/record_store_v1_base.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/dur.h"
+#include "mongo/db/storage/mmap1/dur.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"

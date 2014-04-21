@@ -35,7 +35,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/dur.h"
+#include "mongo/db/storage/mmap1/dur.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"

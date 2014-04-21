@@ -31,8 +31,8 @@
 #pragma once
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/dur.h"
-#include "mongo/db/durop.h"
+#include "mongo/db/storage/mmap1/dur.h"
+#include "mongo/db/storage/mmap1/durop.h"
 #include "mongo/db/taskqueue.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/concurrency/synchronization.h"

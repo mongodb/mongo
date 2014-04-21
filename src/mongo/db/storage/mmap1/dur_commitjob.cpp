@@ -30,10 +30,10 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/storage/mmap1/dur_commitjob.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/dur_stats.h"
+#include "mongo/db/storage/mmap1/dur_stats.h"
 #include "mongo/db/taskqueue.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/stacktrace.h"

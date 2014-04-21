@@ -30,7 +30,7 @@
 
 #include <deque>
 
-#include "mongo/db/dur.h"
+#include "mongo/db/storage/mmap1/dur.h"
 #include "mongo/db/repl/sync.h"
 
 namespace mongo {

@@ -32,7 +32,7 @@
 
 #include "mongo/db/storage/extent.h"
 
-#include "mongo/db/dur.h"
+#include "mongo/db/storage/mmap1/dur.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"

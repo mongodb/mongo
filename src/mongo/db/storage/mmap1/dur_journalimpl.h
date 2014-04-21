@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/dur_journalformat.h"
+#include "mongo/db/storage/mmap1/dur_journalformat.h"
 #include "mongo/util/logfile.h"
 
 namespace mongo {
