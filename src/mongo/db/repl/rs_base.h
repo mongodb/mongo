@@ -30,8 +30,6 @@
 
 namespace mongo {
 
-    extern Tee* rsLog;
-
     /**
      * most operations on a ReplSet object should be done while locked. that
      * logic implemented here.

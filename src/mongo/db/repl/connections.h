@@ -35,7 +35,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/security_key.h"
-#include "mongo/db/repl/rs.h" // extern Tee* rslog
+#include "mongo/db/repl/health.h"
+#include "mongo/db/repl/rs_config.h"
 
 namespace mongo {
 

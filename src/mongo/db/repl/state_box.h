@@ -32,8 +32,6 @@
 
 namespace mongo {
 
-    extern Tee* rsLog;
-
     /* safe container for our state that keeps member pointer and state variables always aligned */
     class StateBox : boost::noncopyable {
     public:

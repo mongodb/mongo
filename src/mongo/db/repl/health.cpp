@@ -59,7 +59,8 @@ namespace mongo {
     using namespace bson;
 
     static RamLog * _rsLog = RamLog::get("rs");
-    Tee *rsLog = _rsLog;
+    Tee* rsLog = _rsLog;
+
     extern bool replSetBlind; // for testing
 
     string ago(time_t t) {

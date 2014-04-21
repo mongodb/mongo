@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/consensus.h"
+#include "mongo/db/repl/health.h"
 #include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/manager.h"
 #include "mongo/db/repl/member.h"
@@ -72,7 +73,6 @@ namespace mongo {
     struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
-    extern Tee *rsLog;
     extern int maxSyncSourceLagSecs;
 
     class ReplSetCmdline;

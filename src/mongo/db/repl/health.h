@@ -32,6 +32,9 @@
 
 namespace mongo {
 
+    // ramlog used for replSet actions
+    extern Tee* rsLog;
+
     // helper functions needed by member.cpp
     std::string ago(time_t t);
 

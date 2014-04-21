@@ -36,8 +36,6 @@
 
 namespace mongo{
 
-    extern Tee* rsLog;
-
     // For testing network failures in percolate() for chaining
     MONGO_FP_DECLARE(rsChaining1);
     MONGO_FP_DECLARE(rsChaining2);
