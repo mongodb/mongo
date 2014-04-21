@@ -1303,6 +1303,47 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {a: 1}}}}}");
     }
 
+    // SERVER-13664
+    TEST_F(QueryPlannerTest, ElemMatchEmbeddedAnd) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1 << "a.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {b: {$gte: 2, $lt: 4}, c: 25}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{b:{$gte:2,$lt: 4},c:25}}}, node: "
+                                "{ixscan: {filter: null, pattern: {'a.b': 1, 'a.c': 1}, "
+                                "bounds: {'a.b': [[-Infinity,4,true,false]], "
+                                         "'a.c': [[25,25,true,true]]}}}}}");
+    }
+
+    // SERVER-13664
+    TEST_F(QueryPlannerTest, ElemMatchEmbeddedOr) {
+        // true means multikey
+        addIndex(BSON("a.b" << 1), true);
+        // true means multikey
+        addIndex(BSON("a.c" << 1), true);
+        runQuery(fromjson("{a: {$elemMatch: {$or: [{b: 3}, {c: 4}]}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{$or:[{b:3},{c:4}]}}}, "
+                                "node: {or: {nodes: ["
+                                    "{ixscan: {filter: null, pattern: {'a.b': 1}}}, "
+                                    "{ixscan: {filter: null, pattern: {'a.c': 1}}}]}}}}");
+    }
+
+    // SERVER-13664
+    TEST_F(QueryPlannerTest, ElemMatchEmbeddedRegex) {
+        addIndex(BSON("a.b" << 1));
+        runQuery(fromjson("{a: {$elemMatch: {b: /foo/}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$elemMatch:{b:/foo/}}}, node: "
+                                "{ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
+    }
+
     // $not can appear as a value operator inside of an elemMatch (value).  We shouldn't crash if we
     // see it.
     TEST_F(QueryPlannerTest, ElemMatchWithNotInside) {
