@@ -5,14 +5,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*! Asynchronous operation types. */
-typedef enum {
-	WT_AOP_INSERT,	/*!< Insert if key is not in the data source */
-	WT_AOP_REMOVE,	/*!< Remove a key from the data source */
-	WT_AOP_SEARCH,	/*!< Search and return key/value pair */
-	WT_AOP_UPDATE	/*!< Set the value of an existing key */
-} WT_ASYNC_OPTYPE;
-
 typedef enum {
 	WT_ASYNCOP_ENQUEUED,	/* Placed on the work queue */
 	WT_ASYNCOP_FREE,	/* Able to be allocated to user */

@@ -532,6 +532,15 @@ struct __wt_cursor {
 #endif
 };
 
+/*! Asynchronous operation types. */
+typedef enum {
+	WT_AOP_NONE=0,	/*!< No type set */
+	WT_AOP_INSERT,	/*!< Insert if key is not in the data source */
+	WT_AOP_REMOVE,	/*!< Remove a key from the data source */
+	WT_AOP_SEARCH,	/*!< Search and return key/value pair */
+	WT_AOP_UPDATE	/*!< Set the value of an existing key */
+} WT_ASYNC_OPTYPE;
+
 /*!
  * A WT_ASYNC_OP handle is the interface to an asynchronous operation.
  *
@@ -632,7 +641,7 @@ struct __wt_async_op {
 	/*!
 	 * Return the record matching the key. The key must first be set.
 	 *
-	 * @snippet ex_all.c Search for an exact match
+	 * @snippet ex_async.c search
 	 *
 	 * On success, the operation contains the returned record.
 	 *
@@ -746,11 +755,20 @@ struct __wt_async_op {
 	 * @snippet ex_async.c Get identifier
 	 *
 	 * @param op the operation handle
-	 * @param ... pointers to hold value fields corresponding to
-	 * WT_ASYNC_OP::value_format.
 	 * @errors
 	 */
 	uint64_t __F(get_id)(WT_ASYNC_OP *op);
+
+	/*!
+	 * Get the type for this operation.
+	 *
+	 * @snippet ex_async.c Get type
+	 *
+	 * @param op the operation handle
+	 * @returns the WT_ASYNC_OPTYPE of this operation
+	 * @errors
+	 */
+	WT_ASYNC_OPTYPE __F(get_type)(WT_ASYNC_OP *op);
 
 	/*! @} */
 

@@ -43,21 +43,27 @@ int global_error = 0;
 static int
 cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 {
+	WT_ASYNC_OPTYPE type;
 	WT_ITEM k, v;
 	const char *key, *value;
+	uint64_t id;
 	int t_ret;
 
 	(void)cb;
 	(void)flags;
+	/*! [Get type] */
+	type = op->get_type(op);
+	/*! [Get type] */
+	/*! [Get identifier] */
+	id = op->get_id(op);
+	/*! [Get identifier] */
 	t_ret = 0;
 	if (ret != 0) {
-		/*! [Get identifier] */
-		printf("ID %" PRIu64 " error %d\n", op->get_id(op), ret);
-		/*! [Get identifier] */
+		printf("ID %" PRIu64 " error %d\n", id, ret);
 		global_error = ret;
 		return (1);
 	}
-	if (op->get_id(op) == search_id) {
+	if (type == WT_AOP_SEARCH) {
 		/*! [Get the op's string key] */
 		t_ret = op->get_key(op, &k);
 		key = k.data;
@@ -66,7 +72,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		t_ret = op->get_value(op, &v);
 		value = v.data;
 		/*! [Get the op's string value] */
-		printf("Got record: %s : %s\n", key, value);
+		printf("Id %" PRIu64 " got record: %s : %s\n", id, key, value);
 	}
 	return (t_ret);
 }
@@ -78,7 +84,7 @@ static WT_ASYNC_CALLBACK cb = { cb_asyncop };
 int main(void)
 {
 	/*! [example connection] */
-	WT_ASYNC_OP *op, *opget;
+	WT_ASYNC_OP *op;
 	WT_CONNECTION *wt_conn;
 	WT_SESSION *session;
 	int i, ret;
@@ -132,13 +138,32 @@ retry:
 	wt_conn->async_flush(wt_conn);
 	/*! [flush] */
 
-	ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &opget);
-	snprintf(k[0], sizeof(k[0]), "key1");
-	opget->set_key(opget, k[0]);
-	search_id = opget->get_id(opget);
-	opget->search(opget);
+	for (i = 0; i < MAX_KEYS; i++) {
+		op = NULL;
+retry2:
+		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
+		if (ret != 0) {
+			/*
+			 * If we used up all the ops, pause and retry to
+			 * give the workers a chance to process them.
+			 */
+			fprintf(stderr,
+			    "Iteration %d: async_new_op ret %d\n",i,ret);
+			sleep(1);
+			goto retry2;
+		}
+		snprintf(k[i], sizeof(k), "key%d", i);
+		op->set_key(op, k[i]);
+		/*! [search] */
+		op->search(op);
+		/*! [search] */
+	}
 
 	/*! [example close] */
+	/*
+	 * Connection close automatically does an async_flush so it will
+	 * allow all queued search operations to complete.
+	 */
 	ret = wt_conn->close(wt_conn, NULL);
 	/*! [example close] */
 

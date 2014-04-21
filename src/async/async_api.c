@@ -168,6 +168,16 @@ __async_get_id(WT_ASYNC_OP *asyncop)
 }
 
 /*
+ * __async_get_type --
+ *	WT_ASYNC_OP->get_type implementation for op handles.
+ */
+static WT_ASYNC_OPTYPE
+__async_get_type(WT_ASYNC_OP *asyncop)
+{
+	return (((WT_ASYNC_OP_IMPL *)asyncop)->optype);
+}
+
+/*
  * __async_op_init --
  *	Initialize all the op handle fields.
  */
@@ -189,6 +199,7 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop->update = __async_update;
 	asyncop->remove = __async_remove;
 	asyncop->get_id = __async_get_id;
+	asyncop->get_type = __async_get_type;
 	/*
 	 * The cursor needs to have the get/set key/value functions initialized.
 	 * It also needs the key/value related fields set up.

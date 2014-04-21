@@ -161,6 +161,7 @@ retry:
 	WT_STAT_FAST_CONN_INCRV(conn->default_session, async_alloc_view, view);
 	WT_ERR(__async_get_format(conn, uri, config, op));
 	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
+	op->optype = WT_AOP_NONE;
 	(void)WT_ATOMIC_STORE(async->ops_index, (i + 1) % conn->async_size);
 	*opp = op;
 err:
