@@ -51,7 +51,7 @@
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/storage/mmap1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"

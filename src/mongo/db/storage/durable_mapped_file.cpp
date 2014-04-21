@@ -38,8 +38,8 @@
 
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/storage/mmap1/dur.h"
-#include "mongo/db/storage/mmap1/dur_journalformat.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;

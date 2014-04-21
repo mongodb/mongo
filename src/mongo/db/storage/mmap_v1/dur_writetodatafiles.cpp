@@ -30,9 +30,9 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/storage/mmap1/dur_commitjob.h"
-#include "mongo/db/storage/mmap1/dur_recover.h"
-#include "mongo/db/storage/mmap1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
+#include "mongo/db/storage/mmap_v1/dur_recover.h"
+#include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/timer.h"
 

@@ -35,7 +35,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/storage/mmap1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/lockstate.h"
 #include "mongo/util/file_allocator.h"
 

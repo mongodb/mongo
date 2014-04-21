@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/storage/mmap1/durop.h"
+#include "mongo/db/storage/mmap_v1/durop.h"
 
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/repair_database.h"

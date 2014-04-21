@@ -40,7 +40,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/storage/mmap1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"

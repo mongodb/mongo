@@ -37,7 +37,7 @@
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/storage/mmap1/dur_commitjob.h"
+#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"

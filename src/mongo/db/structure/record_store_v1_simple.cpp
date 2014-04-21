@@ -35,7 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/storage/mmap1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"

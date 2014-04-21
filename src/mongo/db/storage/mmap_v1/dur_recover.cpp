@@ -30,7 +30,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/storage/mmap1/dur_recover.h"
+#include "mongo/db/storage/mmap_v1/dur_recover.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fcntl.h>
@@ -39,12 +39,12 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/db.h"
-#include "mongo/db/storage/mmap1/dur.h"
-#include "mongo/db/storage/mmap1/dur_commitjob.h"
-#include "mongo/db/storage/mmap1/dur_journal.h"
-#include "mongo/db/storage/mmap1/dur_journalformat.h"
-#include "mongo/db/storage/mmap1/dur_stats.h"
-#include "mongo/db/storage/mmap1/durop.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
+#include "mongo/db/storage/mmap_v1/dur_journal.h"
+#include "mongo/db/storage/mmap_v1/dur_journalformat.h"
+#include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/durop.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/pdfile.h"

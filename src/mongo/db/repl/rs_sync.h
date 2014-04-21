@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/db/client.h"
-#include "mongo/db/storage/mmap1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/sync.h"

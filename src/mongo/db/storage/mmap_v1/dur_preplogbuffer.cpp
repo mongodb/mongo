@@ -38,11 +38,11 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/storage/mmap1/dur.h"
-#include "mongo/db/storage/mmap1/dur_commitjob.h"
-#include "mongo/db/storage/mmap1/dur_journal.h"
-#include "mongo/db/storage/mmap1/dur_journalimpl.h"
-#include "mongo/db/storage/mmap1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
+#include "mongo/db/storage/mmap_v1/dur_journal.h"
+#include "mongo/db/storage/mmap_v1/dur_journalimpl.h"
+#include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/server.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/mongoutils/hash.h"

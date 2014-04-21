@@ -24,7 +24,7 @@
 
 #include "mongo/pch.h"
 #include <map>
-#include "mongo/db/storage/mmap1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 
 namespace mongo {
 

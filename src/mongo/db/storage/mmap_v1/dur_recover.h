@@ -33,7 +33,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <list>
 
-#include "mongo/db/storage/mmap1/dur_journalformat.h"
+#include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/file.h"
 
