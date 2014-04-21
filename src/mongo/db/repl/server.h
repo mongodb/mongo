@@ -1,5 +1,3 @@
-// @file msg.h - interthread message passing
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -36,7 +34,7 @@
 #include <boost/function.hpp>
 
 #include "mongo/util/concurrency/mutex.h"
-#include "task.h"
+#include "mongo/util/concurrency/task.h"
 
 namespace mongo {
 
@@ -59,7 +57,7 @@ namespace mongo {
             void requeue() { rq = true; }
 
         protected:
-            /* REMINDER : for use in mongod, you will want to have this call Client::initThread(). */
+            // REMINDER : for use in mongod, you will want to have this call Client::initThread().
             virtual void starting() { }
 
         private:

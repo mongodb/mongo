@@ -40,8 +40,8 @@
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/server.h"
 #include "mongo/util/background.h"
-#include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"

@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/repl/member.h"
-#include "mongo/util/concurrency/msg.h"
+#include "mongo/db/repl/server.h"
 
 namespace mongo {
     class ReplSetImpl;
