@@ -53,6 +53,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * We didn't find one in the cache.  Allocate and initialize one.
 	 * Insert it at the head expecting LRU usage.
 	 */
+	__wt_spin_lock(session, &async->ops_lock);
 	WT_ERR(__wt_calloc_def(session, 1, &af));
 	WT_ERR(__wt_strdup(session, uri, &af->uri));
 	WT_ERR(__wt_strdup(session, config, &af->config));
@@ -69,7 +70,6 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	WT_ERR(c->close(c));
 	have_cursor = 0;
 
-	__wt_spin_lock(session, &async->ops_lock);
 	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
 	__wt_spin_unlock(session, &async->ops_lock);
 
