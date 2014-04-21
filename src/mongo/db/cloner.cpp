@@ -53,7 +53,6 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 

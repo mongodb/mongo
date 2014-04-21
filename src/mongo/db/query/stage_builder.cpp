@@ -49,7 +49,6 @@
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/text.h"
 #include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 

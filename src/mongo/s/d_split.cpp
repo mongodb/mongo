@@ -48,7 +48,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/s/chunk.h" // for static genID only
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"

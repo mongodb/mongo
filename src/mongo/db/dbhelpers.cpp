@@ -52,7 +52,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
 

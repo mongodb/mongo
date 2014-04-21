@@ -40,7 +40,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/type_explain.h"

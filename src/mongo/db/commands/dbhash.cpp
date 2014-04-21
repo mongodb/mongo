@@ -34,7 +34,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/timer.h"
 

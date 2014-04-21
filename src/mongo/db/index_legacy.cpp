@@ -34,7 +34,6 @@
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 

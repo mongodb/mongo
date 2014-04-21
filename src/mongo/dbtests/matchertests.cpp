@@ -34,7 +34,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/matcher/matcher.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
