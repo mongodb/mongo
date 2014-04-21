@@ -793,7 +793,7 @@ namespace mongo {
             return _b.subarrayStart( num() );
         }
 
-        // These should only be used where you really need interface compatability with BSONObjBuilder
+        // These should only be used where you really need interface compatibility with BSONObjBuilder
         // Currently they are only used by update.cpp and it should probably stay that way
         BufBuilder &subobjStart( const StringData& name ) {
             fill( name );

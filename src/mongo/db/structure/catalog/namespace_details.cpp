@@ -76,7 +76,7 @@ namespace mongo {
         _lastExtentSize = 0;
         _nIndexes = 0;
         _isCapped = capped;
-        _maxDocsInCapped = 0x7fffffff; // no limit (value is for pre-v2.3.2 compatability)
+        _maxDocsInCapped = 0x7fffffff; // no limit (value is for pre-v2.3.2 compatibility)
         _paddingFactor = 1.0;
         _systemFlags = 0;
         _userFlags = 0;
