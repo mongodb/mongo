@@ -221,6 +221,19 @@ WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor, cursorCloseHandler($1))
 
 %include "java_doc.i"
 
+/* WT_ASYNC_OP customization. */
+/* First, replace the varargs get / set methods with Java equivalents. */
+%ignore __wt_async_op::get_key;
+%ignore __wt_async_op::get_value;
+%ignore __wt_async_op::set_key;
+%ignore __wt_async_op::set_value;
+%ignore __wt_async_op::insert;
+%ignore __wt_async_op::remove;
+%ignore __wt_async_op::search;
+%ignore __wt_async_op::update;
+%javamethodmodifiers __wt_async_op::key_format "protected";
+%javamethodmodifiers __wt_async_op::value_format "protected";
+
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Java equivalents. */
 %ignore __wt_cursor::get_key;
@@ -346,6 +359,549 @@ javaCloseHandler(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 }
 
 WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
+%}
+
+%extend __wt_async_op {
+
+	%javamethodmodifiers get_key_wrap "protected";
+	WT_ITEM get_key_wrap(JNIEnv *jenv) {
+		WT_ITEM k;
+		int ret;
+		k.data = NULL;
+		if ((ret = $self->get_key($self, &k)) != 0)
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+		return k;
+	}
+
+	%javamethodmodifiers get_value_wrap "protected";
+	WT_ITEM get_value_wrap(JNIEnv *jenv) {
+		WT_ITEM v;
+		int ret;
+		v.data = NULL;
+		if ((ret = $self->get_value($self, &v)) != 0)
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+		return v;
+	}
+
+	%javamethodmodifiers insert_wrap "protected";
+	int insert_wrap(WT_ITEM *k, WT_ITEM *v) {
+		$self->set_key($self, k);
+		$self->set_value($self, v);
+		return $self->insert($self);
+	}
+
+	%javamethodmodifiers remove_wrap "protected";
+	int remove_wrap(WT_ITEM *k) {
+		$self->set_key($self, k);
+		return $self->remove($self);
+	}
+
+	%javamethodmodifiers search_wrap "protected";
+	int search_wrap(WT_ITEM *k) {
+		$self->set_key($self, k);
+		return $self->search($self);
+	}
+
+	%javamethodmodifiers update_wrap "protected";
+	int update_wrap(WT_ITEM *k, WT_ITEM *v) {
+		$self->set_key($self, k);
+		$self->set_value($self, v);
+		return $self->update($self);
+	}
+
+	%javamethodmodifiers java_init "protected";
+	int java_init(jobject jasyncop) {
+		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
+		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jasyncop);
+		JCALL1(DeleteLocalRef, jcb->jnienv, jasyncop);
+		return (0);
+	}
+}
+
+/* Cache key/value formats in Async_op */
+%typemap(javabody) struct __wt_async_op %{
+ private long swigCPtr;
+ protected boolean swigCMemOwn;
+ protected String keyFormat;
+ protected String valueFormat;
+ protected PackOutputStream keyPacker;
+ protected PackOutputStream valuePacker;
+ protected PackInputStream keyUnpacker;
+ protected PackInputStream valueUnpacker;
+
+ protected $javaclassname(long cPtr, boolean cMemoryOwn) {
+   swigCMemOwn = cMemoryOwn;
+   swigCPtr = cPtr;
+   keyFormat = getKey_format();
+   valueFormat = getValue_format();
+   keyPacker = new PackOutputStream(keyFormat);
+   valuePacker = new PackOutputStream(valueFormat);
+   wiredtigerJNI.Asyncop_java_init(swigCPtr, this, this);
+ }
+
+ protected static long getCPtr($javaclassname obj) {
+   return (obj == null) ? 0 : obj.swigCPtr;
+ }
+%}
+
+%typemap(javacode) struct __wt_async_op %{
+
+	/**
+	 * Retrieve the format string for this async_op's key.
+	 */
+	public String getKeyFormat() {
+		return keyFormat;
+	}
+
+	/**
+	 * Retrieve the format string for this async_op's value.
+	 */
+	public String getValueFormat() {
+		return valueFormat;
+	}
+
+	/**
+	 * Append a byte to the async_op's key.
+	 *
+	 * \param value The value to append.
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putKeyByte(byte value)
+	throws WiredTigerPackingException {
+		keyPacker.addByte(value);
+		return this;
+	}
+
+	/**
+	 * Append a byte array to the async_op's key.
+	 *
+	 * \param value The value to append.
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putKeyByteArray(byte[] value)
+	throws WiredTigerPackingException {
+		this.putKeyByteArray(value, 0, value.length);
+		return this;
+	}
+
+	/**
+	 * Append a byte array to the async_op's key.
+	 *
+	 * \param value The value to append.
+	 * \param off The offset into value at which to start.
+	 * \param len The length of the byte array.
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putKeyByteArray(byte[] value, int off, int len)
+	throws WiredTigerPackingException {
+		keyPacker.addByteArray(value, off, len);
+		return this;
+	}
+
+	/**
+	 * Append an integer to the async_op's key.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putKeyInt(int value)
+	throws WiredTigerPackingException {
+		keyPacker.addInt(value);
+		return this;
+	}
+
+	/**
+	 * Append a long to the async_op's key.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putKeyLong(long value)
+	throws WiredTigerPackingException {
+		keyPacker.addLong(value);
+		return this;
+	}
+
+	/**
+	 * Append a short integer to the async_op's key.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putKeyShort(short value)
+	throws WiredTigerPackingException {
+		keyPacker.addShort(value);
+		return this;
+	}
+
+	/**
+	 * Append a string to the async_op's key.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putKeyString(String value)
+	throws WiredTigerPackingException {
+		keyPacker.addString(value);
+		return this;
+	}
+
+	/**
+	 * Append a byte to the async_op's value.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putValueByte(byte value)
+	throws WiredTigerPackingException {
+		valuePacker.addByte(value);
+		return this;
+	}
+
+	/**
+	 * Append a byte array to the async_op's value.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putValueByteArray(byte[] value)
+	throws WiredTigerPackingException {
+		this.putValueByteArray(value, 0, value.length);
+		return this;
+	}
+
+	/**
+	 * Append a byte array to the async_op's value.
+	 *
+	 * \param value The value to append
+	 * \param off The offset into value at which to start.
+	 * \param len The length of the byte array.
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putValueByteArray(byte[] value, int off, int len)
+	throws WiredTigerPackingException {
+		valuePacker.addByteArray(value, off, len);
+		return this;
+	}
+
+	/**
+	 * Append an integer to the async_op's value.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putValueInt(int value)
+	throws WiredTigerPackingException {
+		valuePacker.addInt(value);
+		return this;
+	}
+
+	/**
+	 * Append a long to the async_op's value.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putValueLong(long value)
+	throws WiredTigerPackingException {
+		valuePacker.addLong(value);
+		return this;
+	}
+
+	/**
+	 * Append a short integer to the async_op's value.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putValueShort(short value)
+	throws WiredTigerPackingException {
+		valuePacker.addShort(value);
+		return this;
+	}
+
+	/**
+	 * Append a string to the async_op's value.
+	 *
+	 * \param value The value to append
+	 * \return This async_op object, so put calls can be chained.
+	 */
+	public Asyncop putValueString(String value)
+	throws WiredTigerPackingException {
+		valuePacker.addString(value);
+		return this;
+	}
+
+	/**
+	 * Retrieve a byte from the async_op's key.
+	 *
+	 * \return The requested value.
+	 */
+	public byte getKeyByte()
+	throws WiredTigerPackingException {
+		return keyUnpacker.getByte();
+	}
+
+	/**
+	 * Retrieve a byte array from the async_op's key.
+	 *
+	 * \param output The byte array where the returned value will be stored.
+	 *	       The array should be large enough to store the entire
+	 *	       data item, if not a truncated value will be returned.
+	 */
+	public void getKeyByteArray(byte[] output)
+	throws WiredTigerPackingException {
+		this.getKeyByteArray(output, 0, output.length);
+	}
+
+	/**
+	 * Retrieve a byte array from the async_op's key.
+	 *
+	 * \param output The byte array where the returned value will be stored.
+	 * \param off Offset into the destination buffer to start copying into.
+	 * \param len The length should be large enough to store the entire
+	 *	      data item, if not a truncated value will be returned.
+	 */
+	public void getKeyByteArray(byte[] output, int off, int len)
+	throws WiredTigerPackingException {
+		keyUnpacker.getByteArray(output, off, len);
+	}
+
+	/**
+	 * Retrieve a byte array from the async_op's key.
+	 *
+	 * \return The requested value.
+	 */
+	public byte[] getKeyByteArray()
+	throws WiredTigerPackingException {
+		return keyUnpacker.getByteArray();
+	}
+
+	/**
+	 * Retrieve an integer from the async_op's key.
+	 *
+	 * \return The requested value.
+	 */
+	public int getKeyInt()
+	throws WiredTigerPackingException {
+		return keyUnpacker.getInt();
+	}
+
+	/**
+	 * Retrieve a long from the async_op's key.
+	 *
+	 * \return The requested value.
+	 */
+	public long getKeyLong()
+	throws WiredTigerPackingException {
+		return keyUnpacker.getLong();
+	}
+
+	/**
+	 * Retrieve a short integer from the async_op's key.
+	 *
+	 * \return The requested value.
+	 */
+	public short getKeyShort()
+	throws WiredTigerPackingException {
+		return keyUnpacker.getShort();
+	}
+
+	/**
+	 * Retrieve a string from the async_op's key.
+	 *
+	 * \return The requested value.
+	 */
+	public String getKeyString()
+	throws WiredTigerPackingException {
+		return keyUnpacker.getString();
+	}
+
+	/**
+	 * Retrieve a byte from the async_op's value.
+	 *
+	 * \return The requested value.
+	 */
+	public byte getValueByte()
+	throws WiredTigerPackingException {
+		return valueUnpacker.getByte();
+	}
+
+	/**
+	 * Retrieve a byte array from the async_op's value.
+	 *
+	 * \param output The byte array where the returned value will be stored.
+	 *	       The array should be large enough to store the entire
+	 *	       data item, if not a truncated value will be returned.
+	 */
+	public void getValueByteArray(byte[] output)
+	throws WiredTigerPackingException {
+		this.getValueByteArray(output, 0, output.length);
+	}
+
+	/**
+	 * Retrieve a byte array from the async_op's value.
+	 *
+	 * \param output The byte array where the returned value will be stored.
+	 * \param off Offset into the destination buffer to start copying into.
+	 * \param len The length should be large enough to store the entire
+	 *	      data item, if not a truncated value will be returned.
+	 */
+	public void getValueByteArray(byte[] output, int off, int len)
+	throws WiredTigerPackingException {
+		valueUnpacker.getByteArray(output, off, len);
+	}
+
+	/**
+	 * Retrieve a byte array from the async_op's value.
+	 *
+	 * \return The requested value.
+	 */
+	public byte[] getValueByteArray()
+	throws WiredTigerPackingException {
+		return valueUnpacker.getByteArray();
+	}
+
+	/**
+	 * Retrieve an integer from the async_op's value.
+	 *
+	 * \return The requested value.
+	 */
+	public int getValueInt()
+	throws WiredTigerPackingException {
+		return valueUnpacker.getInt();
+	}
+
+	/**
+	 * Retrieve a long from the async_op's value.
+	 *
+	 * \return The requested value.
+	 */
+	public long getValueLong()
+	throws WiredTigerPackingException {
+		return valueUnpacker.getLong();
+	}
+
+	/**
+	 * Retrieve a short integer from the async_op's value.
+	 *
+	 * \return The requested value.
+	 */
+	public short getValueShort()
+	throws WiredTigerPackingException {
+		return valueUnpacker.getShort();
+	}
+
+	/**
+	 * Retrieve a string from the async_op's value.
+	 *
+	 * \return The requested value.
+	 */
+	public String getValueString()
+	throws WiredTigerPackingException {
+		return valueUnpacker.getString();
+	}
+
+	/**
+	 * Insert the async_op's current key/value into the table.
+	 *
+	 * \return The status of the operation.
+	 */
+	public int insert() {
+		byte[] key = keyPacker.getValue();
+		byte[] value = valuePacker.getValue();
+		keyPacker.reset();
+		valuePacker.reset();
+		return insert_wrap(key, value);
+	}
+
+	/**
+	 * Update the async_op's current key/value into the table.
+	 *
+	 * \return The status of the operation.
+	 */
+	public int update() {
+		byte[] key = keyPacker.getValue();
+		byte[] value = valuePacker.getValue();
+		keyPacker.reset();
+		valuePacker.reset();
+		return update_wrap(key, value);
+	}
+
+	/**
+	 * Remove the async_op's current key/value into the table.
+	 *
+	 * \return The status of the operation.
+	 */
+	public int remove() {
+		byte[] key = keyPacker.getValue();
+		keyPacker.reset();
+		return remove_wrap(key);
+	}
+
+	/**
+	 * Retrieve the next item in the table.
+	 *
+	 * \return The result of the comparison.
+	 */
+	public int next() {
+		int ret = next_wrap();
+		keyPacker.reset();
+		valuePacker.reset();
+		keyUnpacker = (ret == 0) ?
+		    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret == 0) ?
+		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		return ret;
+	}
+
+	/**
+	 * Retrieve the previous item in the table.
+	 *
+	 * \return The result of the comparison.
+	 */
+	public int prev() {
+		int ret = prev_wrap();
+		keyPacker.reset();
+		valuePacker.reset();
+		keyUnpacker = (ret == 0) ?
+		    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret == 0) ?
+		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		return ret;
+	}
+
+	/**
+	 * Search for an item in the table.
+	 *
+	 * \return The result of the comparison.
+	 */
+	public int search() {
+		int ret = search_wrap(keyPacker.getValue());
+		keyPacker.reset();
+		valuePacker.reset();
+		keyUnpacker = (ret == 0) ?
+		    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret == 0) ?
+		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		return ret;
+	}
+
+	/**
+	 * Search for an item in the table.
+	 *
+	 * \return The result of the comparison.
+	 */
+	public SearchStatus search_near() {
+		SearchStatus ret = search_near_wrap(keyPacker.getValue());
+		keyPacker.reset();
+		valuePacker.reset();
+		keyUnpacker = (ret != SearchStatus.NOTFOUND) ?
+		    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret != SearchStatus.NOTFOUND) ?
+		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		return ret;
+	}
 %}
 
 %extend __wt_cursor {
@@ -957,6 +1513,8 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
   public ";
 
 %rename(open) wiredtiger_open_wrap;
+%ignore __wt_connection::async_new_op;
+%rename(async_new_op) __wt_connection::async_new_op_wrap;
 %ignore __wt_connection::open_session;
 %rename(open_session) __wt_connection::open_session_wrap;
 %ignore __wt_session::open_cursor;
@@ -967,6 +1525,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
   public ";
 %rename(open_cursor) __wt_session::open_cursor_wrap;
 
+%rename(Asyncop) __wt_async_op;
 %rename(Cursor) __wt_cursor;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
@@ -1031,6 +1590,31 @@ err:	if (ret != 0)
 		throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 	return conn;
 }
+}
+
+%extend __wt_connection {
+	WT_SESSION *async_new_opwrap(JNIEnv *jenv, const char *config) {
+		extern WT_EVENT_HANDLER javaApiEventHandler;
+		WT_ASYNC_OP *asyncop = NULL;
+                WT_CONNECTION_IMPL *connimpl;
+		JAVA_CALLBACK *jcb;
+		int ret;
+
+		if ((ret = $self->async_new_op($self, &javaApiEventHandler, config, &asyncop)) != 0)
+			goto err;
+
+                connimpl = (WT_CONNECTION_IMPL *)$self;
+		if ((ret = __wt_calloc_def(connimpl>default_session, 1, &jcb)) != 0)
+			goto err;
+
+		jcb->jnienv = jenv;
+		asyncop->c.lang_private = jcb;
+		asyncop->c.flags |= WT_CURSTD_RAW;
+
+err:		if (ret != 0)
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+		return asyncop;
+	}
 }
 
 %extend __wt_connection {
