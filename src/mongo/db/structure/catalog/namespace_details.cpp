@@ -354,6 +354,14 @@ namespace mongo {
     }
 
 
+    void NamespaceDetails::setCapExtent( const DiskLoc& loc ) {
+        getDur().writingDiskLoc( _capExtent ) = loc;
+    }
+
+    void NamespaceDetails::setCapFirstNewRecord( const DiskLoc& loc ) {
+        getDur().writingDiskLoc( _capFirstNewRecord ) = loc;
+    }
+
     void NamespaceDetails::setFirstExtent( DiskLoc newFirstExtent ) {
         getDur().writingDiskLoc( _firstExtent ) = newFirstExtent;
     }

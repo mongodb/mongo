@@ -83,14 +83,16 @@ namespace mongo {
         }
 
         bool isNull() const { return _a == -1; }
-        void Null() {
+        DiskLoc& Null() {
             _a = -1;
             ofs = 0; /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
+            return *this;
         }
         void assertOk() const { verify(!isNull()); }
-        void setInvalid() {
+        DiskLoc& setInvalid() {
             _a = -2;
             ofs = 0;
+            return *this;
         }
         bool isValid() const { return _a != -2; }
 

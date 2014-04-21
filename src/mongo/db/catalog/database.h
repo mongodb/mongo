@@ -128,12 +128,6 @@ namespace mongo {
         void getFileFormat( int* major, int* minor );
 
         /**
-         * makes sure we have an extra file at the end that is empty
-         * safe to call this multiple times - the implementation will only preallocate one file
-         */
-        void preallocateAFile() { _extentManager.preallocateAFile(); }
-
-        /**
          * @return true if success.  false if bad level or error creating profile ns
          */
         bool setProfilingLevel( int newLevel , string& errmsg );

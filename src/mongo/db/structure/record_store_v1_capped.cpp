@@ -135,7 +135,7 @@ namespace mongo {
                     advanceCapExtent( _ns );
 
                     if ( _details->capExtent() != _details->firstExtent() )
-                        getDur().writingDiskLoc(_details->capFirstNewRecord()).setInvalid();
+                        _details->setCapFirstNewRecord( DiskLoc().setInvalid() );
                     // else signal done with first iteration through extents.
                     continue;
                 }
@@ -178,7 +178,7 @@ namespace mongo {
 
             // Remember first record allocated on this iteration through capExtent.
             if ( _details->capFirstNewRecord().isValid() && _details->capFirstNewRecord().isNull() )
-                getDur().writingDiskLoc(_details->capFirstNewRecord()) = loc;
+                _details->setCapFirstNewRecord( loc );
         }
 
         invariant( !loc.isNull() );
@@ -214,7 +214,7 @@ namespace mongo {
         getDur().writingDiskLoc(cappedListOfAllDeletedRecords()) = DiskLoc();
 
         // preserve firstExtent/lastExtent
-        getDur().writingDiskLoc(_details->capExtent()) = _details->firstExtent();
+        _details->setCapExtent( _details->firstExtent() );
         _details->setStats( 0, 0 );
         // preserve lastExtentSize
         // nIndexes preserve 0
@@ -222,8 +222,7 @@ namespace mongo {
         // max preserve
         _details->setPaddingFactor( 1.0 );
         _details->clearSystemFlags();
-        getDur().writingDiskLoc(_details->capFirstNewRecord()) = DiskLoc();
-        getDur().writingDiskLoc(_details->capFirstNewRecord()).setInvalid();
+        _details->setCapFirstNewRecord( DiskLoc().setInvalid() );
         getDur().writingDiskLoc(cappedLastDelRecLastExtent()).setInvalid();
         // dataFileVersion preserve
         // indexFileVersion preserve
@@ -311,8 +310,7 @@ namespace mongo {
     void CappedRecordStoreV1::cappedCheckMigrate() {
         // migrate old NamespaceDetails format
         if ( _details->capExtent().a() == 0 && _details->capExtent().getOfs() == 0 ) {
-            //capFirstNewRecord = DiskLoc();
-            getDur().writingDiskLoc(_details->capFirstNewRecord()).setInvalid();
+            _details->setCapFirstNewRecord( DiskLoc().setInvalid() );
             // put all the DeletedRecords in cappedListOfAllDeletedRecords()
             for ( int i = 1; i < Buckets; ++i ) {
                 DiskLoc first = _details->deletedListEntry( i );
@@ -327,7 +325,7 @@ namespace mongo {
             // NOTE cappedLastDelRecLastExtent() set to DiskLoc() in above
 
             // Last, in case we're killed before getting here
-            getDur().writingDiskLoc(_details->capExtent()) = _details->firstExtent();
+            _details->setCapExtent( _details->firstExtent() );
         }
     }
 
@@ -364,14 +362,14 @@ namespace mongo {
             getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = i;
         }
 
-        getDur().writingDiskLoc( _details->capExtent() ) =
-            theCapExtent()->xnext.isNull() ? _details->firstExtent() : theCapExtent()->xnext;
+        _details->setCapExtent( theCapExtent()->xnext.isNull() ?
+                                _details->firstExtent() : theCapExtent()->xnext );
 
         /* this isn't true if a collection has been renamed...that is ok just used for diagnostics */
         //dassert( theCapExtent()->ns == ns );
 
         theCapExtent()->assertOk();
-        getDur().writingDiskLoc( _details->capFirstNewRecord() ) = DiskLoc();
+        _details->setCapFirstNewRecord( DiskLoc() );
     }
 
     DiskLoc CappedRecordStoreV1::__capAlloc( int len ) {
@@ -476,7 +474,7 @@ namespace mongo {
                     // NOTE Because we didn't delete the last document, and
                     // capLooped() is false, capExtent is not the first extent
                     // so xprev will be nonnull.
-                    getDur().writingDiskLoc(_details->capExtent()) = theCapExtent()->xprev;
+                    _details->setCapExtent( theCapExtent()->xprev );
                     theCapExtent()->assertOk();
 
                     // update cappedLastDelRecLastExtent()
@@ -509,12 +507,12 @@ namespace mongo {
                     _extentManager->getExtent(newCapExtent)->assertOk();
                 }
                 while ( _extentManager->getExtent(newCapExtent)->firstRecord.isNull() );
-                getDur().writingDiskLoc(_details->capExtent()) = newCapExtent;
+                _details->setCapExtent( newCapExtent );
 
                 // Place all documents in the new capExtent on the fresh side
                 // of the capExtent by setting capFirstNewRecord to the first
                 // document in the new capExtent.
-                getDur().writingDiskLoc(_details->capFirstNewRecord()) = theCapExtent()->firstRecord;
+                _details->setCapFirstNewRecord( theCapExtent()->firstRecord );
 
                 // update cappedLastDelRecLastExtent()
                 cappedTruncateLastDelUpdate();

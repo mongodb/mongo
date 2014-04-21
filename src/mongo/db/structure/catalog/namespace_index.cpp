@@ -35,7 +35,6 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 
-
 namespace mongo {
 
     NamespaceDetails* NamespaceIndex::details(const StringData& ns) {

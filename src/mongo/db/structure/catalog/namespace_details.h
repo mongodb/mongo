@@ -153,10 +153,10 @@ namespace mongo {
 
     public:
         const DiskLoc& capExtent() const { return _capExtent; }
-        const DiskLoc capFirstNewRecord() const { return _capFirstNewRecord; }
+        void setCapExtent( const DiskLoc& loc );
 
-        DiskLoc& capExtent() { return _capExtent; }
-        DiskLoc& capFirstNewRecord() { return _capFirstNewRecord; }
+        const DiskLoc capFirstNewRecord() const { return _capFirstNewRecord; }
+        void setCapFirstNewRecord( const DiskLoc& loc );
 
         bool capLooped() const { return _capFirstNewRecord.isValid(); }
 

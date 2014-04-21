@@ -276,7 +276,7 @@ namespace mongo {
             verify( _details->firstExtent().isNull() );
             _details->setFirstExtent( eloc );
             _details->setLastExtent( eloc );
-            getDur().writingDiskLoc( _details->capExtent() ) = eloc;
+            _details->setCapExtent( eloc );
             verify( e->xprev.isNull() );
             verify( e->xnext.isNull() );
         }
