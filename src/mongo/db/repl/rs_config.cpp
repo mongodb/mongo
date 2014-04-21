@@ -36,7 +36,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/text.h"

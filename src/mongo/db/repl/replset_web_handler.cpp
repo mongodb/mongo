@@ -30,7 +30,7 @@
 
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/mongoutils/str.h"

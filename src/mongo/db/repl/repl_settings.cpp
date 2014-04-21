@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 
 #include <list>
 #include <vector>

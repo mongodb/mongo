@@ -37,7 +37,7 @@
 #include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/health.h"
 #include "mongo/db/repl/heartbeat_info.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/server.h"

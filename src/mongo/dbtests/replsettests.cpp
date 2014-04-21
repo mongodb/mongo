@@ -38,7 +38,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/time_support.h"

@@ -29,7 +29,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/internal_runner.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/fail_point_service.h"
 

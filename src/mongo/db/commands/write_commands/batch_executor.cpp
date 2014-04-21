@@ -46,7 +46,7 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"

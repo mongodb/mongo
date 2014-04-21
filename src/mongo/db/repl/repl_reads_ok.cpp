@@ -31,7 +31,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/repl/is_master.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/assert_util.h"
 

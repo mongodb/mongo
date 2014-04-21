@@ -36,7 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/health.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"

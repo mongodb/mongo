@@ -35,7 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 
 namespace mongo {
     class AppendOplogNoteCmd : public Command {

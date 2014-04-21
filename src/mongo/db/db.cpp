@@ -66,7 +66,7 @@
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_start.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/startup_warnings.h"

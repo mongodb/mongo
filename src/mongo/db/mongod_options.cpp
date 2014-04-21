@@ -37,7 +37,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/repl/replication_server_status.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/storage/record.h"

@@ -28,7 +28,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/master_slave.h"  // replSettings
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
 
 namespace mongo {

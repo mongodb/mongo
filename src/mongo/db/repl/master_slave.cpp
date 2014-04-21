@@ -50,7 +50,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
