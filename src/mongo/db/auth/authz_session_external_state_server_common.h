@@ -44,6 +44,7 @@ namespace mongo {
     public:
         virtual ~AuthzSessionExternalStateServerCommon();
 
+        virtual bool shouldAllowLocalhost() const;
         virtual bool shouldIgnoreAuthChecks() const;
 
     protected:

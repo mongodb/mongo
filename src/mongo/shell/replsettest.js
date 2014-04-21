@@ -895,45 +895,67 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     var status = undefined
 
     var self = this;
-    assert.soon(function() {
-        
-        try {
-            status = self.status();
-        }
-        catch ( ex ) {
-            print( "ReplSetTest waitForIndicator could not get status: " + tojson( ex ) );
-            return false;
-        }
-        
-        var printStatus = false
-        if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ){
-            if( lastTime == null ) print( "ReplSetTest waitForIndicator Initial status ( timeout : " + timeout + " ) :" )
-            printjson( status )
-            lastTime = new Date().getTime()
-            printStatus = true
-        }
+    var checkStatusWaitForIndicator = function() {
+        assert.soon(function() {
 
-        if (typeof status.members == 'undefined') {
-            return false;
-        }
+            try {
+                status = self.status();
+            }
+            catch ( ex ) {
+                print( "ReplSetTest waitForIndicator could not get status: " + tojson( ex ) );
+                return false;
+            }
 
-        for( var i = 0; i < status.members.length; i++ ){
-            if( printStatus ) print( "Status for : " + status.members[i].name + ", checking " + node.host + "/" + node.name )
-            if( status.members[i].name == node.host || status.members[i].name == node.name ){
-                for( var j = 0; j < states.length; j++ ){
-                    if( printStatus ) print( "Status " + " : " + status.members[i][ind] + "  target state : " + states[j] )
-                    if( status.members[i][ind] == states[j] ) return true;
+            var printStatus = false
+            if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ) {
+                if( lastTime == null ) {
+                    print( "ReplSetTest waitForIndicator Initial status ( timeout : " +
+                        timeout + " ) :" );
+                }
+                printjson( status );
+                lastTime = new Date().getTime();
+                printStatus = true;
+            }
+
+            if (typeof status.members == 'undefined') {
+                return false;
+            }
+
+            for( var i = 0; i < status.members.length; i++ ) {
+                if( printStatus ) {
+                    print( "Status for : " + status.members[i].name + ", checking " +
+                            node.host + "/" + node.name );
+                }
+                if( status.members[i].name == node.host || status.members[i].name == node.name ) {
+                    for( var j = 0; j < states.length; j++ ) {
+                        if( printStatus ) {
+                            print( "Status " + " : " + status.members[i][ind] +
+                                    "  target state : " + states[j] );
+                        }
+                        if( status.members[i][ind] == states[j] ) {
+                            return true;
+                        }
+                    }
                 }
             }
-        }
-        
-        return false
-        
-    }, "waiting for state indicator " + ind + " for " + timeout + "ms", timeout);
-    
+
+            return false;
+
+        }, "waiting for state indicator " + ind + " for " + timeout + "ms", timeout);
+    };
+
+    if (self.keyFile) {
+        // Authenticate connections to the replica set members using the keyfile,
+        // if applicable, before attempting to perform operations.
+        authutil.asCluster(self.getMaster(), self.keyFile, checkStatusWaitForIndicator);
+    }
+    else {
+        // No keyfile, so no authenication necessary.
+        checkStatusWaitForIndicator();
+    }
+
     print( "ReplSetTest waitForIndicator final status:" )
     printjson( status )
-    
 }
 
 ReplSetTest.Health = {}

@@ -6,13 +6,7 @@ baseName = "tool_stat1";
 m = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( "admin" );
 
-t = db[ baseName ];
-t.drop();
-
-db.dropAllUsers();
-
 db.createUser({user:  "eliot" , pwd: "eliot", roles: jsTest.adminUserRoles});
-
 assert( db.auth( "eliot" , "eliot" ) , "auth failed" );
 
 x = runMongoProgram( "mongostat", "--host", "127.0.0.1:"+port, "--username", "eliot", "--password", "eliot", "--rowcount", "1" );

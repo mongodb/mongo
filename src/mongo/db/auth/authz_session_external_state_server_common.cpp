@@ -41,7 +41,7 @@ namespace {
 } // namespace
 
     // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost
-    // will always be called before any calls to shouldIgnoreAuthChecks.  If this is not the case,
+    // will always be called before any calls to shouldAllowLocalhost.  If this is not the case,
     // it could cause a security hole.
     AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon(
             AuthorizationManager* authzManager) :
@@ -70,10 +70,13 @@ namespace {
         }
     }
 
-    bool AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks() const {
+    bool AuthzSessionExternalStateServerCommon::shouldAllowLocalhost() const {
         ClientBasic* client = ClientBasic::getCurrent();
-        return !_authzManager->isAuthEnabled() ||
-                (_allowLocalhost && client->getIsLocalHostConnection());
+        return _allowLocalhost && client->getIsLocalHostConnection();
+    }
+
+    bool AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks() const {
+        return !_authzManager->isAuthEnabled();
     }
 
 } // namespace mongo

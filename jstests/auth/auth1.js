@@ -8,15 +8,19 @@ baseName = "jstests_auth_auth1";
 m = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( "test" );
 
-t = db[ baseName ];
-t.drop();
-
 // these are used by read-only user
 mro = new Mongo(m.host);
 dbRO = mro.getDB( "test" );
 tRO = dbRO[ baseName ];
 
+db.getSisterDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]});
+db.getSisterDB("admin").auth("root", "root");
+
+t = db[ baseName ];
+t.drop();
+
 db.dropAllUsers();
+db.logout();
 
 db.getSisterDB( "admin" ).createUser({user: "super", pwd: "super", roles: ["__system"] });
 db.getSisterDB("admin").auth("super", "super");

@@ -477,14 +477,14 @@ var runTests = function(conn) {
         var testDB = conn.getDB('test');
         var adminDB = conn.getDB('admin');
 
+        adminDB.createUser({ user: 'root', pwd: AUTH_INFO.admin.root.pwd,
+                             roles: AUTH_INFO.admin.root.roles });
+        adminDB.auth('root', AUTH_INFO.admin.root.pwd);
+
         for (var x = 0; x < 10; x++) {
             testDB.kill_cursor.insert({ x: x });
             adminDB.kill_cursor.insert({ x: x });
         }
-
-        adminDB.createUser({ user: 'root', pwd: AUTH_INFO.admin.root.pwd,
-                             roles: AUTH_INFO.admin.root.roles });
-        adminDB.auth('root', AUTH_INFO.admin.root.pwd);
 
         for (var dbName in AUTH_INFO) {
             var dbObj = AUTH_INFO[dbName];
@@ -526,6 +526,8 @@ var runTests = function(conn) {
         }
     });
 
+    teardown();
+
     if (failures.length > 0) {
         var list = '';
         failures.forEach(function(test) { list += (test + '\n'); });
@@ -542,3 +544,4 @@ var st = new ShardingTest({ shards: 1, keyFile: 'jstests/libs/key1' });
 runTests(st.s);
 st.stop();
 
+print('SUCCESS! Completed basic_role_auth.js');

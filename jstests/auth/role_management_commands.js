@@ -13,10 +13,7 @@ function runTest(conn) {
     var userAdminConn = new Mongo(conn.host);
     var testUserAdmin = userAdminConn.getDB('test');
     var adminUserAdmin = userAdminConn.getDB('admin');
-    adminUserAdmin.createRole({role: 'myUserAdminRole',
-                               roles: ['userAdminAnyDatabase'],
-                               privileges: []});
-    adminUserAdmin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['myUserAdminRole']});
+    adminUserAdmin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
     adminUserAdmin.auth('userAdmin', 'pwd');
     testUserAdmin.createUser({user: 'testUser', pwd: 'pwd', roles:[]});
     var db = conn.getDB('test');

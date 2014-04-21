@@ -48,20 +48,10 @@ var s = new ShardingTest( "auth1", 0 , 0 , 1 ,
     enableBalancer:true
   } );
 
-print("logging in first, if there was an unclean shutdown the user might already exist");
-login(adminUser);
-
-var user = s.getDB("admin").system.users.findOne();
-if (user) {
-    print("user already exists");
-    printjson(user);
-}
-else {
-    print("adding user");
-    s.getDB(adminUser.db).createUser({user: adminUser.username,
-                                      pwd: adminUser.password,
-                                      roles: jsTest.adminUserRoles});
-}
+print("adding user");
+s.getDB(adminUser.db).createUser({user: adminUser.username,
+                                  pwd: adminUser.password,
+                                  roles: jsTest.adminUserRoles});
 
 login(adminUser);
 assert.writeOK(s.getDB( "config" ).settings.update({ _id: "chunksize" },
@@ -81,7 +71,9 @@ d1.startSet({keyFile : "jstests/libs/key2", verbose : 0});
 d1.initiate();
 
 print("initiated");
-var shardName = getShardName(d1);
+var shardName = authutil.asCluster(d1.nodes,
+                                   "jstests/libs/key2",
+                                   function() { return getShardName(d1); });
 
 print("adding shard w/out auth "+shardName);
 logout(adminUser);
@@ -155,7 +147,8 @@ d2.startSet({keyFile : "jstests/libs/key1", verbose : 0});
 d2.initiate();
 d2.awaitSecondaryNodes();
 
-shardName = getShardName(d2);
+shardName = authutil.asCluster(d2.nodes, "jstests/libs/key1",
+                               function() { return getShardName(d2); });
 
 print("adding shard "+shardName);
 login(adminUser);

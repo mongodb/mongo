@@ -249,10 +249,11 @@ print('--- sharding test ---')
 var st = new ShardingTest({
   mongos: 2,
   shard: 1,
+  keyFile: keyfile,
   other: {
-    mongosOptions: { 'auth': null, 'httpinterface': null, 'keyFile': keyfile },
-    configOptions: { 'auth': null, 'httpinterface': null, 'keyFile': keyfile },
-    shardOptions: { 'auth': null, 'httpinterface': null, 'keyFile': keyfile }
+    mongosOptions: { 'auth': null, 'httpinterface': null },
+    configOptions: { 'auth': null, 'httpinterface': null },
+    shardOptions: { 'auth': null, 'httpinterface': null }
   }
 })
 run_tests(st.s0.getDB('admin'), st.s1.getDB('admin'));

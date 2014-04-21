@@ -124,6 +124,42 @@ namespace {
         _authenticatedUsers.add(internalSecurity.user);
     }
 
+    PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
+        PrivilegeVector defaultPrivileges;
+
+        // If localhost exception is active (and no users exist),
+        // return a vector of the minimum privileges required to bootstrap
+        // a system and add the first user.
+        if (_externalState->shouldAllowLocalhost()) {
+            ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(ADMIN_DBNAME);
+            ActionSet setupAdminUserActionSet;
+            setupAdminUserActionSet.addAction(ActionType::createUser);
+            setupAdminUserActionSet.addAction(ActionType::grantRole);
+            Privilege setupAdminUserPrivilege =
+                Privilege(adminDBResource, setupAdminUserActionSet);
+
+            ResourcePattern externalDBResource = ResourcePattern::forDatabaseName("$external");
+            Privilege setupExternalUserPrivilege =
+                Privilege(externalDBResource, ActionType::createUser);
+
+            ActionSet setupServerConfigActionSet;
+            setupServerConfigActionSet.addAction(ActionType::addShard);
+            setupServerConfigActionSet.addAction(ActionType::replSetConfigure);
+            setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
+            Privilege setupServerConfigPrivilege =
+                Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
+
+            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupAdminUserPrivilege);
+            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges,
+                                                     setupExternalUserPrivilege);
+            Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges,
+                                                     setupServerConfigPrivilege);
+            return defaultPrivileges;
+        }
+
+        return defaultPrivileges;
+    }
+
     Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns,
                                                    const BSONObj& query) {
         if (MONGO_unlikely(ns.isCommand())) {
@@ -434,6 +470,22 @@ namespace {
         const int resourceSearchListLength = buildResourceSearchList(target, resourceSearchList);
 
         ActionSet unmetRequirements = privilege.getActions();
+
+        PrivilegeVector defaultPrivileges = getDefaultPrivileges();
+        for (PrivilegeVector::iterator it = defaultPrivileges.begin();
+                it != defaultPrivileges.end(); ++it) {
+
+            for (int i = 0; i < resourceSearchListLength; ++i) {
+                if (!(it->getResourcePattern() == resourceSearchList[i]))
+                    continue;
+
+                ActionSet userActions = it->getActions();
+                unmetRequirements.removeAllActionsFromSet(userActions);
+
+                if (unmetRequirements.empty())
+                    return true;
+            }
+        }
 
         for (UserSet::iterator it = _authenticatedUsers.begin();
                 it != _authenticatedUsers.end(); ++it) {

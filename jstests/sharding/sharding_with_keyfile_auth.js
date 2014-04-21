@@ -13,28 +13,29 @@ var st = new ShardingTest({ name : myTestName ,
 
 // Make sure all our instances got the key
 var configs = st._configServers
-var shards = st._connections
 var mongoses = st._mongos
 
+mongoses[0].getDB( "admin" ).createUser({ user: "root", pwd: "pass", roles: ["root"] });
+
 for( var i = 0; i < configs.length; i++ ){
-    printjson( new Mongo( "localhost:" + configs[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
-    assert.eq( new Mongo( "localhost:" + configs[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.security.keyFile, keyFile )
+    var confAdmin = configs[i].getDB( "admin" );
+    confAdmin.auth( "root", "pass" );
+    printjson( confAdmin.runCommand({ getCmdLineOpts : 1 }) )
+    assert.eq( confAdmin.runCommand({ getCmdLineOpts : 1 }).parsed.security.keyFile, keyFile )
 }
 
-for( var i = 0; i < shards.length; i++ ){
-    printjson( new Mongo( "localhost:" + shards[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
-    assert.eq( new Mongo( "localhost:" + shards[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.security.keyFile, keyFile )
-}
-    
 for( var i = 0; i < mongoses.length; i++ ){
-    printjson( new Mongo( "localhost:" + mongoses[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }) )
-    assert.eq( new Mongo( "localhost:" + mongoses[i].port ).getDB("admin").runCommand({ getCmdLineOpts : 1 }).parsed.security.keyFile, keyFile )
+    var monsAdmin = mongoses[i].getDB( "admin" );
+    monsAdmin.auth( "root", "pass" );
+    printjson( monsAdmin.runCommand({ getCmdLineOpts : 1 }) )
+    assert.eq( monsAdmin.runCommand({ getCmdLineOpts : 1 }).parsed.security.keyFile, keyFile )
 }
 
 var mongos = new Mongo( "localhost:" + st.s0.port )
-var coll = mongos.getCollection( "test.foo" )
+var coll = mongos.getDB( "test" ).foo;
 
-st.shardColl( coll, { _id : 1 }, false )
+mongos.getDB( "admin" ).auth( "root", "pass" );
+mongos.getDB( "admin" ).runCommand({shardCollection : coll, key : {_id : 1}});
 
 // Create an index so we can find by num later
 coll.ensureIndex({ insert : 1 })

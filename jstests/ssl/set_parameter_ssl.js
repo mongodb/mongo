@@ -8,11 +8,13 @@ port = allocatePorts(1)[0];
 
 function testSSLTransition(oldMode, newMode, shouldSucceed) {
     var conn = MongoRunner.runMongod({port: port,
-                           sslMode: oldMode, 
+                           sslMode: oldMode,
                            sslPEMKeyFile: SERVER_CERT,
                            sslCAFile: CA_CERT});
     
-    var adminDB = conn.getDB("admin"); 
+    var adminDB = conn.getDB("admin");
+    adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
+    adminDB.auth("root", "pwd");
     var res = adminDB.runCommand({ "setParameter" : 1,
                                    "sslMode" : newMode });
 
@@ -27,7 +29,9 @@ function testAuthModeTransition(oldMode, newMode, shouldSucceed) {
                            sslCAFile: CA_CERT,
                            clusterAuthMode: oldMode});
     
-    var adminDB = conn.getDB("admin"); 
+    var adminDB = conn.getDB("admin");
+    adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
+    adminDB.auth("root", "pwd");
     var res = adminDB.runCommand({ "setParameter" : 1,
                                    "clusterAuthMode" : newMode });
 

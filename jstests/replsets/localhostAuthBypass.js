@@ -84,7 +84,7 @@ var runTest = function(useHostName) {
 
     var mongo = new Mongo(host);
 
-    assertCanRunCommands(mongo);
+    assertCannotRunCommands(mongo);
 
     createUser(mongo);
 

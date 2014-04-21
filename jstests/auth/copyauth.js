@@ -52,7 +52,14 @@ function ClusterSpawnHelper(clusterType, startWithAuth) {
         var replSetTest = new ReplSetTest(replSetTestConfig);
         replSetTest.startSet();
         replSetTest.initiate();
-        replSetTest.awaitReplication();
+        if (startWithAuth) {
+            authutil.asCluster(replSetTest.nodes,
+                               replSetTestConfig.nodeOptions.keyFile,
+                               function() { replSetTest.awaitReplication(); });
+        }
+        else {
+            replSetTest.awaitReplication();
+        }
         this.conn = replSetTest.getMaster();
         this.connString = replSetTest.getURL();
     }
@@ -116,15 +123,15 @@ function copydbBetweenClustersTest(configObj) {
     // 1. Get a connection to the source database, insert data and setup auth if applicable
     source = new ClusterSpawnHelper(configObj.sourceClusterType, configObj.isSourceUsingAuth);
 
-    source.conn.getDB(baseName)[baseName].save({i:1});
-    assert.eq(1, source.conn.getDB(baseName)[baseName].count());
-    assert.eq(1, source.conn.getDB(baseName)[baseName].findOne().i);
-
     if (configObj.isSourceUsingAuth) {
         // Create a super user so we can create a regular user and not be locked out afterwards
         source.conn.getDB("admin").createUser({ user: "sourceSuperUser", pwd: "sourceSuperUser",
                                                 roles: [ "root" ] });
         source.conn.getDB("admin").auth("sourceSuperUser", "sourceSuperUser");
+
+        source.conn.getDB(baseName)[baseName].save({i:1});
+        assert.eq(1, source.conn.getDB(baseName)[baseName].count());
+        assert.eq(1, source.conn.getDB(baseName)[baseName].findOne().i);
 
         // Insert a document and create a regular user that we will use for the target
         // authenticating with the source
@@ -133,6 +140,10 @@ function copydbBetweenClustersTest(configObj) {
 
         source.conn.getDB("admin").logout();
         assert.throws(function() { source.conn.getDB(baseName)[baseName].findOne(); });
+    } else {
+        source.conn.getDB(baseName)[baseName].save({i:1});
+        assert.eq(1, source.conn.getDB(baseName)[baseName].count());
+        assert.eq(1, source.conn.getDB(baseName)[baseName].findOne().i);
     }
 
 

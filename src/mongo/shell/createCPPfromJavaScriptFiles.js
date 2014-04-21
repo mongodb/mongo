@@ -106,6 +106,7 @@ shell.CurrentDirectory = WScript.Arguments.Unnamed.Item( 0 );
 
 var fso = new ActiveXObject( "Scripting.FileSystemObject" );
 rebuildIfNeeded(fso, "shell/mongo.cpp", ["shell/assert.js", "shell/types.js", "shell/utils.js", "shell/utils_sh.js",
+                                         "shell/utils_auth.js",
                                          "shell/db.js", "shell/mongo.js", "shell/mr.js",
                                          "shell/query.js", "shell/collection.js",
                                          "shell/upgrade_check.js",

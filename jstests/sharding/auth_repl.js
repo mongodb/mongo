@@ -9,25 +9,21 @@ var primary = replTest.getPrimary();
 // Setup the database using replSet connection before setting the authentication
 var conn = new Mongo(replTest.getURL());
 var testDB = conn.getDB('test');
+var adminDB = conn.getDB('admin');
 var testColl = testDB.user;
-
-assert.writeOK(testColl.insert({ x: 1 }, { writeConcern: { w: nodeCount }}));
 
 // Setup the cached connection for primary and secondary in DBClientReplicaSet
 // before setting up authentication
-var doc = testColl.findOne();
-assert(doc != null);
+assert.commandWorked(adminDB.runCommand({replSetGetStatus: 1}));
 
 conn.setSlaveOk();
-
-doc = testColl.findOne();
-assert(doc != null);
+assert.commandWorked(adminDB.runCommand({replSetGetStatus: 1}));
 
 // Add admin user using direct connection to primary to simulate connection from remote host
-var adminDB = primary.getDB('admin');
-adminDB.createUser({user: 'user', pwd: 'user', roles: jsTest.adminUserRoles},
-                   {w: nodeCount, wtimeout: 30000});
-adminDB.auth('user', 'user');
+var priAdminDB = primary.getDB('admin');
+priAdminDB.createUser({user: 'user', pwd: 'user', roles: jsTest.adminUserRoles},
+                      {w: nodeCount, wtimeout: 30000});
+priAdminDB.auth('user', 'user');
 
 var priTestDB = primary.getDB('test');
 priTestDB.createUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles},
@@ -37,6 +33,8 @@ priTestDB.createUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles},
 assert.eq(1, testDB.auth('a', 'a'));
 
 jsTest.log('Sending an authorized query that should be ok');
+assert.writeOK(testColl.insert({ x: 1 }));
+
 conn.setSlaveOk(true);
 doc = testColl.findOne();
 assert(doc != null);

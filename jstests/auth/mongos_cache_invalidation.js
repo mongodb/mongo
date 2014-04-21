@@ -16,6 +16,9 @@ var st = new ShardingTest({ shards: 2,
                                      {setParameter: "userCacheInvalidationIntervalSecs=600"}],
                             keyFile: 'jstests/libs/key1' });
 
+st.s1.getDB('admin').createUser({user: 'root', pwd: 'pwd', roles: ['root']});
+st.s1.getDB('admin').auth('root', 'pwd');
+
 var res = st.s1.getDB('admin').runCommand({setParameter: 1, userCacheInvalidationIntervalSecs: 0});
 assert.commandFailed(res, "Setting the invalidation interval to an disallowed value should fail");
 
@@ -25,9 +28,10 @@ assert.commandFailed(res, "Setting the invalidation interval to an disallowed va
 res = st.s1.getDB('admin').runCommand({getParameter: 1, userCacheInvalidationIntervalSecs: 1});
 
 assert.eq(5, res.userCacheInvalidationIntervalSecs);
-st.s0.getDB('test').foo.insert({a:1}); // initial data
+st.s1.getDB('test').foo.insert({a:1}); // initial data
+st.s1.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
+st.s1.getDB('admin').logout();
 
-st.s0.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
 st.s0.getDB('admin').auth('admin', 'pwd');
 st.s0.getDB('admin').createRole({role: 'myRole',
                                  roles: [],
@@ -191,3 +195,5 @@ db3.auth('spencer', 'pwd');
  })();
 
 st.stop();
+
+print("SUCCESS Completed mongos_cache_invalidation.js");

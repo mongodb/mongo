@@ -16,6 +16,7 @@
 
 var options = { separateConfig : true,
                 rs : true,
+                enableBalancer: true,
                 mongosOptions : { binVersion : "2.6" },
                 rsOptions : { nodes : 2, binVersion : "2.4" },
                 keyFile : "jstests/libs/key1" };

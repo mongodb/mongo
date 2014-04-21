@@ -183,7 +183,7 @@ jsTest.log("1 test replica sets");
 var rs = new ReplSetTest({name: rsName, nodes: 2});
 var nodes = rs.startSet(mongoOptions);
 rs.initiate();
-rs.awaitReplication();
+authutil.asCluster(nodes, "jstests/libs/key1", function() { rs.awaitReplication(); });
 
 var primary = rs.getPrimary();
 var secondary = rs.getSecondary();
@@ -200,7 +200,7 @@ jsTest.log("2 test initial sync");
 rs = new ReplSetTest({name: rsName, nodes: 1, nodeOptions: mongoOptions});
 nodes = rs.startSet();
 rs.initiate();
-rs.awaitReplication();
+authutil.asCluster(nodes, "jstests/libs/key1", function() { rs.awaitReplication(); });
 
 primary = rs.getPrimary();
 
@@ -234,6 +234,9 @@ rt.stop(false);
 master = rt.start(true, mongoOptions, true);
 slave = rt.start(false, mongoOptions, true);
 var masterDB = master.getDB("admin");
+
+masterDB.createUser({user: "root", pwd: "pass", roles: ["root"]});
+masterDB.auth("root", "pass");
 
 // ensure that master/slave replication is up and running
 masterDB.foo.save({}, { writeConcern: { w: 2, wtimeout: 5000 }});

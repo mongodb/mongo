@@ -17,10 +17,21 @@ var options = { separateConfig : true,
                 keyFile : "jstests/libs/key1" };
 
 var st = new ShardingTest({shards : 3, mongos : 1, other : options});
-st.stopBalancer();
 
 var mongos = st.s0;
 var admin = mongos.getDB( "admin" );
+
+jsTest.log("Setting up initial admin user...");
+var adminUser = "adminUser";
+var password = "password";
+
+// Create a user
+admin.createUser({ user : adminUser, pwd : password, roles: [ "root" ] });
+// There's an admin user now, so we need to login to do anything
+// Login as admin user
+admin.auth(adminUser, password);
+
+st.stopBalancer();
 var shards = mongos.getDB( "config" ).shards.find().toArray();
 
 assert.commandWorked( admin.runCommand({ setParameter : 1, traceExceptions : true }) );
@@ -45,20 +56,8 @@ assert.commandWorked( admin.runCommand({ moveChunk : collSharded.toString(),
                                          to : shards[0]._id }) );
 
 st.printShardingStatus();
-
-var adminUser = "adminUser";
 var shardedDBUser = "shardedDBUser";
 var unshardedDBUser = "unshardedDBUser";
-var password = "password";
-
-jsTest.log("Setting up initial admin user...");
-
-// Create a user
-admin.createUser({ user : adminUser, pwd : password, roles: [ "userAdminAnyDatabase" ] });
-// There's an admin user now, so we need to login to do anything
-
-// Login as admin user
-admin.auth(adminUser, password);
 
 jsTest.log("Setting up database users...");
 

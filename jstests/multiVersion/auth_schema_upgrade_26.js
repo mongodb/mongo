@@ -8,7 +8,6 @@
  * Finally, verifies that all users are available where expected.
  */
 
-load('jstests/multiVersion/libs/auth_support.js');
 load('jstests/multiVersion/libs/multi_cluster.js');
 load('jstests/multiVersion/libs/multi_rs.js');
 
@@ -18,12 +17,12 @@ load('jstests/multiVersion/libs/multi_rs.js');
     var newVersion = '2.6';
     var keyfile = 'jstests/libs/key1';
 
-    var logout = AuthSupport.logout;
-    var assertAuthenticate = AuthSupport.assertAuthenticate;
-    var assertAuthenticateFails = AuthSupport.assertAuthenticateFails;
+    var logout = authutil.logout;
+    var assertAuthenticate = authutil.assertAuthenticate;
+    var assertAuthenticateFails = authutil.assertAuthenticateFails;
 
     function asCluster(conn, action) {
-        return AuthSupport.asCluster(conn, keyfile, action);
+        return authutil.asCluster(conn, keyfile, action);
     }
 
     /**
@@ -120,8 +119,12 @@ load('jstests/multiVersion/libs/multi_rs.js');
         assertAuthenticate(s0AdminConn, 't2', { user: 't2-user', pwd: 'a' });
     }
 
+    // enableBalancer is true because otherwise, the attempt in ShardingTest to turn off
+    // the balancer by authenticating as the system user fails, because the mongos auth-logout
+    // hacks aren't present in old versions.
     var initialOptions = {
         name: 'auth_schema_upgrade_normal',
+        enableBalancer: true,
         rs: { nodes: 3 },
         mongosOptions: { binVersion: oldVersion },
         configOptions: { binVersion: oldVersion },

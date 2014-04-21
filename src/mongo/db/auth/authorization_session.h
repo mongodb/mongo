@@ -100,6 +100,13 @@ namespace mongo {
         // Used to grant internal threads full access.
         void grantInternalAuthorization();
 
+        // Generates a vector of default privileges that are granted to any user,
+        // regardless of which roles that user does or does not possess.
+        // If localhost exception is active, the permissions include the ability to create
+        // the first user and the ability to run the commands needed to bootstrap the system
+        // into a state where the first user can be created.
+        PrivilegeVector getDefaultPrivileges();
+
         // Checks if this connection has the privileges necessary to perform the given query on the
         // given namespace.
         Status checkAuthForQuery(const NamespaceString& ns, const BSONObj& query);

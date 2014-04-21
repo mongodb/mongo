@@ -59,14 +59,12 @@ var assertCannotRunCommands = function(mongo, st) {
         mongo.getDB("config").shards.findOne();
     });
 
-    var to = findEmptyShard(st, "test.foo");
-
     var res = mongo.getDB("admin").runCommand({
         moveChunk: "test.foo",
         find: {_id: 1},
-        to: to
+        to: "shard0000" // Arbitrary shard.
     });
-    assert.commandFailed(res);
+    assert.commandFailedWithCode(res, 13 /* Authz code */);
 };
 
 var assertCanRunCommands = function(mongo, st) {
@@ -179,23 +177,14 @@ var runTest = function(useHostName) {
 
     var mongo = new Mongo(host);
 
-    setupSharding(mongo);
-
-    assertCanRunCommands(mongo, st);
-
-    addUsersToEachShard(st);
-
-    assertCanRunCommands(mongo, st);
-
-    createUser(mongo);
-
-    // now that we have a user, we need to make sure 
-    // helper functions on st work for the rest of the script.
-    authenticate(st.s); 
-
     assertCannotRunCommands(mongo, st);
 
+    createUser(mongo);
     authenticate(mongo);
+    setupSharding(mongo);
+
+    addUsersToEachShard(st);
+    authenticate(st.s);
 
     assertCanRunCommands(mongo, st);
 

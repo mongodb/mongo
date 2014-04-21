@@ -7,10 +7,14 @@ var x509_options = {sslMode : "requireSSL",
                     sslClusterFile: "jstests/libs/cluster-cert.pem",
                     clusterAuthMode: "x509"};
 
+// Start ShardingTest with enableBalancer because ShardingTest attempts to turn
+// off the balancer otherwise, which it will not be authorized to do. Once SERVER-14017
+// is fixed the "enableBalancer" line could be removed.
 var st = new ShardingTest({ name : "sharding_with_x509" ,
                             shards : 2,
                             mongos : 1,
                             other: {
+                                enableBalancer: true,
                                 configOptions : x509_options,
                                 mongosOptions : x509_options,
                                 rsOptions : x509_options,

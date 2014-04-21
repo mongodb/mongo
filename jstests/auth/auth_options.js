@@ -10,6 +10,7 @@ var expectedResult = {
         }
     }
 };
+
 testGetCmdLineOptsMongod({ auth : "" }, expectedResult);
 
 jsTest.log("Testing \"noauth\" command line option");

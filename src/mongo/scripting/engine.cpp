@@ -262,12 +262,14 @@ namespace mongo {
         extern const JSFile upgrade_check;
         extern const JSFile utils;
         extern const JSFile utils_sh;
+        extern const JSFile utils_auth;
         extern const JSFile bulk_api;
     }
 
     void Scope::execCoreFiles() {
         execSetup(JSFiles::utils);
         execSetup(JSFiles::utils_sh);
+        execSetup(JSFiles::utils_auth);
         execSetup(JSFiles::db);
         execSetup(JSFiles::mongo);
         execSetup(JSFiles::mr);

@@ -3,7 +3,6 @@
  * a binary version that is too old, but will proceed if that member is down.
  */
 
-load('jstests/multiVersion/libs/auth_support.js');
 load('jstests/multiVersion/libs/multi_rs.js');
 
 (function () {
@@ -12,12 +11,12 @@ load('jstests/multiVersion/libs/multi_rs.js');
     var newVersion = '2.6';
     var keyfile = 'jstests/libs/key1';
 
-    var logout = AuthSupport.logout;
-    var assertAuthenticate = AuthSupport.assertAuthenticate;
-    var assertAuthenticateFails = AuthSupport.assertAuthenticateFails;
+    var logout = authutil.logout;
+    var assertAuthenticate = authutil.assertAuthenticate;
+    var assertAuthenticateFails = authutil.assertAuthenticateFails;
 
     function asCluster(conn, action) {
-        return AuthSupport.asCluster(conn, keyfile, action);
+        return authutil.asCluster(conn, keyfile, action);
     }
 
     var rst = new ReplSetTest({

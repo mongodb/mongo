@@ -387,6 +387,14 @@ namespace mongo {
             AuthorizationSession* authSession =
                     ClientBasic::getCurrent()->getAuthorizationSession();
             authSession->logoutDatabase(dbname);
+            if (Command::testCommandsEnabled && dbname == "admin") {
+                // Allows logging out as the internal user against the admin database, however
+                // this actually logs out of the local database as well. This is to
+                // support the auth passthrough test framework on mongos (since you can't use the
+                // local database on a mongos, so you can't logout as the internal user
+                // without this).
+                authSession->logoutDatabase("local");
+            }
             return true;
         }
     } cmdLogout;

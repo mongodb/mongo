@@ -56,11 +56,15 @@ namespace mongo {
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
-        // are that auth isn't enabled, the connection is from localhost and there are no admin
-        // users, or the connection is a "god" connection.
-        // NOTE: _checkShouldAllowLocalhost MUST be called at least once before any call to
-        // shouldIgnoreAuthChecks or we could ignore auth checks incorrectly.
+        // are that auth isn't enabled or the connection is a "god" connection.
         virtual bool shouldIgnoreAuthChecks() const = 0;
+
+        // Returns true if this connection should be treated as a localhost connection with no
+        // admin authentication users created. This condition is used to allow the creation of
+        // the first user on a server with authorization enabled.
+        // NOTE: _checkShouldAllowLocalhost MUST be called at least once before any call to
+        // shouldAllowLocalhost or we could ignore auth checks incorrectly.
+        virtual bool shouldAllowLocalhost() const = 0;
 
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.

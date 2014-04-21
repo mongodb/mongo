@@ -43,20 +43,30 @@ namespace mongo {
 
     public:
         AuthzSessionExternalStateMock(AuthorizationManager* authzManager) :
-            AuthzSessionExternalState(authzManager), _returnValue(false) {}
+            AuthzSessionExternalState(authzManager), _ignoreAuthChecksReturnValue(false),
+            _allowLocalhostReturnValue(false) {}
 
         virtual bool shouldIgnoreAuthChecks() const {
-            return _returnValue;
+            return _ignoreAuthChecksReturnValue;
+        }
+
+        virtual bool shouldAllowLocalhost() const {
+            return _allowLocalhostReturnValue;
         }
 
         void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
-            _returnValue = returnValue;
+            _ignoreAuthChecksReturnValue = returnValue;
+        }
+
+        void setReturnValueForShouldAllowLocalhost(bool returnValue) {
+            _allowLocalhostReturnValue = returnValue;
         }
 
         virtual void startRequest() {}
 
     private:
-        bool _returnValue;
+        bool _ignoreAuthChecksReturnValue;
+        bool _allowLocalhostReturnValue;
     };
 
 } // namespace mongo

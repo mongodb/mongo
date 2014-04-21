@@ -623,6 +623,7 @@ var authCommandsLib = {
         {
             testname: "copydb",
             command: {copydb: 1, fromdb: firstDbName, todb: secondDbName},
+            skipSharded: true, // Does not work sharded due to SERVER-13080
             testcases: [
                 {
                     runOnDb: adminDbName,

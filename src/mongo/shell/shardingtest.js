@@ -274,7 +274,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         var rs = this._rs[i].test;
         
         rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
-        rs.awaitReplication();
+        if (keyFile) {
+            authutil.asCluster(rs.nodes, keyFile, function() { rs.awaitReplication(); });
+        }
         rs.awaitSecondaryNodes();
         
         var rsConn = new Mongo( rs.getURL() );
@@ -381,7 +383,23 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     // Disable the balancer unless it is explicitly turned on
     if ( !otherParams.enableBalancer ) {
-        this.stopBalancer();
+        if (keyFile) {
+            authutil.assertAuthenticate(this._mongos, 'admin', {
+                user: '__system',
+                mechanism: 'MONGODB-CR',
+                pwd: cat(keyFile).replace(/[ \n]/g, '')
+            });
+
+            try {
+                this.stopBalancer();
+            }
+            finally {
+                authutil.logout(this._mongos, 'admin');
+            }
+        }
+        else {
+            this.stopBalancer();
+        }
     }
 
     if ( ! otherParams.manualAddShard ){

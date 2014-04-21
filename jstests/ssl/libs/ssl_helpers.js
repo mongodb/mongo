@@ -102,7 +102,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
 // TODO: merge this with that file and add to utils?
 //
 
-ReplSetTest.prototype.upgradeSet = function( options ){
+ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
     options = options || {}
 
     var nodes = this.nodes
@@ -130,15 +130,18 @@ ReplSetTest.prototype.upgradeSet = function( options ){
             this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
         }
         printjson(this.nodeOptions);
-        this.upgradeNode( node, options, true )
+        this.upgradeNode( node, options, true, user, pwd )
 
         if( noDowntimePossible )
             assert.eq( this.getNodeId( primary ), prevPrimaryId )
     }
 }
 
-ReplSetTest.prototype.upgradeNode = function( node, opts, waitForState ){
+ReplSetTest.prototype.upgradeNode = function( node, opts, waitForState, user, pwd ){
     var node = this.restart( node, opts )
+    if (user != undefined) {
+        node.getDB("admin").auth(user, pwd);
+    }
     // By default, wait for primary or secondary state
     if( waitForState == undefined ) waitForState = true
     if( waitForState == true ) waitForState = [ ReplSetTest.State.PRIMARY,
