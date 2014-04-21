@@ -82,3 +82,6 @@ testRadAndDegreesOK(1);
 testRadAndDegreesOK(10)
 testRadAndDegreesOK(50)
 testRadAndDegreesOK(10000)
+
+// SERVER-13666 legacy coordinates must be in bounds for spherical near queries.
+assert.commandFailed(db.runCommand({geoNear : t.getName(), near: [1210.466, 31.2051], spherical: true, num: 10}));
