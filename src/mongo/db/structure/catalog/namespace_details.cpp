@@ -68,6 +68,8 @@ namespace mongo {
      };
 
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool capped ) {
+        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
+
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
         _firstExtent = _lastExtent = _capExtent = loc;
         _stats.datasize = _stats.nrecords = 0;

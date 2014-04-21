@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/db/repl/rs.h"
@@ -83,13 +84,13 @@ namespace mongo {
         if ( details->isCapped() ) {
             _recordStore.reset( new CappedRecordStoreV1( this,
                                                          _ns.ns(),
-                                                         details,
+                                                         new NamespaceDetailsRSV1MetaData( details ),
                                                          &database->getExtentManager(),
                                                          _ns.coll() == "system.indexes" ) );
         }
         else {
             _recordStore.reset( new SimpleRecordStoreV1( _ns.ns(),
-                                                         details,
+                                                         new NamespaceDetailsRSV1MetaData( details ),
                                                          &database->getExtentManager(),
                                                          _ns.coll() == "system.indexes" ) );
         }

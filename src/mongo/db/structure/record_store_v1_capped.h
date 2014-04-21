@@ -43,7 +43,7 @@ namespace mongo {
     public:
         CappedRecordStoreV1( Collection* collection,
                              const StringData& ns,
-                             NamespaceDetails* details,
+                             RecordStoreV1MetaData* details,
                              ExtentManager* em,
                              bool isSystemIndexes );
 

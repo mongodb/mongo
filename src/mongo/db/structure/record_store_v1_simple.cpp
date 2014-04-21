@@ -42,7 +42,6 @@
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store_v1_simple_iterator.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/touch_pages.h"
 
@@ -62,7 +61,7 @@ namespace mongo {
                                                           &freelistIterations );
 
     SimpleRecordStoreV1::SimpleRecordStoreV1( const StringData& ns,
-                                              NamespaceDetails* details,
+                                              RecordStoreV1MetaData* details,
                                               ExtentManager* em,
                                               bool isSystemIndexes )
         : RecordStoreV1Base( ns, details, em, isSystemIndexes ) {
@@ -263,7 +262,6 @@ namespace mongo {
 
     void SimpleRecordStoreV1::addDeletedRec( const DiskLoc& dloc ) {
         DeletedRecord* d = drec( dloc );
-        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
         {
             Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));

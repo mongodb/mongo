@@ -37,12 +37,11 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/util/mmap.h"
 
 namespace mongo {
 
     RecordStoreV1Base::RecordStoreV1Base( const StringData& ns,
-                                          NamespaceDetails* details,
+                                          RecordStoreV1MetaData* details,
                                           ExtentManager* em,
                                           bool isSystemIndexes )
         : RecordStore( ns ),

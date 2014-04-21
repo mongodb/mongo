@@ -44,6 +44,7 @@
 #include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -537,10 +538,9 @@ namespace NamespaceTests {
             void run() {
 
                 string myns = (string)ns() + "AllocQuantized";
-
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
                 SimpleRecordStoreV1 rs( myns,
-                                        db()->namespaceIndex().details( myns ),
+                                        new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         false );
 
@@ -583,7 +583,7 @@ namespace NamespaceTests {
 
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
                 SimpleRecordStoreV1 rs( myns + ".$x",
-                                        db()->namespaceIndex().details( myns ),
+                                        new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         false );
 
@@ -605,7 +605,7 @@ namespace NamespaceTests {
 
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
                 SimpleRecordStoreV1 rs( myns + ".$x",
-                                        db()->namespaceIndex().details( myns ),
+                                        new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         true );
 

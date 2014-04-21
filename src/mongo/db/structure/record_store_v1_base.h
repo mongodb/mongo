@@ -38,13 +38,63 @@ namespace mongo {
     class CappedRecordStoreV1Iterator;
     class DocWriter;
     class ExtentManager;
-    class NamespaceDetails;
     class Record;
+
+    class RecordStoreV1MetaData {
+    public:
+        virtual ~RecordStoreV1MetaData(){}
+
+        virtual int bucket(int size) const = 0;
+
+        virtual const DiskLoc& capExtent() const = 0;
+        virtual void setCapExtent( const DiskLoc& loc ) = 0;
+
+        virtual const DiskLoc& capFirstNewRecord() const = 0;
+        virtual void setCapFirstNewRecord( const DiskLoc& loc ) = 0;
+
+        virtual bool capLooped() const = 0;
+        virtual void clearSystemFlags() = 0;
+
+        virtual long long dataSize() const = 0;
+        virtual long long numRecords() const = 0;
+
+        virtual void incrementStats( long long dataSizeIncrement,
+                                     long long numRecordsIncrement ) = 0;
+
+        virtual void setStats( long long dataSizeIncrement,
+                               long long numRecordsIncrement ) = 0;
+
+        virtual const DiskLoc& deletedListEntry( int bucket ) const = 0;
+        virtual void setDeletedListEntry( int bucket, const DiskLoc& loc ) = 0;
+        virtual void orphanDeletedList() = 0;
+
+        virtual const DiskLoc& firstExtent() const = 0;
+        virtual void setFirstExtent( const DiskLoc& loc ) = 0;
+
+        virtual const DiskLoc& lastExtent() const = 0;
+        virtual void setLastExtent( const DiskLoc& loc ) = 0;
+
+        virtual bool isCapped() const = 0;
+
+        virtual bool isUserFlagSet( int flag ) const = 0;
+
+        virtual int lastExtentSize() const = 0;
+        virtual void setLastExtentSize( int newMax ) = 0;
+
+        virtual long long maxCappedDocs() const = 0;
+
+        virtual double paddingFactor() const = 0;
+
+        virtual void setPaddingFactor( double paddingFactor ) = 0;
+
+        virtual int quantizePowerOf2AllocationSpace(int allocSize) const = 0;
+
+    };
 
     class RecordStoreV1Base : public RecordStore {
     public:
         RecordStoreV1Base( const StringData& ns,
-                           NamespaceDetails* details,
+                           RecordStoreV1MetaData* details,
                            ExtentManager* em,
                            bool isSystemIndexes );
 
@@ -67,7 +117,7 @@ namespace mongo {
         // TODO: another sad one
         virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
-        const NamespaceDetails* details() const { return _details; }
+        const RecordStoreV1MetaData* details() const { return _details.get(); }
 
         /**
          * @return the actual size to create
@@ -112,7 +162,7 @@ namespace mongo {
         */
         void _addRecordToRecListInExtent(Record* r, DiskLoc loc);
 
-        NamespaceDetails* _details;
+        scoped_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
 

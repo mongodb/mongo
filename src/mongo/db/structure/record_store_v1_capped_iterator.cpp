@@ -48,7 +48,7 @@ namespace mongo {
 
         if (_curr.isNull()) {
 
-            const NamespaceDetails* nsd = _recordStore->details();
+            const RecordStoreV1MetaData* nsd = _recordStore->details();
 
             // If a start position isn't specified, we fill one out from the start of the
             // collection.
@@ -140,7 +140,7 @@ namespace mongo {
 
     DiskLoc CappedRecordStoreV1Iterator::getNextCapped(const DiskLoc& dl) {
         invariant(!dl.isNull());
-        NamespaceDetails* details = _recordStore->_details;
+        const RecordStoreV1MetaData* details = _recordStore->details();
 
         if (CollectionScanParams::FORWARD == _direction) {
             // If it's not looped, it's easy.

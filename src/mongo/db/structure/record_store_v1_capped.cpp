@@ -60,7 +60,7 @@ namespace mongo {
 
     CappedRecordStoreV1::CappedRecordStoreV1( Collection* collection,
                                               const StringData& ns,
-                                              NamespaceDetails* details,
+                                              RecordStoreV1MetaData* details,
                                               ExtentManager* em,
                                               bool isSystemIndexes )
         : RecordStoreV1Base( ns, details, em, isSystemIndexes ),
@@ -315,7 +315,7 @@ namespace mongo {
     }
 
     void CappedRecordStoreV1::cappedCheckMigrate() {
-        // migrate old NamespaceDetails format
+        // migrate old RecordStoreV1MetaData format
         if ( _details->capExtent().a() == 0 && _details->capExtent().getOfs() == 0 ) {
             _details->setCapFirstNewRecord( DiskLoc().setInvalid() );
             // put all the DeletedRecords in cappedListOfAllDeletedRecords()
@@ -553,8 +553,6 @@ namespace mongo {
 
     void CappedRecordStoreV1::addDeletedRec( const DiskLoc& dloc ) {
         DeletedRecord* d = drec( dloc );
-
-        BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
         {
             Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
