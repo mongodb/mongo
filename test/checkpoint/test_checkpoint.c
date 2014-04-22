@@ -170,7 +170,7 @@ main(int argc, char *argv[])
 		if (g.cookies != NULL)
 			free(g.cookies);
 	}
-	return (0);
+	return (g.status);
 }
 
 /*
@@ -274,8 +274,10 @@ onint(int signo)
 int
 log_print_err(const char *m, int e, int fatal)
 {
-	if (fatal)
+	if (fatal) {
 		g.running = 0;
+		g.status = e;
+	}
 	fprintf(stderr, "%s: %s: %s\n", g.progname, m, wiredtiger_strerror(e));
 	if (g.logfp != NULL)
 		fprintf(g.logfp, "%s: %s: %s\n",
