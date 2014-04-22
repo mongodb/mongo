@@ -1342,8 +1342,7 @@ __clsm_remove(WT_CURSOR *cursor)
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
 	    (ret = __clsm_lookup(clsm, &value)) == 0)
-		ret = __clsm_put(
-		    session, clsm, &cursor->key, &__tombstone, 1);
+		ret = __clsm_put(session, clsm, &cursor->key, &__tombstone, 1);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
