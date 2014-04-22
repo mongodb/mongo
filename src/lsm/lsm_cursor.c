@@ -219,7 +219,7 @@ __clsm_deleted_encode(WT_SESSION_IMPL *session,
 
 /*
  * __clsm_deleted_decode --
- *	Decode values that start with with the tombstone.
+ *	Decode values that start with the tombstone.
  */
 static inline void
 __clsm_deleted_decode(WT_ITEM *value)
