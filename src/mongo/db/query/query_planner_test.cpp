@@ -1230,6 +1230,41 @@ namespace {
                                 "node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");*/
     }
 
+    // SERVER-13677
+    TEST_F(QueryPlannerTest, ElemMatchWithAllElemMatchChild) {
+        addIndex(BSON("a.b.c.d" << 1));
+        runQuery(fromjson("{z: 1, 'a.b': {$elemMatch: {c: {$all: [{$elemMatch: {d: 0}}]}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c.d': 1}}}}}");
+    }
+
+    // SERVER-13677
+    TEST_F(QueryPlannerTest, ElemMatchWithAllElemMatchChild2) {
+        // true means multikey
+        addIndex(BSON("a.b.c.d" << 1), true);
+        runQuery(fromjson("{'a.b': {$elemMatch: {c: {$all: "
+                            "[{$elemMatch: {d: {$gt: 1, $lt: 3}}}]}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c.d': 1}, "
+                                "bounds: {'a.b.c.d': [[-Infinity,3,true,false]]}}}}}");
+    }
+
+    // SERVER-13677
+    TEST_F(QueryPlannerTest, ElemMatchWithAllChild) {
+        // true means multikey
+        addIndex(BSON("a.b.c" << 1), true);
+        runQuery(fromjson("{z: 1, 'a.b': {$elemMatch: {c: {$all: [4, 5, 6]}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, "
+                                "bounds: {'a.b.c': [[4,4,true,true]]}}}}}");
+    }
+
     TEST_F(QueryPlannerTest, ElemMatchValueMatch) {
         addIndex(BSON("foo" << 1));
         addIndex(BSON("foo" << 1 << "bar" << 1));
