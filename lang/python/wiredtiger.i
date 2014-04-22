@@ -307,6 +307,20 @@ do {
 		SWIG_ERROR_IF_NOT_SET(result);
 }
 
+/* Async operations can return ENOMEM when no ops are available. */
+%define ENOMEM_OK(m)
+%exception m {
+retry:
+	$action
+	if (result != 0 && result != ENOMEM)
+		SWIG_ERROR_IF_NOT_SET(result);
+        else if (result == ENOMEM) {
+                sleep(10000);
+                goto retry;
+        }
+}
+%enddef
+
 /* Cursor positioning methods can also return WT_NOTFOUND. */
 %define NOTFOUND_OK(m)
 %exception m {
@@ -325,6 +339,7 @@ do {
 }
 %enddef
 
+ENOMEM_OK(__wt_connection::async_new_op)
 NOTFOUND_OK(__wt_cursor::next)
 NOTFOUND_OK(__wt_cursor::prev)
 NOTFOUND_OK(__wt_cursor::remove)
