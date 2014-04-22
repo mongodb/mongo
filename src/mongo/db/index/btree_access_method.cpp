@@ -66,7 +66,10 @@ namespace mongo {
     }
 
     void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
-        _keyGenerator->getKeys(obj, keys);
+        Status s = _keyGenerator->getKeys(obj, keys);
+        if (!s.isOK()) {
+            uasserted(17485, s.toString());
+        }
     }
 
 }  // namespace mongo

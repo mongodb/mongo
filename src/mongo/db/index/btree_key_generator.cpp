@@ -27,12 +27,11 @@
 */
 
 #include "mongo/db/index/btree_key_generator.h"
+
+#include <boost/algorithm/string.hpp>
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-    // Used in scanandorder.cpp to inforatively error when we try to sort keys with parallel arrays.
-    const int BtreeKeyGenerator::ParallelArraysCode = 10088;
 
     BtreeKeyGenerator::BtreeKeyGenerator(vector<const char*> fieldNames, vector<BSONElement> fixed, 
                                          bool isSparse)
@@ -50,28 +49,29 @@ namespace mongo {
         _nullElt = _nullObj.firstElement();
     }
 
-    void BtreeKeyGenerator::getKeys(const BSONObj &obj, BSONObjSet *keys) const {
+    Status BtreeKeyGenerator::getKeys(const BSONObj &obj, BSONObjSet *keys) const {
         // These are mutated as part of the getKeys call.  :|
         vector<const char*> fieldNames(_fieldNames);
         vector<BSONElement> fixed(_fixed);
-        getKeysImpl(fieldNames, fixed, obj, keys);
+        Status s = getKeysImpl(fieldNames, fixed, obj, keys);
+        if (!s.isOK()) {
+            return s;
+        }
+
         if (keys->empty() && ! _isSparse) {
             keys->insert(_nullKey);
         }
-    }
-
-    static void assertParallelArrays( const char *first, const char *second ) {
-        stringstream ss;
-        ss << "cannot index parallel arrays [" << first << "] [" << second << "]";
-        uasserted( BtreeKeyGenerator::ParallelArraysCode ,  ss.str() );
+        return s;
     }
 
     BtreeKeyGeneratorV0::BtreeKeyGeneratorV0(vector<const char*> fieldNames,
                                              vector<BSONElement> fixed, bool isSparse)
             : BtreeKeyGenerator(fieldNames, fixed, isSparse) { }
-        
-    void BtreeKeyGeneratorV0::getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
-                                          const BSONObj &obj, BSONObjSet *keys) const {
+
+    Status BtreeKeyGeneratorV0::getKeysImpl(vector<const char*> fieldNames,
+                                            vector<BSONElement> fixed,
+                                            const BSONObj &obj,
+                                            BSONObjSet *keys) const {
         BSONElement arrElt;
         unsigned arrIdx = ~0;
         unsigned numNotFound = 0;
@@ -102,7 +102,10 @@ namespace mongo {
 
             // enforce single array path here
             if ( e.type() == Array && e.rawdata() != arrElt.rawdata() ) {
-                assertParallelArrays( e.fieldName(), arrElt.fieldName() );
+                mongoutils::str::stream ss;
+                ss << "cannot index parallel arrays [" << e.fieldName()
+                   << "] [" << arrElt.fieldName() << "]";
+                return Status( ErrorCodes::BadValue, ss );
             }
         }
 
@@ -118,7 +121,7 @@ namespace mongo {
         if ( _isSparse && numNotFound == _fieldNames.size()) {
             // we didn't find any fields
             // so we're not going to index this document
-            return;
+            return Status::OK();
         }
 
         bool insertArrayNull = false;
@@ -185,142 +188,301 @@ namespace mongo {
             }
             keys->insert( b.obj() );
         }
+
+        return Status::OK();
     }
 
     BtreeKeyGeneratorV1::BtreeKeyGeneratorV1(vector<const char*> fieldNames,
-                                             vector<BSONElement> fixed, bool isSparse)
+                                             vector<BSONElement> fixed,
+                                             bool isSparse)
         : BtreeKeyGenerator(fieldNames, fixed, isSparse) {
+        // Initialize '_keyPattern' by splitting each field name on "." into
+        // the component pieces of the path.
+        for (size_t i = 0; i < fieldNames.size(); ++i) {
+            vector<string> pathPieces;
+            boost::split(pathPieces, fieldNames[i], boost::is_any_of("."));
+            _keyPattern.push_back(pathPieces);
+        }
 
-        BSONObjBuilder b;
-        b.appendUndefined( "" );
-        _undefinedObj = b.obj();
+        BSONObjBuilder undefinedBuilder;
+        undefinedBuilder.appendUndefined("");
+        _undefinedObj = undefinedBuilder.obj();
         _undefinedElt = _undefinedObj.firstElement();
     }
 
-    BSONElement BtreeKeyGeneratorV1::extractNextElement(const BSONObj &obj, const BSONObj &arr,
-                                                        const char *&field,
-                                                        bool &arrayNestedArray) const {
-        string firstField = mongoutils::str::before( field, '.' );
-        bool haveObjField = !obj.getField( firstField ).eoo();
-        BSONElement arrField = arr.getField( firstField );
-        bool haveArrField = !arrField.eoo();
-
-        // An index component field name cannot exist in both a document
-        // array and one of that array's children.
-        uassert(16746,
-                mongoutils::str::stream() <<
-                "Ambiguous field name found in array (do not use numeric field names in "
-                "embedded elements in an array), field: '" << arrField.fieldName() <<
-                "' for array: " << arr,
-                !haveObjField || !haveArrField );
-
-        arrayNestedArray = false;
-        if ( haveObjField ) {
-            return obj.getFieldDottedOrArray( field );
+    Status BtreeKeyGeneratorV1::getKeysImpl(vector<const char*> fieldNames,
+                                            vector<BSONElement> fixed,
+                                            const BSONObj &obj,
+                                            BSONObjSet *keys) const {
+        // We may be able to reject right off the bat due to parallel arrays.
+        Status parallelStatus = checkForParallelArrays(obj, 0);
+        if (!parallelStatus.isOK()) {
+            return parallelStatus;
         }
-        else if ( haveArrField ) {
-            if ( arrField.type() == Array ) {
-                arrayNestedArray = true;
+
+        // Extract key elements for each field in the key pattern, one at a time. The results
+        // will be stored in 'kel'.
+        KeyElementList kel;
+        for (size_t i = 0; i < _keyPattern.size(); ++i) {
+            const vector<string>& pathPieces = _keyPattern[i];
+            const string& field = pathPieces[0];
+            BSONElement el = obj[field];
+
+            // Setup the initial context.
+            KeygenContext context;
+            context.kpIndex = i;
+            context.pathPosition = 0;
+            context.inArray = false;
+
+            // Extract elements and add the results to 'kel'.
+            vector<BSONElement> keysForElement;
+            Status s = getKeysForElement(el, context, &keysForElement);
+            if (!s.isOK()) {
+                return s;
             }
-            return arr.getFieldDottedOrArray( field );
+            kel.push_back(keysForElement);
         }
-        return BSONElement();
+
+        // Actually build the index key BSON objects based on the extracted key elements.
+        buildKeyObjects(kel, keys);
+
+        return Status::OK();
     }
 
-    void BtreeKeyGeneratorV1::_getKeysArrEltFixed(vector<const char*> &fieldNames,
-                                                  vector<BSONElement> &fixed,
-                                                  const BSONElement &arrEntry, BSONObjSet *keys,
-                                                  unsigned numNotFound,
-                                                  const BSONElement &arrObjElt,
-                                                  const set<unsigned> &arrIdxs,
-                                                  bool mayExpandArrayUnembedded) const {
-        // set up any terminal array values
-        for( set<unsigned>::const_iterator j = arrIdxs.begin(); j != arrIdxs.end(); ++j ) {
-            if ( *fieldNames[ *j ] == '\0' ) {
-                fixed[ *j ] = mayExpandArrayUnembedded ? arrEntry : arrObjElt;
+    Status BtreeKeyGeneratorV1::getKeysForElement(const BSONElement& el,
+                                                  KeygenContext context,
+                                                  vector<BSONElement>* out) const {
+        if (Object == el.type()) {
+            // The element is a nested object.
+            if (lastPathPosition(context)) {
+                // We have reached the final position in the path. The nested object
+                // itself will be the index key.
+                return getKeysForSimpleElement(el, context, out);
+            }
+            else {
+                // We haven't reached the final position in the path yet. We need
+                // to descend further down.
+                context.pathPosition++;
+                BSONObj subobj = el.Obj();
+                Status s = checkForParallelArrays(subobj, context.pathPosition);
+                if (!s.isOK()) {
+                    return s;
+                }
+
+                // Get the indexed element from the nested object.
+                const vector<string>& pathPieces = _keyPattern[context.kpIndex];
+                const string& field = pathPieces[context.pathPosition];
+                BSONElement subEl = subobj[field];
+
+                // Recursively extract keys.
+                context.inArray = false;
+                return getKeysForElement(subEl, context, out);
             }
         }
-        // recurse
-        getKeysImplWithArray(fieldNames,
-                             fixed,
-                             arrEntry.type() == Object ? arrEntry.embeddedObject() : BSONObj(),
-                             keys,
-                             numNotFound,
-                             arrObjElt.embeddedObject());
+        else if (Array == el.type()) {
+            return getKeysForArrayElement(el, context, out);
+        }
+        else {
+            // The element is neither an array nor an object.
+            return getKeysForSimpleElement(el, context, out);
+        }
     }
 
-    void BtreeKeyGeneratorV1::getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
-                                          const BSONObj &obj, BSONObjSet *keys) const {
-        getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, BSONObj());
+    Status BtreeKeyGeneratorV1::getKeysForArrayElement(const BSONElement& el,
+                                                       KeygenContext context,
+                                                       vector<BSONElement>* out) const {
+        invariant(Array == el.type());
+
+        // First handle the special case of positional key patterns, e.g. {'a.0': 1}.
+        bool isPositional;
+        Status posStatus = handlePositionalKeypattern(el, context, &isPositional, out);
+        if (isPositional) {
+            return posStatus;
+        }
+
+        BSONObjIterator it(el.Obj());
+
+        if (!it.more() || context.inArray) {
+            // We don't extract keys for empty arrays or arrays nested inside arrays.
+            // Rather, these are treated as simple elements.
+            return getKeysForSimpleElement(el, context, out);
+        }
+        else {
+            // Extract keys for each element inside the array.
+            while (it.more()) {
+                BSONElement subEl = it.next();
+                context.inArray = true;
+                Status s = getKeysForElement(subEl, context, out);
+                if (!s.isOK()) {
+                    return s;
+                }
+            }
+            return Status::OK();
+        }
     }
 
-    void BtreeKeyGeneratorV1::getKeysImplWithArray(vector<const char*> fieldNames,
-                                                   vector<BSONElement> fixed, const BSONObj &obj,
-                                                   BSONObjSet *keys, unsigned numNotFound,
-                                                   const BSONObj &array) const {
-        BSONElement arrElt;
-        set<unsigned> arrIdxs;
-        bool mayExpandArrayUnembedded = true;
-        for( unsigned i = 0; i < fieldNames.size(); ++i ) {
-            if ( *fieldNames[ i ] == '\0' ) {
+    Status BtreeKeyGeneratorV1::handlePositionalKeypattern(const BSONElement& el,
+                                                           KeygenContext context,
+                                                           bool* isPositional,
+                                                           vector<BSONElement>* out) const {
+        *isPositional = true;
+
+        const vector<string>& pathPieces = _keyPattern[context.kpIndex];
+
+        if (lastPathPosition(context)) {
+            // We've already reached the end of the path; there cannot be an additional
+            // positional element to handle.
+            *isPositional = false;
+            return Status::OK();
+        }
+
+        // Convert the array into an object with field names '0', '1', '2', ...
+        BSONObj arrayObj = el.Obj();
+
+        // Get the name of the potential positional element.
+        context.pathPosition++;
+        const string& field = pathPieces[context.pathPosition];
+
+        if (arrayObj[field].eoo()) {
+            // Either 'field' is not positional, or the indexed position is not
+            // present in the array. Bail out now.
+            *isPositional = false;
+            return Status::OK();
+        }
+
+        // We have an element indexed by virtue of its position in the array.
+        BSONElement indexedElement = arrayObj[field];
+
+        // Reject the document if it has subobjects with numerically named fields,
+        // as this leads to an ambiguity.
+        //
+        // Ex.
+        //   Key pattern {"a.0": 1} and document {"a": [{"0": "foo"}]}. Should the
+        //   index key be {"": {"0": "foo:}} or should it be {"": "foo"}?
+        BSONObjIterator objIt(arrayObj);
+        while (objIt.more()) {
+            BSONElement innerElement = objIt.next();
+            if (Object == innerElement.type()) {
+                BSONObj innerObj = innerElement.Obj();
+                if (!innerObj[field].eoo()) {
+                    mongoutils::str::stream ss;
+                    ss << "Ambiguous field name found in array (do not use numeric field "
+                       << "names in embedded elements in an array), field: '" << field
+                       << "' for array " << el.toString();
+                    return Status(ErrorCodes::BadValue, ss);
+                }
+            }
+        }
+
+        if (lastPathPosition(context)) {
+            return getKeysForSimpleElement(indexedElement, context, out);
+        }
+        else {
+            context.inArray = false;
+            return getKeysForElement(indexedElement, context, out);
+        }
+    }
+
+    Status BtreeKeyGeneratorV1::getKeysForSimpleElement(const BSONElement& el,
+                                                        KeygenContext context,
+                                                        vector<BSONElement>* out) const {
+        if (el.eoo() || !lastPathPosition(context)) {
+            // Special case: either the indexed element is missing or we never reached the
+            // final position in the indexed path. In these cases the index key is {"": null}.
+            // If the index is sparse, then there is no index key.
+            if (!_isSparse) {
+                out->push_back(_nullElt);
+            }
+            return Status::OK();
+        }
+        else if (Array == el.type()) {
+            BSONObjIterator it(el.Obj());
+            if (!it.more()) {
+                // Special case: the index key for an empty array is {"": undefined}.
+                out->push_back(_undefinedElt);
+                return Status::OK();
+            }
+        }
+
+        // We haven't hit any special cases. The index key is just the element itself.
+        out->push_back(el);
+
+        return Status::OK();
+    }
+
+    void BtreeKeyGeneratorV1::buildKeyObjects(const KeyElementList& kel, BSONObjSet *keys) const {
+        // A list of indexes into 'kel'. Each index in the list points to the BSONElement that
+        // we will use next for the corresponding field.
+        vector<size_t> posList;
+
+        // The number of index keys to build.
+        size_t numKeys = 0;
+
+        // Initialize 'posList' and 'numKeys'.
+        for (size_t i = 0; i < kel.size(); ++i) {
+            posList.push_back(0);
+            if (kel[i].size() > numKeys) {
+                numKeys = kel[i].size();
+            }
+        }
+
+        for (size_t i = 0; i < numKeys; i++) {
+            BSONObjBuilder bob;
+            for (size_t j = 0; j < posList.size(); j++) {
+                size_t pos = posList[j];
+
+                if (pos >= kel[j].size()) {
+                    // We don't have an element for this position in the key pattern, so
+                    // we append null.
+                    bob.appendNull("");
+                }
+                else {
+                    bob.appendAs(kel[j][pos], "");
+                    if (kel[j].size() > 1) {
+                        ++posList[j];
+                    }
+                }
+            }
+
+            // Output the resulting index key.
+            keys->insert(bob.obj());
+        }
+    }
+
+    //
+    // Helpers.
+    //
+
+    Status BtreeKeyGeneratorV1::checkForParallelArrays(const BSONObj& obj,
+                                                       size_t pathPosition) const {
+        const char* knownArray = NULL;
+        for (size_t i = 0; i < _keyPattern.size(); ++i) {
+            const vector<string>& pathPieces = _keyPattern[i];
+
+            if (pathPosition >= pathPieces.size()) {
                 continue;
             }
 
-            bool arrayNestedArray;
-            // Extract element matching fieldName[ i ] from object xor array.
-            BSONElement e = extractNextElement( obj, array, fieldNames[ i ], arrayNestedArray );
+            const string& field = pathPieces[pathPosition];
+            BSONElement el = obj[field];
+            if (Array == el.type()) {
+                if (NULL != knownArray && !mongoutils::str::equals(knownArray, el.fieldName())) {
+                    mongoutils::str::stream ss;
+                    ss << "cannot index parallel arrays [" << knownArray
+                       << "] [" << el.fieldName() << "]";
+                    return Status(ErrorCodes::BadValue, ss);
+                }
 
-            if ( e.eoo() ) {
-                // if field not present, set to null
-                fixed[ i ] = _nullElt;
-                // done expanding this field name
-                fieldNames[ i ] = "";
-                numNotFound++;
-            }
-            else if ( e.type() == Array ) {
-                arrIdxs.insert( i );
-                if ( arrElt.eoo() ) {
-                    // we only expand arrays on a single path -- track the path here
-                    arrElt = e;
-                }
-                else if ( e.rawdata() != arrElt.rawdata() ) {
-                    // enforce single array path here
-                    assertParallelArrays( e.fieldName(), arrElt.fieldName() );
-                }
-                if ( arrayNestedArray ) {
-                    mayExpandArrayUnembedded = false;   
-                }
-            }
-            else {
-                // not an array - no need for further expansion
-                fixed[ i ] = e;
+                knownArray = el.fieldName();
             }
         }
 
-        if ( arrElt.eoo() ) {
-            // No array, so generate a single key.
-            if ( _isSparse && numNotFound == fieldNames.size()) {
-                return;
-            }            
-            BSONObjBuilder b(_sizeTracker);
-            for( vector< BSONElement >::iterator i = fixed.begin(); i != fixed.end(); ++i ) {
-                b.appendAs( *i, "" );
-            }
-            keys->insert( b.obj() );
-        }
-        else if ( arrElt.embeddedObject().firstElement().eoo() ) {
-            // Empty array, so set matching fields to undefined.
-            _getKeysArrEltFixed(fieldNames, fixed, _undefinedElt, keys, numNotFound, arrElt,
-                                arrIdxs, true );
-        }
-        else {
-            // Non empty array that can be expanded, so generate a key for each member.
-            BSONObj arrObj = arrElt.embeddedObject();
-            BSONObjIterator i( arrObj );
-            while( i.more() ) {
-                _getKeysArrEltFixed(fieldNames, fixed, i.next(), keys, numNotFound, arrElt, arrIdxs,
-                        mayExpandArrayUnembedded );
-            }
-        }
+        return Status::OK();
     }
+
+    bool BtreeKeyGeneratorV1::lastPathPosition(const KeygenContext& context) const {
+        const vector<string>& pathPieces = _keyPattern[context.kpIndex];
+        return (context.pathPosition == (pathPieces.size() - 1));
+    }
+
 }  // namespace mongo
