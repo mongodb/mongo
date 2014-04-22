@@ -80,9 +80,8 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
+int end_checkpoints(void);
 int log_print_err(const char *, int, int);
-int  end_checkpoints(void);
-void load(void);
-int  start_checkpoints(void);
-int  start_workers(table_type);
+int start_checkpoints(void);
+int start_workers(table_type);
 const char *type_to_string(table_type);

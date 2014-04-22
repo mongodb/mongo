@@ -82,8 +82,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		    session, old_upd = cbt->ins->upd));
 
 		/* Allocate a WT_UPDATE structure and transaction ID. */
-		WT_ERR(
-		    __wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		WT_ERR(__wt_txn_modify(session, cbt, upd));
 		logged = 1;
 
