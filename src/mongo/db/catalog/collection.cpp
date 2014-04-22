@@ -466,7 +466,7 @@ namespace mongo {
      * 4) re-write indexes
      */
     Status Collection::truncate() {
-        massert( 17431, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
+        massert( 17445, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
 
         // 1) store index specs
         vector<BSONObj> indexSpecs;
