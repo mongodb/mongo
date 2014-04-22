@@ -490,7 +490,7 @@ namespace mongo {
                 out->push_back(child);
             }
             else if (MatchExpression::AND == child->matchType() ||
-                     MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
+                     Indexability::arrayUsesIndexOnChildren(child)) {
                 findElemMatchChildren(child, out);
             }
         }
