@@ -155,9 +155,8 @@ value_gen(uint8_t *val, size_t *sizep, uint64_t keyno)
 	/*
 	 * WiredTiger doesn't store zero-length data items in row-store files,
 	 * test that by inserting a zero-length data item every so often.
-	 * LSM doesn't support zero length items.
 	 */
-	if (keyno % 63 == 0 && !DATASOURCE("lsm")) {
+	if (keyno % 63 == 0) {
 		val[0] = '\0';
 		*sizep = 0;
 		return;

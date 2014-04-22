@@ -29,10 +29,6 @@ static int __curtable_update(WT_CURSOR *cursor);
 		WT_ERR(__wt_schema_project_merge(session,		\
 		    ctable->cg_cursors,					\
 		    idx->key_plan, idx->key_format, &(*__cp)->key));	\
-		if (idx->need_value) {					\
-			(*__cp)->value.data = "";			\
-			(*__cp)->value.size = 1;			\
-		}							\
 		F_SET(*__cp, WT_CURSTD_KEY_EXT |			\
 		    WT_CURSTD_VALUE_EXT);				\
 		WT_ERR((*__cp)->f(*__cp));				\
