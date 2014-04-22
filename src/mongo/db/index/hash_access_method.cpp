@@ -26,7 +26,6 @@
 *    it in the license file.
 */
 
-#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"

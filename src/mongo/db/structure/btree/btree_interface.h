@@ -38,6 +38,30 @@ namespace mongo {
 namespace transition {
 
     /**
+     * A version-hiding wrapper around the bulk builder for the Btree.
+     */
+    class BtreeBuilderInterface {
+    public:
+        virtual ~BtreeBuilderInterface() { }
+
+        /**
+         * Adds 'key' to intermediate storage.
+         *
+         * 'key' must be > or >= the last key passed to this function (depends on _dupsAllowed).  If
+         * this is violated an error Status (ErrorCodes::InternalError) will be returned.
+         */
+        virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
+
+        /**
+         * commit work.  if not called, destructor will clean up partially completed work
+         *  (in case exception has happened).
+         *
+         * Returns number of keys added.
+         */
+        virtual unsigned long long commit(bool mayInterrupt) = 0;
+    };
+
+    /**
      * This is the interface for interacting with the Btree.  The index access and catalog layers
      * should use this.
      *
@@ -67,6 +91,12 @@ namespace transition {
         //
         // Data changes
         //
+
+        /**
+         * Caller owns returned pointer.
+         * 'this' must outlive the returned pointer.
+         */
+        virtual BtreeBuilderInterface* getBulkBuilder(bool dupsAllowed) = 0;
 
         virtual Status insert(const BSONObj& key, const DiskLoc& loc, bool dupsAllowed) = 0;
 
@@ -136,6 +166,12 @@ namespace transition {
                                      int direction,
                                      DiskLoc* bucketOut,
                                      int* keyOffsetOut) = 0;
+
+        //
+        // Index creation
+        //
+
+        virtual Status initAsEmpty() = 0;
     };
 
 }  // namespace transition

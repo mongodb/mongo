@@ -31,10 +31,9 @@
 #include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/btree_based_access_method.h"
+#include "mongo/db/index/btree_based_bulk_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/sort_phase_one.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/platform/cstdint.h"
 
@@ -44,7 +43,7 @@ namespace IndexUpdateTests {
 
     static const char* const _ns = "unittests.indexupdate";
     DBDirectClient _client;
-    ExternalSortComparison* _aFirstSort = BtreeBasedAccessMethod::getComparison(0, BSON("a" << 1));
+    ExternalSortComparison* _aFirstSort = BtreeBasedBulkAccessMethod::getComparison(0, BSON("a" << 1));
 
     /**
      * Test fixture for a write locked test using collection _ns.  Includes functionality to

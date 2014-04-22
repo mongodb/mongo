@@ -34,6 +34,26 @@ namespace mongo {
 namespace transition {
 
     template <class OnDiskFormat>
+    class BtreeBuilderInterfaceImpl : public BtreeBuilderInterface {
+    public:
+        BtreeBuilderInterfaceImpl(typename BtreeLogic<OnDiskFormat>::Builder* builder)
+            : _builder(builder) { }
+
+        virtual ~BtreeBuilderInterfaceImpl() { }
+
+        Status addKey(const BSONObj& key, const DiskLoc& loc) {
+            return _builder->addKey(key, loc);
+        }
+
+        unsigned long long commit(bool mayInterrupt) {
+            return _builder->commit(mayInterrupt);
+        }
+
+    private:
+        typename BtreeLogic<OnDiskFormat>::Builder* _builder;
+    };
+
+    template <class OnDiskFormat>
     class BtreeInterfaceImpl : public BtreeInterface {
     public:
         BtreeInterfaceImpl(HeadManager* headManager,
@@ -44,6 +64,10 @@ namespace transition {
         }
 
         virtual ~BtreeInterfaceImpl() { }
+
+        virtual BtreeBuilderInterface* getBulkBuilder(bool dupsAllowed) {
+            return new BtreeBuilderInterfaceImpl<OnDiskFormat>(_btree->newBuilder(dupsAllowed));
+        }
 
         virtual Status insert(const BSONObj& key, const DiskLoc& loc, bool dupsAllowed) {
             return _btree->insert(key, loc, dupsAllowed);
@@ -138,6 +162,10 @@ namespace transition {
                                      int* keyOffsetInOut) {
 
             _btree->restorePosition(saved.key, saved.loc, direction, bucketInOut, keyOffsetInOut);
+        }
+
+        virtual Status initAsEmpty() {
+            return _btree->initAsEmpty();
         }
 
     private:

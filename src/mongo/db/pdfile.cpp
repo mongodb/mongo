@@ -69,7 +69,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/is_master.h"
-#include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"

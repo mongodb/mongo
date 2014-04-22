@@ -40,7 +40,6 @@
 
 namespace mongo {
 
-    class BtreeBulk;
     class ExternalSortComparison;
 
     /**
@@ -96,13 +95,9 @@ namespace mongo {
         // XXX: consider migrating callers to use IndexCursor instead
         virtual DiskLoc findSingle( const BSONObj& key ) const;
 
-        // exposed for testing, used for bulk commit
-        static ExternalSortComparison* getComparison(int version,
-                                                     const BSONObj& keyPattern);
-
     protected:
         // Friends who need getKeys.
-        friend class BtreeBulk;
+        friend class BtreeBasedBulkAccessMethod;
 
         // See below for body.
         class BtreeBasedPrivateUpdateData;

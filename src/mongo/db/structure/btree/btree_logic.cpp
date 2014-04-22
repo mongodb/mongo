@@ -28,17 +28,179 @@
 
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/index/btree_index_cursor.h"  // for aboutToDeleteBucket
 #include "mongo/db/jsobj.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/structure/record_store.h"
 #include "mongo/db/structure/btree/btree_logic.h"
 #include "mongo/db/structure/btree/key.h"
+#include "mongo/db/structure/record_store.h"
 
 namespace mongo {
 namespace transition {
+
+    //
+    // Public Builder logic
+    //
+
+    template <class BtreeLayout>
+    typename BtreeLogic<BtreeLayout>::Builder*
+    BtreeLogic<BtreeLayout>::newBuilder(bool dupsAllowed) {
+        return new Builder(this, dupsAllowed);
+    }
+
+    template <class BtreeLayout>
+    BtreeLogic<BtreeLayout>::Builder::Builder(BtreeLogic* logic, bool dupsAllowed)
+        : _logic(logic),
+          _dupsAllowed(dupsAllowed),
+          _numAdded(0) {
+
+        _first = _cur = _logic->addBucket();
+        _b = _getModifiableBucket(_cur);
+        _committed = false;
+    }
+
+    template <class BtreeLayout>
+    Status BtreeLogic<BtreeLayout>::Builder::addKey(const BSONObj& keyObj, const DiskLoc& loc) {
+        auto_ptr<KeyDataOwnedType> key(new KeyDataOwnedType(keyObj));
+
+        if (key->dataSize() > BtreeLayout::KeyMax) {
+            string msg = str::stream() << "Btree::insert: key too large to index, failing "
+                                       << _logic->_recordStore->name()
+                                       << ' ' << key->dataSize() << ' ' << key->toString();
+            problem() << msg << endl;
+            return Status(ErrorCodes::KeyTooLong, msg);
+        }
+
+        // If we have a previous key to compare to...
+        if (_numAdded > 0) {
+            int cmp = _keyLast->woCompare(*key, _logic->_ordering);
+
+            // This shouldn't happen ever.  We expect keys in sorted order.
+            if (cmp > 0) {
+                return Status(ErrorCodes::InternalError, "Bad key order in btree builder");
+            }
+
+            // This could easily happen..
+            if (!_dupsAllowed && (cmp == 0)) {
+                return Status(ErrorCodes::DuplicateKey, _logic->dupKeyError(*_keyLast));
+            }
+        }
+
+        if (!_logic->_pushBack(_b, loc, *key, DiskLoc())) {
+            // bucket was full
+            newBucket();
+            _logic->pushBack(_b, loc, *key, DiskLoc());
+        }
+
+        _keyLast = key;
+        _numAdded++;
+        mayCommitProgressDurably();
+        return Status::OK();
+    }
+
+    template <class BtreeLayout>
+    unsigned long long BtreeLogic<BtreeLayout>::Builder::commit(bool mayInterrupt) {
+        buildNextLevel(_first, mayInterrupt);
+        _committed = true;
+        return _numAdded;
+    }
+
+    //
+    // Private Builder logic
+    //
+
+    template <class BtreeLayout>
+    void BtreeLogic<BtreeLayout>::Builder::newBucket() {
+        DiskLoc newBucketLoc = _logic->addBucket();
+        _b->parent = newBucketLoc;
+        _cur = newBucketLoc;
+        _b = _getModifiableBucket(_cur);
+    }
+
+    template <class BtreeLayout>
+    void BtreeLogic<BtreeLayout>::Builder::buildNextLevel(DiskLoc loc, bool mayInterrupt) {
+        for (;;) {
+            if (_getBucket(loc)->parent.isNull()) {
+                // only 1 bucket at this level. we are done.
+                _logic->_headManager->setHead(loc);
+                break;
+            }
+
+            DiskLoc upLoc = _logic->addBucket();
+            DiskLoc upStart = upLoc;
+            BucketType* up = _getModifiableBucket(upLoc);
+
+            DiskLoc xloc = loc;
+            while (!xloc.isNull()) {
+                if (getDur().commitIfNeeded()) {
+                    _b = _getModifiableBucket(_cur);
+                    up = _getModifiableBucket(upLoc);
+                }
+
+                if (mayInterrupt) {
+                    killCurrentOp.checkForInterrupt();
+                }
+
+                BucketType* x = _getModifiableBucket(xloc);
+                KeyDataType k;
+                DiskLoc r;
+                _logic->popBack(x, &r, &k);
+                bool keepX = (x->n != 0);
+                DiskLoc keepLoc = keepX ? xloc : x->nextChild;
+
+                if (!_logic->_pushBack(up, r, k, keepLoc)) {
+                    // current bucket full
+                    DiskLoc n = _logic->addBucket();
+                    up->parent = n;
+                    upLoc = n;
+                    up = _getModifiableBucket(upLoc);
+                    _logic->pushBack(up, r, k, keepLoc);
+                }
+
+                DiskLoc nextLoc = x->parent;
+                if (keepX) {
+                    x->parent = upLoc;
+                }
+                else {
+                    if (!x->nextChild.isNull()) {
+                        DiskLoc ll = x->nextChild;
+                        _getModifiableBucket(ll)->parent = upLoc;
+                    }
+                    _logic->deallocBucket(x, xloc);
+                }
+                xloc = nextLoc;
+            }
+
+            loc = upStart;
+            mayCommitProgressDurably();
+        }
+    }
+
+    template <class BtreeLayout>
+    void BtreeLogic<BtreeLayout>::Builder::mayCommitProgressDurably() {
+        if (getDur().commitIfNeeded()) {
+            _b = _getModifiableBucket(_cur);
+        }
+    }
+
+    template <class BtreeLayout>
+    typename BtreeLogic<BtreeLayout>::BucketType*
+    BtreeLogic<BtreeLayout>::Builder::_getModifiableBucket(DiskLoc loc) {
+        return _logic->btreemod(_logic->getBucket(loc));
+    }
+
+    template <class BtreeLayout>
+    typename BtreeLogic<BtreeLayout>::BucketType*
+    BtreeLogic<BtreeLayout>::Builder::_getBucket(DiskLoc loc) {
+        return _logic->getBucket(loc);
+    }
+
+    //
+    // BtreeLogic logic
+    //
 
     // static
     template <class BtreeLayout>
@@ -175,8 +337,8 @@ namespace transition {
 
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::popBack(BucketType* bucket,
-                                           DiskLoc* recordLocOut,
-                                           KeyDataType *keyDataOut) {
+                                          DiskLoc* recordLocOut,
+                                          KeyDataType *keyDataOut) {
 
         massert(17435,  "n==0 in btree popBack()", bucket->n > 0 );
 
@@ -1630,6 +1792,16 @@ namespace transition {
     private:
         size_t _sz;
     };
+
+    template <class BtreeLayout>
+    Status BtreeLogic<BtreeLayout>::initAsEmpty() {
+        if (!_headManager->getHead().isNull()) {
+            return Status(ErrorCodes::InternalError, "index already initialized");
+        }
+
+        _headManager->setHead(addBucket());
+        return Status::OK();
+    }
 
     template <class BtreeLayout>
     DiskLoc BtreeLogic<BtreeLayout>::addBucket() {

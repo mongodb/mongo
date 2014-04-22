@@ -29,7 +29,7 @@
 #include "mongo/db/query/idhack_runner.h"
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/structure/btree/btree.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -39,7 +39,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/s/d_logic.h"
 
 namespace {

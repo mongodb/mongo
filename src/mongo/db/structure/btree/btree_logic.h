@@ -71,6 +71,48 @@ namespace transition {
         // Public-facing
         //
 
+        class Builder {
+        public:
+            typedef typename BtreeLayout::KeyOwnedType KeyDataOwnedType;
+            typedef typename BtreeLayout::KeyType KeyDataType;
+
+            Status addKey(const BSONObj& key, const DiskLoc& loc);
+
+            // XXX: status, outparam for # keys?
+            unsigned long long commit(bool mayInterrupt);
+
+        private:
+            friend class BtreeLogic;
+
+            Builder(BtreeLogic* logic, bool dupsAllowed);
+
+            // Direct ports of functionality
+            void newBucket();
+            void buildNextLevel(DiskLoc loc, bool mayInterrupt);
+            void mayCommitProgressDurably();
+            BucketType* _getModifiableBucket(DiskLoc loc);
+            BucketType* _getBucket(DiskLoc loc);
+            // Direct ports of functionality
+
+            // Not owned.
+            BtreeLogic* _logic;
+
+            // Direct port of names.
+            DiskLoc _cur;
+            DiskLoc _first;
+            BucketType* _b;
+            bool _committed;
+            bool _dupsAllowed;
+            long long _numAdded;
+            auto_ptr<KeyDataOwnedType> _keyLast;
+        };
+
+        /**
+         * Caller owns the returned pointer.
+         * 'this' must outlive the returned pointer.
+         */
+        Builder* newBuilder(bool dupsAllowed);
+
         Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) const;
 
         Status insert(const BSONObj& rawKey, const DiskLoc& value, bool dupsAllowed);
@@ -137,9 +179,19 @@ namespace transition {
                      const DiskLoc& savedLoc,
                      BucketType* bucket,
                      int keyPos) const;
-                     
+
+        //
+        // Creation and deletion
+        //
+
+        /**
+         * Returns OK if the index was uninitialized before, error status otherwise.
+         */
+        Status initAsEmpty();
 
     private:
+        friend class BtreeLogic::Builder;
+
         /**
          * This is an in memory wrapper for the variable length data associated with a
          * KeyHeaderType.  It points to on-disk data but is not itself on-disk data.

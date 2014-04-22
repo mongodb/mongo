@@ -34,20 +34,19 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
-#include "mongo/db/structure/btree/btreebuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/extsort.h"
-#include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/structure/catalog/index_details.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
 
@@ -79,13 +78,12 @@ namespace mongo {
     unsigned long long addExistingToIndex( Collection* collection,
                                            const IndexDescriptor* descriptor,
                                            IndexAccessMethod* accessMethod,
-                                           bool shouldYield ) {
+                                           bool shouldYield) {
 
         string ns = collection->ns().ns(); // our copy for sanity
 
         bool dupsAllowed = !descriptor->unique();
         bool dropDups = descriptor->dropDups();
-
 
         string curopMessage;
         {
@@ -264,6 +262,13 @@ namespace mongo {
             Status status = btreeState->accessMethod()->commitBulk( bulk,
                                                                     mayInterrupt,
                                                                     &dupsToDrop );
+
+            // Code above us expects a uassert in case of dupkey errors.
+            if (ErrorCodes::DuplicateKey == status.code()) {
+                uassertStatusOK(status);
+            }
+
+            // Any other errors are probably bad and deserve a massert.
             massert( 17398,
                      str::stream() << "commitBulk failed: " << status.toString(),
                      status.isOK() );
