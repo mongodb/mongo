@@ -178,7 +178,7 @@ static const WT_ITEM __tombstone = { "\x14\x14", 2, 0, NULL, 0 };
  *	Check whether the current value is a tombstone.
  */
 static inline int
-__clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
+__clsm_deleted(WT_CURSOR_LSM *clsm, const WT_ITEM *item)
 {
 	return (!F_ISSET(clsm, WT_CLSM_MINOR_MERGE) &&
 	    item->size == __tombstone.size &&
@@ -219,12 +219,17 @@ __clsm_deleted_encode(WT_SESSION_IMPL *session,
 
 /*
  * __clsm_deleted_decode --
- *	Decode empty values and values that are in the encoded name space.
+ *	Decode values that are start with the tombstone.
  */
 static inline void
 __clsm_deleted_decode(WT_ITEM *value)
 {
-	if (value->size >= __tombstone.size &&
+	/*
+	 * Take care with this check: when an LSM cursor is used for a merge,
+	 * and/or to create a Bloom filter, it is valid to return the tombstone
+	 * value.
+	 */
+	if (value->size > __tombstone.size &&
 	    memcmp(value->data, __tombstone.data, __tombstone.size) == 0)
 		--value->size;
 }
