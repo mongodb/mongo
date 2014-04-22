@@ -165,23 +165,13 @@ __clsm_leave(WT_CURSOR_LSM *clsm)
 }
 
 /*
- * We need a tombstone to mark deleted records, and we use an empty value for
- * that purpose.  For that reason, we have to encode any user-specified empty
- * value in some way to distinguish the two, and obviously, that encoding has
- * to be distinguished from a user-specified value that matches it, and so on.
- * Additionally, we expect tombstones and empty values to be likely in some
- * workloads, so they should be the short encodings.  In summary: tombstones
- * are empty values, single 0x14 bytes are application specified empty values,
- * and application-specified values beginning with 0x14 bytes have an additional
- * 0x14 byte appended before storage, and the extra byte is discarded during
- * retrieval.  We use 0x14 (Device Control 4) to minimize the likelihood of
- * colliding with an application-chosen encoding byte, if the application uses
- * a leading DC4 byte for some reason, we'll do a wasted data copy each time a
- * new value is inserted into the object.
+ * We need a tombstone to mark deleted records, and we use the special
+ * value below for that purpose.  We use two 0x14 (Device Control 4) bytes to
+ * minimize the likelihood of colliding with an application-chosen encoding
+ * byte, if the application uses two leading DC4 byte for some reason, we'll do
+ * a wasted data copy each time a new value is inserted into the object.
  */
-#define	WT_DC4_BYTE	'\x14'
-static const WT_ITEM __lsm_empty = { "\x14", 1, 0, NULL, 0 };
-static const WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
+static const WT_ITEM __tombstone = { "\x14\x14", 2, 0, NULL, 0 };
 
 /*
  * __clsm_deleted --
@@ -190,42 +180,39 @@ static const WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 static inline int
 __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
 {
-	return (!F_ISSET(clsm, WT_CLSM_MINOR_MERGE) && item->size == 0);
+	return (!F_ISSET(clsm, WT_CLSM_MINOR_MERGE) &&
+	    item->size == __tombstone.size &&
+	    memcmp(item->data, __tombstone.data, __tombstone.size) == 0);
 }
 
 /*
  * __clsm_deleted_encode --
- *	Encode empty values and values that are in the encoded name space.
+ *	Encode values that are in the encoded name space.
  */
 static inline int
-__clsm_deleted_encode(
-    WT_SESSION_IMPL *session, WT_ITEM *value, WT_ITEM **valuep)
+__clsm_deleted_encode(WT_SESSION_IMPL *session,
+    const WT_ITEM *value, WT_ITEM *final_value, WT_ITEM **tmpp)
 {
 	WT_ITEM *tmp;
 
-	/* Check for an empty value. */
-	if (value->size == 0) {
-		*valuep = (WT_ITEM *)&__lsm_empty;
-		return (0);
-	}
-
 	/*
 	 * If value requires encoding, get a scratch buffer of the right size
-	 * and create a copy of the data with an appended DC4 byte.  We might
-	 * be able to fast-path this by appending to the WT_ITEM the application
-	 * gives us, but that's quite a bit more complicated since the data may
-	 * not be in WT_ITEM-local memory and we'd have to discard any trailing
-	 * byte we appended before returning to the application.
+	 * and create a copy of the data with the first byte of the tombstone
+	 * appended.
 	 */
-	if (((uint8_t *)value->data)[0] == WT_DC4_BYTE) {
-		WT_RET(__wt_scr_alloc(session, value->size + 1, valuep));
-		tmp = *valuep;
+	if (value->size >= __tombstone.size &&
+	    memcmp(value->data, __tombstone.data, __tombstone.size) == 0) {
+		WT_RET(__wt_scr_alloc(session, value->size + 1, tmpp));
+		tmp = *tmpp;
 
 		memcpy(tmp->mem, value->data, value->size);
-		((uint8_t *)tmp->mem)[value->size] = WT_DC4_BYTE;
-		tmp->size = value->size + 1;
-	} else
-		*valuep = value;
+		memcpy((uint8_t *)tmp->mem + value->size, __tombstone.data, 1);
+		final_value->data = tmp->mem;
+		final_value->size = value->size + __tombstone.size;
+	} else {
+		final_value->data = value->data;
+		final_value->size = value->size;
+	}
 
 	return (0);
 }
@@ -237,7 +224,8 @@ __clsm_deleted_encode(
 static inline void
 __clsm_deleted_decode(WT_ITEM *value)
 {
-	if (((uint8_t *)value->data)[0] == WT_DC4_BYTE)
+	if (value->size >= __tombstone.size &&
+	    memcmp(value->data, __tombstone.data, __tombstone.size) == 0)
 		--value->size;
 }
 
@@ -1277,28 +1265,28 @@ static int
 __clsm_insert(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
-	WT_DECL_ITEM(encoded_value);
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM tmp_value;
+	WT_ITEM value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, insert);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &encoded_value));
 
 	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-	    (ret = __clsm_lookup(clsm, &tmp_value)) != WT_NOTFOUND) {
+	    (ret = __clsm_lookup(clsm, &value)) != WT_NOTFOUND) {
 		if (ret == 0)
 			ret = WT_DUPLICATE_KEY;
 		return (ret);
 	}
 
-	ret = __clsm_put(session, clsm, &cursor->key, encoded_value, 0);
+	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
+	ret = __clsm_put(session, clsm, &cursor->key, &value, 0);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 
-	__wt_scr_free(&encoded_value);
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -1310,23 +1298,25 @@ static int
 __clsm_update(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
-	WT_DECL_ITEM(encoded_value);
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM tmp_value;
+	WT_ITEM value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, update);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &encoded_value));
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm, &tmp_value)) == 0)
-		ret = __clsm_put(session, clsm, &cursor->key, encoded_value, 1);
+	    (ret = __clsm_lookup(clsm, &value)) == 0) {
+		WT_ERR(__clsm_deleted_encode(
+		    session, &cursor->value, &value, &buf));
+		ret = __clsm_put(session, clsm, &cursor->key, &value, 1);
+	}
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 
-	__wt_scr_free(&encoded_value);
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -1339,16 +1329,16 @@ __clsm_remove(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
-	WT_ITEM tmp_value;
+	WT_ITEM value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, remove);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm, &tmp_value)) == 0)
+	    (ret = __clsm_lookup(clsm, &value)) == 0)
 		ret = __clsm_put(
-		    session, clsm, &cursor->key, &__lsm_tombstone, 1);
+		    session, clsm, &cursor->key, &__tombstone, 1);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
