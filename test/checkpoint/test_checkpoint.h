@@ -75,6 +75,7 @@ typedef struct {
 	int ntables;				/* Number tables configured */
 	int ntables_created;			/* Number tables opened */
 	int running;				/* Whether to stop */
+	int status;				/* Exit status */
 	COOKIE *cookies;			/* Per-thread info */
 	pthread_t checkpoint_thread;		/* Checkpoint thread */
 } GLOBAL;
