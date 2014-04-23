@@ -64,7 +64,7 @@ namespace QueryMultiPlanRunner {
         }
 
         IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-            Collection* collection = db->getCollection( ns() );
+            const Collection* collection = db->getCollection( ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
@@ -108,9 +108,12 @@ namespace QueryMultiPlanRunner {
             ixparams.bounds.endKey = BSON("" << 7);
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
+
+            const Collection* coll = ctx.ctx().db()->getCollection(ns());
+
             auto_ptr<WorkingSet> firstWs(new WorkingSet());
             IndexScan* ix = new IndexScan(ixparams, firstWs.get(), NULL);
-            auto_ptr<PlanStage> firstRoot(new FetchStage(firstWs.get(), ix, NULL));
+            auto_ptr<PlanStage> firstRoot(new FetchStage(firstWs.get(), ix, NULL, coll));
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
@@ -130,7 +133,7 @@ namespace QueryMultiPlanRunner {
             CanonicalQuery* cq = NULL;
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
-            MultiPlanRunner mpr(ctx.ctx().db()->getCollection(ns()),cq);
+            MultiPlanRunner mpr(coll, cq);
             mpr.addPlan(createQuerySolution(), firstRoot.release(), firstWs.release());
             mpr.addPlan(createQuerySolution(), secondRoot.release(), secondWs.release());
 

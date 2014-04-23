@@ -118,7 +118,7 @@ namespace QueryStageFetch {
                 mockStage->pushBack(mockMember);
             }
 
-            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL));
+            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL, coll));
 
             // Set the fail point to return not in memory.
             FailPointRegistry* reg = getGlobalFailPointRegistry();
@@ -189,7 +189,7 @@ namespace QueryStageFetch {
                 mockStage->pushBack(mockMember);
             }
 
-            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL));
+            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL, coll));
 
             // Set the fail point to return in memory.
             FailPointRegistry* reg = getGlobalFailPointRegistry();
@@ -254,7 +254,7 @@ namespace QueryStageFetch {
                 mockStage->pushBack(mockMember);
             }
 
-            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL));
+            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL, coll));
 
             // Set the fail point to return not in memory.
             FailPointRegistry* reg = getGlobalFailPointRegistry();
@@ -331,7 +331,7 @@ namespace QueryStageFetch {
                 mockStage->pushBack(mockMember);
             }
 
-            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL));
+            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL, coll));
 
             // Set the fail point to return not in memory so we get a fetch request.
             FailPointRegistry* reg = getGlobalFailPointRegistry();
@@ -397,8 +397,8 @@ namespace QueryStageFetch {
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
 
             // Matcher requires that foo==6 but we only have data with foo==5.
-            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(),
-                                                           filterExpr.get()));
+            auto_ptr<FetchStage> fetchStage(
+                new FetchStage(&ws, mockStage.release(), filterExpr.get(), coll));
 
             // Set the fail point to return not in memory so we get a fetch request.
             FailPointRegistry* reg = getGlobalFailPointRegistry();

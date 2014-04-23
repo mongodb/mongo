@@ -141,9 +141,9 @@ namespace mongo {
 
             // Add a fetch at the top for the user so we can get obj back for sure.
             // TODO: Do we want to do this for the user?  I think so.
-            PlanStage* rootFetch = new FetchStage(ws.get(), userRoot, NULL);
+            PlanStage* rootFetch = new FetchStage(ws.get(), userRoot, NULL, collection);
 
-            PlanExecutor runner(ws.release(), rootFetch);
+            PlanExecutor runner(ws.release(), rootFetch, collection);
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 
@@ -292,7 +292,7 @@ namespace mongo {
                                                 nodeArgs["node"].Obj(),
                                                 workingSet,
                                                 exprs);
-                return new FetchStage(workingSet, subNode, matcher);
+                return new FetchStage(workingSet, subNode, matcher, collection);
             }
             else if ("limit" == nodeName) {
                 uassert(16937, "Limit stage doesn't have a filter (put it on the child)",

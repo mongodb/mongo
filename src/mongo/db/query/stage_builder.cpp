@@ -96,7 +96,7 @@ namespace mongo {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
             PlanStage* childStage = buildStages(collection, qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            return new FetchStage(ws, childStage, fn->filter.get());
+            return new FetchStage(ws, childStage, fn->filter.get(), collection);
         }
         else if (STAGE_SORT == root->getType()) {
             const SortNode* sn = static_cast<const SortNode*>(root);

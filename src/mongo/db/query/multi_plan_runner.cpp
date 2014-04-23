@@ -364,7 +364,8 @@ namespace mongo {
 
         // Run the best plan.  Store it.
         _bestPlan.reset(new PlanExecutor(_candidates[_bestChild].ws,
-                                         _candidates[_bestChild].root));
+                                         _candidates[_bestChild].root,
+                                         _collection));
         _bestPlan->setYieldPolicy(_policy);
         _alreadyProduced = _candidates[_bestChild].results;
         _bestSolution.reset(_candidates[_bestChild].solution);
@@ -381,7 +382,9 @@ namespace mongo {
                     backupChild = i;
                     _backupSolution = _candidates[i].solution;
                     _backupAlreadyProduced = _candidates[i].results;
-                    _backupPlan = new PlanExecutor(_candidates[i].ws, _candidates[i].root);
+                    _backupPlan = new PlanExecutor(_candidates[i].ws, 
+                                                   _candidates[i].root,
+                                                   _collection);
                     _backupPlan->setYieldPolicy(_policy);
                     break;
                 }

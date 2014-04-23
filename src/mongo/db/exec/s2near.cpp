@@ -275,7 +275,7 @@ namespace mongo {
         IndexScan* scan = new IndexScan(params, _ws, _keyGeoFilter.get());
 
         // Owns 'scan'.
-        _child.reset(new FetchStage(_ws, scan, _params.filter));
+        _child.reset(new FetchStage(_ws, scan, _params.filter, _params.collection));
         _seenInScan.clear();
     }
 

@@ -54,7 +54,7 @@ namespace mongo {
         : _collection(collection),
           _canonicalQuery(canonicalQuery),
           _solution(solution),
-          _exec(new PlanExecutor(ws, root)),
+          _exec(new PlanExecutor(ws, root, collection)),
           _alreadyProduced(false),
           _updatedCache(false),
           _killed(false) { }
@@ -210,7 +210,7 @@ namespace mongo {
 
     void CachedPlanRunner::setBackupPlan(QuerySolution* qs, PlanStage* root, WorkingSet* ws) {
         _backupSolution.reset(qs);
-        _backupPlan.reset(new PlanExecutor(ws, root));
+        _backupPlan.reset(new PlanExecutor(ws, root, _collection));
     }
 
 } // namespace mongo

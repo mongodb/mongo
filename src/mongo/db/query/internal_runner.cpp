@@ -42,7 +42,7 @@ namespace mongo {
 
     InternalRunner::InternalRunner(const Collection* collection, PlanStage* root, WorkingSet* ws)
         : _collection(collection),
-          _exec(new PlanExecutor(ws, root)),
+          _exec(new PlanExecutor(ws, root, collection)),
           _policy(Runner::YIELD_MANUAL) {
         invariant( collection );
     }

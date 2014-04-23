@@ -78,7 +78,7 @@ namespace QueryStageCollectionScan {
                 // Create an executor to handle the scan.
                 WorkingSet* ws = new WorkingSet();
                 PlanStage* ps = new CollectionScan(params, ws, NULL);
-                PlanExecutor runner(ws, ps);
+                PlanExecutor runner(ws, ps, collection());
 
                 int resultCount = 0;
                 BSONObj obj;
@@ -96,7 +96,7 @@ namespace QueryStageCollectionScan {
 
                 WorkingSet* ws = new WorkingSet();
                 PlanStage* ps = new CollectionScan(params, ws, NULL);
-                PlanExecutor runner(ws, ps);
+                PlanExecutor runner(ws, ps, collection());
 
                 // Going backwards.
                 int resultCount = expectedCount() - 1;
@@ -334,7 +334,7 @@ namespace QueryStageCollectionScan {
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(params, ws, filterExpr.get());
-            PlanExecutor runner(ws, ps);
+            PlanExecutor runner(ws, ps, params.collection);
 
             // Use the runner to count the number of objects scanned.
             int count = 0;
@@ -437,7 +437,7 @@ namespace QueryStageCollectionScan {
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(params, ws, NULL);
-            PlanExecutor runner(ws, ps);
+            PlanExecutor runner(ws, ps, params.collection);
 
             int count = 0;
             for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
@@ -466,7 +466,7 @@ namespace QueryStageCollectionScan {
 
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(params, ws, NULL);
-            PlanExecutor runner(ws, ps);
+            PlanExecutor runner(ws, ps, params.collection);
 
             int count = 0;
             for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {

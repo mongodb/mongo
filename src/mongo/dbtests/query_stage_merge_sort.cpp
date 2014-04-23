@@ -146,7 +146,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // Must fetch if we want to easily pull out an obj.
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -208,7 +208,7 @@ namespace QueryStageMergeSortTests {
             params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(params, ws, NULL));
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -270,7 +270,7 @@ namespace QueryStageMergeSortTests {
             params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(params, ws, NULL));
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -335,7 +335,7 @@ namespace QueryStageMergeSortTests {
             params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(params, ws, NULL));
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -399,7 +399,7 @@ namespace QueryStageMergeSortTests {
             params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
             ms->addChild(new IndexScan(params, ws, NULL));
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
 
             // Only getting results from the a:1 index scan.
             for (int i = 0; i < N; ++i) {
@@ -451,7 +451,7 @@ namespace QueryStageMergeSortTests {
                 ms->addChild(new IndexScan(params, ws, NULL));
             }
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < numIndices; ++i) {
                 BSONObj obj;

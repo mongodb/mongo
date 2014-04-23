@@ -78,7 +78,9 @@ namespace QueryStageTests {
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
 
             WorkingSet* ws = new WorkingSet();
-            PlanExecutor runner(ws, new IndexScan(params, ws, filterExpr.get()));
+            PlanExecutor runner(ws, 
+                                new IndexScan(params, ws, filterExpr.get()), 
+                                ctx.ctx().db()->getCollection(ns()));
 
             int count = 0;
             for (DiskLoc dl; Runner::RUNNER_ADVANCED == runner.getNext(NULL, &dl); ) {

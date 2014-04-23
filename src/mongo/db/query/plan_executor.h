@@ -52,7 +52,7 @@ namespace mongo {
      */
     class PlanExecutor {
     public:
-        PlanExecutor(WorkingSet* ws, PlanStage* rt);
+        PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection);
         ~PlanExecutor();
 
         //
@@ -99,6 +99,10 @@ namespace mongo {
         void kill();
 
     private:
+        // Collection over which this plan executor runs. Used to resolve record ids retrieved by
+        // the plan stages. The collection must not be destroyed while there are active plans.
+        const Collection* _collection;
+
         boost::scoped_ptr<WorkingSet> _workingSet;
         boost::scoped_ptr<PlanStage> _root;
         boost::scoped_ptr<RunnerYieldPolicy> _yieldPolicy;

@@ -41,8 +41,17 @@ namespace mongo {
     MONGO_FP_DECLARE(fetchInMemoryFail);
     MONGO_FP_DECLARE(fetchInMemorySucceed);
 
-    FetchStage::FetchStage(WorkingSet* ws, PlanStage* child, const MatchExpression* filter)
-        : _ws(ws), _child(child), _filter(filter), _idBeingPagedIn(WorkingSet::INVALID_ID) { }
+    FetchStage::FetchStage(WorkingSet* ws, 
+                           PlanStage* child, 
+                           const MatchExpression* filter, 
+                           const Collection* collection)
+        : _collection(collection),
+          _ws(ws), 
+          _child(child), 
+          _filter(filter), 
+          _idBeingPagedIn(WorkingSet::INVALID_ID) { 
+
+    }
 
     FetchStage::~FetchStage() { }
 

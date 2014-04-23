@@ -45,7 +45,11 @@ namespace mongo {
      */
     class FetchStage : public PlanStage {
     public:
-        FetchStage(WorkingSet* ws, PlanStage* child, const MatchExpression* filter);
+        FetchStage(WorkingSet* ws, 
+                    PlanStage* child, 
+                    const MatchExpression* filter, 
+                    const Collection* collection);
+
         virtual ~FetchStage();
 
         virtual bool isEOF();
@@ -58,6 +62,7 @@ namespace mongo {
         PlanStageStats* getStats();
 
     private:
+
         /**
          * If the member (with id memberID) passes our filter, set *out to memberID and return that
          * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
@@ -69,6 +74,10 @@ namespace mongo {
          * work(...) delegates to this when we're called after requesting a fetch.
          */
         StageState fetchCompleted(WorkingSetID* out);
+
+        // Collection which is used by this stage. Used to resolve record ids retrieved by child
+        // stages. The lifetime of the collection must supersede that of the stage.
+        const Collection* _collection;
 
         // _ws is not owned by us.
         WorkingSet* _ws;

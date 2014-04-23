@@ -36,8 +36,8 @@
 
 namespace mongo {
 
-    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt)
-        : _workingSet(ws) , _root(rt) , _killed(false) { }
+    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection)
+        : _collection(collection), _workingSet(ws), _root(rt), _killed(false) {}
 
     PlanExecutor::~PlanExecutor() { }
 

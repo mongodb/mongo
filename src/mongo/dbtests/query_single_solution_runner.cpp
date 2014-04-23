@@ -126,16 +126,19 @@ namespace QuerySingleSolutionRunner {
             ixparams.bounds.endKey = BSON("" << end);
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
+
+            const Collection* coll = context.db()->getCollection(ns());
+
             auto_ptr<WorkingSet> ws(new WorkingSet());
             IndexScan* ix = new IndexScan(ixparams, ws.get(), NULL);
-            auto_ptr<PlanStage> root(new FetchStage(ws.get(), ix, NULL));
+            auto_ptr<PlanStage> root(new FetchStage(ws.get(), ix, NULL, coll));
 
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             verify(NULL != cq);
 
             // Hand the plan off to the single solution runner.
-            return new SingleSolutionRunner(context.db()->getCollection(ns()),
+            return new SingleSolutionRunner(coll,
                                             cq, new QuerySolution(),
                                             root.release(), ws.release());
         }

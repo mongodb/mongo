@@ -48,7 +48,7 @@ namespace mongo {
         : _collection( collection ),
           _canonicalQuery(canonicalQuery),
           _solution(soln),
-          _exec(new PlanExecutor(ws, root)) { }
+          _exec(new PlanExecutor(ws, root, collection)) { }
 
     SingleSolutionRunner::~SingleSolutionRunner() { }
 

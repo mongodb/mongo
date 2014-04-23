@@ -48,7 +48,7 @@ namespace mongo {
 
         // What collection?
         // not owned
-        Collection* collection;
+        const Collection* collection;
 
         // isNull by default.  If you specify any value for this, you're responsible for the DiskLoc
         // not being invalidated before the first call to work(...).

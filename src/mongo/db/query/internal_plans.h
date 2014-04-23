@@ -111,7 +111,8 @@ namespace mongo {
             IndexScan* ix = new IndexScan(params, ws, NULL);
 
             if (IXSCAN_FETCH & options) {
-                return new InternalRunner(collection, new FetchStage(ws, ix, NULL), ws);
+                return new InternalRunner(
+                                collection, new FetchStage(ws, ix, NULL, collection), ws);
             }
             else {
                 return new InternalRunner(collection, ix, ws);
