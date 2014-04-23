@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/value.h"
-
 namespace mongo {
 
 

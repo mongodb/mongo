@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/value.h"
-
 namespace mongo {
 
     class ReplSetImpl;
@@ -44,7 +42,7 @@ namespace mongo {
             unsigned who;
         };
         static SimpleMutex lyMutex;
-        Guarded<LastYea,lyMutex> ly;
+        LastYea ly;
         unsigned yea(unsigned memberId); // throws VoteException
         void electionFailed(unsigned meid);
         void _electSelf();

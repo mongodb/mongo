@@ -32,6 +32,7 @@
 
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/util/concurrency/value.h"
 
 namespace mongo {
 

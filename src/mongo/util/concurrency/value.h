@@ -1,5 +1,5 @@
 /* @file value.h
-   concurrency helpers DiagStr, Guarded
+   concurrency helpers DiagStr
 */
 
 /**
@@ -35,27 +35,6 @@
 #include "spin_lock.h"
 
 namespace mongo {
-
-    /** declare that a variable that is "guarded" by a mutex.
-
-        The decl documents the rule.  For example "counta and countb are guarded by xyzMutex":
-
-          Guarded<int, xyzMutex> counta;
-          Guarded<int, xyzMutex> countb;
-
-        Upon use, specify the scoped_lock object.  This makes it hard for someone 
-        later to forget to be in the lock.  Check is made that it is the right lock in _DEBUG
-        builds at runtime.
-    */
-    template <typename T, SimpleMutex& BY>
-    class Guarded {
-        T _val;
-    public:
-        T& ref(const SimpleMutex::scoped_lock& lk) {
-            dassert( &lk.m() == &BY );
-            return _val;
-        }
-    };
 
     // todo: rename this to ThreadSafeString or something
     /** there is now one mutex per DiagStr.  If you have hundreds or millions of

@@ -43,7 +43,6 @@
 #include "mongo/db/repl/server.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
-#include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/html.h"

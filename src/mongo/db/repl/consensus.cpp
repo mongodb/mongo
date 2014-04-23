@@ -197,7 +197,7 @@ namespace mongo {
 
     unsigned Consensus::yea(unsigned memberId) { /* throws VoteException */
         SimpleMutex::scoped_lock lk(lyMutex);
-        LastYea &L = this->ly.ref(lk);
+        LastYea &L = this->ly;
         time_t now = time(0);
         if( L.when + LeaseTime >= now && L.who != memberId ) {
             LOG(1) << "replSet not voting yea for " << memberId <<
@@ -214,7 +214,7 @@ namespace mongo {
        */
     void Consensus::electionFailed(unsigned meid) {
         SimpleMutex::scoped_lock lk(lyMutex);
-        LastYea &L = ly.ref(lk);
+        LastYea &L = ly;
         DEV verify( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
         if( L.who == meid )
             L.when = 0;
