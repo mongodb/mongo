@@ -264,13 +264,10 @@ op_name(uint8_t *op)
 static void *
 worker_async(void *arg)
 {
-	struct timespec start, stop;
 	CONFIG *cfg;
 	CONFIG_THREAD *thread;
-	TRACK *trk;
 	WT_ASYNC_OP *asyncop;
 	WT_CONNECTION *conn;
-	size_t i;
 	uint64_t next_val;
 	uint8_t *op, *op_end;
 	int ret;
@@ -279,7 +276,6 @@ worker_async(void *arg)
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
 	conn = cfg->conn;
-	trk = NULL;
 
 	key_buf = thread->key_buf;
 	value_buf = thread->value_buf;
@@ -295,18 +291,13 @@ worker_async(void *arg)
 		switch (*op) {
 		case WORKER_INSERT:
 		case WORKER_INSERT_RMW:
-			trk = &thread->insert;
 			if (cfg->random_range)
 				next_val = wtperf_rand(cfg);
 			else
 				next_val = cfg->icount + get_next_incr(cfg);
 			break;
 		case WORKER_READ:
-			trk = &thread->read;
-			/* FALLTHROUGH */
 		case WORKER_UPDATE:
-			if (*op == WORKER_UPDATE)
-				trk = &thread->update;
 			next_val = wtperf_rand(cfg);
 
 			/*
@@ -1377,9 +1368,11 @@ execute_workload(CONFIG *cfg)
 		goto err;
 	}
 
-	if (cfg->async_threads > 0)
+	if (cfg->async_threads > 0) {
+		lprintf(cfg, 0, 1, "Starting %" PRIu32 " async thread(s)",
+		    cfg->async_threads);
 		pfunc = worker_async;
-	else
+	} else
 		pfunc = worker;
 
 	/* Start each workload. */
