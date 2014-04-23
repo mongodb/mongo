@@ -91,14 +91,6 @@ namespace replset {
 
         const Member* _currentSyncTarget;
 
-        // Notifier thread
-
-        // used to wait until another op has been replicated
-        boost::condition_variable _lastOpCond;
-        boost::mutex _lastOpMutex;
-
-        OpTime _consumedOpTime; // not locked, only used by notifier thread
-
         BackgroundSync();
         BackgroundSync(const BackgroundSync& s);
         BackgroundSync operator=(const BackgroundSync& s);
@@ -118,10 +110,6 @@ namespace replset {
         void stop();
         // restart syncing
         void start();
-
-        // Tracker thread
-        // tells the sync target where this member is synced to
-        void markOplog();
 
         bool isAssumingPrimary();
 

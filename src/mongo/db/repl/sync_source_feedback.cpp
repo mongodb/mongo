@@ -239,7 +239,11 @@ namespace mongo {
     void SyncSourceFeedback::run() {
         Client::initThread("SyncSourceFeedbackThread");
         bool sleepNeeded = false;
-        while (true) {
+        while (!inShutdown()) {
+            if (!theReplSet) {
+                sleepsecs(5);
+                continue;
+            }
             if (sleepNeeded) {
                 sleepmillis(500);
                 sleepNeeded = false;
@@ -249,7 +253,8 @@ namespace mongo {
                 while (!_positionChanged && !_handshakeNeeded) {
                     _cond.wait(lock);
                 }
-                if (theReplSet->isPrimary()) {
+                MemberState state = theReplSet->state();
+                if (state.primary() || state.fatal() || state.startup()) {
                     _positionChanged = false;
                     _handshakeNeeded = false;
                     continue;
@@ -291,5 +296,6 @@ namespace mongo {
                 }
             }
         }
+        cc().shutdown();
     }
 }

@@ -91,8 +91,7 @@ namespace replset {
                                        _pause(true),
                                        _appliedBuffer(true),
                                        _assumingPrimary(false),
-                                       _currentSyncTarget(NULL),
-                                       _consumedOpTime(0, 0) {
+                                       _currentSyncTarget(NULL) {
     }
 
     BackgroundSync* BackgroundSync::get() {
@@ -108,17 +107,7 @@ namespace replset {
     }
 
     void BackgroundSync::notify() {
-        {
-            boost::unique_lock<boost::mutex> lock(s_mutex);
-            if (s_instance == NULL) {
-                return;
-            }
-        }
-
-        {
-            boost::unique_lock<boost::mutex> opLock(s_instance->_lastOpMutex);
-            s_instance->_lastOpCond.notify_all();
-        }
+        theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
 
         {
             boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
@@ -129,55 +118,6 @@ namespace replset {
                 s_instance->_condvar.notify_all();
             }
         }
-    }
-
-    void BackgroundSync::notifierThread() {
-        Client::initThread("rsSyncNotifier");
-        replLocalAuth();
-
-        theReplSet->syncSourceFeedback.go();
-
-        while (!inShutdown()) {
-            if (!theReplSet) {
-                sleepsecs(5);
-                continue;
-            }
-
-            MemberState state = theReplSet->state();
-            if (state.primary() || state.fatal() || state.startup()) {
-                sleepsecs(5);
-                continue;
-            }
-
-            try {
-                {
-                    boost::unique_lock<boost::mutex> lock(_lastOpMutex);
-                    while (_consumedOpTime == theReplSet->lastOpTimeWritten) {
-                        _lastOpCond.wait(lock);
-                    }
-                }
-
-                markOplog();
-            }
-            catch (DBException &e) {
-                log() << "replset tracking exception: " << e.getInfo() << rsLog;
-                sleepsecs(1);
-            }
-            catch (std::exception &e2) {
-                log() << "replset tracking error" << e2.what() << rsLog;
-                sleepsecs(1);
-            }
-        }
-
-        cc().shutdown();
-    }
-
-    void BackgroundSync::markOplog() {
-        LOG(3) << "replset markOplog: " << _consumedOpTime << " "
-               << theReplSet->lastOpTimeWritten << rsLog;
-
-        _consumedOpTime = theReplSet->lastOpTimeWritten;
-        theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
     }
 
     void BackgroundSync::producerThread() {

@@ -248,11 +248,14 @@ namespace mongo {
             return;
         }
 
+        // this ensures that will have bgsync's s_instance at all points where it is needed
+        // so that we needn't check for its existence
+        replset::BackgroundSync* sync = replset::BackgroundSync::get();
+
         boost::thread t(startSyncThread);
 
-        replset::BackgroundSync* sync = replset::BackgroundSync::get();
         boost::thread producer(boost::bind(&replset::BackgroundSync::producerThread, sync));
-        boost::thread notifier(boost::bind(&replset::BackgroundSync::notifierThread, sync));
+        theReplSet->syncSourceFeedback.go();
 
         task::fork(ghost);
 
