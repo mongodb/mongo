@@ -135,6 +135,70 @@ randomize_value(CONFIG *cfg, char *value_buf)
 	return;
 }
 
+static int
+cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
+{
+
+	CONFIG *cfg;
+	CONFIG_THREAD *thread;
+	TRACK *trk;
+	WT_ASYNC_OPTYPE type;
+	char *value;
+	int t_ret;
+
+	(void)cb;
+	(void)flags;
+	type = op->get_type(op);
+	thread = (CONFIG_THREAD *)op->c.lang_private;
+	cfg = thread->cfg;
+
+	switch (type) {
+		case WT_AOP_INSERT:
+			trk = &thread->insert;
+			break;
+		case WT_AOP_SEARCH:
+			trk = &thread->read;
+			if (ret == 0) {
+				if ((t_ret = op->get_value(
+				    op, &value)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "get_value in read.");
+					goto err;
+				}
+			}
+			break;
+		case WT_AOP_UPDATE:
+			trk = &thread->update;
+			break;
+		case WT_AOP_NONE:
+			/* We never expect this type. */
+			lprintf(cfg, ret, 0, "No type in op %" PRIu64,
+			    op->get_id(op));
+			goto err;
+	}
+
+	/*
+	 * Either we have success and we track it, or failure and panic.
+	 *
+	 * Reads and updates can fail with WT_NOTFOUND: we may be searching
+	 * in a random range, or an insert op might have updated the
+	 * last record in the table but not yet finished the actual insert.
+	 */
+	if (ret == 0 || (ret == WT_NOTFOUND && type != WT_AOP_INSERT)) {
+		if (!cfg->in_warmup)
+			(void)async_next_incr(&trk->ops);
+		return (0);
+	}
+err:
+	/* Panic if error */
+	lprintf(cfg, ret, 0, "Error in op %" PRIu64,
+	    op->get_id(op));
+	cfg->error = cfg->stop = 1;
+	return (1);
+}
+
+static WT_ASYNC_CALLBACK cb = { cb_asyncop };
+
 /*
  * track_operation --
  *	Update an operation's tracking structure with new latency information.
@@ -194,6 +258,124 @@ op_name(uint8_t *op)
 		return ("unknown");
 	}
 	/* NOTREACHED */
+}
+
+static void *
+worker_async(void *arg)
+{
+	struct timespec start, stop;
+	CONFIG *cfg;
+	CONFIG_THREAD *thread;
+	TRACK *trk;
+	WT_ASYNC_OP *asyncop;
+	WT_CONNECTION *conn;
+	size_t i;
+	uint64_t next_val;
+	uint8_t *op, *op_end;
+	int ret;
+	char *key_buf, *value_buf;
+
+	thread = (CONFIG_THREAD *)arg;
+	cfg = thread->cfg;
+	conn = cfg->conn;
+	trk = NULL;
+
+	key_buf = thread->key_buf;
+	value_buf = thread->value_buf;
+
+	op = thread->workload->ops;
+	op_end = op + sizeof(thread->workload->ops);
+
+	while (!cfg->stop) {
+		/*
+		 * Generate the next key and setup operation specific
+		 * statistics tracking objects.
+		 */
+		switch (*op) {
+		case WORKER_INSERT:
+		case WORKER_INSERT_RMW:
+			trk = &thread->insert;
+			if (cfg->random_range)
+				next_val = wtperf_rand(cfg);
+			else
+				next_val = cfg->icount + get_next_incr(cfg);
+			break;
+		case WORKER_READ:
+			trk = &thread->read;
+			/* FALLTHROUGH */
+		case WORKER_UPDATE:
+			if (*op == WORKER_UPDATE)
+				trk = &thread->update;
+			next_val = wtperf_rand(cfg);
+
+			/*
+			 * If the workload is started without a populate phase
+			 * we rely on at least one insert to get a valid item
+			 * id.
+			 */
+			if (wtperf_value_range(cfg) < next_val)
+				continue;
+			break;
+		default:
+			goto err;		/* can't happen */
+		}
+
+		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+
+		/*
+		 * Spread the data out around the multiple databases.
+		 * Sleep to allow workers a chance to run and process async ops.
+		 * Then retry to get an async op.
+		 */
+		asyncop = NULL;
+retry:		if ((ret = conn->async_new_op(
+		    conn, cfg->uris[next_val % cfg->table_count],
+		    NULL, &cb, &asyncop)) != 0) {
+			if (ret != ENOMEM)
+				goto err;
+			(void)usleep(10000);
+			goto retry;
+		}
+		asyncop->c.lang_private = thread;
+		asyncop->set_key(asyncop, key_buf);
+		switch (*op) {
+		case WORKER_READ:
+			ret = asyncop->search(asyncop);
+			if (ret == 0)
+				break;
+			goto op_err;
+		case WORKER_INSERT:
+			if (cfg->random_value)
+				randomize_value(cfg, value_buf);
+			asyncop->set_value(asyncop, value_buf);
+			if ((ret = asyncop->insert(asyncop)) == 0)
+				break;
+			goto op_err;
+		case WORKER_UPDATE:
+			if (cfg->random_value)
+				randomize_value(cfg, value_buf);
+			asyncop->set_value(asyncop, value_buf);
+			if ((ret = asyncop->update(asyncop)) == 0)
+				break;
+			goto op_err;
+		default:
+op_err:			lprintf(cfg, ret, 0,
+			    "%s failed for: %s, range: %"PRIu64,
+			    op_name(op), key_buf, wtperf_value_range(cfg));
+			goto err;		/* can't happen */
+		}
+
+		/* Schedule the next operation */
+		if (++op == op_end)
+			op = thread->workload->ops;
+	}
+
+	conn->async_flush(conn);
+	/* Notify our caller we failed and shut the system down. */
+	if (0) {
+err:		cfg->error = cfg->stop = 1;
+	}
+	return (NULL);
 }
 
 static void *
@@ -666,32 +848,6 @@ err:		cfg->error = cfg->stop = 1;
 	return (NULL);
 }
 
-static int
-cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
-{
-
-	CONFIG *cfg;
-	CONFIG_THREAD *thread;
-
-	(void)cb;
-	(void)flags;
-	thread = (CONFIG_THREAD *)op->c.lang_private;
-	cfg = thread->cfg;
-
-	if (ret != 0) {
-		/* We always expect success.  Panic if error */
-		lprintf(cfg, ret, 0, "Error in op %" PRIu64,
-		    op->get_id(op));
-		cfg->error = cfg->stop = 1;
-		return (1);
-	}
-	(void)async_next_incr(&thread->insert.ops);
-	(void)async_next_incr(&cfg->insert_complete);
-	return (0);
-}
-
-static WT_ASYNC_CALLBACK cb = { cb_asyncop };
-
 static void *
 populate_async(void *arg)
 {
@@ -1047,9 +1203,11 @@ execute_populate(CONFIG *cfg)
 	if ((cfg->popthreads =
 	    calloc(cfg->populate_threads, sizeof(CONFIG_THREAD))) == NULL)
 		return (enomem(cfg));
-	if (cfg->async_threads > 0)
+	if (cfg->async_threads > 0) {
+		lprintf(cfg, 0, 1, "Starting %" PRIu32 " async thread(s)",
+		    cfg->async_threads);
 		pfunc = populate_async;
-	else
+	} else
 		pfunc = populate_thread;
 	if ((ret = start_threads(cfg, NULL,
 	    cfg->popthreads, cfg->populate_threads, pfunc)) != 0)
@@ -1200,6 +1358,7 @@ execute_workload(CONFIG *cfg)
 	uint32_t interval, run_ops, run_time;
 	u_int i;
 	int ret, t_ret;
+	void *(*pfunc)(void *);
 
 	cfg->insert_key = 0;
 	cfg->insert_ops = cfg->read_ops = cfg->update_ops = 0;
@@ -1217,6 +1376,11 @@ execute_workload(CONFIG *cfg)
 		goto err;
 	}
 
+	if (cfg->async_threads > 0)
+		pfunc = worker_async;
+	else
+		pfunc = worker;
+
 	/* Start each workload. */
 	for (threads = cfg->workers, i = 0,
 	    workp = cfg->workload; i < cfg->workload_cnt; ++i, ++workp) {
@@ -1232,7 +1396,7 @@ execute_workload(CONFIG *cfg)
 
 		/* Start the workload's threads. */
 		if ((ret = start_threads(
-		    cfg, workp, threads, (u_int)workp->threads, worker)) != 0)
+		    cfg, workp, threads, (u_int)workp->threads, pfunc)) != 0)
 			goto err;
 		threads += workp->threads;
 	}
