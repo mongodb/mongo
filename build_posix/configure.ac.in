@@ -33,8 +33,6 @@ else
 	fi
 fi
 
-AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
-
 # Java and Python APIs
 if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
 	AX_PKG_SWIG(2.0.4, [],
@@ -46,9 +44,7 @@ if test "$wt_cv_enable_java" = "yes"; then
 	AX_PROG_JAVAC
 	AX_PROG_JAR
 	AX_JNI_INCLUDE_DIR
-	if test "$wt_cv_enable_debug" = "yes"; then
-		AX_CHECK_JUNIT
-	fi
+	AX_CHECK_JUNIT
 	for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS ; do
 		JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JNI_INCLUDE_DIR"
 	done
