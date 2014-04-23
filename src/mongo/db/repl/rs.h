@@ -39,6 +39,7 @@
 #include "mongo/db/repl/manager.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/repl_set.h"
 #include "mongo/db/repl/repl_set_impl.h"
 #include "mongo/db/repl/rs_base.h"
 #include "mongo/db/repl/rs_config.h"
@@ -65,11 +66,6 @@
 
 namespace mongo {
 
-    class Cloner;
-    class DBClientConnection;
-    class GhostSync;
-    class ReplSetImpl;
-    struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern int maxSyncSourceLagSecs;
@@ -78,71 +74,6 @@ namespace mongo {
 
     // Main entry point for replica sets
     void startReplSets(ReplSetCmdline *replSetCmdline);
-
-    class ReplSetHealthPollTask;
-
-    class ReplSet : public ReplSetImpl {
-    public:
-        static ReplSet* make(ReplSetCmdline& replSetCmdline);
-        virtual ~ReplSet() {}
-
-        // for the replSetStepDown command
-        bool stepDown(int secs) { return _stepDown(secs); }
-
-        // for the replSetFreeze command
-        bool freeze(int secs) { return _freeze(secs); }
-
-        string selfFullName() {
-            verify( _self );
-            return _self->fullName();
-        }
-
-        virtual bool buildIndexes() const { return _buildIndexes; }
-
-        /* call after constructing to start - returns fairly quickly after launching its threads */
-        void go() { _go(); }
-        void shutdown();
-
-        void fatal() { _fatal(); }
-        virtual bool isPrimary() { return box.getState().primary(); }
-        virtual bool isSecondary() {  return box.getState().secondary(); }
-        MemberState state() const { return ReplSetImpl::state(); }
-        string name() const { return ReplSetImpl::name(); }
-        virtual const ReplSetConfig& config() { return ReplSetImpl::config(); }
-        void getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { _getOplogDiagsAsHtml(server_id,ss); }
-        void summarizeAsHtml(stringstream& ss) const { _summarizeAsHtml(ss); }
-        void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
-        void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
-        threadpool::ThreadPool& getPrefetchPool() { return ReplSetImpl::getPrefetchPool(); }
-        threadpool::ThreadPool& getWriterPool() { return ReplSetImpl::getWriterPool(); }
-
-        /**
-         * We have a new config (reconfig) - apply it.
-         * @param comment write a no-op comment to the oplog about it.  only
-         * makes sense if one is primary and initiating the reconf.
-         *
-         * The slaves are updated when they get a heartbeat indicating the new
-         * config.  The comment is a no-op.
-         */
-        void haveNewConfig(ReplSetConfig& c, bool comment);
-
-        /**
-         * Pointer assignment isn't necessarily atomic, so this needs to assure
-         * locking, even though we don't delete old configs.
-         */
-        const ReplSetConfig& getConfig() { return config(); }
-
-        bool lockedByMe() { return RSBase::lockedByMe(); }
-
-        // heartbeat msg to send to others; descriptive diagnostic info
-        string hbmsg() const {
-            if( time(0)-_hbmsgTime > 120 ) return "";
-            return _hbmsg;
-        }
-
-    protected:
-        ReplSet();
-    };
 
     /**
      * does local authentication
