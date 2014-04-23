@@ -12,6 +12,7 @@ Import("testEnv")
 Import("has_option")
 Import("get_option")
 Import("usev8")
+Import("v8suffix")
 Import("enforce_glibc")
 Import("darwin windows solaris linux nix")
 
@@ -505,10 +506,11 @@ env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evalua
                 LIBDEPS=['bson_template_evaluator'])
 
 if usev8:
-    env.Library('scripting', scripting_common_files + ['scripting/engine_v8.cpp',
-                                                       'scripting/v8_db.cpp',
-                                                       'scripting/v8_utils.cpp',
-                                                       'scripting/v8_profiler.cpp'],
+    env.Library('scripting', scripting_common_files + ['scripting/engine_v8' + v8suffix + '.cpp',
+                                                       'scripting/v8' + v8suffix + '_db.cpp',
+                                                       'scripting/v8' + v8suffix + '_utils.cpp',
+                                                       'scripting/v8' + v8suffix +
+                                                       '_profiler.cpp'],
                  LIBDEPS=['bson_template_evaluator', '$BUILD_DIR/third_party/shim_v8'])
 else:
     env.Library('scripting', scripting_common_files + ['scripting/engine_none.cpp'],

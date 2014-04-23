@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library windows darwin usev8")
+Import("env use_system_version_of_library windows darwin usev8 v8suffix")
 
 env.SConscript( [
         "murmurhash3/SConscript",
@@ -56,9 +56,9 @@ if usev8:
         env.Library("shim_v8", ['shim_v8.cpp'], SYSLIBDEPS=[
             env['LIBDEPS_V8_SYSLIBDEP'] ])
     else:
-        env.Append(CPPPATH='$BUILD_DIR/third_party/v8/include')
-        env.SConscript('v8/SConscript')
-        env.Library('shim_v8', ['shim_v8.cpp'], LIBDEPS=['v8/v8'])
+        env.Append(CPPPATH='$BUILD_DIR/third_party/v8' + v8suffix + '/include')
+        env.SConscript('v8' + v8suffix + '/SConscript')
+        env.Library('shim_v8', ['shim_v8.cpp'], LIBDEPS=['v8' + v8suffix + '/v8'])
 
 if (GetOption("allocator") != "tcmalloc"):
     env.Library("shim_allocator", "shim_allocator.cpp")
