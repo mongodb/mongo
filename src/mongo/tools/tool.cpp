@@ -366,9 +366,13 @@ namespace mongo {
         fclose( file );
 
         uassert(10265, "counts don't match", read == fileLength);
-        toolInfoOutput() << num << " objects found" << std::endl;
-        if (bsonToolGlobalParams.hasFilter)
-            toolInfoOutput() << processed << " objects processed" << std::endl;
+        toolInfoOutput() << num << " document found" << ((num == 1) ? "" : "s")
+                         << std::endl;
+        if (bsonToolGlobalParams.hasFilter) {
+            toolInfoOutput() << processed
+                             << ((processed == 1) ? " document" : " documents")
+                             << " processed" << std::endl;
+        }
         return processed;
     }
 

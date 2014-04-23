@@ -129,7 +129,9 @@ public:
 
         doCollection(coll, q, f, &m);
 
-        toolInfoLog() << "\t\t " << m.done() << " documents" << std::endl;
+        toolInfoLog() << "\t\t " << m.done()
+                      << ((m.done() == 1) ? " document" : " documents")
+                      << std::endl;
     }
 
     void writeMetadataFile( const string coll, boost::filesystem::path outputFile, 
@@ -323,7 +325,9 @@ public:
                 break;
             }
         }
-        toolInfoLog() << "wrote " << seen.size() << " documents" << std::endl;
+        toolInfoLog() << "wrote " << seen.size()
+                      << ((seen.size() == 1) ? " document" : " documents")
+                      << std::endl;
         return forward ? e->xnext : e->xprev;
     }
 
@@ -387,7 +391,9 @@ public:
             toolError() << "ERROR: backwards extent pass failed:" << e.toString() << std::endl;
         }
 
-        toolInfoLog() << "\t\t " << m.done() << " documents" << std::endl;
+        toolInfoLog() << "\t\t " << m.done()
+                      << ((m.done() == 1) ? " document" : " documents")
+                      << std::endl;
     }
     
     int _repair( string dbname ) {
