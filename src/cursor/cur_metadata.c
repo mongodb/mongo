@@ -89,7 +89,7 @@ __curmetadata_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 
 	ret = a_file_cursor->compare(a_file_cursor, b_file_cursor, cmpp);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -128,7 +128,7 @@ err:	if (ret != 0) {
 		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 	}
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -169,7 +169,7 @@ err:	if (ret != 0) {
 		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 	}
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -197,7 +197,7 @@ __curmetadata_reset(WT_CURSOR *cursor)
 	    WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -238,7 +238,7 @@ err:	if (ret != 0) {
 		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 	}
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -270,7 +270,7 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 		F_SET(mdc, WT_MDC_POSITIONED);
 	}
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -298,7 +298,7 @@ __curmetadata_insert(WT_CURSOR *cursor)
 	ret =__wt_metadata_insert(session,
 	    (const char *)cursor->key.data, (const char *)cursor->value.data);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -326,7 +326,7 @@ __curmetadata_update(WT_CURSOR *cursor)
 	ret = __wt_metadata_update(session,
 	    (const char *)cursor->key.data, (const char *)cursor->value.data);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -352,7 +352,7 @@ __curmetadata_remove(WT_CURSOR *cursor)
 	/* TODO: Copy key so we know it is NULL terminated */
 	ret = __wt_metadata_remove(session, (const char *)cursor->key.data);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -377,7 +377,7 @@ __curmetadata_close(WT_CURSOR *cursor)
 
 	WT_ERR(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
