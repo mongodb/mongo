@@ -144,12 +144,16 @@ namespace NamespaceTests {
             }
             int nRecords() const {
                 int count = 0;
-                for ( DiskLoc i = nsd()->firstExtent(); !i.isNull(); i = i.ext()->xnext ) {
-                    int fileNo = i.ext()->firstRecord.a();
+                const Extent* ext;
+                for ( DiskLoc extLoc = nsd()->firstExtent();
+                        !extLoc.isNull();
+                        extLoc = ext->xnext) {
+                    ext = extentManager().getExtent(extLoc);
+                    int fileNo = ext->firstRecord.a();
                     if ( fileNo == -1 )
                         continue;
-                    for ( int j = i.ext()->firstRecord.getOfs(); j != DiskLoc::NullOfs;
-                          j = DiskLoc( fileNo, j ).rec()->nextOfs() ) {
+                    for ( int recOfs = ext->firstRecord.getOfs(); recOfs != DiskLoc::NullOfs;
+                          recOfs = DiskLoc( fileNo, recOfs ).rec()->nextOfs() ) {
                         ++count;
                     }
                 }
@@ -158,8 +162,11 @@ namespace NamespaceTests {
             }
             int nExtents() const {
                 int count = 0;
-                for ( DiskLoc i = nsd()->firstExtent(); !i.isNull(); i = i.ext()->xnext )
+                for ( DiskLoc extLoc = nsd()->firstExtent();
+                        !extLoc.isNull();
+                        extLoc = extentManager().getExtent(extLoc)->xnext ) {
                     ++count;
+                }
                 return count;
             }
             static int min( int a, int b ) {
@@ -186,6 +193,9 @@ namespace NamespaceTests {
 
             Database* db() const {
                 return _context.db();
+            }
+            const ExtentManager& extentManager() const {
+                return db()->getExtentManager();
             }
             Collection* collection() const {
                 return db()->getCollection( ns() );

@@ -168,7 +168,6 @@ namespace mongo {
         */
         BSONObj obj() const; // TODO(ERH): remove
         Record* rec() const; // TODO(ERH): remove
-        Extent* ext() const; // TODO(ERH): remove
 
         template< class V >
         const BtreeBucket<V> * btree() const; // TODO(ERH): remove

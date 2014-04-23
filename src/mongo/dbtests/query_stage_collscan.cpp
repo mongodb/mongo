@@ -121,13 +121,13 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const = 0;
 
         // Quote: bypass standard alloc/insert routines to use the extent we want.
-        static DiskLoc insert( const DiskLoc& ext, int i ) {
+        DiskLoc insert( const DiskLoc& ext, int i ) {
             // Copied verbatim.
             BSONObjBuilder b;
             b.append( "a", i );
             BSONObj o = b.done();
             int len = o.objsize();
-            Extent *e = ext.ext();
+            Extent *e = extentManager().getExtent(ext);
             e = getDur().writing(e);
             int ofs;
             if ( e->lastRecord.isNull() )
@@ -153,6 +153,7 @@ namespace QueryStageCollectionScan {
         static const char *ns() { return "unittests.QueryStageCollectionScanCapped"; }
 
         Database* db() { return _context.db(); }
+        ExtentManager& extentManager() { return db()->getExtentManager(); }
         Collection* collection() { return db()->getCollection( ns() ); }
         NamespaceDetails *nsd() { return collection()->detailsWritable(); }
 
@@ -245,7 +246,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanMidExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+            nsd()->capExtent().writing() = extentManager().getExtent(nsd()->firstExtent())->xnext;
             insert( nsd()->capExtent(), 0 );
             insert( nsd()->lastExtent(), 1 );
             insert( nsd()->firstExtent(), 2 );
@@ -258,7 +259,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanAloneInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+            nsd()->capExtent().writing() = extentManager().getExtent(nsd()->firstExtent())->xnext;
             insert( nsd()->lastExtent(), 0 );
             insert( nsd()->firstExtent(), 1 );
             nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 2 ) );
@@ -269,7 +270,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanFirstInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+            nsd()->capExtent().writing() = extentManager().getExtent(nsd()->firstExtent())->xnext;
             insert( nsd()->lastExtent(), 0 );
             insert( nsd()->firstExtent(), 1 );
             nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 2 ) );
@@ -281,7 +282,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanLastInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
+            nsd()->capExtent().writing() = extentManager().getExtent(nsd()->firstExtent())->xnext;
             insert( nsd()->capExtent(), 0 );
             insert( nsd()->lastExtent(), 1 );
             insert( nsd()->firstExtent(), 2 );

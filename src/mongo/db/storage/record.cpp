@@ -529,11 +529,6 @@ namespace mongo {
         return cc().getContext()->db()->getExtentManager().recordForV1( *this );
     }
 
-    Extent* DiskLoc::ext() const {
-        verify( a() != -1 );
-        return cc().getContext()->db()->getExtentManager().getExtent(*this);
-    }
-
     BSONObj DiskLoc::obj() const {
         return BSONObj( rec()->accessed()->data() );
     }
