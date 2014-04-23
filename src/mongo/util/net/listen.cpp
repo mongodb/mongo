@@ -386,7 +386,14 @@ namespace mongo {
                 int status = WSAEventSelect(_socks[count], events[count], FD_ACCEPT | FD_CLOSE);
                 if (status == SOCKET_ERROR) {
                     const int mongo_errno = WSAGetLastError();
-                    error() << "Windows WSAEventSelect returned " 
+
+                    // During shutdown, we may fail to listen on the socket if it has already
+                    // been closed
+                    if (inShutdown()) {
+                        return;
+                    }
+
+                    error() << "Windows WSAEventSelect returned "
                         << errnoWithDescription(mongo_errno) << endl;
                     fassertFailed(16727);
                 }
