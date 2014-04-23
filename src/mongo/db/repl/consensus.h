@@ -28,6 +28,14 @@
 
 #pragma once
 
+#include <ctime>
+#include <list>
+
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/optime.h"
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
 
     class ReplSetImpl;
@@ -70,7 +78,7 @@ namespace mongo {
         bool shouldRelinquish() const;
         void electSelf();
         void electCmdReceived(BSONObj, BSONObjBuilder*);
-        void multiCommand(BSONObj cmd, list<Target>& L);
+        void multiCommand(BSONObj cmd, std::list<Target>& L);
 
         OID getElectionId() const { return _electionId; }
         void setElectionId(OID oid) { _electionId = oid; }

@@ -26,10 +26,8 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
-#include "mongo/db/commands.h"
 #include "mongo/db/repl/consensus.h"
+
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/replset_commands.h"
 
