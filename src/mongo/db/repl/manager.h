@@ -37,7 +37,6 @@ namespace mongo {
     class Manager : public task::Server {
         ReplSetImpl *rs;
         bool busyWithElectSelf;
-        int _primary;
 
         /** @param two - if true two primaries were seen.  this can happen transiently, in addition
          *  to our polling being only occasional.  in this case null is returned, but the caller

@@ -37,11 +37,6 @@
 
 namespace mongo {
 
-    enum {
-        NOPRIMARY = -2,
-        SELFPRIMARY = -1
-    };
-
     /* check members OTHER THAN US to see if they think they are primary */
     const Member * Manager::findOtherPrimary(bool& two) {
         two = false;
@@ -64,7 +59,7 @@ namespace mongo {
     }
 
     Manager::Manager(ReplSetImpl *_rs) :
-        task::Server("rsMgr"), rs(_rs), busyWithElectSelf(false), _primary(NOPRIMARY) {
+        task::Server("rsMgr"), rs(_rs), busyWithElectSelf(false) {
     }
 
     Manager::~Manager() {
