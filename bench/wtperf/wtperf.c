@@ -138,7 +138,6 @@ randomize_value(CONFIG *cfg, char *value_buf)
 static int
 cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 {
-
 	CONFIG *cfg;
 	CONFIG_THREAD *thread;
 	TRACK *trk;
@@ -151,7 +150,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	type = op->get_type(op);
 	thread = (CONFIG_THREAD *)op->c.lang_private;
 	cfg = thread->cfg;
-
+	trk = NULL;
 	switch (type) {
 		case WT_AOP_INSERT:
 			trk = &thread->insert;
