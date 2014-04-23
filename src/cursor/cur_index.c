@@ -77,7 +77,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 		    cindex->cg_cursors, cindex->value_plan, ap);
 	va_end(ap);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -95,7 +95,7 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	ret = ENOTSUP;
 err:	cursor->saved_err = ret;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
-	API_END(session);
+	API_END(session, ret);
 }
 
 /*
@@ -164,7 +164,7 @@ __curindex_next(WT_CURSOR *cursor)
 	if ((ret = cindex->child->next(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -186,7 +186,7 @@ __curindex_prev(WT_CURSOR *cursor)
 	if ((ret = cindex->child->prev(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -216,7 +216,7 @@ __curindex_reset(WT_CURSOR *cursor)
 		WT_TRET((*cp)->reset(*cp));
 	}
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -266,7 +266,7 @@ __curindex_search(WT_CURSOR *cursor)
 err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	}
 
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -289,7 +289,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	else
 		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -336,7 +336,7 @@ __curindex_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

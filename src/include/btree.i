@@ -310,6 +310,8 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline void
 __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_TXN_GLOBAL *txn_global;
+
 	/*
 	 * We depend on atomic-add being a write barrier, that is, a barrier to
 	 * ensure all changes to the page are flushed before updating the page
@@ -328,6 +330,14 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (F_ISSET(&session->txn, TXN_RUNNING))
 			page->modify->disk_snap_min = session->txn.snap_min;
+
+		/*
+		 * Set the checkpoint generation: if a checkpoint is already
+		 * running, these changes cannot be included, by definition.
+		 */
+		txn_global = &S2C(session)->txn_global;
+		page->modify->checkpoint_gen = txn_global->checkpoint_gen;
+		page->modify->rec_min_skipped_txn = txn_global->last_running;
 	}
 
 	/* Check if this is the largest transaction ID to update the page. */
@@ -360,6 +370,36 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	__wt_page_only_modify_set(session, page);
+}
+
+/*
+ * __wt_page_parent_modify_set --
+ *	Mark the parent page and tree dirty.
+ */
+static inline int
+__wt_page_parent_modify_set(
+    WT_SESSION_IMPL *session, WT_REF *ref, int page_only)
+{
+	WT_PAGE *parent;
+
+	/*
+	 * This function exists as a place to stash this comment.  There are a
+	 * few places where we need to dirty a page's parent.  The trick is the
+	 * page's parent might split at any point, and the page parent might be
+	 * the wrong parent at any particular time.  We ignore this and dirty
+	 * whatever page the page's reference structure points to.  This is safe
+	 * because if we're pointing to the wrong parent, that parent must have
+	 * split, deepening the tree, which implies marking the original parent
+	 * and all of the newly-created children as dirty.  In other words, if
+	 * we have the wrong parent page, everything was marked dirty already.
+	 */
+	parent = ref->home;
+	WT_RET(__wt_page_modify_init(session, parent));
+	if (page_only)
+		__wt_page_only_modify_set(session, parent);
+	else
+		__wt_page_modify_set(session, parent);
+	return (0);
 }
 
 /*

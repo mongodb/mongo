@@ -115,7 +115,8 @@ reason, applications cannot store records in LSM trees with empty values.
 
 @subsection lsm_checkpoints Named checkpoints
 
-Named checkpoints are not supported on LSM trees.
+Named checkpoints are not supported on LSM trees, and cursors cannot be opened
+with a non-empty \c "checkpoint" configuration.
 
 We intend to address these limitations in future releases.
 

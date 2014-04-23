@@ -43,6 +43,7 @@ flags = {
 	'rec_write' : [
 		'EVICTION_LOCKED',
 		'SKIP_UPDATE_ERR',
+		'SKIP_UPDATE_OK',
 		'SKIP_UPDATE_RESTORE'
 	],
 	'shared_cache' : [

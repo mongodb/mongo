@@ -53,6 +53,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	 */
 	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
+	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_SPLITTING));
 
 #ifdef HAVE_DIAGNOSTIC
 	{
@@ -223,10 +224,15 @@ __wt_free_ref(
 	}
 
 	/* Free any address allocation. */
-	if (ref->addr != NULL &&
-	    (page == NULL || __wt_off_page(page, ref->addr))) {
+	if (ref->addr != NULL && __wt_off_page(page, ref->addr)) {
 		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 		__wt_free(session, ref->addr);
+	}
+
+	/* Free any page-deleted information. */
+	if (ref->page_del != NULL) {
+		__wt_free(session, ref->page_del->update_list);
+		__wt_free(session, ref->page_del);
 	}
 
 	__wt_overwrite_and_free_len(session, ref, sizeof(*ref));

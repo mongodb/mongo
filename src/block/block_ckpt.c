@@ -21,7 +21,7 @@ int
 __wt_block_ckpt_init(
     WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci, const char *name)
 {
-	memset(ci, 0, sizeof(*ci));
+	WT_CLEAR(*ci);
 
 	ci->version = WT_BM_CHECKPOINT_VERSION;
 	ci->root_offset = WT_BLOCK_INVALID_OFFSET;
@@ -195,7 +195,9 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
 	__wt_block_extlist_free(session, &ci->alloc);
 	__wt_block_extlist_free(session, &ci->avail);
 	__wt_block_extlist_free(session, &ci->discard);
+	__wt_block_extlist_free(session, &ci->ckpt_alloc);
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
+	__wt_block_extlist_free(session, &ci->ckpt_discard);
 }
 
 /*
@@ -343,12 +345,10 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	WT_CKPT *ckpt, *next_ckpt;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_EXTLIST etmp[2];
 	uint64_t ckpt_size;
 	int deleting, locked;
 
 	ci = &block->live;
-	etmp[0].name = etmp[1].name = NULL;
 	locked = 0;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -400,10 +400,18 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 * resulted in some previous checkpoint never being resolved, the list
 	 * may not be empty.  We should have caught that with the "checkpoint
 	 * in progress" test, but it doesn't cost us anything to be cautious.
+	 *
+	 * We free the checkpoint's allocation and discard extent lists as part
+	 * of the resolution step, not because they're needed at that time, but
+	 * because it's potentially a lot of work, and waiting allows the btree
+	 * layer to continue eviction sooner.  As for the checkpoint-available
+	 * list, make sure they get cleaned out.
 	 */
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
 	WT_RET(__wt_block_extlist_init(
 	    session, &ci->ckpt_avail, "live", "ckpt_avail", 1));
+	__wt_block_extlist_free(session, &ci->ckpt_alloc);
+	__wt_block_extlist_free(session, &ci->ckpt_discard);
 
 	/*
 	 * To delete a checkpoint, we'll need checkpoint information for it and
@@ -603,10 +611,10 @@ live_update:
 	 * outside of the system's lock by copying and resetting the original,
 	 * then doing the work later.
 	 */
-	etmp[0] = ci->alloc;
+	ci->ckpt_alloc = ci->alloc;
 	WT_ERR(__wt_block_extlist_init(
 	    session, &ci->alloc, "live", "alloc", 0));
-	etmp[1] = ci->discard;
+	ci->ckpt_discard = ci->discard;
 	WT_ERR(__wt_block_extlist_init(
 	    session, &ci->discard, "live", "discard", 0));
 
@@ -638,15 +646,6 @@ err:	if (locked)
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		if ((ci = ckpt->bpriv) != NULL)
 			__wt_block_ckpt_destroy(session, ci);
-
-	/*
-	 * Discard the allocation and discard extents from the previous live
-	 * system.
-	 */
-	if (etmp[0].name != NULL)
-		__wt_block_extlist_free(session, &etmp[0]);
-	if (etmp[1].name != NULL)
-		__wt_block_extlist_free(session, &etmp[1]);
 
 	__wt_scr_free(&tmp);
 	return (ret);
@@ -762,8 +761,10 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	ret = __wt_block_extlist_merge(session, &ci->ckpt_avail, &ci->avail);
 	__wt_spin_unlock(session, &block->live_lock);
 
-	/* Discard the list. */
+	/* Discard the lists remaining after the checkpoint call. */
 	__wt_block_extlist_free(session, &ci->ckpt_avail);
+	__wt_block_extlist_free(session, &ci->ckpt_alloc);
+	__wt_block_extlist_free(session, &ci->ckpt_discard);
 
 	return (ret);
 }
