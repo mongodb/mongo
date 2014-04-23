@@ -59,6 +59,10 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 
+%typemap(in, numinputs=0) WT_ASYNC_CALLBACK * %{
+	$1 = &pyApiAsyncCallback;
+%}
+
 %typemap(in, numinputs=0) WT_EVENT_HANDLER * %{
 	$1 = &pyApiEventHandler;
 %}
@@ -958,6 +962,40 @@ pythonCloseCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 WT_EVENT_HANDLER pyApiEventHandler = {
 	pythonErrorCallback, pythonMessageCallback, NULL, pythonCloseCallback
 };
+%}
+
+/* Add async callback support. */
+%{
+static int
+pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int ret,
+    uint32_t flags)
+{
+	PY_CALLBACK *pcb;
+        WT_ASYNC_OP_IMPL *op;
+        WT_ASYNC_OPTYPE type;
+        WT_SESSION_IMPL *session;
+
+        op = (WT_ASYNC_OP_IMPL *)asyncop;
+        type = asyncop->get_type(asyncop);
+        session = O2S(op);
+	pcb = (PY_CALLBACK *)asyncop->c.lang_private;
+	asyncop->c.lang_private = NULL;
+        if (type == WT_AOP_SEARCH) {
+                /*
+                 * Get key/value out for search.
+                 */
+        }
+	if (pcb != NULL)
+		ret = pythonClose(pcb);
+	__wt_free(session, pcb);
+
+        if (ret == 0 || ret == WT_NOTFOUND)
+	        return (0);
+        else
+                return (1);
+}
+
+WT_ASYNC_CALLBACK pyApiAsyncCallback = { pythonAsyncCallback };
 %}
 
 %pythoncode %{
