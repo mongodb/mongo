@@ -176,49 +176,8 @@ namespace replset {
         LOG(3) << "replset markOplog: " << _consumedOpTime << " "
                << theReplSet->lastOpTimeWritten << rsLog;
 
-        boost::unique_lock<boost::mutex> oplogLockSSF(theReplSet->syncSourceFeedback.oplock);
-        if (theReplSet->syncSourceFeedback.supportsUpdater()) {
-            oplogLockSSF.unlock();
-            _consumedOpTime = theReplSet->lastOpTimeWritten;
-            theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
-        }
-        else {
-            if (!hasCursor()) {
-                oplogLockSSF.unlock();
-                sleepmillis(500);
-                return;
-            }
-
-            if (!theReplSet->syncSourceFeedback.moreInCurrentBatch()) {
-                theReplSet->syncSourceFeedback.more();
-            }
-
-            if (!theReplSet->syncSourceFeedback.more()) {
-                theReplSet->syncSourceFeedback.tailCheck();
-                return;
-            }
-
-            // if this member has written the op at optime T
-            // we want to nextSafe up to and including T
-            while (_consumedOpTime < theReplSet->lastOpTimeWritten
-                   && theReplSet->syncSourceFeedback.more()) {
-                BSONObj temp = theReplSet->syncSourceFeedback.nextSafe();
-                _consumedOpTime = temp["ts"]._opTime();
-            }
-
-            // call more() to signal the sync target that we've synced T
-            theReplSet->syncSourceFeedback.more();
-        }
-    }
-
-    bool BackgroundSync::hasCursor() {
-        if (!theReplSet->syncSourceFeedback.haveCursor()) {
-            BSONObj fields = BSON("ts" << 1);
-            theReplSet->syncSourceFeedback.tailingQueryGTE(rsoplog,
-                                                theReplSet->lastOpTimeWritten, &fields);
-        }
-
-        return theReplSet->syncSourceFeedback.haveCursor();
+        _consumedOpTime = theReplSet->lastOpTimeWritten;
+        theReplSet->syncSourceFeedback.updateSelfInMap(theReplSet->lastOpTimeWritten);
     }
 
     void BackgroundSync::producerThread() {
@@ -509,7 +468,6 @@ namespace replset {
                 _currentSyncTarget = target;
             }
 
-            boost::unique_lock<boost::mutex> oplogLockSSF(theReplSet->syncSourceFeedback.oplock);
             theReplSet->syncSourceFeedback.connect(target);
 
             return;

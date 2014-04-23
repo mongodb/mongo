@@ -96,21 +96,16 @@ namespace mongo {
         sub.append("config", theReplSet->myConfig().asBson());
         sub.doneFast();
 
-        LOG(1) << "detecting upstream updater";
+        LOG(1) << "handshaking upstream updater";
         BSONObj res;
         try {
             if (!_connection->runCommand("admin", cmd.obj(), res)) {
-                if (res["errmsg"].str().find("no such cmd") != std::string::npos) {
-                    LOG(1) << "upstream updater is not supported by the member from which we"
-                              " are syncing, using oplogreader-based updating instead";
-                    _supportsUpdater = false;
-                }
-                resetConnection();
+                massert(17446, "upstream updater is not supported by the member from which we"
+                        " are syncing, please update all nodes to 2.6 or later.",
+                        res["errmsg"].str().find("no such cmd") == std::string::npos);
+                log() << "replSet error while handshaking the upstream updater: "
+                      << res["errmsg"].valuestrsafe();
                 return false;
-            }
-            else {
-                LOG(1) << "upstream updater is supported";
-                _supportsUpdater = true;
             }
         }
         catch (const DBException& e) {
@@ -165,9 +160,6 @@ namespace mongo {
         }
 
         if (!replHandshake()) {
-            if (!supportsUpdater()) {
-                return connectOplogReader(hostName);
-            }
             return false;
         }
         return true;
@@ -177,13 +169,8 @@ namespace mongo {
         boost::unique_lock<boost::mutex> lock(_mtx);
         boost::unique_lock<boost::mutex> connlock(_connmtx);
         resetConnection();
-        resetOplogReaderConnection();
         _syncTarget = target;
-        if (_connect(target->fullName())) {
-            if (!supportsUpdater()) {
-                return true;
-            }
-        }
+        _connect(target->fullName());
         return false;
     }
 
@@ -192,25 +179,6 @@ namespace mongo {
         _handshakeNeeded = true;
         _cond.notify_all();
     }
-
-    void SyncSourceFeedback::percolate(const mongo::OID& rid, const OpTime& ot) {
-        // Update our own record of where this node is, and then register an upstream
-        // message about this.
-        // Note that we must keep the map up to date even if we are not actively reporting
-        // upstream via the new command, since our sync source might later change to a node
-        // that does support the command.
-        updateMap(rid, ot);
-        if (!supportsUpdater()) {
-            // this is only necessary if our sync source does not support
-            // the new syncSourceFeedback command
-            theReplSet->ghost->send(boost::bind(&GhostSync::percolate,
-                                                theReplSet->ghost,
-                                                rid,
-                                                ot));
-        }
-    }
-
-
 
     void SyncSourceFeedback::updateMap(const mongo::OID& rid, const OpTime& ot) {
         boost::unique_lock<boost::mutex> lock(_mtx);
@@ -300,11 +268,6 @@ namespace mongo {
                     }
                     if (!_connect(target->fullName())) {
                         sleepNeeded = true;
-                        continue;
-                    }
-                    else if (!supportsUpdater()) {
-                        _handshakeNeeded = false;
-                        _positionChanged = false;
                         continue;
                     }
                 }

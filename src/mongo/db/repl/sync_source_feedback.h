@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/client/constants.h"
+#include "mongo/client/dbclientcursor.h"
 #include "mongo/util/background.h"
-
 
 namespace mongo {
 
@@ -41,14 +42,10 @@ namespace mongo {
     public:
         SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
                               _syncTarget(NULL),
-                              _oplogReader(new OplogReader()),
-                              _supportsUpdater(true),
                               _positionChanged(false),
                               _handshakeNeeded(false) {}
 
-        ~SyncSourceFeedback() {
-            delete _oplogReader;
-        }
+        ~SyncSourceFeedback() {}
 
         /// Adds an entry to _members for a secondary that has connected to us.
         void associateMember(const BSONObj& id, Member* member);
@@ -63,27 +60,13 @@ namespace mongo {
             updateMap(_me["_id"].OID(), ot);
         }
 
-        /// Connect to sync target and create OplogReader if needed.
+        /// Connect to sync target.
         bool connect(const Member* target);
 
         void resetConnection() {
             LOG(1) << "resetting connection in sync source feedback";
             _connection.reset();
         }
-
-        void resetOplogReaderConnection() {
-            _oplogReader->resetConnection();
-        }
-
-        /// Used extensively in bgsync, to see if we need to use the OplogReader syncing method.
-        bool supportsUpdater() const {
-            // oplogReader will be NULL if new updater is supported
-            //boost::unique_lock<boost::mutex> lock(_mtx);
-            return _supportsUpdater;
-        }
-
-        /// Transfers information about a chained node's oplog position from downstream to upstream
-        void percolate(const mongo::OID& rid, const OpTime& ot);
 
         /// Updates the _slaveMap to be forwarded to the sync target.
         void updateMap(const mongo::OID& rid, const OpTime& ot);
@@ -92,54 +75,6 @@ namespace mongo {
 
         /// Loops forever, passing updates when they are present.
         void run();
-
-        /* The below methods just fall through to OplogReader and are only used when our sync target
-         * does not support the update command.
-         */
-        bool connectOplogReader(const std::string& hostName) {
-            return _oplogReader->connect(hostName, _me);
-        }
-
-        bool connect(const mongo::OID& rid, const int from, const string& to) {
-            return _oplogReader->connect(rid, from, to);
-        }
-
-        void ghostQueryGTE(const char *ns, OpTime t) {
-            _oplogReader->ghostQueryGTE(ns, t);
-        }
-
-        bool haveCursor() {
-            return _oplogReader->haveCursor();
-        }
-
-        bool more() {
-            return _oplogReader->more();
-        }
-
-        bool moreInCurrentBatch() {
-            return _oplogReader->moreInCurrentBatch();
-        }
-
-        BSONObj nextSafe() {
-            return _oplogReader->nextSafe();
-        }
-
-        void tailCheck() {
-            _oplogReader->tailCheck();
-        }
-
-        void tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields=0) {
-            _oplogReader->tailingQueryGTE(ns, t, fields);
-        }
-
-        /** 
-        * this mutex protects the _conn field of _oplogReader in that we cannot mix the functions
-        * which check _conn for null (commonConnect() and connect() do this) with the function that
-        * sets the pointer to null (resetConnection()). All other uses of the _oplogReader's _conn
-        * do not need the mutex locked, due to the threading logic that prevents _connect()
-        * from being called concurrently.
-        */
-        boost::mutex oplock;
 
     private:
         /**
@@ -163,19 +98,15 @@ namespace mongo {
             return _connection.get();
         }
 
-        /// Connect to sync target and create OplogReader if needed.
+        /// Connect to sync target.
         bool _connect(const std::string& hostName);
 
         // stores our OID to be passed along in commands
         BSONObj _me;
         // the member we are currently syncing from
         const Member* _syncTarget;
-        // holds the oplogReader for use when we fall back to old style updates
-        OplogReader* _oplogReader;
         // our connection to our sync target
         boost::scoped_ptr<DBClientConnection> _connection;
-        // tracks whether we are in fallback mode or not
-        bool _supportsUpdater;
         // protects connection
         boost::mutex _connmtx;
         // protects cond and maps and the indicator bools

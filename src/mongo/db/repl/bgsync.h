@@ -122,7 +122,6 @@ namespace replset {
         // Tracker thread
         // tells the sync target where this member is synced to
         void markOplog();
-        bool hasCursor();
 
         bool isAssumingPrimary();
 

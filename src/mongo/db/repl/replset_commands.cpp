@@ -435,7 +435,7 @@ namespace mongo {
                     return false;
                 }
                 // if we aren't primary, pass the handshake along
-                if (!theReplSet->isPrimary() && theReplSet->syncSourceFeedback.supportsUpdater()) {
+                if (!theReplSet->isPrimary()) {
                     theReplSet->syncSourceFeedback.forwardSlaveHandshake();
                 }
                 return true;
