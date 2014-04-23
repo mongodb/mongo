@@ -207,6 +207,10 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 	++el->entries;
 	el->bytes += (uint64_t)ext->size;
 
+	/* Update the cached end-of-list. */
+	if (ext->next[0] == NULL)
+		el->last = ext;
+
 	return (0);
 }
 
@@ -350,6 +354,10 @@ __block_off_remove(
 		__wt_block_ext_free(session, ext);
 	else
 		*extp = ext;
+
+	/* Update the cached end-of-list. */
+	if (el->last == ext)
+		el->last = NULL;
 
 	return (0);
 
@@ -928,26 +936,29 @@ __block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 	 * that is, the information is either going to be used to extend the
 	 * last object on the list, or become a new object ending the list.
 	 *
-	 * First, get a stack for the last object in the skiplist, then check
-	 * for a simple extension.  If that doesn't work, allocate a new list
-	 * structure, and append it.
+	 * The terminating element of the list is cached, check it; otherwise,
+	 * get a stack for the last object in the skiplist, check for a simple
+	 * extension, and otherwise append a new structure.
 	 */
-	 ext = __block_off_srch_last(el->off, astack);
-	 if (ext != NULL && ext->off + ext->size == off)
+	if ((ext = el->last) != NULL && ext->off + ext->size == off)
 		ext->size += size;
 	else {
-		/* Assert we're appending to the list. */
-		WT_ASSERT(session, ext == NULL || ext->off + ext->size < off);
+		ext = __block_off_srch_last(el->off, astack);
+		if (ext != NULL && ext->off + ext->size == off)
+			ext->size += size;
+		else {
+			WT_RET(__wt_block_ext_alloc(session, &ext));
+			ext->off = off;
+			ext->size = size;
 
-		WT_RET(__wt_block_ext_alloc(session, &ext));
-		ext->off = off;
-		ext->size = size;
+			for (i = 0; i < ext->depth; ++i)
+				 *astack[i] = ext;
+			++el->entries;
+		}
 
-		for (i = 0; i < ext->depth; ++i)
-			 *astack[i] = ext;
-		++el->entries;
+		/* Update the cached end-of-list */
+		el->last = ext;
 	}
-
 	el->bytes += (uint64_t)size;
 
 	return (0);
@@ -1246,6 +1257,13 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_block_write_off(
 	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1, 1));
 
+	/*
+	 * Remove the allocated blocks from the system's allocation list, extent
+	 * blocks never appear on any allocation list.
+	 */
+	WT_TRET(__wt_block_off_remove_overlap(
+	    session, &block->live.alloc, el->offset, el->size));
+
 	WT_VERBOSE_ERR(session, block,
 	    "%s written %" PRIdMAX "/%" PRIu32,
 	    el->name, (intmax_t)el->offset, el->size);
@@ -1302,13 +1320,15 @@ int
 __wt_block_extlist_init(WT_SESSION_IMPL *session,
     WT_EXTLIST *el, const char *name, const char *extname, int track_size)
 {
-	char buf[128];
+	size_t size;
 
-	memset(el, 0, sizeof(*el));
+	WT_CLEAR(*el);
 
-	(void)snprintf(buf, sizeof(buf), "%s.%s",
+	size = (name == NULL ? 0 : strlen(name)) +
+	    strlen(".") + (extname == NULL ? 0 : strlen(extname) + 1);
+	WT_RET(__wt_calloc_def(session, size, &el->name));
+	(void)snprintf(el->name, size, "%s.%s",
 	    name == NULL ? "" : name, extname == NULL ? "" : extname);
-	WT_RET(__wt_strdup(session, buf, &el->name));
 
 	el->offset = WT_BLOCK_INVALID_OFFSET;
 	el->track_size = track_size;
@@ -1337,7 +1357,7 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	}
 
 	/* Extent lists are re-used, clear them. */
-	memset(el, 0, sizeof(*el));
+	WT_CLEAR(*el);
 }
 
 /*

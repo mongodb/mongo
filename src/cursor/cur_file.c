@@ -65,7 +65,7 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -87,7 +87,7 @@ __curfile_next(WT_CURSOR *cursor)
 	if ((ret = __wt_btcur_next(cbt, 0)) == 0)
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -110,7 +110,7 @@ __curfile_next_random(WT_CURSOR *cursor)
 	if ((ret = __wt_btcur_next_random(cbt)) == 0)
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -132,7 +132,7 @@ __curfile_prev(WT_CURSOR *cursor)
 	if ((ret = __wt_btcur_prev(cbt, 0)) == 0)
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -154,7 +154,7 @@ __curfile_reset(WT_CURSOR *cursor)
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -176,7 +176,7 @@ __curfile_search(WT_CURSOR *cursor)
 
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_search(cbt), ret);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -199,7 +199,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
 	    cursor, __wt_btcur_search_near(cbt, exact), ret);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -318,7 +318,7 @@ __curfile_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

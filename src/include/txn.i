@@ -76,7 +76,7 @@ err:            __wt_txn_unmodify(session);
 
 /*
  * __wt_txn_modify_ref --
- *	Mark a WT_REF object modified by the current transaction.
+ *	Remember a WT_REF object modified by the current transaction.
  */
 static inline int
 __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -86,7 +86,6 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__txn_next_op(session, &op));
 	op->type = TXN_OP_REF;
 	op->u.ref = ref;
-	ref->txnid = session->txn.id;
 	return (0);
 }
 
@@ -98,12 +97,28 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline int
 __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
-	WT_TXN_GLOBAL *txn_global;
 	uint64_t oldest_id;
 
-	txn_global = &S2C(session)->txn_global;
-	oldest_id = txn_global->oldest_id;
+	oldest_id = S2C(session)->txn_global.oldest_id;
 	return (TXNID_LT(id, oldest_id));
+}
+
+/*
+ * __wt_txn_visible_apps --
+ *	Check if a given transaction ID is visible to all application
+ *	transactions (that is, all transactions other than checkpoints).
+ */
+static inline int
+__wt_txn_visible_apps(WT_SESSION_IMPL *session, uint64_t id)
+{
+#ifdef FAST_CHECKPOINTS
+	uint64_t oldest_app_id;
+
+	oldest_app_id = S2C(session)->txn_global.oldest_app_id;
+	return (TXNID_LT(id, oldest_app_id));
+#else
+	return (__wt_txn_visible_all(session, id));
+#endif
 }
 
 /*
@@ -117,7 +132,10 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	txn = &session->txn;
 
-	/* Eviction only sees globally visible updates. */
+	/*
+	 * Eviction only sees globally visible updates, or if there is a
+	 * checkpoint transaction running, use its transaction.
+	*/
 	if (txn->isolation == TXN_ISO_EVICTION)
 		return (__wt_txn_visible_all(session, id));
 

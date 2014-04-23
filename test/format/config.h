@@ -241,7 +241,7 @@ static CONFIG c[] = {
 
 	{ "value_min",
 	  "minimum size of values",
-	  C_ROW|C_VAR, 0x0, 1, 20, 4096, &g.c_value_min, NULL },
+	  C_ROW|C_VAR, 0x0, 0, 20, 4096, &g.c_value_min, NULL },
 
 	{ "wiredtiger_config",
 	  "configuration string used to wiredtiger_open",

@@ -28,6 +28,7 @@ typedef struct {
 
 	/* Track whether all changes to the page are written. */
 	uint64_t max_txn;
+	uint64_t min_skipped_txn;
 	uint32_t orig_write_gen;
 
 	/*
@@ -335,7 +336,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_PAGE *page, *parent;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
 	int locked;
@@ -442,10 +443,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	parent = ref->home;
-	WT_RET(__wt_page_modify_init(session, parent));
-	__wt_page_only_modify_set(session, parent);
-	return (0);
+	return (__wt_page_parent_modify_set(session, ref, 1));
 }
 
 /*
@@ -632,6 +630,12 @@ __rec_write_init(
 	/* Save the page's write generation before reading the page. */
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
+	/*
+	 * Running transactions may update the page after we write it, so
+	 * this is the highest ID we can be confident we will see.
+	 */
+	r->min_skipped_txn = S2C(session)->txn_global.last_running;
+
 	return (0);
 }
 
@@ -784,7 +788,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_PAGE *page;
 	WT_UPDATE *upd, *upd_list, *upd_ovfl;
 	size_t notused;
-	uint64_t max_txn, min_txn, txnid;
+	uint64_t max_txn, min_skipped, min_txn, txnid;
 
 	*updp = NULL;
 
@@ -796,7 +800,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	upd_list = ins == NULL ? WT_ROW_UPDATE(page, rip) : ins->upd;
 
-	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
+	for (max_txn = WT_TXN_NONE, min_skipped = min_txn = UINT64_MAX,
 	    upd = upd_list; upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
@@ -806,6 +810,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			max_txn = txnid;
 		if (!TXNID_LT(min_txn, txnid))
 			min_txn = txnid;
+		if (TXNID_LT(txnid, min_skipped) &&
+		    !__wt_txn_visible_all(session, txnid))
+			min_skipped = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -834,6 +841,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
+	if (TXNID_LT(min_skipped, r->min_skipped_txn))
+		r->min_skipped_txn = min_skipped;
+
 	/*
 	 * If all updates are globally visible, the page can be marked clean and
 	 * we're done, regardless of whether we're evicting or checkpointing.
@@ -851,7 +861,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * If not all updates are globally visible and checkpointing: continue,
 	 * we'll write what we can.
 	 */
-	if (!F_ISSET(r, WT_EVICTION_LOCKED))
+	if (!F_ISSET(r, WT_EVICTION_LOCKED) || F_ISSET(r, WT_SKIP_UPDATE_OK))
 		return (0);
 
 	/*
@@ -987,16 +997,16 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * The child is in a deleted state.
 			 *
-			 * It's possible the state is changing underneath us and
-			 * we can race between checking for a deleted state and
-			 * looking at the stored transaction ID to see if the
-			 * delete is visible to us.  Lock down the structure.
+			 * It's possible the state could change underneath us as
+			 * the page is read in, and we can race between checking
+			 * for a deleted state and looking at the transaction ID
+			 * to see if the delete is visible to us.  Lock down the
+			 * structure.
 			 */
 			if (!WT_ATOMIC_CAS(
 			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
-			ret =
-			    __rec_child_deleted(session, r, ref, statep);
+			ret = __rec_child_deleted(session, r, ref, statep);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			goto done;
 
@@ -1114,10 +1124,12 @@ __rec_child_deleted(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, int *statep)
 {
 	WT_BM *bm;
+	WT_PAGE_DELETED *page_del;
 	size_t addr_size;
 	const uint8_t *addr;
 
 	bm = S2BT(session)->bm;
+	page_del = ref->page_del;
 
 	/*
 	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
@@ -1126,8 +1138,11 @@ __rec_child_deleted(
 	 * us.  In that case, we proceed as with any change that's not visible
 	 * during reconciliation by setting the skipped flag and ignoring the
 	 * change for the purposes of writing the internal page.
+	 *
+	 * In this case, there must be an associated page-deleted structure, and
+	 * it holds the transaction ID we care about.
 	 */
-	if (!__wt_txn_visible(session, ref->txnid)) {
+	if (page_del != NULL && !__wt_txn_visible(session, page_del->txnid)) {
 		/*
 		 * In some cases (for example, when closing a file), there had
 		 * better not be any updates we can't write.
@@ -1137,16 +1152,18 @@ __rec_child_deleted(
 			    "reconciliation illegally skipped an update");
 
 		/* If this page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTION_LOCKED))
+		if (F_ISSET(r, WT_EVICTION_LOCKED) &&
+		    !F_ISSET(r, WT_SKIP_UPDATE_OK))
 			return (EBUSY);
 	}
 
 	/*
-	 * Deal with any underlying disk blocks.  First, check to see if there
-	 * is an address associated with this leaf: if there isn't, we're done.
+	 * The deletion is visible to us, deal with any underlying disk blocks.
 	 *
-	 * Check for any transactions in the system that might want to see the
-	 * page's state before the deletion.
+	 * First, check to see if there is an address associated with this leaf:
+	 * if there isn't, we're done, the underlying page is already gone.  If
+	 * the page still exists, check for any transactions in the system that
+	 * might want to see the page's state before it's deleted.
 	 *
 	 * If any such transactions exist, we cannot discard the underlying leaf
 	 * page to the block manager because the transaction may eventually read
@@ -1160,22 +1177,13 @@ __rec_child_deleted(
 	 * outside of the underlying tracking routines because this action is
 	 * permanent and irrevocable.  (Clearing the address means we've lost
 	 * track of the disk address in a permanent way.  This is safe because
-	 * there's no path to reading the leaf page again: if reconciliation
-	 * fails, and we ever read into this part of the name space again, the
-	 * cache read function instantiates a new page.)
-	 *
-	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
-	 * it means this WT_REF is the re-creation of a deleted node (we wrote
-	 * out the deleted node after the deletion became visible, but before
-	 * we could delete the leaf page, and subsequently crashed, then read
-	 * the page and re-created the WT_REF_DELETED state).   In other words,
-	 * the delete is visible to all (it became visible), and by definition
-	 * there are no older transactions needing to see previous versions of
-	 * the page.
+	 * there's no path to reading the leaf page again: if there's ever a
+	 * read into this part of the name space again, the cache read function
+	 * instantiates an entirely new page.)
 	 */
 	if (ref->addr != NULL &&
-	    (ref->txnid == WT_TXN_NONE ||
-	    __wt_txn_visible_all(session, ref->txnid))) {
+	    (page_del == NULL ||
+	    __wt_txn_visible_all(session, page_del->txnid))) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		WT_RET(bm->free(bm, session, addr, addr_size));
 
@@ -1184,6 +1192,20 @@ __rec_child_deleted(
 			__wt_free(session, ref->addr);
 		}
 		ref->addr = NULL;
+	}
+
+	/*
+	 * Minor memory cleanup: if a truncate call deleted this page and we
+	 * were ever forced to instantiate the page in memory, we would have
+	 * built a list of updates in the page reference in order to be able
+	 * to abort the truncate.  It's a cheap test to make that memory go
+	 * away, we do it here because there's really nowhere else we do the
+	 * checks.  In short, if we have such a list, and the backing address
+	 * blocks are gone, there can't be any transaction that can abort.
+	 */
+	if (ref->addr == NULL && page_del != NULL) {
+		__wt_free(session, ref->page_del->update_list);
+		__wt_free(session, ref->page_del);
 	}
 
 	/*
@@ -4538,11 +4560,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
+#if 0
 		/*
 		 * Display the actual split keys: not turned on because it's a
 		 * lot of output and not generally useful.
 		 */
-		if (0 && WT_VERBOSE_ISSET(session, split)) {
+		if (WT_VERBOSE_ISSET(session, split)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;
 			uint32_t i;
@@ -4575,7 +4598,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 err:			__wt_scr_free(&tkey);
 			WT_RET(ret);
 		}
-
+#endif
 		if (r->bnd_next > r->bnd_next_max) {
 			r->bnd_next_max = r->bnd_next;
 			WT_STAT_FAST_DATA_SET(
@@ -4616,6 +4639,8 @@ err:			__wt_scr_free(&tkey);
 			WT_PANIC_RETX(session,
 			    "reconciliation illegally skipped an update");
 
+		mod->rec_min_skipped_txn = r->min_skipped_txn;
+
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 	}
@@ -4634,6 +4659,12 @@ err:			__wt_scr_free(&tkey);
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
+
+	/*
+	 * Set the checkpoint generation, used to determine whether we can skip
+	 * writing this page again.
+	 */
+	mod->checkpoint_gen = S2C(session)->txn_global.checkpoint_gen;
 
 	return (0);
 }

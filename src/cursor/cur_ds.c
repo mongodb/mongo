@@ -168,7 +168,7 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR(WT_LEX_CMP(session, collator, &a->key, &b->key, *cmpp));
 	}
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -197,7 +197,7 @@ __curds_next(WT_CURSOR *cursor)
 
 err:	__curds_txn_leave(session);
 
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -226,7 +226,7 @@ __curds_prev(WT_CURSOR *cursor)
 
 err:	__curds_txn_leave(session);
 
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -252,7 +252,7 @@ __curds_reset(WT_CURSOR *cursor)
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -281,7 +281,7 @@ __curds_search(WT_CURSOR *cursor)
 
 err:	__curds_txn_leave(session);
 
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -311,7 +311,7 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 
 err:	__curds_txn_leave(session);
 
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -437,7 +437,7 @@ __curds_close(WT_CURSOR *cursor)
 
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

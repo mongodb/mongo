@@ -181,6 +181,9 @@ struct __wt_page_modify {
 	/* The largest transaction ID seen on the page by reconciliation. */
 	uint64_t rec_max_txn;
 
+	/* The smallest transaction ID skipped by reconciliation. */
+	uint64_t rec_min_skipped_txn;
+
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
@@ -324,6 +327,13 @@ struct __wt_page_modify {
 	 * 4B types will always be backed by atomic writes to memory.
 	 */
 	uint32_t write_gen;
+
+	/*
+	 * The checkpoint generation is the most recent checkpoint to have
+	 * visited a page.  When a checkpoint is in progress, dirty pages that
+	 * have not yet been visited can be evicted by application threads.
+	 */
+	uint32_t checkpoint_gen;
 
 #define	WT_PAGE_LOCK(s, p)						\
 	__wt_spin_lock((s), &S2C(s)->page_lock[(p)->modify->page_lock])
@@ -599,6 +609,16 @@ enum __wt_page_state {
 };
 
 /*
+ * WT_PAGE_DELETED --
+ *	Related information for fast-delete, on-disk pages.
+ */
+struct __wt_page_deleted {
+	uint64_t txnid;			/* Transaction ID */
+
+	WT_UPDATE **update_list;	/* List of updates for abort */
+};
+
+/*
  * WT_REF --
  *	A single in-memory page and the state information used to determine if
  * it's OK to dereference the pointer to the page.
@@ -632,7 +652,7 @@ struct __wt_ref {
 		uint64_t pkey;		/* Row-store: on-page key */
 	} key;
 
-	uint64_t txnid;			/* Transaction ID */
+	WT_PAGE_DELETED	*page_del;	/* Deleted on-disk page information */
 };
 /*
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure

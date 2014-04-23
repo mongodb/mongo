@@ -831,7 +831,7 @@ struct __wt_session {
 	 * transfer from a storage device.  The page maximum is the bytes of
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
-	 * 1MB.}
+	 * 32KB.}
 	 * @config{lsm = (, options only relevant for LSM data sources., a set
 	 * of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into

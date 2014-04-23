@@ -45,7 +45,7 @@
  *	An extent list.
  */
 struct __wt_extlist {
-	const char *name;			/* Name */
+	char *name;				/* Name */
 
 	uint64_t bytes;				/* Byte count */
 	uint32_t entries;			/* Entry count */
@@ -54,6 +54,8 @@ struct __wt_extlist {
 	uint32_t cksum, size;			/* Written extent cksum, size */
 
 	int	track_size;			/* Maintain per-size skiplist */
+
+	WT_EXT	*last;				/* Cached last element */
 
 	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Size/offset skiplists */
 	WT_SIZE *sz[WT_SKIP_MAXDEPTH];
@@ -133,7 +135,17 @@ struct __wt_block_ckpt {
 
 	off_t	   file_size;			/* Checkpoint file size */
 	uint64_t   ckpt_size;			/* Checkpoint byte count */
+
 	WT_EXTLIST ckpt_avail;			/* Checkpoint free'd extents */
+
+	/*
+	 * Checkpoint archive: the block manager may potentially free a lot of
+	 * memory from the allocation and discard extent lists when checkpoint
+	 * completes.  Put it off until the checkpoint resolves, that lets the
+	 * upper btree layer continue eviction sooner.
+	 */
+	WT_EXTLIST ckpt_alloc;			/* Checkpoint archive */
+	WT_EXTLIST ckpt_discard;		/* Checkpoint archive */
 };
 
 /*

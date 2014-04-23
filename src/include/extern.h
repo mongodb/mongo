@@ -290,6 +290,10 @@ extern int __wt_debug_tree(WT_SESSION_IMPL *session,
 extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
+extern int __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp);
+extern void __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref);
+extern int __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref);
+extern int __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_free_ref( WT_SESSION_IMPL *session,
@@ -383,7 +387,6 @@ extern int __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     const char *addr,
     WT_ITEM *buf);
-extern void __wt_tree_walk_delete_rollback(WT_REF *ref);
 extern int __wt_tree_walk(WT_SESSION_IMPL *session,
     WT_REF **refp,
     uint32_t flags);

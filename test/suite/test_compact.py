@@ -71,6 +71,11 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         # Reopen the connection to force the object to disk.
         self.reopen_conn()
 
+        # Confirm the tree starts big
+        stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
+        self.assertGreater(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
+        stat_cursor.close()
+
         # Remove most of the object.
         c1 = self.session.open_cursor(uri, None)
         c1.set_key(key_populate(c1, 5))
@@ -93,7 +98,8 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
 
             self.session.compact(uri, None)
 
-        # Confirm compaction worked.
+        # Confirm compaction worked: check the number of on-disk pages
+        self.reopen_conn()
         stat_cursor = self.session.open_cursor('statistics:' + uri, None, None)
         self.assertLess(stat_cursor[stat.dsrc.btree_row_leaf][2], self.maxpages)
         stat_cursor.close()
