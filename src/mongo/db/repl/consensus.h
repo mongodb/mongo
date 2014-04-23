@@ -50,21 +50,24 @@ namespace mongo {
             unsigned who;
         };
         static SimpleMutex lyMutex;
-        LastYea ly;
-        unsigned yea(unsigned memberId); // throws VoteException
-        void electionFailed(unsigned meid);
+        LastYea _ly;
+        unsigned _yea(unsigned memberId); // throws VoteException
+        void _electionFailed(unsigned meid);
         void _electSelf();
-        bool weAreFreshest(bool& allUp, int& nTies);
-        bool sleptLast; // slept last elect() pass
+        bool _weAreFreshest(bool& allUp, int& nTies);
+        bool _sleptLast; // slept last elect() pass
 
         // This is a unique id that is changed each time we transition to PRIMARY, as the
         // result of an election.
         OID _electionId;
         // PRIMARY server's time when the election to primary occurred
         OpTime _electionTime;
+
+        int _totalVotes() const;
+        void _multiCommand(BSONObj cmd, std::list<Target>& L);
     public:
         Consensus(ReplSetImpl *t) : rs(*t) {
-            sleptLast = false;
+            _sleptLast = false;
             steppedDown = 0;
         }
 
@@ -73,12 +76,10 @@ namespace mongo {
         */
         time_t steppedDown;
 
-        int totalVotes() const;
         bool aMajoritySeemsToBeUp() const;
         bool shouldRelinquish() const;
         void electSelf();
         void electCmdReceived(BSONObj, BSONObjBuilder*);
-        void multiCommand(BSONObj cmd, std::list<Target>& L);
 
         OID getElectionId() const { return _electionId; }
         void setElectionId(OID oid) { _electionId = oid; }
