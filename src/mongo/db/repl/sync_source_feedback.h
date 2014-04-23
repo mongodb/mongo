@@ -60,9 +60,6 @@ namespace mongo {
             updateMap(_me["_id"].OID(), ot);
         }
 
-        /// Connect to sync target.
-        bool connect(const Member* target);
-
         void resetConnection() {
             LOG(1) << "resetting connection in sync source feedback";
             _connection.reset();
@@ -107,8 +104,6 @@ namespace mongo {
         const Member* _syncTarget;
         // our connection to our sync target
         boost::scoped_ptr<DBClientConnection> _connection;
-        // protects connection
-        boost::mutex _connmtx;
         // protects cond and maps and the indicator bools
         boost::mutex _mtx;
         // contains the most recent optime of each member syncing to us

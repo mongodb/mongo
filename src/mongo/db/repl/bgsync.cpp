@@ -405,10 +405,9 @@ namespace replset {
             // if we made it here, the target is up and not stale
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);
+                // this will trigger the syncSourceFeedback
                 _currentSyncTarget = target;
             }
-
-            theReplSet->syncSourceFeedback.connect(target);
 
             return;
         }
