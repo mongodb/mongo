@@ -45,7 +45,7 @@ __curbackup_next(WT_CURSOR *cursor)
 
 	F_SET(cursor, WT_CURSTD_KEY_INT);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -66,7 +66,7 @@ __curbackup_reset(WT_CURSOR *cursor)
 	cb->next = 0;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -93,7 +93,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	    tret = __backup_stop(session));		/* Stop the backup. */
 	WT_TRET(tret);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

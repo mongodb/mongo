@@ -27,15 +27,15 @@
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 0, 1))
 
-#define	WT_LSM_LEAVE(session)						\
-	API_END(session);						\
-	WT_TRET(__clsm_leave(clsm))
+#define	WT_LSM_LEAVE(session, ret)					\
+	WT_TRET(__clsm_leave(clsm));					\
+	API_END(session, ret)
 
 #define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
-	CURSOR_UPDATE_API_END(session, ret);				\
-	WT_TRET(__clsm_leave(clsm))
+	WT_TRET(__clsm_leave(clsm));					\
+	CURSOR_UPDATE_API_END(session, ret)
 
-static int __clsm_lookup(WT_CURSOR_LSM *);
+static int __clsm_lookup(WT_CURSOR_LSM *, WT_ITEM *);
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_reset_cursors(WT_CURSOR_LSM *, WT_CURSOR *);
 
@@ -165,26 +165,73 @@ __clsm_leave(WT_CURSOR_LSM *clsm)
 }
 
 /*
- * TODO: use something other than an empty value as a tombstone: we need
- * to support empty values from the application.
+ * We need a tombstone to mark deleted records, and we use the special
+ * value below for that purpose.  We use two 0x14 (Device Control 4) bytes to
+ * minimize the likelihood of colliding with an application-chosen encoding
+ * byte, if the application uses two leading DC4 byte for some reason, we'll do
+ * a wasted data copy each time a new value is inserted into the object.
  */
-static const WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
-
-#define	WT_LSM_NEEDVALUE(c) do {					\
-	WT_CURSOR_NEEDVALUE(c);						\
-	if (__clsm_deleted((WT_CURSOR_LSM *)(c), &(c)->value))		\
-		WT_ERR_MSG((WT_SESSION_IMPL *)cursor->session, EINVAL,	\
-		    "LSM does not yet support zero-length data items");	\
-} while (0)
+static const WT_ITEM __tombstone = { "\x14\x14", 2, 0, NULL, 0 };
 
 /*
  * __clsm_deleted --
  *	Check whether the current value is a tombstone.
  */
 static inline int
-__clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
+__clsm_deleted(WT_CURSOR_LSM *clsm, const WT_ITEM *item)
 {
-	return (!F_ISSET(clsm, WT_CLSM_MINOR_MERGE) && item->size == 0);
+	return (!F_ISSET(clsm, WT_CLSM_MINOR_MERGE) &&
+	    item->size == __tombstone.size &&
+	    memcmp(item->data, __tombstone.data, __tombstone.size) == 0);
+}
+
+/*
+ * __clsm_deleted_encode --
+ *	Encode values that are in the encoded name space.
+ */
+static inline int
+__clsm_deleted_encode(WT_SESSION_IMPL *session,
+    const WT_ITEM *value, WT_ITEM *final_value, WT_ITEM **tmpp)
+{
+	WT_ITEM *tmp;
+
+	/*
+	 * If value requires encoding, get a scratch buffer of the right size
+	 * and create a copy of the data with the first byte of the tombstone
+	 * appended.
+	 */
+	if (value->size >= __tombstone.size &&
+	    memcmp(value->data, __tombstone.data, __tombstone.size) == 0) {
+		WT_RET(__wt_scr_alloc(session, value->size + 1, tmpp));
+		tmp = *tmpp;
+
+		memcpy(tmp->mem, value->data, value->size);
+		memcpy((uint8_t *)tmp->mem + value->size, __tombstone.data, 1);
+		final_value->data = tmp->mem;
+		final_value->size = value->size + __tombstone.size;
+	} else {
+		final_value->data = value->data;
+		final_value->size = value->size;
+	}
+
+	return (0);
+}
+
+/*
+ * __clsm_deleted_decode --
+ *	Decode values that start with the tombstone.
+ */
+static inline void
+__clsm_deleted_decode(WT_ITEM *value)
+{
+	/*
+	 * Take care with this check: when an LSM cursor is used for a merge,
+	 * and/or to create a Bloom filter, it is valid to return the tombstone
+	 * value.
+	 */
+	if (value->size > __tombstone.size &&
+	    memcmp(value->data, __tombstone.data, __tombstone.size) == 0)
+		--value->size;
 }
 
 /*
@@ -605,7 +652,7 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	    session, alsm->lsm_tree->collator, &a->key, &b->key, cmp));
 	*cmpp = cmp;
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -687,7 +734,9 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
+	if (ret == 0)
+		__clsm_deleted_decode(&cursor->value);
 	return (ret);
 }
 
@@ -768,7 +817,9 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
+	if (ret == 0)
+		__clsm_deleted_decode(&cursor->value);
 	return (ret);
 }
 
@@ -827,7 +878,7 @@ __clsm_reset(WT_CURSOR *cursor)
 	/* In case we were somehow left positioned, clear that. */
 	WT_TRET(__clsm_leave(clsm));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -836,7 +887,7 @@ err:	API_END(session);
  *	Position an LSM cursor.
  */
 static int
-__clsm_lookup(WT_CURSOR_LSM *clsm)
+__clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 {
 	WT_BLOOM *bloom;
 	WT_BLOOM_HASH bhash;
@@ -874,8 +925,8 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search(c)) == 0) {
 			WT_ERR(c->get_key(c, &cursor->key));
-			WT_ERR(c->get_value(c, &cursor->value));
-			if (__clsm_deleted(clsm, &cursor->value))
+			WT_ERR(c->get_value(c, value));
+			if (__clsm_deleted(clsm, value))
 				ret = WT_NOTFOUND;
 			goto done;
 		}
@@ -919,9 +970,11 @@ __clsm_search(WT_CURSOR *cursor)
 	WT_LSM_ENTER(clsm, cursor, session, search, 1);
 	WT_CURSOR_NEEDKEY(cursor);
 
-	ret = __clsm_lookup(clsm);
+	ret = __clsm_lookup(clsm, &cursor->value);
 
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
+	if (ret == 0)
+		__clsm_deleted_decode(&cursor->value);
 	return (ret);
 }
 
@@ -1059,7 +1112,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		ret = WT_NOTFOUND;
 
 done:
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
 	if (ret == 0) {
 		c = clsm->current;
 		WT_TRET(c->get_key(c, &cursor->key));
@@ -1073,6 +1126,8 @@ err:	WT_LSM_LEAVE(session);
 	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+
+		__clsm_deleted_decode(&cursor->value);
 	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		clsm->current = NULL;
@@ -1215,23 +1270,28 @@ static int
 __clsm_insert(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
+	WT_ITEM value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, insert);
 	WT_CURSOR_NEEDKEY(cursor);
-	WT_LSM_NEEDVALUE(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-	    (ret = __clsm_lookup(clsm)) != WT_NOTFOUND) {
+	    (ret = __clsm_lookup(clsm, &value)) != WT_NOTFOUND) {
 		if (ret == 0)
 			ret = WT_DUPLICATE_KEY;
 		return (ret);
 	}
 
-	ret = __clsm_put(session, clsm, &cursor->key, &cursor->value, 0);
+	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
+	ret = __clsm_put(session, clsm, &cursor->key, &value, 0);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
+
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -1243,22 +1303,25 @@ static int
 __clsm_update(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_ITEM value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, update);
 	WT_CURSOR_NEEDKEY(cursor);
-	WT_LSM_NEEDVALUE(cursor);
-
-	/* Take a copy of the value: __clsm_lookup overwrites it. */
-	value = cursor->value;
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm)) == 0)
+	    (ret = __clsm_lookup(clsm, &value)) == 0) {
+		WT_ERR(__clsm_deleted_encode(
+		    session, &cursor->value, &value, &buf));
 		ret = __clsm_put(session, clsm, &cursor->key, &value, 1);
+	}
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
+
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -1271,15 +1334,15 @@ __clsm_remove(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
+	WT_ITEM value;
 	WT_SESSION_IMPL *session;
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, remove);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
-	    (ret = __clsm_lookup(clsm)) == 0)
-		ret = __clsm_put(
-		    session, clsm, &cursor->key, &__lsm_tombstone, 1);
+	    (ret = __clsm_lookup(clsm, &value)) == 0)
+		ret = __clsm_put(session, clsm, &cursor->key, &__tombstone, 1);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
@@ -1316,7 +1379,7 @@ __clsm_close(WT_CURSOR *cursor)
 		__wt_lsm_tree_release(session, clsm->lsm_tree);
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -1328,6 +1391,7 @@ int
 __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR_STATIC_INIT(iface,
 	    NULL,			/* get-key */
 	    NULL,			/* get-value */
@@ -1353,6 +1417,11 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 
 	if (!WT_PREFIX_MATCH(uri, "lsm:"))
 		return (EINVAL);
+
+	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
+	if (cval.len != 0)
+		WT_RET_MSG(session, EINVAL,
+		    "LSM does not support opening by checkpoint");
 
 	/* Get the LSM tree. */
 	WT_WITH_SCHEMA_LOCK(session,

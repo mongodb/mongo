@@ -81,7 +81,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 		*va_arg(ap, const char **) = cursor->key.data;
 	va_end(ap);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -155,7 +155,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 err:		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
 	}
-	API_END(session);
+	API_END(session, ret);
 }
 
 /*
@@ -190,7 +190,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 		*va_arg(ap, const char **) = cursor->value.data;
 	va_end(ap);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -228,7 +228,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 err:		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	}
-	API_END(session);
+	API_END(session, ret);
 }
 
 /* Pass through a call to the underlying cursor. */
@@ -286,7 +286,7 @@ __curdump_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

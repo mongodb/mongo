@@ -110,8 +110,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		return (0);
 	}
 
-	__wt_errx(session,
-	    "session %p: hazard pointer table full", session);
+	__wt_errx(session, "session %p: hazard pointer table full", session);
 #ifdef HAVE_DIAGNOSTIC
 	__hazard_dump(session);
 #endif

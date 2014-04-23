@@ -144,27 +144,25 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
-		if (ref->addr != NULL &&
-		    __wt_off_page(parent, ref->addr)) {
+		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
 
 		/*
-		 * Update the parent to reference an empty page.
-		 *
-		 * Set the transaction ID to WT_TXN_NONE because the fact that
+		 * Update the parent to reference a deleted page.  The fact that
 		 * reconciliation left the page "empty" means there's no older
 		 * transaction in the system that might need to see an earlier
-		 * version of the page.  It isn't necessary (WT_TXN_NONE is 0),
-		 * but it's the right thing to do.
+		 * version of the page.  For that reason, we clear the address
+		 * of the page, if we're forced to "read" into that namespace,
+		 * we'll instantiate a new page instead of trying to read from
+		 * the backing store.
 		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
 		__wt_ref_out(session, ref);
 		ref->addr = NULL;
-		ref->txnid = WT_TXN_NONE;
 		WT_PUBLISH(ref->state, WT_REF_DELETED);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
@@ -172,8 +170,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		WT_RET(__wt_split_evict(session, ref, exclusive));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
-		if (ref->addr != NULL &&
-		    __wt_off_page(parent, ref->addr)) {
+		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
 		}
@@ -244,6 +241,7 @@ __rec_review(
 	WT_PAGE_MODIFY *mod;
 	WT_REF *child;
 	uint32_t flags;
+	int behind_checkpoint;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -294,14 +292,12 @@ __rec_review(
 			}
 		} WT_INTL_FOREACH_END;
 
-	mod = page->modify;
-
 	/*
-	 * If the file is being checkpointed, we stop evicting dirty pages: the
-	 * problem is if we write a page, the previous version of the page will
-	 * be free'd, which previous version might be referenced by an internal
-	 * page already been written in service of the checkpoint, leaving the
-	 * checkpoint inconsistent.
+	 * If the file is being checkpointed, we can't evict dirty pages already
+	 * visited during the checkpoint: if we write a page and free the
+	 * previous version of the page, that previous version might be
+	 * referenced by an internal page already been written in the
+	 * checkpoint, leaving the checkpoint inconsistent.
 	 *     Don't rely on new updates being skipped by the transaction used
 	 * for transaction reads: (1) there are paths that dirty pages for
 	 * artificial reasons; (2) internal pages aren't transactional; and
@@ -315,7 +311,15 @@ __rec_review(
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	if (btree->checkpointing && __wt_page_is_modified(page)) {
+	mod = page->modify;
+#ifdef FAST_CHECKPOINTS
+	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
+	    mod->checkpoint_gen >= S2C(session)->txn_global.checkpoint_gen;
+#else
+	behind_checkpoint = btree->checkpointing && (mod != NULL);
+#endif
+
+	if (behind_checkpoint && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
@@ -325,8 +329,7 @@ __rec_review(
 	 * If we are checkpointing, we can't merge multiblock pages into their
 	 * parent.
 	 */
-	if (btree->checkpointing &&
-	    mod != NULL && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
+	if (behind_checkpoint && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
 		return (EBUSY);
 
 	/*
@@ -374,12 +377,21 @@ __rec_review(
 	 */
 	if (__wt_page_is_modified(page)) {
 		flags = WT_EVICTION_LOCKED;
+		if (btree->checkpointing)
+			LF_SET(WT_SKIP_UPDATE_OK);
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
 		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
 		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, ref, NULL, flags));
+		/*
+		 * If we wrote the page and skipped some updates because we
+		 * were helping out a checkpoint, that's okay, but we can't
+		 * evict the page.
+		 */
+		if (LF_ISSET(WT_SKIP_UPDATE_OK) && __wt_page_is_modified(page))
+			return (EBUSY);
 		WT_ASSERT(session,
 		    !__wt_page_is_modified(page) ||
 		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));
@@ -389,7 +401,7 @@ __rec_review(
 		 * on the page are old enough they can be discarded from cache.
 		 */
 		if (!exclusive && mod != NULL &&
-		    !__wt_txn_visible_all(session, mod->rec_max_txn))
+		    !__wt_txn_visible_apps(session, mod->rec_max_txn))
 			return (EBUSY);
 	}
 

@@ -1,4 +1,5 @@
 personal_ws-1.1 en 200
+ACM
 APIs
 Adler's
 Atomicity
@@ -12,12 +13,13 @@ DBTs
 DbCursor
 DbEnv
 DbMultiple
-EB
 EAGAIN
+EB
 EBUSY
 EINVAL
 EmpId
 FreeBSD
+FreeBSD's
 GCC
 Gawlick
 GitHub
@@ -39,6 +41,7 @@ NOTFOUND
 NUMA
 NoSQL
 README
+RedHat
 RepMgr
 Roelofs
 Rrx

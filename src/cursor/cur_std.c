@@ -244,7 +244,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			    cursor->key.data, cursor->key.size, fmt, ap);
 	}
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -314,7 +314,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 err:		cursor->saved_err = ret;
 	}
 
-	API_END(session);
+	API_END(session, ret);
 }
 
 /*
@@ -354,7 +354,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 
 	va_end(ap);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -410,7 +410,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 err:		cursor->saved_err = ret;
 	}
 	va_end(ap);
-	API_END(session);
+	API_END(session, ret);
 }
 
 /*

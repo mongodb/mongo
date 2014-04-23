@@ -8,8 +8,7 @@ logging, across application or system failure.  (Transactional logging
 offers fine-grained durability, but requires a recovery step when files
 are first opened, and impacts the performance of every operation;
 checkpoints offer durability without recovery or impacting performance,
-but the creation of a checkpoint is a relatively heavy-weight operation.
-WiredTiger does not yet support transactional logging.)
+but the creation of a checkpoint is a relatively heavy-weight operation.)
 
 A checkpoint is automatically created whenever a modified data source
 is closed.

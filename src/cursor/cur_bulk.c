@@ -32,7 +32,7 @@ __curbulk_insert(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDVALUE(cursor);
 	WT_ERR(__wt_bulk_insert(cbulk));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -59,7 +59,7 @@ __curbulk_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

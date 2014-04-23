@@ -71,20 +71,20 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	 * the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
-		if (upd == NULL) {
-			/* Make sure the update can proceed. */
-			WT_ERR(__wt_txn_update_check(
-			    session, old_upd = cbt->ins->upd));
+		/*
+		 * If we are restoring updates that couldn't be evicted, the
+		 * key must not exist on the new page.
+		 */
+		WT_ASSERT(session, upd == NULL);
 
-			/* Allocate a WT_UPDATE structure and transaction ID. */
-			WT_ERR(
-			    __wt_update_alloc(session, value, &upd, &upd_size));
-			WT_ERR(__wt_txn_modify(session, cbt, upd));
-			logged = 1;
-		} else {
-			upd_size = sizeof(WT_UPDATE) + upd->size;
-			old_upd = cbt->ins->upd;
-		}
+		/* Make sure the update can proceed. */
+		WT_ERR(__wt_txn_update_check(
+		    session, old_upd = cbt->ins->upd));
+
+		/* Allocate a WT_UPDATE structure and transaction ID. */
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_txn_modify(session, cbt, upd));
+		logged = 1;
 
 		/*
 		 * Point the new WT_UPDATE item to the next element in the list.

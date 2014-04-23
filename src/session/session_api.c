@@ -367,7 +367,7 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	ret = __wt_log_vprintf(session, fmt, ap);
 	va_end(ap);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -632,7 +632,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 
 	ret = __wt_txn_begin(session, cfg);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -664,7 +664,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	else
 		WT_TRET(__wt_txn_rollback(session, cfg));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -686,7 +686,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 
 	WT_TRET(__wt_txn_rollback(session, cfg));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

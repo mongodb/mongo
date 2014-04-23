@@ -349,6 +349,7 @@ cfkos
 change's
 checkfrag
 checkpointed
+checkpointer
 checkpointing
 checksum
 checksums
@@ -658,6 +659,7 @@ namespaces
 nbits
 nbsp
 nclr
+nd
 negint
 newbar
 newfile
@@ -711,6 +713,7 @@ posix
 pre
 prealloc
 preload
+prepend
 prepended
 prepending
 presize

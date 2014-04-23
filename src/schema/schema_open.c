@@ -133,7 +133,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_ERR(__wt_config_getones(session, idx->config, "source", &cval));
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
 	idx->source = __wt_buf_steal(session, buf);
-	idx->need_value = WT_PREFIX_MATCH(idx->source, "lsm:");
 
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
