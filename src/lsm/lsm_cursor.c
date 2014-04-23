@@ -27,13 +27,13 @@
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 0, 1))
 
-#define	WT_LSM_LEAVE(session)						\
-	API_END(session);						\
-	WT_TRET(__clsm_leave(clsm))
+#define	WT_LSM_LEAVE(session, ret)					\
+	WT_TRET(__clsm_leave(clsm));					\
+	API_END(session, ret)
 
 #define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
-	CURSOR_UPDATE_API_END(session, ret);				\
-	WT_TRET(__clsm_leave(clsm))
+	WT_TRET(__clsm_leave(clsm));					\
+	CURSOR_UPDATE_API_END(session, ret)
 
 static int __clsm_lookup(WT_CURSOR_LSM *, WT_ITEM *);
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
@@ -652,7 +652,7 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	    session, alsm->lsm_tree->collator, &a->key, &b->key, cmp));
 	*cmpp = cmp;
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -734,7 +734,7 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
 	if (ret == 0)
 		__clsm_deleted_decode(&cursor->value);
 	return (ret);
@@ -817,7 +817,7 @@ retry:		/*
 	    deleted)
 		goto retry;
 
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
 	if (ret == 0)
 		__clsm_deleted_decode(&cursor->value);
 	return (ret);
@@ -878,7 +878,7 @@ __clsm_reset(WT_CURSOR *cursor)
 	/* In case we were somehow left positioned, clear that. */
 	WT_TRET(__clsm_leave(clsm));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -972,7 +972,7 @@ __clsm_search(WT_CURSOR *cursor)
 
 	ret = __clsm_lookup(clsm, &cursor->value);
 
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
 	if (ret == 0)
 		__clsm_deleted_decode(&cursor->value);
 	return (ret);
@@ -1112,7 +1112,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		ret = WT_NOTFOUND;
 
 done:
-err:	WT_LSM_LEAVE(session);
+err:	WT_LSM_LEAVE(session, ret);
 	if (ret == 0) {
 		c = clsm->current;
 		WT_TRET(c->get_key(c, &cursor->key));
@@ -1342,8 +1342,7 @@ __clsm_remove(WT_CURSOR *cursor)
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
 	    (ret = __clsm_lookup(clsm, &value)) == 0)
-		ret = __clsm_put(
-		    session, clsm, &cursor->key, &__tombstone, 1);
+		ret = __clsm_put(session, clsm, &cursor->key, &__tombstone, 1);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
@@ -1380,7 +1379,7 @@ __clsm_close(WT_CURSOR *cursor)
 		__wt_lsm_tree_release(session, clsm->lsm_tree);
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

@@ -147,10 +147,13 @@ worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
 		cursor->set_key(cursor, key);
 	}
 	new_val = keyno;
-	if (cursor->search(cursor) == 0) {
+	if ((ret = cursor->search(cursor)) == 0) {
 		cursor->get_value(cursor, &old_val);
 		new_val = (u_int)atol(old_val) + 1;
-	}
+	} else if (ret == WT_DEADLOCK)
+		return (ret);
+	else if (ret != WT_NOTFOUND)
+		return (log_print_err("cursor.search", ret, 1));
 	/*
 	 * The search cleared the key from our cursor - set it again. It would
 	 * be nice if we didn't need to.
