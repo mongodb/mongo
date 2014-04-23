@@ -32,7 +32,6 @@
 
 #pragma once
 
-#include "mongo/db/repl/health.h"
 #include "mongo/util/concurrency/list.h"
 #include "mongo/util/concurrency/race.h"
 #include "mongo/util/net/hostandport.h"
@@ -133,6 +132,29 @@ namespace mongo {
         vector<MemberCfg> members;
         string _id;
         int version;
+
+        struct HealthOptions {
+        HealthOptions() :  heartbeatSleepMillis(2000), 
+                heartbeatTimeoutMillis( 10000 ),
+                heartbeatConnRetries(2) 
+            { }
+            
+            unsigned heartbeatSleepMillis;
+            unsigned heartbeatTimeoutMillis;
+            unsigned heartbeatConnRetries ;
+
+            void check() {
+                uassert(13112, "bad replset heartbeat option", heartbeatSleepMillis >= 10);
+                uassert(13113, "bad replset heartbeat option", heartbeatTimeoutMillis >= 10);
+            }
+
+            bool operator==(const HealthOptions& r) const {
+                return (heartbeatSleepMillis==r.heartbeatSleepMillis && 
+                        heartbeatTimeoutMillis==r.heartbeatTimeoutMillis &&
+                        heartbeatConnRetries==r.heartbeatConnRetries);
+            }
+        };
+
         HealthOptions ho;
         string md5;
         BSONObj getLastErrorDefaults;

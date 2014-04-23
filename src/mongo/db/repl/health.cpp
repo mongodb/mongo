@@ -39,13 +39,13 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/replset_commands.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/ramlog.h"
-#include "mongo/util/startup_test.h"
 
 namespace mongo {
     /* decls for connections.h */
@@ -60,8 +60,6 @@ namespace mongo {
 
     static RamLog * _rsLog = RamLog::get("rs");
     Tee* rsLog = _rsLog;
-
-    extern bool replSetBlind; // for testing
 
     string ago(time_t t) {
         if( t == 0 ) return "";
@@ -471,13 +469,4 @@ namespace mongo {
         if( replSetBlind )
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
-
-    static struct Test : public StartupTest {
-        void run() {
-            HealthOptions a,b;
-            verify( a == b );
-            verify( a.isDefault() );
-        }
-    } test;
-
 }

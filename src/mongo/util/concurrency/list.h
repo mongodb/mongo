@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "mongo/util/log.h"
+
 namespace mongo {
 
     /* DON'T USE THIS.  it was a dumb idea.
@@ -99,7 +101,7 @@ namespace mongo {
             }
             prev = t->_next;
             if( ++_orphans > 500 )
-                log() << "warning List1 orphans=" << _orphans << endl;
+                log() << "warning List1 orphans=" << _orphans;
         }
 
     private:

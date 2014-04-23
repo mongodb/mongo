@@ -35,7 +35,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/consensus.h"
-#include "mongo/db/repl/health.h"
 #include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/manager.h"
 #include "mongo/db/repl/member.h"

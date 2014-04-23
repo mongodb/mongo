@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/heartbeat.h"
 #include "mongo/db/repl/manager.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/rs.h"

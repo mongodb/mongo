@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    extern bool replSetBlind;
+
     /**
      * Base class for repl set commands.  Checks basic things such if we're in
      * rs mode before the command does its real work.

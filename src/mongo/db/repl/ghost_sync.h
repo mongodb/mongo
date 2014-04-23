@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/db/repl/health.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/server.h"

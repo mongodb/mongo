@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/db/repl/health.h"
+
 namespace mongo {
 
     /**

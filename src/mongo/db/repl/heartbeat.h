@@ -28,16 +28,18 @@
 
 #pragma once
 
-#include <ctime>
 #include <string>
-
-#include "mongo/logger/tee.h"
 
 namespace mongo {
 
-    // ramlog used for replSet actions
-    extern logger::Tee* rsLog;
+    class BSONObj;
 
-    // helper function needed by member.cpp
-    std::string ago(time_t t);    
+    /* throws */
+    bool requestHeartbeat(const std::string& setname,
+                          const std::string& fromHost,
+                          const std::string& memberFullName,
+                          BSONObj& result,
+                          int myConfigVersion,
+                          int& theirConfigVersion,
+                          bool checkEmpty = false);
 }

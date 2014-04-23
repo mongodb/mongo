@@ -35,7 +35,6 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/ghost_sync.h"
-#include "mongo/db/repl/health.h"
 #include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
@@ -56,8 +55,6 @@ namespace mongo {
 
     MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
     MONGO_FP_DECLARE(rsStopHeartbeatRequest);
-
-    extern bool replSetBlind;
 
     unsigned int HeartbeatInfo::numPings;
 
