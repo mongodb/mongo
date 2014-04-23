@@ -12,22 +12,14 @@ AC_CONFIG_SRCDIR([RELEASE])
 AM_INIT_AUTOMAKE([1.11 foreign parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 
-# If CFLAGS was not set on entry, default to -O3
-wt_CFLAGS=${CFLAGS+set}
-: ${CFLAGS="-O3"}
-AC_PROG_CC(cc gcc)
+# If CFLAGS was not set on entry, default to "-O3 -g"
+: ${CFLAGS="-O3 -g"}
 
+AC_PROG_CC(cc gcc)
 # AC_PROG_CXX(c++ g++)
 
 # Configure options.
 AM_OPTIONS
-
-# GCC debugging builds default to "-O2 -g".
-if test "$GCC" = "yes" &&
-    test "$wt_cv_enable_debug" = "yes" && test "$wt_CFLAGS" != "set"; then
-		CFLAGS="-O2 -g"
-		AM_CFLAGS="-O2 -g"
-fi
 
 if test "$GCC" = "yes"; then
 	# The Solaris gcc compiler gets the additional -pthreads flag.
