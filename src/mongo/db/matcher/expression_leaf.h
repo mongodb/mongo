@@ -30,13 +30,15 @@
 
 #pragma once
 
-#include <pcrecpp.h>
-
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/matcher/expression.h"
+
+namespace pcrecpp {
+    class RE;
+} // namespace pcrecpp;
 
 namespace mongo {
 
@@ -188,7 +190,8 @@ namespace mongo {
          */
         static const size_t MaxPatternSize = 32764;
 
-        RegexMatchExpression() : LeafMatchExpression( REGEX ){}
+        RegexMatchExpression();
+        ~RegexMatchExpression();
 
         Status init( const StringData& path, const StringData& regex, const StringData& options );
         Status init( const StringData& path, const BSONElement& e );

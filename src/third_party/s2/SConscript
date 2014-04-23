@@ -9,9 +9,8 @@ env.SConscript( [
 	"strings/SConscript",
 	"util/coding/SConscript",
 	"util/math/SConscript",
-        ] )
+        ], exports={ 'env' : env })
 
-env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 env.Append(CCFLAGS=['-DDEBUG_MODE=false'])
 
 # Clang warns about struct/class tag mismatch, but as long as this is

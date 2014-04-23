@@ -7,14 +7,17 @@ import itertools
 from buildscripts import utils
 
 Import("env")
-Import("shellEnv")
-Import("testEnv")
 Import("has_option")
 Import("get_option")
 Import("usev8")
 Import("v8suffix")
 Import("enforce_glibc")
 Import("darwin windows solaris linux nix")
+
+# Boost we need everywhere. 's2' is spammed in all over the place by
+# db/geo unfortunately. pcre is also used many places.
+env.InjectThirdPartyIncludePaths(libraries=['boost', 's2', 'pcre'])
+env.InjectMongoIncludePaths()
 
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
@@ -419,7 +422,9 @@ tcmallocServerStatus = []
 if get_option('allocator') == 'tcmalloc':
     tcmallocServerStatus.append("util/tcmalloc_server_status_section.cpp")
 
-env.Library("coredb", [
+coredbEnv = env.Clone()
+coredbEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+coredbEnv.Library("coredb", [
         "client/parallel.cpp",
         "db/audit.cpp",
         "db/commands.cpp",
@@ -516,11 +521,13 @@ env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evalua
                 LIBDEPS=['bson_template_evaluator'])
 
 if usev8:
-    env.Library('scripting', scripting_common_files + ['scripting/engine_v8' + v8suffix + '.cpp',
-                                                       'scripting/v8' + v8suffix + '_db.cpp',
-                                                       'scripting/v8' + v8suffix + '_utils.cpp',
-                                                       'scripting/v8' + v8suffix +
-                                                       '_profiler.cpp'],
+    scriptingEnv = env.Clone()
+    scriptingEnv.InjectThirdPartyIncludePaths(libraries=['v8'])
+    scriptingEnv.Library('scripting',
+                         scripting_common_files + ['scripting/engine_v8' + v8suffix + '.cpp',
+                                                   'scripting/v8' + v8suffix + '_db.cpp',
+                                                   'scripting/v8' + v8suffix + '_utils.cpp',
+                                                   'scripting/v8' + v8suffix + '_profiler.cpp'],
                  LIBDEPS=['bson_template_evaluator', '$BUILD_DIR/third_party/shim_v8'])
 else:
     env.Library('scripting', scripting_common_files + ['scripting/engine_none.cpp'],
@@ -900,6 +907,8 @@ env.CppUnitTest('range_deleter_test',
                     'range_deleter',
                 ])
 
+serveronlyEnv = env.Clone()
+serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = ["coreshard",
                      "db/auth/authmongod",
                      "db/fts/ftsmongod",
@@ -931,8 +940,8 @@ serveronlyLibdeps = ["coreshard",
 if has_option("rocksdb" ):
     serveronlyLibdeps.append( 'db/storage/rocks/storage_rocks' )
 
-env.Library("serveronly", serverOnlyFiles,
-            LIBDEPS=serveronlyLibdeps )
+serveronlyEnv.Library("serveronly", serverOnlyFiles,
+                      LIBDEPS=serveronlyLibdeps )
 
 env.Library("message_server_port", "util/net/message_server_port.cpp")
 
@@ -1080,9 +1089,9 @@ env.Library('mocklib', [
     ],
     LIBDEPS=['clientdriver'])
 
-test = testEnv.Install(
+test = env.Install(
     '#/',
-    testEnv.Program("dbtest",
+    env.Program("dbtest",
                     [ f for f in Glob("dbtests/*.cpp")
                       if not str(f).endswith('framework.cpp') and
                          not str(f).endswith('framework_options.cpp') and
@@ -1105,10 +1114,10 @@ test = testEnv.Install(
                        "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
                        "$BUILD_DIR/mongo/db/repl/replmocks"]))
 
-if len(testEnv.subst('$PROGSUFFIX')):
-    testEnv.Alias( "dbtest", "#/${PROGPREFIX}dbtest${PROGSUFFIX}" )
+if len(env.subst('$PROGSUFFIX')):
+    env.Alias( "dbtest", "#/${PROGPREFIX}dbtest${PROGSUFFIX}" )
 
-env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
+env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
 
 # --- sniffer ---
 mongosniff_built = False
@@ -1167,7 +1176,8 @@ coreShellFiles = [ "shell/bench.cpp",
                    "shell/mk_wcwidth.cpp",
                    "shell/shell_options_init.cpp" ]
 
-if shellEnv is not None:
+if not has_option('noshell'):
+
     env.Library("shell_core", coreShellFiles,
                 LIBDEPS=['clientandshell',
                          'db/index/external_key_generator',
@@ -1178,6 +1188,10 @@ if shellEnv is not None:
     # mongo shell options
     env.Library("shell_options", ["shell/shell_options.cpp"],
                 LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser_init'])
+
+    shellEnv = env.Clone()
+    if windows:
+        shellEnv.Append(LIBS=["winmm.lib"])
 
     mongo_shell = shellEnv.Program(
         "mongo",
@@ -1242,7 +1256,7 @@ installBinary( env, "mongod" )
 installBinary( env, "mongos" )
 
 if shellEnv is not None:
-    installBinary( env, "mongo" )
+    installBinary( shellEnv, "mongo" )
 
 env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
 

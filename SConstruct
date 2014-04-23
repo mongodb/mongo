@@ -541,9 +541,7 @@ if has_option( "cpppath" ):
 env.Prepend( CPPDEFINES=[ "_SCONS" , 
                           "MONGO_EXPOSE_MACROS" ,
                           "SUPPORT_UTF8" ],  # for pcre
-
-
-             CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
+)
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
@@ -863,26 +861,11 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
-if not use_system_version_of_library("pcre"):
-    env.Prepend(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
-
 boostSuffix = "";
-
 if not use_system_version_of_library("boost"):
-    if get_option( "internal-boost") == "1.49":
-        env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'])
-    else:
-        env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost-1.55.0'])
+    if get_option( "internal-boost") != "1.49":
         boostSuffix = "-1.55.0"
     env.Prepend(CPPDEFINES=['BOOST_ALL_NO_LIB'])
-
-env.Prepend(CPPPATH=['$BUILD_DIR/third_party/s2'])
-
-if not use_system_version_of_library("stemmer"):
-    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/libstemmer_c/include'])
-
-if not use_system_version_of_library("snappy"):
-    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/snappy'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
@@ -1751,18 +1734,6 @@ env = doConfigure( env )
 
 env['PDB'] = '${TARGET.base}.pdb'
 
-testEnv = env.Clone()
-testEnv.Append( CPPPATH=["../"] )
-
-shellEnv = None
-if noshell:
-    print( "not building shell" )
-elif not onlyServer:
-    shellEnv = env.Clone();
-
-    if windows:
-        shellEnv.Append( LIBS=["winmm.lib"] )
-
 enforce_glibc = linux and releaseBuild and not has_option("no-glibc-check")
 
 def checkErrorCodes():
@@ -1874,11 +1845,6 @@ distFile = "${SERVER_ARCHIVE}"
 
 env['NIX_LIB_DIR'] = nixLibPrefix
 env['INSTALL_DIR'] = installDir
-if testEnv is not None:
-    testEnv['INSTALL_DIR'] = installDir
-if shellEnv is not None:
-    shellEnv['INSTALL_DIR'] = installDir
-
 
 #  ---- CONVENIENCE ----
 
@@ -1971,8 +1937,6 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 # conditional decision making that hasn't been moved up to this SConstruct file,
 # and they are exported here, as well.
 Export("env")
-Export("shellEnv")
-Export("testEnv")
 Export("get_option")
 Export("has_option use_system_version_of_library")
 Export("mongoCodeVersion")
@@ -1985,6 +1949,10 @@ Export("debugBuild optBuild")
 Export("enforce_glibc")
 Export("s3push")
 Export("use_clang")
+
+def injectMongoIncludePaths(thisEnv):
+    thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
+env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 env.SConscript(['SConscript.buildinfo', 'SConscript.smoke'])
