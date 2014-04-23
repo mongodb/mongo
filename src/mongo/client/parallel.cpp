@@ -620,10 +620,8 @@ namespace mongo {
     
     void ParallelSortClusteredCursor::startInit() {
 
-        bool returnPartial = ( _qSpec.options() & QueryOption_PartialResults );
-        bool specialVersion = _cInfo.versionedNS.size() > 0;
-        bool specialFilter = ! _cInfo.cmdFilter.isEmpty();
-        NamespaceString ns( specialVersion ? _cInfo.versionedNS : _qSpec.ns() );
+        const bool returnPartial = ( _qSpec.options() & QueryOption_PartialResults );
+        NamespaceString ns( !_cInfo.isEmpty() ? _cInfo.versionedNS : _qSpec.ns() );
 
         ChunkManagerPtr manager;
         ShardPtr primary;
@@ -662,7 +660,7 @@ namespace mongo {
                 }
             }
 
-            if( manager ) manager->getShardsForQuery( todo, specialFilter ? _cInfo.cmdFilter : _qSpec.filter() );
+            if( manager ) manager->getShardsForQuery( todo, !_cInfo.isEmpty() ? _cInfo.cmdFilter : _qSpec.filter() );
             else if( primary ) todo.insert( *primary );
 
             // Close all cursors on extra shards first, as these will be invalid
