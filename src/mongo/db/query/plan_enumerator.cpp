@@ -51,7 +51,7 @@ namespace {
      * Returns true if either 'node' or a descendent of 'node'
      * is a predicate that is required to use an index.
      */
-    bool isIndexMandatory(const MatchExpression* node) {
+    bool expressionRequiresIndex(const MatchExpression* node) {
         return CanonicalQuery::countNodes(node, MatchExpression::GEO_NEAR) > 0
             || CanonicalQuery::countNodes(node, MatchExpression::TEXT) > 0;
     }
@@ -330,7 +330,14 @@ namespace mongo {
                 return false;
             }
 
-            // Indices we *must* use.  TEXT or GEO.
+            // There can only be one mandatory predicate (at most one $text, at most one
+            // $geoNear, can't combine $text/$geoNear).
+            MatchExpression* mandatoryPred = NULL;
+
+            // There could be multiple indices which we could use to satisfy the mandatory
+            // predicate. Keep the set of such indices. Currently only one text index is
+            // allowed per collection, but there could be multiple 2d or 2dsphere indices
+            // available to answer a $geoNear predicate.
             set<IndexID> mandatoryIndices;
 
             // Go through 'indexedPreds' and add the predicates to the
@@ -340,25 +347,36 @@ namespace mongo {
 
                 invariant(Indexability::nodeCanUseIndexOnOwnField(child));
 
-                bool childRequiresIndex = isIndexMandatory(child);
-
                 RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
+
+                if (expressionRequiresIndex(child)) {
+                    // 'child' is a predicate which *must* be tagged with an index.
+                    // This should include only TEXT and GEO_NEAR preds.
+
+                    // We expect either 0 or 1 mandatory predicates.
+                    invariant(NULL == mandatoryPred);
+
+                    // Mandatory predicates are TEXT or GEO_NEAR.
+                    invariant(MatchExpression::TEXT == child->matchType() ||
+                              MatchExpression::GEO_NEAR == child->matchType());
+
+                    // The mandatory predicate must have a corresponding "mandatory index".
+                    invariant(rt->first.size() != 0 || rt->notFirst.size() != 0);
+
+                    mandatoryPred = child;
+
+                    // Find all of the indices that could be used to satisfy the pred,
+                    // and add them to the 'mandatoryIndices' set.
+                    mandatoryIndices.insert(rt->first.begin(), rt->first.end());
+                    mandatoryIndices.insert(rt->notFirst.begin(), rt->notFirst.end());
+                }
 
                 for (size_t j = 0; j < rt->first.size(); ++j) {
                     idxToFirst[rt->first[j]].push_back(child);
-                    if (childRequiresIndex) {
-                        // We could have >1 index that could be used to answer the pred for
-                        // things like geoNear.  Just pick the first and make it mandatory.
-                        mandatoryIndices.insert(rt->first[j]);
-                    }
                 }
 
                 for (size_t j = 0 ; j< rt->notFirst.size(); ++j) {
                     idxToNotFirst[rt->notFirst[j]].push_back(child);
-                    if (childRequiresIndex) {
-                        // See comment above about mandatory indices.
-                        mandatoryIndices.insert(rt->notFirst[j]);
-                    }
                 }
             }
 
@@ -387,49 +405,11 @@ namespace mongo {
                 return true;
             }
 
-            // Only near queries and text queries have mandatory indices.
-            // In this case there's no point to enumerating anything here; both geoNear
-            // and text do fetches internally so we can't use any other indices in conjunction.
-            if (mandatoryIndices.size() > 0) {
-                // Just use the first mandatory index, why not.
-                IndexToPredMap::iterator it = idxToFirst.find(*mandatoryIndices.begin());
-
-                OneIndexAssignment indexAssign;
-
-                // This is the index we assign to.
-                indexAssign.index = it->first;
-
-                const IndexEntry& thisIndex = (*_indices)[it->first];
-
-                // If the index is multikey, we only assign one pred to it.  We also skip
-                // compounding.  TODO: is this also true for 2d and 2dsphere indices?  can they be
-                // multikey but still compoundable?  (How do we get covering for them?)
-                if (thisIndex.multikey && (INDEX_TEXT != thisIndex.type)) {
-                    indexAssign.preds.push_back(it->second[0]);
-                    indexAssign.positions.push_back(0);
-                }
-                else {
-                    // The index isn't multikey.  Assign all preds to it.  The planner will
-                    // do something smart with the bounds.
-                    indexAssign.preds = it->second;
-
-                    // Since everything in assign.preds prefixes the index, they all go
-                    // at position '0' in the index, the first position.
-                    indexAssign.positions.resize(indexAssign.preds.size(), 0);
-
-                    // And now we begin compound analysis.
-
-                    // Find everything that could use assign.index but isn't a pred over
-                    // the first field of that index.
-                    IndexToPredMap::iterator compIt = idxToNotFirst.find(indexAssign.index);
-                    if (compIt != idxToNotFirst.end()) {
-                        compound(compIt->second, thisIndex, &indexAssign);
-                    }
-                }
-
-                AndEnumerableState state;
-                state.assignments.push_back(indexAssign);
-                andAssignment->choices.push_back(state);
+            if (NULL != mandatoryPred) {
+                // We must have at least one index which can be used to answer 'mandatoryPred'.
+                invariant(!mandatoryIndices.empty());
+                enumerateMandatoryIndex(idxToFirst, idxToNotFirst, mandatoryPred,
+                                        mandatoryIndices, andAssignment);
                 return true;
             }
 
@@ -444,6 +424,122 @@ namespace mongo {
 
         // Don't know what the node is at this point.
         return false;
+    }
+
+    void PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
+                                                 const IndexToPredMap& idxToNotFirst,
+                                                 MatchExpression* mandatoryPred,
+                                                 const set<IndexID>& mandatoryIndices,
+                                                 AndAssignment* andAssignment) {
+        // Generate index assignments for each index in 'mandatoryIndices'. We
+        // must assign 'mandatoryPred' to one of these indices, but we try all
+        // possibilities in 'mandatoryIndices' because some might be better than
+        // others for this query.
+        for (set<IndexID>::const_iterator indexIt = mandatoryIndices.begin();
+                indexIt != mandatoryIndices.end();
+                ++indexIt) {
+
+            // We have a predicate which *must* be tagged to use an index.
+            // Get the index entry for the index it should use.
+            const IndexEntry& thisIndex = (*_indices)[*indexIt];
+
+            // Only text, 2d, and 2dsphere index types should be able to satisfy
+            // mandatory predicates.
+            invariant(INDEX_TEXT == thisIndex.type ||
+                      INDEX_2D == thisIndex.type ||
+                      INDEX_2DSPHERE == thisIndex.type);
+
+            OneIndexAssignment indexAssign;
+            indexAssign.index = *indexIt;
+
+            IndexToPredMap::const_iterator it = idxToFirst.find(*indexIt);
+            const vector<MatchExpression*>& predsOverLeadingField = it->second;
+
+            if (thisIndex.multikey) {
+                // Special handling for multikey mandatory indices.
+                if (predsOverLeadingField.end() != std::find(predsOverLeadingField.begin(),
+                                                             predsOverLeadingField.end(),
+                                                             mandatoryPred)) {
+                    // The mandatory predicate is over the first field of the index. Assign
+                    // it now.
+                    indexAssign.preds.push_back(mandatoryPred);
+                    indexAssign.positions.push_back(0);
+                }
+                else {
+                    // The mandatory pred is notFirst. Assign an arbitrary predicate
+                    // over the first position.
+                    invariant(!predsOverLeadingField.empty());
+                    indexAssign.preds.push_back(predsOverLeadingField[0]);
+                    indexAssign.positions.push_back(0);
+
+                    // Assign the mandatory predicate at the matching position in the compound
+                    // index. We do this in order to ensure that the mandatory predicate (and not
+                    // some other predicate over the same position in the compound index) gets
+                    // assigned.
+                    //
+                    // The bad thing that could happen otherwise: A non-mandatory predicate gets
+                    // chosen by getMultikeyCompoundablePreds(...) instead of 'mandatoryPred'.
+                    // We would then fail to assign the mandatory predicate, and hence generate
+                    // a bad data access plan.
+                    //
+                    // The mandatory predicate is assigned by calling compound(...) because
+                    // compound(...) has logic for matching up a predicate with the proper
+                    // position in the compound index.
+                    vector<MatchExpression*> mandatoryToCompound;
+                    mandatoryToCompound.push_back(mandatoryPred);
+                    compound(mandatoryToCompound, thisIndex, &indexAssign);
+
+                    // At this point we have assigned a predicate over the leading field and
+                    // we have assigned the mandatory predicate to a trailing field.
+                    //
+                    // Ex:
+                    //   Say we have index {a: 1, b: 1, c: "2dsphere", d: 1}. Also suppose that
+                    //   there is a $near predicate over "c", with additional predicates over
+                    //   "a", "b", "c", and "d". We will have assigned the $near predicate at
+                    //   position 2 and a predicate with path "a" at position 0.
+                }
+
+                // Compound remaining predicates in a multikey-safe way.
+                IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
+                if (compIt != idxToNotFirst.end()) {
+                    const vector<MatchExpression*>& couldCompound = compIt->second;
+                    vector<MatchExpression*> tryCompound;
+
+                    getMultikeyCompoundablePreds(indexAssign.preds, couldCompound, &tryCompound);
+                    if (tryCompound.size()) {
+                        compound(tryCompound, thisIndex, &indexAssign);
+                    }
+                }
+            }
+            else {
+                // For non-multikey, we don't have to do anything too special.
+                // Just assign all "first" predicates and try to compound like usual.
+                indexAssign.preds = it->second;
+
+                // Since everything in assign.preds prefixes the index, they all go
+                // at position '0' in the index, the first position.
+                indexAssign.positions.resize(indexAssign.preds.size(), 0);
+
+                // And now we begin compound analysis.
+
+                // Find everything that could use assign.index but isn't a pred over
+                // the first field of that index.
+                IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
+                if (compIt != idxToNotFirst.end()) {
+                    compound(compIt->second, thisIndex, &indexAssign);
+                }
+            }
+
+            // The mandatory predicate must be assigned.
+            invariant(indexAssign.preds.end() != std::find(indexAssign.preds.begin(),
+                                                           indexAssign.preds.end(),
+                                                           mandatoryPred));
+
+            // Output the assignments for this index.
+            AndEnumerableState state;
+            state.assignments.push_back(indexAssign);
+            andAssignment->choices.push_back(state);
+        }
     }
 
     void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
@@ -514,7 +610,7 @@ namespace mongo {
 
                     // ...select the predicates that are safe to compound and try to
                     // compound them.
-                    getMultikeyCompoundablePreds(indexAssign.preds[0], couldCompound, &tryCompound);
+                    getMultikeyCompoundablePreds(indexAssign.preds, couldCompound, &tryCompound);
                     if (tryCompound.size()) {
                         compound(tryCompound, thisIndex, &indexAssign);
                     }
@@ -844,7 +940,7 @@ namespace mongo {
                 partitionPreds(child, context, indexOut, subnodesOut, mandatorySubnodes);
             }
             else {
-                bool mandatory = isIndexMandatory(child);
+                bool mandatory = expressionRequiresIndex(child);
 
                 // Recursively prepMemo for the subnode. We fall through
                 // to this case for logical nodes other than AND (e.g. OR)
@@ -872,7 +968,7 @@ namespace mongo {
         return true;
     }
 
-    void PlanEnumerator::getMultikeyCompoundablePreds(const MatchExpression* assigned,
+    void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>& assigned,
                                                       const vector<MatchExpression*>& couldCompound,
                                                       vector<MatchExpression*>* out) {
         // Map from a particular $elemMatch expression to the set of prefixes
@@ -887,28 +983,31 @@ namespace mongo {
         // of the used prefixes both inside and outside of an $elemMatch context.
         unordered_map<MatchExpression*, set<string> > used;
 
-        // Initialize 'used' with the starting predicate, 'assigned'. Begin by
+        // Initialize 'used' with the starting predicates in 'assigned'. Begin by
         // initializing the top-level scope with the prefix of the full path.
-        invariant(NULL != assigned->getTag());
-        RelevantTag* usedRt = static_cast<RelevantTag*>(assigned->getTag());
-        set<string> usedPrefixes;
-        usedPrefixes.insert(getPathPrefix(usedRt->path));
-        used[NULL] = usedPrefixes;
+        for (size_t i = 0; i < assigned.size(); i++) {
+            const MatchExpression* assignedPred = assigned[i];
+            invariant(NULL != assignedPred->getTag());
+            RelevantTag* usedRt = static_cast<RelevantTag*>(assignedPred->getTag());
+            set<string> usedPrefixes;
+            usedPrefixes.insert(getPathPrefix(usedRt->path));
+            used[NULL] = usedPrefixes;
 
-        // If 'assigned' is a predicate inside an $elemMatch, we have to
-        // add the prefix not only to the top-level context, but also to the
-        // the $elemMatch context. For example, if 'assigned' is {a: {$elemMatch: {b: 1}}},
-        // then we will have already added "a" to the set for NULL. We now
-        // also need to add "b" to the set for the $elemMatch.
-        if (NULL != usedRt->elemMatchExpr) {
-            set<string> elemMatchUsed;
-            // Whereas getPathPrefix(usedRt->path) is the prefix of the full path,
-            // usedRt->pathPrefix contains the prefix of the portion of the
-            // path that is inside the $elemMatch. These two prefixes are the same
-            // in the top-level context, but here must be different because 'usedRt'
-            // is in an $elemMatch context.
-            elemMatchUsed.insert(usedRt->pathPrefix);
-            used[usedRt->elemMatchExpr] = elemMatchUsed;
+            // If 'assigned' is a predicate inside an $elemMatch, we have to
+            // add the prefix not only to the top-level context, but also to the
+            // the $elemMatch context. For example, if 'assigned' is {a: {$elemMatch: {b: 1}}},
+            // then we will have already added "a" to the set for NULL. We now
+            // also need to add "b" to the set for the $elemMatch.
+            if (NULL != usedRt->elemMatchExpr) {
+                set<string> elemMatchUsed;
+                // Whereas getPathPrefix(usedRt->path) is the prefix of the full path,
+                // usedRt->pathPrefix contains the prefix of the portion of the
+                // path that is inside the $elemMatch. These two prefixes are the same
+                // in the top-level context, but here must be different because 'usedRt'
+                // is in an $elemMatch context.
+                elemMatchUsed.insert(usedRt->pathPrefix);
+                used[usedRt->elemMatchExpr] = elemMatchUsed;
+            }
         }
 
         for (size_t i = 0; i < couldCompound.size(); ++i) {

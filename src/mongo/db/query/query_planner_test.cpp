@@ -1464,9 +1464,40 @@ namespace {
         assertSolutionExists("{fetch: {node: {geoNear2dsphere: {loc: '2dsphere'}}}}");
     }
 
+    TEST_F(QueryPlannerTest, Multikey2DSphereCompound) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << 1), true);
+        addIndex(BSON("loc" << "2dsphere"), true);
+
+        runQuery(fromjson("{loc:{$near:{$geometry:{type:'Point',"
+                                                  "coordinates : [-81.513743,28.369947] },"
+                               " $maxDistance :100}},a: 'mouse'}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {geoNear2dsphere: {loc: '2dsphere'}}}}");
+    }
+
     TEST_F(QueryPlannerTest, Basic2DSphereNonNear) {
         // 2dsphere can do: within+geometry, intersects+geometry
         addIndex(BSON("a" << "2dsphere"));
+
+        runQuery(fromjson("{a: {$geoIntersects: {$geometry: {type: 'Point',"
+                                                           "coordinates: [10.0, 10.0]}}}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
+
+        runQuery(fromjson("{a : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
+
+        // TODO: test that we *don't* annotate for things we shouldn't.
+    }
+
+    TEST_F(QueryPlannerTest, Multikey2DSphereNonNear) {
+        // 2dsphere can do: within+geometry, intersects+geometry
+        // true means multikey
+        addIndex(BSON("a" << "2dsphere"), true);
 
         runQuery(fromjson("{a: {$geoIntersects: {$geometry: {type: 'Point',"
                                                            "coordinates: [10.0, 10.0]}}}}"));
@@ -1504,9 +1535,33 @@ namespace {
         assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
     }
 
+    TEST_F(QueryPlannerTest, Multikey2DSphereGeoNear) {
+        // Can do nearSphere + old point, near + new point.
+        // true means multikey
+        addIndex(BSON("a" << "2dsphere"), true);
+
+        runQuery(fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
+
+        runQuery(fromjson("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
+                                          "$maxDistance:100}}}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{geoNear2dsphere: {a: '2dsphere'}}");
+    }
+
     TEST_F(QueryPlannerTest, Basic2DSphereGeoNearReverseCompound) {
         addIndex(BSON("x" << 1));
         addIndex(BSON("x" << 1 << "a" << "2dsphere"));
+        runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{geoNear2dsphere: {x: 1, a: '2dsphere'}}");
+    }
+
+    TEST_F(QueryPlannerTest, Multikey2DSphereGeoNearReverseCompound) {
+        addIndex(BSON("x" << 1), true);
+        addIndex(BSON("x" << 1 << "a" << "2dsphere"), true);
         runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
 
         assertNumSolutions(1U);
@@ -1520,6 +1575,15 @@ namespace {
 
     TEST_F(QueryPlannerTest, TwoDSphereNoGeoPred) {
         addIndex(BSON("x" << 1 << "a" << "2dsphere"));
+        runQuery(fromjson("{x:1}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1, a: '2dsphere'}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, TwoDSphereNoGeoPredMultikey) {
+        addIndex(BSON("x" << 1 << "a" << "2dsphere"), true);
         runQuery(fromjson("{x:1}"));
 
         assertNumSolutions(2U);
@@ -1563,6 +1627,22 @@ namespace {
                                            "{fetch: {node: {ixscan: {pattern: {b: '2dsphere'}}}}}]}}");
     }
 
+    // SERVER-3984, $or 2dsphere index
+    TEST_F(QueryPlannerTest, Or2DSphereNonNearMultikey) {
+        // true means multikey
+        addIndex(BSON("a" << "2dsphere"), true);
+        addIndex(BSON("b" << "2dsphere"), true);
+        runQuery(fromjson("{$or: [ {a: {$geoIntersects: {$geometry: "
+                                        "{type: 'Point', coordinates: [10.0, 10.0]}}}},"
+                                 " {b: {$geoWithin: { $centerSphere: [[ 10, 20 ], 0.01 ] } }} ]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: "
+                                "[{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
+                                "{fetch: {node: {ixscan: {pattern: {b: '2dsphere'}}}}}]}}");
+    }
+
     TEST_F(QueryPlannerTest, And2DSameFieldNonNear) {
         addIndex(BSON("a" << "2d"));
         runQuery(fromjson("{$and: [ {a : { $within : { $polygon : [[0,0], [2,0], [4,0]] } }},"
@@ -1598,8 +1678,36 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, And2DSphereSameFieldNonNearMultikey) {
+        // true means multikey
+        addIndex(BSON("a" << "2dsphere"), true);
+        runQuery(fromjson("{$and: [ {a: {$geoIntersects: {$geometry: "
+                                        "{type: 'Point', coordinates: [3.0, 1.0]}}}},"
+                                 "  {a: {$geoIntersects: {$geometry: "
+                                        "{type: 'Point', coordinates: [4.0, 1.0]}}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        // Bounds of the two 2dsphere geo predicates are combined into
+        // a single index scan.
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
+    }
+
     TEST_F(QueryPlannerTest, And2DSphereWithNearSameField) {
         addIndex(BSON("a" << "2dsphere"));
+        runQuery(fromjson("{$and: [{a: {$geoIntersects: {$geometry: "
+                                        "{type: 'Point', coordinates: [3.0, 1.0]}}}},"
+                                  "{a: {$near: {$geometry: "
+                                        "{type: 'Point', coordinates: [10.0, 10.0]}}}}]}"));
+
+        // GEO_NEAR must use the index, and GEO predicate becomes a filter.
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, And2DSphereWithNearSameFieldMultikey) {
+        // true means multikey
+        addIndex(BSON("a" << "2dsphere"), true);
         runQuery(fromjson("{$and: [{a: {$geoIntersects: {$geometry: "
                                         "{type: 'Point', coordinates: [3.0, 1.0]}}}},"
                                   "{a: {$near: {$geometry: "
@@ -1622,6 +1730,99 @@ namespace {
         assertSolutionExists("{or: {nodes: ["
                                 "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
                                 "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}]}}");
+    }
+
+    TEST_F(QueryPlannerTest, Or2DSphereSameFieldNonNearMultikey) {
+        // true means multikey
+        addIndex(BSON("a" << "2dsphere"), true);
+        runQuery(fromjson("{$or: [ {a: {$geoIntersects: {$geometry: "
+                                      "{type: 'Point', coordinates: [3.0, 1.0]}}}},"
+                                 "  {a: {$geoIntersects: {$geometry: "
+                                      "{type: 'Point', coordinates: [4.0, 1.0]}}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{or: {nodes: ["
+                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
+                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}]}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNear) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << "2dsphere"), true);
+        runQuery(fromjson("{a: {$gte: 0}, b: {$near: {$geometry: "
+                                             "{type: 'Point', coordinates: [2, 2]}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{geoNear2dsphere: {a: 1, b: '2dsphere'}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearFetchRequired) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << "2dsphere"), true);
+        runQuery(fromjson("{a: {$gte: 0, $lt: 5}, b: {$near: {$geometry: "
+                                                     "{type: 'Point', coordinates: [2, 2]}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a:{$gte:0}}, node: "
+                                "{geoNear2dsphere: {a: 1, b: '2dsphere'}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleIndices) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << "2dsphere"), true);
+        addIndex(BSON("c" << 1 << "b" << "2dsphere"), true);
+        runQuery(fromjson("{a: {$gte: 0}, c: 3, b: {$near: {$geometry: "
+                                                     "{type: 'Point', coordinates: [2, 2]}}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{fetch: {filter: {c:3}, node: "
+                                "{geoNear2dsphere: {a: 1, b: '2dsphere'}}}}");
+        assertSolutionExists("{fetch: {filter: {a:{$gte:0}}, node: "
+                                "{geoNear2dsphere: {c: 1, b: '2dsphere'}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleLeadingFields) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << 1 << "c" << "2dsphere"), true);
+        runQuery(fromjson("{a: {$lt: 5, $gt: 1}, b: 6, c: {$near: {$geometry: "
+                            "{type: 'Point', coordinates: [2, 2]}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a:{$gt:1}}, node: "
+                                "{geoNear2dsphere: {a: 1, b: 1, c: '2dsphere'}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearMultipleGeoPreds) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << 1 << "c" << "2dsphere"), true);
+        runQuery(fromjson("{a: 1, b: 6, $and: ["
+                            "{c: {$near: {$geometry: {type: 'Point', coordinates: [2, 2]}}}},"
+                            "{c: {$geoWithin: {$box: [ [1, 1], [3, 3] ] } } } ] }"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a:1, b:1, c:'2dsphere'}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNearCompoundTest) {
+        // true means multikey
+        addIndex(BSON("a" << 1 << "b" << "2dsphere" << "c" << 1 << "d" << 1), true);
+        runQuery(fromjson("{a: {$gte: 0}, c: {$gte: 0, $lt: 4}, d: {$gt: 1, $lt: 5},"
+                               "b: {$near: {$geometry: "
+                                    "{type: 'Point', coordinates: [2, 2]}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {d:{$gt:1},c:{$gte:0}}, node: "
+                                "{geoNear2dsphere: {a: 1, b: '2dsphere', c: 1, d: 1}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CompoundMultikey2DNear) {
+        // true means multikey
+        addIndex(BSON("a" << "2d" << "b" << 1), true);
+        runQuery(fromjson("{a: {$near: [0, 0]}, b: {$gte: 0}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{geoNear2d: {a: '2d', b: 1}}");
     }
 
     //
@@ -1932,9 +2133,38 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {timestamp: -1, position: '2dsphere'}}}}}");
     }
 
+    // SERVER-10801
+    TEST_F(QueryPlannerTest, SortOnGeoQueryMultikey) {
+        // true means multikey
+        addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"), true);
+        BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", "
+            "coordinates: [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}");
+        BSONObj sort = fromjson("{timestamp: -1}");
+        runQuerySortProj(query, sort, BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {timestamp: -1}, limit: 0, "
+                                "node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: "
+                                "{timestamp: -1, position: '2dsphere'}}}}}");
+    }
+
     // SERVER-9257
     TEST_F(QueryPlannerTest, CompoundGeoNoGeoPredicate) {
         addIndex(BSON("creationDate" << 1 << "foo.bar" << "2dsphere"));
+        runQuerySortProj(fromjson("{creationDate: { $gt: 7}}"),
+                         fromjson("{creationDate: 1}"), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {creationDate: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {creationDate: 1, 'foo.bar': '2dsphere'}}}}}");
+    }
+
+    // SERVER-9257
+    TEST_F(QueryPlannerTest, CompoundGeoNoGeoPredicateMultikey) {
+        // true means multikey
+        addIndex(BSON("creationDate" << 1 << "foo.bar" << "2dsphere"), true);
         runQuerySortProj(fromjson("{creationDate: { $gt: 7}}"),
                          fromjson("{creationDate: 1}"), BSONObj());
 
@@ -2505,6 +2735,28 @@ namespace {
     TEST_F(QueryPlannerTest, Negation2DSphereGeoNear) {
         // Can do nearSphere + old point, near + new point.
         addIndex(BSON("a" << "2dsphere"));
+
+        runQuery(fromjson("{$and: [{a: {$nearSphere: [0,0], $maxDistance: 0.31}}, "
+                          "{b: {$ne: 1}}]}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+
+        runQuery(fromjson("{$and: [{a: {$geoNear: {$geometry: {type: 'Point', "
+                                                              "coordinates: [0, 0]},"
+                                                  "$maxDistance: 100}}},"
+                                  "{b: {$ne: 1}}]}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {geoNear2dsphere: {a: '2dsphere'}}}}");
+    }
+
+    //
+    // 2DSphere geo negation
+    // Filter is embedded in a separate fetch node.
+    //
+    TEST_F(QueryPlannerTest, Negation2DSphereGeoNearMultikey) {
+        // Can do nearSphere + old point, near + new point.
+        // true means multikey
+        addIndex(BSON("a" << "2dsphere"), true);
 
         runQuery(fromjson("{$and: [{a: {$nearSphere: [0,0], $maxDistance: 0.31}}, "
                           "{b: {$ne: 1}}]}"));
