@@ -393,9 +393,11 @@ off_page:		ikey = key;
 			 * prefix (and also setting the final buffer size);
 			 * Append the key to the prefix (already in the buffer).
 			 */
-			WT_ERR(__wt_buf_initsize(
-			    session, retb, size + unpack->prefix));
+			if (retb->memsize < size + unpack->prefix)
+				WT_ERR(__wt_buf_grow(
+				    session, retb, size + unpack->prefix));
 			memcpy((uint8_t *)retb->data + unpack->prefix, p, size);
+			retb->size = size + unpack->prefix;
 
 			if (slot_offset == 0)
 				break;
