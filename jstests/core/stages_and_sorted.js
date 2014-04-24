@@ -1,5 +1,6 @@
 t = db.stages_and_sorted;
 t.drop();
+var collname = "stages_and_sorted";
 
 var N = 10;
 for (var i = 0; i < N; ++i) {
@@ -38,13 +39,13 @@ ixscan3 = {ixscan: {args:{name: "stages_and_sorted", keyPattern:{baz: 1},
 
 // Intersect foo==1 with bar==1 with baz==12.
 andix1ix2 = {andSorted: {args: {nodes: [ixscan1, ixscan2, ixscan3]}}};
-res = db.runCommand({stageDebug: andix1ix2});
+res = db.runCommand({stageDebug: {collection: collname, plan: andix1ix2}});
 printjson(res);
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, N);
 
 // Might as well make sure that hashed does the same thing.
 andix1ix2hash = {andHash: {args: {nodes: [ixscan1, ixscan2, ixscan3]}}};
-res = db.runCommand({stageDebug: andix1ix2hash});
+res = db.runCommand({stageDebug: {collection: collname, plan: andix1ix2hash}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, N);

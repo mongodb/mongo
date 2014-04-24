@@ -55,7 +55,7 @@ namespace mongo {
     /**
      * A command for manually constructing a query tree and running it.
      *
-     * db.runCommand({stageDebug: rootNode})
+     * db.runCommand({stageDebug: {collection: collname, plan: rootNode}})
      *
      * The value of the filter field is a BSONObj that specifies values that fields must have.  What
      * you'd pass to a matcher.
@@ -63,12 +63,12 @@ namespace mongo {
      * Leaf Nodes:
      *
      * node -> {ixscan: {filter: {FILTER},
-     *                   args: {name: "collectionname", indexKeyPattern: kpObj, start: startObj,
+     *                   args: {indexKeyPattern: kpObj, start: startObj,
      *                          stop: stopObj, endInclusive: true/false, direction: -1/1,
      *                          limit: int}}}
-     * node -> {cscan: {filter: {filter}, args: {name: "collectionname", direction: -1/1}}}
+     * node -> {cscan: {filter: {filter}, args: {direction: -1/1}}}
      * TODO: language for text.
-     * node -> {text: {filter: {filter}, args: {name: "collectionname", search: "searchstr"}}}
+     * node -> {text: {filter: {filter}, args: {search: "searchstr"}}}
      *
      * Internal Nodes:
      *
@@ -80,7 +80,6 @@ namespace mongo {
      * node -> {skip: {args: {node: node, num: posint}}}
      * node -> {sort: {args: {node: node, pattern: objWithSortCriterion }}}
      * node -> {mergeSort: {args: {nodes: [node, node], pattern: objWithSortCriterion}}}
-     * node -> {cscan: {filter: {filter}, args: {name: "collectionname" }}}
      *
      * Forthcoming Nodes:
      *
@@ -111,13 +110,34 @@ namespace mongo {
             if (argElt.eoo() || !argElt.isABSONObj()) { return false; }
             BSONObj argObj = argElt.Obj();
 
+            // Pull out the collection name.
+            BSONElement collElt = argObj["collection"];
+            if (collElt.eoo() || (String != collElt.type())) {
+                return false;
+            }
+            string collName = collElt.String();
+
+            // Need a context to get the actual Collection*
+            Client::ReadContext ctx(dbname);
+
+            // Make sure the collection is valid.
+            Database* db = ctx.ctx().db();
+            Collection* collection = db->getCollection(db->name() + '.' + collName);
+            uassert(17446, "Couldn't find the collection " + collName, NULL != collection);
+
+            // Pull out the plan
+            BSONElement planElt = argObj["plan"];
+            if (planElt.eoo() || !planElt.isABSONObj()) {
+                return false;
+            }
+            BSONObj planObj = planElt.Obj();
+
+            // Parse the plan into these.
             OwnedPointerVector<MatchExpression> exprs;
             auto_ptr<WorkingSet> ws(new WorkingSet());
 
-            Client::ReadContext ctx(dbname);
-
-            PlanStage* userRoot = parseQuery(ctx.ctx().db(), argObj, ws.get(), &exprs);
-            uassert(16911, "Couldn't parse plan from " + argObj.toString(), NULL != userRoot);
+            PlanStage* userRoot = parseQuery(collection, planObj, ws.get(), &exprs);
+            uassert(16911, "Couldn't parse plan from " + cmdObj.toString(), NULL != userRoot);
 
             // Add a fetch at the top for the user so we can get obj back for sure.
             // TODO: Do we want to do this for the user?  I think so.
@@ -135,8 +155,11 @@ namespace mongo {
             return true;
         }
 
-        PlanStage* parseQuery(Database* db, BSONObj obj, WorkingSet* workingSet,
+        PlanStage* parseQuery(Collection* collection,
+                              BSONObj obj,
+                              WorkingSet* workingSet,
                               OwnedPointerVector<MatchExpression>* exprs) {
+
             BSONElement firstElt = obj.firstElement();
             if (!firstElt.isABSONObj()) { return NULL; }
             BSONObj paramObj = firstElt.Obj();
@@ -174,13 +197,12 @@ namespace mongo {
             string nodeName = firstElt.fieldName();
 
             if ("ixscan" == nodeName) {
-
-                Collection* collection = db->getCollection( db->name() + "." + nodeArgs["name"].String() );
-                uassert(16913, "Can't find collection " + nodeArgs["name"].String(), collection);
+                // This'll throw if it's not an obj but that's OK.
+                BSONObj keyPatternObj = nodeArgs["keyPattern"].Obj();
 
                 IndexDescriptor* desc =
-                    collection->getIndexCatalog()->findIndexByKeyPattern(nodeArgs["keyPattern"].Obj());
-                uassert(16890, "Can't find index: " + nodeArgs["keyPattern"].Obj().toString(), desc );
+                    collection->getIndexCatalog()->findIndexByKeyPattern(keyPatternObj);
+                uassert(16890, "Can't find index: " + keyPatternObj.toString(), desc);
 
                 IndexScanParams params;
                 params.descriptor = desc;
@@ -205,7 +227,7 @@ namespace mongo {
                     uassert(16922, "node of AND isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
                     uassert(16923, "Can't parse sub-node of AND: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -231,7 +253,7 @@ namespace mongo {
                     uassert(16925, "node of AND isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
                     uassert(16926, "Can't parse sub-node of AND: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -254,7 +276,7 @@ namespace mongo {
                 while (it.more()) {
                     BSONElement e = it.next();
                     if (!e.isABSONObj()) { return NULL; }
-                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
                     uassert(16936, "Can't parse sub-node of OR: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -266,7 +288,10 @@ namespace mongo {
             else if ("fetch" == nodeName) {
                 uassert(16929, "Node argument must be provided to fetch",
                         nodeArgs["node"].isABSONObj());
-                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(collection,
+                                                nodeArgs["node"].Obj(),
+                                                workingSet,
+                                                exprs);
                 return new FetchStage(workingSet, subNode, matcher);
             }
             else if ("limit" == nodeName) {
@@ -276,7 +301,10 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16931, "Num argument must be provided to limit",
                         nodeArgs["num"].isNumber());
-                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(collection,
+                                                nodeArgs["node"].Obj(),
+                                                workingSet,
+                                                exprs);
                 return new LimitStage(nodeArgs["num"].numberInt(), workingSet, subNode);
             }
             else if ("skip" == nodeName) {
@@ -286,16 +314,15 @@ namespace mongo {
                         nodeArgs["node"].isABSONObj());
                 uassert(16933, "Num argument must be provided to skip",
                         nodeArgs["num"].isNumber());
-                PlanStage* subNode = parseQuery(db, nodeArgs["node"].Obj(), workingSet, exprs);
+                PlanStage* subNode = parseQuery(collection,
+                                                nodeArgs["node"].Obj(),
+                                                workingSet,
+                                                exprs);
                 return new SkipStage(nodeArgs["num"].numberInt(), workingSet, subNode);
             }
             else if ("cscan" == nodeName) {
                 CollectionScanParams params;
-
-                // What collection?
-                string ns = db->name() + "." + nodeArgs["name"].String();
-                params.collection = db->getCollection(ns);
-                uassert(16962, "Can't find collection " + ns, NULL != params.collection );
+                params.collection = collection;
 
                 // What direction?
                 uassert(16963, "Direction argument must be specified and be a number",
@@ -340,7 +367,7 @@ namespace mongo {
                     uassert(16973, "node of mergeSort isn't an obj?: " + e.toString(),
                             e.isABSONObj());
 
-                    PlanStage* subNode = parseQuery(db, e.Obj(), workingSet, exprs);
+                    PlanStage* subNode = parseQuery(collection, e.Obj(), workingSet, exprs);
                     uassert(16974, "Can't parse sub-node of mergeSort: " + e.Obj().toString(),
                             NULL != subNode);
                     // takes ownership
@@ -349,10 +376,8 @@ namespace mongo {
                 return mergeStage.release();
             }
             else if ("text" == nodeName) {
-                string ns = nodeArgs["name"].String();
                 string search = nodeArgs["search"].String();
-                Collection* collection = db->getCollection( ns );
-                uassert(17193, "Can't find namespace " + ns, collection);
+
                 vector<IndexDescriptor*> idxMatches;
                 collection->getIndexCatalog()->findIndexByType("text", idxMatches);
                 uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);

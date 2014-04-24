@@ -1,6 +1,8 @@
 t = db.stages_and_hashed;
 t.drop();
 
+var collname = "stages_and_hashed";
+
 var N = 50;
 for (var i = 0; i < N; ++i) {
     t.insert({foo: i, bar: N - i, baz: i});
@@ -23,20 +25,20 @@ ixscan2 = {ixscan: {args:{name: "stages_and_hashed", keyPattern:{bar: 1},
 // bar = 50 - foo
 // Intersection is (foo=0 bar=50, foo=1 bar=49, ..., foo=10 bar=40)
 andix1ix2 = {andHash: {args: { nodes: [ixscan1, ixscan2]}}}
-res = db.runCommand({stageDebug: andix1ix2});
+res = db.runCommand({stageDebug: {plan: andix1ix2, collection: collname}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, 11);
 
 // This should raise an error as we can't filter on baz since we haven't done a fetch and it's not
 // in the index data.
 andix1ix2badfilter = {andHash: {filter: {baz: 5}, args: {nodes: [ixscan1, ixscan2]}}};
-res = db.runCommand({stageDebug: andix1ix2badfilter});
+res = db.runCommand({stageDebug: {collection: collname, plan:andix1ix2badfilter}});
 assert.eq(res.ok, 0);
 
 // Filter predicates from 2 indices.  Tests that we union the idx info.
 andix1ix2filter = {andHash: {filter: {bar: {$in: [45, 46, 48]},
                                       foo: {$in: [4,5,6]}},
                              args: {nodes: [ixscan1, ixscan2]}}};
-res = db.runCommand({stageDebug: andix1ix2filter});
+res = db.runCommand({stageDebug: {collection: collname, plan: andix1ix2filter}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, 2);
