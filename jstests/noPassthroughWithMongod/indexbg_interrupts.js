@@ -77,7 +77,7 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     // Wait for the secondary to get the index entry
     assert.soon( function() { 
         return 2 == secondDB.system.indexes.count( {ns:dbname + "." + collection} ); }, 
-                 "index not created on secondary", 120000, 50 );
+                 "index not created on secondary", 240000 );
 
     jsTest.log("Index created and system.indexes entry exists on secondary");
 
