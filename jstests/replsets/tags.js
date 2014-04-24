@@ -102,7 +102,7 @@ master = replTest.getMaster();
 
 printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
 
-var timeout = 3000;
+var timeout = 6000;
 
 var options = { writeConcern: { w: "3 or 4", wtimeout: timeout }};
 var result = master.getDB("foo").bar.insert({ x: 1 }, options);
