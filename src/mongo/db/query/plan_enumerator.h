@@ -273,9 +273,9 @@ namespace mongo {
                             vector<MemoID>* mandatorySubnodes);
 
         /**
-         * Finds a set of predicates that can be safely compounded with 'assigned',
-         * under the assumption that we are assignining predicates to a compound,
-         * multikey index.
+         * Finds a set of predicates that can be safely compounded with the set
+         * of predicates in 'assigned', under the assumption that we are assigning
+         * predicates to a compound, multikey index.
          *
          * The list of candidate predicates that we could compound is passed
          * in 'couldCompound'. A subset of these predicates that is safe to
@@ -313,8 +313,28 @@ namespace mongo {
          *    2) {'a.b': 1, a: {$elemMatch: {b: {$gt: 0}}}}. We cannot combine the
          *    bounds here because the prefix 'a' is shared by two predicates which
          *    are not joined together by an $elemMatch.
+         *
+         * NOTE:
+         *   Usually 'assigned' has just one predicate. However, in order to support
+         *   mandatory predicate assignment (TEXT and GEO_NEAR), we allow multiple
+         *   already-assigned predicates to be passed. If a mandatory predicate is over
+         *   a trailing field in a multikey compound index, then we assign both a predicate
+         *   over the leading field as well as the mandatory predicate prior to calling
+         *   this function.
+         *
+         *   Ex:
+         *      Say we have index {a: 1, b: 1, c: "2dsphere", d: 1} as well as a $near
+         *      predicate and a $within predicate over "c". The $near predicate is mandatory
+         *      and must be assigned. The $within predicate is not mandatory. Furthermore,
+         *      it cannot be assigned in addition to the $near predicate because the index
+         *      is multikey.
+         *
+         *      In this case the enumerator must assign the $near predicate, and pass it in
+         *      in 'assigned'. Otherwise it would be possible to assign the $within predicate,
+         *      and then not assign the $near because the $within is already assigned (and
+         *      has the same path).
          */
-        void getMultikeyCompoundablePreds(const MatchExpression* assigned,
+        void getMultikeyCompoundablePreds(const vector<MatchExpression*>& assigned,
                                           const vector<MatchExpression*>& couldCompound,
                                           vector<MatchExpression*>* out);
 
@@ -363,6 +383,17 @@ namespace mongo {
                                const IndexToPredMap& idxToNotFirst,
                                const vector<MemoID>& subnodes,
                                AndAssignment* andAssignment);
+
+        /**
+         * Generate single-index assignments for queries which contain mandatory
+         * predicates (TEXT and GEO_NEAR, which are required to use a compatible index).
+         * Outputs these assignments into 'andAssignment'.
+         */
+        void enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
+                                     const IndexToPredMap& idxToNotFirst,
+                                     MatchExpression* mandatoryPred,
+                                     const set<IndexID>& mandatoryIndices,
+                                     AndAssignment* andAssignment);
 
         /**
          * Try to assign predicates in 'tryCompound' to 'thisIndex' as compound assignments.
