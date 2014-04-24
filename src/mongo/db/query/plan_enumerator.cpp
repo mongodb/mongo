@@ -87,7 +87,9 @@ namespace mongo {
 
     std::string PlanEnumerator::dumpMemo() {
         mongoutils::str::stream ss;
-        for (size_t i = 0; i < _memo.size(); ++i) {
+
+        // Note that this needs to be kept in sync with allocateAssignment which assigns memo IDs.
+        for (size_t i = 1; i < _memo.size(); ++i) {
             ss << "[Node #" << i << "]: " << _memo[i]->toString() << "\n";
         }
         return ss;
@@ -152,11 +154,22 @@ namespace mongo {
         }
     }
 
+    PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
+        unordered_map<MatchExpression*, MemoID>::iterator it = _nodeToId.find(node);
+
+        if (_nodeToId.end() == it) {
+            error() << "Trying to look up memo entry for node, none found.";
+            invariant(0);
+        }
+
+        return it->second;
+    }
+
     bool PlanEnumerator::getNext(MatchExpression** tree) {
         if (_done) { return false; }
 
         // Tag with our first solution.
-        tagMemo(_nodeToId[_root]);
+        tagMemo(memoIDForNode(_root));
 
         *tree = _root->shallowClone();
         tagForSort(*tree);
@@ -164,7 +177,7 @@ namespace mongo {
 
         _root->resetTag();
         QLOG() << "Enumerator: memo just before moving:" << endl << dumpMemo();
-        _done = nextMemo(_nodeToId[_root]);
+        _done = nextMemo(memoIDForNode(_root));
         return true;
     }
 
@@ -172,9 +185,14 @@ namespace mongo {
     // Structure creation
     //
 
-    void PlanEnumerator::allocateAssignment(MatchExpression* expr, NodeAssignment** assign,
+    void PlanEnumerator::allocateAssignment(MatchExpression* expr,
+                                            NodeAssignment** assign,
                                             MemoID* id) {
-        size_t newID = _memo.size();
+        // We start at 1 so that the lookup of any entries not explicitly allocated
+        // will refer to an invalid memo slot.
+        size_t newID = _memo.size() + 1;
+
+        // Shouldn't be anything there already.
         verify(_nodeToId.end() == _nodeToId.find(expr));
         _nodeToId[expr] = newID;
         verify(_memo.end() == _memo.find(newID));
@@ -211,7 +229,22 @@ namespace mongo {
             return true;
         }
         else if (Indexability::isBoundsGeneratingNot(node)) {
-            return prepMemo(node->getChild(0), childContext);
+            bool childIndexable = prepMemo(node->getChild(0), childContext);
+            // If the child isn't indexable then bail out now.
+            if (!childIndexable) {
+                return false;
+            }
+
+            // Our parent node, if any exists, will expect a memo entry keyed on 'node'.  As such we
+            // have the node ID for 'node' just point to the memo created for the child that
+            // actually generates the bounds.
+            size_t myMemoID;
+            NodeAssignment* assign;
+            allocateAssignment(node, &assign, &myMemoID);
+            OrAssignment* orAssignment = new OrAssignment();
+            orAssignment->subnodes.push_back(memoIDForNode(node->getChild(0)));
+            assign->orAssignment.reset(orAssignment);
+            return true;
         }
         else if (MatchExpression::OR == node->matchType()) {
             // For an OR to be indexed, all its children must be indexed.
@@ -228,7 +261,7 @@ namespace mongo {
 
             OrAssignment* orAssignment = new OrAssignment();
             for (size_t i = 0; i < node->numChildren(); ++i) {
-                orAssignment->subnodes.push_back(_nodeToId[node->getChild(i)]);
+                orAssignment->subnodes.push_back(memoIDForNode(node->getChild(i)));
             }
             assign->orAssignment.reset(orAssignment);
             return true;
@@ -245,7 +278,7 @@ namespace mongo {
             // For an OR to be indexed, all its children must be indexed.
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 if (prepMemo(node->getChild(i), childContext)) {
-                    aa->subnodes.push_back(_nodeToId[node->getChild(i)]);
+                    aa->subnodes.push_back(memoIDForNode(node->getChild(i)));
                 }
             }
 
@@ -818,8 +851,7 @@ namespace mongo {
                 // and for array nodes other than ELEM_MATCH_OBJECT or
                 // ELEM_MATCH_VALUE (e.g. ALL).
                 if (prepMemo(child, context)) {
-                    verify(_nodeToId.end() != _nodeToId.find(child));
-                    size_t childID = _nodeToId[child];
+                    size_t childID = memoIDForNode(child);
 
                     // Output the subnode.
                     if (mandatory) {

@@ -216,6 +216,12 @@ namespace {
             return solns.size();
         }
 
+        void dumpSolutions() {
+            mongoutils::str::stream ost;
+            dumpSolutions(ost);
+            log() << string(ost);
+        }
+
         void dumpSolutions(mongoutils::str::stream& ost) const {
             for (vector<QuerySolution*>::const_iterator it = solns.begin();
                     it != solns.end();
@@ -757,6 +763,30 @@ namespace {
 
         assertNumSolutions(1U);
         assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // SERVER-13714.  A non-top-level indexable negation exposed a bug in plan enumeration.
+    TEST_F(QueryPlannerTest, NonTopLevelIndexedNegation) {
+        addIndex(BSON("state" << 1));
+        addIndex(BSON("is_draft" << 1));
+        addIndex(BSON("published_date" << 1));
+        addIndex(BSON("newsroom_id" << 1));
+
+        BSONObj queryObj = fromjson("{$and:[{$or:[{is_draft:false},{creator_id:1}]},"
+                                           "{$or:[{state:3,is_draft:false},"
+                                                 "{published_date:{$ne:null}}]},"
+                                           "{newsroom_id:{$in:[1]}}]}");
+        runQuery(queryObj);
+    }
+
+    TEST_F(QueryPlannerTest, NonTopLevelIndexedNegationMinQuery) {
+        addIndex(BSON("state" << 1));
+        addIndex(BSON("is_draft" << 1));
+        addIndex(BSON("published_date" << 1));
+
+        // This is the min query to reproduce SERVER-13714
+        BSONObj queryObj = fromjson("{$or:[{state:1, is_draft:1}, {published_date:{$ne: 1}}]}");
+        runQuery(queryObj);
     }
 
     // SERVER-12594: we don't yet collapse an OR of ANDs into a single ixscan.
