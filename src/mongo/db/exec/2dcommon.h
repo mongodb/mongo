@@ -63,14 +63,14 @@ namespace twod_exec {
 
         //// Distance not used ////
 
-        GeoPoint(const GeoIndexEntry& node)
-            : _key(node._key), _loc(node.recordLoc), _o(node.recordLoc.obj()),
+        GeoPoint(const GeoIndexEntry& node, const BSONObj& obj)
+            : _key(node._key), _loc(node.recordLoc), _o(obj),
               _distance(-1), _exact(false) { }
 
         //// Immediate initialization of distance ////
 
-        GeoPoint(const GeoIndexEntry& node, double distance, bool exact)
-            : _key(node._key), _loc(node.recordLoc), _o(node.recordLoc.obj()),
+        GeoPoint(const GeoIndexEntry& node, const BSONObj& obj, double distance, bool exact)
+            : _key(node._key), _loc(node.recordLoc), _o(obj),
               _distance(distance), _exact(exact) { }
 
         GeoPoint(const GeoPoint& pt, double distance, bool exact)
@@ -266,6 +266,9 @@ namespace twod_exec {
         const IndexDescriptor* _descriptor;
         shared_ptr<GeoHashConverter> _converter;
         TwoDIndexingParams _params;
+
+    private:
+        const Collection* _collection;
     };
 
 }  // namespace twod_exec

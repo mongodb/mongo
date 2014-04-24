@@ -405,7 +405,7 @@ namespace mongo {
         if (it != _invalidationMap.end()) {
             WorkingSetMember* member = _ws->get(it->second);
             verify(member->hasLoc());
-            WorkingSetCommon::fetchAndInvalidateLoc(member);
+            WorkingSetCommon::fetchAndInvalidateLoc(member, _params.collection);
             verify(!member->hasLoc());
             // Don't keep it around in the invalidation map since there's no valid DiskLoc anymore.
             _invalidationMap.erase(it);

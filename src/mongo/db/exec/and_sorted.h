@@ -53,7 +53,7 @@ namespace mongo {
      */
     class AndSortedStage : public PlanStage {
     public:
-        AndSortedStage(WorkingSet* ws, const MatchExpression* filter);
+        AndSortedStage(WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
         virtual ~AndSortedStage();
 
         void addChild(PlanStage* child);
@@ -74,6 +74,9 @@ namespace mongo {
         // Move a child which hasn't advanced to the target node forward.
         // Returns the target node in 'out' if all children successfully advance to it.
         PlanStage::StageState moveTowardTargetLoc(WorkingSetID* out);
+
+        // Not owned by us.
+        const Collection* _collection;
 
         // Not owned by us.
         WorkingSet* _ws;

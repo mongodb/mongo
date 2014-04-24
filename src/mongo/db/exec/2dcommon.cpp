@@ -40,15 +40,20 @@ namespace twod_exec {
 
     class GeoMatchableDocument : public MatchableDocument {
     public:
-        GeoMatchableDocument(const BSONObj& keyPattern, const BSONObj& key, DiskLoc loc, bool *fetched)
-            : _keyPattern(keyPattern),
+        GeoMatchableDocument(const BSONObj& keyPattern, 
+                             const BSONObj& key, 
+                             DiskLoc loc, 
+                             const Collection* collection, 
+                             bool* fetched)
+            : _collection(collection),
+              _keyPattern(keyPattern),
               _key(key),
               _loc(loc),
               _fetched(fetched) { }
 
         BSONObj toBSON() const {
             *_fetched = true;
-            return _loc.obj();
+            return _collection->docFor(_loc);
         }
 
         virtual ElementIterator* allocateIterator(const ElementPath* path) const {
@@ -78,7 +83,7 @@ namespace twod_exec {
 
             // All else fails, fetch.
             *_fetched = true;
-            return new BSONElementIterator(path, _loc.obj());
+            return new BSONElementIterator(path, _collection->docFor(_loc));
         }
 
         virtual void releaseIterator( ElementIterator* iterator ) const {
@@ -86,6 +91,8 @@ namespace twod_exec {
         }
 
     private:
+        const Collection* _collection;
+
         BSONObj _keyPattern;
         BSONObj _key;
         DiskLoc _loc;
@@ -128,6 +135,7 @@ namespace twod_exec {
                 GeoMatchableDocument md(_accessMethod->getDescriptor()->keyPattern(),
                                         node._key,
                                         node.recordLoc,
+                                        _accessMethod->collection(),
                                         &fetched);
                 bool good = _filter->matches(&md);
 
@@ -304,7 +312,8 @@ namespace twod_exec {
         _centerPrefix(0, 0, 0),
         _descriptor(accessMethod->getDescriptor()),
         _converter(accessMethod->getParams().geoHashConverter),
-        _params(accessMethod->getParams()) {
+        _params(accessMethod->getParams()),
+        _collection(accessMethod->collection()) {
 
             // Set up the initial expand state
             _state = START;
@@ -575,14 +584,16 @@ namespace twod_exec {
 
         // Final check for new doc
         // OK to touch, since we're probably returning this object now
-        if(remembered(node.recordLoc.obj())) {
+        const BSONObj obj = _collection->docFor(node.recordLoc);
+
+        if (remembered(obj)) {
             //cout << "remembered\n";
             return 0;
         }
 
         if(! onBounds) {
             //log() << "Added ind to " << _type << endl;
-            _stack.push_front(GeoPoint(node));
+            _stack.push_front(GeoPoint(node, obj));
             found++;
         } else {
             // We now handle every possible point in the document, even those not in the key
@@ -591,7 +602,7 @@ namespace twod_exec {
             // If we're filtering by hash, get the original
 
             vector< BSONObj > locs;
-            getPointsFor(node._key, node.recordLoc.obj(), locs, true);
+            getPointsFor(node._key, obj, locs, true);
             for(vector< BSONObj >::iterator i = locs.begin(); i != locs.end(); ++i){
                 double d = -1;
                 Point p(*i);
@@ -601,7 +612,7 @@ namespace twod_exec {
 
                 if(! needExact || exactDocCheck(p, d)){
                     //log() << "Added mult to " << _type << endl;
-                    _stack.push_front(GeoPoint(node));
+                    _stack.push_front(GeoPoint(node, obj));
                     found++;
                     // IExit after first point is added
                     break;

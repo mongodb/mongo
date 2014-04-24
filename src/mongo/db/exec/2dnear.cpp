@@ -28,12 +28,12 @@
 
 #include "mongo/db/exec/2dnear.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
 
@@ -84,7 +84,7 @@ namespace mongo {
                 WorkingSetID id = _workingSet->allocate();
                 WorkingSetMember* member = _workingSet->get(id);
                 member->loc = it->_loc;
-                member->obj = member->loc.obj();
+                member->obj = _params.collection->docFor(member->loc);
                 member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
                 if (_params.addDistMeta) {
                     member->addComputed(new GeoDistanceComputedData(it->_distance));
@@ -140,7 +140,7 @@ namespace mongo {
             WorkingSetMember* member = _workingSet->get(it->second);
             // If it's in the invalidation map it must have a DiskLoc.
             verify(member->hasLoc());
-            WorkingSetCommon::fetchAndInvalidateLoc(member);
+            WorkingSetCommon::fetchAndInvalidateLoc(member, _params.collection);
             verify(!member->hasLoc());
         }
         _invalidationMap.erase(range.first, range.second);
@@ -176,7 +176,8 @@ namespace twod_exec {
         _distError(type == GEO_PLANE
                 ? accessMethod->getParams().geoHashConverter->getError()
                 : accessMethod->getParams().geoHashConverter->getErrorSphere()),
-        _farthest(0) { }
+        _farthest(0),
+        _collection(accessMethod->collection()) {}
 
     GeoAccumulator:: KeyResult GeoHopper::approxKeyCheck(const Point& p, double& d) {
         // Always check approximate distance, since it lets us avoid doing
@@ -224,7 +225,7 @@ namespace twod_exec {
     int GeoHopper::addSpecific(const GeoIndexEntry& node, const Point& keyP, bool onBounds,
             double keyD, bool potentiallyNewDoc) {
         // Unique documents
-        GeoPoint newPoint(node, keyD, false);
+        GeoPoint newPoint(node, _collection->docFor(node.recordLoc), keyD, false);
         int prevSize = _points.size();
 
         // STEP 1 : Remove old duplicate points from the set if needed

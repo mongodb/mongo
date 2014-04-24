@@ -107,6 +107,13 @@ namespace mongo {
         IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
         const IndexDescriptor* _descriptor;
 
+        /**
+         * The collection is needed for resolving record locations to actual objects.
+         */
+        const Collection* collection() const {
+            return _btreeState->collection();
+        }
+
     private:
         bool removeOneKey(const BSONObj& key, const DiskLoc& loc);
 

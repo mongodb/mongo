@@ -153,8 +153,9 @@ namespace mongo {
         // Return the info object.
         const BSONObj& infoObj() const { _checkOk(); return _infoObj; }
 
-        // this is the owner of this IndexDescriptor
-        IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
+        // Both the collection and the catalog must outlive the IndexDescriptor
+        const Collection* getCollection() const { return _collection; }
+        const IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
 
         bool areIndexOptionsEquivalent( const IndexDescriptor* other ) const;
 

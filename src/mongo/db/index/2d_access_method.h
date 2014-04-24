@@ -73,7 +73,6 @@ namespace mongo {
 
     private:
         friend class TwoDIndexCursor;
-        friend class twod_internal::GeoPoint;
         friend class twod_internal::GeoAccumulator;
         friend class twod_internal::GeoBrowse;
         friend class twod_internal::GeoHopper;

@@ -130,7 +130,7 @@ namespace mongo {
             problem() << "Assertion failure: _unindex failed "
                 << _descriptor->indexNamespace() << endl;
             out() << "Assertion failure: _unindex failed: " << e.what() << '\n';
-            out() << "  obj:" << loc.obj().toString() << '\n';
+            out() << "  obj:" << _btreeState->collection()->docFor(loc).toString() << '\n';
             out() << "  key:" << key.toString() << '\n';
             out() << "  dl:" << loc.toString() << endl;
             logContext();
@@ -160,7 +160,8 @@ namespace mongo {
                 ++*numDeleted;
             } else if (options.logIfError) {
                 log() << "unindex failed (key too big?) " << _descriptor->indexNamespace()
-                      << " key: " << *i << " " << loc.obj()["_id"] << endl;
+                      << " key: " << *i << " " 
+                      << _btreeState->collection()->docFor(loc)["_id"] << endl;
             }
         }
 

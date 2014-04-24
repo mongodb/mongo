@@ -129,7 +129,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws);
+            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -192,7 +192,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws);
+            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -254,7 +254,7 @@ namespace QueryStageMergeSortTests {
             MergeSortStageParams msparams;
             msparams.dedup = false;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws);
+            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -318,7 +318,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:-1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << -1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws);
+            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -381,7 +381,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws);
+            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -430,7 +430,7 @@ namespace QueryStageMergeSortTests {
             // Sort by foo:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("foo" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws);
+            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
 
             IndexScanParams params;
             params.bounds.isSimpleRange = true;
@@ -482,7 +482,7 @@ namespace QueryStageMergeSortTests {
             // Sort by foo:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("foo" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, &ws));
+            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, &ws, coll));
 
             IndexScanParams params;
             params.bounds.isSimpleRange = true;

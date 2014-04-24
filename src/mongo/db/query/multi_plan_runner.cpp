@@ -154,7 +154,7 @@ namespace mongo {
                 if (member->hasLoc() && member->loc == dl) {
                     list<WorkingSetID>::iterator next = it;
                     next++;
-                    WorkingSetCommon::fetchAndInvalidateLoc(member);
+                    WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
                     _bestPlan->getWorkingSet()->flagForReview(*it);
                     _alreadyProduced.erase(it);
                     it = next;
@@ -171,7 +171,7 @@ namespace mongo {
                     if (member->hasLoc() && member->loc == dl) {
                         list<WorkingSetID>::iterator next = it;
                         next++;
-                        WorkingSetCommon::fetchAndInvalidateLoc(member);
+                        WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
                         _backupPlan->getWorkingSet()->flagForReview(*it);
                         _backupAlreadyProduced.erase(it);
                         it = next;
@@ -191,7 +191,7 @@ namespace mongo {
                     if (member->hasLoc() && member->loc == dl) {
                         list<WorkingSetID>::iterator next = it;
                         next++;
-                        WorkingSetCommon::fetchAndInvalidateLoc(member);
+                        WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
                         _candidates[i].ws->flagForReview(*it);
                         _candidates[i].results.erase(it);
                         it = next;

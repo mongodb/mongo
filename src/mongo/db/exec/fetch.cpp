@@ -171,7 +171,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(_idBeingPagedIn);
             if (member->hasLoc() && (member->loc == dl)) {
                 // Just fetch it now and kill the DiskLoc.
-                WorkingSetCommon::fetchAndInvalidateLoc(member);
+                WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
             }
         }
     }

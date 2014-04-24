@@ -46,15 +46,22 @@ namespace mongo {
          * @param limit  The maximum number of results to return
          * @param geoField  Which field in the provided DiskLoc has the point to test.
          */
-        GeoHaystackSearchHopper(const BSONObj& nearObj, double maxDistance, unsigned limit,
-                                const string& geoField)
-            : _near(nearObj), _maxDistance(maxDistance), _limit(limit), _geoField(geoField) { }
+        GeoHaystackSearchHopper(const BSONObj& nearObj, 
+                                double maxDistance,
+                                unsigned limit,
+                                const string& geoField,
+                                const Collection* collection)
+            : _collection(collection),
+              _near(nearObj), 
+              _maxDistance(maxDistance),
+              _limit(limit),
+              _geoField(geoField) { }
 
         // Consider the point in loc, and keep it if it's within _maxDistance (and we have space for
         // it)
         void consider(const DiskLoc& loc) {
             if (limitReached()) return;
-            Point p(loc.obj().getFieldDotted(_geoField));
+            Point p(_collection->docFor(loc).getFieldDotted(_geoField));
             if (distance(_near, p) > _maxDistance)
                 return;
             _locs.push_back(loc);
@@ -62,7 +69,7 @@ namespace mongo {
 
         int appendResultsTo(BSONArrayBuilder* b) {
             for (unsigned i = 0; i <_locs.size(); i++)
-                b->append(_locs[i].obj());
+                b->append(_collection->docFor(_locs[i]));
             return _locs.size();
         }
 
@@ -71,6 +78,8 @@ namespace mongo {
             return _locs.size() >= _limit;
         }
     private:
+        const Collection* _collection;
+
         Point _near;
         double _maxDistance;
         unsigned _limit;

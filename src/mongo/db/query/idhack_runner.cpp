@@ -156,7 +156,7 @@ namespace mongo {
             }
 
             // Either the data was in memory or we paged it in.
-            *objOut = loc.obj();
+            *objOut = _collection->docFor(loc);
 
             // If we're sharded make sure the key belongs to us.  We need the object to do this.
             if (shardingState.needCollectionMetadata(_collection->ns().ns())) {

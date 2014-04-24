@@ -48,16 +48,23 @@ namespace mongo {
 
     const size_t AndHashStage::kLookAheadWorks = 10;
 
-    AndHashStage::AndHashStage(WorkingSet* ws, const MatchExpression* filter)
-        : _ws(ws),
+    AndHashStage::AndHashStage(WorkingSet* ws, 
+                               const MatchExpression* filter,
+                               const Collection* collection)
+        : _collection(collection),
+          _ws(ws),
           _filter(filter),
           _hashingChildren(true),
           _currentChild(0),
           _memUsage(0),
           _maxMemUsage(kDefaultMaxMemUsageBytes) {}
 
-    AndHashStage::AndHashStage(WorkingSet* ws, const MatchExpression* filter, size_t maxMemUsage)
-        : _ws(ws),
+    AndHashStage::AndHashStage(WorkingSet* ws, 
+                               const MatchExpression* filter,
+                               const Collection* collection,
+                               size_t maxMemUsage)
+        : _collection(collection),
+          _ws(ws),
           _filter(filter),
           _hashingChildren(true),
           _currentChild(0),
@@ -457,7 +464,7 @@ namespace mongo {
             if (WorkingSet::INVALID_ID != _lookAheadResults[i]) {
                 WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
                 if (member->hasLoc() && member->loc == dl) {
-                    WorkingSetCommon::fetchAndInvalidateLoc(member);
+                    WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
                     _ws->flagForReview(_lookAheadResults[i]);
                     _lookAheadResults[i] = WorkingSet::INVALID_ID;
                 }
@@ -487,7 +494,7 @@ namespace mongo {
             _memUsage -= member->getMemUsage();
 
             // The loc is about to be invalidated.  Fetch it and clear the loc.
-            WorkingSetCommon::fetchAndInvalidateLoc(member);
+            WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
 
             // Add the WSID to the to-be-reviewed list in the WS.
             _ws->flagForReview(id);

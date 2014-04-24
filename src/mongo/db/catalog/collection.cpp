@@ -155,7 +155,7 @@ namespace mongo {
         return count;
     }
 
-    BSONObj Collection::docFor( const DiskLoc& loc ) {
+    BSONObj Collection::docFor(const DiskLoc& loc) const {
         Record* rec = _recordStore->recordFor( loc );
         return BSONObj( rec->accessed()->data() );
     }

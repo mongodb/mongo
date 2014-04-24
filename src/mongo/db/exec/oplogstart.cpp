@@ -38,7 +38,7 @@
 namespace mongo {
 
     // Does not take ownership.
-    OplogStart::OplogStart(Collection* collection, MatchExpression* filter, WorkingSet* ws)
+    OplogStart::OplogStart(const Collection* collection, MatchExpression* filter, WorkingSet* ws)
         : _needInit(true),
           _backwardsScanning(false),
           _extentHopping(false),
@@ -87,12 +87,12 @@ namespace mongo {
         const DiskLoc loc = _subIterators.back()->getNext();
         _subIterators.popAndDeleteBack();
 
-        if (!loc.isNull() && !_filter->matchesBSON(loc.obj())) {
+        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(loc))) {
             _done = true;
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
-            member->obj = member->loc.obj();
+            member->obj = _collection->docFor(member->loc);
             member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             *out = id;
             return PlanStage::ADVANCED;

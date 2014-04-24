@@ -98,7 +98,7 @@ namespace mongo {
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
         member->loc = _browse->currLoc();
-        member->obj = member->loc.obj();
+        member->obj = _params.collection->docFor(member->loc);
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
         _browse->advance();
@@ -129,11 +129,11 @@ namespace mongo {
                 WorkingSetID id = _workingSet->allocate();
                 WorkingSetMember* member = _workingSet->get(id);
                 member->loc = dl;
-                member->obj = member->loc.obj();
+                member->obj = _params.collection->docFor(member->loc);
                 member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
                 // And flag it for later.
-                WorkingSetCommon::fetchAndInvalidateLoc(member);
+                WorkingSetCommon::fetchAndInvalidateLoc(member, _params.collection);
                 _workingSet->flagForReview(id);
             }
         }

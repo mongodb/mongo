@@ -246,7 +246,7 @@ namespace mongo {
 
         // Filter for phrases and negated terms
         if (_params.query.hasNonTermPieces()) {
-            if (!_ftsMatcher.matchesNonTerm(loc.obj())) {
+            if (!_ftsMatcher.matchesNonTerm(_params.index->getCollection()->docFor(loc))) {
                 return PlanStage::NEED_TIME;
             }
         }
@@ -254,7 +254,7 @@ namespace mongo {
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->loc = loc;
-        member->obj = member->loc.obj();
+        member->obj = _params.index->getCollection()->docFor(member->loc);
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         member->addComputed(new TextScoreComputedData(score));
         return PlanStage::ADVANCED;
@@ -265,15 +265,17 @@ namespace mongo {
         TextMatchableDocument(const BSONObj& keyPattern,
                               const BSONObj& key,
                               DiskLoc loc,
+                              const Collection* collection,
                               bool *fetched)
-            : _keyPattern(keyPattern),
+            : _collection(collection),
+              _keyPattern(keyPattern),
               _key(key),
               _loc(loc),
               _fetched(fetched) { }
 
         BSONObj toBSON() const {
             *_fetched = true;
-            return _loc.obj();
+            return _collection->docFor(_loc);
         }
 
         virtual ElementIterator* allocateIterator(const ElementPath* path) const {
@@ -298,7 +300,7 @@ namespace mongo {
 
             // All else fails, fetch.
             *_fetched = true;
-            return new BSONElementIterator(path, _loc.obj());
+            return new BSONElementIterator(path, _collection->docFor(_loc));
         }
 
         virtual void releaseIterator( ElementIterator* iterator ) const {
@@ -306,6 +308,7 @@ namespace mongo {
         }
 
     private:
+        const Collection* _collection;
         BSONObj _keyPattern;
         BSONObj _key;
         DiskLoc _loc;
@@ -338,7 +341,11 @@ namespace mongo {
             if (_filter) {
                 // We have not seen this document before and need to apply a filter.
                 bool fetched = false;
-                TextMatchableDocument tdoc(_params.index->keyPattern(), key, loc, &fetched);
+                TextMatchableDocument tdoc(_params.index->keyPattern(), 
+                                           key, 
+                                           loc, 
+                                           _params.index->getCollection(), 
+                                           &fetched);
 
                 if (!_filter->matches(&tdoc)) {
                     // We had to fetch but we're not going to return it.

@@ -44,7 +44,7 @@ namespace mongo {
 
     const size_t kMaxBytes = 32 * 1024 * 1024;
 
-    SortStageKeyGenerator::SortStageKeyGenerator(Collection* collection,
+    SortStageKeyGenerator::SortStageKeyGenerator(const Collection* collection,
                                                  const BSONObj& sortSpec,
                                                  const BSONObj& queryObj) {
         _collection = collection;
@@ -441,7 +441,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(it->second);
             verify(member->loc == dl);
 
-            WorkingSetCommon::fetchAndInvalidateLoc(member);
+            WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
 
             // Remove the DiskLoc from our set of active DLs.
             _wsidByDiskLoc.erase(it);

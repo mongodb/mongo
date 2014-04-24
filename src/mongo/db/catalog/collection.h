@@ -132,7 +132,7 @@ namespace mongo {
 
         bool requiresIdIndex() const;
 
-        BSONObj docFor( const DiskLoc& loc );
+        BSONObj docFor(const DiskLoc& loc) const;
 
         // ---- things that should move to a CollectionAccessMethod like thing
         /**

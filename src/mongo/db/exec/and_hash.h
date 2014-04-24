@@ -52,12 +52,15 @@ namespace mongo {
      */
     class AndHashStage : public PlanStage {
     public:
-        AndHashStage(WorkingSet* ws, const MatchExpression* filter);
+        AndHashStage(WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
 
         /**
          * For testing only. Allows tests to set memory usage threshold.
          */
-        AndHashStage(WorkingSet* ws, const MatchExpression* filter, size_t maxMemUsage);
+        AndHashStage(WorkingSet* ws, 
+                     const MatchExpression* filter, 
+                     const Collection* collection,
+                     size_t maxMemUsage);
 
         virtual ~AndHashStage();
 
@@ -84,6 +87,9 @@ namespace mongo {
         StageState readFirstChild(WorkingSetID* out);
         StageState hashOtherChildren(WorkingSetID* out);
         StageState workChild(size_t childNo, WorkingSetID* out);
+
+        // Not owned by us.
+        const Collection* _collection;
 
         // Not owned by us.
         WorkingSet* _ws;

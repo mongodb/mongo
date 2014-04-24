@@ -139,6 +139,9 @@ namespace twod_exec {
         // Safe to use currently since we don't yield in $near searches.  If we do start to yield,
         // we may need to replace dirtied disklocs in our holder / ensure our logic is correct.
         map<DiskLoc, Holder::iterator> _seenPts;
+
+    private:
+        const Collection* _collection;
     };
 
     class GeoSearch : public GeoHopper {

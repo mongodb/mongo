@@ -116,6 +116,7 @@ namespace QueryStageSortTests {
             insertVarietyOfObjects(ms, coll);
 
             SortStageParams params;
+            params.collection = coll;
             params.pattern = BSON("foo" << direction);
             params.limit = limit();
 
@@ -259,6 +260,7 @@ namespace QueryStageSortTests {
             insertVarietyOfObjects(ms.get(), coll);
 
             SortStageParams params;
+            params.collection = coll;
             params.pattern = BSON("foo" << 1);
             params.limit = limit();
             auto_ptr<SortStage> ss(new SortStage(params, &ws, ms.get()));
@@ -351,6 +353,7 @@ namespace QueryStageSortTests {
             }
 
             SortStageParams params;
+            params.collection = coll;
             params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
             params.limit = 0;
 
