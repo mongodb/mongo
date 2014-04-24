@@ -80,6 +80,7 @@ if (jsTest.options().keyFile) {
 
     jsTest.log("Clone db from standalone server to replica set SECONDARY");
     masterDB.dropDatabase();
+    replTest.awaitReplication();
     secondaryDB.cloneDatabase(standalone.host);
     assert.eq(0, secondaryDB[testColName].count(),
               'cloneDatabase from standalone to SECONDARY succeeded and should not accept writes');
