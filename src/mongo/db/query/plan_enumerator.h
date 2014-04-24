@@ -372,6 +372,12 @@ namespace mongo {
                       const IndexEntry& thisIndex,
                       OneIndexAssignment* assign);
 
+        /**
+         * Return the memo entry for 'node'.  Does some sanity checking to ensure that a memo entry
+         * actually exists.
+         */
+        MemoID memoIDForNode(MatchExpression* node);
+
         std::string dumpMemo();
 
         // Map from expression to its MemoID.
