@@ -39,7 +39,7 @@ upd_sum=0
 while test "$run" -le "$runmax"; do
 	rm -rf $home
 	mkdir $home
-	LD_PRELOAD=/usr/lib64/libjemalloc.so.1 ./wtperf -O $wttest
+	LD_PRELOAD=/usr/lib64/libjemalloc.so.1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest
 	load=`grep "^Load time:" ./WT_TEST/test.stat | cut -d ' ' -f 3`
 	rd=`grep "Executed.*read operations" ./WT_TEST/test.stat | cut -d ' ' -f 2`
 	ins=`grep "Executed.*insert operations" ./WT_TEST/test.stat | cut -d ' ' -f 2`
@@ -107,3 +107,4 @@ echo "Load time: $load_avg" >> $outfile
 echo "Read count: $rd_avg" >> $outfile
 echo "Insert count: $ins_avg" >> $outfile
 echo "Update count: $upd_avg" >> $outfile
+exit 0
