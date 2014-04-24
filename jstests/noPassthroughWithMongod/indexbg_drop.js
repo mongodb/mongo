@@ -56,7 +56,7 @@ assert.eq(3, masterDB.system.indexes.count( {ns:dbname + "." + collection}, {bac
 // Wait for the secondary to get the index entry
 assert.soon( 
     function() { return 3 == secondDB.system.indexes.count( {ns:dbname + "." + collection} ); }, 
-    "index not created on secondary (prior to drop)", 120000, 50 );
+    "index not created on secondary (prior to drop)", 240000 );
 
 jsTest.log("Index created and system.indexes entry exists on secondary");
 
