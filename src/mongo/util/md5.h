@@ -51,6 +51,14 @@
 #  define md5_INCLUDED
 
 /*
+ * To avoid the collision with libssh, lets
+ * rename the methods here with some defines
+ */
+#define md5_init mongo_md5_init
+#define md5_append mongo_md5_append
+#define md5_finish mongo_md5_finish
+
+/*
  * This package supports both compile-time and run-time determination of CPU
  * byte order.  If ARCH_IS_BIG_ENDIAN is defined as 0, the code will be
  * compiled to run only on little-endian CPUs; if ARCH_IS_BIG_ENDIAN is
