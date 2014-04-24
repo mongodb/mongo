@@ -40,6 +40,7 @@ namespace mongo {
 
     class Cloner;
     struct HowToFixUp;
+    class ReplSetCmdline;
 
     class ReplicationStartSynchronizer {
     public:
@@ -47,24 +48,6 @@ namespace mongo {
         boost::mutex mtx;
         bool indexRebuildDone;
         boost::condition cond;
-    };
-
-    void parseReplsetCmdLine(const std::string& cfgString,
-                             string& setname,
-                             vector<HostAndPort>& seeds,
-                             set<HostAndPort>& seedSet);
-
-    /** Parameter given to the --replSet command line option (parsed).
-        Syntax is "<setname>/<seedhost1>,<seedhost2>"
-        where setname is a name and seedhost is "<host>[:<port>]" */
-    class ReplSetCmdline {
-    public:
-        ReplSetCmdline(const std::string& cfgString) {
-            parseReplsetCmdLine(cfgString, setname, seeds, seedSet);
-        }
-        string setname;
-        vector<HostAndPort> seeds;
-        set<HostAndPort> seedSet;
     };
 
     // information about the entire replset, such as the various servers in the set, and their state

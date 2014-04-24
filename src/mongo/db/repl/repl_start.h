@@ -28,7 +28,30 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "mongo/util/net/hostandport.h"
+
 namespace mongo {
+
+    void parseReplsetCmdLine(const std::string& cfgString,
+                             std::string& setname,
+                             vector<HostAndPort>& seeds,
+                             set<HostAndPort>& seedSet);
+
+    /** Parameter given to the --replSet command line option (parsed).
+        Syntax is "<setname>/<seedhost1>,<seedhost2>"
+        where setname is a name and seedhost is "<host>[:<port>]" */
+    class ReplSetCmdline {
+    public:
+        ReplSetCmdline(const std::string& cfgString) {
+            parseReplsetCmdLine(cfgString, setname, seeds, seedSet);
+        }
+        std::string setname;
+        vector<HostAndPort> seeds;
+        set<HostAndPort> seedSet;
+    };
 
     // Entry point for replication at server startup.
     // This function starts replica set or master/slave replication
