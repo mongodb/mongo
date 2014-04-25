@@ -157,6 +157,8 @@ class mongod(object):
         sock.close()
         
     def is_mongod_up(self, port=mongod_port):
+        if not start_mongod:
+            return False
         try:
             self.check_mongo_port(int(port))
             return True
@@ -602,12 +604,12 @@ def runTest(test, result):
 
     result["exit_code"] = r
 
+
     is_mongod_still_up = test_mongod.is_mongod_up(mongod_port)
-    if not is_mongod_still_up:
+    if start_mongod and not is_mongod_still_up:
         print "mongod is not running after test"
         result["mongod_running_at_end"] = is_mongod_still_up;
-        if start_mongod:
-            raise TestServerFailure(path)
+        raise TestServerFailure(path)
 
     result["mongod_running_at_end"] = is_mongod_still_up;
 
