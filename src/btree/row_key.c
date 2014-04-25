@@ -389,13 +389,12 @@ off_page:		ikey = key;
 			}
 
 			/*
-			 * Ensure the buffer can hold the key's bytes plus the
-			 * prefix (and also setting the final buffer size);
-			 * Append the key to the prefix (already in the buffer).
+			 * Extend the buffer as necessary to hold the key bytes
+			 * plus the prefix, append the key to the prefix already
+			 * in the buffer.
 			 */
-			if (retb->memsize < size + unpack->prefix)
-				WT_ERR(__wt_buf_grow(
-				    session, retb, size + unpack->prefix));
+			WT_ERR(__wt_buf_grow(
+			    session, retb, size + unpack->prefix));
 			memcpy((uint8_t *)retb->data + unpack->prefix, p, size);
 			retb->size = size + unpack->prefix;
 

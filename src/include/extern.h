@@ -1467,22 +1467,11 @@ extern uint32_t __wt_log2_int(uint32_t n);
 extern int __wt_ispo2(uint32_t v);
 extern uint32_t __wt_rduppo2(uint32_t n, uint32_t po2);
 extern uint32_t __wt_random(void);
-extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
-extern int __wt_buf_extend(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
-extern int __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
-extern int __wt_buf_initsize(WT_SESSION_IMPL *session,
+extern void __wt_buf_clear(WT_ITEM *buf);
+extern int __wt_buf_grow_worker(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
-    size_t size);
-extern int __wt_buf_set( WT_SESSION_IMPL *session,
-    WT_ITEM *buf,
-    const void *data,
-    size_t size);
-extern int __wt_buf_set_printable( WT_SESSION_IMPL *session,
-    WT_ITEM *buf,
-    const void *from_arg,
     size_t size);
 extern void *__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf);
-extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern int __wt_buf_fmt(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const char *fmt,
@@ -1501,7 +1490,6 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
  , const char *file, int line
 #endif
  );
-extern void __wt_scr_free(WT_ITEM **bufp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
 extern void *__wt_ext_scr_alloc( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
