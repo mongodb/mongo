@@ -35,11 +35,9 @@ assert.lt( 10 , diff1() );
 
 // Wait for balancer to kick in.
 var initialDiff = diff1();
-var maxRetries = 3;
-while ( diff1() == initialDiff ){
-    sleep( 5000 );
-    assert.lt( 0, maxRetries--, "Balancer did not kick in.");
-}
+assert.soon(function() {
+                return diff1() != initialDiff;
+            }, "Balancer did not kick in");
 
 print("* A");
 print( "disabling the balancer" );
