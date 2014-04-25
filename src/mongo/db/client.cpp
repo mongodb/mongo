@@ -67,15 +67,6 @@
 #include "mongo/util/mongoutils/checksum.h"
 #include "mongo/util/mongoutils/str.h"
 
-#ifndef __has_feature
-#define __has_feature(x) 0
-#endif
-
-#define ASAN_ENABLED __has_feature(address_sanitizer)
-#define MSAN_ENABLED __has_feature(memory_sanitizer)
-#define TSAN_ENABLED __has_feature(thread_sanitizer)
-#define XSAN_ENABLED (ASAN_ENABLED || MSAN_ENABLED || TSAN_ENABLED)
-
 namespace mongo {
 
     mongo::mutex& Client::clientsMutex = *(new mutex("clientsMutex"));
@@ -83,67 +74,10 @@ namespace mongo {
 
     TSP_DEFINE(Client, currentClient)
 
-#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
-    struct StackChecker;
-    ThreadLocalValue<StackChecker *> checker;
-
-    struct StackChecker { 
-#if defined(_WIN32)
-        enum { SZ = 330 * 1024 };
-#elif defined(__APPLE__) && defined(__MACH__)
-        enum { SZ = 374 * 1024 };
-#elif defined(__linux__)
-        enum { SZ = 235 * 1024 };
-#else
-        enum { SZ = 235 * 1024 };   // default size, same as Linux to match old behavior
-#endif
-        char buf[SZ];
-        StackChecker() { 
-            checker.set(this);
-        }
-        void init() { 
-            memset(buf, 42, sizeof(buf)); 
-        }
-        static void check(StringData tname) {
-            static int max;
-            StackChecker *sc = checker.get();
-            const char *p = sc->buf;
-
-            int lastStackByteModifed = 0;
-            for( ; lastStackByteModifed < SZ; lastStackByteModifed++ ) { 
-                if( p[lastStackByteModifed] != 42 )
-                    break;
-            }
-            int numberBytesUsed = SZ-lastStackByteModifed;
-            
-            if( numberBytesUsed > max ) {
-                max = numberBytesUsed;
-                log() << "thread " << tname << " stack usage was " << numberBytesUsed << " bytes, " 
-                      << " which is the most so far" << endl;
-            }
-            
-            if ( numberBytesUsed > ( SZ - 16000 ) ) {
-                // we are within 16000 bytes of SZ
-                log() << "used " << numberBytesUsed << " bytes, max is " << (int)SZ << " exiting" << endl;
-                fassertFailed( 16151 );
-            }
-
-        }
-    };
-#endif
-
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
-        {
-            if( sizeof(void*) == 8 ) {
-                StackChecker sc;
-                sc.init();
-            }
-        }
-#endif
         verify( currentClient.get() == 0 );
 
         string fullDesc = desc;
@@ -220,13 +154,6 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
-#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
-        {
-            if( sizeof(void*) == 8 ) {
-                StackChecker::check( desc() );
-            }
-        }
-#endif
         _shutdown = true;
         if ( inShutdown() )
             return false;
