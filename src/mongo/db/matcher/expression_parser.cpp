@@ -87,7 +87,8 @@ namespace mongo {
     StatusWithMatchExpression MatchExpressionParser::_parseSubField( const BSONObj& context,
                                                                      const AndMatchExpression* andSoFar,
                                                                      const char* name,
-                                                                     const BSONElement& e ) {
+                                                                     const BSONElement& e,
+                                                                     int level ) {
 
         // TODO: these should move to getGtLtOp, or its replacement
 
@@ -95,7 +96,7 @@ namespace mongo {
             return _parseComparison( name, new EqualityMatchExpression(), e );
 
         if ( mongoutils::str::equals( "$not", e.fieldName() ) ) {
-            return _parseNot( name, e );
+            return _parseNot( name, e, level );
         }
 
         int x = e.getGtLtOp(-1);
@@ -258,10 +259,10 @@ namespace mongo {
         }
 
         case BSONObj::opELEM_MATCH:
-            return _parseElemMatch( name, e );
+            return _parseElemMatch( name, e, level );
 
         case BSONObj::opALL:
-            return _parseAll( name, e );
+            return _parseAll( name, e, level );
 
         case BSONObj::opWITHIN:
         case BSONObj::opGEO_INTERSECTS:
@@ -377,7 +378,7 @@ namespace mongo {
             }
 
             if ( _isExpressionDocument( e, false ) ) {
-                Status s = _parseSub( e.fieldName(), e.Obj(), root.get() );
+                Status s = _parseSub( e.fieldName(), e.Obj(), root.get(), level );
                 if ( !s.isOK() )
                     return StatusWithMatchExpression( s );
                 continue;
@@ -410,12 +411,22 @@ namespace mongo {
 
     Status MatchExpressionParser::_parseSub( const char* name,
                                              const BSONObj& sub,
-                                             AndMatchExpression* root ) {
+                                             AndMatchExpression* root,
+                                             int level ) {
         // The one exception to {field : {fully contained argument} } is, of course, geo.  Example:
         // sub == { field : {$near[Sphere]: [0,0], $maxDistance: 1000, $minDistance: 10 } }
         // We peek inside of 'sub' to see if it's possibly a $near.  If so, we can't iterate over
         // its subfields and parse them one at a time (there is no $maxDistance without $near), so
         // we hand the entire object over to the geo parsing routines.
+
+        if (level > kMaximumTreeDepth) {
+            mongoutils::str::stream ss;
+            ss << "exceeded maximum query tree depth of " << kMaximumTreeDepth
+               << " at " << sub.toString();
+            return Status( ErrorCodes::BadValue, ss );
+        }
+
+        level++;
 
         BSONObjIterator geoIt(sub);
         if (geoIt.more()) {
@@ -447,7 +458,7 @@ namespace mongo {
         while ( j.more() ) {
             BSONElement deep = j.next();
 
-            StatusWithMatchExpression s = _parseSubField( sub, root, name, deep );
+            StatusWithMatchExpression s = _parseSubField( sub, root, name, deep, level );
             if ( !s.isOK() )
                 return s.getStatus();
 
@@ -636,7 +647,8 @@ namespace mongo {
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseElemMatch( const char* name,
-                                                            const BSONElement& e ) {
+                                                                      const BSONElement& e,
+                                                                      int level ) {
         if ( e.type() != Object )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$elemMatch needs an Object" );
 
@@ -666,7 +678,7 @@ namespace mongo {
             // value case
 
             AndMatchExpression theAnd;
-            Status s = _parseSub( "", obj, &theAnd );
+            Status s = _parseSub( "", obj, &theAnd, level );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
 
@@ -689,7 +701,7 @@ namespace mongo {
 
         // object case
 
-        StatusWithMatchExpression sub = _parse( obj, false );
+        StatusWithMatchExpression sub = _parse( obj, level );
         if ( !sub.isOK() )
             return sub;
 
@@ -709,7 +721,8 @@ namespace mongo {
     }
 
     StatusWithMatchExpression MatchExpressionParser::_parseAll( const char* name,
-                                                      const BSONElement& e ) {
+                                                                const BSONElement& e,
+                                                                int level ) {
         if ( e.type() != Array )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$all needs an array" );
 
@@ -742,7 +755,8 @@ namespace mongo {
                                                  "$all/$elemMatch has to be consistent" );
                 }
 
-                StatusWithMatchExpression inner = _parseElemMatch( "", hopefullyElemMatchObj.firstElement() );
+                StatusWithMatchExpression inner =
+                    _parseElemMatch( "", hopefullyElemMatchObj.firstElement(), level );
                 if ( !inner.isOK() )
                     return inner;
                 temp->add( static_cast<ArrayMatchingMatchExpression*>( inner.getValue() ) );

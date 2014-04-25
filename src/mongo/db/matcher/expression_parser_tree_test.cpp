@@ -136,6 +136,43 @@ namespace mongo {
         ASSERT_FALSE( result.isOK() );
     }
 
+    // We should also exceed the depth limit through deeply nested $not.
+    TEST( MatchExpressionParserTreeTest, MaximumTreeDepthExceededNestedNots ) {
+        static const int depth = 105;
+
+        std::stringstream ss;
+        ss << "{a: ";
+        for (int i = 0; i < depth; i++) {
+            ss << "{$not: ";
+        }
+        ss << "{$eq: 5}";
+        for (int i = 0; i < depth+1; i++) {
+            ss << "}";
+        }
+
+        BSONObj query = fromjson( ss.str() );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+    }
+
+    // Depth limit with nested $elemMatch object.
+    TEST( MatchExpressionParserTreeTest, MaximumTreeDepthExceededNestedElemMatch ) {
+        static const int depth = 105;
+
+        std::stringstream ss;
+        for (int i = 0; i < depth; i++) {
+            ss << "{a: {$elemMatch: ";
+        }
+        ss << "{b: 5}";
+        for (int i = 0; i < depth; i++) {
+            ss << "}}";
+        }
+
+        BSONObj query = fromjson( ss.str() );
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_FALSE( result.isOK() );
+    }
+
     TEST( MatchExpressionParserLeafTest, NotRegex1 ) {
         BSONObjBuilder b;
         b.appendRegex( "$not", "abc", "i" );

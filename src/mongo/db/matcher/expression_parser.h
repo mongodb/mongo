@@ -92,7 +92,8 @@ namespace mongo {
          */
         static Status _parseSub( const char* name,
                                  const BSONObj& obj,
-                                 AndMatchExpression* root );
+                                 AndMatchExpression* root,
+                                 int level );
 
         /**
          * parses a single field in a sub expression
@@ -102,7 +103,8 @@ namespace mongo {
         static StatusWithMatchExpression _parseSubField( const BSONObj& context,
                                                          const AndMatchExpression* andSoFar,
                                                          const char* name,
-                                                         const BSONElement& e );
+                                                         const BSONElement& e,
+                                                         int level );
 
         static StatusWithMatchExpression _parseComparison( const char* name,
                                                            ComparisonMatchExpression* cmp,
@@ -124,16 +126,20 @@ namespace mongo {
         // arrays
 
         static StatusWithMatchExpression _parseElemMatch( const char* name,
-                                                     const BSONElement& e );
+                                                          const BSONElement& e,
+                                                          int level );
 
         static StatusWithMatchExpression _parseAll( const char* name,
-                                               const BSONElement& e );
+                                                    const BSONElement& e,
+                                                    int level );
 
         // tree
 
         static Status _parseTreeList( const BSONObj& arr, ListOfMatchExpression* out, int level );
 
-        static StatusWithMatchExpression _parseNot( const char* name, const BSONElement& e );
+        static StatusWithMatchExpression _parseNot( const char* name,
+                                                    const BSONElement& e,
+                                                    int level );
 
         // The maximum allowed depth of a query tree. Just to guard against stack overflow.
         static const int kMaximumTreeDepth;
