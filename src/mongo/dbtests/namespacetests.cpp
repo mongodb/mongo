@@ -153,7 +153,7 @@ namespace NamespaceTests {
                     if ( fileNo == -1 )
                         continue;
                     for ( int recOfs = ext->firstRecord.getOfs(); recOfs != DiskLoc::NullOfs;
-                          recOfs = DiskLoc( fileNo, recOfs ).rec()->nextOfs() ) {
+                          recOfs = recordStore()->recordFor(DiskLoc(fileNo, recOfs))->nextOfs() ) {
                         ++count;
                     }
                 }

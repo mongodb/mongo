@@ -28,6 +28,7 @@
 
 #include "mongo/db/exec/fetch.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pdfile.h"
@@ -105,7 +106,7 @@ namespace mongo {
             verify(WorkingSetMember::LOC_AND_IDX == member->state);
             verify(member->hasLoc());
 
-            Record* record = member->loc.rec();
+            Record* record = _collection->getRecordStore()->recordFor(member->loc);
             const char* data = record->dataNoThrowing();
 
             if (!recordInMemory(data)) {
@@ -193,7 +194,7 @@ namespace mongo {
         verify(!member->hasObj());
 
         // Make the (unowned) object.
-        Record* record = member->loc.rec();
+        Record* record = _collection->getRecordStore()->recordFor(member->loc);
         const char* data = record->dataNoThrowing();
         member->obj = BSONObj(data);
 

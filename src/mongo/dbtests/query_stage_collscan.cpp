@@ -41,6 +41,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/db/structure/record_store.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point_service.h"
 
@@ -130,12 +131,15 @@ namespace QueryStageCollectionScan {
             Extent *e = extentManager().getExtent(ext);
             e = getDur().writing(e);
             int ofs;
-            if ( e->lastRecord.isNull() )
+            if ( e->lastRecord.isNull() ) {
                 ofs = ext.getOfs() + ( e->_extentData - (char *)e );
-            else
-                ofs = e->lastRecord.getOfs() + e->lastRecord.rec()->lengthWithHeaders();
+            }
+            else {
+                ofs = e->lastRecord.getOfs()
+                    + recordStore()->recordFor(e->lastRecord)->lengthWithHeaders();
+            }
             DiskLoc dl( ext.a(), ofs );
-            Record *r = dl.rec();
+            Record *r = recordStore()->recordFor(dl);
             r = (Record*) getDur().writingPtr(r, Record::HeaderSize + len);
             r->lengthWithHeaders() = Record::HeaderSize + len;
             r->extentOfs() = e->myLoc.getOfs();
@@ -145,7 +149,7 @@ namespace QueryStageCollectionScan {
             if ( e->firstRecord.isNull() )
                 e->firstRecord = dl;
             else
-                getDur().writingInt(e->lastRecord.rec()->nextOfs()) = ofs;
+                getDur().writingInt(recordStore()->recordFor(e->lastRecord)->nextOfs()) = ofs;
             e->lastRecord = dl;
             return dl;
         }
@@ -158,6 +162,13 @@ namespace QueryStageCollectionScan {
         NamespaceDetails *nsd() { return collection()->detailsWritable(); }
 
     private:
+        const RecordStore* recordStore() {
+            Collection* c = collection();
+            if ( !c )
+                return NULL;
+            return c->getRecordStore();
+        }
+
         Lock::GlobalWrite lk_;
         Client::Context _context;
     };

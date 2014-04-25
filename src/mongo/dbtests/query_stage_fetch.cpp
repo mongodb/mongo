@@ -134,7 +134,7 @@ namespace QueryStageFetch {
             // Let's do the fetch ourselves (though it doesn't really matter)
             WorkingSetMember* member = ws.get(id);
             ASSERT_FALSE(member->hasObj());
-            member->loc.rec()->touch();
+            coll->getRecordStore()->recordFor(member->loc)->touch();
 
             // Next call to work() should give us the object in a diff. state
             state = fetchStage->work(&id);

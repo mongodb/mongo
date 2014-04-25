@@ -147,7 +147,7 @@ namespace mongo {
                 verify(member->hasLoc());
 
                 // Actually bring record into memory.
-                Record* record = member->loc.rec();
+                Record* record = _collection->getRecordStore()->recordFor(member->loc);
 
                 // If we're allowed to, go to disk outside of the lock.
                 if (NULL != _yieldPolicy.get()) {
