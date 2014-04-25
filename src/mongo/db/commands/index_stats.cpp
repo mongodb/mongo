@@ -17,6 +17,8 @@
  *    limitations under the License.
  */
 
+#if 0 // disabled pending SERVER-13555
+
 #include "mongo/pch.h"
 
 #include <iostream>
@@ -551,3 +553,4 @@ namespace mongo {
 
 } // namespace mongo
 
+#endif
