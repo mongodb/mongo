@@ -226,10 +226,6 @@ namespace mongo {
                 error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
                 dbexit( EXIT_UNCAUGHT );
             }
-            catch ( ... ) {
-                error() << "Uncaught exception, terminating" << endl;
-                dbexit( EXIT_UNCAUGHT );
-            }
 
             // Normal disconnect path.
 #ifdef MONGO_SSL
