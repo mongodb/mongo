@@ -52,7 +52,7 @@ files.forEach(function(x) {
     // clean cloneCollectionAsCapped copydbgetnonce dataSize
     // datasize dbstats deleteIndexes dropIndexes forceerror
     // getnonce logout medianKey profile reIndex repairDatabase
-    // reseterror splitVector validate
+    // reseterror splitVector validate top
 
     /* missing commands :
      * forceerror and switchtoclienterrors
@@ -125,25 +125,25 @@ files.forEach(function(x) {
         'reversecursor|' +
         'block_check_supported|' +
         'stages.*|' +
+        'top|' +
         'touch1|' +
         'dbcase|' + // undo after fixing SERVER-11735
         'stats' + // tests db.stats().dataFileVersion, which doesn't appear in sharded db.stats()
         ')\.js$');
 
     if (failsInShardingPattern.test(x.name)) {
-        print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding " +
-              "but might not anymore " + x.name);
+        print(" >>>>>>>>>>>>>>> skipping test that would correctly fail under sharding: " + x.name);
         return;
     }
 
     if (mightBeFixedPattern.test(x.name)) {
-        print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding " +
+        print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding: " +
               "but might not anymore " + x.name);
         return;
     }
 
     if (notForShardingPattern.test(x.name)) {
-        print(" >>>>>>>>>>>>>>> skipping test that would correctly fail under sharding " + x.name);
+        print(" !!!!!!!!!!!!!!! skipping test that should not run under sharding: " + x.name);
         return;
     }
     
