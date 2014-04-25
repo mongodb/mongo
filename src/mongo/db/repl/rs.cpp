@@ -145,13 +145,7 @@ namespace {
         LOG(1) << "replSet waiting for global write lock";
         Lock::GlobalWrite lk;
 
-        // Make sure that new OpTimes are higher than existing ones even with clock skew
-        DBDirectClient c;
-        BSONObj lastOp = c.findOne( "local.oplog.rs", Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk );
-        if ( !lastOp.isEmpty() ) {
-            LOG(1) << "replSet setting last OpTime";
-            OpTime::setLast( lastOp[ "ts" ].date() );
-        }
+        initOpTimeFromOplog("local.oplog.rs");
 
         // Generate new election unique id
         elect.setElectionId(OID::gen());

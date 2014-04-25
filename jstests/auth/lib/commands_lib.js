@@ -1249,15 +1249,6 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "getoptime",
-            command: {getoptime: 1},
-            skipSharded: true,
-            testcases: [
-                { runOnDb: firstDbName, roles: roles_all, privileges: [ ] },
-                { runOnDb: secondDbName, roles: roles_all, privileges: [ ] }
-            ]
-        },
-        {
             testname: "getShardMap",
             command: {getShardMap: "x"},
             testcases: [

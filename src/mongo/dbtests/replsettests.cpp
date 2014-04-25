@@ -32,6 +32,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/db.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
@@ -242,13 +243,7 @@ namespace ReplSetTests {
     class TestInitApplyOp : public Base {
     public:
         void run() {
-
-            OpTime o;
-
-            {
-                mongo::mutex::scoped_lock lk2(OpTime::m);
-                o = OpTime::now(lk2);
-            }
+            OpTime o(getNextGlobalOptime());
 
             BSONObjBuilder b;
             b.append("ns","dummy");
@@ -289,7 +284,7 @@ namespace ReplSetTests {
     class TestInitApplyOp2 : public Base {
     public:
         void run() {
-            OpTime o = OpTime::_now();
+            OpTime o(getNextGlobalOptime());
 
             BSONObjBuilder b;
             b.appendTimestamp("ts", o.asLL());
@@ -338,10 +333,9 @@ namespace ReplSetTests {
 
         BSONObj updateFail() {
             BSONObjBuilder b;
-            {
-                mongo::mutex::scoped_lock lk2(OpTime::m);
-                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
-            }
+            OpTime ts(getNextGlobalOptime());
+
+            b.appendTimestamp("ts", ts.asLL());
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123 << "x" << 123));
@@ -385,10 +379,9 @@ namespace ReplSetTests {
     class CappedUpdate : public CappedInitialSync {
         void updateSucceed() {
             BSONObjBuilder b;
-            {
-                mongo::mutex::scoped_lock lk2(OpTime::m);
-                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
-            }
+            OpTime ts(getNextGlobalOptime());
+
+            b.appendTimestamp("ts", ts.asLL());
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 789)));
             b.append("o2", BSON("x" << 456));
@@ -433,10 +426,9 @@ namespace ReplSetTests {
     class CappedInsert : public CappedInitialSync {
         void insertSucceed() {
             BSONObjBuilder b;
-            {
-                mongo::mutex::scoped_lock lk2(OpTime::m);
-                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
-            }
+            OpTime ts(getNextGlobalOptime());
+
+            b.appendTimestamp("ts", ts.asLL());
             b.append("op", "i");
             b.append("o", BSON("_id" << 123 << "x" << 456));
             b.append("ns", cappedNs());
@@ -462,11 +454,7 @@ namespace ReplSetTests {
 
         void addOp(const string& op, BSONObj o, BSONObj* o2 = NULL, const char* coll = NULL,
                    int version = 0) {
-            OpTime ts;
-            {
-                Lock::GlobalWrite lk;
-                ts = OpTime::_now();
-            }
+            OpTime ts(getNextGlobalOptime());
 
             BSONObjBuilder b;
             b.appendTimestamp("ts", ts.asLL());

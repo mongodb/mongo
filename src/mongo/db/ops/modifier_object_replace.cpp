@@ -30,6 +30,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -40,7 +41,7 @@ namespace mongo {
     namespace {
         const char idFieldName[] = "_id";
 
-        void fixupTimestamps( const BSONObj& obj ) {
+        Status fixupTimestamps( const BSONObj& obj ) {
             BSONObjIterator i(obj);
             while (i.more()) {
                 BSONElement e = i.next();
@@ -52,11 +53,13 @@ namespace mongo {
                         *(reinterpret_cast<unsigned long long*>(
                               const_cast<char *>(e.value())));
                     if (timestamp == 0) {
-                        mutex::scoped_lock lk(OpTime::m);
-                        timestamp = OpTime::now(lk).asDate();
+                        OpTime ts(getNextGlobalOptime());
+                        timestamp = ts.asDate();
                     }
                 }
             }
+
+            return Status::OK();
         }
     }
 
@@ -99,9 +102,7 @@ namespace mongo {
         // We make a copy of the object here because the update driver does not guarantees, in
         // the case of object replacement, that the modExpr is going to outlive this mod.
         _val = modExpr.embeddedObject().getOwned();
-        fixupTimestamps(_val);
-
-        return Status::OK();
+        return fixupTimestamps(_val);
     }
 
     Status ModifierObjectReplace::prepare(mutablebson::Element root,

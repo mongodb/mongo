@@ -29,6 +29,7 @@
  */
 
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/structure/catalog/namespace.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -122,8 +123,7 @@ namespace mongo {
                 // no-op
             }
             else if ( e.type() == Timestamp && e.timestampValue() == 0 ) {
-                mutex::scoped_lock lk(OpTime::m);
-                b.append( e.fieldName(), OpTime::now(lk) );
+                b.append( e.fieldName(), getNextGlobalOptime() );
             }
             else {
                 b.append( e );

@@ -35,7 +35,7 @@ namespace mongo {
         EXIT_OOM_MALLOC = 42 ,
         EXIT_OOM_REALLOC = 43 ,
         EXIT_FS = 45 ,
-        EXIT_CLOCK_SKEW = 47 ,
+        EXIT_CLOCK_SKEW = 47 , // OpTime clock skew, deprecated
         EXIT_NET_ERROR = 48 ,
         EXIT_WINDOWS_SERVICE_STOP = 49 ,
         EXIT_POSSIBLE_CORRUPTION = 60 , // this means we detected a possible corruption situation, like a buf overflow

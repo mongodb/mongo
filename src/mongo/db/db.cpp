@@ -194,13 +194,7 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                try {
-                    assembleResponse( m, dbresponse, port->remote() );
-                }
-                catch ( const ClockSkewException & ) {
-                    log() << "ClockSkewException - shutting down" << endl;
-                    exitCleanly( EXIT_CLOCK_SKEW );
-                }
+                assembleResponse( m, dbresponse, port->remote() );
 
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);

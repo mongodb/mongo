@@ -30,6 +30,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
@@ -245,9 +246,7 @@ namespace mongo {
                 return s;
         }
         else {
-            mutex::scoped_lock lk(OpTime::m);
-            const OpTime timestamp = OpTime::now(lk);
-            Status s = elemToSet.setValueTimestamp(timestamp);
+            Status s = elemToSet.setValueTimestamp(getNextGlobalOptime());
             if (!s.isOK())
                 return s;
         }

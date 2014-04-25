@@ -41,26 +41,14 @@ namespace mongo {
     class OpTime {
         unsigned i; // ordinal comes first so we can do a single 64 bit compare on little endian
         unsigned secs;
-        static OpTime last;
-        static OpTime skewed();
     public:
-        static void setLast(const Date_t &date) {
-            mutex::scoped_lock lk(m);
-            last = OpTime(date);
-            notifier.notify_all();
-        }
-        static void setLast(const OpTime &new_last) {
-            mutex::scoped_lock lk(m);
-            last = new_last;
-            notifier.notify_all();
-        }
-
         unsigned getSecs() const {
             return secs;
         }
         unsigned getInc() const {
             return i;
         }
+
         OpTime(Date_t date) {
             reinterpret_cast<unsigned long long&>(*this) = date.millis;
             dassert( (int)secs >= 0 );
@@ -83,20 +71,9 @@ namespace mongo {
             secs = 0;
             i = 0;
         }
-        // it isn't generally safe to not be locked for this. so use now(). some tests use this.
-        static OpTime _now();
-
-        static mongo::mutex m;
-
-        static OpTime now(const mongo::mutex::scoped_lock&);
-
-        static OpTime getLast(const mongo::mutex::scoped_lock&);
 
         // Maximum OpTime value.
         static OpTime max();
-
-        // Waits for global OpTime to be different from *this
-        void waitForDifferent(unsigned millis);
 
         /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
          64 bit "container" for these values.  While these are not really "Dates", that seems a
@@ -152,8 +129,6 @@ namespace mongo {
         bool operator>=(const OpTime& r) const {
             return !(*this < r);
         }
-    private:
-        static boost::condition notifier;
     };
 #pragma pack()
 

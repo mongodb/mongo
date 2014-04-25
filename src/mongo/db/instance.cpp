@@ -56,6 +56,7 @@
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
@@ -690,11 +691,10 @@ namespace mongo {
                     }
 
                     if (pass == 0) {
-                        mutex::scoped_lock lk(OpTime::m);
-                        last = OpTime::getLast(lk);
+                        last = getLastSetOptime();
                     }
                     else {
-                        last.waitForDifferent(1000/*ms*/);
+                        waitForOptimeChange(last, 1000/*ms*/);
                     }
                 }
 

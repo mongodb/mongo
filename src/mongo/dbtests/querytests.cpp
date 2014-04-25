@@ -33,6 +33,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
@@ -590,9 +591,10 @@ namespace QueryTests {
                                 BSON( "create" << "querytests.OplogReplaySlaveReadTill" <<
                                      "capped" << true << "size" << 8192 ),
                                 info );
-            Date_t one = OpTime::_now().asDate();
-            Date_t two = OpTime::_now().asDate();
-            Date_t three = OpTime::_now().asDate();
+
+            Date_t one = getNextGlobalOptime().asDate();
+            Date_t two = getNextGlobalOptime().asDate();
+            Date_t three = getNextGlobalOptime().asDate();
             insert( ns, BSON( "ts" << one ) );
             insert( ns, BSON( "ts" << two ) );
             insert( ns, BSON( "ts" << three ) );

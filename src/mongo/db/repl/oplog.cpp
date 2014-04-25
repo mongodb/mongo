@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
@@ -69,6 +70,17 @@ namespace mongo {
     static Database* localDB = NULL;
     static Collection* localOplogMainCollection = 0;
     static Collection* localOplogRSCollection = 0;
+
+    // Synchronizes the section where a new OpTime is generated and when it actually
+    // appears in the oplog.
+    static mongo::mutex newOpMutex("oplogNewOp");
+    static boost::condition newOptimeNotifier;
+
+    static void setNewOptime(const OpTime& newTime) {
+        mutex::scoped_lock lk(newOpMutex);
+        setGlobalOptime(newTime);
+        newOptimeNotifier.notify_all();
+    }
 
     void oplogCheckCloseDatabase( Database* db ) {
         verify( Lock::isW() );
@@ -142,7 +154,7 @@ namespace mongo {
             }
         }
 
-        OpTime::setLast( ts );
+        setNewOptime(ts);
     }
 
     /**
@@ -226,9 +238,11 @@ namespace mongo {
             return;
         }
 
-        mutex::scoped_lock lk2(OpTime::m);
+        mutex::scoped_lock lk2(newOpMutex);
 
-        const OpTime ts = OpTime::now(lk2);
+        OpTime ts(getNextGlobalOptime());
+        newOptimeNotifier.notify_all();
+
         long long hashNew;
         if( theReplSet ) {
             if (!theReplSet->box.getState().primary()) {
@@ -316,9 +330,11 @@ namespace mongo {
             return;
         }
 
-        mutex::scoped_lock lk2(OpTime::m);
+        mutex::scoped_lock lk2(newOpMutex);
 
-        const OpTime ts = OpTime::now(lk2);
+        OpTime ts(getNextGlobalOptime());
+        newOptimeNotifier.notify_all();
+
         Client::Context context("", 0);
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
@@ -444,11 +460,7 @@ namespace mongo {
 
             if( rs ) return;
 
-            DBDirectClient c;
-            BSONObj lastOp = c.findOne( ns, Query().sort(reverseNaturalObj) );
-            if ( !lastOp.isEmpty() ) {
-                OpTime::setLast( lastOp[ "ts" ].date() );
-            }
+            initOpTimeFromOplog(ns);
             return;
         }
 
@@ -736,5 +748,31 @@ namespace mongo {
                 fieldO2.isABSONObj() ? &o2 : NULL,
                 !fieldB.eoo() ? &valueB : NULL );
         return failedUpdate;
+    }
+
+    bool waitForOptimeChange(const OpTime& referenceTime, unsigned timeoutMillis) {
+        mutex::scoped_lock lk(newOpMutex);
+
+        while (referenceTime == getLastSetOptime()) {
+            if (!newOptimeNotifier.timed_wait(lk.boost(),
+                                              boost::posix_time::milliseconds(timeoutMillis)))
+                return false;
+        }
+
+        return true;
+
+    }
+
+    void initOpTimeFromOplog(const std::string& oplogNS) {
+        DBDirectClient c;
+        BSONObj lastOp = c.findOne(oplogNS,
+                                   Query().sort(reverseNaturalObj),
+                                   NULL,
+                                   QueryOption_SlaveOk);
+
+        if (!lastOp.isEmpty()) {
+            LOG(1) << "replSet setting last OpTime";
+            setNewOptime(lastOp[ "ts" ].date());
+        }
     }
 }

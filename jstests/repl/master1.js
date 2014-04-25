@@ -44,6 +44,10 @@ rt.stop( true );
 m = rt.start( true, null, true );
 assert.eq( op.ts.i, lastop().ts.i );
 am().save( {} );
-sleep( 3000 ); // make sure dies on its own before stop() called
 
-assert.eq( 47 /*EXIT_CLOCK_SKEW*/, rt.stop( true ) );
+// The above write should cause the server to terminate
+assert.throws(function() {
+    am().findOne();
+});
+
+assert.neq(0, rt.stop( true )); // fasserted

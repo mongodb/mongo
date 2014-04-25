@@ -222,6 +222,8 @@ env.Library('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 
 env.Library('auth_helpers', ['client/auth_helpers.cpp'])
 
+env.Library('global_optime', ['db/global_optime.cpp'])
+
 env.Library('spin_lock', ["util/concurrency/spin_lock.cpp"])
 env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
                 LIBDEPS=['spin_lock', '$BUILD_DIR/third_party/shim_boost'])
@@ -892,6 +894,7 @@ env.Library("serveronly", serverOnlyFiles,
                      "defaultversion",
                      "geoparser",
                      "geoquery",
+                     "global_optime",
                      "index_key_validate",
                      "index_set",
                      'range_deleter',

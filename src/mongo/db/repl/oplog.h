@@ -33,6 +33,7 @@ namespace mongo {
     class BSONObj;
     class Database;
     class TransactionExperiment;
+    class OpTime;
 
     // These functions redefine the function for logOp(),
     // for either master/slave or replica sets.
@@ -101,4 +102,15 @@ namespace mongo {
                                const BSONObj& op,
                                bool fromRepl = true,
                                bool convertUpdateToUpsert = false);
+
+    /**
+     * Waits until the given timeout for the OpTime from the oplog to change.
+     * Returns true if the OpTime changed occured before the timeout.
+     */
+    bool waitForOptimeChange(const OpTime& referenceTime, unsigned timeoutMillis);
+
+    /**
+     * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
+     */
+    void initOpTimeFromOplog(const std::string& oplogNS);
 }
