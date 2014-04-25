@@ -30,10 +30,12 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <string>
+#include <queue>
 
 #include "mongo/base/status.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
@@ -45,9 +47,16 @@ namespace mongo {
 
     class SubplanRunner : public Runner {
     public:
-        SubplanRunner(Collection* collection,
-                      const QueryPlannerParams& params,
-                      CanonicalQuery* cq);
+        /**
+         * Used to create SubplanRunner instances. The caller owns the instance
+         * returned through 'out'.
+         *
+         * 'out' is valid only if an OK status is returned.
+         */
+        static Status make(Collection* collection,
+                           const QueryPlannerParams& params,
+                           CanonicalQuery* cq,
+                           SubplanRunner** out);
 
         static bool canUseSubplanRunner(const CanonicalQuery& query);
 
@@ -76,7 +85,21 @@ namespace mongo {
         virtual Status getInfo(TypeExplain** explain,
                                PlanInfo** planInfo) const;
 
+        /**
+         * Plan each branch of the $or independently, and store the resulting
+         * lists of query solutions in '_solutions'.
+         *
+         * Called from SubplanRunner::make so that getRunner can fail if
+         * subquery planning fails, rather than returning a runner and failing
+         * through getNext(...).
+         */
+        Status planSubqueries();
+
     private:
+        SubplanRunner(Collection* collection,
+                      const QueryPlannerParams& params,
+                      CanonicalQuery* cq);
+
         bool runSubplans();
 
         enum SubplanRunnerState {
@@ -99,6 +122,19 @@ namespace mongo {
         boost::scoped_ptr<Runner> _underlyingRunner;
 
         std::string _ns;
+
+        // We do the subquery planning up front, and keep the resulting
+        // query solutions here. Lists of query solutions are dequeued
+        // and ownership is transferred to the underlying runners one
+        // at a time.
+        std::queue< std::vector<QuerySolution*> > _solutions;
+
+        // Holds the canonicalized subqueries. Ownership is transferred
+        // to the underlying runners one at a time.
+        std::queue<CanonicalQuery*> _cqs;
+
+        // We need this to extract cache-friendly index data from the index assignments.
+        map<BSONObj, size_t> _indexMap;
     };
 
 }  // namespace mongo

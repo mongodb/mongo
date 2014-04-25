@@ -90,6 +90,21 @@ namespace mongo {
         return true;
     }
 
+    // static
+    Status SubplanRunner::make(Collection* collection,
+                               const QueryPlannerParams& params,
+                               CanonicalQuery* cq,
+                               SubplanRunner** out) {
+        auto_ptr<SubplanRunner> autoRunner(new SubplanRunner(collection, params, cq));
+        Status planningStatus = autoRunner->planSubqueries();
+        if (!planningStatus.isOK()) {
+            return planningStatus;
+        }
+
+        *out = autoRunner.release();
+        return Status::OK();
+    }
+
     SubplanRunner::SubplanRunner(Collection* collection,
                                  const QueryPlannerParams& params,
                                  CanonicalQuery* cq)
@@ -101,7 +116,20 @@ namespace mongo {
           _policy(Runner::YIELD_MANUAL),
           _ns(cq->getParsed().ns()) { }
 
-    SubplanRunner::~SubplanRunner() { }
+    SubplanRunner::~SubplanRunner() {
+        while (!_solutions.empty()) {
+            vector<QuerySolution*> solns = _solutions.front();
+            for (size_t i = 0; i < solns.size(); i++) {
+                delete solns[i];
+            }
+            _solutions.pop();
+        }
+
+        while (!_cqs.empty()) {
+            delete _cqs.front();
+            _cqs.pop();
+        }
+    }
 
     Runner::RunnerState SubplanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         if (_killed) {
@@ -162,19 +190,12 @@ namespace mongo {
         return _underlyingRunner->getNext(objOut, dlOut);
     }
 
-    bool SubplanRunner::runSubplans() {
-        // This is what we annotate with the index selections and then turn into a solution.
-        auto_ptr<OrMatchExpression> theOr(
-            static_cast<OrMatchExpression*>(_query->root()->shallowClone()));
+    Status SubplanRunner::planSubqueries() {
+        MatchExpression* theOr = _query->root();
 
-        // This is the skeleton of index selections that is inserted into the cache.
-        auto_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
-
-        // We need this to extract cache-friendly index data from the index assignments.
-        map<BSONObj, size_t> indexMap;
         for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {
             const IndexEntry& ie = _plannerParams.indices[i];
-            indexMap[ie.keyPattern] = i;
+            _indexMap[ie.keyPattern] = i;
             QLOG() << "Subplanner: index " << i << " is " << ie.toString() << endl;
         }
 
@@ -186,8 +207,10 @@ namespace mongo {
                                                                 orChild,
                                                                 &orChildCQ);
             if (!childCQStatus.isOK()) {
-                QLOG() << "Subplanner: Can't canonicalize subchild " << orChild->toString();
-                return false;
+                mongoutils::str::stream ss;
+                ss << "Subplanner: Can't canonicalize subchild " << orChild->toString()
+                   << " " << childCQStatus.reason();
+                return Status(ErrorCodes::BadValue, ss);
             }
 
             // Make sure it gets cleaned up.
@@ -202,17 +225,53 @@ namespace mongo {
             Status status = QueryPlanner::plan(*safeOrChildCQ, _plannerParams, &solutions);
 
             if (!status.isOK()) {
-                QLOG() << "Subplanner: Can't plan for subchild " << orChildCQ->toString();
-                return false;
+                mongoutils::str::stream ss;
+                ss << "Subplanner: Can't plan for subchild " << orChildCQ->toString()
+                   << " " << status.reason();
+                return Status(ErrorCodes::BadValue, ss);
             }
             QLOG() << "Subplanner: got " << solutions.size() << " solutions";
 
             if (0 == solutions.size()) {
                 // If one child doesn't have an indexed solution, bail out.
-                QLOG() << "Subplanner: No solutions for subchild " << orChildCQ->toString();
-                return false;
+                mongoutils::str::stream ss;
+                ss << "Subplanner: No solutions for subchild " << orChildCQ->toString();
+                return Status(ErrorCodes::BadValue, ss);
             }
-            else if (1 == solutions.size()) {
+
+            // Hang onto the canonicalized subqueries and the corresponding query solutions
+            // so that they can be used in subplan running later on.
+            _cqs.push(safeOrChildCQ.release());
+            _solutions.push(solutions);
+        }
+
+        return Status::OK();
+    }
+
+    bool SubplanRunner::runSubplans() {
+        // This is what we annotate with the index selections and then turn into a solution.
+        auto_ptr<OrMatchExpression> theOr(
+            static_cast<OrMatchExpression*>(_query->root()->shallowClone()));
+
+        // This is the skeleton of index selections that is inserted into the cache.
+        auto_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
+
+        for (size_t i = 0; i < theOr->numChildren(); ++i) {
+            MatchExpression* orChild = theOr->getChild(i);
+
+            auto_ptr<CanonicalQuery> orChildCQ(_cqs.front());
+            _cqs.pop();
+
+            // 'solutions' is owned by the SubplanRunner instance until
+            // it is popped from the queue.
+            vector<QuerySolution*> solutions = _solutions.front();
+
+            // We already checked for zero solutions in planSubqueries(...).
+            invariant(!solutions.empty());
+
+            if (1 == solutions.size()) {
+                // There is only one solution. Transfer ownership to an auto_ptr.
+                _solutions.pop();
                 auto_ptr<QuerySolution> autoSoln(solutions[0]);
 
                 // We want a well-formed *indexed* solution.
@@ -230,7 +289,7 @@ namespace mongo {
 
                 // Add the index assignments to our original query.
                 Status tagStatus = QueryPlanner::tagAccordingToCache(
-                    orChild, autoSoln->cacheData->tree.get(), indexMap);
+                    orChild, autoSoln->cacheData->tree.get(), _indexMap);
 
                 if (!tagStatus.isOK()) {
                     QLOG() << "Subplanner: Failed to extract indices from subchild"
@@ -243,9 +302,11 @@ namespace mongo {
             }
             else {
                 // N solutions, rank them.  Takes ownership of safeOrChildCQ.
-                MultiPlanRunner* mpr = new MultiPlanRunner(_collection, safeOrChildCQ.release());
+                MultiPlanRunner* mpr = new MultiPlanRunner(_collection, orChildCQ.release());
 
-                // Dump all the solutions into the MPR.
+                // Dump all the solutions into the MPR. The MPR takes ownership of
+                // each solution.
+                _solutions.pop();
                 for (size_t i = 0; i < solutions.size(); ++i) {
                     WorkingSet* ws;
                     PlanStage* root;
@@ -287,7 +348,7 @@ namespace mongo {
 
                 // Add the index assignments to our original query.
                 Status tagStatus = QueryPlanner::tagAccordingToCache(
-                    orChild, bestSoln->cacheData->tree.get(), indexMap);
+                    orChild, bestSoln->cacheData->tree.get(), _indexMap);
 
                 if (!tagStatus.isOK()) {
                     QLOG() << "Subplanner: Failed to extract indices from subchild"

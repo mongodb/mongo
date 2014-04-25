@@ -331,7 +331,15 @@ namespace mongo {
 
             QLOG() << "Running query as sub-queries: " << canonicalQuery->toStringShort();
             LOG(2) << "Running query as sub-queries: " << canonicalQuery->toStringShort();
-            *out = new SubplanRunner(collection, plannerParams, canonicalQuery.release());
+
+            SubplanRunner* runner;
+            Status runnerStatus = SubplanRunner::make(collection, plannerParams,
+                                                      canonicalQuery.release(), &runner);
+            if (!runnerStatus.isOK()) {
+                return runnerStatus;
+            }
+
+            *out = runner;
             return Status::OK();
         }
 
