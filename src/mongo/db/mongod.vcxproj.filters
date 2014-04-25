@@ -485,9 +485,6 @@
     <ClCompile Include="..\util\util.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="btree.cpp">
-      <Filter>db\Source Files\a to d</Filter>
-    </ClCompile>
     <ClCompile Include="durop.cpp">
       <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
@@ -2784,9 +2781,6 @@
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="durop.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
-    <ClInclude Include="btree.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="client.h">

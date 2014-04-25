@@ -189,22 +189,6 @@ src/mongo/client/syncclusterconnection.cpp
 * 8020 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/syncclusterconnection.cpp#L283) SyncClusterConnection::remove prepare failed: 
 
 
-src/mongo/db/btree.cpp
-----
-* 10281 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.cpp#L143) assert is misdefined
-* 10282 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.cpp#L324) n==0 in btree popBack()
-* 10283 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.cpp#L331) rchild not null in btree popBack()
-* 10285 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.cpp#L1771) _insert: reuse key but lchild is not null
-* 10286 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.cpp#L1772) _insert: reuse key but rchild is not null
-* 10287 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.cpp#L84) btree: key+recloc already in index
-* 15898 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.cpp#L42) error in index possibly corruption consider repairing 
-
-
-src/mongo/db/btree.h
-----
-* 13000 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btree.h#L361) invalid keyNode: " +  BSON( "i" << i << "n
-
-
 src/mongo/db/btreebuilder.cpp
 ----
 * 10288 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/btreebuilder.cpp#L76) bad key order in BtreeBuilder - server internal error

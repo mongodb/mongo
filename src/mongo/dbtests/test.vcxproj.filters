@@ -526,9 +526,6 @@
     <ClInclude Include="..\db\mongomutex.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\btree.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\durop.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
@@ -3326,9 +3323,6 @@
     </ClCompile>
     <ClCompile Include="..\db\repl\rs_rollback.cpp">
       <Filter>db\repl</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\btree.cpp">
-      <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
     <ClCompile Include="..\db\dur_writetodatafiles.cpp">
       <Filter>db\Source Files\a to d</Filter>

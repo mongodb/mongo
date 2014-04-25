@@ -169,13 +169,6 @@ namespace mongo {
         */
         BSONObj obj() const; // TODO(ERH): remove
 
-        template< class V >
-        const BtreeBucket<V> * btree() const; // TODO(ERH): remove
-
-        // Explicitly signals we are writing and casts away const
-        template< class V >
-        BtreeBucket<V> * btreemod() const; // TODO(ERH): remove
-
         /// members for Sorter
         struct SorterDeserializeSettings {}; // unused
         void serializeForSorter(BufBuilder& buf) const { buf.appendStruct(*this); }

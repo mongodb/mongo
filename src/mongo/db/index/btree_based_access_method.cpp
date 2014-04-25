@@ -43,10 +43,13 @@
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/structure/btree/btree_interface.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
     BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState)
         : _btreeState(btreeState), _descriptor(btreeState->descriptor()) {
@@ -57,9 +60,6 @@ namespace mongo {
                                                                      btreeState->ordering(),
                                                                      _descriptor->version()));
     }
-
-    // This is currently in btree.cpp.  Once that file is retired it'll move here.
-    extern bool failIndexKeyTooLong;
 
     // Find the keys for obj, put them in the tree pointing to loc
     Status BtreeBasedAccessMethod::insert(const BSONObj& obj,

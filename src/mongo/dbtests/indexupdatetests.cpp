@@ -28,7 +28,6 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/db/structure/btree/btree.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/btree_based_bulk_access_method.h"

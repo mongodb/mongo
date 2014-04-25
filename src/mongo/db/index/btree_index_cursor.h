@@ -46,7 +46,7 @@ namespace mongo {
         bool isEOF() const;
 
         /**
-         * Called from btree.cpp when we're about to delete a Btree bucket.
+         * Called from btree_logic.cpp when we're about to delete a Btree bucket.
          */
         static void aboutToDeleteBucket(const DiskLoc& bucket);
 
