@@ -65,13 +65,14 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         r = st.adminCommand({ shardCollection : "test.col" , key : { _id : 1 } });
         assert.eq(r, true, "error sharding collection for this configuration");
 
-	// Test mongos talking to shards
+        // Test mongos talking to shards
         var bigstr = Array(1024*1024).join("#");
 
+        var bulk = db1.col.initializeUnorderedBulkOp();
         for(var i = 0; i < 128; i++){
-            db1.col.insert({_id:i, string:bigstr});
+            bulk.insert({ _id: i, string: bigstr });
         }
-        db1.getLastError();
+        assert.writeOK(bulk.execute());
         assert.eq(128, db1.col.count(), "error retrieving documents from cluster");
 
         // Test shards talking to each other

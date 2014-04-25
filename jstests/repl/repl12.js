@@ -17,7 +17,6 @@ for( i = 0; i < 3; ++i ) {
     m.getDB( a ).c.save( {} );
     a += "a";
 }
-m.getDB(a).getLastError();
 
 //print("\n\n\n DB NAMES MASTER:");
 //printjson(m.getDBNames());

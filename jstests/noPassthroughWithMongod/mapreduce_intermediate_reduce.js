@@ -15,14 +15,14 @@ var coll = db.getCollection("mrInput");
 //
 var expectedOutColl = [];
 
+var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 10; i++) {
     for (var j = 1; j < 50; j++) {
-        coll.insert({idx: i, j: j});
+        bulk.insert({ idx: i, j: j });
     }
     expectedOutColl.push ({ _id: i, value: j - 1 });
 }
-
-assertGLEOK(db.getLastErrorObj());
+assert.writeOK(bulk.execute());
 
 function mapFn() { emit(this.idx, 1); };
 function reduceFn(key, values) { return Array.sum(values); };

@@ -21,16 +21,11 @@ print('Number of documents to exceed maximum BSON size: ' + numDocs)
 print('About to insert ' + numDocs + ' documents into ' +
       exportimport_db.getName() + '.' + src.getName());
 var i;
+var bulk = src.initializeUnorderedBulkOp();
 for (i = 0; i < numDocs; ++i) {
-    src.insert({ x : bigString });
+    bulk.insert({ x: bigString });
 }
-var lastError = exportimport_db.getLastError();
-if (lastError == null) {
-    print('Finished inserting ' + numDocs + ' documents');
-}
-else {
-    doassert('Insertion failed: ' + lastError);
-}
+assert.writeOK(bulk.execute());
 
 data = 'data/exportimport_array_test.json';
 

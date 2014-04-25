@@ -15,12 +15,14 @@ if ( bi.indexOf( "erh2" ) >= 0 ){
 if ( shouldRun ) {
 
     num = 0;
+    var bulk = t.initializeUnorderedBulkOp();
     for ( x = -180; x < 180; x += .5 ){
         for ( y = -180; y < 180; y += .5 ){
             o = { _id : num++ , loc : [ x , y ] };
-            t.save( o );
+            bulk.insert( o );
         }
     }
+    assert.writeOK(bulk.execute());
 
     var numTests = 31;
     for( var n = 0; n < numTests; n++ ){

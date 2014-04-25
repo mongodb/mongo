@@ -35,7 +35,6 @@ t.insert( { x : true } )  //non-date value
 t.insert( { x : "yo" } )  //non-date value
 t.insert( { x : 3 } )     //non-date value
 t.insert( { x : /foo/ } ) //non-date value
-db.getLastError();
 
 assert.eq( 30 , t.count() );
 

@@ -1,4 +1,5 @@
 // Test that opcounters get incremented properly.
+// Legacy write mode test also available at jstests/gle.
 
 var mongo = new Mongo(db.getMongo().host);
 mongo.forceWriteMode("commands");

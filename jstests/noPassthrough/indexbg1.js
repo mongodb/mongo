@@ -35,10 +35,11 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
     t = db[ baseName ];
     t.drop();
 
+    var bulk = db.jstests_indexbg1.initializeUnorderedBulkOp();
     for( i = 0; i < size; ++i ) {
-        db.jstests_indexbg1.save( {i:i} );
+        bulk.insert({ i: i });
     }
-    db.getLastError();
+    assert.writeOK(bulk.execute());
     assert.eq( size, t.count() );
     
     doParallel( fullName + ".ensureIndex( {i:1}, {background:true} )" );
@@ -62,25 +63,16 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         assert( ex.nscanned < 1000 , "took too long to find 100: " + tojson( ex ) );
 
 
-        t.remove( {i:40}, true ); // table scan
-        assert( !db.getLastError() );
-
-        t.update( {i:10}, {i:-10} ); // should scan 10
-        assert( !db.getLastError() );
+        assert.writeOK(t.remove({ i: 40 }, true )); // table scan
+        assert.writeOK(t.update({ i: 10 }, { i :-10 })); // should scan 10
 
         id = t.find().hint( {$natural:-1} ).next()._id;
 
-        t.update( {_id:id}, {i:-2} );
-        assert( !db.getLastError() );
-
-        t.save( {i:-50} );
-        assert( !db.getLastError() );
-
-        t.save( {i:size+2} );
-        assert( !db.getLastError() );
+        assert.writeOK(t.update({ _id: id }, { i: -2 } ));
+        assert.writeOK(t.save({ i: -50 }));
+        assert.writeOK(t.save({ i: size + 2 }));
 
         assert.eq( size + 1, t.count() );
-        assert( !db.getLastError() );
 
         print( "finished with checks" );
     } catch( e ) {
@@ -113,10 +105,10 @@ assert.eq( 1, t.count( {i:-2} ) );
 assert.eq( 1, t.count( {i:-50} ) );
 assert.eq( 1, t.count( {i:size+2} ) );
 assert.eq( 0, t.count( {i:40} ) );
-assert( !db.getLastError() );
 print("about to drop index");
 t.dropIndex( {i:1} );
-printjson( db.getLastError() );
-assert( !db.getLastError() );
+var gle = db.getLastError();
+printjson( gle );
+assert( !gle );
 
 testServer.stop();
