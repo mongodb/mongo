@@ -2466,6 +2466,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 				goto skip_check_complete;
 			break;
 		case WT_PAGE_ROW_LEAF:
+			WT_CLEAR(key);
 			if (skip->ins == NULL)
 				WT_RET(__wt_row_leaf_key(
 				    session, page, skip->rip, &key, 0));
@@ -2475,6 +2476,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 			}
 			WT_RET(WT_LEX_CMP(session,
 			    btree->collator, &key, &(bnd + 1)->key, cmp));
+			__wt_free(session, key.mem);
 			if (cmp >= 0)
 				goto skip_check_complete;
 			break;
