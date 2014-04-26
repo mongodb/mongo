@@ -538,23 +538,14 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 
 	/*
 	 * We have to build the key (it's never been instantiated, and it's some
-	 * kind of compressed or overflow key).
-	 *
-	 * Magic: the row-store leaf page search loop calls us to instantiate
-	 * keys, and it's not prepared to handle memory being allocated in the
-	 * key's WT_ITEM.  Call __wt_row_leaf_key_work to instantiate the key
-	 * with no buffer reference, then retry to pick up a simple reference
-	 * to the instantiated key.
+	 * kind of compressed or overflow key).  Call __wt_row_leaf_key_work to
+	 * instantiate the key with no buffer reference, then retry to pick up
+	 * a simple reference to the instantiated key.
 	 */
 	if (instantiate) {
 		WT_RET(__wt_row_leaf_key_work(session, page, rip, NULL, 1));
 		goto retry;
 	}
-
-	/*
-	 * If instantiate wasn't set, our caller is prepared to handle memory
-	 * allocations in the key's WT_ITEM, pass the key.
-	 */
 	return (__wt_row_leaf_key_work(session, page, rip, key, 0));
 }
 
