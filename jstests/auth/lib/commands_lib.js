@@ -1347,6 +1347,7 @@ var authCommandsLib = {
                 }
             ]
         },
+/*      temporarily removed see SERVER-13555 
         {
             testname: "indexStats",
             command: {indexStats: "x", index: "a_1"},
@@ -1373,6 +1374,7 @@ var authCommandsLib = {
                 }
             ]
         },
+*/
         {
             testname: "isMaster",
             command: {isMaster: 1},
