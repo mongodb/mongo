@@ -1572,8 +1572,9 @@ __rec_split_row_promote(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key, uint8_t type)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(update);
 	WT_DECL_RET;
-	WT_ITEM update, *max;
+	WT_ITEM *max;
 	WT_UPD_SKIPPED *skip;
 	size_t cnt, len, size;
 	uint32_t i;
@@ -1616,7 +1617,7 @@ __rec_split_row_promote(
 		return (__wt_buf_set(session, key, r->cur->data, r->cur->size));
 
 	btree = S2BT(session);
-	WT_CLEAR(update);
+	WT_RET(__wt_scr_alloc(session, 0, &update));
 
 	/*
 	 * Note #2: if we skipped updates, an update key may be larger than the
@@ -1629,23 +1630,23 @@ __rec_split_row_promote(
 		skip = &r->skip[i - 1];
 		if (skip->ins == NULL)
 			WT_ERR(__wt_row_leaf_key(
-			    session, r->page, skip->rip, &update, 0));
+			    session, r->page, skip->rip, update, 0));
 		else {
-			update.data = WT_INSERT_KEY(skip->ins);
-			update.size = WT_INSERT_KEY_SIZE(skip->ins);
+			update->data = WT_INSERT_KEY(skip->ins);
+			update->size = WT_INSERT_KEY_SIZE(skip->ins);
 		}
 
 		/* Compare against the current key, it must be less. */
 		WT_ERR(WT_LEX_CMP(
-		    session, btree->collator, &update, r->cur, cmp));
+		    session, btree->collator, update, r->cur, cmp));
 		if (cmp >= 0)
 			continue;
 
 		/* Compare against the last key, it must be greater. */
 		WT_ERR(WT_LEX_CMP(
-		    session, btree->collator, &update, r->last, cmp));
+		    session, btree->collator, update, r->last, cmp));
 		if (cmp >= 0)
-			max = &update;
+			max = update;
 
 		/*
 		 * The skipped updates are in key-sort order so the entry we're
@@ -1677,7 +1678,7 @@ __rec_split_row_promote(
 		}
 	ret = __wt_buf_set(session, key, r->cur->data, size);
 
-err:	__wt_free(session, update.mem);
+err:	__wt_scr_free(&update);
 	return (ret);
 }
 
@@ -2397,7 +2398,8 @@ __rec_split_write(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int final)
 {
 	WT_BTREE *btree;
-	WT_ITEM key;
+	WT_DECL_ITEM(key);
+	WT_DECL_RET;
 	WT_MULTI *multi;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
@@ -2413,6 +2415,8 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	dsk = buf->mem;
 	page = r->page;
 	mod = page->modify;
+
+	WT_RET(__wt_scr_alloc(session, 0, &key));
 
 	/* Set the zero-length value flag in the page header. */
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
@@ -2436,7 +2440,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	case WT_PAGE_ROW_INT:
 		bnd->addr.type = WT_ADDR_INT;
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 	bnd->size = (uint32_t)buf->size;
@@ -2453,7 +2457,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	for (i = 0, skip = r->skip; i < r->skip_next; ++i, ++skip) {
 		/* The final block gets all remaining skipped updates. */
 		if (final) {
-			WT_RET(__rec_skip_update_move(session, bnd, skip));
+			WT_ERR(__rec_skip_update_move(session, bnd, skip));
 			continue;
 		}
 
@@ -2471,24 +2475,23 @@ __rec_split_write(WT_SESSION_IMPL *session,
 				goto skip_check_complete;
 			break;
 		case WT_PAGE_ROW_LEAF:
-			WT_CLEAR(key);
 			if (skip->ins == NULL)
-				WT_RET(__wt_row_leaf_key(
-				    session, page, skip->rip, &key, 0));
+				WT_ERR(__wt_row_leaf_key(
+				    session, page, skip->rip, key, 0));
 			else {
-				key.data = WT_INSERT_KEY(skip->ins);
-				key.size = WT_INSERT_KEY_SIZE(skip->ins);
+				key->data = WT_INSERT_KEY(skip->ins);
+				key->size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
-			WT_RET(WT_LEX_CMP(session,
-			    btree->collator, &key, &(bnd + 1)->key, cmp));
-			__wt_free(session, key.mem);
+			WT_ERR(WT_LEX_CMP(session,
+			    btree->collator, key, &(bnd + 1)->key, cmp));
 			if (cmp >= 0)
 				goto skip_check_complete;
 			break;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
-		WT_RET(__rec_skip_update_move(session, bnd, skip));
+		WT_ERR(__rec_skip_update_move(session, bnd, skip));
 	}
+
 skip_check_complete:
 	/*
 	 * If there are updates that weren't moved to the block, shuffle them to
@@ -2509,14 +2512,14 @@ skip_check_complete:
 	 */
 	if (bnd->skip != NULL) {
 		if (bnd->already_compressed)
-			WT_RET(__rec_raw_decompress(
+			WT_ERR(__rec_raw_decompress(
 			    session, buf->data, buf->size, &bnd->dsk));
 		else
-			WT_RET(__wt_strndup(
+			WT_ERR(__wt_strndup(
 			    session, buf->data, buf->size, &bnd->dsk));
 		WT_ASSERT(session, __wt_verify_dsk_image(
 		    session, "[evict split]", buf->data, buf->size) == 0);
-		return (0);
+		goto done;
 	}
 
 	/*
@@ -2552,16 +2555,19 @@ skip_check_complete:
 				bnd->addr = multi->addr;
 
 				WT_STAT_FAST_DATA_INCR(session, rec_page_match);
-				return (0);
+				goto done;
 			}
 		}
 	}
 
-	WT_RET(__wt_bt_write(session,
+	WT_ERR(__wt_bt_write(session,
 	    buf, addr, &addr_size, 0, bnd->already_compressed));
-	WT_RET(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
+	WT_ERR(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
 	bnd->addr.size = (uint8_t)addr_size;
-	return (0);
+
+done:
+err:	__wt_scr_free(&key);
+	return (ret);
 }
 
 /*
