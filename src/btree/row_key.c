@@ -226,8 +226,8 @@ off_page:		ikey = key;
 			 * In short: if it's not an overflow key, take a copy
 			 * and roll forward.
 			 */
-			WT_ERR(__wt_buf_set(
-			    session, retb, WT_IKEY_DATA(ikey), ikey->size));
+			retb->data = WT_IKEY_DATA(ikey);
+			retb->size = ikey->size;
 			direction = FORWARD;
 			goto next;
 		}
@@ -300,16 +300,12 @@ off_page:		ikey = key;
 			 * found this key while rolling backwards and switched
 			 * directions then.
 			 */
-			if (btree->huffman_key == NULL)
-				WT_ERR(__wt_buf_set(
-				    session, retb, unpack->data, unpack->size));
-			else {
+			if (btree->huffman_key == NULL) {
+				retb->data = unpack->data;
+				retb->size = unpack->size;
+			} else
 				WT_ERR(__wt_dsk_cell_data_ref(
 				    session, WT_PAGE_ROW_LEAF, unpack, retb));
-				if (retb->data != retb->mem)
-					WT_ERR(__wt_buf_set(session,
-					    retb, retb->data, retb->size));
-			}
 
 			if (slot_offset == 0) {
 				/*
@@ -387,6 +383,17 @@ off_page:		ikey = key;
 				p = tmp->data;
 				size = tmp->size;
 			}
+
+			/*
+			 * We may only be referencing a key, get a copy of it
+			 * (this call cannot be combined with the buffer grow
+			 * we're about to do because this buffer may be mapped,
+			 * that is, it may have been used to read a mapped-in
+			 * overflow key).
+			 */
+			if (retb->data != retb->mem)
+				WT_ERR(__wt_buf_set(
+				    session, retb, retb->data, retb->size));
 
 			/*
 			 * Extend the buffer as necessary to hold the key bytes
