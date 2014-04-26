@@ -118,7 +118,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_ITEM *item, _item;
+	WT_ITEM *item;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *child, *parent;
@@ -128,13 +128,11 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	int cmp, depth;
 
 	btree = S2BT(session);
+	item = &cbt->srch;
 	rip = NULL;
 	match = 0;				/* -Wuninitialized */
 
 	__cursor_search_clear(cbt);
-
-	item = &_item;
-	WT_CLEAR_INLINE(WT_ITEM, *item);
 
 	/*
 	 * The row-store search routine uses a different comparison API.
@@ -308,7 +306,7 @@ leaf_only:
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
 
-			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 0));
 			match = WT_MIN(skiplow, skiphigh);
 			cmp = __wt_lex_compare_skip(srch_key, item, &match);
 			if (cmp == 0)
@@ -327,7 +325,7 @@ leaf_only:
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
 
-			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 0));
 			WT_ERR(WT_LEX_CMP_SKIP(session,
 			    btree->collator, srch_key, item, cmp, &match));
 			if (cmp == 0)
@@ -338,21 +336,6 @@ leaf_only:
 			base = indx + 1;
 			--limit;
 		}
-
-	/*
-	 * We don't expect the search item to have any allocated memory (it's a
-	 * performance problem if it does).  Trust, but verify, and complain if
-	 * there's a problem.
-	 */
-	if (item->mem != NULL) {
-		static int complain = 1;
-		if (complain) {
-			__wt_errx(session,
-			    "unexpected key item memory allocation in search");
-			complain = 0;
-		}
-		__wt_buf_free(session, item);
-	}
 
 	/*
 	 * The best case is finding an exact match in the page's WT_ROW slot
