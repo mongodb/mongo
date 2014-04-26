@@ -1572,14 +1572,13 @@ __rec_split_row_promote(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key, uint8_t type)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM update, *max;
 	WT_UPD_SKIPPED *skip;
 	size_t cnt, len, size;
 	uint32_t i;
 	const uint8_t *pa, *pb;
 	int cmp;
-
-	btree = S2BT(session);
 
 	/*
 	 * For a column-store, the promoted key is the recno and we already have
@@ -1616,6 +1615,9 @@ __rec_split_row_promote(
 	if (type != WT_PAGE_ROW_LEAF || !r->key_sfx_compress)
 		return (__wt_buf_set(session, key, r->cur->data, r->cur->size));
 
+	btree = S2BT(session);
+	WT_CLEAR(update);
+
 	/*
 	 * Note #2: if we skipped updates, an update key may be larger than the
 	 * last key stored in the previous block (probable for append-centric
@@ -1626,7 +1628,7 @@ __rec_split_row_promote(
 	for (i = r->skip_next; i > 0; --i) {
 		skip = &r->skip[i - 1];
 		if (skip->ins == NULL)
-			WT_RET(__wt_row_leaf_key(
+			WT_ERR(__wt_row_leaf_key(
 			    session, r->page, skip->rip, &update, 0));
 		else {
 			update.data = WT_INSERT_KEY(skip->ins);
@@ -1634,13 +1636,13 @@ __rec_split_row_promote(
 		}
 
 		/* Compare against the current key, it must be less. */
-		WT_RET(WT_LEX_CMP(
+		WT_ERR(WT_LEX_CMP(
 		    session, btree->collator, &update, r->cur, cmp));
 		if (cmp >= 0)
 			continue;
 
 		/* Compare against the last key, it must be greater. */
-		WT_RET(WT_LEX_CMP(
+		WT_ERR(WT_LEX_CMP(
 		    session, btree->collator, &update, r->last, cmp));
 		if (cmp >= 0)
 			max = &update;
@@ -1673,7 +1675,10 @@ __rec_split_row_promote(
 			}
 			break;
 		}
-	return (__wt_buf_set(session, key, r->cur->data, size));
+	ret = __wt_buf_set(session, key, r->cur->data, size);
+
+err:	__wt_free(session, update.mem);
+	return (ret);
 }
 
 /*
