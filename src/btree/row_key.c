@@ -254,17 +254,17 @@ off_page:		ikey = key;
 			 */
 			if (slot_offset == 0) {
 				WT_ERR(__wt_readlock(
-				    session, S2BT(session)->ovfl_lock));
+				    session, btree->ovfl_lock));
 				key = WT_ROW_KEY_COPY(rip);
 				if (__wt_off_page(page, key)) {
-					WT_ERR(__wt_rwunlock(session,
-					    S2BT(session)->ovfl_lock));
+					WT_ERR(__wt_rwunlock(
+					    session, btree->ovfl_lock));
 					goto off_page;
 				}
 				ret = __wt_dsk_cell_data_ref(
 				    session, WT_PAGE_ROW_LEAF, unpack, retb);
-				WT_TRET(__wt_rwunlock(session,
-				    S2BT(session)->ovfl_lock));
+				WT_TRET(__wt_rwunlock(
+				    session, btree->ovfl_lock));
 				WT_ERR(ret);
 				break;
 			}
