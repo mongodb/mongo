@@ -452,11 +452,11 @@ namespace mongo {
 
         {
             // declare that we will write to [k(keypos),k(n)]
-            const char *p = (const char *) &getKeyHeader(bucket, keypos);
-            const char *q = (const char *) &getKeyHeader(bucket, bucket->n+1);
+            char* start = reinterpret_cast<char*>(&getKeyHeader(bucket, keypos));
+            char* end = reinterpret_cast<char*>(&getKeyHeader(bucket, bucket->n + 1));
 
             // Declare that we will write to [k(keypos),k(n)]
-            trans->writingPtr((void*)( (char*)bucket + (p - (char*)bucket)), q - p);
+            trans->writingPtr(start, end - start);
         }
 
         // e.g. for n==3, keypos==2

@@ -76,7 +76,8 @@ namespace mongo {
         virtual BtreeBuilderInterface* getBulkBuilder(bool dupsAllowed) {
             // The BtreeBuilderInterfaceImpl (currently) takes ownership of the DurTransaction.
             DurTransaction* trans = new DurTransaction();
-            return new BtreeBuilderInterfaceImpl<OnDiskFormat>(trans, _btree->newBuilder(trans, dupsAllowed));
+            return new BtreeBuilderInterfaceImpl<OnDiskFormat>(
+                trans, _btree->newBuilder(trans, dupsAllowed));
         }
 
         virtual Status insert(const BSONObj& key, const DiskLoc& loc, bool dupsAllowed) {
