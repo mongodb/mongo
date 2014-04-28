@@ -79,11 +79,14 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    bool Helpers::findOne(Collection* collection, const BSONObj &query, BSONObj& result, bool requireIndex) {
+    bool Helpers::findOne(Collection* collection, 
+                          const BSONObj &query, 
+                          BSONObj& result, 
+                          bool requireIndex) {
         DiskLoc loc = findOne( collection, query, requireIndex );
         if ( loc.isNull() )
             return false;
-        result = loc.obj();
+        result = collection->docFor(loc);
         return true;
     }
 

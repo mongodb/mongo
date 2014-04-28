@@ -26,9 +26,10 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -126,7 +127,7 @@ namespace mongo {
         {
             // search _id range (0, 10)
             Lock::DBRead lk( ns );
-            Client::Context ctx( ns );
+
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
                             BSON( "_id" << numDocsInserted ),
@@ -143,9 +144,13 @@ namespace mongo {
             ASSERT_NOT_EQUALS( estSizeBytes, 0 );
             ASSERT_LESS_THAN( estSizeBytes, maxSizeBytes );
 
+            Database* db = dbHolder().get(nsToDatabase(range.ns), storageGlobalParams.dbpath);
+            const Collection* collection = db->getCollection(ns);
+
             // Make sure all the disklocs actually correspond to the right info
-            for ( set<DiskLoc>::iterator it = locs.begin(); it != locs.end(); ++it ) {
-                ASSERT_EQUALS( it->obj()["tag"].OID(), tag );
+            for ( set<DiskLoc>::const_iterator it = locs.begin(); it != locs.end(); ++it ) {
+                const BSONObj obj = collection->docFor(*it);
+                ASSERT_EQUALS(obj["tag"].OID(), tag);
             }
         }
     }

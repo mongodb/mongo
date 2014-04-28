@@ -1614,7 +1614,7 @@ namespace QueryUtilTests {
                 IndexDescriptor* desc = catalog->findIndexByKeyPattern( key );
                 invariant( desc );
 
-                int x = nsd()->_catalogFindIndexByName( desc->indexName() );
+                int x = nsd()->_catalogFindIndexByName(collection(), desc->indexName(), false);
                 invariant( x >= 0 );
 
                 return x;

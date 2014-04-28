@@ -162,7 +162,7 @@ namespace ReplTests {
                                                             CollectionScanParams::FORWARD );
                 while ( !it->isEOF() ) {
                     DiskLoc currLoc = it->getNext();
-                    ops.push_back( currLoc.obj() );
+                    ops.push_back(coll->docFor(currLoc));
                 }
                 delete it;
             }
@@ -195,7 +195,7 @@ namespace ReplTests {
             out() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
                 DiskLoc currLoc = it->getNext();
-                out() << currLoc.obj().toString() << endl;
+                out() << coll->docFor(currLoc).toString() << endl;
             }
             delete it;
         }

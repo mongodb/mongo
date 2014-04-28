@@ -57,7 +57,6 @@ namespace mongo {
         int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
 
-        Record* rec() const; // TODO(ERH): remove
     public:
 
         enum SentinelValues {
@@ -154,13 +153,6 @@ namespace mongo {
         struct Hasher {
             size_t operator()( DiskLoc loc ) const;
         };
-
-        /* Get the "thing" associated with this disk location.
-           it is assumed the object is what you say it is -- you must assure that
-           (think of this as an unchecked type cast)
-           Note: set your Context first so that the database to which the diskloc applies is known.
-        */
-        BSONObj obj() const; // TODO(ERH): remove
 
         /// members for Sorter
         struct SorterDeserializeSettings {}; // unused

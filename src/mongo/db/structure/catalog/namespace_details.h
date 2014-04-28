@@ -37,9 +37,6 @@
 namespace mongo {
 
     class Collection;
-    class Database;
-    class IndexCatalog;
-    class IndexCatalogEntry;
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.
@@ -334,16 +331,21 @@ namespace mongo {
          */
         static int quantizePowerOf2AllocationSpace(int allocSize);
 
-    public:
         NamespaceDetails *writingWithoutExtra() {
             return ( NamespaceDetails* ) getDur().writingPtr( this, sizeof( NamespaceDetails ) );
         }
         /** Make all linked Extra objects writeable as well */
         NamespaceDetails *writingWithExtra();
 
-        // @return offset in indexes[]
-        int _catalogFindIndexByName( const StringData& name,
-                                     bool includeBackgroundInProgress = false) const;
+        /**
+         * Returns the offset of the specified index name within the array of indexes. Must be
+         * passed-in the owning collection to resolve the index record entries to objects.
+         *
+         * @return > 0 if index name was found, -1 otherwise.
+         */
+        int _catalogFindIndexByName(const Collection* coll,
+                                    const StringData& name, 
+                                    bool includeBackgroundInProgress) const;
 
     private:
 

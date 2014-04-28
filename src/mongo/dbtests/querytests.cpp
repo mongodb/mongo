@@ -120,7 +120,7 @@ namespace QueryTests {
             ASSERT( Helpers::findOne( _collection, query, ret, true ) );
             ASSERT_EQUALS( string( "b" ), ret.firstElement().fieldName() );
             // Cross check with findOne() returning location.
-            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, true ).obj() );
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, true)));
         }
     };
     
@@ -134,7 +134,7 @@ namespace QueryTests {
             // Check findOne() returning object, allowing unindexed scan.
             ASSERT( Helpers::findOne( _collection, query, ret, false ) );
             // Check findOne() returning location, allowing unindexed scan.
-            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, false ).obj() );
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, false)));
             
             // Check findOne() returning object, requiring indexed scan without index.
             ASSERT_THROWS( Helpers::findOne( _collection, query, ret, true ), MsgAssertionException );
@@ -145,7 +145,7 @@ namespace QueryTests {
             // Check findOne() returning object, requiring indexed scan with index.
             ASSERT( Helpers::findOne( _collection, query, ret, true ) );
             // Check findOne() returning location, requiring indexed scan with index.
-            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, true ).obj() );
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, true)));
         }
     };
     
@@ -176,7 +176,7 @@ namespace QueryTests {
             BSONObj ret;
             ASSERT( Helpers::findOne( _collection, query, ret, false ) );
             ASSERT( ret.isEmpty() );
-            ASSERT_EQUALS( ret, Helpers::findOne( _collection, query, false ).obj() );
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, false)));
         }
     };
     

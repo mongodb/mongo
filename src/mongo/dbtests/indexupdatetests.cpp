@@ -497,24 +497,24 @@ namespace IndexUpdateTests {
             IndexCatalog::IndexBuildBlock* b = halfAddIndex("b");
             IndexCatalog::IndexBuildBlock* c = halfAddIndex("c");
             IndexCatalog::IndexBuildBlock* d = halfAddIndex("d");
-            int offset = nsd->findIndexByName( "b_1", true );
+            int offset = nsd->_catalogFindIndexByName( "b_1", true );
             ASSERT_EQUALS(2, offset);
 
             delete b;
 
-            ASSERT_EQUALS(2, nsd->findIndexByName( "c_1", true ) );
-            ASSERT_EQUALS(3, nsd->findIndexByName( "d_1", true ) );
+            ASSERT_EQUALS(2, nsd->_catalogFindIndexByName( "c_1", true ) );
+            ASSERT_EQUALS(3, nsd->_catalogFindIndexByName( "d_1", true ) );
 
-            offset = nsd->findIndexByName( "d_1", true );
+            offset = nsd->_catalogFindIndexByName( "d_1", true );
             delete d;
 
-            ASSERT_EQUALS(2, nsd->findIndexByName( "c_1", true ) );
-            ASSERT( nsd->findIndexByName( "d_1", true ) < 0 );
+            ASSERT_EQUALS(2, nsd->_catalogFindIndexByName( "c_1", true ) );
+            ASSERT( nsd->_catalogFindIndexByName( "d_1", true ) < 0 );
 
-            offset = nsd->findIndexByName( "a_1", true );
+            offset = nsd->_catalogFindIndexByName( "a_1", true );
             delete a;
 
-            ASSERT_EQUALS(1, nsd->findIndexByName( "c_1", true ));
+            ASSERT_EQUALS(1, nsd->_catalogFindIndexByName( "c_1", true ));
             delete c;
         }
 

@@ -148,8 +148,8 @@ namespace mongo {
     }
 
     int IndexCatalogEntry::_indexNo() const {
-        int idxNo = _collection->details()->_catalogFindIndexByName( _descriptor->indexName(),
-                                                                     true );
+        int idxNo = _collection->details()->_catalogFindIndexByName(
+                                                _collection, _descriptor->indexName(), true);
         fassert( 17341, idxNo >= 0 );
         return idxNo;
     }

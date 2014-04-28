@@ -178,9 +178,9 @@ namespace QueryStageAnd {
             getLocs(&data, coll);
             size_t memUsageBefore = ah->getMemUsage();
             for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
-                if (it->obj()["foo"].numberInt() == 15) {
+                if (coll->docFor(*it)["foo"].numberInt() == 15) {
                     ah->invalidate(*it, INVALIDATION_DELETION);
-                    remove(it->obj());
+                    remove(coll->docFor(*it));
                     break;
                 }
             }
@@ -280,7 +280,7 @@ namespace QueryStageAnd {
 
             size_t memUsageBefore = ah->getMemUsage();
             for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
-                if (0 == deletedObj.woCompare(it->obj())) {
+                if (0 == deletedObj.woCompare(coll->docFor(*it))) {
                     ah->invalidate(*it, INVALIDATION_DELETION);
                     break;
                 }
@@ -302,7 +302,7 @@ namespace QueryStageAnd {
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 WorkingSetMember* wsm = ws.get(id);
-                ASSERT_NOT_EQUALS(0, deletedObj.woCompare(wsm->loc.obj()));
+                ASSERT_NOT_EQUALS(0, deletedObj.woCompare(coll->docFor(wsm->loc)));
                 ++count;
             }
 
@@ -798,7 +798,7 @@ namespace QueryStageAnd {
             // and make sure it shows up in the flagged results.
             ah->prepareToYield();
             ah->invalidate(*data.begin(), INVALIDATION_DELETION);
-            remove(data.begin()->obj());
+            remove(coll->docFor(*data.begin()));
             ah->recoverFromYield();
 
             // Make sure the nuked obj is actually in the flagged data.
@@ -837,7 +837,7 @@ namespace QueryStageAnd {
             // not flagged.
             ah->prepareToYield();
             ah->invalidate(*it, INVALIDATION_DELETION);
-            remove(it->obj());
+            remove(coll->docFor(*it));
             ah->recoverFromYield();
 
             // Get all results aside from the two we killed.
@@ -1098,11 +1098,11 @@ namespace QueryStageAnd {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
-                BSONObj thisObj = ws.get(id)->loc.obj();
+                BSONObj thisObj = coll->docFor(ws.get(id)->loc);
                 ASSERT_EQUALS(7 + count, thisObj["bar"].numberInt());
                 ++count;
                 if (WorkingSet::INVALID_ID != lastId) {
-                    BSONObj lastObj = ws.get(lastId)->loc.obj();
+                    BSONObj lastObj = coll->docFor(ws.get(lastId)->loc);
                     ASSERT_LESS_THAN(lastObj["bar"].woCompare(thisObj["bar"]), 0);
                 }
                 lastId = id;

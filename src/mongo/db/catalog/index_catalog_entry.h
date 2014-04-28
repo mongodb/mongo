@@ -144,10 +144,6 @@ namespace mongo {
         // pass ownership to EntryContainer
         void add( IndexCatalogEntry* entry ) { _entries.mutableVector().push_back( entry ); }
 
-        // TODO: should the findIndexBy* methods be done here
-        // and proxied in IndexCatatalog
-        //IndexCatalogEntry* findIndexByName();
-
     private:
         OwnedPointerVector<IndexCatalogEntry> _entries;
     };

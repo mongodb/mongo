@@ -100,11 +100,11 @@ namespace mongo {
             int idxNo = ii.pos() - 1;
 
             if ( idxNo >= _details->getCompletedIndexCount() ) {
-                _unfinishedIndexes.push_back( id.info.obj().getOwned() );
+                _unfinishedIndexes.push_back(_collection->docFor(id.info).getOwned());
                 continue;
             }
 
-            BSONObj ownedInfoObj = id.info.obj().getOwned();
+            BSONObj ownedInfoObj = _collection->docFor(id.info).getOwned();
             BSONObj keyPattern = ownedInfoObj.getObjectField("key");
             IndexDescriptor* descriptor = new IndexDescriptor( _collection,
                                                                _getAccessMethodName(keyPattern),
@@ -343,7 +343,7 @@ namespace mongo {
         string idxName = descriptor->indexName(); // out copy for yields, etc...
 
         invariant( entry == _entries.find( descriptor ) );
-        invariant( _details->_catalogFindIndexByName( idxName, true ) >= 0 );
+        invariant(_details->_catalogFindIndexByName(_collection, idxName, true) >= 0);
 
         try {
             Client& client = cc();
@@ -361,7 +361,7 @@ namespace mongo {
             _inProgressIndexes.erase(it);
 
             // sanity check
-            int idxNo = _details->_catalogFindIndexByName( idxName, true );
+            int idxNo = _details->_catalogFindIndexByName(_collection, idxName, true);
             invariant( idxNo < numIndexesReady() );
 
             return Status::OK();
@@ -508,7 +508,7 @@ namespace mongo {
         _inProgress = false; // defensive
         fassert( 17204, _catalog->_collection->ok() ); // defensive
 
-        int idxNo = _collection->details()->_catalogFindIndexByName( _indexName, true );
+        int idxNo = _collection->details()->_catalogFindIndexByName(_collection, _indexName, true);
         fassert( 17205, idxNo >= 0 );
 
         IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
@@ -538,7 +538,7 @@ namespace mongo {
 
         NamespaceDetails* nsd = _collection->detailsWritable();
 
-        int idxNo = nsd->_catalogFindIndexByName( _indexName, true );
+        int idxNo = nsd->_catalogFindIndexByName(_collection, _indexName, true);
         fassert( 17202, idxNo >= 0 );
 
         // Make sure the newly created index is relocated to nIndexes, if it isn't already there
@@ -850,7 +850,7 @@ namespace mongo {
         string indexNamespace = entry->descriptor()->indexNamespace();
         string indexName = entry->descriptor()->indexName();
 
-        int idxNo = _details->_catalogFindIndexByName( indexName, true );
+        int idxNo = _details->_catalogFindIndexByName(_collection, indexName, true);
         invariant( idxNo >= 0 );
 
         // --------- START REAL WORK ----------
@@ -892,7 +892,7 @@ namespace mongo {
                                              const string& indexNamespace,
                                              int idxNo ) {
         invariant( idxNo >= 0 );
-        invariant( _details->_catalogFindIndexByName( indexName, true ) == idxNo );
+        invariant(_details->_catalogFindIndexByName(_collection, indexName, true) == idxNo);
 
         // data + system.namespacesa
         DurTransaction txn; // XXX
@@ -937,7 +937,7 @@ namespace mongo {
             BSONObj keyPattern = spec.getObjectField("key");
             IndexDescriptor desc( _collection, _getAccessMethodName(keyPattern), spec );
 
-            int idxNo = _details->_catalogFindIndexByName( desc.indexName(), true );
+            int idxNo = _details->_catalogFindIndexByName(_collection, desc.indexName(), true);
             invariant( idxNo >= 0 );
             invariant( idxNo >= numIndexesReady() );
 
@@ -951,7 +951,8 @@ namespace mongo {
     void IndexCatalog::updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds ) {
         IndexDetails* indexDetails = _getIndexDetails( idx );
 
-        BSONElement oldExpireSecs = indexDetails->info.obj().getField("expireAfterSeconds");
+        const BSONElement oldExpireSecs = 
+            _collection->docFor(indexDetails->info).getField("expireAfterSeconds");
 
         // Important that we set the new value in-place.  We are writing directly to the
         // object here so must be careful not to overwrite with a longer numeric type.
@@ -1153,7 +1154,7 @@ namespace mongo {
     }
 
     IndexDetails* IndexCatalog::_getIndexDetails( const IndexDescriptor* descriptor ) const {
-        int idxNo = _details->_catalogFindIndexByName( descriptor->indexName(), true );
+        int idxNo = _details->_catalogFindIndexByName(_collection, descriptor->indexName(), true);
         invariant( idxNo >= 0 );
         return &_details->idx( idxNo );
     }

@@ -234,10 +234,11 @@ namespace mongo {
             // Copy over all the data from source collection to target collection.
             bool insertSuccessful = true;
             boost::scoped_ptr<RecordIterator> sourceIt;
+            Collection* sourceColl = NULL;
 
             {
                 Client::Context srcCtx( source );
-                Collection* sourceColl = srcCtx.db()->getCollection( source );
+                sourceColl = srcCtx.db()->getCollection( source );
                 sourceIt.reset( sourceColl->getIterator( DiskLoc(), false, CollectionScanParams::FORWARD ) );
             }
 
@@ -246,7 +247,7 @@ namespace mongo {
                 BSONObj o;
                 {
                     Client::Context srcCtx( source );
-                    o = sourceIt->getNext().obj();
+                    o = sourceColl->docFor(sourceIt->getNext());
                 }
                 // Insert and check return status of insert.
                 {
@@ -278,7 +279,6 @@ namespace mongo {
             bool indexSuccessful = true;
             {
                 Client::Context srcCtx( source );
-                Collection* sourceColl = srcCtx.db()->getCollection( source );
                 IndexCatalog::IndexIterator sourceIndIt =
                     sourceColl->getIndexCatalog()->getIndexIterator( true );
 

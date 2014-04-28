@@ -523,7 +523,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
@@ -532,7 +532,7 @@ namespace QueryStageCollectionScan {
             // Remove locs[count].
             scan->prepareToYield();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
-            remove(locs[count].obj());
+            remove(coll->docFor(locs[count]));
             scan->recoverFromYield();
 
             // Skip over locs[count].
@@ -544,7 +544,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
@@ -584,7 +584,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
@@ -593,7 +593,7 @@ namespace QueryStageCollectionScan {
             // Remove locs[count].
             scan->prepareToYield();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
-            remove(locs[count].obj());
+            remove(coll->docFor(locs[count]));
             scan->recoverFromYield();
 
             // Skip over locs[count].
@@ -605,7 +605,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
@@ -657,7 +657,7 @@ namespace QueryStageCollectionScan {
             // Delete the thing we're fetching.
             scan->prepareToYield();
             scan->invalidate(locs[0], INVALIDATION_DELETION);
-            remove(locs[0].obj());
+            remove(coll->docFor(locs[0]));
             scan->recoverFromYield();
 
             // Turn fetches off.
@@ -671,7 +671,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(locs[count].obj()["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }

@@ -466,11 +466,13 @@ namespace mongo {
         }
     }
 
-    int NamespaceDetails::_catalogFindIndexByName(const StringData& name,
+    int NamespaceDetails::_catalogFindIndexByName(const Collection* coll,
+                                                  const StringData& name,
                                                   bool includeBackgroundInProgress) const {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
-            if ( name == i.next().info.obj().getStringField("name") )
+            const BSONObj obj = coll->docFor(i.next().info);
+            if ( name == obj.getStringField("name") )
                 return i.pos()-1;
         }
         return -1;

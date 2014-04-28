@@ -324,7 +324,7 @@ namespace QueryStageFetch {
                 WorkingSetMember mockMember;
                 mockMember.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
                 mockMember.loc = *locs.begin();
-                mockMember.obj = mockMember.loc.obj();
+                mockMember.obj = coll->docFor(mockMember.loc);
                 // Points into our DB.
                 ASSERT_FALSE(mockMember.obj.isOwned());
                 mockStage->pushBack(mockMember);

@@ -524,16 +524,6 @@ namespace mongo {
         return this;
     }
 
-    Record* DiskLoc::rec() const {
-        // XXX-ERH
-        verify(a() != -1);
-        return cc().getContext()->db()->getExtentManager().recordForV1( *this );
-    }
-
-    BSONObj DiskLoc::obj() const {
-        return BSONObj( rec()->accessed()->data() );
-    }
-
     void Record::_accessing() const {
         if ( likelyInPhysicalMemory() )
             return;

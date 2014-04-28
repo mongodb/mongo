@@ -519,11 +519,11 @@ namespace mongo {
 
         audit::logRenameCollection( currentClient.get(), fromNS, toNS );
 
+        Collection* systemIndexCollection = getCollection(txn, _indexesName);
+
         // move index namespaces
         BSONObj oldIndexSpec;
-        while( Helpers::findOne( getCollection( txn, _indexesName ),
-                                 BSON( "ns" << fromNS ),
-                                 oldIndexSpec ) ) {
+        while (Helpers::findOne(systemIndexCollection, BSON("ns" << fromNS), oldIndexSpec)) {
             oldIndexSpec = oldIndexSpec.getOwned();
 
             BSONObj newIndexSpec;
@@ -540,8 +540,6 @@ namespace mongo {
                 newIndexSpec = b.obj();
             }
 
-            Collection* systemIndexCollection = getCollection( txn, _indexesName );
-
             StatusWith<DiskLoc> newIndexSpecLoc =
                 systemIndexCollection->insertDocument( txn, newIndexSpec, false );
             if ( !newIndexSpecLoc.isOK() )
@@ -551,7 +549,9 @@ namespace mongo {
 
             {
                 // fix IndexDetails pointer
-                int indexI = details->_catalogFindIndexByName( indexName );
+                int indexI = details->_catalogFindIndexByName(
+                                        systemIndexCollection, indexName, false);
+
                 IndexDetails& indexDetails = details->idx(indexI);
                 *txn->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
             }
