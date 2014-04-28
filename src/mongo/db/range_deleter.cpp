@@ -237,6 +237,9 @@ namespace mongo {
                 _taskQueueNotEmptyCV.notify_one();
             }
             else {
+                log() << "rangeDeleter waiting for " << toDelete->cursorsToWait.size()
+                      << " cursors in " << ns << " to finish" << endl;
+
                 _notReadyQueue.push_back(toDelete.release());
             }
         }
@@ -278,6 +281,11 @@ namespace mongo {
         _env->getCursorIds(ns, &cursorsToWait);
 
         long long checkIntervalMillis = 5;
+
+        if (!cursorsToWait.empty()) {
+            log() << "rangeDeleter waiting for " << cursorsToWait.size()
+                  << " cursors in " << ns << " to finish" << endl;
+        }
 
         while (!cursorsToWait.empty()) {
             set<CursorId> cursorsNow;
