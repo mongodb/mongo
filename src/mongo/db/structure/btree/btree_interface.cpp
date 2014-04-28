@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/structure/btree/btree_interface.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 #include "mongo/db/structure/btree/btree_logic.h"
 
@@ -35,8 +36,9 @@ namespace mongo {
     template <class OnDiskFormat>
     class BtreeBuilderInterfaceImpl : public BtreeBuilderInterface {
     public:
-        BtreeBuilderInterfaceImpl(typename BtreeLogic<OnDiskFormat>::Builder* builder)
-            : _builder(builder) { }
+        BtreeBuilderInterfaceImpl(TransactionExperiment* trans,
+                                  typename BtreeLogic<OnDiskFormat>::Builder* builder)
+            : _builder(builder), _trans(trans) { }
 
         virtual ~BtreeBuilderInterfaceImpl() { }
 
@@ -50,6 +52,9 @@ namespace mongo {
 
     private:
         typename BtreeLogic<OnDiskFormat>::Builder* _builder;
+
+        // XXX: this shouldn't be owned here eventually...
+        scoped_ptr<TransactionExperiment> _trans;
     };
 
     template <class OnDiskFormat>
@@ -69,15 +74,19 @@ namespace mongo {
         virtual ~BtreeInterfaceImpl() { }
 
         virtual BtreeBuilderInterface* getBulkBuilder(bool dupsAllowed) {
-            return new BtreeBuilderInterfaceImpl<OnDiskFormat>(_btree->newBuilder(dupsAllowed));
+            // The BtreeBuilderInterfaceImpl (currently) takes ownership of the DurTransaction.
+            DurTransaction* trans = new DurTransaction();
+            return new BtreeBuilderInterfaceImpl<OnDiskFormat>(trans, _btree->newBuilder(trans, dupsAllowed));
         }
 
         virtual Status insert(const BSONObj& key, const DiskLoc& loc, bool dupsAllowed) {
-            return _btree->insert(key, loc, dupsAllowed);
+            DurTransaction trans;
+            return _btree->insert(&trans, key, loc, dupsAllowed);
         }
 
         virtual bool unindex(const BSONObj& key, const DiskLoc& loc) {
-            return _btree->unindex(key, loc);
+            DurTransaction trans;
+            return _btree->unindex(&trans, key, loc);
         }
 
         virtual void fullValidate(long long *numKeysOut) {
@@ -168,7 +177,8 @@ namespace mongo {
         }
 
         virtual Status initAsEmpty() {
-            return _btree->initAsEmpty();
+            DurTransaction trans;
+            return _btree->initAsEmpty(&trans);
         }
 
     private:

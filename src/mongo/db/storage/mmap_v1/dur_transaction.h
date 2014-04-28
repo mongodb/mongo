@@ -37,6 +37,8 @@ namespace mongo {
      */
     class DurTransaction : public TransactionExperiment  {
     public:
+        DurTransaction() { }
+
         virtual ~DurTransaction() { }
 
         virtual bool commitIfNeeded(bool force = false);

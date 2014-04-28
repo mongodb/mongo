@@ -40,6 +40,7 @@ namespace mongo {
     class TransactionExperiment  {
         MONGO_DISALLOW_COPYING(TransactionExperiment);
     public:
+        TransactionExperiment() { }
         virtual ~TransactionExperiment() { }
 
         /**
@@ -62,7 +63,8 @@ namespace mongo {
          */
         template <typename T>
         inline T* writing(T* x) {
-            return static_cast<T*>(writingPtr(x, sizeof(T)));
+            writingPtr(static_cast<void*>(x), sizeof(T));
+            return x;
         }
     };
 
