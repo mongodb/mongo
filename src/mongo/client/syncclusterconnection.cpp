@@ -291,8 +291,27 @@ namespace mongo {
         return isOk( info );
     }
 
+    void SyncClusterConnection::attachQueryHandler( QueryHandler* handler ) {
+        _customQueryHandler.reset( handler );
+    }
+
     auto_ptr<DBClientCursor> SyncClusterConnection::_queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
+
+        if ( _customQueryHandler && _customQueryHandler->canHandleQuery( ns, query ) ) {
+
+            LOG( 2 ) << "custom query handler used for query on " << ns << ": "
+                     << query.toString() << endl;
+
+            return _customQueryHandler->handleQuery( _connAddresses,
+                                                     ns,
+                                                     query,
+                                                     nToReturn,
+                                                     nToSkip,
+                                                     fieldsToReturn,
+                                                     queryOptions,
+                                                     batchSize );
+        }
 
         for ( size_t i=0; i<_conns.size(); i++ ) {
             try {
