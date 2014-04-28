@@ -38,6 +38,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/db.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/ops/delete.h"
@@ -386,6 +387,23 @@ namespace mongo {
                 state = runner->getNext(&obj, &rloc);
                 runner.reset();
                 if (Runner::RUNNER_EOF == state) { break; }
+
+                if (Runner::RUNNER_DEAD == state) {
+                    warning() << "cursor died: aborting deletion for "
+                              << min << " to " << max << " in " << ns
+                              << endl;
+                    break;
+                }
+
+                if (Runner::RUNNER_ERROR == state) {
+                    warning() << "cursor error while trying to delete "
+                              << min << " to " << max
+                              << " in " << ns << ": "
+                              << WorkingSetCommon::toStatusString(obj) << endl;
+                    break;
+                }
+
+                verify(Runner::RUNNER_ADVANCED == state);
 
                 int newYieldCount = c.curop()->numYields();
                 if (oldYieldCount != newYieldCount && !_isMaster()) {
