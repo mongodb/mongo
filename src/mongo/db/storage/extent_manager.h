@@ -87,9 +87,6 @@ namespace mongo {
         // TODO: make private
         DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false );
 
-        // TODO(ERH): remove?
-        void preallocateAFile() { getFile( numFiles() , 0, true ); }
-
         void flushFiles( bool sync );
 
         // must call Extent::reuse on the returned extent
@@ -135,24 +132,6 @@ namespace mongo {
 
         Extent* getNextExtent( Extent* ) const;
         Extent* getPrevExtent( Extent* ) const;
-
-        // get(Next|Prev)Record follows the Record linked list
-        // these WILL cross Extent boundaries
-        // * @param loc - has to be the DiskLoc for a Record
-
-        // * TODO(ERH): remove this - only RecordStore can do this
-        DiskLoc getNextRecord( const DiskLoc& loc ) const;
-
-        // * TODO(ERH): remove this - only RecordStore can do this
-        DiskLoc getPrevRecord( const DiskLoc& loc ) const;
-
-        // does NOT traverse extent boundaries
-
-        // * TODO(ERH): remove this - only RecordStore can do this
-        DiskLoc getNextRecordInExtent( const DiskLoc& loc ) const;
-
-        // * TODO(ERH): remove this - only RecordStore can do this
-        DiskLoc getPrevRecordInExtent( const DiskLoc& loc ) const;
 
         /**
          * quantizes extent size to >= min + page boundary

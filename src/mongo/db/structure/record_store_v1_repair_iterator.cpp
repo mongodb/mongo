@@ -74,10 +74,10 @@ namespace mongo {
             else {
                 switch (_stage) {
                 case FORWARD_SCAN:
-                    _currRecord = em->getNextRecordInExtent(_currRecord);
+                    _currRecord = _recordStore->getNextRecordInExtent(_currRecord);
                     break;
                 case BACKWARD_SCAN:
-                    _currRecord = em->getPrevRecordInExtent(_currRecord);
+                    _currRecord = _recordStore->getPrevRecordInExtent(_currRecord);
                     break;
                 default:
                     invariant(!"This should never be reached.");

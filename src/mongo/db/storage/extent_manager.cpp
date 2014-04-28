@@ -175,7 +175,7 @@ namespace mongo {
         int n = (int) _files.size();
         DataFile *ret = getFile( n, sizeNeeded );
         if ( preallocateNextFile )
-            preallocateAFile();
+            getFile( numFiles() , 0, true ); // preallocate a file
         return ret;
     }
 
@@ -227,65 +227,6 @@ namespace mongo {
         if ( doSanityCheck )
             e->assertOk();
         return e;
-    }
-
-
-    DiskLoc ExtentManager::getNextRecordInExtent( const DiskLoc& loc ) const {
-        int nextOffset = recordForV1( loc )->nextOfs();
-
-        if ( nextOffset == DiskLoc::NullOfs )
-            return DiskLoc();
-
-        fassert( 16967, abs(nextOffset) >= 8 ); // defensive
-        return DiskLoc( loc.a(), nextOffset );
-    }
-
-    DiskLoc ExtentManager::getNextRecord( const DiskLoc& loc ) const {
-        DiskLoc next = getNextRecordInExtent( loc );
-        if ( !next.isNull() )
-            return next;
-
-        // now traverse extents
-
-        Extent *e = extentForV1(loc);
-        while ( 1 ) {
-            if ( e->xnext.isNull() )
-                return DiskLoc(); // end of collection
-            e = getExtent( e->xnext );
-            if ( !e->firstRecord.isNull() )
-                break;
-            // entire extent could be empty, keep looking
-        }
-        return e->firstRecord;
-    }
-
-    DiskLoc ExtentManager::getPrevRecordInExtent( const DiskLoc& loc ) const {
-        int prevOffset = recordForV1( loc )->prevOfs();
-
-        if ( prevOffset == DiskLoc::NullOfs )
-            return DiskLoc();
-
-        fassert( 16968, abs(prevOffset) >= 8 ); // defensive
-        return DiskLoc( loc.a(), prevOffset );
-    }
-
-    DiskLoc ExtentManager::getPrevRecord( const DiskLoc& loc ) const {
-        DiskLoc prev = getPrevRecordInExtent( loc );
-        if ( !prev.isNull() )
-            return prev;
-
-        // now traverse extents
-
-        Extent *e = extentForV1(loc);
-        while ( 1 ) {
-            if ( e->xprev.isNull() )
-                return DiskLoc(); // end of collection
-            e = getExtent( e->xprev );
-            if ( !e->firstRecord.isNull() )
-                break;
-            // entire extent could be empty, keep looking
-        }
-        return e->lastRecord;
     }
 
     Extent* ExtentManager::getNextExtent( Extent* e ) const {
