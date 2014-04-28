@@ -308,12 +308,9 @@ namespace mongo {
          }
          * these methods all return true iff only something was modified
          */
-
         bool setUserFlag( int flag );
         bool clearUserFlag( int flag );
         bool replaceUserFlags( int flags );
-
-        void syncUserFlags( const string& ns );
 
         /* return which "deleted bucket" for this size object */
         static int bucket(int size) {

@@ -251,6 +251,14 @@ namespace mongo {
             return static_cast<int>( dataSize() / n );
         }
 
+        // TODO- below till next mark are suspect
+        bool isUserFlagSet( int flag ) const;
+        bool setUserFlag( int flag );
+        bool clearUserFlag( int flag );
+
+        void setMaxCappedDocs( long long max );
+        // --- end suspect things
+
     private:
         /**
          * same semantics as insertDocument, but doesn't do:
@@ -263,6 +271,9 @@ namespace mongo {
         void _compactExtent(const DiskLoc diskloc, int extentNumber,
                             MultiIndexBlock& indexesToInsertTo,
                             const CompactOptions* compactOptions, CompactStats* stats );
+
+        void _syncUserFlags(); // TODO: this is bizarre, should go away
+
 
         // @return 0 for inf., otherwise a number of files
         int largestFileNumberInQuota() const;

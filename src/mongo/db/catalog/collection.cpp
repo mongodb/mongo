@@ -37,7 +37,9 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/ops/update.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
@@ -588,6 +590,54 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    bool Collection::isUserFlagSet( int flag ) const {
+        return _details->isUserFlagSet( flag );
+    }
+
+    bool Collection::setUserFlag( int flag ) {
+        if ( !_details->setUserFlag( flag ) )
+            return false;
+        _syncUserFlags();
+        return true;
+    }
+
+    bool Collection::clearUserFlag( int flag ) {
+        if ( !_details->clearUserFlag( flag ) )
+            return false;
+        _syncUserFlags();
+        return true;
+    }
+
+    void Collection::_syncUserFlags() {
+        if ( _ns.coll() == "system.namespaces" )
+            return;
+        string system_namespaces = _ns.getSisterNS( "system.namespaces" );
+        Collection* coll = _database->getCollection( system_namespaces );
+
+        DiskLoc oldLocation = Helpers::findOne( coll, BSON( "name" << _ns.ns() ), false );
+        fassert( 17247, !oldLocation.isNull() );
+
+        BSONObj oldEntry = coll->docFor( oldLocation );
+
+        BSONObj newEntry = applyUpdateOperators( oldEntry,
+                                                 BSON( "$set" <<
+                                                       BSON( "options.flags" <<
+                                                             _details->userFlags() ) ) );
+
+        StatusWith<DiskLoc> loc = coll->updateDocument( oldLocation, newEntry, false, NULL );
+        if ( !loc.isOK() ) {
+            // TODO: should this be an fassert?
+            error() << "syncUserFlags failed! "
+                    << " ns: " << _ns
+                    << " error: " << loc.toString();
+        }
+
+    }
+
+    void Collection::setMaxCappedDocs( long long max ) {
+        _details->setMaxCappedDocs( max );
     }
 
 }

@@ -162,9 +162,7 @@ namespace mongo {
                 requirePowerOf2 = true;
 
             if ( requirePowerOf2 ) {
-                if ( _details->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes) ) {
-                    _details->syncUserFlags( _collection->ns().ns() );
-                }
+                _collection->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes);
             }
         }
 

@@ -693,20 +693,18 @@ namespace mongo {
         Collection* collection = getCollection( ns );
         massert( 17400, "_namespaceIndex.add_ns failed?", collection );
 
-        NamespaceDetails* nsd = collection->detailsWritable();
-
         // allocation strategy set explicitly in flags or by server-wide default
         if ( !options.capped ) {
             if ( options.flagsSet ) {
-                nsd->setUserFlag( options.flags );
+                collection->setUserFlag( options.flags );
             }
             else if ( newCollectionsUsePowerOf2Sizes ) {
-                nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                collection->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
             }
         }
 
         if ( options.cappedMaxDocs > 0 )
-            nsd->setMaxCappedDocs( options.cappedMaxDocs );
+            collection->setMaxCappedDocs( options.cappedMaxDocs );
 
         if ( allocateDefaultSpace ) {
             if ( options.initialNumExtents > 0 ) {

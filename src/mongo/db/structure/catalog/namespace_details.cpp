@@ -38,7 +38,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/delete.h"
@@ -381,35 +380,6 @@ namespace mongo {
 
     void NamespaceDetails::setDeletedListEntry( int bucket, const DiskLoc& loc ) {
         *getDur().writing( &_deletedList[bucket] ) = loc;
-    }
-
-    /**
-     * // TODO: this should move to Collection
-     * keeping things in sync this way is a bit of a hack
-     * and the fact that we have to pass in ns again
-     * should be changed, just not sure to what
-     */
-    void NamespaceDetails::syncUserFlags( const string& ns ) {
-        Lock::assertWriteLocked( ns );
-
-        string system_namespaces = nsToDatabaseSubstring(ns).toString() + ".system.namespaces";
-        Collection* coll = cc().getContext()->db()->getCollection( system_namespaces );
-
-        DiskLoc oldLocation = Helpers::findOne( coll, BSON( "name" << ns ), false );
-        fassert( 17247, !oldLocation.isNull() );
-
-        BSONObj oldEntry = coll->docFor( oldLocation );
-
-        BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
-
-        StatusWith<DiskLoc> loc = coll->updateDocument( oldLocation, newEntry, false, NULL );
-        if ( !loc.isOK() ) {
-            // TODO: should this be an fassert?
-            error() << "syncUserFlags failed! "
-                    << " ns: " << ns
-                    << " error: " << loc.toString();
-        }
-
     }
 
     bool NamespaceDetails::setUserFlag( int flags ) {

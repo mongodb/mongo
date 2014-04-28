@@ -1217,8 +1217,6 @@ namespace mongo {
                 return false;
             }
 
-            NamespaceDetails* nsd = coll->detailsWritable();
-
             bool ok = true;
 
             BSONForEach( e, jsobj ) {
@@ -1229,16 +1227,17 @@ namespace mongo {
                     // no-op
                 }
                 else if ( str::equals( "usePowerOf2Sizes", e.fieldName() ) ) {
-                    bool oldPowerOf2 = nsd->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes);
+                    bool oldPowerOf2 = coll->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes);
                     bool newPowerOf2 = e.trueValue();
 
                     if ( oldPowerOf2 != newPowerOf2 ) {
                         // change userFlags
                         result.appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
 
-                        newPowerOf2 ? nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) :
-                                      nsd->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
-                        nsd->syncUserFlags( ns ); // must keep system.namespaces up-to-date
+                        if ( newPowerOf2 )
+                            coll->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                        else
+                            coll->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
 
                         result.appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
                     }
