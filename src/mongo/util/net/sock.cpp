@@ -519,15 +519,10 @@ namespace mongo {
             setTimeout( _timeout );
         }
 
-        // Minimum timeout for waiting for background job to finish is 5 seconds.  If _timeout is
-        // less than 5 seconds then the background job will finish as soon as _timeout has
-        // elapsed.
-        static const unsigned int minTimeoutMillis = 5000;
-        const unsigned int timeout = std::max(minTimeoutMillis,
-                                              static_cast<unsigned int>(_timeout * 1000));
+        static const unsigned int connectTimeoutMillis = 5000;
         ConnectBG bg(_fd, remote);
         bg.go();
-        if ( bg.wait(timeout) ) {
+        if ( bg.wait(connectTimeoutMillis) ) {
             if ( bg.inError() ) {
                 warning() << "Failed to connect to "
                           << _remote.getAddr() << ":" << _remote.getPort()
@@ -542,7 +537,7 @@ namespace mongo {
             bg.wait(); // so bg stays in scope until bg thread terminates
             warning() << "Failed to connect to "
                       << _remote.getAddr() << ":" << _remote.getPort()
-                      << " after " << timeout << " milliseconds, giving up." << endl;
+                      << " after " << connectTimeoutMillis << " milliseconds, giving up." << endl;
             return false;
         }
 
