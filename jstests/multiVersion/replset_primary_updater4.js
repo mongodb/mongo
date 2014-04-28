@@ -17,7 +17,7 @@ load( './jstests/multiVersion/libs/multi_rs.js' )
 load( './jstests/libs/test_background_ops.js' )
 
 var oldVersion = "2.4"
-var newVersion = "latest"
+var newVersion = "2.6"
 
 var nodes = { n1 : { binVersion : oldVersion },
               n2 : { binVersion : newVersion },
