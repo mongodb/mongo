@@ -46,14 +46,40 @@ var skipExplain = t.find( query ).skip(1).explain();
 print( "explain for skip query = " + tojson( skipExplain ) );
 assert.neq( explain.cursor, skipExplain.cursor, "F1" );
 
-// Only acceptable projection for ID hack is {_id: 1}.
-var projectionExplain = t.find( query, { _id : 0, z : 1 } ).explain();
-print( "explain for projection query = " + tojson( projectionExplain ) );
-assert.neq( explain.cursor, projectionExplain.cursor, "G1" );
-
 // Covered query returning _id field only can be handled by ID hack.
 var coveredExplain = t.find( query, { _id : 1 } ).explain();
 print( "explain for covered query = " + tojson( coveredExplain ) );
-assert.eq( explain.cursor, coveredExplain.cursor, "H1" );
+assert.eq( explain.cursor, coveredExplain.cursor, "G1" );
 // Check doc from covered ID hack query.
-assert.eq( { _id : { x: 2 } }, t.findOne( query, { _id : 1 } ), "H2" );
+assert.eq( { _id : { x: 2 } }, t.findOne( query, { _id : 1 } ), "G2" );
+
+//
+// Non-covered projection for idhack.
+//
+
+t.drop();
+t.insert( { _id: 0, a: 0, b: [ { c: 1 }, { c: 2 } ] });
+t.insert( { _id: 1, a: 1, b: [ { c: 3 }, { c: 4 } ] });
+
+// Simple inclusion.
+assert.eq( { _id: 1, a: 1 }, t.find( { _id: 1 }, { a: 1 } ).next() );
+assert.eq( { a: 1 }, t.find({ _id: 1 }, { _id: 0, a: 1 } ).next() );
+assert.eq( { _id: 0, a: 0 }, t.find( { _id: 0 }, { _id: 1, a: 1 } ).next() );
+
+// Non-simple: exclusion.
+assert.eq( { _id: 1, a: 1 }, t.find( { _id: 1 }, { b: 0 } ).next() );
+assert.eq( { _id: 0, }, t.find( { _id: 0 }, { a: 0, b: 0 } ).next() );
+
+// Non-simple: dotted fields.
+assert.eq( { b: [ { c: 1 }, { c: 2 } ] }, t.find( { _id: 0 }, { _id: 0, "b.c": 1 } ).next() );
+assert.eq( { _id: 1 }, t.find( { _id: 1 }, { "foo.bar": 1 } ).next() );
+
+// Non-simple: elemMatch projection.
+assert.eq( { _id: 1, b: [ { c: 4 } ] },
+           t.find( { _id: 1 }, { b: { $elemMatch: { c: 4 } } } ).next() );
+
+// Non-simple: $returnKey.
+assert.eq( { _id: 1 }, t.find( { _id: 1 } )._addSpecial( "$returnKey", true ).next() );
+
+// Non-simple: $returnKey overrides other projections.
+assert.eq( { _id: 1 }, t.find( { _id: 1 }, { a: 1 } )._addSpecial( "$returnKey", true ).next() );

@@ -347,8 +347,16 @@ namespace mongo {
     }
 
     Status ProjectionExec::transform(const BSONObj& in, BSONObj* out) const {
+        // If it's a positional projection we need a MatchDetails.
+        MatchDetails matchDetails;
+        if (transformRequiresDetails()) {
+            matchDetails.requestElemMatchKey();
+            verify(NULL != _queryExpression);
+            verify(_queryExpression->matchesBSON(in, &matchDetails));
+        }
+
         BSONObjBuilder bob;
-        Status s = transform(in, &bob, NULL);
+        Status s = transform(in, &bob, &matchDetails);
         if (!s.isOK()) {
             return s;
         }

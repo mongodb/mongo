@@ -85,6 +85,26 @@ namespace mongo {
 
         PlanStageStats* getStats();
 
+        typedef unordered_set<StringData, StringData::Hasher> FieldSet;
+
+        /**
+         * Given the projection spec for a simple inclusion projection,
+         * 'projObj', populates 'includedFields' with the set of field
+         * names to be included.
+         */
+        static void getSimpleInclusionFields(const BSONObj& projObj,
+                                             FieldSet* includedFields);
+
+        /**
+         * Applies a simple inclusion projection to 'in', including
+         * only the fields specified by 'includedFields'.
+         *
+         * The resulting document is constructed using 'bob'.
+         */
+        static void transformSimpleInclusion(const BSONObj& in,
+                                             const FieldSet& includedFields,
+                                             BSONObjBuilder& bob);
+
     private:
         Status transform(WorkingSetMember* member);
 

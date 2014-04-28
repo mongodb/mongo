@@ -85,9 +85,17 @@ namespace mongo {
 
     private:
         /**
-         * ID Hack will work with only one projection: {_id: 1}.
+         * ID Hack queries are only covered with the projection {_id: 1}.
          */
-        static bool canUseProjection(const CanonicalQuery& query);
+        bool hasCoveredProjection() const;
+
+        /**
+         * If '_query' has a projection, then apply it, returning the result in 'objOut'.
+         * The diskloc 'loc' contains the BSONObj to transform.
+         *
+         * Otherwise do nothing and return false.
+         */
+         bool applyProjection(const DiskLoc& loc, BSONObj* objOut) const;
 
         // Not owned here.
         const Collection* _collection;
