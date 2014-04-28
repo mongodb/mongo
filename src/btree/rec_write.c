@@ -788,7 +788,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_PAGE *page;
 	WT_UPDATE *upd, *upd_list, *upd_ovfl;
 	size_t notused;
-	uint64_t max_txn, min_skipped, min_txn, txnid;
+	uint64_t max_txn, min_txn, txnid;
+	int skipped;
 
 	*updp = NULL;
 
@@ -799,20 +800,21 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * list, else is an on-page row-store WT_UPDATE list.
 	 */
 	upd_list = ins == NULL ? WT_ROW_UPDATE(page, rip) : ins->upd;
+	skipped = 0;
 
-	for (max_txn = WT_TXN_NONE, min_skipped = min_txn = UINT64_MAX,
-	    upd = upd_list; upd != NULL; upd = upd->next) {
+	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX, upd = upd_list;
+	    upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
 		/* Track the largest/smallest transaction IDs on the list. */
 		if (TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
-		if (!TXNID_LT(min_txn, txnid))
+		if (TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (TXNID_LT(txnid, min_skipped) &&
+		if (TXNID_LT(txnid, r->min_skipped_txn) &&
 		    !__wt_txn_visible_all(session, txnid))
-			min_skipped = txnid;
+			r->min_skipped_txn = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -828,7 +830,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			if (__wt_txn_visible(session, txnid))
 				*updp = upd;
 			else
-				r->leave_dirty = 1;
+				skipped = 1;
 		}
 	}
 
@@ -841,33 +843,31 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
-	if (TXNID_LT(min_skipped, r->min_skipped_txn))
-		r->min_skipped_txn = min_skipped;
-
 	/*
-	 * If all updates are globally visible, the page can be marked clean and
-	 * we're done, regardless of whether we're evicting or checkpointing.
+	 * If all updates are globally visible and no updates were skipped, the
+	 * page can be marked clean and we're done, regardless of whether we're
+	 * evicting or checkpointing.
+	 *
+	 * The oldest transaction ID may have moved while we were scanning the
+	 * page, so it is possible to skip an update but then find that by the
+	 * end of the scan, all updates are stable.
 	 */
-	if (__wt_txn_visible_all(session, max_txn))
+	if (__wt_txn_visible_all(session, max_txn) && !skipped)
 		return (0);
 
 	/*
-	 * If not all updates are globally visible, the page cannot be marked
-	 * clean.
+	 * If some updates are not globally visible, or were skipped, the page
+	 * cannot be marked clean.
 	 */
 	r->leave_dirty = 1;
 
-	/*
-	 * If not all updates are globally visible and checkpointing: continue,
-	 * we'll write what we can.
-	 */
+	/* If we are checkpointing, continue: we'll write what we can. */
 	if (!F_ISSET(r, WT_EVICTION_LOCKED) || F_ISSET(r, WT_SKIP_UPDATE_OK))
 		return (0);
 
 	/*
-	 * If not all updates are globally visible and evicting: if we aren't
-	 * able to save/restore the not-yet-visible updates, the page can't be
-	 * evicted.
+	 * If we are evicting and we aren't able to save/restore the
+	 * not-yet-visible updates, the page can't be evicted.
 	 */
 	if (!F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
