@@ -1314,6 +1314,29 @@ def doConfigure(myenv):
         if (not using_system_version_of_cxx_libraries()):
             myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"]);
 
+    # Check if we are on a POSIX system by testing if _POSIX_VERSION is defined.
+    def CheckPosixSystem(context):
+
+        test_body = """
+        // POSIX requires the existence of unistd.h, so if we can't include unistd.h, we
+        // are definitely not a POSIX system.
+        #include <unistd.h>
+        #if !defined(_POSIX_VERSION)
+        #error not a POSIX system
+        #endif
+        """
+
+        context.Message('Checking if we are on a POSIX system... ')
+        ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+        context.Result(ret)
+        return ret
+
+    conf = Configure(myenv, help=False, custom_tests = {
+        'CheckPosixSystem' : CheckPosixSystem,
+    })
+    posix_system = conf.CheckPosixSystem()
+    conf.Finish()
+
     if has_option('sanitize'):
         if not (using_clang() or using_gcc()):
             print( 'sanitize is only supported with clang or gcc')
@@ -1428,10 +1451,8 @@ def doConfigure(myenv):
             boostlib = "boost_" + b
             conf.FindSysLibDep( boostlib, [ boostlib + "-mt", boostlib ], language='C++' )
 
-    if conf.CheckHeader('unistd.h'):
+    if posix_system:
         conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
-
-    if solaris or conf.CheckDeclaration('clock_gettime', includes='#include <time.h>'):
         conf.CheckLib('rt')
 
     if linux:
