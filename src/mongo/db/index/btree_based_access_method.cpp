@@ -55,11 +55,11 @@ namespace mongo {
         : _btreeState(btreeState), _descriptor(btreeState->descriptor()) {
 
         verify(0 == _descriptor->version() || 1 == _descriptor->version());
-        _newInterface.reset(transition::BtreeInterface::getInterface(btreeState->headManager(),
-                                                                     btreeState->recordStore(),
-                                                                     btreeState->ordering(),
-                                                                     _descriptor->indexNamespace(),
-                                                                     _descriptor->version()));
+        _newInterface.reset(BtreeInterface::getInterface(btreeState->headManager(),
+                                                         btreeState->recordStore(),
+                                                         btreeState->ordering(),
+                                                         _descriptor->indexNamespace(),
+                                                         _descriptor->version()));
     }
 
     // Find the keys for obj, put them in the tree pointing to loc

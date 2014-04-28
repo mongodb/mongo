@@ -35,7 +35,6 @@
 #pragma once
 
 namespace mongo {
-namespace transition {
 
     /**
      * A version-hiding wrapper around the bulk builder for the Btree.
@@ -175,5 +174,4 @@ namespace transition {
         virtual Status initAsEmpty() = 0;
     };
 
-}  // namespace transition
 }  // namespace mongo

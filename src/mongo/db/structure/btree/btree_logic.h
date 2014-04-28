@@ -38,7 +38,6 @@
 #include "mongo/db/structure/head_manager.h"
 
 namespace mongo {
-namespace transition {
 
     /**
      * This is the logic for manipulating the Btree.  It is (mostly) independent of the on-disk
@@ -499,5 +498,4 @@ namespace transition {
         string _indexName;
     };
 
-}  // namespace transition
 }  // namespace mongo

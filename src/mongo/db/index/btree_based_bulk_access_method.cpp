@@ -90,7 +90,7 @@ namespace mongo {
     }
 
     BtreeBasedBulkAccessMethod::BtreeBasedBulkAccessMethod(BtreeBasedAccessMethod* real,
-                         transition::BtreeInterface* interface,
+                         BtreeInterface* interface,
                          const IndexDescriptor* descriptor,
                          int numRecords) {
 
@@ -159,7 +159,7 @@ namespace mongo {
                                            _keysInserted,
                                            10);
 
-        scoped_ptr<transition::BtreeBuilderInterface> builder;
+        scoped_ptr<BtreeBuilderInterface> builder;
         builder.reset(_interface->getBulkBuilder(dupsAllowed));
 
         while (i->more()) {

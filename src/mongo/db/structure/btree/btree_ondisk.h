@@ -35,7 +35,6 @@
 #include "mongo/db/structure/btree/key.h"
 
 namespace mongo {
-namespace transition {
 
     const int OldBucketSize = 8192;
 
@@ -357,5 +356,4 @@ namespace transition {
 
 #pragma pack()
 
-}  // namespace transition
 }  // namespace mongo

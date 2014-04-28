@@ -44,7 +44,7 @@ namespace mongo {
     class BtreeBasedBulkAccessMethod : public IndexAccessMethod {
     public:
         BtreeBasedBulkAccessMethod(BtreeBasedAccessMethod* real,
-                                   transition::BtreeInterface* interface,
+                                   BtreeInterface* interface,
                                    const IndexDescriptor* descriptor,
                                    int numRecords);
 
@@ -119,7 +119,7 @@ namespace mongo {
         BtreeBasedAccessMethod* _real;
 
         // Not owned here.
-        transition::BtreeInterface* _interface;
+        BtreeInterface* _interface;
 
         // The external sorter.
         boost::scoped_ptr<BSONObjExternalSorter> _sorter;

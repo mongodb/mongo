@@ -45,7 +45,7 @@ namespace mongo {
     SimpleMutex BtreeIndexCursor::_activeCursorsMutex("active_btree_index_cursors");
 
     BtreeIndexCursor::BtreeIndexCursor(const DiskLoc head,
-                                       transition::BtreeInterface* newInterface)
+                                       BtreeInterface* newInterface)
         : _direction(1),
           _interface(newInterface),
           _bucket(head),

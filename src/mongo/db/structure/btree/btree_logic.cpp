@@ -39,7 +39,6 @@
 #include "mongo/db/structure/record_store.h"
 
 namespace mongo {
-namespace transition {
 
     //
     // Public Builder logic
@@ -2471,5 +2470,4 @@ namespace transition {
     template struct FixedWidthKey<DiskLoc56Bit>;
     template class BtreeLogic<BtreeLayoutV1>;
 
-}  // namespace transition
 }  // namespace mongo

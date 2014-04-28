@@ -31,7 +31,6 @@
 #include "mongo/db/structure/btree/btree_logic.h"
 
 namespace mongo {
-namespace transition {
 
     template <class OnDiskFormat>
     class BtreeBuilderInterfaceImpl : public BtreeBuilderInterface {
@@ -198,5 +197,4 @@ namespace transition {
         }
     }
 
-}  // namespace transition
 }  // namespace mongo

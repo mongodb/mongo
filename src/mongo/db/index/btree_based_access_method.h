@@ -117,7 +117,7 @@ namespace mongo {
     private:
         bool removeOneKey(const BSONObj& key, const DiskLoc& loc);
 
-        scoped_ptr<transition::BtreeInterface> _newInterface;
+        scoped_ptr<BtreeInterface> _newInterface;
     };
 
     /**

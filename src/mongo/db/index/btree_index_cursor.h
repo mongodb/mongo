@@ -103,7 +103,7 @@ namespace mongo {
          * Intentionally private, we're friends with the only class allowed to call it.
          */
         BtreeIndexCursor(const DiskLoc head,
-                         transition::BtreeInterface* newInterface);
+                         BtreeInterface* newInterface);
 
         bool isSavedPositionValid();
 
@@ -118,12 +118,12 @@ namespace mongo {
         static SimpleMutex _activeCursorsMutex;
 
         // For saving/restoring position.
-        transition::BtreeInterface::SavedPositionData _savedData;
+        BtreeInterface::SavedPositionData _savedData;
 
         int _direction;
 
         // Not owned here.
-        transition::BtreeInterface* _interface;
+        BtreeInterface* _interface;
 
         // TODO: Have some kind of BtreeInterface::BtreePosition to encapsulate this.
         // What are we looking at RIGHT NOW?  We look at a bucket.
