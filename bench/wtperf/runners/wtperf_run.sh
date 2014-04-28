@@ -36,10 +36,35 @@ rd_sum=0
 upd_max=0
 upd_min=0
 upd_sum=0
+
+# getval min/max val cur
+# Returns the minimum or maximum of val and cur.
+# min == 0, max == 1.
+getval()
+{
+	max="$1"
+	val="$2"
+	cur="$3"
+	ret=$cur
+	if test "$max" -eq "1"; then
+		if test "$val" -gt "$cur"; then
+			ret=$val
+		fi
+	elif test "$val" -lt "$cur"; then
+			ret=$val
+	fi
+	echo "$ret"
+}
+
+getmin=0
+getmax=1
 while test "$run" -le "$runmax"; do
 	rm -rf $home
 	mkdir $home
 	LD_PRELOAD=/usr/lib64/libjemalloc.so.1 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib ./wtperf -O $wttest
+	if test "$?" -ne "0"; then
+		exit 1
+	fi
 	load=`grep "^Load time:" ./WT_TEST/test.stat | cut -d ' ' -f 3`
 	rd=`grep "Executed.*read operations" ./WT_TEST/test.stat | cut -d ' ' -f 2`
 	ins=`grep "Executed.*insert operations" ./WT_TEST/test.stat | cut -d ' ' -f 2`
@@ -52,6 +77,9 @@ while test "$run" -le "$runmax"; do
 	rd_sum=`expr $rd_sum + $rd`
 	ins_sum=`expr $ins_sum + $ins`
 	upd_sum=`expr $upd_sum + $upd`
+	#
+	# Keep running track of min and max for each operation type.
+	#
 	if test "$run" -eq "1"; then
 		load_min=$load
 		load_max=$load
@@ -68,24 +96,12 @@ while test "$run" -le "$runmax"; do
 		if (($(bc <<< "$load > $load_max") )); then
 			load_max=$load
 		fi
-		if test "$rd" -lt "$rd_min"; then
-			rd_min=$rd
-		fi
-		if test "$rd" -gt "$rd_max"; then
-			rd_max=$rd
-		fi
-		if test "$ins" -lt "$ins_min"; then
-			ins_min=$ins
-		fi
-		if test "$ins" -gt "$ins_max"; then
-			ins_max=$ins
-		fi
-		if test "$upd" -lt "$upd_min"; then
-			upd_min=$upd
-		fi
-		if test "$upd" -gt "$upd_max"; then
-			upd_max=$upd
-		fi
+		rd_min=$(getval $getmin $rd $rd_min)
+		rd_max=$(getval $getmax $rd $rd_max)
+		ins_min=$(getval $getmin $ins $ins_min)
+		ins_max=$(getval $getmax $ins $ins_max)
+		upd_min=$(getval $getmin $upd $upd_min)
+		upd_max=$(getval $getmax $upd $upd_max)
 	fi
 	run=`expr $run + 1`
 done
