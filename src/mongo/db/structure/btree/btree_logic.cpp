@@ -68,7 +68,7 @@ namespace transition {
 
         if (key->dataSize() > BtreeLayout::KeyMax) {
             string msg = str::stream() << "Btree::insert: key too large to index, failing "
-                                       << _logic->_recordStore->name()
+                                       << _logic->_indexName
                                        << ' ' << key->dataSize() << ' ' << key->toString();
             problem() << msg << endl;
             return Status(ErrorCodes::KeyTooLong, msg);
@@ -1142,13 +1142,13 @@ namespace transition {
     string BtreeLogic<BtreeLayout>::dupKeyError(const KeyDataType& key) const {
         stringstream ss;
         ss << "E11000 duplicate key error ";
-        ss << "index: " << "TODO FIXME" << " ";
+        ss << "index: " << _indexName << " ";
         ss << "dup key: " << key.toString();
         return ss.str();
     }
 
     /**
-     * Find a key withing this btree bucket.
+     * Find a key within this btree bucket.
      *
      * When duplicate keys are allowed, we use the DiskLoc of the record as if it were part of the
      * key.  That assures that even when there are many duplicates (e.g., 1 million) for a key, our
@@ -2195,7 +2195,7 @@ namespace transition {
 
         if (key.dataSize() > BtreeLayout::KeyMax) {
             string msg = str::stream() << "Btree::insert: key too large to index, failing "
-                                       // << btreeState->descriptor()->indexNamespace() << ' '
+                                       << _indexName << ' '
                                        << key.dataSize() << ' ' << key.toString();
             return Status(ErrorCodes::KeyTooLong, msg);
         }

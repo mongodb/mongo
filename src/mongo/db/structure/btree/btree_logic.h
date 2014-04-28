@@ -62,10 +62,20 @@ namespace transition {
         // AKA BucketBasics or BtreeBucket, either one.
         typedef typename BtreeLayout::BucketType BucketType;
 
-        BtreeLogic(HeadManager* head, RecordStore* store, const Ordering& ordering)
+        /**
+         * 'head' manages the catalog information.
+         * 'store' allocates and frees buckets.
+         * 'ordering' is meta-information we store in the catalog.
+         * 'indexName' is a string identifying the index that we use to print errors with.
+         */
+        BtreeLogic(HeadManager* head,
+                   RecordStore* store,
+                   const Ordering& ordering,
+                   const string& indexName)
             : _headManager(head),
               _recordStore(store),
-              _ordering(ordering) { }
+              _ordering(ordering),
+              _indexName(indexName) { }
 
         //
         // Public-facing
@@ -485,6 +495,8 @@ namespace transition {
         RecordStore* _recordStore;
 
         Ordering _ordering;
+
+        string _indexName;
     };
 
 }  // namespace transition

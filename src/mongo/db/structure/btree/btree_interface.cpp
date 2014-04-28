@@ -58,9 +58,13 @@ namespace transition {
     public:
         BtreeInterfaceImpl(HeadManager* headManager,
                            RecordStore* recordStore,
-                           const Ordering& ordering) {
+                           const Ordering& ordering,
+                           const string& indexName) {
 
-            _btree.reset(new BtreeLogic<OnDiskFormat>(headManager, recordStore, ordering));
+            _btree.reset(new BtreeLogic<OnDiskFormat>(headManager,
+                                                      recordStore,
+                                                      ordering,
+                                                      indexName));
         }
 
         virtual ~BtreeInterfaceImpl() { }
@@ -176,14 +180,21 @@ namespace transition {
     BtreeInterface* BtreeInterface::getInterface(HeadManager* headManager,
                                                  RecordStore* recordStore,
                                                  const Ordering& ordering,
+                                                 const string& indexName,
                                                  int version) {
 
         if (0 == version) {
-            return new BtreeInterfaceImpl<BtreeLayoutV0>(headManager, recordStore, ordering);
+            return new BtreeInterfaceImpl<BtreeLayoutV0>(headManager,
+                                                         recordStore,
+                                                         ordering,
+                                                         indexName);
         }
         else {
             invariant(1 == version);
-            return new BtreeInterfaceImpl<BtreeLayoutV1>(headManager, recordStore, ordering);
+            return new BtreeInterfaceImpl<BtreeLayoutV1>(headManager,
+                                                         recordStore,
+                                                         ordering,
+                                                         indexName);
         }
     }
 

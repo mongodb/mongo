@@ -86,6 +86,7 @@ namespace transition {
         static BtreeInterface* getInterface(HeadManager* headManager,
                                             RecordStore* recordStore,
                                             const Ordering& ordering,
+                                            const string& indexName,
                                             int version);
 
         //

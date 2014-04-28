@@ -58,6 +58,7 @@ namespace mongo {
         _newInterface.reset(transition::BtreeInterface::getInterface(btreeState->headManager(),
                                                                      btreeState->recordStore(),
                                                                      btreeState->ordering(),
+                                                                     _descriptor->indexNamespace(),
                                                                      _descriptor->version()));
     }
 
