@@ -42,24 +42,72 @@ namespace mongo {
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 
-    static unsigned long long _nextMemoryMappedFileLocation = 256LL * 1024LL * 1024LL * 1024LL;
-    static SimpleMutex _nextMemoryMappedFileLocationMutex( "nextMemoryMappedFileLocationMutex" );
+    const unsigned long long memoryMappedFileLocationFloor = 256LL * 1024LL * 1024LL * 1024LL;
+    static unsigned long long _nextMemoryMappedFileLocation = memoryMappedFileLocationFloor;
 
-    static void* getNextMemoryMappedFileLocation( unsigned long long mmfSize ) {
-        if ( 4 == sizeof(void*) ) {
+    static SimpleMutex _nextMemoryMappedFileLocationMutex("nextMemoryMappedFileLocationMutex");
+
+    unsigned long long AlignNumber(unsigned long long number, unsigned long long granularity)
+    {
+        return (number + granularity - 1) & ~(granularity - 1);
+    }
+
+    static void* getNextMemoryMappedFileLocation(unsigned long long mmfSize) {
+        if (4 == sizeof(void*)) {
             return 0;
         }
-        SimpleMutex::scoped_lock lk( _nextMemoryMappedFileLocationMutex );
+        SimpleMutex::scoped_lock lk(_nextMemoryMappedFileLocationMutex);
+
         static unsigned long long granularity = 0;
-        if ( 0 == granularity ) {
+
+        if (0 == granularity) {
             SYSTEM_INFO systemInfo;
-            GetSystemInfo( &systemInfo );
-            granularity = static_cast<unsigned long long>( systemInfo.dwAllocationGranularity );
+            GetSystemInfo(&systemInfo);
+            granularity = static_cast<unsigned long long>(systemInfo.dwAllocationGranularity);
         }
+
         unsigned long long thisMemoryMappedFileLocation = _nextMemoryMappedFileLocation;
-        mmfSize = ( mmfSize + granularity - 1) & ~( granularity - 1 );
-        _nextMemoryMappedFileLocation += mmfSize;
-        return reinterpret_cast<void*>( static_cast<uintptr_t>( thisMemoryMappedFileLocation ) );
+
+        int current_retry = 1;
+
+        while (true) {
+            MEMORY_BASIC_INFORMATION memInfo;
+
+            if (VirtualQuery(reinterpret_cast<LPCVOID>(thisMemoryMappedFileLocation),
+                &memInfo, sizeof(memInfo)) == 0) {
+                DWORD gle = GetLastError();
+
+                // If we exceed the limits of Virtual Memory 
+                // - 8TB before Windows 8.1/2012 R2, 128 TB after
+                // restart scanning from our memory mapped floor once more
+                // This is a linear scan of regions, not of every VM page
+                if (gle == ERROR_INVALID_PARAMETER && current_retry == 1) {
+                    thisMemoryMappedFileLocation = memoryMappedFileLocationFloor;
+                    ++current_retry;
+                    continue;
+                }
+
+                log() << "VirtualQuery of " << thisMemoryMappedFileLocation
+                    << " failed with error " << errnoWithDescription(gle);
+                fassertFailed(17484);
+            }
+
+            // Free memory regions that we can use for memory map files
+            // 1. Marked MEM_FREE, not MEM_RESERVE
+            // 2. Marked as PAGE_NOACCESS, not anything else
+            if (memInfo.Protect == PAGE_NOACCESS &&
+                memInfo.State == MEM_FREE &&
+                memInfo.RegionSize > mmfSize)
+                break;
+
+            thisMemoryMappedFileLocation = reinterpret_cast<unsigned long long>(memInfo.BaseAddress)
+                + memInfo.RegionSize;
+        }
+
+        _nextMemoryMappedFileLocation = thisMemoryMappedFileLocation
+            + AlignNumber(mmfSize, granularity);
+
+        return reinterpret_cast<void*>(static_cast<uintptr_t>(thisMemoryMappedFileLocation));
     }
 
     /** notification on unmapping so we can clear writable bits */
@@ -98,24 +146,47 @@ namespace mongo {
 
     void* MemoryMappedFile::createReadOnlyMap() {
         verify( maphandle );
+
         scoped_lock lk(mapViewMutex);
-        LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
-        void* readOnlyMapAddress = MapViewOfFileEx(
+
+        void* readOnlyMapAddress = NULL;
+        int current_retry = 0;
+
+        while (true) {
+
+            LPVOID thisAddress = getNextMemoryMappedFileLocation(len);
+
+            readOnlyMapAddress = MapViewOfFileEx(
                 maphandle,          // file mapping handle
                 FILE_MAP_READ,      // access
                 0, 0,               // file offset, high and low
                 0,                  // bytes to map, 0 == all
-                thisAddress );      // address to place file
-        if ( 0 == readOnlyMapAddress ) {
-            DWORD dosError = GetLastError();
-            log() << "MapViewOfFileEx for " << filename()
+                thisAddress);       // address to place file
+
+            if (0 == readOnlyMapAddress) {
+                DWORD dosError = GetLastError();
+
+                ++current_retry;
+
+                // If we failed to allocate a memory mapped file, try again in case we picked
+                // an address that Windows is also trying to use for some other VM allocations
+                if (dosError == ERROR_INVALID_ADDRESS && current_retry < 5) {
+                    continue;
+                }
+
+                log() << "MapViewOfFileEx for " << filename()
                     << " at address " << thisAddress
-                    << " failed with error " << errnoWithDescription( dosError )
+                    << " failed with error " << errnoWithDescription(dosError)
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createReadOnlyMap"
                     << endl;
-            fassertFailed( 16165 );
+
+                fassertFailed(16165);
+            }
+
+            break;
         }
+
         views.push_back( readOnlyMapAddress );
         return readOnlyMapAddress;
     }
@@ -190,25 +261,45 @@ namespace mongo {
         {
             scoped_lock lk(mapViewMutex);
             DWORD access = ( options & READONLY ) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
-            LPVOID thisAddress = getNextMemoryMappedFileLocation( length );
-            view = MapViewOfFileEx(
+
+            int current_retry = 0;
+            while (true) {
+
+                LPVOID thisAddress = getNextMemoryMappedFileLocation(length);
+
+                view = MapViewOfFileEx(
                     maphandle,      // file mapping handle
                     access,         // access
                     0, 0,           // file offset, high and low
                     0,              // bytes to map, 0 == all
-                    thisAddress );  // address to place file
-            if ( view == 0 ) {
-                DWORD dosError = GetLastError();
-                log() << "MapViewOfFileEx for " << filename
+                    thisAddress);  // address to place file
+
+                if (view == 0) {
+                    DWORD dosError = GetLastError();
+
+                    ++current_retry;
+
+                    // If we failed to allocate a memory mapped file, try again in case we picked
+                    // an address that Windows is also trying to use for some other VM allocations
+                    if (dosError == ERROR_INVALID_ADDRESS && current_retry < 5) {
+                        continue;
+                    }
+
+                    log() << "MapViewOfFileEx for " << filename
                         << " at address " << thisAddress
-                        << " failed with " << errnoWithDescription( dosError )
+                        << " failed with " << errnoWithDescription(dosError)
                         << " (file size is " << length << ")"
                         << " in MemoryMappedFile::map"
                         << endl;
-                close();
-                fassertFailed( 16166 );
+
+                    close();
+                    fassertFailed(16166);
+                }
+
+                break;
             }
         }
+
         views.push_back(view);
         len = length;
         return view;
@@ -269,23 +360,46 @@ namespace mongo {
 
     void* MemoryMappedFile::createPrivateMap() {
         verify( maphandle );
+
         scoped_lock lk(mapViewMutex);
+
         LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
-        void* privateMapAddress = MapViewOfFileEx(
+
+        void* privateMapAddress = NULL;
+        int current_retry = 0;
+
+        while (true) {
+
+            privateMapAddress = MapViewOfFileEx(
                 maphandle,          // file mapping handle
                 FILE_MAP_READ,      // access
                 0, 0,               // file offset, high and low
                 0,                  // bytes to map, 0 == all
-                thisAddress );      // address to place file
-        if ( privateMapAddress == 0 ) {
-            DWORD dosError = GetLastError();
-            log() << "MapViewOfFileEx for " << filename()
-                    << " failed with error " << errnoWithDescription( dosError )
+                thisAddress);      // address to place file
+
+            if (privateMapAddress == 0) {
+                DWORD dosError = GetLastError();
+
+                ++current_retry;
+
+                // If we failed to allocate a memory mapped file, try again in case we picked
+                // an address that Windows is also trying to use for some other VM allocations
+                if (dosError == ERROR_INVALID_ADDRESS && current_retry < 5) {
+                    continue;
+                }
+
+                log() << "MapViewOfFileEx for " << filename()
+                    << " failed with error " << errnoWithDescription(dosError)
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createPrivateMap"
                     << endl;
-            fassertFailed( 16167 );
+
+                fassertFailed(16167);
+            }
+
+            break;
         }
+
         clearWritableBits( privateMapAddress );
         views.push_back( privateMapAddress );
         return privateMapAddress;
