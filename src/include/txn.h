@@ -89,9 +89,9 @@ struct __wt_txn_op {
 	union {
 		/* TXN_OP_BASIC, TXN_OP_INMEM */
 		struct {
-			WT_INSERT *ins;
-			WT_UPDATE *upd;
 			WT_ITEM key;
+			uint64_t recno;
+			WT_UPDATE *upd;
 		} op;
 		/* TXN_OP_REF */
 		WT_REF *ref;

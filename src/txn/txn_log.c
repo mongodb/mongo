@@ -28,8 +28,7 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 	 * 4) row store insert/update.
 	 */
 	if (op->u.op.key.data == NULL) {
-		WT_ASSERT(session, op->u.op.ins != NULL);
-		recno = op->u.op.ins->u.recno;
+		recno = op->u.op.recno;
 
 		if (WT_UPDATE_DELETED_ISSET(op->u.op.upd))
 			WT_RET(__wt_logop_col_remove_pack(session, logrec,
@@ -70,9 +69,20 @@ __txn_commit_printlog(
 void
 __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
-	if (op->type == TXN_OP_TRUNCATE_ROW) {
+	switch (op->type) {
+	case TXN_OP_BASIC:
+	case TXN_OP_INMEM:
+		__wt_buf_free(session, &op->u.op.key);
+		break;
+
+	case TXN_OP_REF:
+	case TXN_OP_TRUNCATE_COL:
+		break;
+
+	case TXN_OP_TRUNCATE_ROW:
 		__wt_buf_free(session, &op->u.truncate_row.start);
 		__wt_buf_free(session, &op->u.truncate_row.stop);
+		break;
 	}
 }
 

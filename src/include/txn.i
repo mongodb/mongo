@@ -64,7 +64,8 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	/* If we are logging, we need a reference to the key. */
 	if (cbt->btree->type == BTREE_ROW && S2C(session)->logging)
 		WT_ERR(__wt_cursor_row_leaf_key(cbt, &op->u.op.key));
-	op->u.op.ins = cbt->ins;
+	if (cbt->ins != NULL)
+		op->u.op.recno = WT_INSERT_RECNO(cbt->ins);
 	op->u.op.upd = upd;
 	op->fileid = S2BT(session)->id;
 	upd->txnid = session->txn.id;
