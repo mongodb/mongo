@@ -181,6 +181,9 @@ namespace mongo {
          * Mark the Runner as no longer valid.  Can happen when a runner yields and the underlying
          * database is dropped/indexes removed/etc.  All future to calls to getNext return
          * RUNNER_DEAD. Every other call is a NOOP.
+         *
+         * The runner must guarantee as a postcondition that future calls to collection() will
+         * return NULL.
          */
         virtual void kill() = 0;
 
