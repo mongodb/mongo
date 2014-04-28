@@ -40,7 +40,8 @@ namespace mongo {
     // used by index and original collections
     class SimpleRecordStoreV1 : public RecordStoreV1Base {
     public:
-        SimpleRecordStoreV1( const StringData& ns,
+        SimpleRecordStoreV1( TransactionExperiment* txn,
+                             const StringData& ns,
                              RecordStoreV1MetaData* details,
                              ExtentManager* em,
                              bool isSystemIndexes );
@@ -54,23 +55,30 @@ namespace mongo {
 
         virtual std::vector<RecordIterator*> getManyIterators() const;
 
-        virtual Status truncate();
+        virtual Status truncate(TransactionExperiment* txn);
 
         virtual bool compactSupported() const { return true; }
-        virtual Status compact( RecordStoreCompactAdaptor* adaptor,
+        virtual Status compact( TransactionExperiment* txn,
+                                RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
                                 CompactStats* stats );
 
     protected:
         virtual bool isCapped() const { return false; }
 
-        virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
+        virtual StatusWith<DiskLoc> allocRecord( TransactionExperiment* txn,
+                                                 int lengthWithHeaders,
+                                                 int quotaMax );
 
-        virtual void addDeletedRec(const DiskLoc& dloc);
+        virtual void addDeletedRec(TransactionExperiment* txn,
+                                   const DiskLoc& dloc);
     private:
-        DiskLoc _allocFromExistingExtents( int lengthWithHeaders );
+        DiskLoc _allocFromExistingExtents( TransactionExperiment* txn,
+                                           int lengthWithHeaders );
 
-        void _compactExtent(const DiskLoc diskloc, int extentNumber,
+        void _compactExtent(TransactionExperiment* txn,
+                            const DiskLoc diskloc,
+                            int extentNumber,
                             RecordStoreCompactAdaptor* adaptor,
                             const CompactOptions* compactOptions,
                             CompactStats* stats );

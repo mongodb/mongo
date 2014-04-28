@@ -40,8 +40,8 @@ namespace mongo {
         return getDur().isCommitNeeded();
     }
 
-    void DurTransaction::writingPtr(void* data, size_t len) {
-        getDur().writingPtr(data, len);
+    void* DurTransaction::writingPtr(void* data, size_t len) {
+        return getDur().writingPtr(data, len);
     }
 
 }  // namespace mongo

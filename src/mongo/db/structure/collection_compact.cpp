@@ -43,6 +43,7 @@
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
@@ -101,6 +102,7 @@ namespace mongo {
 
 
     StatusWith<CompactStats> Collection::compact( const CompactOptions* compactOptions ) {
+        DurTransaction txn[1];
 
         if ( !_recordStore->compactSupported() )
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
@@ -155,7 +157,7 @@ namespace mongo {
 
         MyCompactAdaptor adaptor( this, &multiIndexBlock );
 
-        _recordStore->compact( &adaptor, compactOptions, &stats );
+        _recordStore->compact( txn, &adaptor, compactOptions, &stats );
 
         log() << "starting index commits";
         status = multiIndexBlock.commit();

@@ -31,6 +31,9 @@
 #include "mongo/db/index/btree_index_cursor.h"  // for aboutToDeleteBucket
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/btree/btree_logic.h"
@@ -1274,9 +1277,10 @@ namespace mongo {
 
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::deallocBucket(BucketType* bucket, const DiskLoc bucketLoc) {
+        DurTransaction txn[1];
         bucket->n = BtreeLayout::INVALID_N_SENTINEL;
         bucket->parent.Null();
-        _recordStore->deleteRecord(bucketLoc);
+        _recordStore->deleteRecord(txn, bucketLoc);
     }
 
     template <class BtreeLayout>
@@ -2008,7 +2012,7 @@ namespace mongo {
     template <class BtreeLayout>
     DiskLoc BtreeLogic<BtreeLayout>::addBucket(TransactionExperiment* trans) {
         DummyDocWriter docWriter(BtreeLayout::BucketSize);
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord(&docWriter, 0);
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord(trans, &docWriter, 0);
         // XXX: remove this(?) or turn into massert or sanely bubble it back up.
         uassertStatusOK(loc.getStatus());
         BucketType* b = btreemod(trans, getBucket(loc.getValue()));

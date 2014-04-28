@@ -41,6 +41,7 @@
 #include "mongo/db/queryutil.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/db/structure/catalog/namespace.h"
@@ -546,16 +547,18 @@ namespace NamespaceTests {
         class AllocQuantized : public Base {
         public:
             void run() {
+                DurTransaction txn[1];
 
                 string myns = (string)ns() + "AllocQuantized";
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( myns,
+                SimpleRecordStoreV1 rs( txn,
+                                        myns,
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         false );
 
                 BSONObj obj = docForRecordSize( 300 );
-                StatusWith<DiskLoc> result = rs.insertRecord( obj.objdata(), obj.objsize(), 0 );
+                StatusWith<DiskLoc> result = rs.insertRecord( txn, obj.objdata(), obj.objsize(), 0 );
                 ASSERT( result.isOK() );
 
                 // The length of the allocated record is quantized.
@@ -589,16 +592,18 @@ namespace NamespaceTests {
         class AllocIndexNamespaceNotQuantized : public Base {
         public:
             void run() {
+                DurTransaction txn[1];
                 string myns = (string)ns() + "AllocIndexNamespaceNotQuantized";
 
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( myns + ".$x",
+                SimpleRecordStoreV1 rs( txn,
+                                        myns + ".$x",
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         false );
 
                 BSONObj obj = docForRecordSize( 300 );
-                StatusWith<DiskLoc> result = rs.insertRecord( obj.objdata(), obj.objsize(), 0 );
+                StatusWith<DiskLoc> result = rs.insertRecord(txn,  obj.objdata(), obj.objsize(), 0 );
                 ASSERT( result.isOK() );
 
                 // The length of the allocated record is not quantized.
@@ -611,16 +616,18 @@ namespace NamespaceTests {
         class AllocIndexNamespaceSlightlyQuantized : public Base {
         public:
             void run() {
+                DurTransaction txn[1];
                 string myns = (string)ns() + "AllocIndexNamespaceNotQuantized";
 
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( myns + ".$x",
+                SimpleRecordStoreV1 rs( txn,
+                                        myns + ".$x",
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         true );
 
                 BSONObj obj = docForRecordSize( 298 );
-                StatusWith<DiskLoc> result = rs.insertRecord( obj.objdata(), obj.objsize(), 0 );
+                StatusWith<DiskLoc> result = rs.insertRecord( txn, obj.objdata(), obj.objsize(), 0 );
                 ASSERT( result.isOK() );
 
                 ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );

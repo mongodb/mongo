@@ -40,7 +40,6 @@ namespace mongo {
     class TransactionExperiment  {
         MONGO_DISALLOW_COPYING(TransactionExperiment);
     public:
-        TransactionExperiment() { }
         virtual ~TransactionExperiment() { }
 
         /**
@@ -55,17 +54,29 @@ namespace mongo {
 
         /**
          * Declare that the data at [x, x + len) is being written.
-        */
-        virtual void writingPtr(void* data, size_t len) = 0;
+         */
+        virtual void* writingPtr(void* data, size_t len) = 0;
+
+        //
+        // Sugar methods
+        //
+
+        /**
+         * Declare write intent for an int
+         */
+        inline int& writingInt(int& d) { return *writing( &d ); }
 
         /**
          * A templated helper for writingPtr.
          */
         template <typename T>
         inline T* writing(T* x) {
-            writingPtr(static_cast<void*>(x), sizeof(T));
+            writingPtr(x, sizeof(T));
             return x;
         }
+
+    protected:
+        TransactionExperiment() {}
     };
 
 }  // namespace mongo

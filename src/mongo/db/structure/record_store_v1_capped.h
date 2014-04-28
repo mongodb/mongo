@@ -41,7 +41,8 @@ namespace mongo {
 
     class CappedRecordStoreV1 : public RecordStoreV1Base {
     public:
-        CappedRecordStoreV1( Collection* collection,
+        CappedRecordStoreV1( TransactionExperiment* txn,
+                             Collection* collection,
                              const StringData& ns,
                              RecordStoreV1MetaData* details,
                              ExtentManager* em,
@@ -51,7 +52,7 @@ namespace mongo {
 
         const char* name() const { return "CappedRecordStoreV1"; }
 
-        virtual Status truncate();
+        virtual Status truncate(TransactionExperiment* txn);
 
         /**
          * Truncate documents newer than the document at 'end' from the capped
@@ -60,7 +61,7 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        void temp_cappedTruncateAfter( DiskLoc end, bool inclusive );
+        void temp_cappedTruncateAfter( TransactionExperiment* txn, DiskLoc end, bool inclusive );
 
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
@@ -69,7 +70,8 @@ namespace mongo {
 
         virtual bool compactSupported() const { return false; }
 
-        virtual Status compact( RecordStoreCompactAdaptor* adaptor,
+        virtual Status compact( TransactionExperiment* txn,
+                                RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
                                 CompactStats* stats );
 
@@ -82,27 +84,29 @@ namespace mongo {
 
         virtual bool isCapped() const { return true; }
 
-        virtual StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
+        virtual StatusWith<DiskLoc> allocRecord( TransactionExperiment* txn,
+                                                 int lengthWithHeaders,
+                                                 int quotaMax );
 
-        virtual void addDeletedRec(const DiskLoc& dloc);
+        virtual void addDeletedRec(TransactionExperiment* txn, const DiskLoc& dloc);
 
     private:
         // -- start copy from cap.cpp --
-        void compact();
+        void compact(TransactionExperiment* txn);
         const DiskLoc& cappedFirstDeletedInCurExtent() const;
-        void setFirstDeletedInCurExtent( const DiskLoc& loc ) const;
-        void cappedCheckMigrate();
-        DiskLoc __capAlloc( int len );
+        void setFirstDeletedInCurExtent( TransactionExperiment* txn, const DiskLoc& loc );
+        void cappedCheckMigrate(TransactionExperiment* txn);
+        DiskLoc __capAlloc( TransactionExperiment* txn, int len );
         bool inCapExtent( const DiskLoc &dl ) const;
         const DiskLoc& cappedListOfAllDeletedRecords() const;
         const DiskLoc& cappedLastDelRecLastExtent() const;
-        void setListOfAllDeletedRecords( const DiskLoc& loc ) const;
-        void setLastDelRecLastExtent( const DiskLoc& loc ) const;
+        void setListOfAllDeletedRecords( TransactionExperiment* txn, const DiskLoc& loc );
+        void setLastDelRecLastExtent( TransactionExperiment* txn, const DiskLoc& loc );
         bool capLooped() const;
         Extent *theCapExtent() const;
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
-        void advanceCapExtent( const StringData& ns );
-        void cappedTruncateLastDelUpdate();
+        void advanceCapExtent( TransactionExperiment* txn, const StringData& ns );
+        void cappedTruncateLastDelUpdate(TransactionExperiment* txn);
 
         /**
          * Truncate documents newer than the document at 'end' from the capped
@@ -110,7 +114,10 @@ namespace mongo {
          * function.  An assertion will be thrown if that is attempted.
          * @param inclusive - Truncate 'end' as well iff true
          */
-        void cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive);
+        void cappedTruncateAfter(TransactionExperiment* txn,
+                                 const char* ns,
+                                 DiskLoc end,
+                                 bool inclusive);
 
         void _maybeComplain( int len ) const;
 

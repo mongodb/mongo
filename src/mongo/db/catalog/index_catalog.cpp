@@ -61,6 +61,7 @@
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
@@ -125,6 +126,7 @@ namespace mongo {
     }
 
     IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures( IndexDescriptor* descriptor ) {
+        DurTransaction txn[1];
         auto_ptr<IndexDescriptor> descriptorCleanup( descriptor );
 
         NamespaceDetails* indexMetadata =
@@ -134,7 +136,8 @@ namespace mongo {
                  str::stream() << "no NamespaceDetails for index: " << descriptor->toString(),
                  indexMetadata );
 
-        auto_ptr<RecordStore> recordStore( new SimpleRecordStoreV1( descriptor->indexNamespace(),
+        auto_ptr<RecordStore> recordStore( new SimpleRecordStoreV1( txn,
+                                                                    descriptor->indexNamespace(),
                                                                     new NamespaceDetailsRSV1MetaData( indexMetadata ),
                                                                     _collection->getExtentManager(),
                                                                     false ) );

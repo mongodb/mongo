@@ -47,6 +47,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
@@ -80,18 +81,22 @@ namespace mongo {
           _infoCache( this ),
           _indexCatalog( this, details ),
           _cursorCache( fullNS ) {
+        DurTransaction txn[1];
+
         _details = details;
         _database = database;
 
         if ( details->isCapped() ) {
-            _recordStore.reset( new CappedRecordStoreV1( this,
+            _recordStore.reset( new CappedRecordStoreV1( txn,
+                                                         this,
                                                          _ns.ns(),
                                                          new NamespaceDetailsRSV1MetaData( details ),
                                                          &database->getExtentManager(),
                                                          _ns.coll() == "system.indexes" ) );
         }
         else {
-            _recordStore.reset( new SimpleRecordStoreV1( _ns.ns(),
+            _recordStore.reset( new SimpleRecordStoreV1( txn,
+                                                         _ns.ns(),
                                                          new NamespaceDetailsRSV1MetaData( details ),
                                                          &database->getExtentManager(),
                                                          _ns.coll() == "system.indexes" ) );
@@ -163,10 +168,14 @@ namespace mongo {
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( const DocWriter* doc, bool enforceQuota ) {
+        DurTransaction txn[1];
         verify( _indexCatalog.numIndexesTotal() == 0 ); // eventually can implement, just not done
 
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord( doc,
-                                                             enforceQuota ? largestFileNumberInQuota() : 0 );
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
+                                                              doc,
+                                                              enforceQuota
+                                                                 ? largestFileNumberInQuota()
+                                                                 : 0 );
         if ( !loc.isOK() )
             return loc;
 
@@ -199,7 +208,9 @@ namespace mongo {
 
     StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& doc,
                                                     MultiIndexBlock& indexBlock ) {
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord( doc.objdata(),
+        DurTransaction txn[1];
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
+                                                              doc.objdata(),
                                                               doc.objsize(),
                                                               0 );
 
@@ -225,7 +236,9 @@ namespace mongo {
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
 
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord( docToInsert.objdata(),
+        DurTransaction txn[1];
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
+                                                              docToInsert.objdata(),
                                                               docToInsert.objsize(),
                                                               enforceQuota ? largestFileNumberInQuota() : 0 );
         if ( !loc.isOK() )
@@ -246,7 +259,7 @@ namespace mongo {
 
             // indexRecord takes care of rolling back indexes
             // so we just have to delete the main storage
-            _recordStore->deleteRecord( loc.getValue() );
+            _recordStore->deleteRecord( txn, loc.getValue() );
             return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
         }
 
@@ -255,6 +268,7 @@ namespace mongo {
 
     void Collection::deleteDocument( const DiskLoc& loc, bool cappedOK, bool noWarn,
                                      BSONObj* deletedId ) {
+        DurTransaction txn[1];
         if ( _details->isCapped() && !cappedOK ) {
             log() << "failing remove on a capped ns " << _ns << endl;
             uasserted( 10089,  "cannot remove from a capped collection" );
@@ -275,7 +289,7 @@ namespace mongo {
 
         _indexCatalog.unindexRecord( doc, loc, noWarn);
 
-        _recordStore->deleteRecord( loc );
+        _recordStore->deleteRecord( txn, loc );
 
         _infoCache.notifyOfWriteOp();
     }
@@ -287,6 +301,7 @@ namespace mongo {
                                                     const BSONObj& objNew,
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
+        DurTransaction txn[1];
 
         Record* oldRecord = _recordStore->recordFor( oldLocation );
         BSONObj objOld( oldRecord->accessed()->data() );
@@ -358,7 +373,7 @@ namespace mongo {
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location
                 // remember its already unindexed
-                _recordStore->deleteRecord( oldLocation );
+                _recordStore->deleteRecord( txn, oldLocation );
             }
             else {
                 // new doc insert failed, so lets re-index the old document and location
@@ -392,7 +407,7 @@ namespace mongo {
 
         //  update in place
         int sz = objNew.objsize();
-        memcpy(getDur().writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
+        memcpy(txn->writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
 
         return StatusWith<DiskLoc>( oldLocation );
     }
@@ -460,7 +475,8 @@ namespace mongo {
     }
 
     void Collection::increaseStorageSize( int size, bool enforceQuota ) {
-        _recordStore->increaseStorageSize( size, enforceQuota ? largestFileNumberInQuota() : 0 );
+        DurTransaction txn[1];
+        _recordStore->increaseStorageSize(txn, size, enforceQuota ? largestFileNumberInQuota() : 0);
     }
 
     int Collection::largestFileNumberInQuota() const {
@@ -496,6 +512,7 @@ namespace mongo {
      * 4) re-write indexes
      */
     Status Collection::truncate() {
+        DurTransaction txn[1];
         massert( 17445, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
 
         // 1) store index specs
@@ -516,7 +533,7 @@ namespace mongo {
         _infoCache.reset();
 
         // 3) truncate record store
-        status = _recordStore->truncate();
+        status = _recordStore->truncate(txn);
         if ( !status.isOK() )
             return status;
 
@@ -531,8 +548,10 @@ namespace mongo {
     }
 
     void Collection::temp_cappedTruncateAfter( DiskLoc end, bool inclusive) {
+        DurTransaction txn[1];
         invariant( isCapped() );
-        reinterpret_cast<CappedRecordStoreV1*>(_recordStore.get())->temp_cappedTruncateAfter( end, inclusive );
+        reinterpret_cast<CappedRecordStoreV1*>(
+            _recordStore.get())->temp_cappedTruncateAfter( txn, end, inclusive );
     }
 
     namespace {

@@ -44,6 +44,7 @@ namespace mongo {
     class MAdvise;
     class NamespaceDetails;
     class Record;
+    class TransactionExperiment;
 
     class RecordStoreCompactAdaptor;
     class RecordStore;
@@ -100,11 +101,16 @@ namespace mongo {
 
         virtual Record* recordFor( const DiskLoc& loc ) const = 0;
 
-        virtual void deleteRecord( const DiskLoc& dl ) = 0;
+        virtual void deleteRecord( TransactionExperiment* txn, const DiskLoc& dl ) = 0;
 
-        virtual StatusWith<DiskLoc> insertRecord( const char* data, int len, int quotaMax ) = 0;
+        virtual StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+                                                  const char* data,
+                                                  int len,
+                                                  int quotaMax ) = 0;
 
-        virtual StatusWith<DiskLoc> insertRecord( const DocWriter* doc, int quotaMax ) = 0;
+        virtual StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+                                                  const DocWriter* doc,
+                                                  int quotaMax ) = 0;
 
         /**
          * returned iterator owned by caller
@@ -133,11 +139,12 @@ namespace mongo {
         /**
          * removes all Records
          */
-        virtual Status truncate() = 0;
+        virtual Status truncate( TransactionExperiment* txn ) = 0;
 
         // does this RecordStore support the compact operation
         virtual bool compactSupported() const = 0;
-        virtual Status compact( RecordStoreCompactAdaptor* adaptor,
+        virtual Status compact( TransactionExperiment* txn,
+                                RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
                                 CompactStats* stats ) = 0;
 
@@ -154,7 +161,7 @@ namespace mongo {
 
         // TODO: this makes me sad, it shouldn't be in the interface
         // do not use this anymore
-        virtual void increaseStorageSize( int size, int quotaMax ) = 0;
+        virtual void increaseStorageSize( TransactionExperiment* txn,  int size, int quotaMax ) = 0;
 
         // TODO: another sad one
         virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const = 0;

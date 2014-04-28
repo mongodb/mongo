@@ -31,11 +31,11 @@
 #include "mongo/db/structure/record_store_v1_base.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store_v1_repair_iterator.h"
 
@@ -138,34 +138,39 @@ namespace mongo {
     }
 
 
-    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( const DocWriter* doc, int quotaMax ) {
+    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( TransactionExperiment* txn,
+                                                         const DocWriter* doc,
+                                                         int quotaMax ) {
         int lenWHdr = doc->documentSize() + Record::HeaderSize;
         if ( doc->addPadding() )
             lenWHdr = getRecordAllocationSize( lenWHdr );
 
-        StatusWith<DiskLoc> loc = allocRecord( lenWHdr, quotaMax );
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, quotaMax );
         if ( !loc.isOK() )
             return loc;
 
         Record *r = recordFor( loc.getValue() );
         fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
 
-        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
+        r = reinterpret_cast<Record*>( txn->writingPtr(r, lenWHdr) );
         doc->writeDocument( r->data() );
 
-        _addRecordToRecListInExtent(r, loc.getValue());
+        _addRecordToRecListInExtent(txn, r, loc.getValue());
 
-        _details->incrementStats( r->netLength(), 1 );
+        _details->incrementStats( txn, r->netLength(), 1 );
 
         return loc;
     }
 
 
-    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( const char* data, int len, int quotaMax ) {
+    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( TransactionExperiment* txn,
+                                                         const char* data,
+                                                         int len,
+                                                         int quotaMax ) {
         int lenWHdr = getRecordAllocationSize( len + Record::HeaderSize );
         fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
 
-        StatusWith<DiskLoc> loc = allocRecord( lenWHdr, quotaMax );
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, quotaMax );
         if ( !loc.isOK() )
             return loc;
 
@@ -173,17 +178,17 @@ namespace mongo {
         fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
 
         // copy the data
-        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
+        r = reinterpret_cast<Record*>( txn->writingPtr(r, lenWHdr) );
         memcpy( r->data(), data, len );
 
-        _addRecordToRecListInExtent(r, loc.getValue());
+        _addRecordToRecListInExtent(txn, r, loc.getValue());
 
-        _details->incrementStats( r->netLength(), 1 );
+        _details->incrementStats( txn, r->netLength(), 1 );
 
         return loc;
     }
 
-    void RecordStoreV1Base::deleteRecord( const DiskLoc& dl ) {
+    void RecordStoreV1Base::deleteRecord( TransactionExperiment* txn, const DiskLoc& dl ) {
 
         Record* todelete = recordFor( dl );
 
@@ -192,19 +197,19 @@ namespace mongo {
             if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
                 DiskLoc prev = getPrevRecordInExtent( dl );
                 Record* prevRecord = recordFor( prev );
-                getDur().writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
+                txn->writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
             }
 
             if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
                 DiskLoc next = getNextRecord( dl );
                 Record* nextRecord = recordFor( next );
-                getDur().writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
+                txn->writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
             }
         }
 
         /* remove ourself from extent pointers */
         {
-            Extent *e = getDur().writing( _getExtent( _getExtentLocForRecord( dl ) ) );
+            Extent *e = txn->writing( _getExtent( _getExtentLocForRecord( dl ) ) );
             if ( e->firstRecord == dl ) {
                 if ( todelete->nextOfs() == DiskLoc::NullOfs )
                     e->firstRecord.Null();
@@ -221,7 +226,7 @@ namespace mongo {
 
         /* add to the free list */
         {
-            _details->incrementStats( -1 * todelete->netLength(), -1 );
+            _details->incrementStats( txn, -1 * todelete->netLength(), -1 );
 
             if ( _isSystemIndexes ) {
                 /* temp: if in system.indexes, don't reuse, and zero out: we want to be
@@ -229,15 +234,15 @@ namespace mongo {
                    to this disk location.  so an incorrectly done remove would cause
                    a lot of problems.
                 */
-                memset( getDur().writingPtr(todelete, todelete->lengthWithHeaders() ),
+                memset( txn->writingPtr(todelete, todelete->lengthWithHeaders() ),
                         0, todelete->lengthWithHeaders() );
             }
             else {
                 DEV {
                     unsigned long long *p = reinterpret_cast<unsigned long long *>( todelete->data() );
-                    *getDur().writing(p) = 0;
+                    *txn->writing(p) = 0;
                 }
-                addDeletedRec(dl);
+                addDeletedRec(txn, dl);
             }
         }
 
@@ -247,11 +252,13 @@ namespace mongo {
         return new RecordStoreV1RepairIterator(this);
     }
 
-    void RecordStoreV1Base::_addRecordToRecListInExtent(Record *r, DiskLoc loc) {
+    void RecordStoreV1Base::_addRecordToRecListInExtent(TransactionExperiment* txn,
+                                                        Record *r,
+                                                        DiskLoc loc) {
         dassert( recordFor(loc) == r );
         Extent *e = _getExtent( _getExtentLocForRecord( loc ) );
         if ( e->lastRecord.isNull() ) {
-            Extent::FL *fl = getDur().writing(e->fl());
+            Extent::FL *fl = txn->writing(e->fl());
             fl->firstRecord = fl->lastRecord = loc;
             r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
         }
@@ -259,12 +266,14 @@ namespace mongo {
             Record *oldlast = recordFor(e->lastRecord);
             r->prevOfs() = e->lastRecord.getOfs();
             r->nextOfs() = DiskLoc::NullOfs;
-            getDur().writingInt(oldlast->nextOfs()) = loc.getOfs();
-            *getDur().writing(&e->lastRecord) = loc;
+            txn->writingInt(oldlast->nextOfs()) = loc.getOfs();
+            *txn->writing(&e->lastRecord) = loc;
         }
     }
 
-    void RecordStoreV1Base::increaseStorageSize( int size, int quotaMax ) {
+    void RecordStoreV1Base::increaseStorageSize( TransactionExperiment* txn,
+                                                 int size,
+                                                 int quotaMax ) {
         DiskLoc eloc = _extentManager->allocateExtent( _ns,
                                                        isCapped(),
                                                        size,
@@ -274,26 +283,26 @@ namespace mongo {
 
         invariant( e );
 
-        DiskLoc emptyLoc = getDur().writing(e)->reuse( _ns, isCapped() );
+        DiskLoc emptyLoc = txn->writing(e)->reuse( _ns, isCapped() );
 
         if ( _details->lastExtent().isNull() ) {
             verify( _details->firstExtent().isNull() );
-            _details->setFirstExtent( eloc );
-            _details->setLastExtent( eloc );
-            _details->setCapExtent( eloc );
+            _details->setFirstExtent( txn, eloc );
+            _details->setLastExtent( txn, eloc );
+            _details->setCapExtent( txn, eloc );
             verify( e->xprev.isNull() );
             verify( e->xnext.isNull() );
         }
         else {
             verify( !_details->firstExtent().isNull() );
-            *getDur().writing(&e->xprev) = _details->lastExtent();
-            *getDur().writing(&_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
-            _details->setLastExtent( eloc );
+            *txn->writing(&e->xprev) = _details->lastExtent();
+            *txn->writing(&_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
+            _details->setLastExtent( txn, eloc );
         }
 
-        _details->setLastExtentSize( e->length );
+        _details->setLastExtentSize( txn, e->length );
 
-        addDeletedRec(emptyLoc);
+        addDeletedRec(txn, emptyLoc);
     }
 
     Status RecordStoreV1Base::validate( bool full, bool scanData,
