@@ -35,12 +35,10 @@
 #include <cstring>  // for memcpy
 
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/index_set.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle.h"
@@ -721,22 +719,7 @@ namespace mongo {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
                 // no work to do, in which case we want to consider the object unchanged.
                 if (!damages.empty() ) {
-
-                    // Broadcast the mutation so that query results stay correct.
-                    collection->cursorCache()->invalidateDocument(loc, INVALIDATION_MUTATION);
-
-                    collection->detailsWritable()->paddingFits();
-
-                    // All updates were in place. Apply them via durability and writing pointer.
-                    mutablebson::DamageVector::const_iterator where = damages.begin();
-                    const mutablebson::DamageVector::const_iterator end = damages.end();
-                    for( ; where != end; ++where ) {
-                        const char* sourcePtr = source + where->sourceOffset;
-                        void* targetPtr = getDur().writingPtr(
-                            const_cast<char*>(oldObj.objdata()) + where->targetOffset,
-                            where->size);
-                        std::memcpy(targetPtr, sourcePtr, where->size);
-                    }
+                    collection->updateDocumentWithDamages( loc, source, damages );
                     docWasModified = true;
                     opDebug->fastmod = true;
                 }

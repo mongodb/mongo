@@ -395,6 +395,30 @@ namespace mongo {
         return StatusWith<DiskLoc>( oldLocation );
     }
 
+    Status Collection::updateDocumentWithDamages( const DiskLoc& loc,
+                                                  const char* damangeSource,
+                                                  const mutablebson::DamageVector& damages ) {
+
+        // Broadcast the mutation so that query results stay correct.
+        _cursorCache.invalidateDocument(loc, INVALIDATION_MUTATION);
+
+        _details->paddingFits();
+
+        Record* rec = _recordStore->recordFor( loc );
+        char* root = rec->data();
+
+        // All updates were in place. Apply them via durability and writing pointer.
+        mutablebson::DamageVector::const_iterator where = damages.begin();
+        const mutablebson::DamageVector::const_iterator end = damages.end();
+        for( ; where != end; ++where ) {
+            const char* sourcePtr = damangeSource + where->sourceOffset;
+            void* targetPtr = getDur().writingPtr(root + where->targetOffset, where->size);
+            std::memcpy(targetPtr, sourcePtr, where->size);
+        }
+
+        return Status::OK();
+    }
+
     int64_t Collection::storageSize( int* numExtents, BSONArrayBuilder* extentInfo ) const {
         if ( _details->firstExtent().isNull() ) {
             if ( numExtents )

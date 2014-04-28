@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/catalog/collection_cursor_cache.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
@@ -183,6 +184,14 @@ namespace mongo {
                                             const BSONObj& newDoc,
                                             bool enforceQuota,
                                             OpDebug* debug );
+
+        /**
+         * right now not allowed to modify indexes
+         */
+        Status updateDocumentWithDamages( const DiskLoc& loc,
+                                          const char* damangeSource,
+                                          const mutablebson::DamageVector& damages );
+
 
         int64_t storageSize( int* numExtents = NULL, BSONArrayBuilder* extentInfo = NULL ) const;
 
