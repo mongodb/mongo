@@ -186,12 +186,16 @@ namespace mongo {
 
         virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string coll = cmdObj.firstElement().valuestr();
-            std::string ns = db->name() + "." + coll;
+            std::string collName = cmdObj.firstElement().valuestr();
+            std::string ns = db->name() + "." + collName;
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+            Collection* coll = db->getCollection(ns);
+            if (coll) {
+                return IndexBuilder::killMatchingIndexBuilds(coll, criteria);
+            }
+            return std::vector<BSONObj>();
         }
 
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
