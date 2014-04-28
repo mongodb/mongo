@@ -514,7 +514,7 @@ __wt_row_leaf_key(WT_SESSION_IMPL *session,
 	 * exists to inline fast-path checks for already instantiated keys and
 	 * on-page uncompressed keys.
 	 */
-retry:	ikey = WT_ROW_KEY_COPY(rip);
+	ikey = WT_ROW_KEY_COPY(rip);
 
 	/*
 	 * Key copied.
@@ -538,15 +538,9 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 
 	/*
 	 * We have to build the key (it's never been instantiated, and it's some
-	 * kind of compressed or overflow key).  Call __wt_row_leaf_key_work to
-	 * instantiate the key with no buffer reference, then retry to pick up
-	 * a simple reference to the instantiated key.
+	 * kind of compressed or overflow key).
 	 */
-	if (instantiate) {
-		WT_RET(__wt_row_leaf_key_work(session, page, rip, NULL, 1));
-		goto retry;
-	}
-	return (__wt_row_leaf_key_work(session, page, rip, key, 0));
+	return (__wt_row_leaf_key_work(session, page, rip, key, instantiate));
 }
 
 /*

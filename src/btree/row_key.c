@@ -419,7 +419,20 @@ next:		switch (direction) {
 		}
 	}
 
-	/* Optionally instantiate the key. */
+	/*
+	 * Optionally instantiate the key: there's a cost to figuring out a key
+	 * value in a leaf page with prefix-compressed or Huffman encoded keys,
+	 * amortize the cost by instantiating a copy of the calculated key in
+	 * allocated memory.  We don't instantiate keys when pages are first
+	 * brought into memory because it's wasted effort if the page is only
+	 * read by a cursor in sorted order.  If, instead, the page is read by a
+	 * cursor in reverse order, we immediately instantiate periodic keys for
+	 * the page (otherwise the reverse walk would be insanely slow).  If,
+	 * instead, the page is randomly searched, we instantiate keys as they
+	 * are accessed (meaning, for example, as long as the binary search only
+	 * touches one-half of the page, the only keys we instantiate will be in
+	 * that half of the page).
+	 */
 	if (instantiate) {
 		key = WT_ROW_KEY_COPY(rip_arg);
 		if (!__wt_off_page(page, key)) {

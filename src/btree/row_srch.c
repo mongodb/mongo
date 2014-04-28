@@ -306,7 +306,7 @@ leaf_only:
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
 
-			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 0));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			match = WT_MIN(skiplow, skiphigh);
 			cmp = __wt_lex_compare_skip(srch_key, item, &match);
 			if (cmp == 0)
@@ -325,7 +325,7 @@ leaf_only:
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
 
-			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 0));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
 			WT_ERR(WT_LEX_CMP_SKIP(session,
 			    btree->collator, srch_key, item, cmp, &match));
 			if (cmp == 0)
