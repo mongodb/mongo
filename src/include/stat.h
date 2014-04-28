@@ -124,6 +124,7 @@ struct __wt_connection_stats {
 	WT_STATS async_full;
 	WT_STATS async_max_queue;
 	WT_STATS async_op_alloc;
+	WT_STATS async_op_compact;
 	WT_STATS async_op_insert;
 	WT_STATS async_op_remove;
 	WT_STATS async_op_search;

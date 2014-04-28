@@ -158,6 +158,25 @@ err:	API_END(session);
 }
 
 /*
+ * __async_compact --
+ *	WT_ASYNC_OP->compact implementation for op handles.
+ */
+static int
+__async_compact(WT_ASYNC_OP *asyncop)
+{
+	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	ASYNCOP_API_CALL(O2C(op), session, compact);
+	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_compact);
+	WT_ERR(__async_op_wrap(op, WT_AOP_COMPACT));
+err:	API_END(session);
+	return (ret);
+}
+
+/*
  * __async_get_id --
  *	WT_ASYNC_OP->get_id implementation for op handles.
  */
@@ -198,6 +217,7 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop->insert = __async_insert;
 	asyncop->update = __async_update;
 	asyncop->remove = __async_remove;
+	asyncop->compact = __async_compact;
 	asyncop->get_id = __async_get_id;
 	asyncop->get_type = __async_get_type;
 	/*

@@ -13,6 +13,7 @@ static const WT_CONFIG_CHECK confchk_connection_async_new_op[] = {
 	{ "append", "boolean", NULL, NULL},
 	{ "overwrite", "boolean", NULL, NULL},
 	{ "raw", "boolean", NULL, NULL},
+	{ "timeout", "int", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -325,7 +326,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "connection.async_new_op",
-	  "append=0,overwrite=,raw=0",
+	  "append=0,overwrite=,raw=0,timeout=1200",
 	  confchk_connection_async_new_op
 	},
 	{ "connection.close",

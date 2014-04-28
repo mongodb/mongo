@@ -318,6 +318,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->async_full.desc = "async: number of times op allocation failed";
 	stats->async_max_queue.desc = "async: maximum work queue length";
 	stats->async_op_alloc.desc = "async op allocation";
+	stats->async_op_compact.desc = "async op compact calls";
 	stats->async_op_insert.desc = "async op insert calls";
 	stats->async_op_remove.desc = "async op remove calls";
 	stats->async_op_search.desc = "async op search calls";
@@ -441,6 +442,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->async_full.v = 0;
 	stats->async_max_queue.v = 0;
 	stats->async_op_alloc.v = 0;
+	stats->async_op_compact.v = 0;
 	stats->async_op_insert.v = 0;
 	stats->async_op_remove.v = 0;
 	stats->async_op_search.v = 0;

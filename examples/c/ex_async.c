@@ -137,6 +137,10 @@ retry:
 	/*! [flush] */
 	wt_conn->async_flush(wt_conn);
 	/*! [flush] */
+	/*! [Compact a table] */
+	ret = wt_conn->async_new_op(wt_conn, uri, "timeout=10", &cb, &op);
+	op->compact(op);
+	/*! [Compact a table] */
 
 	for (i = 0; i < MAX_KEYS; i++) {
 		op = NULL;

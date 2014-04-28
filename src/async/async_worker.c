@@ -109,6 +109,11 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 
 	wt_session = (WT_SESSION *)session;
 	*cursorp = NULL;
+	/*
+	 * Compact doesn't need a cursor.
+	 */
+	if (op->optype == WT_AOP_COMPACT)
+		return (0);
 	WT_ASSERT(session, op->format != NULL);
 	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
 		if (op->format->cfg_hash == ac->cfg_hash &&
@@ -151,16 +156,24 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	WT_ASYNC_OP *asyncop;
 	WT_DECL_RET;
 	WT_ITEM val;
+	WT_SESSION *wt_session;
 
 	asyncop = (WT_ASYNC_OP *)op;
 	/*
 	 * Set the key of our local cursor from the async op handle.
 	 * If needed, also set the value.
 	 */
-	__wt_cursor_set_raw_key(cursor, &asyncop->c.key);
-	if (op->optype != WT_AOP_SEARCH && op->optype != WT_AOP_REMOVE)
-		__wt_cursor_set_raw_value(cursor, &asyncop->c.value);
+	if (op->optype != WT_AOP_COMPACT) {
+		__wt_cursor_set_raw_key(cursor, &asyncop->c.key);
+		if (op->optype != WT_AOP_SEARCH && op->optype != WT_AOP_REMOVE)
+			__wt_cursor_set_raw_value(cursor, &asyncop->c.value);
+	}
 	switch (op->optype) {
+		case WT_AOP_COMPACT:
+			wt_session = &session->iface;
+			WT_ERR(wt_session->compact(wt_session,
+			    op->format->uri, op->format->config));
+			break;
 		case WT_AOP_INSERT:
 		case WT_AOP_UPDATE:
 			WT_ERR(cursor->insert(cursor));
@@ -203,7 +216,8 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	ret = 0;
 	cb_ret = 0;
 
-	WT_RET(__wt_txn_begin(session, NULL));
+	if (op->optype != WT_AOP_COMPACT)
+		WT_RET(__wt_txn_begin(session, NULL));
 	WT_ASSERT(session, op->state == WT_ASYNCOP_WORKING);
 	WT_RET(__async_worker_cursor(session, op, worker, &cursor));
 	/*
@@ -217,18 +231,20 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * If the operation succeeded and the user callback returned
 	 * zero then commit.  Otherwise rollback.
 	 */
-	if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0)
-		WT_TRET(__wt_txn_commit(session, NULL));
-	else
-		WT_TRET(__wt_txn_rollback(session, NULL));
+	if (op->optype != WT_AOP_COMPACT) {
+		if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0)
+			WT_TRET(__wt_txn_commit(session, NULL));
+		else
+			WT_TRET(__wt_txn_rollback(session, NULL));
+		F_CLR(&asyncop->c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		cursor->reset(cursor);
+	}
 	/*
 	 * After the callback returns, and the transaction resolved release
-	 * the op back to the free pool and reset our cached cursor.
-	 * We do this regardless of success or failure.
+	 * the op back to the free pool.  We do this regardless of
+	 * success or failure.
 	 */
-	F_CLR(&asyncop->c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	WT_PUBLISH(op->state, WT_ASYNCOP_FREE);
-	cursor->reset(cursor);
 	return (ret);
 }
 

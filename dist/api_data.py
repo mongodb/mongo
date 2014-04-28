@@ -595,6 +595,11 @@ methods = {
 	    ignore the encodings for the key and value, manage data as if
 	    the formats were \c "u".  See @ref cursor_raw for details''',
 	    type='boolean'),
+	Config('timeout', '1200', r'''
+	    maximum amount of time to allow for compact in seconds. The
+	    actual amount of time spent in compact may exceed the configured
+	    value. A value of zero disables the timeout''',
+	    type='int'),
 ]),
 'connection.close' : Method([]),
 'connection.reconfigure' : Method(connection_runtime_config),

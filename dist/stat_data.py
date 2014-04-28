@@ -51,6 +51,7 @@ connection_stats = [
 	Stat('async_max_queue', 'async: maximum work queue length',
 	    'max_aggregate,no_scale'),
 	Stat('async_op_alloc', 'async op allocation'),
+	Stat('async_op_compact', 'async op compact calls'),
 	Stat('async_op_insert', 'async op insert calls'),
 	Stat('async_op_remove', 'async op remove calls'),
 	Stat('async_op_search', 'async op search calls'),
