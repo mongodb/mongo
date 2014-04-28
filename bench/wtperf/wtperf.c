@@ -169,6 +169,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		case WT_AOP_UPDATE:
 			trk = &thread->update;
 			break;
+		case WT_AOP_COMPACT:
 		case WT_AOP_REMOVE:
 		case WT_AOP_NONE:
 			/* We never expect this type. */
