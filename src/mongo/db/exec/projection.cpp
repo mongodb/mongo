@@ -59,27 +59,8 @@ namespace mongo {
             invariant(_projObj.isOwned());
             invariant(!_projObj.isEmpty());
 
-            // The _id is included by default.
-            bool includeId = true;
-
-            // Figure out what fields are in the projection.  TODO: we can get this from the
-            // ParsedProjection...modify that to have this type instead of a vector.
-            BSONObjIterator projObjIt(_projObj);
-            while (projObjIt.more()) {
-                BSONElement elt = projObjIt.next();
-                // Must deal with the _id case separately as there is an implicit _id: 1 in the
-                // projection.
-                if (mongoutils::str::equals(elt.fieldName(), kIdField)
-                    && !elt.trueValue()) {
-                    includeId = false;
-                    continue;
-                }
-                _includedFields.insert(elt.fieldNameStringData());
-            }
-
-            if (includeId) {
-                _includedFields.insert(kIdField);
-            }
+            // Figure out what fields are in the projection.
+            getSimpleInclusionFields(_projObj, &_includedFields);
 
             // If we're pulling data out of one index we can pre-compute the indices of the fields
             // in the key that we pull data from and avoid looking up the field name each time.
@@ -113,6 +94,49 @@ namespace mongo {
         }
     }
 
+    // static
+    void ProjectionStage::getSimpleInclusionFields(const BSONObj& projObj,
+                                                   FieldSet* includedFields) {
+        // The _id is included by default.
+        bool includeId = true;
+
+        // Figure out what fields are in the projection.  TODO: we can get this from the
+        // ParsedProjection...modify that to have this type instead of a vector.
+        BSONObjIterator projObjIt(projObj);
+        while (projObjIt.more()) {
+            BSONElement elt = projObjIt.next();
+            // Must deal with the _id case separately as there is an implicit _id: 1 in the
+            // projection.
+            if (mongoutils::str::equals(elt.fieldName(), kIdField)
+                && !elt.trueValue()) {
+                includeId = false;
+                continue;
+            }
+            includedFields->insert(elt.fieldNameStringData());
+        }
+
+        if (includeId) {
+            includedFields->insert(kIdField);
+        }
+    }
+
+    // static
+    void ProjectionStage::transformSimpleInclusion(const BSONObj& in,
+                                                   const FieldSet& includedFields,
+                                                   BSONObjBuilder& bob) {
+        // Look at every field in the source document and see if we're including it.
+        BSONObjIterator inputIt(in);
+        while (inputIt.more()) {
+            BSONElement elt = inputIt.next();
+            unordered_set<StringData, StringData::Hasher>::const_iterator fieldIt;
+            fieldIt = includedFields.find(elt.fieldNameStringData());
+            if (includedFields.end() != fieldIt) {
+                // If so, add it to the builder.
+                bob.append(elt);
+            }
+        }
+    }
+
     Status ProjectionStage::transform(WorkingSetMember* member) {
         // The default no-fast-path case.
         if (ProjectionStageParams::NO_FAST_PATH == _projImpl) {
@@ -131,17 +155,8 @@ namespace mongo {
             // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.
             invariant(member->hasObj());
 
-            // Look at every field in the source document and see if we're including it.
-            BSONObjIterator inputIt(member->obj);
-            while (inputIt.more()) {
-                BSONElement elt = inputIt.next();
-                unordered_set<StringData, StringData::Hasher>::iterator fieldIt;
-                fieldIt = _includedFields.find(elt.fieldNameStringData());
-                if (_includedFields.end() != fieldIt) {
-                    // If so, add it to the builder.
-                    bob.append(elt);
-                }
-            }
+            // Apply the SIMPLE_DOC projection.
+            transformSimpleInclusion(member->obj, _includedFields, bob);
         }
         else {
             invariant(ProjectionStageParams::COVERED_ONE_INDEX == _projImpl);

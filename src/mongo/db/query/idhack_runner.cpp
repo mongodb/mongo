@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/exec/projection.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
@@ -40,30 +41,6 @@
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/s/d_logic.h"
-
-namespace {
-
-    using namespace mongo;
-
-    /**
-     * Does the query contain a projection on {_id: 1}?
-     */
-    bool hasIDProjection(const CanonicalQuery* query) {
-        // We don't know the answer if the query is NULL.
-        if (!query) {
-            return false;
-        }
-        // No projection means not covered.
-        if (!query->getProj()) {
-            return false;
-        }
-        // Since the only supported projection is {_id: 1},
-        // a valid ParsedProjection is enough to indicate that
-        // we have a covered query.
-        return true;
-     }
-
-} // namespace
 
 namespace mongo {
 
@@ -118,7 +95,7 @@ namespace mongo {
         if (NULL == objOut) {
             // No object requested - nothing to do.
         }
-        else if (hasIDProjection(_query.get())) {
+        else if (hasCoveredProjection()) {
             // Covered query on _id field only.
             // Set object to search key.
             // Search key is retrieved from the canonical query at
@@ -129,10 +106,12 @@ namespace mongo {
             *objOut = _key.getOwned();
         }
         else {
-            invariant(!hasIDProjection(_query.get()));
-
             _nscannedObjects++;
-            *objOut = _collection->docFor(loc);
+
+            if (!applyProjection(loc, objOut)) {
+                // No projection. Just return the object inside the diskloc.
+                *objOut = _collection->docFor(loc);
+            }
 
             // If we're sharded make sure the key belongs to us.  We need the object to do this.
             if (shardingState.needCollectionMetadata(_collection->ns().ns())) {
@@ -156,6 +135,48 @@ namespace mongo {
         _done = true;
         return Runner::RUNNER_ADVANCED;
     }
+
+     bool IDHackRunner::applyProjection(const DiskLoc& loc, BSONObj* objOut) const {
+        if (NULL == _query.get() || NULL == _query->getProj()) {
+            // This idhack query does not have a projection.
+            return false;
+        }
+
+        const BSONObj& docAtLoc = _collection->docFor(loc);
+
+        // We have a non-covered projection (covered projections should be handled earlier,
+        // in getNext(..). For simple inclusion projections we use a fast path similar to that
+        // implemented in the ProjectionStage. For non-simple inclusion projections we fallback
+        // to ProjectionExec.
+        const BSONObj& projObj = _query->getParsed().getProj();
+
+        if (_query->getProj()->wantIndexKey()) {
+            // $returnKey is specified. This overrides everything else.
+            BSONObjBuilder bob;
+            const BSONObj& queryObj = _query->getParsed().getFilter();
+            bob.append(queryObj["_id"]);
+            *objOut = bob.obj();
+        }
+        else if (_query->getProj()->requiresDocument() || _query->getProj()->wantIndexKey()) {
+            // Not a simple projection, so fallback on the regular projection path.
+            ProjectionExec projExec(projObj, _query->root());
+            projExec.transform(docAtLoc, objOut);
+        }
+        else {
+            // This is a simple inclusion projection. Start by getting the set
+            // of fields to include.
+            unordered_set<StringData, StringData::Hasher> includedFields;
+            ProjectionStage::getSimpleInclusionFields(projObj, &includedFields);
+
+            // Apply the simple inclusion projection.
+            BSONObjBuilder bob;
+            ProjectionStage::transformSimpleInclusion(docAtLoc, includedFields, bob);
+
+            *objOut = bob.obj();
+        }
+
+        return true;
+     }
 
     bool IDHackRunner::isEOF() {
         return _killed || _done;
@@ -203,8 +224,8 @@ namespace mongo {
             BSONElement keyElt = _key.firstElement();
             BSONObj indexBounds = BSON("_id" << BSON_ARRAY( BSON_ARRAY( keyElt << keyElt ) ) );
             (*explain)->setIndexBounds(indexBounds);
-            // Covered projection is only one supported.
-            (*explain)->setIndexOnly(hasIDProjection(_query.get()));
+            // ID hack queries are only considered covered if they have the projection {_id: 1}.
+            (*explain)->setIndexOnly(hasCoveredProjection());
         }
         else if (NULL != planInfo) {
             *planInfo = new PlanInfo();
@@ -219,18 +240,22 @@ namespace mongo {
         return !query.getParsed().showDiskLoc()
             && query.getParsed().getHint().isEmpty()
             && 0 == query.getParsed().getSkip()
-            && canUseProjection(query)
             && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
             && !query.getParsed().hasOption(QueryOption_CursorTailable);
     }
 
     // static
-    bool IDHackRunner::canUseProjection(const CanonicalQuery& query) {
-        const ParsedProjection* proj = query.getProj();
+    bool IDHackRunner::hasCoveredProjection() const {
+        // Some update operations use the IDHackRunner without creating a
+        // canonical query. In this case, _query will be NULL. Just return
+        // false, as we won't have to do any projection handling for updates.
+        if (NULL == _query.get()) {
+            return false;
+        }
 
-        // No projection is OK - ID Hack will fetch entire document.
+        const ParsedProjection* proj = _query->getProj();
         if (!proj) {
-            return true;
+            return false;
         }
 
         // If there is a projection, it has to be a covered projection on
