@@ -4105,7 +4105,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					if (ikey == NULL)
 						WT_ERR(__wt_row_leaf_key_work(
 						    session,
-						    page, rip, NULL, 1));
+						    page, rip, tmpkey, 1));
 
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));

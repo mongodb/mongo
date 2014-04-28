@@ -17,6 +17,7 @@ int
 __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_ROW *rip;
@@ -47,8 +48,9 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Allocate a bit array and figure out the set of "interesting" keys,
 	 * marking up the array.
 	 */
-	WT_RET(__wt_scr_alloc(
-	    session, (uint32_t)__bitstr_size(page->pg_row_entries), &tmp));
+	WT_RET(__wt_scr_alloc(session, 0, &key));
+	WT_RET(__wt_scr_alloc(session,
+	    (uint32_t)__bitstr_size(page->pg_row_entries), &tmp));
 
 	if ((gap = btree->key_gap) == 0)
 		gap = 1;
@@ -58,11 +60,12 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (rip = page->pg_row_d, i = 0; i < page->pg_row_entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_leaf_key_work(
-			    session, page, rip, NULL, 1));
+			    session, page, rip, key, 1));
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(&key);
+	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -124,12 +127,11 @@ __wt_row_leaf_key_copy(
  */
 int
 __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb_arg, int instantiate)
+    WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb, int instantiate)
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BTREE *btree;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_DECL_ITEM(retb);
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -147,10 +149,6 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 	jump_rip = NULL;
 	jump_slot_offset = 0;
 	last_prefix = 0;
-
-	/* If the caller didn't pass us a buffer, allocate a scratch one. */
-	if ((retb = retb_arg) == NULL)
-		WT_ERR(__wt_scr_alloc(session, 0, &retb));
 
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
@@ -443,9 +441,6 @@ next:		switch (direction) {
 	}
 
 err:	__wt_scr_free(&tmp);
-	if (retb != retb_arg)
-		__wt_scr_free(&retb);
-
 	return (ret);
 }
 
