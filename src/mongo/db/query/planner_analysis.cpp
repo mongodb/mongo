@@ -63,11 +63,18 @@ namespace mongo {
          * Returns true if every interval in 'oil' is a point, false otherwise.
          */
         bool isUnionOfPoints(const OrderedIntervalList& oil) {
+            // We can't explode if there are empty bounds. Don't consider the
+            // oil a union of points if there are no intervals.
+            if (0 == oil.intervals.size()) {
+                return false;
+            }
+
             for (size_t i = 0; i < oil.intervals.size(); ++i) {
                 if (!oil.intervals[i].isPoint()) {
                     return false;
                 }
             }
+
             return true;
         }
 

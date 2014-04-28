@@ -1799,6 +1799,29 @@ namespace {
                                  "{ixscan: {pattern: {a:1, b:1, c:-1}}}]}}}}");
     }
 
+    // SERVER-13752: don't try to explode if the ordered interval list for
+    // the leading field of the compound index is empty.
+    TEST_F(QueryPlannerTest, CantExplodeWithEmptyBounds) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runQuerySortProj(fromjson("{a: {$in: []}}"), BSON("b" << 1), BSONObj());
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{sort: {pattern: {b:1}, limit: 0, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {b:1}, limit: 0, node: "
+                                "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
+    }
+
+    // SERVER-13752
+    TEST_F(QueryPlannerTest, CantExplodeWithEmptyBounds2) {
+        addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+        runQuerySortProj(fromjson("{a: {$gt: 3, $lt: 0}}"), BSON("b" << 1), BSONObj());
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{sort: {pattern: {b:1}, limit: 0, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{sort: {pattern: {b:1}, limit: 0, node: "
+                                "{fetch: {node: {ixscan: {pattern: {a:1,b:1,c:1}}}}}}}");
+    }
+
     TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {
         addIndex(BSON("a" << 1 << "b" << -1 << "c" << 1));
         runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}, b: {$gte: 0}}"),
