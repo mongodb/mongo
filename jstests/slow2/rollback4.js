@@ -2,10 +2,11 @@
 
 var replTest = new ReplSetTest({ name: 'unicomplex', 
                                  nodes: 3, 
-                                 oplogSize: 2000 });
+                                 oplogSize: 2000,
+                              });
 var nodes = replTest.nodeList();
 
-var conns = replTest.startSet();
+var conns = replTest.startSet({verbose: 1});
 var r = replTest.initiate({ "_id": "unicomplex",
                           "members": [
                                       { "_id": 0, "host": nodes[0] },

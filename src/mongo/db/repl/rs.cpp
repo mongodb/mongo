@@ -134,7 +134,7 @@ namespace {
 }
 
     void ReplSetImpl::assumePrimary() {
-        LOG(2) << "replSet assuming primary" << endl;
+        LOG(1) << "replSet assuming primary" << endl;
         verify( iAmPotentiallyHot() );
 
         // Wait for replication to stop and buffer to be consumed
@@ -142,17 +142,20 @@ namespace {
         replset::BackgroundSync::get()->stopReplicationAndFlushBuffer();
 
         // Lock here to prevent stepping down & becoming primary from getting interleaved
+        LOG(1) << "replSet waiting for global write lock";
         Lock::GlobalWrite lk;
 
         // Make sure that new OpTimes are higher than existing ones even with clock skew
         DBDirectClient c;
         BSONObj lastOp = c.findOne( "local.oplog.rs", Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk );
         if ( !lastOp.isEmpty() ) {
+            LOG(1) << "replSet setting last OpTime";
             OpTime::setLast( lastOp[ "ts" ].date() );
         }
 
         // Generate new election unique id
         elect.setElectionId(OID::gen());
+        LOG(1) << "replSet truly becoming primary";
         changeState(MemberState::RS_PRIMARY);
 
         // This must be done after becoming primary but before releasing the write lock. This adds

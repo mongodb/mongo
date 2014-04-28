@@ -431,7 +431,7 @@ namespace mongo {
 
             {
                 for( list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
-                    DEV log() << "replSet elect res: " << i->result.toString() << rsLog;
+                    LOG(1) << "replSet elect res: " << i->result.toString() << rsLog;
                     if( i->ok ) {
                         int v = i->result["vote"].Int();
                         tally += v;
