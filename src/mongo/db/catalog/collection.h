@@ -251,7 +251,7 @@ namespace mongo {
             return static_cast<int>( dataSize() / n );
         }
 
-        // TODO- below till next mark are suspect
+        // TODO(erh) - below till next mark are suspect
         bool isUserFlagSet( int flag ) const;
         bool setUserFlag( int flag );
         bool clearUserFlag( int flag );
