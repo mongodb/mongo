@@ -1535,6 +1535,7 @@ extern int __wt_ext_transaction_visible( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     uint64_t transaction_id);
 extern void __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op);
+extern int __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_checkpoint_logread( WT_SESSION_IMPL *session,
     const uint8_t **pp,

@@ -12,13 +12,18 @@
  *	Log an operation for the current transaction.
  */
 static int
-__txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
+__txn_op_log(WT_SESSION_IMPL *session,
+    WT_ITEM *logrec, WT_TXN_OP *op, WT_CURSOR_BTREE *cbt)
 {
-	WT_ITEM value;
+	WT_DECL_RET;
+	WT_ITEM key, value;
+	WT_UPDATE *upd;
 	uint64_t recno;
 
-	value.data = WT_UPDATE_DATA(op->u.op.upd);
-	value.size = op->u.op.upd->size;
+	WT_CLEAR(key);
+	upd = op->u.upd;
+	value.data = WT_UPDATE_DATA(upd);
+	value.size = upd->size;
 
 	/*
 	 * Log the operation.  It must be one of the following:
@@ -27,25 +32,30 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 	 * 3) row store remove; or
 	 * 4) row store insert/update.
 	 */
-	if (op->u.op.key.data == NULL) {
-		recno = op->u.op.recno;
+	if (cbt->btree->type != BTREE_ROW) {
+		WT_ASSERT(session, cbt->ins != NULL);
+		recno = WT_INSERT_RECNO(cbt->ins);
+		WT_ASSERT(session, recno != 0);
 
-		if (WT_UPDATE_DELETED_ISSET(op->u.op.upd))
-			WT_RET(__wt_logop_col_remove_pack(session, logrec,
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			WT_ERR(__wt_logop_col_remove_pack(session, logrec,
 			    op->fileid, recno));
 		else
-			WT_RET(__wt_logop_col_put_pack(session, logrec,
+			WT_ERR(__wt_logop_col_put_pack(session, logrec,
 			    op->fileid, recno, &value));
 	} else {
-		if (WT_UPDATE_DELETED_ISSET(op->u.op.upd))
-			WT_RET(__wt_logop_row_remove_pack(session, logrec,
-			    op->fileid, &op->u.op.key));
+		WT_ERR(__wt_cursor_row_leaf_key(cbt, &key));
+
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			WT_ERR(__wt_logop_row_remove_pack(session, logrec,
+			    op->fileid, &key));
 		else
-			WT_RET(__wt_logop_row_put_pack(session, logrec,
-			    op->fileid, &op->u.op.key, &value));
+			WT_ERR(__wt_logop_row_put_pack(session, logrec,
+			    op->fileid, &key, &value));
 	}
 
-	return (0);
+err:	__wt_buf_free(session, &key);
+	return (ret);
 }
 
 /*
@@ -72,9 +82,6 @@ __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 	switch (op->type) {
 	case TXN_OP_BASIC:
 	case TXN_OP_INMEM:
-		__wt_buf_free(session, &op->u.op.key);
-		break;
-
 	case TXN_OP_REF:
 	case TXN_OP_TRUNCATE_COL:
 		break;
@@ -87,23 +94,22 @@ __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 }
 
 /*
- * __wt_txn_log_commit --
- *	Write the operations of a transaction to the log at commit time.
+ * __txn_logrec_init --
+ *	Allocate and initialize a buffer for a transaction's log records.
  */
-int
-__wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__txn_logrec_init(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
 	WT_DECL_ITEM(logrec);
+	WT_DECL_RET;
 	WT_TXN *txn;
-	WT_TXN_OP *op;
 	const char *fmt = WT_UNCHECKED_STRING(Iq);
-	size_t header_size;
 	uint32_t rectype = WT_LOGREC_COMMIT;
-	u_int i;
+	size_t header_size;
 
-	WT_UNUSED(cfg);
 	txn = &session->txn;
+	if (txn->logrec != NULL)
+		return (0);
 
 	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->id));
 	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
@@ -112,35 +118,69 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	    (uint8_t *)logrec->data + logrec->size, header_size,
 	    fmt, rectype, txn->id));
 	logrec->size += (uint32_t)header_size;
+	txn->logrec = logrec;
+
+	if (0) {
+err:		__wt_logrec_free(session, &logrec);
+	}
+	return (ret);
+}
+
+/*
+ * __wt_txn_log_op --
+ *	Write the last logged operation into the in-memory buffer.
+ */
+int
+__wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+	WT_ITEM *logrec;
+	WT_TXN *txn;
+	WT_TXN_OP *op;
+
+	txn = &session->txn;
+	WT_ASSERT(session, txn->mod_count > 0);
+	op = txn->mod + txn->mod_count - 1;
+
+	WT_RET(__txn_logrec_init(session));
+	logrec = txn->logrec;
+
+	switch (op->type) {
+	case TXN_OP_BASIC:
+		return (__txn_op_log(session, logrec, op, cbt));
+	case TXN_OP_INMEM:
+	case TXN_OP_REF:
+		/* Nothing to log, we're done. */
+		return (0);
+	case TXN_OP_TRUNCATE_COL:
+		return (__wt_logop_col_truncate_pack(session, logrec,
+		    op->fileid,
+		    op->u.truncate_col.start, op->u.truncate_col.stop));
+	case TXN_OP_TRUNCATE_ROW:
+		return (__wt_logop_row_truncate_pack(session, txn->logrec,
+		    op->fileid,
+		    &op->u.truncate_row.start, &op->u.truncate_row.stop,
+		    (uint32_t)op->u.truncate_row.mode));
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	/* NOTREACHED */
+}
+
+/*
+ * __wt_txn_log_commit --
+ *	Write the operations of a transaction to the log at commit time.
+ */
+int
+__wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_TXN *txn;
+
+	WT_UNUSED(cfg);
+	txn = &session->txn;
 
 	/* Write updates to the log. */
-	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
-		switch (op->type) {
-		case TXN_OP_BASIC:
-			WT_ERR(__txn_op_log(session, logrec, op));
-			break;
-		case TXN_OP_INMEM:
-		case TXN_OP_REF:
-			/* Nothing to log, we're done. */
-			break;
-		case TXN_OP_TRUNCATE_COL:
-			WT_ERR(__wt_logop_col_truncate_pack(session, logrec,
-			    op->fileid,
-			    op->u.truncate_col.start, op->u.truncate_col.stop));
-			break;
-		case TXN_OP_TRUNCATE_ROW:
-			WT_ERR(__wt_logop_row_truncate_pack(session, logrec,
-			    op->fileid,
-			    &op->u.truncate_row.start, &op->u.truncate_row.stop,
-			    (uint32_t)op->u.truncate_row.mode));
-			break;
-		}
-
-	WT_ERR(__wt_log_write(session,
-	    logrec, NULL, S2C(session)->txn_logsync));
-
-err:	__wt_logrec_free(session, &logrec);
-	return (ret);
+	return (__wt_log_write(session,
+	    txn->logrec, NULL, S2C(session)->txn_logsync));
 }
 
 /*
@@ -339,6 +379,9 @@ __wt_txn_truncate_log(
 		op->u.truncate_col.stop =
 		    (stop == NULL) ? 0 : stop->recno;
 	}
+
+	/* Write that operation into the in-memory log. */
+	WT_RET(__wt_txn_log_op(session, NULL));
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOGGING_INMEM));
 	F_SET(session, WT_SESSION_LOGGING_INMEM);
