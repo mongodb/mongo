@@ -236,7 +236,7 @@ namespace NamespaceTests {
                 for( int i = 0; i < Buckets; ++i ) {
                     if ( !nsd()->deletedListEntry( i ).isNull() ) {
                         deleted = nsd()->deletedListEntry( i );
-                        nsd()->deletedListEntry( i ).writing().Null();
+                        nsd()->setDeletedListEntry(i, DiskLoc());
                         break;
                     }
                 }
@@ -252,8 +252,7 @@ namespace NamespaceTests {
 
                 // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
                 // new size.
-                nsd()->deletedListEntry( NamespaceDetails::bucket( newDeletedRecordSize ) ).writing() =
-                        deleted;
+                nsd()->setDeletedListEntry(NamespaceDetails::bucket(newDeletedRecordSize), deleted);
             }
         };
 

@@ -260,7 +260,7 @@ namespace mongo {
             r->prevOfs() = e->lastRecord.getOfs();
             r->nextOfs() = DiskLoc::NullOfs;
             getDur().writingInt(oldlast->nextOfs()) = loc.getOfs();
-            getDur().writingDiskLoc(e->lastRecord) = loc;
+            *getDur().writing(&e->lastRecord) = loc;
         }
     }
 
@@ -286,8 +286,8 @@ namespace mongo {
         }
         else {
             verify( !_details->firstExtent().isNull() );
-            getDur().writingDiskLoc(e->xprev) = _details->lastExtent();
-            getDur().writingDiskLoc(_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
+            *getDur().writing(&e->xprev) = _details->lastExtent();
+            *getDur().writing(&_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
             _details->setLastExtent( eloc );
         }
 

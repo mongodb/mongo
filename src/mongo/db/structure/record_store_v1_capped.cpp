@@ -235,8 +235,8 @@ namespace mongo {
             DiskLoc prev = _extentManager->getExtent(ext)->xprev;
             DiskLoc next = _extentManager->getExtent(ext)->xnext;
             DiskLoc empty = _extentManager->getExtent(ext)->reuse( _ns, true );
-            getDur().writingDiskLoc(_extentManager->getExtent(ext)->xprev) = prev;
-            getDur().writingDiskLoc(_extentManager->getExtent(ext)->xnext) = next;
+            *getDur().writing(&_extentManager->getExtent(ext)->xprev) = prev;
+            *getDur().writing(&_extentManager->getExtent(ext)->xnext) = next;
             addDeletedRec( empty );
         }
 
@@ -311,7 +311,7 @@ namespace mongo {
         if ( cappedLastDelRecLastExtent().isNull() )
             setListOfAllDeletedRecords( loc );
         else
-            getDur().writingDiskLoc( drec(cappedLastDelRecLastExtent())->nextDeleted() ) = loc;
+            *getDur().writing( &drec(cappedLastDelRecLastExtent())->nextDeleted() ) = loc;
     }
 
     void CappedRecordStoreV1::cappedCheckMigrate() {
@@ -325,7 +325,7 @@ namespace mongo {
                     continue;
                 DiskLoc last = first;
                 for (; !drec(last)->nextDeleted().isNull(); last = drec(last)->nextDeleted() );
-                getDur().writingDiskLoc(drec(last)->nextDeleted()) = cappedListOfAllDeletedRecords();
+                *getDur().writing(&drec(last)->nextDeleted()) = cappedListOfAllDeletedRecords();
                 setListOfAllDeletedRecords( first );
                 _details->setDeletedListEntry(i,DiskLoc());
             }
@@ -397,8 +397,8 @@ namespace mongo {
             if ( prev.isNull() )
                 setListOfAllDeletedRecords( drec(ret)->nextDeleted() );
             else
-                getDur().writingDiskLoc(drec(prev)->nextDeleted()) = drec(ret)->nextDeleted();
-            getDur().writingDiskLoc(drec(ret)->nextDeleted()).setInvalid(); // defensive.
+                *getDur().writing(&drec(prev)->nextDeleted()) = drec(ret)->nextDeleted();
+            *getDur().writing(&drec(ret)->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
             invariant( drec(ret)->extentOfs() < ret.getOfs() );
         }
 
@@ -570,7 +570,7 @@ namespace mongo {
                 DiskLoc i = cappedListOfAllDeletedRecords();
                 for (; !drec(i)->nextDeleted().isNull(); i = drec(i)->nextDeleted() )
                     ;
-                getDur().writingDiskLoc(drec(i)->nextDeleted()) = dloc;
+                *getDur().writing(&drec(i)->nextDeleted()) = dloc;
             }
         }
         else {

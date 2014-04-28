@@ -1275,7 +1275,7 @@ namespace transition {
 
         BucketType* p = getBucket(bucket->parent);
         int parentIdx = indexInParent(bucket, bucketLoc);
-        childLocForPos(p, parentIdx).writing().Null();
+        *getDur().writing(&childLocForPos(p, parentIdx)) = DiskLoc();
         deallocBucket(bucket, bucketLoc);
     }
 
@@ -1445,9 +1445,10 @@ namespace transition {
         else {
             BucketType* parentBucket = getBucket(bucket->parent);
             int bucketIndexInParent = indexInParent(bucket, bucketLoc);
-            childLocForPos(parentBucket, bucketIndexInParent).writing() = bucket->nextChild;
+            *getDur().writing(&childLocForPos(parentBucket, bucketIndexInParent)) =
+                bucket->nextChild;
         }
-        getBucket(bucket->nextChild)->parent.writing() = bucket->parent;
+        *getDur().writing(&getBucket(bucket->nextChild)->parent) = bucket->parent;
         BtreeIndexCursor::aboutToDeleteBucket(bucketLoc);
         deallocBucket(bucket, bucketLoc);
     }
@@ -1801,7 +1802,7 @@ namespace transition {
     inline void BtreeLogic<BtreeLayout>::fix(const DiskLoc bucketLoc,
                                              const DiskLoc child) {
         if (!child.isNull()) {
-            getBucket(child)->parent.writing() = bucketLoc;
+            *getDur().writing(&getBucket(child)->parent) = bucketLoc;
         }
     }
 
@@ -1884,9 +1885,9 @@ namespace transition {
             }
             kn->prevChildBucket = bucket->nextChild;
             invariant(kn->prevChildBucket == leftChildLoc);
-            bucket->nextChild.writing() = rightChildLoc;
+            *getDur().writing(&bucket->nextChild) = rightChildLoc;
             if (!rightChildLoc.isNull()) {
-                getBucket(rightChildLoc)->parent.writing() = bucketLoc;
+                *getDur().writing(&getBucket(rightChildLoc)->parent) = bucketLoc;
             }
         }
         else {
@@ -1899,7 +1900,7 @@ namespace transition {
             // Intent declared in basicInsert()
             *getDur().alreadyDeclared(const_cast<LocType*>(pc)) = rightChildLoc;
             if (!rightChildLoc.isNull()) {
-                getBucket(rightChildLoc)->parent.writing() = bucketLoc;
+                *getDur().writing(&getBucket(rightChildLoc)->parent) = bucketLoc;
             }
         }
     }
@@ -1944,12 +1945,12 @@ namespace transition {
             assertValid(p, _ordering);
             bucket->parent = L;
             _headManager->setHead(L);
-            getBucket(rLoc)->parent.writing() = bucket->parent;
+            *getDur().writing(&getBucket(rLoc)->parent) = bucket->parent;
         }
         else {
             // set this before calling _insert - if it splits it will do fixParent() logic and
             // change the value.
-            getBucket(rLoc)->parent.writing() = bucket->parent;
+            *getDur().writing(&getBucket(rLoc)->parent) = bucket->parent;
             _insert(getBucket(bucket->parent),
                     bucket->parent,
                     splitkey.data,
@@ -2235,7 +2236,7 @@ namespace transition {
                 LOG(4) << "btree _insert: reusing unused key" << endl;
                 massert(17433, "_insert: reuse key but lchild is not null", leftChild.isNull());
                 massert(17434, "_insert: reuse key but rchild is not null", rightChild.isNull());
-                header.writing().setUsed();
+                getDur().writing(&header)->setUsed();
                 return Status::OK();
             }
             return Status(ErrorCodes::UniqueIndexViolation, "FIXME");
@@ -2461,12 +2462,6 @@ namespace transition {
     //
     // And, template stuff.
     //
-
-    template <class LocType>
-    FixedWidthKey<LocType>&
-    FixedWidthKey<LocType>::writing() const {
-        return *getDur().writing(const_cast<FixedWidthKey<LocType>*>(this));
-    }
 
     // V0 format.
     template struct FixedWidthKey<DiskLoc>;

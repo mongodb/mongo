@@ -464,9 +464,9 @@ namespace mongo {
 
         // remove from the free list
         if ( !best->xprev.isNull() )
-            getDur().writingDiskLoc(getExtent( best->xprev )->xnext) = best->xnext;
+            *getDur().writing(&getExtent( best->xprev )->xnext) = best->xnext;
         if ( !best->xnext.isNull() )
-            getDur().writingDiskLoc(getExtent( best->xnext )->xprev) = best->xprev;
+            *getDur().writing(&getExtent( best->xnext )->xprev) = best->xprev;
         if ( _getFreeListStart() == best->myLoc )
             _setFreeListStart( best->xnext );
         if ( _getFreeListEnd() == best->myLoc )
@@ -521,8 +521,8 @@ namespace mongo {
         else {
             DiskLoc a = _getFreeListStart();
             invariant( getExtent( a )->xprev.isNull() );
-            getDur().writingDiskLoc( getExtent( a )->xprev ) = lastExt;
-            getDur().writingDiskLoc( getExtent( lastExt )->xnext ) = a;
+            *getDur().writing( &getExtent( a )->xprev ) = lastExt;
+            *getDur().writing( &getExtent( lastExt )->xnext ) = a;
             _setFreeListStart( firstExt );
         }
 
@@ -545,13 +545,13 @@ namespace mongo {
     void ExtentManager::_setFreeListStart( DiskLoc loc ) {
         invariant( !_files.empty() );
         DataFile* file = _files[0];
-        getDur().writingDiskLoc( file->header()->freeListStart ) = loc;
+        *getDur().writing( &file->header()->freeListStart ) = loc;
     }
 
     void ExtentManager::_setFreeListEnd( DiskLoc loc ) {
         invariant( !_files.empty() );
         DataFile* file = _files[0];
-        getDur().writingDiskLoc( file->header()->freeListEnd ) = loc;
+        *getDur().writing( &file->header()->freeListEnd ) = loc;
     }
 
     void ExtentManager::freeListStats( int* numExtents, int64_t* totalFreeSize ) const {

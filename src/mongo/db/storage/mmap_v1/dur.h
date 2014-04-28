@@ -134,9 +134,6 @@ namespace mongo {
             /** @return true if time to commit but does NOT do a commit */
             virtual bool isCommitNeeded() const = 0;
 
-            /** Declare write intent for a DiskLoc.  @see DiskLoc::writing() */
-            inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
-
             /** Declare write intent for an int */
             inline int& writingInt(int& d) { return *static_cast<int*>(writingPtr( &d, sizeof(d))); }
 
@@ -225,8 +222,4 @@ namespace mongo {
     } // namespace dur
 
     inline dur::DurableInterface& getDur() { return dur::DurableInterface::getDur(); }
-
-    /** declare that we are modifying a diskloc and this is a datafile write. */
-    inline DiskLoc& DiskLoc::writing() const { return getDur().writingDiskLoc(*const_cast< DiskLoc * >( this )); }
-
 }

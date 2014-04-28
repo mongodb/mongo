@@ -538,7 +538,7 @@ namespace mongo {
                 // fix IndexDetails pointer
                 int indexI = details->_catalogFindIndexByName( indexName );
                 IndexDetails& indexDetails = details->idx(indexI);
-                getDur().writingDiskLoc(indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
+                *getDur().writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
             }
 
             {

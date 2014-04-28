@@ -78,11 +78,6 @@ namespace transition {
         // Accessors / mutators
         //
 
-        /**
-         * Signals that we are writing this _KeyNode and casts away const
-         */
-        FixedWidthKey<LocType>& writing() const;
-
         short keyDataOfs() const {
             return static_cast<short>(_kdo);
         }
@@ -294,14 +289,6 @@ namespace transition {
         }
 
         string toString() const { return DiskLoc(*this).toString(); }
-
-        //
-        // XXX: does this really belong here
-        //
-
-        DiskLoc56Bit& writing() const { 
-            return *((DiskLoc56Bit*) getDur().writingPtr((void*)this, 7));
-        }
     };
 
     struct BtreeBucketV1 {

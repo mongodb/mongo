@@ -166,7 +166,7 @@ namespace mongo {
         int offset = header()->unused.getOfs();
 
         DataFileHeader *h = header();
-        getDur().writingDiskLoc(h->unused).set( fileNo, offset + size );
+        *getDur().writing(&h->unused) = DiskLoc( fileNo, offset + size );
         getDur().writingInt(h->unusedLength) = h->unusedLength - size;
 
         return DiskLoc( fileNo, offset );
@@ -217,8 +217,8 @@ namespace mongo {
         if ( freeListStart == minDiskLoc ) {
             // we are upgrading from 2.4 to 2.6
             invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real
-            getDur().writingDiskLoc( freeListStart ).Null();
-            getDur().writingDiskLoc( freeListEnd ).Null();
+            *getDur().writing( &freeListStart ) = DiskLoc();
+            *getDur().writing( &freeListEnd ) = DiskLoc();
         }
     }
 

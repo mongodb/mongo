@@ -436,8 +436,8 @@ namespace mongo {
         IndexDetails& indexDetails = _collection->detailsWritable()->getNextIndexDetails( _collection );
 
         try {
-            getDur().writingDiskLoc( indexDetails.info ) = systemIndexesEntry.getValue();
-            getDur().writingDiskLoc( indexDetails.head ).Null();
+            *getDur().writing( &indexDetails.info ) = systemIndexesEntry.getValue();
+            *getDur().writing( &indexDetails.head ) = DiskLoc();
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;

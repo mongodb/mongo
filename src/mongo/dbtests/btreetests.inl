@@ -545,7 +545,7 @@
         }
         static void set( const DiskLoc &l, IndexDetails &id ) {
             ArtificialTree::is( id.head )->deallocBucket( id.head, id );
-            getDur().writingDiskLoc(id.head) = l;
+            *getDur().writing(&id.head) = l;
         }
         static string expectedKey( const char *spec ) {
             if ( spec[ 0 ] != '$' ) {

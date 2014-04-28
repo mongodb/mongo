@@ -356,31 +356,31 @@ namespace mongo {
     }
 
     void NamespaceDetails::setFirstExtent( const DiskLoc& loc ) {
-        getDur().writingDiskLoc( _firstExtent ) = loc;
+        *getDur().writing( &_firstExtent ) = loc;
     }
 
     void NamespaceDetails::setLastExtent( const DiskLoc& loc ) {
-        getDur().writingDiskLoc( _lastExtent ) = loc;
+        *getDur().writing( &_lastExtent ) = loc;
     }
 
     void NamespaceDetails::setCapExtent( const DiskLoc& loc ) {
-        getDur().writingDiskLoc( _capExtent ) = loc;
+        *getDur().writing( &_capExtent ) = loc;
     }
 
     void NamespaceDetails::setCapFirstNewRecord( const DiskLoc& loc ) {
-        getDur().writingDiskLoc( _capFirstNewRecord ) = loc;
+        *getDur().writing( &_capFirstNewRecord ) = loc;
     }
 
     void NamespaceDetails::setFirstExtentInvalid() {
-        getDur().writingDiskLoc( _firstExtent ).setInvalid();
+        *getDur().writing( &_firstExtent ) = DiskLoc().setInvalid();
     }
 
     void NamespaceDetails::setLastExtentInvalid() {
-        getDur().writingDiskLoc( _lastExtent ).setInvalid();
+        *getDur().writing( &_lastExtent ) = DiskLoc().setInvalid();
     }
 
     void NamespaceDetails::setDeletedListEntry( int bucket, const DiskLoc& loc ) {
-        getDur().writingDiskLoc( _deletedList[bucket] ) = loc;
+        *getDur().writing( &_deletedList[bucket] ) = loc;
     }
 
     /**
@@ -492,7 +492,7 @@ namespace mongo {
 
     void NamespaceDetails::orphanDeletedList() {
         for( int i = 0; i < Buckets; i++ ) {
-            getDur().writingDiskLoc(_deletedList[i]).Null();
+            *getDur().writing(&_deletedList[i]) = DiskLoc();
         }
     }
 

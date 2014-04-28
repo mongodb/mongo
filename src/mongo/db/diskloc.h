@@ -155,13 +155,6 @@ namespace mongo {
             size_t operator()( DiskLoc loc ) const;
         };
 
-        /**
-         * Marks this disk loc for writing
-         * @returns a non const reference to this disk loc
-         * This function explicitly signals we are writing and casts away const
-         */
-        DiskLoc& writing() const; // see dur.h
-
         /* Get the "thing" associated with this disk location.
            it is assumed the object is what you say it is -- you must assure that
            (think of this as an unchecked type cast)
