@@ -413,6 +413,7 @@ namespace mongo {
 
     void SubplanRunner::kill() {
         _killed = true;
+        _collection = NULL;
 
         if (NULL != _underlyingRunner.get()) {
             _underlyingRunner->kill();
