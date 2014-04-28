@@ -271,6 +271,22 @@ namespace transition {
         return BtreeLayout::BucketSize - headerSize();
     }
 
+    // We define this value as the maximum number of bytes such that, if we have
+    // fewer than this many bytes, we must be able to either merge with or receive
+    // keys from any neighboring node.  If our utilization goes below this value we
+    // know we can bring up the utilization with a simple operation.  Ignoring the
+    // 90/10 split policy which is sometimes employed and our 'unused' nodes, this
+    // is a lower bound on bucket utilization for non root buckets.
+    //
+    // Note that the exact value here depends on the implementation of
+    // rebalancedSeparatorPos().  The conditions for lowWaterMark - 1 are as
+    // follows:  We know we cannot merge with the neighbor, so the total data size
+    // for us, the neighbor, and the separator must be at least
+    // BucketType::bodySize() + 1.  We must be able to accept one key of any
+    // allowed size, so our size plus storage for that additional key must be
+    // <= BucketType::bodySize() / 2.  This way, with the extra key we'll have a
+    // new bucket data size < half the total data size and by the implementation
+    // of rebalancedSeparatorPos() the key must be added.
     template <class BtreeLayout>
     int BtreeLogic<BtreeLayout>::lowWaterMark() {
         return bodySize() / 2 - BtreeLayout::KeyMax - sizeof(KeyHeaderType) + 1;
@@ -299,6 +315,9 @@ namespace transition {
         bucket->emptySize += bytes;
     }
 
+    /**
+     * We allocate space from the end of the buffer for data.  The keynodes grow from the front.
+     */
     template <class BtreeLayout>
     int BtreeLogic<BtreeLayout>::_alloc(BucketType* bucket, int bytes) {
         invariant(bucket->emptySize >= bytes);
@@ -335,6 +354,10 @@ namespace transition {
         setNotPacked(bucket);
     }
 
+    /**
+     * Pull rightmost key from the bucket.  This version requires its right child to be null so it
+     * does not bother returning that value.
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::popBack(BucketType* bucket,
                                           DiskLoc* recordLocOut,
@@ -351,7 +374,7 @@ namespace transition {
 
         massert(17436, "rchild not null in btree popBack()", bucket->nextChild.isNull());
 
-        // weirdly, we also put the rightmost down pointer in nextchild, even when bucket isn't
+        // Weirdly, we also put the rightmost down pointer in nextchild, even when bucket isn't
         // full.
         bucket->nextChild = kn.prevChildBucket;
         bucket->n--;
@@ -362,6 +385,9 @@ namespace transition {
         _unalloc(bucket, keysize);
     }
 
+    /**
+     * Add a key.  Must be > all existing.  Be careful to set next ptr right.
+     */
     template <class BtreeLayout>
     bool BtreeLogic<BtreeLayout>::_pushBack(BucketType* bucket,
                                              const DiskLoc recordLoc,
@@ -396,6 +422,18 @@ namespace transition {
         return true;
     }
 
+    /**
+     * Durability note:
+     *
+     * We do separate intent declarations herein.  Arguably one could just declare the whole bucket
+     * given we do group commits.  This is something we could investigate later as to what is
+     * faster.
+     **/
+
+    /**
+     * Insert a key in a bucket with no complexity -- no splits required
+     * Returns false if a split is required.
+     */
     template <class BtreeLayout>
     bool BtreeLogic<BtreeLayout>::basicInsert(BucketType* bucket,
                                                const DiskLoc bucketLoc,
@@ -420,6 +458,7 @@ namespace transition {
             const char *p = (const char *) &getKeyHeader(bucket, keypos);
             const char *q = (const char *) &getKeyHeader(bucket, bucket->n+1);
 
+            // Declare that we will write to [k(keypos),k(n)]
             BucketType* durBucket = (BucketType*)getDur().writingAtOffset((void*)bucket, p - (char*)bucket, q - p);
             invariant(durBucket == bucket);
         }
@@ -446,6 +485,10 @@ namespace transition {
         return true;
     }
 
+    /**
+     * With this implementation, refPos == 0 disregards effect of refPos.  index > 0 prevents
+     * creation of an empty bucket.
+     */
     template <class BtreeLayout>
     bool BtreeLogic<BtreeLayout>::mayDropKey(BucketType* bucket, int index, int refPos) {
         return index > 0
@@ -471,6 +514,10 @@ namespace transition {
         return size;
     }
 
+    /**
+     * When we delete things, we just leave empty space until the node is full and then we repack
+     * it.
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::_pack(BucketType* bucket,
                                          const DiskLoc thisLoc,
@@ -484,6 +531,9 @@ namespace transition {
         _packReadyForMod(btreemod(bucket), refPos);
     }
 
+    /**
+     * Version when write intent already declared.
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::_packReadyForMod(BucketType* bucket, int &refPos) {
         assertWritable(bucket);
@@ -549,11 +599,30 @@ namespace transition {
         _packReadyForMod(bucket, refPos);
     }
 
+    /**
+     * In the standard btree algorithm, we would split based on the
+     * existing keys _and_ the new key.  But that's more work to
+     * implement, so we split the existing keys and then add the new key.
+     *
+     * There are several published heuristic algorithms for doing splits, but basically what you
+     * want are (1) even balancing between the two sides and (2) a small split key so the parent can
+     * have a larger branching factor.
+     *
+     * We just have a simple algorithm right now: if a key includes the halfway point (or 10% way
+     * point) in terms of bytes, split on that key; otherwise split on the key immediately to the
+     * left of the halfway point (or 10% point).
+     *
+     * This function is expected to be called on a packed bucket.
+     */
     template <class BtreeLayout>
     int BtreeLogic<BtreeLayout>::splitPos(BucketType* bucket, int keypos) {
         invariant(bucket->n > 2);
         int split = 0;
         int rightSize = 0;
+
+        // When splitting a btree node, if the new key is greater than all the other keys, we should
+        // not do an even split, but a 90/10 split.  see SERVER-983.  TODO I think we only want to
+        // do the 90% split on the rhs node of the tree.
         int rightSizeLimit = (bucket->topSize + sizeof(KeyHeaderType) * bucket->n)
                            / (keypos == bucket->n ? 10 : 2);
 
@@ -675,6 +744,15 @@ namespace transition {
         skipUnusedKeys(thisLocInOut, keyOfsInOut, direction);
     }
 
+    /**
+     * find smallest/biggest value greater-equal/less-equal than specified
+     *
+     * starting thisLoc + keyOfs will be strictly less than/strictly greater than
+     * keyBegin/keyBeginLen/keyEnd
+     *
+     * All the direction checks below allowed me to refactor the code, but possibly separate forward
+     * and reverse implementations would be more efficient
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::advanceToImpl(DiskLoc* thisLocInOut,
                                                 int* keyOfsInOut,
@@ -948,6 +1026,18 @@ namespace transition {
         }
     }
 
+    /**
+     * NOTE: Currently the Ordering implementation assumes a compound index will not have more keys
+     * than an unsigned variable has bits.  The same assumption is used in the implementation below
+     * with respect to the 'mask' variable.
+     *
+     * 'l' is a regular bsonobj
+     *
+     * 'rBegin' is composed partly of an existing bsonobj, and the remaining keys are taken from a
+     * vector of elements that frequently changes 
+     *
+     * see https://jira.mongodb.org/browse/SERVER-371
+     */
     // static
     template <class BtreeLayout>
     int BtreeLogic<BtreeLayout>::customBSONCmp(const BSONObj& l,
@@ -1057,6 +1147,20 @@ namespace transition {
         return ss.str();
     }
 
+    /**
+     * Find a key withing this btree bucket.
+     *
+     * When duplicate keys are allowed, we use the DiskLoc of the record as if it were part of the
+     * key.  That assures that even when there are many duplicates (e.g., 1 million) for a key, our
+     * performance is still good.
+     *
+     * assertIfDup: if the key exists (ignoring the recordLoc), uassert
+     *
+     * pos: for existing keys k0...kn-1.
+     * returns # it goes BEFORE.  so key[pos-1] < key < key[pos]
+     * returns n if it goes after the last existing key.
+     * note result might be an Unused location!
+     */
     template <class BtreeLayout>
     Status BtreeLogic<BtreeLayout>::find(BucketType* bucket,
                                           const KeyDataType& key,
@@ -1236,6 +1340,9 @@ namespace transition {
         return key.header.recordLoc == savedLoc;
     }
 
+    /**
+     * May delete the bucket 'bucket' rendering 'bucketLoc' invalid.
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::delKeyAtPos(BucketType* bucket,
                                                const DiskLoc bucketLoc,
@@ -1272,6 +1379,29 @@ namespace transition {
         }
     }
 
+    /**
+     * This function replaces the specified key (k) by either the prev or next key in the btree
+     * (k').  We require that k have either a left or right child.  If k has a left child, we set k'
+     * to the prev key of k, which must be a leaf present in the left child.  If k does not have a
+     * left child, we set k' to the next key of k, which must be a leaf present in the right child.
+     * When we replace k with k', we copy k' over k (which may cause a split) and then remove k'
+     * from its original location.  Because k' is stored in a descendent of k, replacing k by k'
+     * will not modify the storage location of the original k', and we can easily remove k' from its
+     * original location.
+     *
+     * This function is only needed in cases where k has a left or right child; in other cases a
+     * simpler key removal implementation is possible.
+     *
+     * NOTE on noncompliant BtreeBuilder btrees: It is possible (though likely rare) for btrees
+     * created by BtreeBuilder to have k' that is not a leaf, see SERVER-2732.  These cases are
+     * handled in the same manner as described in the "legacy btree structures" note below.
+     *
+     * NOTE on legacy btree structures: In legacy btrees, k' can be a nonleaf.  In such a case we
+     * 'delete' k by marking it as an unused node rather than replacing it with k'.  Also, k' may be
+     * a leaf but marked as an unused node.  In such a case we replace k by k', preserving the key's
+     * unused marking.  This function is only expected to mark a key as unused when handling a
+     * legacy btree.
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::deleteInternalKey(BucketType* bucket,
                                                      const DiskLoc bucketLoc,
@@ -1349,6 +1479,10 @@ namespace transition {
         return sum <= BtreeLayout::BucketSize;
     }
 
+    /**
+     * This implementation must respect the meaning and value of lowWaterMark.  Also see comments in
+     * splitPos().
+     */
     template <class BtreeLayout>
     int BtreeLogic<BtreeLayout>::rebalancedSeparatorPos(BucketType* bucket,
                                                          const DiskLoc bucketLoc,
@@ -1395,6 +1529,7 @@ namespace transition {
             }
         }
 
+        // safeguards - we must not create an empty bucket
         if (split < 1) {
             split = 1;
         }
@@ -1419,7 +1554,9 @@ namespace transition {
         _packReadyForMod(l, pos);
         _packReadyForMod(r, pos);
 
+        // We know the additional keys below will fit in l because canMergeChildren() must be true.
         int oldLNum = l->n;
+        // left child's right child becomes old parent key's left child
         FullKey knLeft = getFullKey(bucket, leftIndex);
         pushBack(l, knLeft.recordLoc, knLeft.data, l->nextChild);
 
@@ -1437,6 +1574,10 @@ namespace transition {
         _delKeyAtPos(bucket, leftIndex, true);
 
         if (bucket->n == 0) {
+            // Will trash bucket and bucketLoc.
+            //
+            // TODO To ensure all leaves are of equal height, we should ensure this is only called
+            // on the root.
             replaceWithNextChild(bucket, bucketLoc);
         }
         else {
@@ -1472,6 +1613,9 @@ namespace transition {
     bool BtreeLogic<BtreeLayout>::tryBalanceChildren(BucketType* bucket,
                                                       const DiskLoc bucketLoc,
                                                       int leftIndex) {
+
+        // If we can merge, then we must merge rather than balance to preserve bucket utilization
+        // constraints.
         if (canMergeChildren(bucket, bucketLoc, leftIndex)) {
             return false;
         }
@@ -1489,6 +1633,11 @@ namespace transition {
                                                         const DiskLoc lchild,
                                                         BucketType* r,
                                                         const DiskLoc rchild) {
+
+        // TODO maybe do some audits the same way pushBack() does?  As a precondition, rchild + the
+        // old separator are <= half a body size, and lchild is at most completely full.  Based on
+        // the value of split, rchild will get <= half of the total bytes which is at most 75% of a
+        // full body.  So rchild will have room for the following keys:
         int rAdd = l->n - split;
         reserveKeysFront(r, rAdd);
 
@@ -1504,8 +1653,13 @@ namespace transition {
 
         FullKey kn = getFullKey(l, split);
         l->nextChild = kn.prevChildBucket;
+
+        // Because lchild is a descendant of thisLoc, updating thisLoc will not affect packing or
+        // keys of lchild and kn will be stable during the following setInternalKey()            
         setInternalKey(bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
 
+        // lchild and rchild cannot be merged, so there must be >0 (actually more) keys to the left
+        // of split.
         int zeropos = 0;
         truncateTo(l, split, zeropos);
     }
@@ -1594,9 +1748,14 @@ namespace transition {
         BucketType* p = getBucket(bucket->parent);
         int parentIdx = indexInParent(bucket, bucketLoc);
 
+        // TODO will missing neighbor case be possible long term?  Should we try to merge/balance
+        // somehow in that case if so?
         bool mayBalanceRight = (parentIdx < p->n) && !childLocForPos(p, parentIdx + 1).isNull();
         bool mayBalanceLeft = ( parentIdx > 0 ) && !childLocForPos(p, parentIdx - 1).isNull();
 
+        // Balance if possible on one side - we merge only if absolutely necessary to preserve btree
+        // bucket utilization constraints since that's a more heavy duty operation (especially if we
+        // must re-split later).
         if (mayBalanceRight && tryBalanceChildren(p, bucket->parent, parentIdx)) {
             return true;
         }
@@ -1646,6 +1805,10 @@ namespace transition {
         }
     }
 
+    /**
+     * This can cause a lot of additional page writes when we assign buckets to different parents.
+     * Maybe get rid of parent ptrs?
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::fixParentPtrs(BucketType* bucket,
                                                  const DiskLoc bucketLoc,
@@ -1671,12 +1834,30 @@ namespace transition {
                                                   const DiskLoc lchild,
                                                   const DiskLoc rchild) {
         childLocForPos(bucket, keypos).Null();
+        // This may leave the bucket empty (n == 0) which is ok only as a transient state.  In the
+        // instant case, the implementation of insertHere behaves correctly when n == 0 and as a
+        // side effect increments n.
         _delKeyAtPos(bucket, keypos, true);
+
+        // Ensure we do not orphan neighbor's old child.
         invariant(childLocForPos(bucket, keypos ) == rchild);
+
+        // Just set temporarily - required to pass validation in insertHere()
         childLocForPos(bucket, keypos) = lchild;
+
         insertHere(bucketLoc, keypos, key, recordLoc, lchild, rchild);
     }
 
+    /**
+     * insert a key in this bucket, splitting if necessary.
+     *
+     * @keypos - where to insert the key in range 0..n.  0=make leftmost, n=make rightmost.  NOTE
+     * this function may free some data, and as a result the value passed for keypos may be invalid
+     * after calling insertHere()
+     *
+     * Some of the write intent signaling below relies on the implementation of the optimized write
+     * intent code in basicInsert().
+     */
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::insertHere(const DiskLoc bucketLoc,
                                               int pos,
@@ -1748,9 +1929,14 @@ namespace transition {
         fixParentPtrs(getBucket(rLoc), rLoc);
 
         FullKey splitkey = getFullKey(bucket, split);
+        // splitkey key gets promoted, its children will be thisLoc (l) and rLoc (r)
         bucket->nextChild = splitkey.prevChildBucket;
 
+        // Because thisLoc is a descendant of parent, updating parent will not affect packing or
+        // keys of thisLoc and splitkey will be stable during the following:
+
         if (bucket->parent.isNull()) {
+            // promote splitkey to a parent this->node make a new parent if we were the root
             DiskLoc L = addBucket();
             BucketType* p = btreemod(getBucket(L));
             pushBack(p, splitkey.recordLoc, splitkey.data, bucketLoc);
@@ -1761,6 +1947,8 @@ namespace transition {
             getBucket(rLoc)->parent.writing() = bucket->parent;
         }
         else {
+            // set this before calling _insert - if it splits it will do fixParent() logic and
+            // change the value.
             getBucket(rLoc)->parent.writing() = bucket->parent;
             _insert(getBucket(bucket->parent),
                     bucket->parent,
@@ -1772,8 +1960,10 @@ namespace transition {
         }
 
         int newpos = keypos;
+        // note this may trash splitkey.key.  thus we had to promote it before finishing up here.
         truncateTo(bucket, split, newpos);
 
+        // add our this->new key, there is room this->now
         if (keypos <= split) {
             insertHere(bucketLoc, newpos, key, recordLoc, lchild, rchild);
         }
