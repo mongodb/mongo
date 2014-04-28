@@ -493,6 +493,7 @@ var authCommandsLib = {
                         dbOwner: 1,
                         clusterMonitor: 1,
                         clusterAdmin: 1,
+                        backup: 1,
                         root: 1,
                         __system: 1
                     },
@@ -508,6 +509,7 @@ var authCommandsLib = {
                         dbAdminAnyDatabase: 1,
                         clusterMonitor: 1,
                         clusterAdmin: 1,
+                        backup: 1,
                         root: 1,
                         __system: 1
                     },

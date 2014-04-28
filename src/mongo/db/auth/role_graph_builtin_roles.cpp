@@ -466,9 +466,12 @@ namespace {
     }
 
     void addBackupPrivileges(PrivilegeVector* privileges) {
+        ActionSet normalResourceActions;
+        normalResourceActions << ActionType::find
+                              << ActionType::collStats;
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
-                Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
+                Privilege(ResourcePattern::forAnyNormalResource(), normalResourceActions));
 
         ActionSet clusterActions;
         clusterActions << ActionType::getParameter // To check authSchemaVersion
