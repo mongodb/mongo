@@ -40,6 +40,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store.h"
 #include "mongo/dbtests/dbtests.h"

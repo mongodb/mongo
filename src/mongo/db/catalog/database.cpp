@@ -50,6 +50,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
@@ -198,7 +199,7 @@ namespace mongo {
     Database::Database(const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
-          _extentManager(_name, _path, storageGlobalParams.directoryperdb),
+          _extentManager(new ExtentManager(_name, _path, storageGlobalParams.directoryperdb)),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
           _indexesName(_name + ".system.indexes"),
@@ -226,8 +227,8 @@ namespace mongo {
                 NamespaceDetails* details = _namespaceIndex.details( oldFreeList );
                 if ( details ) {
                     if ( !details->firstExtent().isNull() ) {
-                        _extentManager.freeExtents(details->firstExtent(),
-                                                   details->lastExtent());
+                        _extentManager->freeExtents(details->firstExtent(),
+                                                    details->lastExtent());
                     }
                     _namespaceIndex.kill_ns( oldFreeList );
                 }
@@ -299,7 +300,7 @@ namespace mongo {
     //        repair purposes yet we do not.
     void Database::openAllFiles() {
         verify(this);
-        Status s = _extentManager.init();
+        Status s = _extentManager->init();
         if ( !s.isOK() ) {
             msgasserted( 16966, str::stream() << "_extentManager.init failed: " << s.toString() );
         }
@@ -344,6 +345,12 @@ namespace mongo {
                 warning() << "could not drop temp collection '" << toDelete[i] << "': " << info;
         }
     }
+
+    long long Database::fileSize() const { return _extentManager->fileSize(); }
+
+    int Database::numFiles() const { return _extentManager->numFiles(); }
+
+    void Database::flushFiles( bool sync ) { return _extentManager->flushFiles( sync ); }
 
     bool Database::setProfilingLevel( int newLevel , string& errmsg ) {
         if ( _profile == newLevel )
@@ -788,7 +795,7 @@ namespace mongo {
 
         // free extents
         if( !d->firstExtent().isNull() ) {
-            _extentManager.freeExtents(d->firstExtent(), d->lastExtent());
+            _extentManager->freeExtents(d->firstExtent(), d->lastExtent());
             d->setFirstExtentInvalid();
             d->setLastExtentInvalid();
         }
@@ -800,12 +807,12 @@ namespace mongo {
     }
 
     void Database::getFileFormat( int* major, int* minor ) {
-        if ( _extentManager.numFiles() == 0 ) {
+        if ( _extentManager->numFiles() == 0 ) {
             *major = 0;
             *minor = 0;
             return;
         }
-        const DataFile* df = _extentManager.getFile( 0 );
+        const DataFile* df = _extentManager->getFile( 0 );
         *major = df->getHeader()->version;
         *minor = df->getHeader()->versionMinor;
     }

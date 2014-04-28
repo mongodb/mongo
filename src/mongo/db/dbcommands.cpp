@@ -67,6 +67,7 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_logic.h"

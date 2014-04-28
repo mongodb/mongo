@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/net/listen.h"

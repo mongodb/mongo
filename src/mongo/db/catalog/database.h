@@ -32,7 +32,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/structure/catalog/namespace_index.h"
-#include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/string_map.h"
@@ -41,6 +40,7 @@ namespace mongo {
 
     class Collection;
     class Extent;
+    class ExtentManager;
     class DataFile;
     class IndexCatalog;
     class NamespaceDetails;
@@ -121,9 +121,9 @@ namespace mongo {
         /**
          * total file size of Database in bytes
          */
-        long long fileSize() const { return _extentManager.fileSize(); }
+        long long fileSize() const;
 
-        int numFiles() const { return _extentManager.numFiles(); }
+        int numFiles() const;
 
         void getFileFormat( int* major, int* minor );
 
@@ -132,7 +132,7 @@ namespace mongo {
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
 
-        void flushFiles( bool sync ) { return _extentManager.flushFiles( sync ); }
+        void flushFiles( bool sync );
 
         /**
          * @return true if ns is part of the database
@@ -154,8 +154,8 @@ namespace mongo {
         NamespaceIndex& namespaceIndex() { return _namespaceIndex; }
 
         // TODO: do not think this method should exist, so should try and encapsulate better
-        ExtentManager& getExtentManager() { return _extentManager; }
-        const ExtentManager& getExtentManager() const { return _extentManager; }
+        ExtentManager& getExtentManager() { return *_extentManager; }
+        const ExtentManager& getExtentManager() const { return *_extentManager; }
 
         Status dropCollection( const StringData& fullns );
 
@@ -219,7 +219,7 @@ namespace mongo {
         const string _path; // "/data/db"
 
         NamespaceIndex _namespaceIndex;
-        ExtentManager _extentManager;
+        boost::scoped_ptr<ExtentManager> _extentManager;
 
         const string _profileName; // "alleyinsider.system.profile"
         const string _namespacesName; // "alleyinsider.system.namespaces"

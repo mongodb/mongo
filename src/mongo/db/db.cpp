@@ -73,6 +73,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/data_file.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"

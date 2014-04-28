@@ -49,6 +49,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
