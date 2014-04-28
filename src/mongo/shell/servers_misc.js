@@ -285,12 +285,14 @@ SyncCCTest.prototype.tempStart = function( num ){
 }
 
 
-function startParallelShell( jsCode, port ){
+function startParallelShell( jsCode, port, noConnect ){
     var x;
 
     var args = ["mongo"];
 
-    if (typeof(db) == "object") {
+    if (noConnect) {
+        args.push("--nodb");
+    } else if (typeof(db) == "object") {
         jsCode = "db = db.getSiblingDB('" + db.getName() + "');" + jsCode;
     }
 

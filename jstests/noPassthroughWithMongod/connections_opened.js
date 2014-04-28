@@ -2,7 +2,7 @@
 
 var numPerTypeToCreate = 100;
 
-// We need to create a new mongod to ensure no one else is talking to us in the background, and 
+// We need to create a new mongod to ensure no one else is talking to us in the background, and
 // will screw up our stats.
 var mongo = MongoRunner.runMongod({});
 var db = mongo.getDB("test");
@@ -18,21 +18,31 @@ var testDB = 'connectionsOpenedTest';
 var signalCollection = 'keepRunning';
 
 function createPersistentConnection() {
-    return new Mongo(db.getMongo().host);
+    assert.soon(function() {
+                    try {
+                        return new Mongo(db.getMongo().host);
+                    } catch (x) {
+                        return false;
+                    }}, "Timed out waiting for persistent connection to connect", 30000, 5000);
 }
 
 function createTemporaryConnection() {
-    // Creates a connection by spawing a shell that polls the signal collection until it is told to
-    // terminate.
-    var pollString = "assert.soon(function() {"
-        + "return db.getSiblingDB('" + testDB + "').getCollection('" + signalCollection + "')"
+    // Retry connecting until you are successful
+    var pollString = "var conn = null;" +
+        "assert.soon(function() {" +
+        "try { conn = new Mongo(\"" + db.getMongo().host + "\"); return conn" +
+        "} catch (x) {return false;}}, " +
+        "\"Timed out waiting for temporary connection to connect\", 30000, 5000);"
+    // Poll the signal collection until it is told to terminate.
+    pollString += "assert.soon(function() {"
+        + "return conn.getDB('" + testDB + "').getCollection('" + signalCollection + "')"
         + ".findOne().stop;}, \"Parallel shell never told to terminate\", 10 * 60000);";
-    return startParallelShell(pollString);
+    return startParallelShell(pollString, null, true);
 }
 
 function waitForConnections(expectedCurrentConnections, expectedTotalConnections) {
     assert.soon(function() {
-                    currentConnInfo = db.serverStatus().connections;
+                    var currentConnInfo = db.serverStatus().connections;
                     return (expectedCurrentConnections == currentConnInfo.current) &&
                         (expectedTotalConnections, currentConnInfo.totalCreated);
                 },
