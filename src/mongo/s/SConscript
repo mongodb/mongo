@@ -345,7 +345,8 @@ env.Library(
         'cluster_write.cpp',
         'dbclient_multi_command.cpp',
         'dbclient_shard_resolver.cpp',
-        'write_ops/dbclient_safe_writer.cpp'
+        'scc_fast_query_handler.cpp',
+        'write_ops/dbclient_safe_writer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',

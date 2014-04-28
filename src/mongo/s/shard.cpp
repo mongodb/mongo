@@ -49,6 +49,7 @@
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
+#include "mongo/s/scc_fast_query_handler.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/version_manager.h"
 
@@ -497,6 +498,15 @@ namespace mongo {
         // to the end of every runCommand.  mongod uses this information to produce auditing
         // records attributed to the proper authenticated user(s).
         conn->setRunCommandHook(boost::bind(&audit::appendImpersonatedUsers, _1));
+
+        // For every SCC created, add a hook that will allow fastest-config-first config reads if
+        // the appropriate server options are set.
+        if ( conn->type() == ConnectionString::SYNC ) {
+            SyncClusterConnection* scc = dynamic_cast<SyncClusterConnection*>( conn );
+            if ( scc ) {
+                scc->attachQueryHandler( new SCCFastQueryHandler );
+            }
+        }
     }
 
     void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {

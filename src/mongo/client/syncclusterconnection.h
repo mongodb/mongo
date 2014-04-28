@@ -47,6 +47,8 @@ namespace mongo {
         using DBClientBase::update;
         using DBClientBase::remove;
 
+        class QueryHandler;
+
         /**
          * @param commaSeparated should be 3 hosts comma separated
          */
@@ -116,6 +118,13 @@ namespace mongo {
         virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
         virtual void setPostRunCommandHook(DBClientWithCommands::PostRunCommandHookFunc func);
 
+        /**
+         * Allow custom query processing through an external (e.g. mongos-only) service.
+         *
+         * Takes ownership of attached handler.
+         */
+        void attachQueryHandler( QueryHandler* handler );
+
     protected:
         virtual void _auth(const BSONObj& params);
 
@@ -132,12 +141,45 @@ namespace mongo {
         string _address;
         vector<string> _connAddresses;
         vector<DBClientConnection*> _conns;
-        map<string,int> _lockTypes;
-        mongo::mutex _mutex;
 
         vector<BSONObj> _lastErrors;
 
+        // Optionally attached by user
+        scoped_ptr<QueryHandler> _customQueryHandler;
+
+        mongo::mutex _mutex;
+        map<string,int> _lockTypes;
+        // End mutex
+
         double _socketTimeout;
+    };
+
+    /**
+     * Interface for custom query processing for the SCC.
+     * Allows plugging different host query behaviors for different types of queries.
+     */
+    class SyncClusterConnection::QueryHandler {
+    public:
+
+        virtual ~QueryHandler() {};
+
+        /**
+         * Returns true if the query can be processed using this handler.
+         */
+        virtual bool canHandleQuery( const string& ns, Query query ) = 0;
+
+        /**
+         * Returns a cursor on one of the hosts with the desired results for the query.
+         * May throw or return an empty auto_ptr on failure.
+         */
+        virtual auto_ptr<DBClientCursor> handleQuery( const vector<string>& hosts,
+                                                      const string &ns,
+                                                      Query query,
+                                                      int nToReturn,
+                                                      int nToSkip,
+                                                      const BSONObj *fieldsToReturn,
+                                                      int queryOptions,
+                                                      int batchSize ) = 0;
     };
 
     class MONGO_CLIENT_API UpdateNotTheSame : public UserException {
