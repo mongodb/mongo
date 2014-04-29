@@ -73,7 +73,6 @@
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
@@ -650,34 +649,24 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        PageFaultRetryableSection s;
-        while ( 1 ) {
-            try {
-                DeleteRequest request(ns);
-                request.setQuery(pattern);
-                request.setMulti(!justOne);
-                request.setUpdateOpLog(true);
-                DeleteExecutor executor(&request);
-                uassertStatusOK(executor.prepare());
-                Lock::DBWrite lk(ns.ns());
+        DeleteRequest request(ns);
+        request.setQuery(pattern);
+        request.setMulti(!justOne);
+        request.setUpdateOpLog(true);
+        DeleteExecutor executor(&request);
+        uassertStatusOK(executor.prepare());
+        Lock::DBWrite lk(ns.ns());
 
-                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-                    return;
+        // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
+        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+            return;
 
-                Client::Context ctx(ns);
-                DurTransaction txn;
+        Client::Context ctx(ns);
+        DurTransaction txn;
 
-                long long n = executor.execute(&txn);
-                lastError.getSafe()->recordDelete( n );
-                op.debug().ndeleted = n;
-                break;
-            }
-            catch ( PageFaultException& e ) {
-                LOG(2) << "recordDelete got a PageFaultException" << endl;
-                e.touch();
-            }
-        }
+        long long n = executor.execute(&txn);
+        lastError.getSafe()->recordDelete( n );
+        op.debug().ndeleted = n;
     }
 
     QueryResult* emptyMoreResult(long long);
@@ -904,34 +893,25 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
-        PageFaultRetryableSection s;
-        while ( true ) {
-            try {
-                Lock::DBWrite lk(ns);
-                
-                // CONCURRENCY TODO: is being read locked in big log sufficient here?
-                // writelock is used to synchronize stepdowns w/ writes
-                uassert( 10058 , "not master", isMasterNs(ns) );
-                
-                if ( handlePossibleShardedMessage( m , 0 ) )
-                    return;
-                
-                Client::Context ctx(ns);
-                DurTransaction txn;
-                
-                if (multi.size() > 1) {
-                    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-                    insertMulti(&txn, ctx, keepGoing, ns, multi, op);
-                } else {
-                    checkAndInsert(&txn, ctx, ns, multi[0]);
-                    globalOpCounters.incInsertInWriteLock(1);
-                    op.debug().ninserted = 1;
-                }
-                return;
-            }
-            catch ( PageFaultException& e ) {
-                e.touch();
-            }
+        Lock::DBWrite lk(ns);
+
+        // CONCURRENCY TODO: is being read locked in big log sufficient here?
+        // writelock is used to synchronize stepdowns w/ writes
+        uassert( 10058 , "not master", isMasterNs(ns) );
+
+        if ( handlePossibleShardedMessage( m , 0 ) )
+            return;
+
+        Client::Context ctx(ns);
+        DurTransaction txn;
+
+        if (multi.size() > 1) {
+            const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+            insertMulti(&txn, ctx, keepGoing, ns, multi, op);
+        } else {
+            checkAndInsert(&txn, ctx, ns, multi[0]);
+            globalOpCounters.incInsertInWriteLock(1);
+            op.debug().ninserted = 1;
         }
     }
 

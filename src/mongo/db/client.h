@@ -58,7 +58,6 @@ namespace mongo {
     class Client;
     class AbstractMessagingPort;
     class LockCollectionForReading;
-    class PageFaultRetryableSection;
 
     TSP_DECLARE(Client, currentClient)
 
@@ -109,9 +108,6 @@ namespace mongo {
         BSONObj getHandshake() const { return _handshake; }
         ConnectionId getConnectionId() const { return _connectionId; }
 
-        bool inPageFaultRetryableSection() const { return _pageFaultRetryableSection != 0; }
-        PageFaultRetryableSection* getPageFaultRetryableSection() const { return _pageFaultRetryableSection; }
-
         void writeHappened() { _hasWrittenSinceCheckpoint = true; _hasWrittenThisOperation = true; }
         bool hasWrittenSinceCheckpoint() const { return _hasWrittenSinceCheckpoint; }
         void checkpointHappened() { _hasWrittenSinceCheckpoint = false; }
@@ -120,14 +116,6 @@ namespace mongo {
             _hasWrittenThisOperation = false;
             _hasWrittenSinceCheckpoint = false;
         }
-
-        /**
-         * Call this to allow PageFaultExceptions even if writes happened before this was called.
-         * Writes after this is called still prevent PFEs from being thrown.
-         */
-        void clearHasWrittenThisOperation() { _hasWrittenThisOperation = false; }
-
-        bool allowedToThrowPageFaultException() const;
 
         LockState& lockState() { return _ls; }
 
@@ -147,12 +135,9 @@ namespace mongo {
 
         bool _hasWrittenThisOperation;
         bool _hasWrittenSinceCheckpoint;
-        PageFaultRetryableSection *_pageFaultRetryableSection;
 
         LockState _ls;
         
-        friend class PageFaultRetryableSection; // TEMP
-        friend class NoPageFaultsAllowed; // TEMP
     public:
 
         /** "read lock, and set my context, all in one operation" 

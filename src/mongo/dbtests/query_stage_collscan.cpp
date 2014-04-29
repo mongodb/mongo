@@ -615,73 +615,6 @@ namespace QueryStageCollectionScan {
         }
     };
 
-    class QueryStageCollscanFetch : public QueryStageCollectionScanBase {
-    public:
-        void run() {
-            Client::WriteContext ctx(ns());
-            Collection* coll = ctx.ctx().db()->getCollection(ns());
-
-            // We want every result from our collscan to NOT be in memory, at least
-            // the first time around.
-            const char* kCollscanFetchFpName = "collscanInMemoryFail";
-            FailPointRegistry* registry = getGlobalFailPointRegistry();
-            FailPoint* failPoint = registry->getFailPoint(kCollscanFetchFpName);
-            ASSERT(NULL != failPoint);
-
-            // Get the DiskLocs that would be returned by an in-order scan.
-            vector<DiskLoc> locs;
-            getLocs(coll, CollectionScanParams::FORWARD, &locs);
-
-            // Configure the scan.
-            CollectionScanParams params;
-            params.collection = coll;
-            params.direction = CollectionScanParams::FORWARD;
-            params.tailable = false;
-
-            WorkingSet ws;
-            scoped_ptr<CollectionScan> scan(new CollectionScan(params, &ws, NULL));
-            failPoint->setMode(FailPoint::alwaysOn);
-
-            // Expect the first result to be a fetch request for the first object (after
-            // some NEEDS_TIME initialization).
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state;
-            do {
-                state = scan->work(&id);
-            } while (PlanStage::NEED_FETCH != state);
-
-            // Make sure we're fetching the first thing in the scan.
-            WorkingSetMember* member = ws.get(id);
-            ASSERT_EQUALS(locs[0], member->loc);
-
-            // Delete the thing we're fetching.
-            scan->prepareToYield();
-            scan->invalidate(locs[0], INVALIDATION_DELETION);
-            remove(coll->docFor(locs[0]));
-            scan->recoverFromYield();
-
-            // Turn fetches off.
-            failPoint->setMode(FailPoint::off);
-
-            // Make sure we get the rest of the docs but NOT the one we just nuked mid-fetch.
-            // We start at 1 to bypass the document we just deleted.
-            int count = 1;
-            while (!scan->isEOF()) {
-                WorkingSetID id = WorkingSet::INVALID_ID;
-                PlanStage::StageState state = scan->work(&id);
-                if (PlanStage::ADVANCED == state) {
-                    WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
-                                  member->obj["foo"].numberInt());
-                    ++count;
-                }
-            }
-
-            ASSERT_EQUALS(numObj(), count);
-        }
-    };
-
-
     class All : public Suite {
     public:
         All() : Suite( "QueryStageCollectionScan" ) {}
@@ -710,7 +643,6 @@ namespace QueryStageCollectionScan {
             add<QueryStageCollscanObjectsInOrderBackward>();
             add<QueryStageCollscanInvalidateUpcomingObject>();
             add<QueryStageCollscanInvalidateUpcomingObjectBackward>();
-            add<QueryStageCollscanFetch>();
         }
     } all;
 

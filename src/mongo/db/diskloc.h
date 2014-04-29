@@ -40,7 +40,6 @@
 
 namespace mongo {
 
-    class Record;
     class DeletedRecord;
     class Extent;
     class DataFile;

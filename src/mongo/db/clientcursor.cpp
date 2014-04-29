@@ -44,7 +44,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 
@@ -158,17 +157,11 @@ namespace mongo {
 #endif
     }
 
-    void ClientCursor::staticYield(int micros, const StringData& ns, const Record* rec) {
+    void ClientCursor::staticYield(int micros, const StringData& ns) {
         bool haveReadLock = Lock::isReadLocked();
 
         killCurrentOp.checkForInterrupt();
         {
-            auto_ptr<LockMongoFilesShared> lk;
-            if ( rec ) {
-                // need to lock this else rec->touch won't be safe file could disappear
-                lk.reset( new LockMongoFilesShared() );
-            }
-
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
                 if ( haveReadLock ) {
@@ -211,11 +204,6 @@ namespace mongo {
                           << " top: " << c->info()
                           << endl;
             }
-
-            if ( rec )
-                rec->touch();
-
-            lk.reset(0); // need to release this before dbtempreleasecond
         }
     }
 

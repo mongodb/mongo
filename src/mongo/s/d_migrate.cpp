@@ -58,7 +58,6 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/oplog.h"
@@ -502,57 +501,35 @@ namespace mongo {
             while ( 1 ) {
                 bool filledBuffer = false;
                 
-                auto_ptr<LockMongoFilesShared> fileLock;
-                Record* recordToTouch = 0;
+                Client::ReadContext ctx( _ns );
+                Collection* collection = ctx.ctx().db()->getCollection( _ns );
 
-                {
-                    Client::ReadContext ctx( _ns );
-                    Collection* collection = ctx.ctx().db()->getCollection( _ns );
+                scoped_spinlock lk( _trackerLocks );
+                set<DiskLoc>::iterator i = _cloneLocs.begin();
+                for ( ; i!=_cloneLocs.end(); ++i ) {
+                    if (tracker.intervalHasElapsed()) // should I yield?
+                        break;
+                    
+                    invariant( collection );
 
-                    scoped_spinlock lk( _trackerLocks );
-                    set<DiskLoc>::iterator i = _cloneLocs.begin();
-                    for ( ; i!=_cloneLocs.end(); ++i ) {
-                        if (tracker.intervalHasElapsed()) // should I yield?
-                            break;
-                        
-                        invariant( collection );
+                    DiskLoc dl = *i;
+                    BSONObj o = collection->docFor( dl );
 
-                        DiskLoc dl = *i;
-                        
-                        Record* r = collection->getRecordStore()->recordFor( dl );
-                        if ( ! r->likelyInPhysicalMemory() ) {
-                            fileLock.reset( new LockMongoFilesShared() );
-                            recordToTouch = r;
-                            break;
-                        }
-                        
-                        BSONObj o = collection->docFor( dl );
-
-                        // use the builder size instead of accumulating 'o's size so that we take into consideration
-                        // the overhead of BSONArray indices, and *always* append one doc
-                        if ( a.arrSize() != 0 &&
-                             a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                            filledBuffer = true; // break out of outer while loop
-                            break;
-                        }
-                        
-                        a.append( o );
+                    // use the builder size instead of accumulating 'o's size so that we take into consideration
+                    // the overhead of BSONArray indices, and *always* append one doc
+                    if ( a.arrSize() != 0 &&
+                         a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
+                        filledBuffer = true; // break out of outer while loop
+                        break;
                     }
                     
-                    _cloneLocs.erase( _cloneLocs.begin() , i );
-                    
-                    if ( _cloneLocs.empty() || filledBuffer )
-                        break;
+                    a.append( o );
                 }
                 
-                if ( recordToTouch ) {
-                    // its safe to touch here because we have a LockMongoFilesShared
-                    // we can't do where we get the lock because we would have to unlock the main readlock and tne _trackerLocks
-                    // simpler to handle this out there
-                    recordToTouch->touch();
-                    recordToTouch = 0;
-                }
+                _cloneLocs.erase( _cloneLocs.begin() , i );
                 
+                if ( _cloneLocs.empty() || filledBuffer )
+                    break;
             }
 
             result.appendArray( "objects" , a.arr() );
@@ -1774,32 +1751,23 @@ namespace mongo {
                     while( i.more() ) {
                         BSONObj o = i.next().Obj();
                         {
-                            PageFaultRetryableSection pgrs;
-                            while ( 1 ) {
-                                try {
-                                    Client::WriteContext cx( ns );
+                            Client::WriteContext cx( ns );
 
-                                    BSONObj localDoc;
-                                    if ( willOverrideLocalId( cx.ctx().db(), o, &localDoc ) ) {
-                                        string errMsg =
-                                            str::stream() << "cannot migrate chunk, local document "
-                                                          << localDoc
-                                                          << " has same _id as cloned "
-                                                          << "remote document " << o;
+                            BSONObj localDoc;
+                            if ( willOverrideLocalId( cx.ctx().db(), o, &localDoc ) ) {
+                                string errMsg =
+                                    str::stream() << "cannot migrate chunk, local document "
+                                    << localDoc
+                                    << " has same _id as cloned "
+                                    << "remote document " << o;
 
-                                        warning() << errMsg << endl;
+                                warning() << errMsg << endl;
 
-                                        // Exception will abort migration cleanly
-                                        uasserted( 16976, errMsg );
-                                    }
-
-                                    Helpers::upsert( ns, o, true );
-                                    break;
-                                }
-                                catch ( PageFaultException& e ) {
-                                    e.touch();
-                                }
+                                // Exception will abort migration cleanly
+                                uasserted( 16976, errMsg );
                             }
+
+                            Helpers::upsert( ns, o, true );
                         }
                         thisTime++;
                         numCloned++;

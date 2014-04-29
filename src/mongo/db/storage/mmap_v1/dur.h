@@ -32,6 +32,7 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/storage/durable_mapped_file.h"
+#include "mongo/db/storage/record.h"
 
 namespace mongo {
 

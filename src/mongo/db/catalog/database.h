@@ -32,7 +32,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/structure/catalog/namespace_index.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/string_map.h"
 
@@ -145,9 +144,6 @@ namespace mongo {
             return ns[_name.size()] == '.';
         }
 
-        const RecordStats& recordStats() const { return _recordStats; }
-        RecordStats& recordStats() { return _recordStats; }
-
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }
 
@@ -243,7 +239,6 @@ namespace mongo {
         const string _namespacesName; // "alleyinsider.system.namespaces"
         const string _indexesName; // "alleyinsider.system.indexes"
 
-        RecordStats _recordStats;
         int _profile; // 0=off.
 
         int _magic; // used for making sure the object is still loaded in memory

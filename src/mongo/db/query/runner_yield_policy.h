@@ -58,15 +58,13 @@ namespace mongo {
          *
          * Provided runner MUST be YIELD_MANUAL.
          */
-        bool yieldAndCheckIfOK(Runner* runner, Record* record = NULL) {
+        bool yieldAndCheckIfOK(Runner* runner) {
             invariant(runner);
             invariant(runner->collection());
 
             int micros = ClientCursor::suggestYieldMicros();
 
             // If micros is not positive, no point in yielding, nobody waiting.
-            //
-            // TODO: Do we want to yield anyway if record is not NULL?
             //
             // TODO: Track how many times we actually yield, how many times micros is <0, etc.
             if (micros <= 0) { return true; }
@@ -78,7 +76,7 @@ namespace mongo {
             runner->collection()->cursorCache()->registerRunner( _runnerYielding );
 
             // Note that this call checks for interrupt, and thus can throw if interrupt flag is set
-            staticYield(micros, record);
+            staticYield(micros);
 
             if ( runner->collection() ) {
                 // if the runner was killed, runner->collection() will return NULL
@@ -91,18 +89,15 @@ namespace mongo {
         }
 
         /**
-         * Yield, possibly fetching the provided record.  Caller is in charge of all runner
-         * registration.
+         * Yield.  Caller is in charge of all runner registration.
          *
          * Used for YIELD_AUTO runners.
          */
-        void yield(Record* rec = NULL) {
+        void yield() {
             int micros = ClientCursor::suggestYieldMicros();
 
-            // If there is anyone waiting on us or if there's a record to page-in, yield.  TODO: Do
-            // we want to page in the record in the lock even if nobody is waiting for the lock?
-            if (micros > 0 || (NULL != rec)) {
-                staticYield(micros, rec);
+            if (micros > 0) {
+                staticYield(micros);
                 // TODO:  When do we really want to reset this?  Currently we reset it when we
                 // actually yield.  As such we'll keep on trying to yield once the tracker has
                 // elapsed.  If we reset it even if we don't yield, we'll wait until the time
@@ -111,8 +106,8 @@ namespace mongo {
             }
         }
 
-        static void staticYield(int micros, const Record* rec = NULL) {
-            ClientCursor::staticYield(micros, "", rec);
+        static void staticYield(int micros) {
+            ClientCursor::staticYield(micros, "");
         }
 
     private:

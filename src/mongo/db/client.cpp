@@ -55,7 +55,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
@@ -105,7 +104,6 @@ namespace mongo {
     {
         _hasWrittenThisOperation = false;
         _hasWrittenSinceCheckpoint = false;
-        _pageFaultRetryableSection = 0;
         _connectionId = p ? p->connectionId() : 0;
         _curOp = new CurOp( this );
 #ifndef _WIN32
@@ -449,24 +447,6 @@ namespace mongo {
         }
 
         return writers + readers;
-    }
-
-    bool Client::allowedToThrowPageFaultException() const {
-        if ( _hasWrittenThisOperation )
-            return false;
-
-        if ( ! _pageFaultRetryableSection )
-            return false;
-
-        if ( _pageFaultRetryableSection->laps() >= 100 )
-            return false;
-        
-        // if we've done a normal yield, it means we're in a ClientCursor or something similar
-        // in that case, that code should be handling yielding, not us
-        if ( _curOp && _curOp->numYields() > 0 ) 
-            return false;
-
-        return true;
     }
 
     void OpDebug::reset() {

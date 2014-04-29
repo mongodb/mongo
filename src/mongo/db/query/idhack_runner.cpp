@@ -39,7 +39,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/s/d_logic.h"
 
 namespace {
@@ -132,30 +131,7 @@ namespace mongo {
         else {
             invariant(!hasIDProjection(_query.get()));
 
-            // Fetch object from storage.
-            Record* record = _collection->getRecordStore()->recordFor( loc );
-
             _nscannedObjects++;
-
-            // If the record isn't in memory...
-            if (!Record::likelyInPhysicalMemory(record->dataNoThrowing())) {
-                // And we're allowed to yield ourselves...
-                if (Runner::YIELD_AUTO == _policy) {
-                    // Note what we're yielding to fetch so that we don't crash if the loc is
-                    // deleted during a yield.
-                    _locFetching = loc;
-                    // Yield.  TODO: Do we want to bother yielding if micros < 0?
-                    int micros = ClientCursor::suggestYieldMicros();
-                    ClientCursor::staticYield(micros, "", record);
-                    // This can happen when we're yielded for various reasons (e.g. db/idx dropped).
-                    if (_killed) {
-                        _done = true;
-                        return Runner::RUNNER_DEAD;
-                    }
-                }
-            }
-
-            // Either the data was in memory or we paged it in.
             *objOut = _collection->docFor(loc);
 
             // If we're sharded make sure the key belongs to us.  We need the object to do this.

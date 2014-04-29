@@ -46,7 +46,6 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"

@@ -32,7 +32,6 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/storage/record.h"
 
 namespace mongo {
 
@@ -146,30 +145,7 @@ namespace mongo {
                 // lock between receiving the NEED_FETCH and actually fetching(?).
                 verify(member->hasLoc());
 
-                // Actually bring record into memory.
-                Record* record = _collection->getRecordStore()->recordFor(member->loc);
-
-                // If we're allowed to, go to disk outside of the lock.
-                if (NULL != _yieldPolicy.get()) {
-                    saveState();
-                    _yieldPolicy->yield(record);
-                    if (_killed) { return Runner::RUNNER_DEAD; }
-                    restoreState();
-                }
-                else {
-                    // We're set to manually yield.  We go to disk in the lock.
-                    record->touch();
-                }
-
-                // Record should be in memory now.  Log if it's not.
-                if (!Record::likelyInPhysicalMemory(record->dataNoThrowing())) {
-                    OCCASIONALLY {
-                        warning() << "Record wasn't in memory immediately after fetch: "
-                                  << member->loc.toString() << endl;
-                    }
-                }
-
-                // Note that we're not freeing id.  Fetch semantics say that we shouldn't.
+                // XXX: remove NEED_FETCH
             }
             else if (PlanStage::IS_EOF == code) {
                 return Runner::RUNNER_EOF;

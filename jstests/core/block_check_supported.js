@@ -6,6 +6,9 @@
 // Check that an object contains a specific set of fields and only those fields
 // NOTE: destroys 'item'
 //
+
+// See SERVER-13783
+if (0) {
 var testExpectedFields = function(itemString, item, fieldList) {
     print('Testing ' + itemString + ' for expected fields');
     for (var i = 0; i < fieldList.length; ++i) {
@@ -116,3 +119,4 @@ var doTest = function () {
 };
 
 doTest();
+}

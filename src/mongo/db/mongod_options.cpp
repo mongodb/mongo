@@ -919,13 +919,11 @@ namespace mongo {
         }
 
         if (params.count("repair")) {
-            Record::MemoryTrackingEnabled = false;
             mongodGlobalParams.upgrade = 1; // --repair implies --upgrade
             mongodGlobalParams.repair = 1;
             storageGlobalParams.dur = false;
         }
         if (params.count("upgrade")) {
-            Record::MemoryTrackingEnabled = false;
             mongodGlobalParams.upgrade = 1;
         }
         if (params.count("notablescan")) {

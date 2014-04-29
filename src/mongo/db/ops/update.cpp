@@ -42,7 +42,6 @@
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/lite_parsed_query.h"
@@ -52,7 +51,6 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/platform/unordered_set.h"
 

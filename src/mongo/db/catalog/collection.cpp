@@ -48,6 +48,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/record.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
@@ -164,7 +165,7 @@ namespace mongo {
 
     BSONObj Collection::docFor(const DiskLoc& loc) const {
         Record* rec = _recordStore->recordFor( loc );
-        return BSONObj( rec->accessed()->data() );
+        return BSONObj( rec->data() );
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( TransactionExperiment* txn,
@@ -309,7 +310,7 @@ namespace mongo {
                                                     OpDebug* debug ) {
 
         Record* oldRecord = _recordStore->recordFor( oldLocation );
-        BSONObj objOld( oldRecord->accessed()->data() );
+        BSONObj objOld( oldRecord->data() );
 
         if ( objOld.hasElement( "_id" ) ) {
             BSONElement oldId = objOld["_id"];

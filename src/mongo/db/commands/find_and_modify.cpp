@@ -36,7 +36,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -99,20 +98,10 @@ namespace mongo {
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(ns);
             
-            PageFaultRetryableSection s;
-            while ( 1 ) {
-                try {
-                    return runNoDirectClient( ns , 
-                                              query , fields , update , 
-                                              upsert , returnNew , remove , 
-                                              result , errmsg );
-                }
-                catch ( PageFaultException& e ) {
-                    e.touch();
-                }
-            }
-
-                    
+            return runNoDirectClient( ns , 
+                                      query , fields , update , 
+                                      upsert , returnNew , remove , 
+                                      result , errmsg );
         }
 
         void _appendHelper( BSONObjBuilder& result , const BSONObj& doc , bool found , const BSONObj& fields ) {

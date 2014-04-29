@@ -70,11 +70,6 @@ namespace mongo {
         StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID,
                                    WorkingSetID* out);
 
-        /**
-         * work(...) delegates to this when we're called after requesting a fetch.
-         */
-        StageState fetchCompleted(WorkingSetID* out);
-
         // Collection which is used by this stage. Used to resolve record ids retrieved by child
         // stages. The lifetime of the collection must supersede that of the stage.
         const Collection* _collection;
@@ -85,10 +80,6 @@ namespace mongo {
 
         // The filter is not owned by us.
         const MatchExpression* _filter;
-
-        // If we're fetching a DiskLoc and it points at something that's not in memory, we return a
-        // a "please page this in" result and hold on to the WSID until the next call to work(...).
-        WorkingSetID _idBeingPagedIn;
 
         // Stats
         CommonStats _commonStats;

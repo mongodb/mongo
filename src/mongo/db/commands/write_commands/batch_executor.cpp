@@ -43,7 +43,6 @@
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/pagefault.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -866,20 +865,7 @@ namespace mongo {
 
         WriteOpResult result;
 
-        // NOTE: Deletes will not fault outside the lock once any data has been written
-        PageFaultRetryableSection pageFaultSection;
-        while ( true ) {
-            try {
-                multiRemove( removeItem, &result );
-                break;
-            }
-            catch (PageFaultException& pfe) {
-                pfe.touch();
-                invariant(!result.getError());
-                continue;
-            }
-            fassertFailed(17429);
-        }
+        multiRemove( removeItem, &result );
 
         // END CURRENT OP
         incWriteStats( removeItem, result.getStats(), result.getError(), currentOp.get() );
@@ -965,35 +951,21 @@ namespace mongo {
             state->request->getInsertRequest()->getDocumentsAt( state->currIndex ) :
             normalizedInsert.getValue();
 
-        cc().clearHasWrittenThisOperation();
-        PageFaultRetryableSection pageFaultSection;
-        while (true) {
-            try {
-                if (!state->lockAndCheck(result)) {
-                    break;
-                }
-
+        try {
+            if (state->lockAndCheck(result)) {
                 if (!state->request->isInsertIndexRequest()) {
                     singleInsert(insertDoc, state->getCollection(), result);
                 }
                 else {
                     singleCreateIndex(insertDoc, state->getCollection(), result);
                 }
-                break;
             }
-            catch (const DBException& ex) {
-                Status status(ex.toStatus());
-                if (ErrorCodes::isInterruption(status.code()))
-                    throw;
-                result->setError(toWriteError(status));
-                break;
-            }
-            catch (PageFaultException& pfe) {
-                state->unlock();
-                pfe.touch();
-                continue;  // Try the operation again.
-            }
-            fassertFailed(17430);
+        }
+        catch (const DBException& ex) {
+            Status status(ex.toStatus());
+            if (ErrorCodes::isInterruption(status.code()))
+                throw;
+            result->setError(toWriteError(status));
         }
 
         // Errors release the write lock, as a matter of policy.

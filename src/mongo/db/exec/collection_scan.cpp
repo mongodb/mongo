@@ -39,39 +39,13 @@
 
 namespace mongo {
 
-    // Some fail points for testing.
-    MONGO_FP_DECLARE(collscanInMemoryFail);
-    MONGO_FP_DECLARE(collscanInMemorySucceed);
-
-    // static
-    bool CollectionScan::diskLocInMemory(DiskLoc loc) {
-        if (MONGO_FAIL_POINT(collscanInMemoryFail)) {
-            return false;
-        }
-
-        if (MONGO_FAIL_POINT(collscanInMemorySucceed)) {
-            return true;
-        }
-
-        return _iter->recordFor(loc)->likelyInPhysicalMemory();
-    }
-
     CollectionScan::CollectionScan(const CollectionScanParams& params,
                                    WorkingSet* workingSet,
                                    const MatchExpression* filter)
         : _workingSet(workingSet),
           _filter(filter),
           _params(params),
-          _nsDropped(false) {
-
-        // We pre-allocate a WSID and use it to pass up fetch requests.  It is only
-        // used to pass up fetch requests and we should never use it for anything else.
-        _wsidForFetch = _workingSet->allocate();
-        WorkingSetMember* member = _workingSet->get(_wsidForFetch);
-        // Kind of a lie since the obj isn't pointing to the data at loc. but the obj
-        // won't be used.
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-    }
+          _nsDropped(false) { }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
@@ -90,18 +64,6 @@ namespace mongo {
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
-        }
-
-        // See if the record we're about to access is in memory.  If it's not, pass a fetch
-        // request up.
-        if (!isEOF()) {
-            DiskLoc curr = _iter->curr();
-            if (!curr.isNull() && !diskLocInMemory(curr)) {
-                WorkingSetMember* member = _workingSet->get(_wsidForFetch);
-                member->loc = curr;
-                *out = _wsidForFetch;
-                return PlanStage::NEED_FETCH;
-            }
         }
 
         // What we'll return to the user.
@@ -169,11 +131,6 @@ namespace mongo {
         if (NULL != _iter) {
             _iter->invalidate(dl);
         }
-
-        // We might have 'dl' inside of the WSM that _wsidForFetch references.  This is OK because
-        // the runner who handles the fetch request does so before releasing any locks (and allowing
-        // the DiskLoc to be deleted).  We also don't use any data in the WSM referenced by
-        // _wsidForFetch so it's OK to leave the DiskLoc there.
     }
 
     void CollectionScan::prepareToYield() {

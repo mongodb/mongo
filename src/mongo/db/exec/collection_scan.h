@@ -77,11 +77,6 @@ namespace mongo {
         // True if Database::getCollection(_ns) == NULL on our first call to work.
         bool _nsDropped;
 
-        // If we want to return a DiskLoc and it points at something that's not in memory, we return
-        // a a "please page this in" result.  We allocate one WSM for this purpose at construction
-        // and reuse it for any future fetch requests, changing the DiskLoc as appropriate.
-        WorkingSetID _wsidForFetch;
-
         // Stats
         CommonStats _commonStats;
         CollectionScanStats _specificStats;

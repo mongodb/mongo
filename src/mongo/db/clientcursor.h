@@ -85,7 +85,7 @@ namespace mongo {
         // Yielding.
         //
 
-        static void staticYield(int micros, const StringData& ns, const Record* rec);
+        static void staticYield(int micros, const StringData& ns);
         static int suggestYieldMicros();
 
         //
