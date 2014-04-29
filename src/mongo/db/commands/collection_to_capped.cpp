@@ -172,10 +172,6 @@ namespace mongo {
         CmdConvertToCapped() : Command( "convertToCapped" ) {}
         virtual bool slaveOk() const { return false; }
         virtual bool isWriteCommandForConfigServer() const { return true; }
-        virtual bool logTheOp() {
-            // see CmdRenameCollection::logTheOp as to why this is best
-            return true;
-        }
         virtual void help( stringstream &help ) const {
             help << "{ convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
         }
@@ -243,7 +239,12 @@ namespace mongo {
                 return appendCommandStatus( result, status );
 
             status = db->renameCollection( &txn, longTmpName, longSource, false );
-            return appendCommandStatus( result, status );
+            if ( !status.isOK() )
+                return appendCommandStatus( result, status );
+
+            if (!fromRepl)
+                logOp(&txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+            return true;
         }
     } cmdConvertToCapped;
 

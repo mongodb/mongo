@@ -40,9 +40,6 @@ namespace mongo {
         virtual bool requiresAuth() { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) { return true; }
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }

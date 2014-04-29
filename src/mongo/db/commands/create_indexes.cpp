@@ -49,7 +49,6 @@ namespace mongo {
         CmdCreateIndex() : Command( "createIndexes" ){}
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return false; } // TODO: this could be made true...
 
         virtual Status checkAuthForCommand(ClientBasic* client,

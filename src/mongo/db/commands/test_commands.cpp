@@ -36,6 +36,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 
@@ -46,7 +47,6 @@ namespace mongo {
     public:
         GodInsert() : Command( "godinsert" ) { }
         virtual bool adminOnly() const { return false; }
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
         // No auth needed because it only works when enabled via command line.
@@ -85,7 +85,6 @@ namespace mongo {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool adminOnly() const { return true; }
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual void help( stringstream& help ) const {
             help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
@@ -184,7 +183,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
             NamespaceString nss( dbname, coll );
@@ -203,6 +202,8 @@ namespace mongo {
 
             IndexBuilder::restoreIndexes(indexes);
 
+            if (!fromRepl)
+                logOp(&txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             return true;
         }
     };

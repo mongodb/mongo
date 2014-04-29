@@ -1484,9 +1484,6 @@ namespace mongo {
         class CmdWhatsMyUri : public Command {
         public:
             CmdWhatsMyUri() : Command("whatsmyuri") { }
-            virtual bool logTheOp() {
-                return false; // the modification will be logged directly
-            }
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1715,7 +1712,6 @@ namespace mongo {
     public:
         CmdListDatabases() : Command("listDatabases", true , "listdatabases" ) {}
 
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
@@ -1843,7 +1839,6 @@ namespace mongo {
     class CmdCloseAllDatabases : public Command {
     public:
         CmdCloseAllDatabases() : Command("closeAllDatabases", false , "closeAllDatabases" ) {}
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
@@ -1867,7 +1862,6 @@ namespace mongo {
     class CmdReplSetGetStatus : public Command {
     public:
         CmdReplSetGetStatus() : Command("replSetGetStatus"){}
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool isWriteCommandForConfigServer() const { return false; }

@@ -40,9 +40,6 @@ namespace mongo {
     public:
         static void disableAuthMechanism(std::string authMechanism);
 
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }

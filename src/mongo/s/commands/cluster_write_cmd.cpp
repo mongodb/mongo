@@ -56,10 +56,6 @@ namespace mongo {
         virtual ~ClusterWriteCmd() {
         }
 
-        bool logTheOp() {
-            return false;
-        }
-
         bool slaveOk() const {
             return false;
         }

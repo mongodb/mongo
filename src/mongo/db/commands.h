@@ -110,13 +110,6 @@ namespace mutablebson {
             return false;
         }
 
-        /* Override and return true to if true,log the operation (logOp()) to the replication log.
-           (not done if fromRepl of course)
-
-           Note if run() returns false, we do NOT log.
-        */
-        virtual bool logTheOp() { return false; }
-
         /**
          * Override and return fales if the command opcounters should not be incremented on
          * behalf of this command.

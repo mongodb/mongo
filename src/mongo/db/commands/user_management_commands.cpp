@@ -306,10 +306,6 @@ namespace mongo {
 
         CmdCreateUser() : Command("createUser") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -470,10 +466,6 @@ namespace mongo {
 
         CmdUpdateUser() : Command("updateUser") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -625,10 +617,6 @@ namespace mongo {
 
         CmdDropUser() : Command("dropUser") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -725,10 +713,6 @@ namespace mongo {
 
         CmdDropAllUsersFromDatabase() : Command("dropAllUsersFromDatabase") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -803,10 +787,6 @@ namespace mongo {
     public:
 
         CmdGrantRolesToUser() : Command("grantRolesToUser") {}
-
-        virtual bool logTheOp() {
-            return false;
-        }
 
         virtual bool slaveOk() const {
             return false;
@@ -906,10 +886,6 @@ namespace mongo {
 
         CmdRevokeRolesFromUser() : Command("revokeRolesFromUser") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -1005,10 +981,6 @@ namespace mongo {
 
     class CmdUsersInfo: public Command {
     public:
-
-        virtual bool logTheOp() {
-            return false;
-        }
 
         virtual bool slaveOk() const {
             return false;
@@ -1163,10 +1135,6 @@ namespace mongo {
 
         CmdCreateRole() : Command("createRole") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -1312,10 +1280,6 @@ namespace mongo {
 
         CmdUpdateRole() : Command("updateRole") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -1445,10 +1409,6 @@ namespace mongo {
     public:
 
         CmdGrantPrivilegesToRole() : Command("grantPrivilegesToRole") {}
-
-        virtual bool logTheOp() {
-            return false;
-        }
 
         virtual bool slaveOk() const {
             return false;
@@ -1585,10 +1545,6 @@ namespace mongo {
     public:
 
         CmdRevokePrivilegesFromRole() : Command("revokePrivilegesFromRole") {}
-
-        virtual bool logTheOp() {
-            return false;
-        }
 
         virtual bool slaveOk() const {
             return false;
@@ -1728,10 +1684,6 @@ namespace mongo {
 
         CmdGrantRolesToRole() : Command("grantRolesToRole") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -1851,10 +1803,6 @@ namespace mongo {
 
         CmdRevokeRolesFromRole() : Command("revokeRolesFromRole") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -1967,10 +1915,6 @@ namespace mongo {
     public:
 
         CmdDropRole() : Command("dropRole") {}
-
-        virtual bool logTheOp() {
-            return false;
-        }
 
         virtual bool slaveOk() const {
             return false;
@@ -2149,10 +2093,6 @@ namespace mongo {
 
         CmdDropAllRolesFromDatabase() : Command("dropAllRolesFromDatabase") {}
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -2283,10 +2223,6 @@ namespace mongo {
     class CmdRolesInfo: public Command {
     public:
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return false;
         }
@@ -2392,10 +2328,6 @@ namespace mongo {
     class CmdInvalidateUserCache: public Command {
     public:
 
-        virtual bool logTheOp() {
-            return false;
-        }
-
         virtual bool slaveOk() const {
             return true;
         }
@@ -2447,10 +2379,6 @@ namespace mongo {
     public:
 
         CmdMergeAuthzCollections() : Command("_mergeAuthzCollections") {}
-
-        virtual bool logTheOp() {
-            return false;
-        }
 
         virtual bool slaveOk() const {
             return false;

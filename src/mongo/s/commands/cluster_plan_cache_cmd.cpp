@@ -54,10 +54,6 @@ namespace mongo {
         virtual ~ClusterPlanCacheCmd() {
         }
 
-        bool logTheOp() {
-            return false;
-        }
-
         bool slaveOk() const {
             return false;
         }

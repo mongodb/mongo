@@ -106,7 +106,6 @@ namespace mongo {
         virtual bool adminOnly() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool maintenanceMode() const { return true; }
-        virtual bool logTheOp() { return false; }
         virtual void help( stringstream& help ) const {
             help << "touch collection\n"
                 "Page in all pages of memory containing every extent for the given collection\n"

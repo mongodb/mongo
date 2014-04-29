@@ -330,9 +330,6 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "for testing purposes only.  forces a user assertion exception";
         }
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }

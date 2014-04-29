@@ -54,10 +54,6 @@ namespace mongo {
         virtual ~ClusterIndexFilterCmd() {
         }
 
-        bool logTheOp() {
-            return false;
-        }
-
         bool slaveOk() const {
             return false;
         }

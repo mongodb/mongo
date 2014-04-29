@@ -58,7 +58,6 @@ namespace mongo {
         }
 
         CmdFindAndModify() : Command("findAndModify", false, "findandmodify") { }
-        virtual bool logTheOp() { return false; } // the modifications will be logged directly
         virtual bool slaveOk() const { return false; }
         virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void addRequiredPrivileges(const std::string& dbname,

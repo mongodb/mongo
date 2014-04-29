@@ -38,15 +38,14 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
 
     /* "dropIndexes" is now the preferred form - "deleteIndexes" deprecated */
     class CmdDropIndexes : public Command {
     public:
-        virtual bool logTheOp() {
-            return true;
-        }
         virtual bool slaveOk() const {
             return false;
         }
@@ -93,14 +92,25 @@ namespace mongo {
         }
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
+        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
+            Lock::DBWrite dbXLock(dbname);
+            DurTransaction txn;
+            bool ok = wrappedRun(&txn, dbname, jsobj, errmsg, anObjBuilder);
+            if (ok && !fromRepl)
+                logOp(&txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+            return ok;
+        }
+        bool wrappedRun(TransactionExperiment* txn,
+                        const string& dbname,
+                        BSONObj& jsobj,
+                        string& errmsg,
+                        BSONObjBuilder& anObjBuilder) {
             BSONElement e = jsobj.firstElement();
             const string toDeleteNs = dbname + '.' + e.valuestr();
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
 
-            Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(toDeleteNs);
             Database* db = ctx.db();
 
@@ -181,7 +191,6 @@ namespace mongo {
 
     class CmdReIndex : public Command {
     public:
-        virtual bool logTheOp() { return false; } // only reindexes on the one node
         virtual bool slaveOk() const { return true; }    // can reindex on a secondary
         virtual bool isWriteCommandForConfigServer() const { return true; }
         virtual void help( stringstream& help ) const {

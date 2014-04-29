@@ -149,9 +149,6 @@ namespace mongo {
 
     class CmdDropDatabase : public Command {
     public:
-        virtual bool logTheOp() {
-            return true;
-        }
         virtual void help( stringstream& help ) const {
             help << "drop (delete) this database";
         }
@@ -212,26 +209,28 @@ namespace mongo {
                 // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase,
                 // and that may need a global lock.
                 Lock::GlobalWrite lk;
+                Client::Context context(dbname);
+                DurTransaction txn;
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
-                Client::Context context(dbname);
                 stopIndexBuilds(context.db(), cmdObj);
                 dropDatabase(context.db());
 
                 log() << "dropDatabase " << dbname << " finished";
+
+                if (!fromRepl)
+                    logOp(&txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             }
 
             result.append( "dropped" , dbname );
+
             return true;
         }
     } cmdDropDatabase;
 
     class CmdRepairDatabase : public Command {
     public:
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }
@@ -444,9 +443,6 @@ namespace mongo {
     class CmdDrop : public Command {
     public:
         CmdDrop() : Command("drop") { }
-        virtual bool logTheOp() {
-            return true;
-        }
         virtual bool slaveOk() const {
             return false;
         }
@@ -473,7 +469,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
         }
 
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
@@ -505,8 +501,11 @@ namespace mongo {
 
             Status s = db->dropCollection( &txn, nsToDrop );
 
-            if ( s.isOK() )
+            if ( s.isOK() ) {
+                if (!fromRepl)
+                    logOp(&txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
                 return true;
+            }
             
             appendCommandStatus( result, s );
 
@@ -519,7 +518,6 @@ namespace mongo {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }
         CmdCount() : Command("count") { }
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const {
             // ok on --slave setups
             return replSettings.slave == SimpleSlave;
@@ -585,9 +583,6 @@ namespace mongo {
     class CmdCreate : public Command {
     public:
         CmdCreate() : Command("create") { }
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return false;
         }
@@ -1195,7 +1190,6 @@ namespace mongo {
 
         virtual bool slaveOk() const { return false; }
         virtual bool isWriteCommandForConfigServer() const { return true; }
-        virtual bool logTheOp() { return true; }
         virtual void help( stringstream &help ) const {
             help << 
                 "Sets collection options.\n"
@@ -1303,6 +1297,9 @@ namespace mongo {
                 }
             }
             
+            if (ok && !fromRepl)
+                logOp(&txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+
             return ok;
         }
 
@@ -1644,10 +1641,6 @@ namespace mongo {
         client.curop()->ensureStarted();
 
         retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
-        if ( retval && c->logTheOp() && ! fromRepl ) {
-            DurTransaction txn; // XXX
-            logOp(&txn, "c", cmdns, cmdObj);
-        }
 
         appendCommandStatus(result, retval, errmsg);
         

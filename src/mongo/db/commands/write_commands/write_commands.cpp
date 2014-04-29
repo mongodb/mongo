@@ -77,9 +77,6 @@ namespace mongo {
         }
     }
 
-    // Write commands are fanned out in oplog as single writes.
-    bool WriteCmd::logTheOp() { return false; }
-
     // Slaves can't perform writes.
     bool WriteCmd::slaveOk() const { return false; }
 

@@ -149,7 +149,6 @@ namespace mongo {
         ParallelCollectionScanCmd() : Command( "parallelCollectionScan" ){}
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
 
         virtual Status checkAuthForCommand(ClientBasic* client,

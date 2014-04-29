@@ -61,8 +61,6 @@ namespace mongo {
         static void redactTooLongLog( mutablebson::Document* cmdObj, const StringData& fieldName );
 
     private:
-        virtual bool logTheOp();
-
         virtual bool slaveOk() const;
 
         virtual bool isWriteCommandForConfigServer() const;

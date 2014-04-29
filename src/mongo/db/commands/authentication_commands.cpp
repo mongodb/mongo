@@ -91,7 +91,6 @@ namespace mongo {
             _random(SecureRandom::create()) {
         }
 
-        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const {
             return true;
         }
@@ -343,9 +342,6 @@ namespace mongo {
 
     class CmdLogout : public Command {
     public:
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }

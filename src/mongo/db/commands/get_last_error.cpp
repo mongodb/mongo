@@ -47,9 +47,6 @@ namespace mongo {
     class CmdResetError : public Command {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual bool slaveOk() const {
             return true;
         }
@@ -79,7 +76,6 @@ namespace mongo {
     public:
         CmdGetLastError() : Command("getLastError", false, "getlasterror") { }
         virtual bool isWriteCommandForConfigServer() const      { return false; }
-        virtual bool logTheOp()           { return false; }
         virtual bool slaveOk() const      { return true;  }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -256,9 +252,6 @@ namespace mongo {
     class CmdGetPrevError : public Command {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual bool logTheOp() {
-            return false;
-        }
         virtual void help( stringstream& help ) const {
             help << "check for errors since last reseterror commandcal";
         }
