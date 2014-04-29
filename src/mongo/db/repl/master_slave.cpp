@@ -499,15 +499,15 @@ namespace mongo {
         return true;
     }
 
-    void ReplSource::applyOperation(Database* db, const BSONObj& op) {
+    void ReplSource::applyOperation(TransactionExperiment* txn, Database* db, const BSONObj& op) {
         try {
-            bool failedUpdate = applyOperation_inlock( db, op );
+            bool failedUpdate = applyOperation_inlock( txn, db, op );
             if (failedUpdate) {
                 Sync sync(hostName);
                 if (sync.shouldRetry(op)) {
                     uassert(15914,
                             "Failure retrying initial sync update",
-                            !applyOperation_inlock(db, op));
+                            !applyOperation_inlock(txn, db, op));
                 }
             }
         }
@@ -605,6 +605,7 @@ namespace mongo {
         }
                 
         Client::Context ctx( ns );
+        DurTransaction txn;
         ctx.getClient()->curop()->reset();
 
         bool empty = ctx.db()->isEmpty();
@@ -615,7 +616,7 @@ namespace mongo {
         // always apply admin command command
         // this is a bit hacky -- the semantics of replication/commands aren't well specified
         if ( strcmp( clientName, "admin" ) == 0 && *op.getStringField( "op" ) == 'c' ) {
-            applyOperation( ctx.db(), op );
+            applyOperation( &txn, ctx.db(), op );
             return;
         }
 
@@ -644,7 +645,7 @@ namespace mongo {
             save();
         }
         else {
-            applyOperation( ctx.db(), op );
+            applyOperation( &txn, ctx.db(), op );
             addDbNextPass.erase( clientName );
         }
     }

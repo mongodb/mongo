@@ -189,7 +189,7 @@ namespace mongo {
                 }
                 uassertStatusOK( loc.getStatus() );
                 if ( logForRepl )
-                    logOp("i", to_collection, js);
+                    logOp(&txn, "i", to_collection, js);
 
                 getDur().commitIfNeeded();
 
@@ -222,6 +222,8 @@ namespace mongo {
                       bool logForRepl, bool masterSameProcess, bool slaveOk, bool mayYield,
                       bool mayBeInterrupted, Query query) {
 
+        DurTransaction txn; // XXX
+
         list<BSONObj> indexesToBuild;
         LOG(2) << "\t\tcloning collection " << from_collection << " to " << to_collection << " on " << _conn->getServerAddress() << " with filter " << query.toString() << endl;
 
@@ -253,7 +255,6 @@ namespace mongo {
                 string ns = spec["ns"].String(); // this was fixed when pulled off network
                 Collection* collection = f.context.db()->getCollection( ns );
                 if ( !collection ) {
-                    DurTransaction txn; // XXX
                     collection = f.context.db()->createCollection( &txn, ns );
                     verify( collection );
                 }
@@ -269,7 +270,7 @@ namespace mongo {
                 }
 
                 if ( logForRepl )
-                    logOp("i", to_collection, spec);
+                    logOp(&txn, "i", to_collection, spec);
 
                 getDur().commitIfNeeded();
 

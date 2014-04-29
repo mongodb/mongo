@@ -763,7 +763,7 @@ namespace mongo {
             // Call logOp if requested.
             if (request.shouldCallLogOp() && !logObj.isEmpty()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
-                logOp("u", nsString.ns().c_str(), logObj , &idQuery,
+                logOp(txn, "u", nsString.ns().c_str(), logObj , &idQuery,
                       NULL, request.isFromMigration(), &newObj);
             }
 
@@ -878,7 +878,7 @@ namespace mongo {
                                                                 !request.isGod() /*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
         if (request.shouldCallLogOp()) {
-            logOp("i", nsString.ns().c_str(), newObj,
+            logOp(txn, "i", nsString.ns().c_str(), newObj,
                    NULL, NULL, request.isFromMigration(), &newObj);
         }
 

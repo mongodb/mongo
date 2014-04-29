@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/text.h"
 
@@ -50,7 +51,7 @@ namespace mongo {
     const int ReplSetConfig::DEFAULT_HB_TIMEOUT = 10;
 
     static AtomicUInt _warnedAboutVotes = 0;
-    void logOpInitiate(const bo&);
+    void logOpInitiate(TransactionExperiment* txn, const bo&);
 
     void assertOnlyHas(BSONObj o, const set<string>& fields) {
         BSONObj::iterator i(o);
@@ -81,6 +82,7 @@ namespace mongo {
               << newConfigBSON << rsLog;
         {
             Client::WriteContext cx( rsConfigNs );
+            DurTransaction txn;
 
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
@@ -88,7 +90,7 @@ namespace mongo {
                                      newConfigBSON,
                                      false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
-                logOpInitiate(comment);
+                logOpInitiate(&txn, comment);
         }
         log() << "replSet saveConfigLocally done" << rsLog;
     }

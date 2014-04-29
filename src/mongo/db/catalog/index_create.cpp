@@ -141,7 +141,7 @@ namespace mongo {
                     runner->saveState();
                     BSONObj toDelete;
                     collection->deleteDocument( &txn, loc, false, true, &toDelete );
-                    logOp( "d", ns.c_str(), toDelete );
+                    logOp( &txn, "d", ns.c_str(), toDelete );
 
                     if (!runner->restoreState()) {
                         // Runner got killed somehow.  This probably shouldn't happen.
@@ -290,7 +290,7 @@ namespace mongo {
                                             true /* noWarn */,
                                             &toDelete );
                 if ( isMaster( ns.c_str() ) ) {
-                    logOp( "d", ns.c_str(), toDelete );
+                    logOp( &txn, "d", ns.c_str(), toDelete );
                 }
                 
                 getDur().commitIfNeeded();

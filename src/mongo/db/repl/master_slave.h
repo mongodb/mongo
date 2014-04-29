@@ -42,6 +42,7 @@
 namespace mongo {
 
     class Database;
+    class TransactionExperiment;
 
     // Main entry point for master/slave at startup time.
     void startMasterSlave();
@@ -119,7 +120,7 @@ namespace mongo {
     public:
         OplogReader oplogReader;
 
-        void applyOperation(Database* db, const BSONObj& op);
+        void applyOperation(TransactionExperiment* txn, Database* db, const BSONObj& op);
         string hostName;    // ip addr or hostname plus optionally, ":<port>"
         string _sourceName;  // a logical source name.
         string sourceName() const { return _sourceName.empty() ? "main" : _sourceName; }

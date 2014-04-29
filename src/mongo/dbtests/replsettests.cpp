@@ -367,8 +367,9 @@ namespace ReplSetTests {
         // returns true on success, false on failure
         bool apply(const BSONObj& op) {
             Client::Context ctx( _cappedNs );
+            DurTransaction txn;
             // in an annoying twist of api, returns true on failure
-            return !applyOperation_inlock(ctx.db(), op, true);
+            return !applyOperation_inlock(&txn, ctx.db(), op, true);
         }
 
         void run() {

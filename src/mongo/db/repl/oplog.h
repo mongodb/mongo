@@ -32,6 +32,7 @@ namespace mongo {
 
     class BSONObj;
     class Database;
+    class TransactionExperiment;
 
     // These functions redefine the function for logOp(),
     // for either master/slave or replica sets.
@@ -66,8 +67,13 @@ namespace mongo {
 
        See _logOp() in oplog.cpp for more details.
     */
-    void logOp( const char *opstr, const char *ns, const BSONObj& obj,
-                BSONObj *patt = NULL, bool *b = NULL, bool fromMigrate = false,
+    void logOp( TransactionExperiment* txn,
+                const char *opstr,
+                const char *ns,
+                const BSONObj& obj,
+                BSONObj *patt = NULL,
+                bool *b = NULL,
+                bool fromMigrate = false,
                 const BSONObj* fullObj = NULL );
 
     // Log an empty no-op operation to the local oplog
@@ -90,7 +96,8 @@ namespace mongo {
      * @param convertUpdateToUpsert convert some updates to upserts for idempotency reasons
      * Returns if the op was an update that could not be applied (true on failure)
      */
-    bool applyOperation_inlock(Database* db,
+    bool applyOperation_inlock(TransactionExperiment* txn,
+                               Database* db,
                                const BSONObj& op,
                                bool fromRepl = true,
                                bool convertUpdateToUpsert = false);

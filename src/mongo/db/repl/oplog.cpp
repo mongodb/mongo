@@ -85,7 +85,14 @@ namespace mongo {
                  result.isOK() );
     }
 
-    static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
+    static void _logOpUninitialized(TransactionExperiment* txn,
+                                    const char *opstr,
+                                    const char *ns,
+                                    const char *logNS,
+                                    const BSONObj& obj,
+                                    BSONObj *o2,
+                                    bool *bb,
+                                    bool fromMigrate ) {
         uassert(13288, "replSet error write op to db before replSet initialized", str::startsWith(ns, "local.") || *opstr == 'n');
     }
 
@@ -94,7 +101,7 @@ namespace mongo {
         */
     void _logOpObjRS(const BSONObj& op) {
         Lock::DBWrite lk("local");
-        DurTransaction txn; //XXX should be part of parent txn
+        DurTransaction txn;
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -104,7 +111,7 @@ namespace mongo {
                 Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
                 localDB = ctx.db();
                 verify( localDB );
-                localOplogRSCollection = localDB->getCollection( rsoplog );
+                localOplogRSCollection = localDB->getCollection( &txn, rsoplog );
                 massert(13389,
                         "local.oplog.rs missing. did you drop it? if so restart server",
                         localOplogRSCollection);
@@ -203,7 +210,14 @@ namespace mongo {
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
     static const int OPLOG_VERSION = 2;
-    static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
+    static void _logOpRS(TransactionExperiment* txn,
+                         const char *opstr,
+                         const char *ns,
+                         const char *logNS,
+                         const BSONObj& obj,
+                         BSONObj *o2,
+                         bool *bb,
+                         bool fromMigrate ) {
         Lock::DBWrite lk1("local");
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -254,14 +268,13 @@ namespace mongo {
             Client::Context ctx(rsoplog, storageGlobalParams.dbpath);
             localDB = ctx.db();
             verify( localDB );
-            localOplogRSCollection = localDB->getCollection( rsoplog );
+            localOplogRSCollection = localDB->getCollection( txn, rsoplog );
             massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", localOplogRSCollection);
         }
 
         Client::Context ctx(rsoplog, localDB);
-        DurTransaction txn; // XXX
         OplogDocWriter writer( partial, obj );
-        checkOplogInsert( localOplogRSCollection->insertDocument( &txn, &writer, false ) );
+        checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
         /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
            this code (or code in now() maybe) should be improved.
@@ -285,7 +298,14 @@ namespace mongo {
 
     }
 
-    static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
+    static void _logOpOld(TransactionExperiment* txn,
+                          const char *opstr,
+                          const char *ns,
+                          const char *logNS,
+                          const BSONObj& obj,
+                          BSONObj *o2,
+                          bool *bb,
+                          bool fromMigrate ) {
         Lock::DBWrite lk("local");
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
@@ -326,19 +346,25 @@ namespace mongo {
             Client::Context ctx(logNS, storageGlobalParams.dbpath);
             localDB = ctx.db();
             verify( localDB );
-            localOplogMainCollection = localDB->getCollection(logNS);
+            localOplogMainCollection = localDB->getCollection(txn, logNS);
             verify( localOplogMainCollection );
         }
 
         Client::Context ctx(logNS , localDB);
-        DurTransaction txn; //XXX should be part of parent txn
         OplogDocWriter writer( partial, obj );
-        checkOplogInsert( localOplogMainCollection->insertDocument( &txn, &writer, false ) );
+        checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
 
         context.getClient()->setLastOp( ts );
     }
 
-    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) = _logOpOld;
+    static void (*_logOp)(TransactionExperiment* txn,
+                          const char *opstr,
+                          const char *ns,
+                          const char *logNS,
+                          const BSONObj& obj,
+                          BSONObj *o2,
+                          bool *bb,
+                          bool fromMigrate ) = _logOpOld;
     void newReplUp() {
         replSettings.master = true;
         _logOp = _logOpRS;
@@ -350,13 +376,15 @@ namespace mongo {
     void oldRepl() { _logOp = _logOpOld; }
 
     void logKeepalive() {
-        _logOp("n", "", 0, BSONObj(), 0, 0, false);
+        DurTransaction txn;
+        _logOp(&txn, "n", "", 0, BSONObj(), 0, 0, false);
     }
     void logOpComment(const BSONObj& obj) {
-        _logOp("n", "", 0, obj, 0, 0, false);
+        DurTransaction txn;
+        _logOp(&txn, "n", "", 0, obj, 0, 0, false);
     }
-    void logOpInitiate(const BSONObj& obj) {
-        _logOpRS("n", "", 0, obj, 0, 0, false);
+    void logOpInitiate(TransactionExperiment* txn, const BSONObj& obj) {
+        _logOpRS(txn, "n", "", 0, obj, 0, 0, false);
     }
 
     /*@ @param opstr:
@@ -366,7 +394,8 @@ namespace mongo {
           d delete / remove
           u update
     */
-    void logOp(const char* opstr,
+    void logOp(TransactionExperiment* txn,
+               const char* opstr,
                const char* ns,
                const BSONObj& obj,
                BSONObj* patt,
@@ -374,7 +403,7 @@ namespace mongo {
                bool fromMigrate,
                const BSONObj* fullObj) {
         if ( replSettings.master ) {
-            _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
+            _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
         logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
@@ -397,8 +426,8 @@ namespace mongo {
             ns = rsoplog;
 
         Client::Context ctx(ns);
-        DurTransaction txn; // XXX
-        Collection* collection = ctx.db()->getCollection( ns );
+        DurTransaction txn;
+        Collection* collection = ctx.db()->getCollection( &txn, ns );
 
         if ( collection ) {
 
@@ -460,7 +489,7 @@ namespace mongo {
 
         invariant( ctx.db()->createCollection( &txn, ns, options ) );
         if( !rs )
-            logOp( "n", "", BSONObj() );
+            logOp( &txn, "n", "", BSONObj() );
 
         /* sync here so we don't get any surprising lag later when we try to sync */
         MemoryMappedFile::flushAll(true);
@@ -472,9 +501,11 @@ namespace mongo {
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
-    bool applyOperation_inlock(Database* db, const BSONObj& op,
-                               bool fromRepl, bool convertUpdateToUpsert) {
-        DurTransaction txn; //XXX should be part of parent txn
+    bool applyOperation_inlock(TransactionExperiment* txn,
+                               Database* db,
+                               const BSONObj& op,
+                               bool fromRepl,
+                               bool convertUpdateToUpsert) {
         LOG(3) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
@@ -503,7 +534,7 @@ namespace mongo {
 
         Lock::assertWriteLocked(ns);
 
-        Collection* collection = db->getCollection( ns );
+        Collection* collection = db->getCollection( txn, ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 
         // operation type -- see logOp() comments for types
@@ -559,7 +590,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(&txn, request, &debug);
+                    update(txn, request, &debug);
 
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
@@ -588,7 +619,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(&txn, request, &debug);
+                    update(txn, request, &debug);
                 }
             }
         }
@@ -615,7 +646,7 @@ namespace mongo {
             UpdateLifecycleImpl updateLifecycle(true, requestNs);
             request.setLifecycle(&updateLifecycle);
 
-            UpdateResult ur = update(&txn, request, &debug);
+            UpdateResult ur = update(txn, request, &debug);
 
             if( ur.numMatched == 0 ) {
                 if( ur.modifiers ) {
@@ -656,7 +687,7 @@ namespace mongo {
         else if ( *opType == 'd' ) {
             opCounters->gotDelete();
             if ( opType[1] == 0 )
-                deleteObjects(&txn, ns, o, /*justOne*/ valueB);
+                deleteObjects(txn, ns, o, /*justOne*/ valueB);
             else
                 verify( opType[1] == 'b' ); // "db" advertisement
         }

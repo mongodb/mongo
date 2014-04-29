@@ -1658,8 +1658,9 @@ namespace mongo {
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
                     Client::WriteContext ctx( ns );
+                    DurTransaction txn;
                     Database* db = ctx.ctx().db();
-                    Collection* collection = db->getCollection( ns );
+                    Collection* collection = db->getCollection( &txn, ns );
                     if ( !collection ) {
                         errmsg = str::stream() << "collection dropped during migration: " << ns;
                         warning() << errmsg;
@@ -1678,7 +1679,7 @@ namespace mongo {
                     }
 
                     // make sure to create index on secondaries as well
-                    logOp( "i", db->getSystemIndexesName().c_str(), idx,
+                    logOp( &txn, "i", db->getSystemIndexesName().c_str(), idx,
                            NULL, NULL, true /* fromMigrate */ );
                 }
 

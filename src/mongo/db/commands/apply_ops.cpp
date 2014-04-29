@@ -41,6 +41,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
     class ApplyOpsCmd : public Command {
@@ -83,6 +84,7 @@ namespace mongo {
             // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
             // ns used so locking individually requires more analysis
             Lock::GlobalWrite globalWriteLock;
+            DurTransaction txn;
 
             // Preconditions check reads the database state, so needs to be done locked
             if ( cmdObj["preCondition"].type() == Array ) {
@@ -128,7 +130,7 @@ namespace mongo {
                 invariant(Lock::nested());
 
                 Client::Context ctx(ns);
-                bool failed = applyOperation_inlock(ctx.db(), temp, false, alwaysUpsert);
+                bool failed = applyOperation_inlock(&txn, ctx.db(), temp, false, alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
@@ -159,7 +161,7 @@ namespace mongo {
                     }
                 }
 
-                logOp("c", tempNS.c_str(), cmdBuilder.done());
+                logOp(&txn, "c", tempNS.c_str(), cmdBuilder.done());
             }
 
             return errors == 0;

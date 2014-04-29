@@ -824,7 +824,7 @@ namespace mongo {
                 return;
 
             uassertStatusOK( status );
-            logOp( "i", ns, js );
+            logOp( txn, "i", ns, js );
             return;
         }
 
@@ -841,7 +841,7 @@ namespace mongo {
 
         StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );
         uassertStatusOK( status.getStatus() );
-        logOp("i", ns, js);
+        logOp(txn, "i", ns, js);
     }
 
     NOINLINE_DECL void insertMulti(TransactionExperiment* txn,

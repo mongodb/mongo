@@ -141,7 +141,7 @@ namespace mongo {
                 options = b.obj();
             }
             string logNs = nsToDatabase(ns) + ".$cmd";
-            logOp("c", logNs.c_str(), options);
+            logOp(txn, "c", logNs.c_str(), options);
         }
 
         return Status::OK();

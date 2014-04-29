@@ -176,7 +176,7 @@ namespace ReplTests {
                     if ( 0 ) {
                         mongo::unittest::log() << "op: " << *i << endl;
                     }
-                    a.applyOperation( ctx.db(), *i );
+                    a.applyOperation( &txn, ctx.db(), *i );
                 }
             }
         }

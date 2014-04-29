@@ -430,7 +430,7 @@ namespace mongo {
                 if ( callback )
                     callback->goingToDelete( obj );
 
-                logOp("d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
+                logOp(&txn, "d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
                 collection->deleteDocument( &txn, rloc );
                 numDeleted++;
             }

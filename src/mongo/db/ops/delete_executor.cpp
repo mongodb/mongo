@@ -176,7 +176,7 @@ namespace mongo {
                 }
                 else {
                     bool replJustOne = true;
-                    logOp("d", ns.ns().c_str(), toDelete, 0, &replJustOne);
+                    logOp(txn, "d", ns.ns().c_str(), toDelete, 0, &replJustOne);
                 }
             }
 

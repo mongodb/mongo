@@ -354,7 +354,7 @@ namespace mongo {
                     b.append( "create", nsToCollectionSubstring( _config.incLong ));
                     b.appendElements( options.toBSON() );
                     string logNs = nsToDatabase( _config.incLong ) + ".$cmd";
-                    logOp( "c", logNs.c_str(), b.obj() );
+                    logOp( &txn, "c", logNs.c_str(), b.obj() );
                 }
 
                 BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
@@ -362,7 +362,7 @@ namespace mongo {
                 Status status = incColl->getIndexCatalog()->createIndex( indexSpec, false );
                 // Log the createIndex operation.
                 string logNs = nsToDatabase( _config.incLong ) + ".system.indexes";
-                logOp( "i", logNs.c_str(), indexSpec );
+                logOp( &txn, "i", logNs.c_str(), indexSpec );
                 if ( !status.isOK() ) {
                     uasserted( 17305 , str::stream() << "createIndex failed for mr incLong ns: " <<
                             _config.incLong << " err: " << status.code() );
@@ -414,7 +414,7 @@ namespace mongo {
                     b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
                     b.appendElements( options.toBSON() );
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                    logOp( "c", logNs.c_str(), b.obj() );
+                    logOp( &txn, "c", logNs.c_str(), b.obj() );
                 }
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
@@ -422,7 +422,7 @@ namespace mongo {
                     tempColl->getIndexCatalog()->createIndex( *it, false );
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
-                    logOp( "i", logNs.c_str(), *it );
+                    logOp( &txn, "i", logNs.c_str(), *it );
                 }
             }
 
@@ -646,7 +646,7 @@ namespace mongo {
             BSONObj bo = b.obj();
 
             coll->insertDocument( &txn, bo, true );
-            logOp( "i", ns.c_str(), bo );
+            logOp( &txn, "i", ns.c_str(), bo );
         }
 
         /**
@@ -664,7 +664,7 @@ namespace mongo {
                                                   " collection expected: " << _config.incLong );
 
             coll->insertDocument( &txn, o, true );
-            logOp( "i", _config.incLong.c_str(), o );
+            logOp( &txn, "i", _config.incLong.c_str(), o );
             getDur().commitIfNeeded();
         }
 

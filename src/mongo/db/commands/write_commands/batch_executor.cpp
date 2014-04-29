@@ -1023,7 +1023,7 @@ namespace mongo {
             result->setError(toWriteError(status.getStatus()));
         }
         else {
-            logOp( "i", insertNS.c_str(), docToInsert );
+            logOp( &txn, "i", insertNS.c_str(), docToInsert );
             getDur().commitIfNeeded();
             result->getStats().n = 1;
         }
@@ -1038,6 +1038,7 @@ namespace mongo {
     static void singleCreateIndex( const BSONObj& indexDesc,
                                    Collection* collection,
                                    WriteOpResult* result ) {
+        DurTransaction txn;
 
         const string indexNS = collection->ns().getSystemIndexesCollection();
 
@@ -1052,7 +1053,7 @@ namespace mongo {
             result->setError(toWriteError(status));
         }
         else {
-            logOp( "i", indexNS.c_str(), indexDesc );
+            logOp( &txn, "i", indexNS.c_str(), indexDesc );
             result->getStats().n = 1;
         }
     }

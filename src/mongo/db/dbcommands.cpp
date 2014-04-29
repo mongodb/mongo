@@ -1645,7 +1645,8 @@ namespace mongo {
 
         retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
         if ( retval && c->logTheOp() && ! fromRepl ) {
-            logOp("c", cmdns, cmdObj);
+            DurTransaction txn; // XXX
+            logOp(&txn, "c", cmdns, cmdObj);
         }
 
         appendCommandStatus(result, retval, errmsg);
