@@ -39,6 +39,7 @@
 #include "mongo/db/geo/s2.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
+#include "mongo/db/index/expression_params.h" // DEFAULT_PREFIX_LENGTH
 
 namespace mongo {
 
@@ -228,6 +229,19 @@ namespace mongo {
                    || MatchExpression::MATCH_IN == expr->matchType());
         }
 
+        bool isPrefixed = false;
+        int prefixLength = 0;
+        if (mongoutils::str::equals("prefix", elt.valuestrsafe())) {
+            isPrefixed = true;
+            verify(expr->isComparision() || MatchExpression::MATCH_IN == expr->matchType());
+            if (index.infoObj["prefixLength"].eoo()) {
+                prefixLength = ExpressionParams::DEFAULT_PREFIX_LENGTH;
+            }
+            else {
+                prefixLength = index.infoObj["prefixLength"].numberInt();
+            }
+        }
+
         if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
             OrderedIntervalList acc;
             translate(expr->getChild(0), elt, index, &acc, tightnessOut);
@@ -333,7 +347,8 @@ namespace mongo {
         }
         else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
-            translateEquality(node->getData(), isHashed, oilOut, tightnessOut);
+            translateEquality(node->getData(), isHashed, oilOut, tightnessOut,
+                              isPrefixed, prefixLength);
         }
         else if (MatchExpression::LTE == expr->matchType()) {
             const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
@@ -354,7 +369,13 @@ namespace mongo {
             else {
                 bob.appendMinForType("", dataElt.type());
             }
-            bob.appendAs(dataElt, "");
+            if (isPrefixed) {
+                BSONObj obj = ExpressionMapping::prefix(dataElt, prefixLength);
+                bob.appendAs(obj.getField(""), "");
+            }
+            else {
+                bob.appendAs(dataElt, "");
+            }
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), true));
@@ -385,7 +406,13 @@ namespace mongo {
             else {
                 bob.appendMinForType("", dataElt.type());
             }
-            bob.appendAs(dataElt, "");
+            if (isPrefixed) {
+                BSONObj obj = ExpressionMapping::prefix(dataElt, prefixLength);
+                bob.appendAs(obj.getField(""), "");
+            }
+            else {
+                bob.appendAs(dataElt, "");
+            }
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             Interval interval = makeRangeInterval(dataObj, typeMatch(dataObj), false);
@@ -415,7 +442,13 @@ namespace mongo {
             }
 
             BSONObjBuilder bob;
-            bob.appendAs(node->getData(), "");
+            if (isPrefixed) {
+                BSONObj obj = ExpressionMapping::prefix(dataElt, prefixLength);
+                bob.appendAs(obj.getField(""), "");
+            }
+            else {
+                bob.appendAs(dataElt, "");
+            }
             if (dataElt.isNumber()) {
                 bob.appendNumber("", std::numeric_limits<double>::infinity());
             }
@@ -451,7 +484,13 @@ namespace mongo {
             }
 
             BSONObjBuilder bob;
-            bob.appendAs(dataElt, "");
+            if (isPrefixed) {
+                BSONObj obj = ExpressionMapping::prefix(dataElt, prefixLength);
+                bob.appendAs(obj.getField(""), "");
+            }
+            else {
+                bob.appendAs(dataElt, "");
+            }
             if (dataElt.isNumber()) {
                 bob.appendNumber("", std::numeric_limits<double>::infinity());
             }
@@ -503,7 +542,8 @@ namespace mongo {
             IndexBoundsBuilder::BoundsTightness tightness;
             for (BSONElementSet::iterator it = afr.equalities().begin();
                  it != afr.equalities().end(); ++it) {
-                translateEquality(*it, isHashed, oilOut, &tightness);
+                translateEquality(*it, isHashed, oilOut, &tightness,
+                                  isPrefixed, prefixLength);
                 if (tightness != IndexBoundsBuilder::EXACT) {
                     *tightnessOut = tightness;
                 }
@@ -748,14 +788,21 @@ namespace mongo {
     }
 
     // static
-    void IndexBoundsBuilder::translateEquality(const BSONElement& data, bool isHashed,
-                                               OrderedIntervalList* oil, BoundsTightness* tightnessOut) {
+    void IndexBoundsBuilder::translateEquality(const BSONElement& data,
+                                               bool isHashed,
+                                               OrderedIntervalList* oil,
+                                               BoundsTightness* tightnessOut,
+                                               bool isPrefixed,
+                                               int prefixLength) {
         // We have to copy the data out of the parse tree and stuff it into the index
         // bounds.  BSONValue will be useful here.
         if (Array != data.type()) {
             BSONObj dataObj;
             if (isHashed) {
                 dataObj = ExpressionMapping::hash(data);
+            }
+            else if (isPrefixed) {
+                dataObj = ExpressionMapping::prefix(data, prefixLength);
             }
             else {
                 dataObj = objFromElement(data);

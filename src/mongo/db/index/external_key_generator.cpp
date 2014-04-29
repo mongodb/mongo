@@ -76,6 +76,13 @@ namespace {
             ExpressionParams::parseHashParams(infoObj, &seed, &version, &field);
             ExpressionKeysPrivate::getHashKeys(doc, field, seed, version, infoObj["sparse"].trueValue(), keys);
         }
+        else if (IndexNames::PREFIX == type) {
+            int prefixLength;
+            string field;
+            ExpressionParams::parsePrefixParams(infoObj, &prefixLength, &field);
+            ExpressionKeysPrivate::getPrefixKeys(doc, field, prefixLength,
+                                                 infoObj["sparse"].trueValue(), keys);
+        }
         else {
             invariant(IndexNames::BTREE == type);
 
