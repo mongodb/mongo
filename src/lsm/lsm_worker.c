@@ -253,6 +253,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
+	j = 0;
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
 
