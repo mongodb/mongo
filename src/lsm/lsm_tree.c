@@ -165,8 +165,8 @@ __lsm_tree_set_name(WT_SESSION_IMPL *session,
  *	Get the URI of the Bloom filter for a given chunk.
  */
 int
-__wt_lsm_tree_bloom_name(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, uint32_t id, void *retp)
+__wt_lsm_tree_bloom_name(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, uint32_t id, const char **retp)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
@@ -185,8 +185,8 @@ err:	__wt_scr_free(&tmp);
  *	Get the URI of the file for a given chunk.
  */
 int
-__wt_lsm_tree_chunk_name(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, uint32_t id, void *retp)
+__wt_lsm_tree_chunk_name(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, uint32_t id, const char **retp)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
