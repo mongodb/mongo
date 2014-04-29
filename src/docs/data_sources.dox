@@ -104,5 +104,5 @@ corresponding key, as shown in the following example:
 
 @snippet ex_stat.c statistics retrieve by key
 
-See @ref tuning_statistics for more examples of how statistics can be used.
+See @ref tune_statistics for more examples of how statistics can be used.
 */

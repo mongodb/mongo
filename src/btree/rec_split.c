@@ -418,7 +418,8 @@ __split_inmem_build(
     WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref, WT_MULTI *multi)
 {
 	WT_CURSOR_BTREE cbt;
-	WT_ITEM key;
+	WT_DECL_ITEM(key);
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *skip;
@@ -427,7 +428,6 @@ __split_inmem_build(
 
 	WT_CLEAR(cbt);
 	cbt.btree = S2BT(session);
-	WT_CLEAR(key);
 
 	/*
 	 * We can find unresolved updates when attempting to evict a page, which
@@ -450,6 +450,9 @@ __split_inmem_build(
 	 */
 	multi->skip_dsk = NULL;
 
+	if (orig->type == WT_PAGE_ROW_LEAF)
+		WT_RET(__wt_scr_alloc(session, 0, &key));
+
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip)
 		switch (orig->type) {
@@ -461,10 +464,10 @@ __split_inmem_build(
 			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
-			WT_RET(__wt_col_search(session, recno, ref, &cbt));
+			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_col_modify(
+			WT_ERR(__wt_col_modify(
 			    session, &cbt, recno, NULL, upd, 0));
 			break;
 		case WT_PAGE_ROW_LEAF:
@@ -474,27 +477,35 @@ __split_inmem_build(
 				upd = orig->pg_row_upd[slot];
 				orig->pg_row_upd[slot] = NULL;
 
-				WT_RET(__wt_row_leaf_key(
-				    session, orig, skip->rip, &key, 0));
+				WT_ERR(__wt_row_leaf_key(
+				    session, orig, skip->rip, key, 0));
 			} else {
 				upd = skip->ins->upd;
 				skip->ins->upd = NULL;
 
-				key.data = WT_INSERT_KEY(skip->ins);
-				key.size = WT_INSERT_KEY_SIZE(skip->ins);
+				key->data = WT_INSERT_KEY(skip->ins);
+				key->size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
 
 			/* Search the page. */
-			WT_RET(__wt_row_search(session, &key, ref, &cbt));
+			WT_ERR(__wt_row_search(session, key, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_row_modify(
-			    session, &cbt, &key, NULL, upd, 0));
+			WT_ERR(
+			    __wt_row_modify(session, &cbt, key, NULL, upd, 0));
 			break;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
-	return (0);
+	/*
+	 * We modified the page above, which will have copied the current
+	 * checkpoint generation.  If there is a checkpoint in progress, it
+	 * must write this page, so reset the checkpoint generation to zero.
+	 */
+	page->modify->checkpoint_gen = 0;
+
+err:	__wt_scr_free(&key);
+	return (ret);
 }
 
 /*
@@ -583,16 +594,17 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *parent, *child;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_PAGE_MODIFY *mod;
-	WT_REF **alloc_refp, **ref_tmp;
+	WT_REF **alloc_refp, *parent_ref, **ref_tmp;
 	size_t parent_decr, parent_incr, size;
 	uint32_t i, j, parent_entries, result_entries, split_entries;
-	int complete, locked;
+	int complete, hazard, locked;
 
 	kpack = &_kpack;
 	alloc_index = NULL;
+	parent_ref = NULL;
 	ref_tmp = NULL;
 	parent_decr = parent_incr = 0;
-	complete = locked = 0;
+	complete = hazard = locked = 0;
 
 	child = ref->page;
 	mod = child->modify;
@@ -633,6 +645,18 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		__wt_yield();
 	}
 	locked = 1;
+
+	/*
+	 * We have exclusive access to the parent, and at this point, the child
+	 * prevents the parent from being evicted.  However, once we update the
+	 * parent's index, it will no longer refer to the child, and could
+	 * conceivably be evicted.  Get a hazard pointer on the parent now, so
+	 * that we can safely access it after updating the index.
+	 */
+	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
+		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_GEN));
+		hazard = 1;
+	}
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
@@ -784,6 +808,9 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 err:	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+
+	if (hazard)
+		WT_TRET(__wt_hazard_clear(session, parent));
 
 	/*
 	 * Discard the child; test for split completion instead of errors, there

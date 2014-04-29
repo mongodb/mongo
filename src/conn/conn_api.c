@@ -605,7 +605,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 		WT_ERR(__wt_cond_signal(
 		    session, __wt_process.cache_pool->cache_pool_cond));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

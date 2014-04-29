@@ -31,8 +31,6 @@ struct __wt_index {
 	const char *key_format;		/* Key format */
 	const char *key_plan;		/* Key projection plan */
 	const char *value_plan;		/* Value projection plan */
-
-	int need_value;			/* Index must have a non-empty value */
 };
 
 /*

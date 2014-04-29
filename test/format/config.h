@@ -183,6 +183,10 @@ static CONFIG c[] = {
 	  "maximum size of Btree leaf nodes",
 	  0x0, 0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
 
+	{ "logging",
+	  "if logging configured",				/* 30% */
+	  0x0, C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+
 	{ "merge_max",
 	  "the maximum number of chunks to include in a merge operation",
 	  0x0, 0x0, 4, 20, 100, &g.c_merge_max, NULL },
@@ -241,7 +245,7 @@ static CONFIG c[] = {
 
 	{ "value_min",
 	  "minimum size of values",
-	  C_ROW|C_VAR, 0x0, 1, 20, 4096, &g.c_value_min, NULL },
+	  C_ROW|C_VAR, 0x0, 0, 20, 4096, &g.c_value_min, NULL },
 
 	{ "wiredtiger_config",
 	  "configuration string used to wiredtiger_open",

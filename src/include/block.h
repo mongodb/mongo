@@ -55,6 +55,8 @@ struct __wt_extlist {
 
 	int	track_size;			/* Maintain per-size skiplist */
 
+	WT_EXT	*last;				/* Cached last element */
+
 	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Size/offset skiplists */
 	WT_SIZE *sz[WT_SKIP_MAXDEPTH];
 };

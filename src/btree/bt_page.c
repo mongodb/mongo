@@ -77,12 +77,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			page = ref->page;
 			WT_ASSERT(session, page != NULL);
 
-			/*
-			 * Force evict pages that are too big.  Only do this
-			 * check if there is a chance of eviction succeeding.
-			 * That is, if the updates on the page are visible to
-			 * the running transaction.
-			 */
+			/* Forcibly evict pages that are too big. */
 			if (!LF_ISSET(WT_READ_NO_GEN) &&
 			    force_attempts < 10 &&
 			    __wt_eviction_force_check(session, page)) {
@@ -233,15 +228,18 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_PAGE_HEADER *dsk, uint32_t flags, WT_PAGE **pagep)
+__wt_page_inmem(WT_SESSION_IMPL *session,
+    WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_HEADER *dsk;
 	uint32_t alloc_entries;
 	size_t size;
 
 	*pagep = NULL;
+
+	dsk = (WT_PAGE_HEADER *)image;
 	alloc_entries = 0;
 
 	/*

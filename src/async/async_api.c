@@ -96,7 +96,7 @@ __async_search(WT_ASYNC_OP *asyncop)
 	ASYNCOP_API_CALL(O2C(op), session, search);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_search);
 	WT_ERR(__async_op_wrap(op, WT_AOP_SEARCH));
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -115,7 +115,7 @@ __async_insert(WT_ASYNC_OP *asyncop)
 	ASYNCOP_API_CALL(O2C(op), session, insert);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_insert);
 	WT_ERR(__async_op_wrap(op, WT_AOP_INSERT));
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -134,7 +134,7 @@ __async_update(WT_ASYNC_OP *asyncop)
 	ASYNCOP_API_CALL(O2C(op), session, update);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_update);
 	WT_ERR(__async_op_wrap(op, WT_AOP_UPDATE));
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -153,7 +153,7 @@ __async_remove(WT_ASYNC_OP *asyncop)
 	ASYNCOP_API_CALL(O2C(op), session, remove);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_remove);
 	WT_ERR(__async_op_wrap(op, WT_AOP_REMOVE));
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -172,7 +172,7 @@ __async_compact(WT_ASYNC_OP *asyncop)
 	ASYNCOP_API_CALL(O2C(op), session, compact);
 	WT_STAT_FAST_CONN_INCR(O2S(op), async_op_compact);
 	WT_ERR(__async_op_wrap(op, WT_AOP_COMPACT));
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 

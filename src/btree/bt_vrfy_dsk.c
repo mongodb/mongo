@@ -332,6 +332,7 @@ __verify_dsk_row(
 			 * space, then shift the decoded data past the prefix
 			 * and copy the prefix into place.  Take care with the
 			 * pointers: current->data may be pointing inside the
+			 * buffer.
 			 */
 			if (prefix != 0) {
 				WT_ERR(__wt_buf_grow(

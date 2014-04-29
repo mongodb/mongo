@@ -126,7 +126,6 @@ struct __wt_item {
 #ifndef DOXYGEN
 #define	WT_ITEM_ALIGNED					0x00000001
 #define	WT_ITEM_INUSE					0x00000002
-#define	WT_ITEM_MAPPED					0x00000004
 	/* This appears in the middle of the struct to avoid padding. */
 	/*! Object flags (internal use). */
 	uint32_t flags;

@@ -53,7 +53,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
-__wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+__wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_DECL_RET;
 	WT_TXN_OP *op;
@@ -61,16 +61,9 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    TXN_OP_INMEM : TXN_OP_BASIC;
-	/* If we are logging, we need a reference to the key. */
-	if (cbt->btree->type == BTREE_ROW && S2C(session)->logging)
-		WT_ERR(__wt_cursor_row_leaf_key(cbt, &op->u.op.key));
-	op->u.op.ins = cbt->ins;
-	op->u.op.upd = upd;
+	op->u.upd = upd;
 	op->fileid = S2BT(session)->id;
 	upd->txnid = session->txn.id;
-	if (0) {
-err:            __wt_txn_unmodify(session);
-	}
 	return (ret);
 }
 
@@ -86,7 +79,7 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__txn_next_op(session, &op));
 	op->type = TXN_OP_REF;
 	op->u.ref = ref;
-	return (0);
+	return (__wt_txn_log_op(session, NULL));
 }
 
 /*
@@ -97,12 +90,24 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline int
 __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
-	WT_TXN_GLOBAL *txn_global;
 	uint64_t oldest_id;
 
-	txn_global = &S2C(session)->txn_global;
-	oldest_id = txn_global->oldest_id;
+	oldest_id = S2C(session)->txn_global.oldest_id;
 	return (TXNID_LT(id, oldest_id));
+}
+
+/*
+ * __wt_txn_visible_apps --
+ *	Check if a given transaction ID is visible to all application
+ *	transactions (that is, all transactions other than checkpoints).
+ */
+static inline int
+__wt_txn_visible_apps(WT_SESSION_IMPL *session, uint64_t id)
+{
+	uint64_t oldest_app_id;
+
+	oldest_app_id = S2C(session)->txn_global.oldest_app_id;
+	return (TXNID_LT(id, oldest_app_id));
 }
 
 /*
@@ -116,7 +121,10 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	txn = &session->txn;
 
-	/* Eviction only sees globally visible updates. */
+	/*
+	 * Eviction only sees globally visible updates, or if there is a
+	 * checkpoint transaction running, use its transaction.
+	*/
 	if (txn->isolation == TXN_ISO_EVICTION)
 		return (__wt_txn_visible_all(session, id));
 

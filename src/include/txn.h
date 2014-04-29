@@ -40,6 +40,24 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
+	/*
+	 * The oldest transaction ID not yet visible to transactions,
+	 * excluding any checkpoint in progress.
+	 */
+	uint64_t oldest_app_id;
+
+	/*
+	 * The transaction ID of a running checkpoint transaction (if any).
+	 */
+	uint64_t checkpoint_txn;
+
+	/*
+	 * The current checkpoint generation.  Use a 32-bit count for now: if
+	 * we can do 4 billion checkpoints without a restart, we'll be in good
+	 * shape.
+	 */
+	uint32_t checkpoint_gen;
+
 	/* Count of scanning threads, or -1 for exclusive access. */
 	volatile int32_t scan_count;
 
@@ -70,11 +88,7 @@ struct __wt_txn_op {
 	} type;
 	union {
 		/* TXN_OP_BASIC, TXN_OP_INMEM */
-		struct {
-			WT_INSERT *ins;
-			WT_UPDATE *upd;
-			WT_ITEM key;
-		} op;
+		WT_UPDATE *upd;
 		/* TXN_OP_REF */
 		WT_REF *ref;
 		/* TXN_OP_TRUNCATE_COL */
@@ -117,6 +131,9 @@ struct __wt_txn {
 	WT_TXN_OP      *mod;
 	size_t		mod_alloc;
 	u_int		mod_count;
+
+	/* Scratch buffer for in-memory log records. */
+	WT_ITEM	       *logrec;
 
 	/* Requested notification when transactions are resolved. */
 	WT_TXN_NOTIFY *notify;

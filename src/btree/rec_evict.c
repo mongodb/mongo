@@ -241,6 +241,7 @@ __rec_review(
 	WT_PAGE_MODIFY *mod;
 	WT_REF *child;
 	uint32_t flags;
+	int behind_checkpoint;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -291,14 +292,12 @@ __rec_review(
 			}
 		} WT_INTL_FOREACH_END;
 
-	mod = page->modify;
-
 	/*
-	 * If the file is being checkpointed, we stop evicting dirty pages: the
-	 * problem is if we write a page, the previous version of the page will
-	 * be free'd, which previous version might be referenced by an internal
-	 * page already been written in service of the checkpoint, leaving the
-	 * checkpoint inconsistent.
+	 * If the file is being checkpointed, we can't evict dirty pages already
+	 * visited during the checkpoint: if we write a page and free the
+	 * previous version of the page, that previous version might be
+	 * referenced by an internal page already been written in the
+	 * checkpoint, leaving the checkpoint inconsistent.
 	 *     Don't rely on new updates being skipped by the transaction used
 	 * for transaction reads: (1) there are paths that dirty pages for
 	 * artificial reasons; (2) internal pages aren't transactional; and
@@ -312,7 +311,11 @@ __rec_review(
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	if (btree->checkpointing && __wt_page_is_modified(page)) {
+	mod = page->modify;
+	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
+	    mod->checkpoint_gen >= S2C(session)->txn_global.checkpoint_gen;
+
+	if (behind_checkpoint && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
@@ -322,8 +325,7 @@ __rec_review(
 	 * If we are checkpointing, we can't merge multiblock pages into their
 	 * parent.
 	 */
-	if (btree->checkpointing &&
-	    mod != NULL && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
+	if (behind_checkpoint && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
 		return (EBUSY);
 
 	/*
@@ -351,20 +353,23 @@ __rec_review(
 	 * Otherwise, if the top-level page we're evicting is a leaf page, set
 	 * the update-restore flag, so reconciliation will write blocks it can
 	 * write and create a list of skipped updates for blocks it cannot
-	 * write.   This is how forced eviction of huge pages works: we take a
+	 * write.  This is how forced eviction of huge pages works: we take a
 	 * big page and reconcile it into blocks, some of which we write and
 	 * discard, the rest of which we re-create as smaller in-memory pages,
 	 * (restoring the updates that stopped us from writing the block), and
 	 * inserting the whole mess into the page's parent.
-	 *	Don't set the update-restore flag for internal pages, they don't
+	 *
+	 * Don't set the update-restore flag for internal pages, they don't
 	 * have updates that can be saved and restored.
-	 *	Don't set the update-restore flag for small pages.  (If a small
+	 *
+	 * Don't set the update-restore flag for small pages.  (If a small
 	 * page were selected by eviction and then modified, and we configure it
 	 * for update-restore, we'll end up splitting one or two pages into the
 	 * parent, which is a waste of effort.  If we don't set update-restore,
 	 * eviction will return EBUSY, which makes more sense, the page was just
 	 * modified.)
-	 *	Don't set the update-restore flag for any page other than the
+	 *
+	 * Don't set the update-restore flag for any page other than the
 	 * top one; only the reconciled top page goes through the split path
 	 * (and child pages are pages we expect to merge into the top page, they
 	 * they are not expected to split).
@@ -386,7 +391,7 @@ __rec_review(
 		 * on the page are old enough they can be discarded from cache.
 		 */
 		if (!exclusive && mod != NULL &&
-		    !__wt_txn_visible_all(session, mod->rec_max_txn))
+		    !__wt_txn_visible_apps(session, mod->rec_max_txn))
 			return (EBUSY);
 	}
 

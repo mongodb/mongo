@@ -30,16 +30,6 @@ if test "$wt_cv_enable_bzip2" = "yes"; then
 fi
 AM_CONDITIONAL([BZIP2], [test "$wt_cv_enable_bzip2" = "yes"])
 
-AC_MSG_CHECKING(if --enable-debug option specified)
-AC_ARG_ENABLE(debug,
-	[AS_HELP_STRING([--enable-debug],
-	    [Configure for debug symbols.])], r=$enableval, r=no)
-case "$r" in
-no)	wt_cv_enable_debug=no;;
-*)	wt_cv_enable_debug=yes;;
-esac
-AC_MSG_RESULT($wt_cv_enable_debug)
-
 AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
 AC_MSG_CHECKING(if --enable-diagnostic option specified)
 AC_ARG_ENABLE(diagnostic,

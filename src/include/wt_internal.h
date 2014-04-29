@@ -278,6 +278,7 @@ struct __wt_update;
 #include "extern.h"
 #include "verify_build.h"
 
+#include "buf.i"
 #include "intpack.i"			/* required by cell.i, packing.i */
 #include "packing.i"
 #include "cell.i"			/* required by btree.i */

@@ -39,7 +39,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 		    cindex->cg_cursors, cindex->value_plan, ap);
 	va_end(ap);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -57,7 +57,7 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	ret = ENOTSUP;
 err:	cursor->saved_err = ret;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
-	API_END(session);
+	API_END(session, ret);
 }
 
 /*
@@ -126,7 +126,7 @@ __curindex_next(WT_CURSOR *cursor)
 	if ((ret = cindex->child->next(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -148,7 +148,7 @@ __curindex_prev(WT_CURSOR *cursor)
 	if ((ret = cindex->child->prev(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -178,7 +178,7 @@ __curindex_reset(WT_CURSOR *cursor)
 		WT_TRET((*cp)->reset(*cp));
 	}
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -228,7 +228,7 @@ __curindex_search(WT_CURSOR *cursor)
 err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	}
 
-	API_END(session);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -251,7 +251,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	else
 		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -298,7 +298,7 @@ __curindex_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-err:	API_END(session);
+err:	API_END(session, ret);
 	return (ret);
 }
 
@@ -360,9 +360,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	    __curindex_close);		/* close */
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR *cursor;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_INDEX *idx;
-	WT_ITEM fmt, plan;
 	WT_TABLE *table;
 	const char *columns, *idxname, *tablename;
 	size_t namesize;
@@ -421,15 +421,17 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	/* Handle projections. */
 	if (columns != NULL) {
-		WT_CLEAR(fmt);
+		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), NULL, 0, &fmt));
-		cursor->value_format = __wt_buf_steal(session, &fmt);
+		    columns, strlen(columns), NULL, 0, tmp));
+		WT_ERR(__wt_strndup(
+		    session, tmp->data, tmp->size, &cursor->value_format));
 
-		WT_CLEAR(plan);
+		WT_ERR(__wt_buf_init(session, tmp, 0));
 		WT_ERR(__wt_struct_plan(session, table,
-		    columns, strlen(columns), 0, &plan));
-		cindex->value_plan = __wt_buf_steal(session, &plan);
+		    columns, strlen(columns), 0, tmp));
+		WT_ERR(__wt_strndup(
+		    session, tmp->data, tmp->size, &cindex->value_plan));
 	}
 
 	/* Open the column groups needed for this index cursor. */
@@ -442,5 +444,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 err:		WT_TRET(__curindex_close(cursor));
 	}
 
+	__wt_scr_free(&tmp);
 	return (ret);
 }

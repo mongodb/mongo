@@ -11,30 +11,15 @@ AC_CONFIG_SRCDIR([RELEASE])
 
 AM_INIT_AUTOMAKE([1.11 foreign parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
-AM_OPTIONS
 
-# If CFLAGS was not set on entry and we are not debugging, default to -O3
-wt_test_CFLAGS=${CFLAGS+set}
-if test "$wt_test_CFLAGS" != set && test "$wt_cv_enable_debug" != "yes"; then
-	CFLAGS="-O3"
-fi
-
-define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
-define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
-LT_PREREQ(2.2.6)
-LT_INIT([pic-only])
-AC_SUBST([LIBTOOL_DEPS])
+# If CFLAGS was not set on entry, default to "-O3 -g"
+: ${CFLAGS="-O3 -g"}
 
 AC_PROG_CC(cc gcc)
 # AC_PROG_CXX(c++ g++)
 
-# Add debugging flags if requested and not already in CFLAGS
-if test "$wt_cv_enable_debug" = "yes"; then
-	case "$CFLAGS" in
-		*-g*)	;;
-		*)	AM_CFLAGS="$AM_CFLAGS -g" ;;
-	esac
-fi
+# Configure options.
+AM_OPTIONS
 
 if test "$GCC" = "yes"; then
 	# The Solaris gcc compiler gets the additional -pthreads flag.
@@ -48,8 +33,6 @@ else
 	fi
 fi
 
-AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
-
 # Java and Python APIs
 if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
 	AX_PKG_SWIG(2.0.4, [],
@@ -61,9 +44,7 @@ if test "$wt_cv_enable_java" = "yes"; then
 	AX_PROG_JAVAC
 	AX_PROG_JAR
 	AX_JNI_INCLUDE_DIR
-	if test "$wt_cv_enable_debug" = "yes"; then
-		AX_CHECK_JUNIT
-	fi
+	AX_CHECK_JUNIT
 	for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS ; do
 		JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JNI_INCLUDE_DIR"
 	done
@@ -77,6 +58,12 @@ if test "$wt_cv_enable_python" = "yes"; then
 	fi
 	AC_SUBST(PYTHON_INSTALL_ARG)
 fi
+
+define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
+define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
+LT_PREREQ(2.2.6)
+LT_INIT([pic-only])
+AC_SUBST([LIBTOOL_DEPS])
 
 AM_TYPES
 

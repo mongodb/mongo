@@ -7,193 +7,44 @@
 
 #include "wt_internal.h"
 
-static void __wt_buf_clear(WT_ITEM *);
-
 /*
- * __wt_buf_clear --
- *	Clear a buffer.
- */
-static void
-__wt_buf_clear(WT_ITEM *buf)
-{
-	buf->data = NULL;
-	buf->size = 0;
-
-	buf->mem = NULL;
-	buf->memsize = 0;
-
-	/*
-	 * Note: don't clear the flags, the buffer remains marked for aligned
-	 * use as well as "in-use".
-	 */
-	F_CLR(buf, WT_ITEM_MAPPED);
-}
-
-/*
- * __wt_buf_grow --
+ * __wt_buf_grow_worker --
  *	Grow a buffer that's currently in-use.
  */
 int
-__wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
+__wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	size_t offset;
 	int set_data;
 
-	/* Clear buffers previously used for mapped returns. */
-	if (F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_buf_clear(buf);
-
-	if (size > buf->memsize) {
-		/*
-		 * Grow the buffer's memory: if the data reference is not set
-		 * or references the buffer's memory, maintain it.
-		 */
-		WT_ASSERT(session, buf->mem == NULL || buf->memsize > 0);
-		if (buf->data == NULL) {
-			offset = 0;
-			set_data = 1;
-		} else if (WT_DATA_IN_ITEM(buf)) {
-			offset = WT_PTRDIFF(buf->data, buf->mem);
-			set_data = 1;
-		} else {
-			offset = 0;
-			set_data = 0;
-		}
-
-		if (F_ISSET(buf, WT_ITEM_ALIGNED))
-			WT_RET(__wt_realloc_aligned(
-			    session, &buf->memsize, size, &buf->mem));
-		else
-			WT_RET(__wt_realloc(
-			    session, &buf->memsize, size, &buf->mem));
-
-		if (set_data)
-			buf->data = (uint8_t *)buf->mem + offset;
-	}
-	return (0);
-}
-
-/*
- * __wt_buf_extend --
- *	Extend a buffer that's currently in-use.  The difference from
- *	__wt_buf_grow is that extend is expected to be called repeatedly for
- *	the same buffer, and so grows the buffer exponentially to avoid
- *	repeated costly calls to realloc.
- */
-int
-__wt_buf_extend(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
-{
-	if (size <= buf->memsize)
-		return (0);
-
-	return (__wt_buf_grow(session, buf, WT_MAX(size, 2 * buf->memsize)));
-}
-
-/*
- * __wt_buf_init --
- *	Initialize a buffer at a specific size.
- */
-int
-__wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
-{
-	buf->data = buf->mem;
-	WT_RET(__wt_buf_grow(session, buf, size));
-	buf->size = 0;
-
-	return (0);
-}
-
-/*
- * __wt_buf_initsize --
- *	Initialize a buffer at a specific size, and set the data length.
- */
-int
-__wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
-{
-	WT_RET(__wt_buf_init(session, buf, size));
-	buf->size = size;			/* Set the data length. */
-
-	return (0);
-}
-
-/*
- * __wt_buf_set --
- *	Set the contents of the buffer.
- */
-int
-__wt_buf_set(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, const void *data, size_t size)
-{
-	/* Ensure the buffer is large enough. */
-	WT_RET(__wt_buf_initsize(session, buf, size));
-
-	/* Copy, allowing for overlapping strings. */
-	memmove(buf->mem, data, size);
-
-	return (0);
-}
-
-/*
- * __wt_buf_set_printable --
- *	Set the contents of the buffer to a printable representation of a
- * byte string.
- */
-int
-__wt_buf_set_printable(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, const void *from_arg, size_t size)
-{
-	return (__wt_raw_to_esc_hex(session, from_arg, size, buf));
-}
-
-/*
- * __wt_buf_steal --
- *	Steal a buffer for another purpose.
- */
-void *
-__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf)
-{
-	void *retp;
-
-	WT_ASSERT(session, !F_ISSET(buf, WT_ITEM_MAPPED));
+	WT_ASSERT(session, size > buf->memsize);
+	WT_ASSERT(session, buf->mem == NULL || buf->memsize > 0);
 
 	/*
-	 * Sometimes we steal a buffer for a different purpose, for example,
-	 * we've read in an overflow item, and now it's going to become a key
-	 * on an in-memory page, eventually freed when the page is discarded.
-	 *
-	 * First, correct for the possibility the data field doesn't point to
-	 * the start of memory (if we only have a single memory reference, it
-	 * must point to the start of the memory chunk, otherwise freeing the
-	 * memory isn't going to work out).  This is possibly a common case:
-	 * it happens when we read in overflow items and we want to skip over
-	 * the page header, so buf->data references a location past buf->mem.
+	 * Grow the buffer's memory: if the data reference is not set or
+	 * references the buffer's memory, maintain it.
 	 */
-	if (buf->data != buf->mem) {
-		WT_ASSERT(session, buf->data > buf->mem &&
-		    WT_PTRDIFF(buf->data, buf->mem) + buf->size <=
-		    buf->memsize);
-		memmove(buf->mem, buf->data, buf->size);
+	if (buf->data == NULL) {
+		offset = 0;
+		set_data = 1;
+	} else if (WT_DATA_IN_ITEM(buf)) {
+		offset = WT_PTRDIFF(buf->data, buf->mem);
+		set_data = 1;
+	} else {
+		offset = 0;
+		set_data = 0;
 	}
 
-	/* Second, give our caller the buffer's memory. */
-	retp = buf->mem;
+	if (F_ISSET(buf, WT_ITEM_ALIGNED))
+		WT_RET(__wt_realloc_aligned(
+		    session, &buf->memsize, size, &buf->mem));
+	else
+		WT_RET(__wt_realloc(session, &buf->memsize, size, &buf->mem));
 
-	/* Third, discard the buffer's memory. */
-	__wt_buf_clear(buf);
+	if (set_data)
+		buf->data = (uint8_t *)buf->mem + offset;
 
-	return (retp);
-}
-
-/*
- * __wt_buf_free --
- *	Free a buffer.
- */
-void
-__wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
-{
-	if (!F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_free(session, buf->mem);
-	__wt_buf_clear(buf);
+	return (0);
 }
 
 /*
@@ -206,10 +57,6 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 {
 	va_list ap;
 	size_t len;
-
-	/* Clear buffers previously used for mapped returns. */
-	if (F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_buf_clear(buf);
 
 	for (;;) {
 		va_start(ap, fmt);
@@ -227,8 +74,7 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		 * If not, double the size of the buffer: we're dealing with
 		 * strings, and we don't expect these numbers to get huge.
 		 */
-		WT_RET(__wt_buf_grow(
-		    session, buf, WT_MAX(len + 1, buf->memsize * 2)));
+		WT_RET(__wt_buf_extend(session, buf, len + 1));
 	}
 }
 
@@ -244,9 +90,13 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 	size_t len, space;
 	char *p;
 
-	/* Clear buffers previously used for mapped returns. */
-	if (F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_buf_clear(buf);
+	/*
+	 * If we're appending data to an existing buffer, any data field should
+	 * point into the allocated memory.  (It wouldn't be insane to copy any
+	 * previously existing data at this point, if data wasn't in the local
+	 * buffer, but we don't and it would be bad if we didn't notice it.)
+	 */
+	WT_ASSERT(session, buf->data == NULL || WT_DATA_IN_ITEM(buf));
 
 	for (;;) {
 		va_start(ap, fmt);
@@ -266,8 +116,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 		 * If not, double the size of the buffer: we're dealing with
 		 * strings, and we don't expect these numbers to get huge.
 		 */
-		WT_RET(__wt_buf_grow(session, buf,
-		    WT_MAX(buf->size + len + 1, buf->memsize * 2)));
+		WT_RET(__wt_buf_extend(session, buf, buf->size + len + 1));
 	}
 }
 
@@ -374,19 +223,6 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 
 err:	WT_RET_MSG(session, ret,
 	    "session unable to allocate a scratch buffer");
-}
-
-/*
- * __wt_scr_free --
- *	Release a scratch buffer.
- */
-void
-__wt_scr_free(WT_ITEM **bufp)
-{
-	if (*bufp == NULL)
-		return;
-	F_CLR(*bufp, WT_ITEM_INUSE);
-	*bufp = NULL;
 }
 
 /*

@@ -26,10 +26,15 @@
 	    __wt_config_check((s),					\
 	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0)
 
-#define	API_END(s)							\
+#define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
 		(s)->dhandle = __olddh;					\
 		(s)->name = __oldname;					\
+		if (F_ISSET(&(s)->txn, TXN_RUNNING) &&			\
+		    (ret) != 0 &&					\
+		    (ret) != WT_NOTFOUND &&				\
+		    (ret) != WT_DUPLICATE_KEY)				\
+			F_SET(&(s)->txn, TXN_ERROR);			\
 	}								\
 } while (0)
 
@@ -51,7 +56,7 @@
 
 /* End a transactional API call, optional retry on deadlock. */
 #define	TXN_API_END_RETRY(s, ret, retry)				\
-	API_END(s);							\
+	API_END(s, ret);						\
 	if (__autotxn) {						\
 		if (F_ISSET(&(s)->txn, TXN_AUTOCOMMIT))			\
 			F_CLR(&(s)->txn, TXN_AUTOCOMMIT);		\
@@ -65,10 +70,7 @@
 				continue;				\
 			}						\
 		}							\
-	} else if (F_ISSET(&(s)->txn, TXN_RUNNING) && (ret) != 0 &&	\
-	    (ret) != WT_NOTFOUND &&					\
-	    (ret) != WT_DUPLICATE_KEY)					\
-		F_SET(&(s)->txn, TXN_ERROR);				\
+	}								\
 	break;								\
 } while (ret == 0)
 
@@ -81,7 +83,7 @@
  * return WT_NOTFOUND.
  */
 #define	API_END_NOTFOUND_MAP(s, ret)					\
-	API_END(s);							\
+	API_END(s, ret);						\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
 #define	CONNECTION_API_CALL(conn, s, n, config, cfg)			\

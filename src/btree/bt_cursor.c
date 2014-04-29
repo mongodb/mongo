@@ -833,6 +833,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt)
 
 	ret = __curfile_leave(cbt);
 	__wt_buf_free(session, &cbt->tmp);
+	__wt_buf_free(session, &cbt->srch);
 
 	return (ret);
 }
