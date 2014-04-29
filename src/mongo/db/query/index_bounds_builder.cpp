@@ -346,6 +346,14 @@ namespace mongo {
                 return;
             }
 
+            // Only NaN is <= NaN.
+            if (isNaN(dataElt.numberDouble())) {
+                double nan = dataElt.numberDouble();
+                oilOut->intervals.push_back(makePointInterval(nan));
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
             BSONObjBuilder bob;
             // Use -infinity for one-sided numerical bounds
             if (dataElt.isNumber()) {
@@ -373,6 +381,12 @@ namespace mongo {
             // Everything is <= MaxKey.
             if (MaxKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
+            // Nothing is < NaN.
+            if (isNaN(dataElt.numberDouble())) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -414,6 +428,12 @@ namespace mongo {
                 return;
             }
 
+            // Nothing is > NaN.
+            if (isNaN(dataElt.numberDouble())) {
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
             BSONObjBuilder bob;
             bob.appendAs(node->getData(), "");
             if (dataElt.isNumber()) {
@@ -446,6 +466,14 @@ namespace mongo {
             // Everything is >= MinKey.
             if (MinKey == dataElt.type()) {
                 oilOut->intervals.push_back(allValues());
+                *tightnessOut = IndexBoundsBuilder::EXACT;
+                return;
+            }
+
+            // Only NaN is >= NaN.
+            if (isNaN(dataElt.numberDouble())) {
+                double nan = dataElt.numberDouble();
+                oilOut->intervals.push_back(makePointInterval(nan));
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -699,6 +727,13 @@ namespace mongo {
     Interval IndexBoundsBuilder::makePointInterval(const string& str) {
         BSONObjBuilder bob;
         bob.append("", str);
+        return makePointInterval(bob.obj());
+    }
+
+    // static
+    Interval IndexBoundsBuilder::makePointInterval(double d) {
+        BSONObjBuilder bob;
+        bob.append("", d);
         return makePointInterval(bob.obj());
     }
 

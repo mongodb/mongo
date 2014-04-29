@@ -118,6 +118,28 @@ namespace mongo {
             return false;
         }
 
+        // Special case handling for NaN. NaN is equal to NaN but
+        // otherwise always compares to false.
+        if (isNaN(e.numberDouble()) || isNaN(_rhs.numberDouble())) {
+            bool bothNaN = isNaN(e.numberDouble()) && isNaN(_rhs.numberDouble());
+            switch ( matchType() ) {
+            case LT:
+                return false;
+            case LTE:
+                return bothNaN;
+            case EQ:
+                return bothNaN;
+            case GT:
+                return false;
+            case GTE:
+                return bothNaN;
+            default:
+                // This is a comparison match expression, so it must be either
+                // a $lt, $lte, $gt, $gte, or equality expression.
+                fassertFailed( 17448 );
+            }
+        }
+
         int x = compareElementValues( e, _rhs );
 
         //log() << "\t\t" << x << endl;
@@ -134,6 +156,8 @@ namespace mongo {
         case GTE:
             return x >= 0;
         default:
+            // This is a comparison match expression, so it must be either
+            // a $lt, $lte, $gt, $gte, or equality expression.
             fassertFailed( 16828 );
         }
     }

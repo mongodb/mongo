@@ -115,6 +115,7 @@ namespace mongo {
          */
         static Interval makePointInterval(const BSONObj& obj);
         static Interval makePointInterval(const string& str);
+        static Interval makePointInterval(double d);
 
         /**
          * Since we have no BSONValue we must make an object that's a copy of a piece of another
