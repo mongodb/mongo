@@ -304,6 +304,8 @@ add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\""
 
 add_option('build-fast-and-loose', "NEVER for production builds", 0, False)
 
+add_option('disable-warnings-as-errors', "Don't add -Werror to compiler command line", 0, False)
+
 add_option('propagate-shell-environment',
            "Pass shell environment to sub-processes (NEVER for production builds)",
            0, False)
@@ -772,7 +774,9 @@ if nix:
                          "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux or darwin:
-        env.Append( CCFLAGS=["-Werror", "-pipe"] )
+        env.Append( CCFLAGS=["-pipe"] )
+        if not has_option("disable-warnings-as-errors"):
+            env.Append( CCFLAGS=["-Werror"] )
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
