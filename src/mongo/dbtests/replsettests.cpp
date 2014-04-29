@@ -62,6 +62,9 @@ namespace ReplSetTests {
         static ReplSetTest* make() {
             auto_ptr<ReplSetTest> ret(new ReplSetTest());
             ret->init();
+            // we need to get() the BackgroundSync so that it has its s_instance initialized
+            // since applyOps() eventually calls notify() which makes use of the s_instance
+            replset::BackgroundSync::get();
             return ret.release();
         }
         virtual ~ReplSetTest() {
@@ -538,6 +541,8 @@ namespace ReplSetTests {
     public:
         void run() {
             const int expected = 100;
+
+            theReplSet->syncSourceFeedback.ensureMe();
 
             drop();
             addInserts(100);
