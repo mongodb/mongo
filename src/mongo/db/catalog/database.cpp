@@ -764,7 +764,7 @@ namespace mongo {
             }
 
             if ( nss.isSystem() ) {
-                authindex::createSystemIndexes( collection );
+                authindex::createSystemIndexes( txn, collection );
             }
 
         }

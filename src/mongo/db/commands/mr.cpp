@@ -570,8 +570,9 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::DBWrite lock( _config.outputOptions.finalNamespace );
+                    DurTransaction txn; // XXX
                     BSONObj o = cursor->nextSafe();
-                    Helpers::upsert( _config.outputOptions.finalNamespace , o );
+                    Helpers::upsert( &txn, _config.outputOptions.finalNamespace , o );
                     getDur().commitIfNeeded();
                     pm.hit();
                 }
@@ -588,6 +589,7 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock; // TODO(erh) why global?
+                    DurTransaction txn; // XXX
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
@@ -606,12 +608,13 @@ namespace mongo {
                         values.clear();
                         values.push_back( temp );
                         values.push_back( old );
-                        Helpers::upsert(_config.outputOptions.finalNamespace,
+                        Helpers::upsert(&txn,
+                                        _config.outputOptions.finalNamespace,
                                         _config.reducer->finalReduce(values,
                                                                      _config.finalizer.get()));
                     }
                     else {
-                        Helpers::upsert( _config.outputOptions.finalNamespace , temp );
+                        Helpers::upsert( &txn, _config.outputOptions.finalNamespace , temp );
                     }
                     getDur().commitIfNeeded();
                     pm.hit();

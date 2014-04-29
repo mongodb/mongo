@@ -38,6 +38,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
 
@@ -66,20 +67,21 @@ namespace mongo {
         string myname = getHostName();
         {
             Client::WriteContext ctx("local");
+            DurTransaction txn;
             // local.me is an identifier for a server for getLastError w:2+
             if (!Helpers::getSingleton("local.me", _me) ||
                 !_me.hasField("host") ||
                 _me["host"].String() != myname) {
 
                 // clean out local.me
-                Helpers::emptyCollection("local.me");
+                Helpers::emptyCollection(&txn, "local.me");
 
                 // repopulate
                 BSONObjBuilder b;
                 b.appendOID("_id", 0, true);
                 b.append("host", myname);
                 _me = b.obj();
-                Helpers::putSingleton("local.me", _me);
+                Helpers::putSingleton(&txn, "local.me", _me);
             }
             // _me is used outside of a read lock, so we must copy it out of the mmap
             _me = _me.getOwned();

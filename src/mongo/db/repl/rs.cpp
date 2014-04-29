@@ -955,12 +955,14 @@ namespace {
 
     void ReplSetImpl::clearInitialSyncFlag() {
         Lock::DBWrite lk( "local" );
-        Helpers::putSingleton("local.replset.minvalid", BSON( "$unset" << _initialSyncFlag ));
+        DurTransaction txn; // XXX?
+        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON( "$unset" << _initialSyncFlag ));
     }
 
     void ReplSetImpl::setInitialSyncFlag() {
         Lock::DBWrite lk( "local" );
-        Helpers::putSingleton("local.replset.minvalid", BSON( "$set" << _initialSyncFlag ));
+        DurTransaction txn; // XXX?
+        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON( "$set" << _initialSyncFlag ));
     }
 
     bool ReplSetImpl::getInitialSyncFlag() {
@@ -978,7 +980,8 @@ namespace {
         subobj.appendTimestamp("ts", obj["ts"].date());
         subobj.done();
         Lock::DBWrite lk( "local" );
-        Helpers::putSingleton("local.replset.minvalid", builder.obj());
+        DurTransaction txn; // XXX?
+        Helpers::putSingleton(&txn, "local.replset.minvalid", builder.obj());
     }
 
     OpTime ReplSetImpl::getMinValid() {

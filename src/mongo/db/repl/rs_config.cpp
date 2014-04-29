@@ -86,7 +86,8 @@ namespace mongo {
 
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
-            Helpers::putSingletonGod(rsConfigNs.c_str(),
+            Helpers::putSingletonGod(&txn,
+                                     rsConfigNs.c_str(),
                                      newConfigBSON,
                                      false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )

@@ -60,8 +60,11 @@ namespace mongo {
 
     const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
 
-    void Helpers::ensureIndex(Collection* collection,
-                              BSONObj keyPattern, bool unique, const char *name) {
+    void Helpers::ensureIndex(TransactionExperiment* txn,
+                              Collection* collection,
+                              BSONObj keyPattern,
+                              bool unique,
+                              const char *name) {
         BSONObjBuilder b;
         b.append("name", name);
         b.append("ns", collection->ns());
@@ -213,14 +216,16 @@ namespace mongo {
         return Runner::RUNNER_ADVANCED == state;
     }
 
-    void Helpers::upsert( const string& ns , const BSONObj& o, bool fromMigrate ) {
+    void Helpers::upsert( TransactionExperiment* txn,
+                          const string& ns,
+                          const BSONObj& o,
+                          bool fromMigrate ) {
         BSONElement e = o["_id"];
         verify( e.type() );
         BSONObj id = e.wrap();
 
         OpDebug debug;
         Client::Context context(ns);
-        DurTransaction txn; // XXX
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -233,13 +238,12 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(&txn, request, &debug);
+        update(txn, request, &debug);
     }
 
-    void Helpers::putSingleton(const char *ns, BSONObj obj) {
+    void Helpers::putSingleton(TransactionExperiment* txn, const char *ns, BSONObj obj) {
         OpDebug debug;
         Client::Context context(ns);
-        DurTransaction txn; // XXX
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -250,15 +254,14 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(&txn, request, &debug);
+        update(txn, request, &debug);
 
         context.getClient()->curop()->done();
     }
 
-    void Helpers::putSingletonGod(const char *ns, BSONObj obj, bool logTheOp) {
+    void Helpers::putSingletonGod(TransactionExperiment* txn, const char *ns, BSONObj obj, bool logTheOp) {
         OpDebug debug;
         Client::Context context(ns);
-        DurTransaction txn; // XXX
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -268,7 +271,7 @@ namespace mongo {
         request.setUpsert();
         request.setUpdateOpLog(logTheOp);
 
-        update(&txn, request, &debug);
+        update(txn, request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -549,10 +552,9 @@ namespace mongo {
     }
 
 
-    void Helpers::emptyCollection(const char *ns) {
+    void Helpers::emptyCollection(TransactionExperiment* txn, const char *ns) {
         Client::Context context(ns);
-        DurTransaction txn; // XXX
-        deleteObjects(&txn, ns, BSONObj(), false);
+        deleteObjects(txn, ns, BSONObj(), false);
     }
 
     Helpers::RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) 

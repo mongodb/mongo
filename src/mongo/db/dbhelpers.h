@@ -42,6 +42,7 @@ namespace mongo {
 
     class Collection;
     class Cursor;
+    class TransactionExperiment;
 
     /**
      * db helpers are helper functions and classes that let us easily manipulate the local
@@ -63,8 +64,11 @@ namespace mongo {
 
            Note: does nothing if collection does not yet exist.
         */
-        static void ensureIndex(Collection* collection,
-                                BSONObj keyPattern, bool unique, const char *name);
+        static void ensureIndex(TransactionExperiment* txn,
+                                Collection* collection,
+                                BSONObj keyPattern,
+                                bool unique,
+                                const char *name);
 
         /* fetch a single object from collection ns that matches query.
            set your db SavedContext first.
@@ -109,8 +113,8 @@ namespace mongo {
             @return true if object exists.
         */
         static bool getSingleton(const char *ns, BSONObj& result);
-        static void putSingleton(const char *ns, BSONObj obj);
-        static void putSingletonGod(const char *ns, BSONObj obj, bool logTheOp);
+        static void putSingleton(TransactionExperiment* txn, const char *ns, BSONObj obj);
+        static void putSingletonGod(TransactionExperiment* txn, const char *ns, BSONObj obj, bool logTheOp);
         static bool getFirst(const char *ns, BSONObj& result) { return getSingleton(ns, result); }
         static bool getLast(const char *ns, BSONObj& result); // get last object int he collection; e.g. {$natural : -1}
 
@@ -119,7 +123,10 @@ namespace mongo {
          * you do not have to have Context set
          * o has to have an _id field or will assert
          */
-        static void upsert( const string& ns , const BSONObj& o, bool fromMigrate = false );
+        static void upsert( TransactionExperiment* txn,
+                            const string& ns,
+                            const BSONObj& o,
+                            bool fromMigrate = false );
 
         /** You do not need to set the database before calling.
             @return true if collection is empty.
@@ -193,7 +200,7 @@ namespace mongo {
          * You do not need to set the database before calling.
          * Does not oplog the operation.
          */
-        static void emptyCollection(const char *ns);
+        static void emptyCollection(TransactionExperiment* txn, const char *ns);
 
         /**
          * for saving deleted bson objects to a flat file

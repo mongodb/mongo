@@ -1753,6 +1753,7 @@ namespace mongo {
                         BSONObj o = i.next().Obj();
                         {
                             Client::WriteContext cx( ns );
+                            DurTransaction txn;
 
                             BSONObj localDoc;
                             if ( willOverrideLocalId( cx.ctx().db(), o, &localDoc ) ) {
@@ -1768,7 +1769,7 @@ namespace mongo {
                                 uasserted( 16976, errMsg );
                             }
 
-                            Helpers::upsert( ns, o, true );
+                            Helpers::upsert( &txn, ns, o, true );
                         }
                         thisTime++;
                         numCloned++;
@@ -1981,6 +1982,7 @@ namespace mongo {
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ) {
                     Client::WriteContext cx(ns);
+                    DurTransaction txn;
 
                     BSONObj it = i.next().Obj();
 
@@ -1999,7 +2001,7 @@ namespace mongo {
                     }
 
                     // We are in write lock here, so sure we aren't killing
-                    Helpers::upsert( ns , it , true );
+                    Helpers::upsert( &txn, ns , it , true );
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
                     didAnything = true;
