@@ -150,9 +150,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	(void)cb;
 	(void)flags;
 	type = op->get_type(op);
-	if (type == WT_AOP_COMPACT)
-		tables = (uint32_t *)op->c.lang_private;
-	else {
+	if (type != WT_AOP_COMPACT) {
 		thread = (CONFIG_THREAD *)op->c.lang_private;
 		cfg = thread->cfg;
 	}
@@ -176,6 +174,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 			trk = &thread->update;
 			break;
 		case WT_AOP_COMPACT:
+			tables = (uint32_t *)op->c.lang_private;
 			ATOMIC_ADD(*tables, -1);
 			break;
 		case WT_AOP_REMOVE:
