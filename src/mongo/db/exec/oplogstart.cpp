@@ -31,7 +31,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 

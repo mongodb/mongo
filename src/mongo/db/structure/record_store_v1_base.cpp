@@ -257,8 +257,8 @@ namespace mongo {
         dassert( recordFor(loc) == r );
         Extent *e = _getExtent( _getExtentLocForRecord( loc ) );
         if ( e->lastRecord.isNull() ) {
-            Extent::FL *fl = txn->writing(e->fl());
-            fl->firstRecord = fl->lastRecord = loc;
+            *txn->writing(&e->firstRecord) = loc;
+            *txn->writing(&e->lastRecord) = loc;
             r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
         }
         else {

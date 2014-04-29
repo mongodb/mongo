@@ -101,7 +101,7 @@ namespace mongo {
         return sz;
     }
 
-    BSONObj Extent::dump() {
+    BSONObj Extent::dump() const {
         return BSON( "loc" << myLoc.toString()
                      << "xnext" << xnext.toString()
                      << "xprev" << xprev.toString()
@@ -112,7 +112,7 @@ namespace mongo {
                      << "lastRecord" << lastRecord.toString() );
     }
 
-    void Extent::dump(iostream& s) {
+    void Extent::dump(iostream& s) const {
         s << "    loc:" << myLoc.toString()
           << " xnext:" << xnext.toString()
           << " xprev:" << xprev.toString() << '\n';
@@ -179,7 +179,7 @@ namespace mongo {
         return emptyLoc;
     }
 
-    bool Extent::validates(const DiskLoc diskLoc, vector<string>* errors) {
+    bool Extent::validates(const DiskLoc diskLoc, vector<string>* errors) const {
         bool extentOk = true;
         if (magic != extentSignature) {
             if (errors) {

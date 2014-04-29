@@ -59,13 +59,13 @@ namespace mongo {
         DiskLoc lastRecord;
         char _extentData[4];
 
-        static int HeaderSize() { return sizeof(Extent)-4; }
+        // -----
 
-        bool validates(const DiskLoc diskLoc, std::vector<string>* errors = NULL);
+        bool validates(const DiskLoc diskLoc, std::vector<string>* errors = NULL) const;
 
-        BSONObj dump();
+        BSONObj dump() const;
 
-        void dump(iostream& s);
+        void dump(iostream& s) const;
 
         /* assumes already zeroed -- insufficient for block 'reuse' perhaps
         Returns a DeletedRecord location which is the data in the extent ready for us.
@@ -76,20 +76,13 @@ namespace mongo {
         /* like init(), but for a reuse case */
         DiskLoc reuse(const StringData& nsname, bool newUseIsAsCapped);
 
+        /** caller must declare write intent first */
+        void markEmpty();
+
         bool isOk() const { return magic == extentSignature; }
         void assertOk() const { verify(isOk()); }
 
-        Record* getRecord(DiskLoc dl) {
-            verify( !dl.isNull() );
-            verify( dl.sameFile(myLoc) );
-            int x = dl.getOfs() - myLoc.getOfs();
-            verify( x > 0 );
-            return (Record *) (((char *) this) + x);
-        }
-
-        DeletedRecord* getDeletedRecord(const DiskLoc& dl ) {
-            return reinterpret_cast<DeletedRecord*>( getRecord( dl ) );
-        }
+        static int HeaderSize() { return sizeof(Extent)-4; }
 
         static int maxSize();
         static int minSize() { return 0x1000; }
@@ -104,18 +97,19 @@ namespace mongo {
          */
         static int initialSize(int len);
 
-        struct FL {
-            DiskLoc firstRecord;
-            DiskLoc lastRecord;
-        };
-        /** often we want to update just the firstRecord and lastRecord fields.
-            this helper is for that -- for use with getDur().writing() method
-        */
-        FL* fl() { return (FL*) &firstRecord; }
-
-        /** caller must declare write intent first */
-        void markEmpty();
     private:
+        Record* getRecord(DiskLoc dl) {
+            verify( !dl.isNull() );
+            verify( dl.sameFile(myLoc) );
+            int x = dl.getOfs() - myLoc.getOfs();
+            verify( x > 0 );
+            return (Record *) (((char *) this) + x);
+        }
+
+        DeletedRecord* getDeletedRecord(const DiskLoc& dl ) {
+            return reinterpret_cast<DeletedRecord*>( getRecord( dl ) );
+        }
+
         DiskLoc _reuse(const StringData& nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
     };
 

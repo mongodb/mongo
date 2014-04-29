@@ -33,7 +33,6 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/catalog/collection.h"
 
