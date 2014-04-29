@@ -862,7 +862,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	r->leave_dirty = 1;
 
 	/* If we are checkpointing, continue: we'll write what we can. */
-	if (!F_ISSET(r, WT_EVICTION_LOCKED) || F_ISSET(r, WT_SKIP_UPDATE_OK))
+	if (!F_ISSET(r, WT_EVICTION_LOCKED))
 		return (0);
 
 	/*
@@ -1152,8 +1152,7 @@ __rec_child_deleted(
 			    "reconciliation illegally skipped an update");
 
 		/* If this page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTION_LOCKED) &&
-		    !F_ISSET(r, WT_SKIP_UPDATE_OK))
+		if (F_ISSET(r, WT_EVICTION_LOCKED))
 			return (EBUSY);
 	}
 
