@@ -40,6 +40,7 @@
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -56,19 +57,20 @@ namespace QueryTests {
         Client::Context _context;
         Database* _database;
         Collection* _collection;
+        DurTransaction _txn;
     public:
         Base() : _context( ns() ) {
             _database = _context.db();
             _collection = _database->getCollection( ns() );
             if ( _collection ) {
-                _database->dropCollection( ns() );
+                _database->dropCollection( &_txn, ns() );
             }
-            _collection = _database->createCollection( ns() );
+            _collection = _database->createCollection( &_txn, ns() );
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
             try {
-                uassertStatusOK( _database->dropCollection( ns() ) );
+                uassertStatusOK( _database->dropCollection( &_txn, ns() ) );
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up collection" );
@@ -97,10 +99,10 @@ namespace QueryTests {
                 oid.init();
                 b.appendOID( "_id", &oid );
                 b.appendElements( o );
-                _collection->insertDocument( b.obj(), false );
+                _collection->insertDocument( &_txn, b.obj(), false );
             }
             else {
-                _collection->insertDocument( o, false );
+                _collection->insertDocument( &_txn, o, false );
             }
         }
     };
@@ -154,13 +156,14 @@ namespace QueryTests {
             // an empty object (one might be allowed inside a reserved namespace at some point).
             Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.querytests" );
+            DurTransaction txn;
 
             Database* db = ctx.db();
             if ( db->getCollection( ns() ) ) {
                 _collection = NULL;
-                db->dropCollection( ns() );
+                db->dropCollection( &txn, ns() );
             }
-            _collection = db->createCollection( ns(), CollectionOptions(), true, false );
+            _collection = db->createCollection( &txn, ns(), CollectionOptions(), true, false );
             ASSERT( _collection );
 
             DBDirectClient cl;
@@ -1169,9 +1172,10 @@ namespace QueryTests {
             string err;
 
             Client::WriteContext ctx( "unittests" );
+            DurTransaction txn;
 
             // note that extents are always at least 4KB now - so this will get rounded up a bit.
-            ASSERT( userCreateNS( ctx.ctx().db(), ns(),
+            ASSERT( userCreateNS( &txn, ctx.ctx().db(), ns(),
                                   fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
             for ( int i=0; i<200; i++ ) {
                 insertNext();

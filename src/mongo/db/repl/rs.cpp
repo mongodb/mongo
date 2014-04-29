@@ -44,6 +44,7 @@
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/platform/bits.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/net/sock.h"
@@ -119,6 +120,7 @@ namespace {
     void dropAllTempCollections() {
         vector<string> dbNames;
         getDatabaseNames(dbNames);
+        DurTransaction txn;
         for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
             // The local db is special because it isn't replicated. It is cleared at startup even on
             // replica set members.
@@ -126,7 +128,7 @@ namespace {
                 continue;
 
             Client::Context ctx(*it);
-            ctx.db()->clearTmpCollections();
+            ctx.db()->clearTmpCollections(&txn);
         }
     }
 }

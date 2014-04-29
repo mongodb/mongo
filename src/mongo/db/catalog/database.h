@@ -44,6 +44,7 @@ namespace mongo {
     class DataFile;
     class IndexCatalog;
     class NamespaceDetails;
+    class TransactionExperiment;
 
     struct CollectionOptions {
         CollectionOptions() {
@@ -109,7 +110,7 @@ namespace mongo {
         const string& name() const { return _name; }
         const string& path() const { return _path; }
 
-        void clearTmpCollections();
+        void clearTmpCollections(TransactionExperiment* txn);
 
         /**
          * tries to make sure that this hasn't been deleted
@@ -130,7 +131,7 @@ namespace mongo {
         /**
          * @return true if success.  false if bad level or error creating profile ns
          */
-        bool setProfilingLevel( int newLevel , string& errmsg );
+        bool setProfilingLevel( TransactionExperiment* txn, int newLevel , string& errmsg );
 
         void flushFiles( bool sync );
 
@@ -157,23 +158,36 @@ namespace mongo {
         ExtentManager& getExtentManager() { return *_extentManager; }
         const ExtentManager& getExtentManager() const { return *_extentManager; }
 
-        Status dropCollection( const StringData& fullns );
+        Status dropCollection( TransactionExperiment* txn, const StringData& fullns );
 
-        Collection* createCollection( const StringData& ns,
+        Collection* createCollection( TransactionExperiment* txn,
+                                      const StringData& ns,
                                       const CollectionOptions& options = CollectionOptions(),
                                       bool allocateSpace = true,
                                       bool createDefaultIndexes = true );
 
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
+         * The methods without a transaction are deprecated.
+         * TODO remove deprecated method once we require reads to have Transaction objects.
          */
         Collection* getCollection( const StringData& ns );
 
         Collection* getCollection( const NamespaceString& ns ) { return getCollection( ns.ns() ); }
 
-        Collection* getOrCreateCollection( const StringData& ns );
+        Collection* getCollection( TransactionExperiment* txn, const StringData& ns );
 
-        Status renameCollection( const StringData& fromNS, const StringData& toNS, bool stayTemp );
+        Collection* getCollection( TransactionExperiment* txn, const NamespaceString& ns ) {
+            return getCollection( txn, ns.ns() );
+        }
+
+        Collection* getOrCreateCollection( const StringData& ns );
+        Collection* getOrCreateCollection( TransactionExperiment* txn, const StringData& ns );
+
+        Status renameCollection( TransactionExperiment* txn,
+                                 const StringData& fromNS,
+                                 const StringData& toNS,
+                                 bool stayTemp );
 
         /**
          * @return name of an existing database with same text name but different
@@ -193,7 +207,9 @@ namespace mongo {
 
         ~Database(); // closes files and other cleanup see below.
 
-        void _addNamespaceToCatalog( const StringData& ns, const BSONObj* options );
+        void _addNamespaceToCatalog( TransactionExperiment* txn,
+                                     const StringData& ns,
+                                     const BSONObj* options );
 
 
         /**
@@ -202,7 +218,7 @@ namespace mongo {
          * removes from NamespaceIndex
          * NOT RIGHT NOW, removes cache entry in Database TODO?
          */
-        Status _dropNS( const StringData& ns );
+        Status _dropNS( TransactionExperiment* txn, const StringData& ns );
 
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
@@ -212,7 +228,9 @@ namespace mongo {
 
         void openAllFiles();
 
-        Status _renameSingleNamespace( const StringData& fromNS, const StringData& toNS,
+        Status _renameSingleNamespace( TransactionExperiment* txn,
+                                       const StringData& fromNS,
+                                       const StringData& toNS,
                                        bool stayTemp );
 
         const string _name; // "alleyinsider"

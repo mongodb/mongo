@@ -54,6 +54,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
@@ -93,6 +94,7 @@ namespace mongo {
         */
     void _logOpObjRS(const BSONObj& op) {
         Lock::DBWrite lk("local");
+        DurTransaction txn; //XXX should be part of parent txn
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -108,7 +110,7 @@ namespace mongo {
                         localOplogRSCollection);
             }
             Client::Context ctx(rsoplog, localDB);
-            checkOplogInsert( localOplogRSCollection->insertDocument( op, false ) );
+            checkOplogInsert( localOplogRSCollection->insertDocument( &txn, op, false ) );
 
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
@@ -257,8 +259,9 @@ namespace mongo {
         }
 
         Client::Context ctx(rsoplog, localDB);
+        DurTransaction txn; // XXX
         OplogDocWriter writer( partial, obj );
-        checkOplogInsert( localOplogRSCollection->insertDocument( &writer, false ) );
+        checkOplogInsert( localOplogRSCollection->insertDocument( &txn, &writer, false ) );
 
         /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
            this code (or code in now() maybe) should be improved.
@@ -328,8 +331,9 @@ namespace mongo {
         }
 
         Client::Context ctx(logNS , localDB);
+        DurTransaction txn; //XXX should be part of parent txn
         OplogDocWriter writer( partial, obj );
-        checkOplogInsert( localOplogMainCollection->insertDocument( &writer, false ) );
+        checkOplogInsert( localOplogMainCollection->insertDocument( &txn, &writer, false ) );
 
         context.getClient()->setLastOp( ts );
     }
@@ -393,6 +397,7 @@ namespace mongo {
             ns = rsoplog;
 
         Client::Context ctx(ns);
+        DurTransaction txn; // XXX
         Collection* collection = ctx.db()->getCollection( ns );
 
         if ( collection ) {
@@ -453,7 +458,7 @@ namespace mongo {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
-        invariant( ctx.db()->createCollection( ns, options ) );
+        invariant( ctx.db()->createCollection( &txn, ns, options ) );
         if( !rs )
             logOp( "n", "", BSONObj() );
 
@@ -469,6 +474,7 @@ namespace mongo {
      */
     bool applyOperation_inlock(Database* db, const BSONObj& op,
                                bool fromRepl, bool convertUpdateToUpsert) {
+        DurTransaction txn; //XXX should be part of parent txn
         LOG(3) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
@@ -553,7 +559,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(request, &debug);
+                    update(&txn, request, &debug);
 
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
@@ -582,7 +588,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(request, &debug);
+                    update(&txn, request, &debug);
                 }
             }
         }
@@ -609,7 +615,7 @@ namespace mongo {
             UpdateLifecycleImpl updateLifecycle(true, requestNs);
             request.setLifecycle(&updateLifecycle);
 
-            UpdateResult ur = update(request, &debug);
+            UpdateResult ur = update(&txn, request, &debug);
 
             if( ur.numMatched == 0 ) {
                 if( ur.modifiers ) {
@@ -650,7 +656,7 @@ namespace mongo {
         else if ( *opType == 'd' ) {
             opCounters->gotDelete();
             if ( opType[1] == 0 )
-                deleteObjects(ns, o, /*justOne*/ valueB);
+                deleteObjects(&txn, ns, o, /*justOne*/ valueB);
             else
                 verify( opType[1] == 'b' ); // "db" advertisement
         }

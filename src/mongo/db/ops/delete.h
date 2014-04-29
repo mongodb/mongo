@@ -34,8 +34,11 @@
 
 namespace mongo {
 
+    class TransactionExperiment;
+
     // If justOne is true, deletedId is set to the id of the deleted object.
-    long long deleteObjects(const StringData& ns,
+    long long deleteObjects(TransactionExperiment* txn,
+                            const StringData& ns,
                             BSONObj pattern,
                             bool justOne,
                             bool logop = false,

@@ -37,6 +37,7 @@
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -109,6 +110,7 @@ namespace mongo {
         // should already have write lock
         const char *ns = o.getStringField("ns");
         Client::Context ctx(ns);
+        DurTransaction txn;
 
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
@@ -125,7 +127,7 @@ namespace mongo {
         else {
             Collection* collection = ctx.db()->getOrCreateCollection( ns );
             verify( collection ); // should never happen
-            StatusWith<DiskLoc> result = collection->insertDocument( missingObj, true );
+            StatusWith<DiskLoc> result = collection->insertDocument( &txn, missingObj, true );
             uassert(15917,
                     str::stream() << "failed to insert missing doc: " << result.toString(),
                     result.isOK() );

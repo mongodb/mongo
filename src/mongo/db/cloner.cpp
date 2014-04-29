@@ -52,6 +52,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -125,6 +126,7 @@ namespace mongo {
 
         void operator()( DBClientCursorBatchIterator &i ) {
             Lock::GlobalWrite lk;
+            DurTransaction txn;
             context.relocked();
 
             bool createdCollection = false;
@@ -153,7 +155,7 @@ namespace mongo {
                                  << to_collection << "]",
                                  !createdCollection );
                         createdCollection = true;
-                        collection = context.db()->createCollection( to_collection );
+                        collection = context.db()->createCollection( &txn, to_collection );
                         verify( collection );
                     }
                 }
@@ -180,7 +182,7 @@ namespace mongo {
 
                 verify(nsToCollectionSubstring(from_collection) != "system.indexes");
 
-                StatusWith<DiskLoc> loc = collection->insertDocument( js, true );
+                StatusWith<DiskLoc> loc = collection->insertDocument( &txn, js, true );
                 if ( !loc.isOK() ) {
                     error() << "error: exception cloning object in " << from_collection
                             << ' ' << loc.toString() << " obj:" << js;
@@ -251,7 +253,8 @@ namespace mongo {
                 string ns = spec["ns"].String(); // this was fixed when pulled off network
                 Collection* collection = f.context.db()->getCollection( ns );
                 if ( !collection ) {
-                    collection = f.context.db()->createCollection( ns );
+                    DurTransaction txn; // XXX
+                    collection = f.context.db()->createCollection( &txn, ns );
                     verify( collection );
                 }
 
@@ -309,12 +312,13 @@ namespace mongo {
                                 bool logForRepl) {
 
         Client::WriteContext ctx(ns);
+        DurTransaction txn; // XXX
 
         // config
         string temp = ctx.ctx().db()->name() + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
         if (config["options"].isABSONObj()) {
-            Status status = userCreateNS(ctx.ctx().db(), ns, config["options"].Obj(), logForRepl, 0);
+            Status status = userCreateNS(&txn, ctx.ctx().db(), ns, config["options"].Obj(), logForRepl, 0);
             if ( !status.isOK() ) {
                 errmsg = status.toString();
                 return false;
@@ -345,6 +349,7 @@ namespace mongo {
     bool Cloner::go(Client::Context& context,
                     const string& masterHost, const CloneOptions& opts, set<string>* clonedColls,
                     string& errmsg, int* errCode) {
+        DurTransaction txn; // XXX
         if ( errCode ) {
             *errCode = 0;
         }
@@ -468,7 +473,7 @@ namespace mongo {
 
             {
                 /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(context.db(), to_name, options, opts.logForRepl, false);
+                userCreateNS(&txn, context.db(), to_name, options, opts.logForRepl, false);
             }
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;

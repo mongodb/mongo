@@ -51,6 +51,7 @@
 #include "mongo/db/queryutil.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/platform/unordered_set.h"
@@ -480,13 +481,16 @@ namespace mongo {
         }
     } // namespace
 
-    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug) {
+    UpdateResult update(TransactionExperiment* txn,
+                        const UpdateRequest& request,
+                        OpDebug* opDebug) {
 
         UpdateExecutor executor(&request, opDebug);
-        return executor.execute();
+        return executor.execute(txn);
     }
 
     UpdateResult update(
+            TransactionExperiment* txn,
             const UpdateRequest& request,
             OpDebug* opDebug,
             UpdateDriver* driver,
@@ -719,7 +723,7 @@ namespace mongo {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
                 // no work to do, in which case we want to consider the object unchanged.
                 if (!damages.empty() ) {
-                    collection->updateDocumentWithDamages( loc, source, damages );
+                    collection->updateDocumentWithDamages( txn, loc, source, damages );
                     docWasModified = true;
                     opDebug->fastmod = true;
                 }
@@ -734,7 +738,8 @@ namespace mongo {
                         str::stream() << "Resulting document after update is larger than "
                                       << BSONObjMaxUserSize,
                         newObj.objsize() <= BSONObjMaxUserSize);
-                StatusWith<DiskLoc> res = collection->updateDocument(loc,
+                StatusWith<DiskLoc> res = collection->updateDocument(txn,
+                                                                     loc,
                                                                      newObj,
                                                                      true,
                                                                      opDebug);
@@ -860,7 +865,7 @@ namespace mongo {
             Database* db = cc().getContext()->db();
             collection = db->getCollection(request.getNamespaceString().ns());
             if (!collection) {
-                collection = db->createCollection(request.getNamespaceString().ns());
+                collection = db->createCollection(txn, request.getNamespaceString().ns());
             }
         }
 
@@ -870,7 +875,8 @@ namespace mongo {
                 str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
                 newObj.objsize() <= BSONObjMaxUserSize);
 
-        StatusWith<DiskLoc> newLoc = collection->insertDocument(newObj,
+        StatusWith<DiskLoc> newLoc = collection->insertDocument(txn,
+                                                                newObj,
                                                                 !request.isGod() /*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
         if (request.shouldCallLogOp()) {

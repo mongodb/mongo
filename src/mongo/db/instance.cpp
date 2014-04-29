@@ -55,6 +55,7 @@
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobjmanipulator.h"
@@ -516,7 +517,8 @@ namespace mongo {
                 LOG(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                profile(c, op, currentOp);
+                DurTransaction txn;
+                profile(&txn, c, op, currentOp);
             }
         }
 
@@ -621,8 +623,9 @@ namespace mongo {
             return;
 
         Client::Context ctx( ns );
+        DurTransaction txn;
 
-        UpdateResult res = executor.execute();
+        UpdateResult res = executor.execute(&txn);
 
         // for getlasterror
         lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
@@ -663,8 +666,9 @@ namespace mongo {
                     return;
 
                 Client::Context ctx(ns);
+                DurTransaction txn;
 
-                long long n = executor.execute();
+                long long n = executor.execute(&txn);
                 lastError.getSafe()->recordDelete( n );
                 op.debug().ndeleted = n;
                 break;
@@ -802,7 +806,11 @@ namespace mongo {
         return ok;
     }
 
-    void checkAndInsert(Client::Context& ctx, const char *ns, /*modifies*/BSONObj& js) {
+    void checkAndInsert(TransactionExperiment* txn,
+                        Client::Context& ctx,
+                        const char *ns,
+                        /*modifies*/BSONObj& js) {
+
         if ( nsToCollectionSubstring( ns ) == "system.indexes" ) {
             string targetNS = js["ns"].String();
             uassertStatusOK( userAllowedWriteNS( targetNS ) );
@@ -810,7 +818,7 @@ namespace mongo {
             Collection* collection = ctx.db()->getCollection( targetNS );
             if ( !collection ) {
                 // implicitly create
-                collection = ctx.db()->createCollection( targetNS );
+                collection = ctx.db()->createCollection( txn, targetNS );
                 verify( collection );
             }
 
@@ -838,20 +846,25 @@ namespace mongo {
 
         Collection* collection = ctx.db()->getCollection( ns );
         if ( !collection ) {
-            collection = ctx.db()->createCollection( ns );
+            collection = ctx.db()->createCollection( txn, ns );
             verify( collection );
         }
 
-        StatusWith<DiskLoc> status = collection->insertDocument( js, true );
+        StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );
         uassertStatusOK( status.getStatus() );
         logOp("i", ns, js);
     }
 
-    NOINLINE_DECL void insertMulti(Client::Context& ctx, bool keepGoing, const char *ns, vector<BSONObj>& objs, CurOp& op) {
+    NOINLINE_DECL void insertMulti(TransactionExperiment* txn,
+                                   Client::Context& ctx,
+                                   bool keepGoing,
+                                   const char *ns,
+                                   vector<BSONObj>& objs,
+                                   CurOp& op) {
         size_t i;
         for (i=0; i<objs.size(); i++){
             try {
-                checkAndInsert(ctx, ns, objs[i]);
+                checkAndInsert(txn, ctx, ns, objs[i]);
                 getDur().commitIfNeeded();
             } catch (const UserException&) {
                 if (!keepGoing || i == objs.size()-1){
@@ -904,12 +917,13 @@ namespace mongo {
                     return;
                 
                 Client::Context ctx(ns);
+                DurTransaction txn;
                 
                 if (multi.size() > 1) {
                     const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-                    insertMulti(ctx, keepGoing, ns, multi, op);
+                    insertMulti(&txn, ctx, keepGoing, ns, multi, op);
                 } else {
-                    checkAndInsert(ctx, ns, multi[0]);
+                    checkAndInsert(&txn, ctx, ns, multi[0]);
                     globalOpCounters.incInsertInWriteLock(1);
                     op.debug().ninserted = 1;
                 }

@@ -40,6 +40,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/time_support.h"
 
@@ -148,14 +149,15 @@ namespace ReplSetTests {
         static void insert( const BSONObj &o, bool god = false ) {
             Lock::DBWrite lk(ns());
             Client::Context ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             if (o.hasField("_id")) {
-                coll->insertDocument(o, true);
+                coll->insertDocument(&txn, o, true);
                 return;
             }
 
@@ -164,7 +166,7 @@ namespace ReplSetTests {
             id.init();
             b.appendOID("_id", &id);
             b.appendElements(o);
-            coll->insertDocument(b.obj(), true);
+            coll->insertDocument(&txn, b.obj(), true);
         }
 
         BSONObj findOne( const BSONObj &query = BSONObj() ) const {
@@ -173,13 +175,15 @@ namespace ReplSetTests {
 
         void drop() {
             Client::WriteContext c(ns());
+            DurTransaction txn;
+
             Database* db = c.ctx().db();
 
             if ( db->getCollection( ns() ) == NULL ) {
                 return;
             }
 
-            db->dropCollection(ns());
+            db->dropCollection(&txn, ns());
         }
         static void setup() {
             replSettings.replSet = "foo";
@@ -316,14 +320,16 @@ namespace ReplSetTests {
 
         void create() {
             Client::Context c(_cappedNs);
-            ASSERT( userCreateNS( c.db(), _cappedNs, fromjson( spec() ), false ).isOK() );
+            DurTransaction txn;
+            ASSERT( userCreateNS( &txn, c.db(), _cappedNs, fromjson( spec() ), false ).isOK() );
         }
 
         void dropCapped() {
             Client::Context c(_cappedNs);
+            DurTransaction txn;
             Database* db = c.db();
-            if ( db->getCollection( _cappedNs ) ) {
-                db->dropCollection( _cappedNs );
+            if ( db->getCollection( &txn, _cappedNs ) ) {
+                db->dropCollection( &txn, _cappedNs );
             }
         }
 
@@ -389,14 +395,15 @@ namespace ReplSetTests {
 
         void insert() {
             Client::Context ctx(cappedNs());
+            DurTransaction txn;
             Database* db = ctx.db();
-            Collection* coll = db->getCollection(cappedNs());
+            Collection* coll = db->getCollection(&txn, cappedNs());
             if (!coll) {
-                coll = db->createCollection(cappedNs());
+                coll = db->createCollection(&txn, cappedNs());
             }
 
             BSONObj o = BSON(GENOID << "x" << 456);
-            DiskLoc loc = coll->insertDocument(o, true).getValue();
+            DiskLoc loc = coll->insertDocument(&txn, o, true).getValue();
             verify(!loc.isNull());
         }
     public:

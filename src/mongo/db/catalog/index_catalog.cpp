@@ -126,7 +126,7 @@ namespace mongo {
     }
 
     IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures( IndexDescriptor* descriptor ) {
-        DurTransaction txn[1];
+        DurTransaction txn; //XXX
         auto_ptr<IndexDescriptor> descriptorCleanup( descriptor );
 
         NamespaceDetails* indexMetadata =
@@ -136,7 +136,7 @@ namespace mongo {
                  str::stream() << "no NamespaceDetails for index: " << descriptor->toString(),
                  indexMetadata );
 
-        auto_ptr<RecordStore> recordStore( new SimpleRecordStoreV1( txn,
+        auto_ptr<RecordStore> recordStore( new SimpleRecordStoreV1( &txn,
                                                                     descriptor->indexNamespace(),
                                                                     new NamespaceDetailsRSV1MetaData( indexMetadata ),
                                                                     _collection->getExtentManager(),
@@ -166,7 +166,7 @@ namespace mongo {
                 requirePowerOf2 = true;
 
             if ( requirePowerOf2 ) {
-                _collection->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes);
+                _collection->setUserFlag(&txn, NamespaceDetails::Flag_UsePowerOf2Sizes);
             }
         }
 
@@ -430,7 +430,8 @@ namespace mongo {
         Collection* systemIndexes = db->getOrCreateCollection( db->_indexesName );
         invariant( systemIndexes );
 
-        StatusWith<DiskLoc> systemIndexesEntry = systemIndexes->insertDocument( _spec, false );
+        DurTransaction txn; //XXX
+        StatusWith<DiskLoc> systemIndexesEntry = systemIndexes->insertDocument( &txn, _spec, false );
         if ( !systemIndexesEntry.isOK() )
             return systemIndexesEntry.getStatus();
 
@@ -468,7 +469,7 @@ namespace mongo {
         nsi.add_ns( descriptor->indexNamespace(), DiskLoc(), false );
 
         // 4) system.namespaces entry index ns
-        db->_addNamespaceToCatalog( descriptor->indexNamespace(), NULL );
+        db->_addNamespaceToCatalog( &txn, descriptor->indexNamespace(), NULL );
 
         /// ----------   setup in memory structures  ----------------
 
@@ -894,7 +895,8 @@ namespace mongo {
         invariant( _details->_catalogFindIndexByName( indexName, true ) == idxNo );
 
         // data + system.namespacesa
-        Status status = _collection->_database->_dropNS( indexNamespace );
+        DurTransaction txn; // XXX
+        Status status = _collection->_database->_dropNS( &txn, indexNamespace );
         if ( status.code() == ErrorCodes::NamespaceNotFound ) {
             // this is ok, as we may be partially through index creation
         }
@@ -917,7 +919,9 @@ namespace mongo {
         b.append( "ns", _collection->ns() );
         b.append( "name", indexName );
         BSONObj cond = b.obj(); // e.g.: { name: "ts_1", ns: "foo.coll" }
-        return static_cast<int>( deleteObjects( _collection->_database->_indexesName,
+        DurTransaction txn; // XXX
+        return static_cast<int>( deleteObjects( &txn,
+                                                _collection->_database->_indexesName,
                                                 cond,
                                                 false,
                                                 false,

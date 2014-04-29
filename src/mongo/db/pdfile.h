@@ -45,10 +45,12 @@
 namespace mongo {
 
     class Database;
+    class TransactionExperiment;
 
     void dropDatabase(Database* db);
 
-    Status userCreateNS( Database* db,
+    Status userCreateNS( TransactionExperiment* txn,
+                         Database* db,
                          const StringData& ns,
                          BSONObj options,
                          bool logForReplication,

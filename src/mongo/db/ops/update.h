@@ -38,6 +38,7 @@
 namespace mongo {
 
     class CanonicalQuery;
+    class TransactionExperiment;
     class UpdateDriver;
 
     /**
@@ -45,7 +46,7 @@ namespace mongo {
      *
      * Caller must hold the appropriate database locks.
      */
-    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug);
+    UpdateResult update(TransactionExperiment* txn, const UpdateRequest& request, OpDebug* opDebug);
 
     /**
      * Execute the update described by "request", using the given already-parsed
@@ -55,7 +56,8 @@ namespace mongo {
      *
      * TODO: Move this into a private method of UpdateExecutor.
      */
-    UpdateResult update(const UpdateRequest& request,
+    UpdateResult update(TransactionExperiment* txn,
+                        const UpdateRequest& request,
                         OpDebug* opDebug,
                         UpdateDriver* driver,
                         CanonicalQuery* cq);

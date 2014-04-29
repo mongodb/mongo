@@ -35,6 +35,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -106,10 +107,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             const int N = 50;
@@ -169,10 +171,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             const int N = 50;
@@ -231,10 +234,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             const int N = 50;
@@ -294,10 +298,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             const int N = 50;
@@ -358,10 +363,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             const int N = 50;
@@ -420,10 +426,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             WorkingSet* ws = new WorkingSet();
@@ -472,10 +479,11 @@ namespace QueryStageMergeSortTests {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             WorkingSet ws;

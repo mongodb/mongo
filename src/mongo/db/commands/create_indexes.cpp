@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -167,12 +168,13 @@ namespace mongo {
             Client::WriteContext writeContext( ns.ns(),
                                                storageGlobalParams.dbpath,
                                                false /* doVersion */ );
+            DurTransaction txn;
             Database* db = writeContext.ctx().db();
 
-            Collection* collection = db->getCollection( ns.ns() );
+            Collection* collection = db->getCollection( &txn, ns.ns() );
             result.appendBool( "createdCollectionAutomatically", collection == NULL );
             if ( !collection ) {
-                collection = db->createCollection( ns.ns() );
+                collection = db->createCollection( &txn, ns.ns() );
                 invariant( collection );
             }
 

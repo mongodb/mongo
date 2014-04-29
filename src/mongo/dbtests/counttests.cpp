@@ -34,6 +34,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -44,20 +45,21 @@ namespace CountTests {
         Client::Context _context;
         Database* _database;
         Collection* _collection;
+        DurTransaction _txn;
     public:
         Base() : lk(ns()), _context( ns() ) {
             _database = _context.db();
             _collection = _database->getCollection( ns() );
             if ( _collection ) {
-                _database->dropCollection( ns() );
+                _database->dropCollection( &_txn, ns() );
             }
-            _collection = _database->createCollection( ns() );
+            _collection = _database->createCollection( &_txn, ns() );
 
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
             try {
-                uassertStatusOK( _database->dropCollection( ns() ) );
+                uassertStatusOK( _database->dropCollection( &_txn, ns() ) );
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up collection" );
@@ -86,10 +88,10 @@ namespace CountTests {
                 oid.init();
                 b.appendOID( "_id", &oid );
                 b.appendElements( o );
-                _collection->insertDocument( b.obj(), false );
+                _collection->insertDocument( &_txn, b.obj(), false );
             }
             else {
-                _collection->insertDocument( o, false );
+                _collection->insertDocument( &_txn, o, false );
             }
         }
         static BSONObj countCommand( const BSONObj &query ) {

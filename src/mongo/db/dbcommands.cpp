@@ -68,6 +68,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_logic.h"
@@ -357,6 +358,7 @@ namespace mongo {
             //
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(dbname);
+            DurTransaction txn;
 
             BSONElement e = cmdObj.firstElement();
             result.append("was", ctx.db()->getProfilingLevel());
@@ -368,7 +370,7 @@ namespace mongo {
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
-                ok = ctx.db()->setProfilingLevel( p , errmsg );
+                ok = ctx.db()->setProfilingLevel( &txn, p , errmsg );
             }
 
             BSONElement slow = cmdObj["slowms"];
@@ -483,9 +485,10 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(nsToDrop);
+            DurTransaction txn;
             Database* db = ctx.db();
 
-            Collection* coll = db->getCollection( nsToDrop );
+            Collection* coll = db->getCollection( &txn, nsToDrop );
             // If collection does not exist, short circuit and return.
             if ( !coll ) {
                 errmsg = "ns not found";
@@ -499,7 +502,7 @@ namespace mongo {
             result.append( "ns", nsToDrop );
             result.append( "nIndexesWas", numIndexes );
 
-            Status s = db->dropCollection( nsToDrop );
+            Status s = db->dropCollection( &txn, nsToDrop );
 
             if ( s.isOK() )
                 return true;
@@ -648,10 +651,11 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(ns);
+            DurTransaction txn;
 
             // Create collection.
             return appendCommandStatus( result,
-                                        userCreateNS(ctx.db(), ns.c_str(), options, !fromRepl) );
+                                        userCreateNS(&txn, ctx.db(), ns.c_str(), options, !fromRepl) );
         }
     } cmdCreate;
 
@@ -1211,6 +1215,7 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx( ns );
+            DurTransaction txn;
 
             Collection* coll = ctx.db()->getCollection( ns );
             if ( !coll ) {
@@ -1236,9 +1241,9 @@ namespace mongo {
                         result.appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
 
                         if ( newPowerOf2 )
-                            coll->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                            coll->setUserFlag( &txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
                         else
-                            coll->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                            coll->clearUserFlag( &txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
 
                         result.appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
                     }

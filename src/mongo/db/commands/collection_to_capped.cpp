@@ -36,10 +36,12 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
 
-    Status cloneCollectionAsCapped( Database* db,
+    Status cloneCollectionAsCapped( TransactionExperiment* txn,
+                                    Database* db,
                                     const string& shortFrom,
                                     const string& shortTo,
                                     double size,
@@ -49,7 +51,7 @@ namespace mongo {
         string fromNs = db->name() + "." + shortFrom;
         string toNs = db->name() + "." + shortTo;
 
-        Collection* fromCollection = db->getCollection( fromNs );
+        Collection* fromCollection = db->getCollection( txn, fromNs );
         if ( !fromCollection )
             return Status( ErrorCodes::NamespaceNotFound,
                            str::stream() << "source collection " << fromNs <<  " does not exist" );
@@ -66,12 +68,12 @@ namespace mongo {
             if ( temp )
                 spec.appendBool( "temp", true );
 
-            Status status = userCreateNS( ctx.db(), toNs, spec.done(), logForReplication );
+            Status status = userCreateNS( txn, ctx.db(), toNs, spec.done(), logForReplication );
             if ( !status.isOK() )
                 return status;
         }
 
-        Collection* toCollection = db->getCollection( toNs );
+        Collection* toCollection = db->getCollection( txn, toNs );
         invariant( toCollection ); // we created above
 
         // how much data to ignore because it won't fit anyway
@@ -93,7 +95,7 @@ namespace mongo {
             case Runner::RUNNER_EOF:
                 return Status::OK();
             case Runner::RUNNER_DEAD:
-                db->dropCollection( toNs );
+                db->dropCollection( txn, toNs );
                 return Status( ErrorCodes::InternalError, "runner turned dead while iterating" );
             case Runner::RUNNER_ERROR:
                 return Status( ErrorCodes::InternalError, "runner error while iterating" );
@@ -103,7 +105,7 @@ namespace mongo {
                     continue;
                 }
 
-                toCollection->insertDocument( obj, true );
+                toCollection->insertDocument( txn, obj, true );
                 if ( logForReplication )
                     logOp( "i", toNs.c_str(), obj );
                 getDur().commitIfNeeded();
@@ -153,8 +155,9 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(dbname);
+            DurTransaction txn;
 
-            Status status = cloneCollectionAsCapped( ctx.db(), from, to, size, temp, true );
+            Status status = cloneCollectionAsCapped( &txn, ctx.db(), from, to, size, temp, true );
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -203,6 +206,7 @@ namespace mongo {
             //
             Lock::GlobalWrite globalWriteLock;
             Client::Context ctx(dbname);
+            DurTransaction txn;
 
             Database* db = ctx.db();
 
@@ -222,23 +226,23 @@ namespace mongo {
             string longTmpName = str::stream() << dbname << "." << shortTmpName;
 
             if ( db->getCollection( longTmpName ) ) {
-                Status status = db->dropCollection( longTmpName );
+                Status status = db->dropCollection( &txn, longTmpName );
                 if ( !status.isOK() )
                     return appendCommandStatus( result, status );
             }
 
-            Status status = cloneCollectionAsCapped( db, shortSource, shortTmpName, size, true, false );
+            Status status = cloneCollectionAsCapped( &txn, db, shortSource, shortTmpName, size, true, false );
 
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
             verify( db->getCollection( longTmpName ) );
 
-            status = db->dropCollection( longSource );
+            status = db->dropCollection( &txn, longSource );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
-            status = db->renameCollection( longTmpName, longSource, false );
+            status = db->renameCollection( &txn, longTmpName, longSource, false );
             return appendCommandStatus( result, status );
         }
     } cmdConvertToCapped;

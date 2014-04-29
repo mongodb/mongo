@@ -1277,10 +1277,10 @@ namespace mongo {
 
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::deallocBucket(BucketType* bucket, const DiskLoc bucketLoc) {
-        DurTransaction txn[1];
+        DurTransaction txn; // XXX
         bucket->n = BtreeLayout::INVALID_N_SENTINEL;
         bucket->parent.Null();
-        _recordStore->deleteRecord(txn, bucketLoc);
+        _recordStore->deleteRecord(&txn, bucketLoc);
     }
 
     template <class BtreeLayout>

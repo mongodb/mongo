@@ -101,9 +101,8 @@ namespace mongo {
     }
 
 
-    StatusWith<CompactStats> Collection::compact( const CompactOptions* compactOptions ) {
-        DurTransaction txn[1];
-
+    StatusWith<CompactStats> Collection::compact( TransactionExperiment* txn,
+                                                  const CompactOptions* compactOptions ) {
         if ( !_recordStore->compactSupported() )
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
                                              str::stream() <<

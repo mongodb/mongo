@@ -51,6 +51,7 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
@@ -306,7 +307,7 @@ namespace mongo {
         }
     }
 
-    void Database::clearTmpCollections() {
+    void Database::clearTmpCollections(TransactionExperiment* txn) {
 
         Lock::assertWriteLocked( _name );
 
@@ -315,7 +316,7 @@ namespace mongo {
         // would corrupt the cursor.
         vector<string> toDelete;
         {
-            Collection* coll = getCollection( _namespacesName );
+            Collection* coll = getCollection( txn, _namespacesName );
             if ( coll ) {
                 scoped_ptr<RecordIterator> it( coll->getIterator() );
                 DiskLoc next;
@@ -352,7 +353,7 @@ namespace mongo {
 
     void Database::flushFiles( bool sync ) { return _extentManager->flushFiles( sync ); }
 
-    bool Database::setProfilingLevel( int newLevel , string& errmsg ) {
+    bool Database::setProfilingLevel( TransactionExperiment* txn, int newLevel , string& errmsg ) {
         if ( _profile == newLevel )
             return true;
 
@@ -366,18 +367,18 @@ namespace mongo {
             return true;
         }
 
-        if (!getOrCreateProfileCollection(this, true, &errmsg))
+        if (!getOrCreateProfileCollection(txn, this, true, &errmsg))
             return false;
 
         _profile = newLevel;
         return true;
     }
 
-    Status Database::dropCollection( const StringData& fullns ) {
+    Status Database::dropCollection( TransactionExperiment* txn, const StringData& fullns ) {
         LOG(1) << "dropCollection: " << fullns << endl;
         massertNamespaceNotIndex( fullns, "dropCollection" );
 
-        Collection* collection = getCollection( fullns );
+        Collection* collection = getCollection( txn, fullns );
         if ( !collection ) {
             // collection doesn't exist
             return Status::OK();
@@ -424,7 +425,7 @@ namespace mongo {
 
         Top::global.collectionDropped( fullns );
 
-        Status s = _dropNS( fullns );
+        Status s = _dropNS( txn, fullns );
 
         _clearCollectionCache( fullns ); // we want to do this always
 
@@ -466,6 +467,11 @@ namespace mongo {
     }
 
     Collection* Database::getCollection( const StringData& ns ) {
+        DurTransaction txn; // TODO remove once we require reads to have transactions
+        return getCollection(&txn, ns);
+    }
+
+    Collection* Database::getCollection( TransactionExperiment* txn, const StringData& ns ) {
         verify( _name == nsToDatabaseSubstring( ns ) );
 
         scoped_lock lk( _collectionLock );
@@ -491,18 +497,20 @@ namespace mongo {
             return NULL;
         }
 
-        Collection* c = new Collection( ns, details, this );
+        Collection* c = new Collection( txn, ns, details, this );
         _collections[ns] = c;
         return c;
     }
 
 
 
-    Status Database::renameCollection( const StringData& fromNS, const StringData& toNS,
+    Status Database::renameCollection( TransactionExperiment* txn,
+                                       const StringData& fromNS,
+                                       const StringData& toNS,
                                        bool stayTemp ) {
 
         // move data namespace
-        Status s = _renameSingleNamespace( fromNS, toNS, stayTemp );
+        Status s = _renameSingleNamespace( txn, fromNS, toNS, stayTemp );
         if ( !s.isOK() )
             return s;
 
@@ -513,7 +521,7 @@ namespace mongo {
 
         // move index namespaces
         BSONObj oldIndexSpec;
-        while( Helpers::findOne( getCollection( _indexesName ),
+        while( Helpers::findOne( getCollection( txn, _indexesName ),
                                  BSON( "ns" << fromNS ),
                                  oldIndexSpec ) ) {
             oldIndexSpec = oldIndexSpec.getOwned();
@@ -532,10 +540,10 @@ namespace mongo {
                 newIndexSpec = b.obj();
             }
 
-            Collection* systemIndexCollection = getCollection( _indexesName );
+            Collection* systemIndexCollection = getCollection( txn, _indexesName );
 
             StatusWith<DiskLoc> newIndexSpecLoc =
-                systemIndexCollection->insertDocument( newIndexSpec, false );
+                systemIndexCollection->insertDocument( txn, newIndexSpec, false );
             if ( !newIndexSpecLoc.isOK() )
                 return newIndexSpecLoc.getStatus();
 
@@ -545,7 +553,7 @@ namespace mongo {
                 // fix IndexDetails pointer
                 int indexI = details->_catalogFindIndexByName( indexName );
                 IndexDetails& indexDetails = details->idx(indexI);
-                *getDur().writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
+                *txn->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
             }
 
             {
@@ -553,12 +561,12 @@ namespace mongo {
                 string oldIndexNs = IndexDescriptor::makeIndexNamespace( fromNS, indexName );
                 string newIndexNs = IndexDescriptor::makeIndexNamespace( toNS, indexName );
 
-                Status s = _renameSingleNamespace( oldIndexNs, newIndexNs, false );
+                Status s = _renameSingleNamespace( txn, oldIndexNs, newIndexNs, false );
                 if ( !s.isOK() )
                     return s;
             }
 
-            deleteObjects( _indexesName, oldIndexSpec, true, false, true );
+            deleteObjects( txn, _indexesName, oldIndexSpec, true, false, true );
         }
 
         Top::global.collectionDropped( fromNS.toString() );
@@ -566,7 +574,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status Database::_renameSingleNamespace( const StringData& fromNS, const StringData& toNS,
+    Status Database::_renameSingleNamespace( TransactionExperiment* txn,
+                                             const StringData& fromNS,
+                                             const StringData& toNS,
                                              bool stayTemp ) {
 
         // TODO: make it so we dont't need to do this
@@ -621,7 +631,7 @@ namespace mongo {
         {
 
             BSONObj oldSpec;
-            if ( !Helpers::findOne( getCollection( _namespacesName ),
+            if ( !Helpers::findOne( getCollection( txn, _namespacesName ),
                                     BSON( "name" << fromNS ),
                                     oldSpec ) )
                 return Status( ErrorCodes::InternalError, "can't find system.namespaces entry" );
@@ -641,17 +651,21 @@ namespace mongo {
             newSpec = b.obj();
         }
 
-        _addNamespaceToCatalog( toNSString, newSpec.isEmpty() ? 0 : &newSpec );
+        _addNamespaceToCatalog( txn, toNSString, newSpec.isEmpty() ? 0 : &newSpec );
 
-        deleteObjects( _namespacesName, BSON( "name" << fromNS ), false, false, true );
+        deleteObjects( txn, _namespacesName, BSON( "name" << fromNS ), false, false, true );
 
         return Status::OK();
     }
 
     Collection* Database::getOrCreateCollection( const StringData& ns ) {
-        Collection* c = getCollection( ns );
+        DurTransaction txn; // TODO remove once we require reads to have transactions
+        return getOrCreateCollection(&txn, ns);
+    }
+    Collection* Database::getOrCreateCollection(TransactionExperiment* txn, const StringData& ns) {
+        Collection* c = getCollection( txn, ns );
         if ( !c ) {
-            c = createCollection( ns );
+            c = createCollection( txn, ns );
         }
         return c;
     }
@@ -666,7 +680,8 @@ namespace mongo {
         }
     }
 
-    Collection* Database::createCollection( const StringData& ns,
+    Collection* Database::createCollection( TransactionExperiment* txn,
+                                            const StringData& ns,
                                             const CollectionOptions& options,
                                             bool allocateDefaultSpace,
                                             bool createIdIndex ) {
@@ -695,18 +710,18 @@ namespace mongo {
 
         _namespaceIndex.add_ns( ns, DiskLoc(), options.capped );
         BSONObj optionsAsBSON = options.toBSON();
-        _addNamespaceToCatalog( ns, &optionsAsBSON );
+        _addNamespaceToCatalog( txn, ns, &optionsAsBSON );
 
-        Collection* collection = getCollection( ns );
+        Collection* collection = getCollection( txn, ns );
         massert( 17400, "_namespaceIndex.add_ns failed?", collection );
 
         // allocation strategy set explicitly in flags or by server-wide default
         if ( !options.capped ) {
             if ( options.flagsSet ) {
-                collection->setUserFlag( options.flags );
+                collection->setUserFlag( txn, options.flags );
             }
             else if ( newCollectionsUsePowerOf2Sizes ) {
-                collection->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                collection->setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
             }
         }
 
@@ -717,14 +732,14 @@ namespace mongo {
             if ( options.initialNumExtents > 0 ) {
                 int size = _massageExtentSize( options.cappedSize );
                 for ( int i = 0; i < options.initialNumExtents; i++ ) {
-                    collection->increaseStorageSize( size, false );
+                    collection->increaseStorageSize( txn, size, false );
                 }
             }
             else if ( !options.initialExtentSizes.empty() ) {
                 for ( size_t i = 0; i < options.initialExtentSizes.size(); i++ ) {
                     int size = options.initialExtentSizes[i];
                     size = _massageExtentSize( size );
-                    collection->increaseStorageSize( size, false );
+                    collection->increaseStorageSize( txn, size, false );
                 }
             }
             else if ( options.capped ) {
@@ -732,11 +747,11 @@ namespace mongo {
                 while ( collection->storageSize() < options.cappedSize ) {
                     int sz = _massageExtentSize( options.cappedSize - collection->storageSize() );
                     sz &= 0xffffff00;
-                    collection->increaseStorageSize( sz, true );
+                    collection->increaseStorageSize( txn, sz, true );
                 }
             }
             else {
-                collection->increaseStorageSize( Extent::initialSize( 128 ), false );
+                collection->increaseStorageSize( txn, Extent::initialSize( 128 ), false );
             }
         }
 
@@ -758,7 +773,9 @@ namespace mongo {
     }
 
 
-    void Database::_addNamespaceToCatalog( const StringData& ns, const BSONObj* options ) {
+    void Database::_addNamespaceToCatalog( TransactionExperiment* txn,
+                                           const StringData& ns,
+                                           const BSONObj* options ) {
         LOG(1) << "Database::_addNamespaceToCatalog ns: " << ns << endl;
         if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
@@ -771,14 +788,14 @@ namespace mongo {
             b.append("options", *options);
         BSONObj obj = b.done();
 
-        Collection* collection = getCollection( _namespacesName );
+        Collection* collection = getCollection( txn, _namespacesName );
         if ( !collection )
-            collection = createCollection( _namespacesName );
-        StatusWith<DiskLoc> loc = collection->insertDocument( obj, false );
+            collection = createCollection( txn, _namespacesName );
+        StatusWith<DiskLoc> loc = collection->insertDocument( txn, obj, false );
         uassertStatusOK( loc.getStatus() );
     }
 
-    Status Database::_dropNS( const StringData& ns ) {
+    Status Database::_dropNS( TransactionExperiment* txn, const StringData& ns ) {
 
         NamespaceDetails* d = _namespaceIndex.details( ns );
         if ( !d )
@@ -790,7 +807,7 @@ namespace mongo {
         {
             // remove from the system catalog
             BSONObj cond = BSON( "name" << ns );   // { name: "colltodropname" }
-            deleteObjects( _namespacesName, cond, false, false, true);
+            deleteObjects( txn, _namespacesName, cond, false, false, true);
         }
 
         // free extents

@@ -39,6 +39,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
 
@@ -127,6 +128,7 @@ namespace mongo {
             std::vector<BSONObj> indexesInProg;
 
             Lock::GlobalWrite globalWriteLock;
+            DurTransaction txn;
 
             {
                 Client::Context srcCtx( source );
@@ -182,7 +184,7 @@ namespace mongo {
                         return false;
                     }
 
-                    Status s = ctx.db()->dropCollection( target );
+                    Status s = ctx.db()->dropCollection( &txn, target );
                     if ( !s.isOK() ) {
                         errmsg = s.toString();
                         restoreIndexBuildsOnSource( indexesInProg, source );
@@ -193,7 +195,7 @@ namespace mongo {
                 // If we are renaming in the same database, just
                 // rename the namespace and we're done.
                 if ( sourceDB == targetDB ) {
-                    Status s = ctx.db()->renameCollection( source, target,
+                    Status s = ctx.db()->renameCollection( &txn, source, target,
                                                            cmdObj["stayTemp"].trueValue() );
                     if ( !s.isOK() ) {
                         errmsg = s.toString();
@@ -214,13 +216,13 @@ namespace mongo {
                     options.cappedSize = size;
                     options.setNoIdIndex();
 
-                    targetColl = ctx.db()->createCollection( target, options );
+                    targetColl = ctx.db()->createCollection( &txn, target, options );
                 }
                 else {
                     CollectionOptions options;
                     options.setNoIdIndex();
                     // No logOp necessary because the entire renameCollection command is one logOp.
-                    targetColl = ctx.db()->createCollection( target, options );
+                    targetColl = ctx.db()->createCollection( &txn, target, options );
                 }
                 if ( !targetColl ) {
                     errmsg = "Failed to create target collection.";
@@ -252,7 +254,7 @@ namespace mongo {
                     if ( !targetColl )
                         targetColl = ctx.db()->getCollection( target );
                     // No logOp necessary because the entire renameCollection command is one logOp.
-                    Status s = targetColl->insertDocument( o, true ).getStatus();
+                    Status s = targetColl->insertDocument( &txn, o, true ).getStatus();
                     if ( !s.isOK() ) {
                         insertSuccessful = false;
                         errmsg = s.toString();
@@ -264,7 +266,7 @@ namespace mongo {
             // If inserts were unsuccessful, drop the target collection and return false.
             if ( !insertSuccessful ) {
                 Client::Context ctx( target );
-                Status s = ctx.db()->dropCollection( target );
+                Status s = ctx.db()->dropCollection( &txn, target );
                 if ( !s.isOK() )
                     errmsg = s.toString();
                 restoreIndexBuildsOnSource( indexesInProg, source );
@@ -318,7 +320,7 @@ namespace mongo {
 
                 // If indexes were unsuccessful, drop the target collection and return false.
                 if ( !indexSuccessful ) {
-                    Status s = ctx.db()->dropCollection( target );
+                    Status s = ctx.db()->dropCollection( &txn, target );
                     if ( !s.isOK() )
                         errmsg = s.toString();
                     restoreIndexBuildsOnSource( indexesInProg, source );
@@ -329,7 +331,7 @@ namespace mongo {
             // Drop the source collection.
             {
                 Client::Context srcCtx( source );
-                Status s = srcCtx.db()->dropCollection( source );
+                Status s = srcCtx.db()->dropCollection( &txn, source );
                 if ( !s.isOK() ) {
                     errmsg = s.toString();
                     restoreIndexBuildsOnSource( indexesInProg, source );

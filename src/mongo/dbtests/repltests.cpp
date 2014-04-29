@@ -43,6 +43,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -55,6 +56,7 @@ namespace ReplTests {
     class Base {
         Lock::GlobalWrite lk;
         Client::Context _context;
+        mutable DurTransaction _txn;
     public:
         Base() : _context( ns() ) {
             oldRepl();
@@ -65,7 +67,7 @@ namespace ReplTests {
 
             Collection* c = _context.db()->getCollection( ns() );
             if ( ! c ) {
-                c = _context.db()->createCollection( ns() );
+                c = _context.db()->createCollection( &_txn, ns() );
             }
             c->getIndexCatalog()->ensureHaveIdIndex();
         }
@@ -114,9 +116,9 @@ namespace ReplTests {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( ns() );
+            Collection* coll = db->getCollection( &_txn, ns() );
             if ( !coll ) {
-                coll = db->createCollection( ns() );
+                coll = db->createCollection( &_txn, ns() );
             }
 
             int count = 0;
@@ -131,10 +133,11 @@ namespace ReplTests {
         static int opCount() {
             Lock::GlobalWrite lk;
             Client::Context ctx( cllNS() );
+            DurTransaction txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( cllNS() );
             if ( !coll ) {
-                coll = db->createCollection( cllNS() );
+                coll = db->createCollection( &txn, cllNS() );
             }
 
             int count = 0;
@@ -148,6 +151,7 @@ namespace ReplTests {
         }
         static void applyAllOperations() {
             Lock::GlobalWrite lk;
+            DurTransaction txn;
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
@@ -179,10 +183,11 @@ namespace ReplTests {
         static void printAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
+            DurTransaction txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns );
             if ( !coll ) {
-                coll = db->createCollection( ns );
+                coll = db->createCollection( &txn, ns );
             }
 
             RecordIterator* it = coll->getIterator( DiskLoc(), false,
@@ -198,10 +203,11 @@ namespace ReplTests {
         static void deleteAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
+            DurTransaction txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns );
             if ( !coll ) {
-                coll = db->createCollection( ns );
+                coll = db->createCollection( &txn, ns );
             }
 
             vector< DiskLoc > toDelete;
@@ -212,20 +218,21 @@ namespace ReplTests {
             }
             delete it;
             for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-                coll->deleteDocument( *i, true );
+                coll->deleteDocument( &txn, *i, true );
             }
         }
         static void insert( const BSONObj &o ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
+            DurTransaction txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns() );
             if ( !coll ) {
-                coll = db->createCollection( ns() );
+                coll = db->createCollection( &txn, ns() );
             }
 
             if ( o.hasField( "_id" ) ) {
-                coll->insertDocument( o, true );
+                coll->insertDocument( &txn, o, true );
                 return;
             }
 
@@ -234,7 +241,7 @@ namespace ReplTests {
             id.init();
             b.appendOID( "_id", &id );
             b.appendElements( o );
-            coll->insertDocument( b.obj(), true );
+            coll->insertDocument( &txn, b.obj(), true );
         }
         static BSONObj wid( const char *json ) {
             class BSONObjBuilder b;

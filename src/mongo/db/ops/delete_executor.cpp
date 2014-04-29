@@ -81,7 +81,7 @@ namespace mongo {
         return status;
     }
 
-    long long DeleteExecutor::execute() {
+    long long DeleteExecutor::execute(TransactionExperiment* txn) {
         uassertStatusOK(prepare());
         uassert(17417,
                 mongoutils::str::stream() <<
@@ -165,7 +165,7 @@ namespace mongo {
             // TODO: do we want to buffer docs and delete them in a group rather than
             // saving/restoring state repeatedly?
             runner->saveState();
-            collection->deleteDocument(rloc, false, false, logop ? &toDelete : NULL );
+            collection->deleteDocument(txn, rloc, false, false, logop ? &toDelete : NULL );
             runner->restoreState();
 
             nDeleted++;

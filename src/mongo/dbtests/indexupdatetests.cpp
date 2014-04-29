@@ -34,6 +34,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -89,6 +90,7 @@ namespace IndexUpdateTests {
         }
 #endif
         Client::WriteContext _ctx;
+        DurTransaction _txn;
     };
 
     /** addKeysToPhaseOne() adds keys from a collection's documents to an external sorter. */
@@ -313,14 +315,14 @@ namespace IndexUpdateTests {
         void run() {
             // Create a new collection.
             Database* db = _ctx.ctx().db();
-            db->dropCollection( _ns );
-            Collection* coll = db->createCollection( _ns );
+            db->dropCollection( &_txn, _ns );
+            Collection* coll = db->createCollection( &_txn, _ns );
             // Drop all indexes including id index.
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents with enforceQuota=true.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                coll->insertDocument( BSON( "a" << i ), true );
+                coll->insertDocument( &_txn, BSON( "a" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();
@@ -343,13 +345,13 @@ namespace IndexUpdateTests {
         void run() {
             // Create a new collection.
             Database* db = _ctx.ctx().db();
-            db->dropCollection( _ns );
-            Collection* coll = db->createCollection( _ns );
+            db->dropCollection( &_txn, _ns );
+            Collection* coll = db->createCollection( &_txn, _ns );
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                coll->insertDocument( BSON( "a" << i ), true );
+                coll->insertDocument( &_txn, BSON( "a" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();
@@ -372,16 +374,16 @@ namespace IndexUpdateTests {
         void run() {
             // Recreate the collection as capped, without an _id index.
             Database* db = _ctx.ctx().db();
-            db->dropCollection( _ns );
+            db->dropCollection( &_txn, _ns );
             CollectionOptions options;
             options.capped = true;
             options.cappedSize = 10 * 1024;
-            Collection* coll = db->createCollection( _ns, options );
+            Collection* coll = db->createCollection( &_txn, _ns, options );
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                coll->insertDocument( BSON( "_id" << i ), true );
+                coll->insertDocument( &_txn, BSON( "_id" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();
@@ -406,16 +408,16 @@ namespace IndexUpdateTests {
         void run() {
             // Recreate the collection as capped, without an _id index.
             Database* db = _ctx.ctx().db();
-            db->dropCollection( _ns );
+            db->dropCollection( &_txn, _ns );
             CollectionOptions options;
             options.capped = true;
             options.cappedSize = 10 * 1024;
-            Collection* coll = db->createCollection( _ns, options );
+            Collection* coll = db->createCollection( &_txn, _ns, options );
             coll->getIndexCatalog()->dropAllIndexes( true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
-                coll->insertDocument( BSON( "_id" << i ), true );
+                coll->insertDocument( &_txn, BSON( "_id" << i ), true );
             }
             // Initialize curop.
             cc().curop()->reset();

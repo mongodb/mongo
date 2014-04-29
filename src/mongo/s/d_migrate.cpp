@@ -66,6 +66,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -1644,6 +1645,7 @@ namespace mongo {
             {
                 // 0. copy system.namespaces entry if collection doesn't already exist
                 Client::WriteContext ctx( ns );
+                DurTransaction txn;
                 // Only copy if ns doesn't already exist
                 Database* db = ctx.ctx().db();
                 Collection* collection = db->getCollection( ns );
@@ -1652,14 +1654,14 @@ namespace mongo {
                     string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
                     if ( entry["options"].isABSONObj() ) {
-                        Status status = userCreateNS( db, ns, entry["options"].Obj(), true, 0 );
+                        Status status = userCreateNS( &txn, db, ns, entry["options"].Obj(), true, 0 );
                         if ( !status.isOK() ) {
                             warning() << "failed to create collection [" << ns << "] "
                                       << " with options: " << status;
                         }
                     }
                     else {
-                        db->createCollection( ns );
+                        db->createCollection( &txn, ns );
                     }
                 }
             }

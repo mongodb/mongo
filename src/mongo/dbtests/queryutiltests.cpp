@@ -38,6 +38,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -1585,14 +1586,15 @@ namespace QueryUtilTests {
         class IndexBase {
             Lock::DBWrite _lk;
             Client::Context _ctx;
+            DurTransaction _txn;
         public:
             IndexBase() : _lk(ns()), _ctx( ns() ) , indexNum_( 0 ) {
-                userCreateNS( _ctx.db(), ns(), BSONObj(), false );
+                userCreateNS( &_txn, _ctx.db(), ns(), BSONObj(), false );
             }
             ~IndexBase() {
                 if ( !nsd() )
                     return;
-                _ctx.db()->dropCollection( ns() );
+                _ctx.db()->dropCollection( &_txn, ns() );
             }
         protected:
             static const char *ns() { return "unittests.FieldRangeSetPairTests"; }

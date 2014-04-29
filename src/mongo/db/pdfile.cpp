@@ -105,7 +105,8 @@ namespace mongo {
      * @param createDefaultIndexes - if false, defers id (and other) index creation.
      * @return true if successful
     */
-    Status userCreateNS( Database* db,
+    Status userCreateNS( TransactionExperiment* txn,
+                         Database* db,
                          const StringData& ns,
                          BSONObj options,
                          bool logForReplication,
@@ -130,7 +131,7 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        invariant( db->createCollection( ns, collectionOptions, true, createDefaultIndexes ) );
+        invariant( db->createCollection( txn, ns, collectionOptions, true, createDefaultIndexes ) );
 
         if ( logForReplication ) {
             if ( options.getField( "create" ).eoo() ) {

@@ -41,6 +41,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 
 /* Scenarios
@@ -336,6 +337,7 @@ namespace mongo {
 
     void ReplSetImpl::syncFixUp(HowToFixUp& h, OplogReader& r) {
         DBClientConnection *them = r.conn();
+        DurTransaction txn;
 
         // fetch all first so we needn't handle interruption in a fancy way
 
@@ -407,7 +409,7 @@ namespace mongo {
 
                 Client::Context c(ns);
                 {
-                    c.db()->dropCollection(ns);
+                    c.db()->dropCollection(&txn, ns);
                     {
                         string errmsg;
                         dbtemprelease r;
@@ -458,7 +460,7 @@ namespace mongo {
             Client::Context c(*i);
             try {
                 log() << "replSet rollback drop: " << *i << rsLog;
-                c.db()->dropCollection(*i);
+                c.db()->dropCollection(&txn, *i);
             }
             catch(...) {
                 log() << "replset rollback error dropping collection " << *i << rsLog;
@@ -524,12 +526,12 @@ namespace mongo {
                                 //would be faster but requires index: DiskLoc loc = Helpers::findById(nsd, pattern);
                                 if( !loc.isNull() ) {
                                     try {
-                                        collection->temp_cappedTruncateAfter(loc, true);
+                                        collection->temp_cappedTruncateAfter(&txn, loc, true);
                                     }
                                     catch(DBException& e) {
                                         if( e.getCode() == 13415 ) {
                                             // hack: need to just make cappedTruncate do this...
-                                            uassertStatusOK( collection->truncate() );
+                                            uassertStatusOK( collection->truncate(&txn ) );
                                         }
                                         else {
                                             throw;
@@ -544,7 +546,7 @@ namespace mongo {
                         else {
                             try {
                                 deletes++;
-                                deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
+                                deleteObjects(&txn, d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
                             }
                             catch(...) {
                                 log() << "replSet error rollback delete failed ns:" << d.ns << rsLog;
@@ -558,7 +560,7 @@ namespace mongo {
                                 if( o.isEmpty() ) {
                                     // we should drop
                                     try {
-                                        c.db()->dropCollection(d.ns);
+                                        c.db()->dropCollection(&txn, d.ns);
                                     }
                                     catch(...) {
                                         log() << "replset error rolling back collection " << d.ns << rsLog;
@@ -587,7 +589,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(request, &debug);
+                    update(&txn, request, &debug);
 
                 }
             }
@@ -606,7 +608,7 @@ namespace mongo {
         // clean up oplog
         LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
         // todo: fatal error if this throws?
-        oplogCollection->temp_cappedTruncateAfter(h.commonPointOurDiskloc, false);
+        oplogCollection->temp_cappedTruncateAfter(&txn, h.commonPointOurDiskloc, false);
 
         Status status = getGlobalAuthorizationManager()->initialize();
         if (!status.isOK()) {

@@ -50,6 +50,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
@@ -598,7 +599,8 @@ namespace mongo {
         }
 
         if ( currentOp->shouldDBProfile( executionTime ) ) {
-            profile( *client, currentOp->getOp(), *currentOp );
+            DurTransaction txn;
+            profile( &txn, *client, currentOp->getOp(), *currentOp );
         }
     }
 
@@ -924,7 +926,8 @@ namespace mongo {
         _collection = database->getCollection(request->getTargetingNS());
         if (!_collection) {
             // Implicitly create if it doesn't exist
-            _collection = database->createCollection(request->getTargetingNS());
+            DurTransaction txn;
+            _collection = database->createCollection(&txn, request->getTargetingNS());
             if (!_collection) {
                 result->setError(
                         toWriteError(Status(ErrorCodes::InternalError,
@@ -1041,7 +1044,8 @@ namespace mongo {
 
         Lock::assertWriteLocked( insertNS );
 
-        StatusWith<DiskLoc> status = collection->insertDocument( docToInsert, true );
+        DurTransaction txn;
+        StatusWith<DiskLoc> status = collection->insertDocument( &txn, docToInsert, true );
 
         if ( !status.isOK() ) {
             result->setError(toWriteError(status.getStatus()));
@@ -1111,9 +1115,10 @@ namespace mongo {
         Client::Context ctx( nsString.ns(),
                              storageGlobalParams.dbpath,
                              false /* don't check version */ );
+        DurTransaction txn;
 
         try {
-            UpdateResult res = executor.execute();
+            UpdateResult res = executor.execute(&txn);
 
             const long long numDocsModified = res.numDocsModified;
             const long long numMatched = res.numMatched;
@@ -1173,9 +1178,10 @@ namespace mongo {
         Client::Context writeContext( nss.ns(),
                                       storageGlobalParams.dbpath,
                                       false /* don't check version */);
+        DurTransaction txn;
 
         try {
-            result->getStats().n = executor.execute();
+            result->getStats().n = executor.execute(&txn);
         }
         catch ( const DBException& ex ) {
             status = ex.toStatus();

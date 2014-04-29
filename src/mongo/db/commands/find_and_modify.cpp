@@ -43,6 +43,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/query/get_runner.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
 
@@ -139,7 +140,8 @@ namespace mongo {
             
             Lock::DBWrite lk( ns );
             Client::Context cx( ns );
-            Collection* collection = cx.db()->getCollection( ns );
+            DurTransaction txn;
+            Collection* collection = cx.db()->getCollection( &txn, ns );
 
             BSONObj doc;
             bool found = false;
@@ -225,7 +227,7 @@ namespace mongo {
             if ( remove ) {
                 _appendHelper( result , doc , found , fields );
                 if ( found ) {
-                    deleteObjects( ns , queryModified , true , true );
+                    deleteObjects( &txn, ns , queryModified , true , true );
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
@@ -255,7 +257,7 @@ namespace mongo {
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = mongo::update(request, &cc().curop()->debug());
+                    UpdateResult res = mongo::update(&txn, request, &cc().curop()->debug());
                     if ( !collection ) {
                         // collection created by an upsert
                         collection = cx.db()->getCollection( ns );

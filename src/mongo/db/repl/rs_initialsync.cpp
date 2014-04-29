@@ -42,6 +42,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/initial_sync.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -127,6 +128,7 @@ namespace mongo {
 
     static void emptyOplog() {
         Client::WriteContext ctx(rsoplog);
+        DurTransaction txn;
         Collection* collection = ctx.ctx().db()->getCollection(rsoplog);
 
         // temp
@@ -134,7 +136,7 @@ namespace mongo {
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;
-        uassertStatusOK( collection->truncate() );
+        uassertStatusOK( collection->truncate(&txn) );
     }
 
     const Member* ReplSetImpl::getMemberToSyncTo() {

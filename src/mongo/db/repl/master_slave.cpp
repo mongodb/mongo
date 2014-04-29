@@ -53,6 +53,7 @@
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -193,6 +194,7 @@ namespace mongo {
         {
             OpDebug debug;
             Client::Context ctx("local.sources");
+            DurTransaction txn;
 
             const NamespaceString requestNs("local.sources");
             UpdateRequest request(requestNs);
@@ -201,7 +203,7 @@ namespace mongo {
             request.setUpdates(o);
             request.setUpsert();
 
-            UpdateResult res = update(request, &debug);
+            UpdateResult res = update(&txn, request, &debug);
 
             verify( ! res.modifiers );
             verify( res.numMatched == 1 );

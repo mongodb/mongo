@@ -40,12 +40,13 @@ namespace mongo {
 
     class Collection;
     class Database;
+    class TransactionExperiment;
 
     /* --- profiling --------------------------------------------
        do when database->profile is set
     */
 
-    void profile(const Client& c, int op, CurOp& currentOp);
+    void profile(TransactionExperiment* txn, const Client& c, int op, CurOp& currentOp);
 
     /**
      * Get (or create) the profile collection
@@ -54,7 +55,8 @@ namespace mongo {
      * @param   force   Always create the collection if it does not exist
      * @return  Collection for the newly created collection, or NULL on error
     **/
-    Collection* getOrCreateProfileCollection(Database *db,
+    Collection* getOrCreateProfileCollection(TransactionExperiment* txn,
+                                             Database *db,
                                              bool force = false,
                                              std::string* errmsg = NULL);
 

@@ -79,8 +79,11 @@ namespace {
     }
 } // namespace
 
-    static void _profile(const Client& c, Database* db,
-                         CurOp& currentOp, BufBuilder& profileBufBuilder) {
+    static void _profile(TransactionExperiment* txn,
+                         const Client& c,
+                         Database* db,
+                         CurOp& currentOp,
+                         BufBuilder& profileBufBuilder) {
         dassert( db );
 
         // build object
@@ -120,13 +123,13 @@ namespace {
 
         // write: not replicated
         // get or create the profiling collection
-        Collection* profileCollection = getOrCreateProfileCollection(db);
+        Collection* profileCollection = getOrCreateProfileCollection(txn, db);
         if ( profileCollection ) {
-            profileCollection->insertDocument( p, false );
+            profileCollection->insertDocument( txn, p, false );
         }
     }
 
-    void profile(const Client& c, int op, CurOp& currentOp) {
+    void profile(TransactionExperiment* txn, const Client& c, int op, CurOp& currentOp) {
         // initialize with 1kb to start, to avoid realloc later
         // doing this outside the dblock to improve performance
         BufBuilder profileBufBuilder(1024);
@@ -137,7 +140,7 @@ namespace {
             Lock::DBWrite lk( currentOp.getNS() );
             if (dbHolder()._isLoaded(nsToDatabase(currentOp.getNS()), storageGlobalParams.dbpath)) {
                 Client::Context cx(currentOp.getNS(), storageGlobalParams.dbpath, false);
-                _profile(c, cx.db(),
+                _profile(txn, c, cx.db(),
                          currentOp, profileBufBuilder);
             }
             else {
@@ -152,10 +155,13 @@ namespace {
         }
     }
 
-    Collection* getOrCreateProfileCollection(Database *db, bool force, string* errmsg ) {
+    Collection* getOrCreateProfileCollection(TransactionExperiment* txn,
+                                             Database *db,
+                                             bool force,
+                                             string* errmsg ) {
         fassert(16372, db);
         const char* profileName = db->getProfilingNS();
-        Collection* collection = db->getCollection( profileName );
+        Collection* collection = db->getCollection( txn, profileName );
 
         if ( collection ) {
             if ( !collection->isCapped() ) {
@@ -187,7 +193,7 @@ namespace {
         collectionOptions.capped = true;
         collectionOptions.cappedSize = 1024 * 1024;
 
-        collection = db->createCollection( profileName, collectionOptions );
+        collection = db->createCollection( txn, profileName, collectionOptions );
         invariant( collection );
         return collection;
     }

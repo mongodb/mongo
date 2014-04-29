@@ -40,6 +40,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
@@ -47,7 +48,6 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 
@@ -74,14 +74,14 @@ namespace mongo {
 
     // ----
 
-    Collection::Collection( const StringData& fullNS,
+    Collection::Collection( TransactionExperiment* txn,
+                            const StringData& fullNS,
                             NamespaceDetails* details,
                             Database* database )
         : _ns( fullNS ),
           _infoCache( this ),
           _indexCatalog( this, details ),
           _cursorCache( fullNS ) {
-        DurTransaction txn[1];
 
         _details = details;
         _database = database;
@@ -167,8 +167,9 @@ namespace mongo {
         return BSONObj( rec->accessed()->data() );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( const DocWriter* doc, bool enforceQuota ) {
-        DurTransaction txn[1];
+    StatusWith<DiskLoc> Collection::insertDocument( TransactionExperiment* txn,
+                                                    const DocWriter* doc,
+                                                    bool enforceQuota ) {
         verify( _indexCatalog.numIndexesTotal() == 0 ); // eventually can implement, just not done
 
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
@@ -182,7 +183,9 @@ namespace mongo {
         return StatusWith<DiskLoc>( loc );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
+    StatusWith<DiskLoc> Collection::insertDocument( TransactionExperiment* txn,
+                                                    const BSONObj& docToInsert,
+                                                    bool enforceQuota ) {
         if ( _indexCatalog.findIdIndex() ) {
             if ( docToInsert["_id"].eoo() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
@@ -198,7 +201,7 @@ namespace mongo {
                 return StatusWith<DiskLoc>( ret );
         }
 
-        StatusWith<DiskLoc> status = _insertDocument( docToInsert, enforceQuota );
+        StatusWith<DiskLoc> status = _insertDocument( txn, docToInsert, enforceQuota );
         if ( status.isOK() ) {
             _details->paddingFits();
         }
@@ -206,9 +209,9 @@ namespace mongo {
         return status;
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& doc,
+    StatusWith<DiskLoc> Collection::insertDocument( TransactionExperiment* txn,
+                                                    const BSONObj& doc,
                                                     MultiIndexBlock& indexBlock ) {
-        DurTransaction txn[1];
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
                                                               doc.objdata(),
                                                               doc.objsize(),
@@ -229,14 +232,14 @@ namespace mongo {
     }
 
 
-    StatusWith<DiskLoc> Collection::_insertDocument( const BSONObj& docToInsert,
+    StatusWith<DiskLoc> Collection::_insertDocument( TransactionExperiment* txn,
+                                                     const BSONObj& docToInsert,
                                                      bool enforceQuota ) {
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
 
-        DurTransaction txn[1];
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
                                                               docToInsert.objdata(),
                                                               docToInsert.objsize(),
@@ -266,9 +269,11 @@ namespace mongo {
         return loc;
     }
 
-    void Collection::deleteDocument( const DiskLoc& loc, bool cappedOK, bool noWarn,
+    void Collection::deleteDocument( TransactionExperiment* txn,
+                                     const DiskLoc& loc,
+                                     bool cappedOK,
+                                     bool noWarn,
                                      BSONObj* deletedId ) {
-        DurTransaction txn[1];
         if ( _details->isCapped() && !cappedOK ) {
             log() << "failing remove on a capped ns " << _ns << endl;
             uasserted( 10089,  "cannot remove from a capped collection" );
@@ -297,11 +302,11 @@ namespace mongo {
     Counter64 moveCounter;
     ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", &moveCounter );
 
-    StatusWith<DiskLoc> Collection::updateDocument( const DiskLoc& oldLocation,
+    StatusWith<DiskLoc> Collection::updateDocument( TransactionExperiment* txn,
+                                                    const DiskLoc& oldLocation,
                                                     const BSONObj& objNew,
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
-        DurTransaction txn[1];
 
         Record* oldRecord = _recordStore->recordFor( oldLocation );
         BSONObj objOld( oldRecord->accessed()->data() );
@@ -368,7 +373,7 @@ namespace mongo {
                     debug->nmoved += 1;
             }
 
-            StatusWith<DiskLoc> loc = _insertDocument( objNew, enforceQuota );
+            StatusWith<DiskLoc> loc = _insertDocument( txn, objNew, enforceQuota );
 
             if ( loc.isOK() ) {
                 // insert successful, now lets deallocate the old location
@@ -412,7 +417,8 @@ namespace mongo {
         return StatusWith<DiskLoc>( oldLocation );
     }
 
-    Status Collection::updateDocumentWithDamages( const DiskLoc& loc,
+    Status Collection::updateDocumentWithDamages( TransactionExperiment* txn,
+                                                  const DiskLoc& loc,
                                                   const char* damangeSource,
                                                   const mutablebson::DamageVector& damages ) {
 
@@ -429,7 +435,7 @@ namespace mongo {
         const mutablebson::DamageVector::const_iterator end = damages.end();
         for( ; where != end; ++where ) {
             const char* sourcePtr = damangeSource + where->sourceOffset;
-            void* targetPtr = getDur().writingPtr(root + where->targetOffset, where->size);
+            void* targetPtr = txn->writingPtr(root + where->targetOffset, where->size);
             std::memcpy(targetPtr, sourcePtr, where->size);
         }
 
@@ -474,8 +480,7 @@ namespace mongo {
         return &_database->getExtentManager();
     }
 
-    void Collection::increaseStorageSize( int size, bool enforceQuota ) {
-        DurTransaction txn[1];
+    void Collection::increaseStorageSize(TransactionExperiment* txn, int size, bool enforceQuota) {
         _recordStore->increaseStorageSize(txn, size, enforceQuota ? largestFileNumberInQuota() : 0);
     }
 
@@ -511,8 +516,7 @@ namespace mongo {
      * 3) truncate record store
      * 4) re-write indexes
      */
-    Status Collection::truncate() {
-        DurTransaction txn[1];
+    Status Collection::truncate(TransactionExperiment* txn) {
         massert( 17445, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
 
         // 1) store index specs
@@ -547,8 +551,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Collection::temp_cappedTruncateAfter( DiskLoc end, bool inclusive) {
-        DurTransaction txn[1];
+    void Collection::temp_cappedTruncateAfter(TransactionExperiment* txn,
+                                              DiskLoc end,
+                                              bool inclusive) {
         invariant( isCapped() );
         reinterpret_cast<CappedRecordStoreV1*>(
             _recordStore.get())->temp_cappedTruncateAfter( txn, end, inclusive );
@@ -615,25 +620,25 @@ namespace mongo {
         return _details->isUserFlagSet( flag );
     }
 
-    bool Collection::setUserFlag( int flag ) {
+    bool Collection::setUserFlag( TransactionExperiment* txn, int flag ) {
         if ( !_details->setUserFlag( flag ) )
             return false;
-        _syncUserFlags();
+        _syncUserFlags(txn);
         return true;
     }
 
-    bool Collection::clearUserFlag( int flag ) {
+    bool Collection::clearUserFlag( TransactionExperiment* txn, int flag ) {
         if ( !_details->clearUserFlag( flag ) )
             return false;
-        _syncUserFlags();
+        _syncUserFlags(txn);
         return true;
     }
 
-    void Collection::_syncUserFlags() {
+    void Collection::_syncUserFlags(TransactionExperiment* txn) {
         if ( _ns.coll() == "system.namespaces" )
             return;
         string system_namespaces = _ns.getSisterNS( "system.namespaces" );
-        Collection* coll = _database->getCollection( system_namespaces );
+        Collection* coll = _database->getCollection( txn, system_namespaces );
 
         DiskLoc oldLocation = Helpers::findOne( coll, BSON( "name" << _ns.ns() ), false );
         fassert( 17247, !oldLocation.isNull() );
@@ -645,7 +650,7 @@ namespace mongo {
                                                        BSON( "options.flags" <<
                                                              _details->userFlags() ) ) );
 
-        StatusWith<DiskLoc> loc = coll->updateDocument( oldLocation, newEntry, false, NULL );
+        StatusWith<DiskLoc> loc = coll->updateDocument( txn, oldLocation, newEntry, false, NULL );
         if ( !loc.isOK() ) {
             // TODO: should this be an fassert?
             error() << "syncUserFlags failed! "

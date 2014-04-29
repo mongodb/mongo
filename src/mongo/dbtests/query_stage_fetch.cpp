@@ -41,6 +41,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"
@@ -90,10 +91,11 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
             WorkingSet ws;
 
@@ -161,10 +163,11 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
             WorkingSet ws;
 
@@ -226,10 +229,11 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
             WorkingSet ws;
 
@@ -298,10 +302,11 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
             WorkingSet ws;
 
@@ -362,10 +367,11 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
             WorkingSet ws;
 

@@ -48,6 +48,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/range_preserver.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/s/collection_metadata.h"
@@ -340,12 +341,13 @@ namespace mongo {
             if (_useIncremental) {
                 // Create the inc collection and make sure we have index on "0" key.
                 Client::WriteContext incCtx( _config.incLong );
-                Collection* incColl = incCtx.ctx().db()->getCollection( _config.incLong );
+                DurTransaction txn;
+                Collection* incColl = incCtx.ctx().db()->getCollection( &txn, _config.incLong );
                 if ( !incColl ) {
                     CollectionOptions options;
                     options.setNoIdIndex();
                     options.temp = true;
-                    incColl = incCtx.ctx().db()->createCollection( _config.incLong, options );
+                    incColl = incCtx.ctx().db()->createCollection( &txn, _config.incLong, options );
 
                     // Log the createCollection operation.
                     BSONObjBuilder b;
@@ -400,11 +402,12 @@ namespace mongo {
             {
                 // create temp collection and insert the indexes from temporary storage
                 Client::WriteContext tempCtx( _config.tempNamespace );
-                Collection* tempColl = tempCtx.ctx().db()->getCollection( _config.tempNamespace );
+                DurTransaction txn;
+                Collection* tempColl = tempCtx.ctx().db()->getCollection( &txn, _config.tempNamespace );
                 if ( !tempColl ) {
                     CollectionOptions options;
                     options.temp = true;
-                    tempColl = tempCtx.ctx().db()->createCollection( _config.tempNamespace, options );
+                    tempColl = tempCtx.ctx().db()->createCollection( &txn, _config.tempNamespace, options );
 
                     // Log the createCollection operation.
                     BSONObjBuilder b;
@@ -626,6 +629,7 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx( ns );
+            DurTransaction txn;
             Collection* coll = ctx.ctx().db()->getCollection( ns );
             if ( !coll )
                 uasserted(13630, str::stream() << "attempted to insert into nonexistent" <<
@@ -641,7 +645,7 @@ namespace mongo {
             b.appendElements(o);
             BSONObj bo = b.obj();
 
-            coll->insertDocument( bo, true );
+            coll->insertDocument( &txn, bo, true );
             logOp( "i", ns.c_str(), bo );
         }
 
@@ -652,13 +656,14 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx( _config.incLong );
+            DurTransaction txn;
             Collection* coll = ctx.ctx().db()->getCollection( _config.incLong );
             if ( !coll )
                 uasserted(13631, str::stream() << "attempted to insert into nonexistent"
                                                   " collection during a mr operation." <<
                                                   " collection expected: " << _config.incLong );
 
-            coll->insertDocument( o, true );
+            coll->insertDocument( &txn, o, true );
             logOp( "i", _config.incLong.c_str(), o );
             getDur().commitIfNeeded();
         }

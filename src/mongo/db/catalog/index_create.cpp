@@ -45,6 +45,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/processinfo.h"
@@ -136,7 +137,8 @@ namespace mongo {
                     bool runnerEOF = runner->isEOF();
                     runner->saveState();
                     BSONObj toDelete;
-                    collection->deleteDocument( loc, false, true, &toDelete );
+                    DurTransaction txn; // XXX
+                    collection->deleteDocument( &txn, loc, false, true, &toDelete );
                     logOp( "d", ns.c_str(), toDelete );
 
                     if (!runner->restoreState()) {
@@ -278,7 +280,9 @@ namespace mongo {
 
             for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
                 BSONObj toDelete;
-                collection->deleteDocument( *i,
+                DurTransaction txn; // XXX
+                collection->deleteDocument( &txn,
+                                            *i,
                                             false /* cappedOk */,
                                             true /* noWarn */,
                                             &toDelete );

@@ -43,6 +43,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/mongoutils/str.h"
@@ -126,10 +127,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -227,10 +229,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -312,10 +315,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -360,10 +364,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Generate large keys for {foo: 1, big: 1} index.
@@ -411,10 +416,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Generate large keys for {baz: 1, big: 1} index.
@@ -461,10 +467,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -521,10 +528,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Generate large keys for {bar: 1, big: 1} index.
@@ -579,10 +587,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -637,10 +646,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 10; ++i) {
@@ -684,10 +694,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -739,10 +750,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Insert a bunch of data
@@ -855,10 +867,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Insert a bunch of data
@@ -907,10 +920,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
 
@@ -951,10 +965,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -998,10 +1013,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -1042,10 +1058,11 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(ns());
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {

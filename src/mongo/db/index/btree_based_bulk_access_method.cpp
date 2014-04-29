@@ -132,12 +132,12 @@ namespace mongo {
     }
 
     Status BtreeBasedBulkAccessMethod::commit(set<DiskLoc>* dupsToDrop, CurOp* op, bool mayInterrupt) {
-        DurTransaction txn[1];
+        DurTransaction txn; // XXX
         DiskLoc oldHead = _real->_btreeState->head();
         // XXX: do we expect the tree to be empty but have a head set?  Looks like so from old code.
         invariant(!oldHead.isNull());
         _real->_btreeState->setHead(DiskLoc());
-        _real->_btreeState->recordStore()->deleteRecord(txn, oldHead);
+        _real->_btreeState->recordStore()->deleteRecord(&txn, oldHead);
 
         if (_isMultiKey) {
             _real->_btreeState->setMultikey();

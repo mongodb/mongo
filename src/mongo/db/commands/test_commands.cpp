@@ -36,6 +36,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
@@ -64,16 +65,17 @@ namespace mongo {
 
             Lock::DBWrite lk(ns);
             Client::Context ctx( ns );
+            DurTransaction txn;
             Database* db = ctx.db();
             Collection* collection = db->getCollection( ns );
             if ( !collection ) {
-                collection = db->createCollection( ns );
+                collection = db->createCollection( &txn, ns );
                 if ( !collection ) {
                     errmsg = "could not create collection";
                     return false;
                 }
             }
-            StatusWith<DiskLoc> res = collection->insertDocument( obj, false );
+            StatusWith<DiskLoc> res = collection->insertDocument( &txn, obj, false );
             return appendCommandStatus( result, res.getStatus() );
         }
     };
@@ -142,6 +144,7 @@ namespace mongo {
             bool inc = cmdObj.getBoolField( "inc" ); // inclusive range?
 
             Client::WriteContext ctx( nss.ns() );
+            DurTransaction txn;
             Collection* collection = ctx.ctx().db()->getCollection( nss.ns() );
             massert( 13417, "captrunc collection not found or empty", collection);
 
@@ -154,7 +157,7 @@ namespace mongo {
                 Runner::RunnerState state = runner->getNext(NULL, &end);
                 massert( 13418, "captrunc invalid n", Runner::RUNNER_ADVANCED == state);
             }
-            collection->temp_cappedTruncateAfter( end, inc );
+            collection->temp_cappedTruncateAfter( &txn, end, inc );
             return true;
         }
     };
@@ -187,13 +190,14 @@ namespace mongo {
             NamespaceString nss( dbname, coll );
 
             Client::WriteContext ctx( nss.ns() );
+            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* collection = db->getCollection( nss.ns() );
             massert( 13429, "emptycapped no such collection", collection );
 
             std::vector<BSONObj> indexes = stopIndexBuilds(db, cmdObj);
 
-            Status status = collection->truncate();
+            Status status = collection->truncate(&txn);
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 

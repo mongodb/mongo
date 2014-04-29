@@ -41,6 +41,7 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 
@@ -273,6 +274,7 @@ namespace mongo {
     Status repairDatabase( string dbName,
                            bool preserveClonedFilesOnFailure,
                            bool backupOriginalFiles ) {
+        DurTransaction txn; // XXX
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
         doingRepair dr;
         dbName = nsToDatabase( dbName );
@@ -364,11 +366,11 @@ namespace mongo {
                 Collection* tempCollection = NULL;
                 {
                     Client::Context tempContext( ns, tempDatabase );
-                    tempCollection = tempDatabase->createCollection( ns, options, true, false );
+                    tempCollection = tempDatabase->createCollection( &txn, ns, options, true, false );
                 }
 
                 Client::Context readContext( ns, originalDatabase );
-                Collection* originalCollection = originalDatabase->getCollection( ns );
+                Collection* originalCollection = originalDatabase->getCollection( &txn, ns );
                 invariant( originalCollection );
 
                 // data
@@ -400,7 +402,7 @@ namespace mongo {
                     BSONObj doc = originalCollection->docFor( loc );
 
                     Client::Context tempContext( ns, tempDatabase );
-                    StatusWith<DiskLoc> result = tempCollection->insertDocument( doc, indexBlock );
+                    StatusWith<DiskLoc> result = tempCollection->insertDocument( &txn, doc, indexBlock );
                     if ( !result.isOK() )
                         return result.getStatus();
 

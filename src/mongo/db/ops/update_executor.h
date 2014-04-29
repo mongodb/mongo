@@ -39,6 +39,7 @@ namespace mongo {
 
     class CanonicalQuery;
     class OpDebug;
+    class TransactionExperiment;
     class UpdateRequest;
 
     /**
@@ -90,7 +91,7 @@ namespace mongo {
          * Execute an update.  Requires the caller to hold the database lock on the
          * appropriate resources for the request.
          */
-        UpdateResult execute();
+        UpdateResult execute(TransactionExperiment* txn);
 
     private:
         /**

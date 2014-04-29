@@ -50,6 +50,7 @@ namespace mongo {
     class NamespaceDetails;
     class IndexCatalog;
     class MultiIndexBlock;
+    class TransactionExperiment;
 
     class RecordIterator;
     class FlatIterator;
@@ -108,9 +109,10 @@ namespace mongo {
      */
     class Collection {
     public:
-        Collection( const StringData& fullNS,
-                        NamespaceDetails* details,
-                        Database* database );
+        Collection( TransactionExperiment* txn,
+                    const StringData& fullNS,
+                    NamespaceDetails* details,
+                    Database* database );
 
         ~Collection();
 
@@ -159,7 +161,8 @@ namespace mongo {
          */
         int64_t countTableScan( const MatchExpression* expression );
 
-        void deleteDocument( const DiskLoc& loc,
+        void deleteDocument( TransactionExperiment* txn,
+                             const DiskLoc& loc,
                              bool cappedOK = false,
                              bool noWarn = false,
                              BSONObj* deletedId = 0 );
@@ -168,11 +171,17 @@ namespace mongo {
          * this does NOT modify the doc before inserting
          * i.e. will not add an _id field for documents that are missing it
          */
-        StatusWith<DiskLoc> insertDocument( const BSONObj& doc, bool enforceQuota );
+        StatusWith<DiskLoc> insertDocument( TransactionExperiment* txn,
+                                            const BSONObj& doc,
+                                            bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( const DocWriter* doc, bool enforceQuota );
+        StatusWith<DiskLoc> insertDocument( TransactionExperiment* txn,
+                                            const DocWriter* doc,
+                                            bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( const BSONObj& doc, MultiIndexBlock& indexBlock );
+        StatusWith<DiskLoc> insertDocument( TransactionExperiment* txn,
+                                            const BSONObj& doc,
+                                            MultiIndexBlock& indexBlock );
 
         /**
          * updates the document @ oldLocation with newDoc
@@ -180,7 +189,8 @@ namespace mongo {
          * if not, it is moved
          * @return the post update location of the doc (may or may not be the same as oldLocation)
          */
-        StatusWith<DiskLoc> updateDocument( const DiskLoc& oldLocation,
+        StatusWith<DiskLoc> updateDocument( TransactionExperiment* txn,
+                                            const DiskLoc& oldLocation,
                                             const BSONObj& newDoc,
                                             bool enforceQuota,
                                             OpDebug* debug );
@@ -188,7 +198,8 @@ namespace mongo {
         /**
          * right now not allowed to modify indexes
          */
-        Status updateDocumentWithDamages( const DiskLoc& loc,
+        Status updateDocumentWithDamages( TransactionExperiment* txn,
+                                          const DiskLoc& loc,
                                           const char* damangeSource,
                                           const mutablebson::DamageVector& damages );
 
@@ -197,14 +208,14 @@ namespace mongo {
 
         // -----------
 
-        StatusWith<CompactStats> compact( const CompactOptions* options );
+        StatusWith<CompactStats> compact(TransactionExperiment* txn, const CompactOptions* options);
 
         /**
          * removes all documents as fast as possible
          * indexes before and after will be the same
          * as will other characteristics
          */
-        Status truncate();
+        Status truncate(TransactionExperiment* txn);
 
         /**
          * @param full - does more checks
@@ -223,7 +234,7 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        void temp_cappedTruncateAfter( DiskLoc end, bool inclusive );
+        void temp_cappedTruncateAfter( TransactionExperiment* txn, DiskLoc end, bool inclusive );
 
         // -----------
 
@@ -232,7 +243,7 @@ namespace mongo {
         // this will add a new extent the collection
         // the new extent will be returned
         // it will have been added to the linked list already
-        void increaseStorageSize( int size, bool enforceQuota );
+        void increaseStorageSize( TransactionExperiment* txn, int size, bool enforceQuota );
 
         //
         // Stats
@@ -253,8 +264,8 @@ namespace mongo {
 
         // TODO(erh) - below till next mark are suspect
         bool isUserFlagSet( int flag ) const;
-        bool setUserFlag( int flag );
-        bool clearUserFlag( int flag );
+        bool setUserFlag( TransactionExperiment* txn, int flag );
+        bool clearUserFlag( TransactionExperiment* txn, int flag );
 
         void setMaxCappedDocs( long long max );
         // --- end suspect things
@@ -265,14 +276,18 @@ namespace mongo {
          *  - some user error checks
          *  - adjust padding
          */
-        StatusWith<DiskLoc> _insertDocument( const BSONObj& doc,
+        StatusWith<DiskLoc> _insertDocument( TransactionExperiment* txn,
+                                             const BSONObj& doc,
                                              bool enforceQuota );
 
-        void _compactExtent(const DiskLoc diskloc, int extentNumber,
+        void _compactExtent(TransactionExperiment* txn,
+                            const DiskLoc diskloc,
+                            int extentNumber,
                             MultiIndexBlock& indexesToInsertTo,
-                            const CompactOptions* compactOptions, CompactStats* stats );
+                            const CompactOptions* compactOptions,
+                            CompactStats* stats );
 
-        void _syncUserFlags(); // TODO: this is bizarre, should go away
+        void _syncUserFlags(TransactionExperiment* txn); // TODO: this is bizarre, should go away
 
 
         // @return 0 for inf., otherwise a number of files

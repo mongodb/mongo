@@ -132,14 +132,16 @@ namespace NamespaceTests {
         public:
             Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
             virtual ~Base() {
+                DurTransaction txn;
                 if ( !nsd() )
                     return;
-                _context.db()->dropCollection( ns() );
+                _context.db()->dropCollection( &txn, ns() );
             }
         protected:
             void create() {
                 Lock::GlobalWrite lk;
-                ASSERT( userCreateNS( db(), ns(), fromjson( spec() ), false ).isOK() );
+                DurTransaction txn;
+                ASSERT( userCreateNS( &txn, db(), ns(), fromjson( spec() ), false ).isOK() );
             }
             virtual string spec() const {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":1}";
@@ -274,9 +276,10 @@ namespace NamespaceTests {
         class SingleAlloc : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 BSONObj b = bigObj();
-                ASSERT( collection()->insertDocument( b, true ).isOK() );
+                ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
                 ASSERT_EQUALS( 1, nRecords() );
             }
         };
@@ -284,6 +287,7 @@ namespace NamespaceTests {
         class Realloc : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
 
                 const int N = 20;
@@ -291,7 +295,7 @@ namespace NamespaceTests {
                 DiskLoc l[ N ];
                 for ( int i = 0; i < N; ++i ) {
                     BSONObj b = bigObj();
-                    StatusWith<DiskLoc> status = collection()->insertDocument( b, true );
+                    StatusWith<DiskLoc> status = collection()->insertDocument( &txn, b, true );
                     ASSERT( status.isOK() );
                     l[ i ] = status.getValue();
                     ASSERT( !l[ i ].isNull() );
@@ -306,12 +310,13 @@ namespace NamespaceTests {
         class TwoExtent : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
                 DiskLoc l[ 8 ];
                 for ( int i = 0; i < 8; ++i ) {
-                    StatusWith<DiskLoc> status = collection()->insertDocument( bigObj(), true );
+                    StatusWith<DiskLoc> status = collection()->insertDocument( &txn, bigObj(), true );
                     ASSERT( status.isOK() );
                     l[ i ] = status.getValue();
                     ASSERT( !l[ i ].isNull() );
@@ -326,7 +331,7 @@ namespace NamespaceTests {
                 bob.appendOID( "_id", NULL, true );
                 bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
                 BSONObj bigger = bob.done();
-                StatusWith<DiskLoc> status = collection()->insertDocument( bigger, false );
+                StatusWith<DiskLoc> status = collection()->insertDocument( &txn, bigger, false );
                 ASSERT( !status.isOK() );
                 ASSERT_EQUALS( 0, nRecords() );
             }
@@ -547,18 +552,18 @@ namespace NamespaceTests {
         class AllocQuantized : public Base {
         public:
             void run() {
-                DurTransaction txn[1];
+                DurTransaction txn;
 
                 string myns = (string)ns() + "AllocQuantized";
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( txn,
+                SimpleRecordStoreV1 rs( &txn,
                                         myns,
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         false );
 
                 BSONObj obj = docForRecordSize( 300 );
-                StatusWith<DiskLoc> result = rs.insertRecord( txn, obj.objdata(), obj.objsize(), 0 );
+                StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
                 ASSERT( result.isOK() );
 
                 // The length of the allocated record is quantized.
@@ -571,12 +576,13 @@ namespace NamespaceTests {
         class AllocCappedNotQuantized : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 ASSERT( nsd()->isCapped() );
                 ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
 
                 StatusWith<DiskLoc> result =
-                    collection()->insertDocument( docForRecordSize( 300 ), false );
+                    collection()->insertDocument( &txn, docForRecordSize( 300 ), false );
                 ASSERT( result.isOK() );
                 Record* record = collection()->getRecordStore()->recordFor( result.getValue() );
                 // Check that no quantization is performed.
@@ -592,18 +598,18 @@ namespace NamespaceTests {
         class AllocIndexNamespaceNotQuantized : public Base {
         public:
             void run() {
-                DurTransaction txn[1];
+                DurTransaction txn;
                 string myns = (string)ns() + "AllocIndexNamespaceNotQuantized";
 
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( txn,
+                SimpleRecordStoreV1 rs( &txn,
                                         myns + ".$x",
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         false );
 
                 BSONObj obj = docForRecordSize( 300 );
-                StatusWith<DiskLoc> result = rs.insertRecord(txn,  obj.objdata(), obj.objsize(), 0 );
+                StatusWith<DiskLoc> result = rs.insertRecord(&txn,  obj.objdata(), obj.objsize(), 0 );
                 ASSERT( result.isOK() );
 
                 // The length of the allocated record is not quantized.
@@ -616,18 +622,18 @@ namespace NamespaceTests {
         class AllocIndexNamespaceSlightlyQuantized : public Base {
         public:
             void run() {
-                DurTransaction txn[1];
+                DurTransaction txn;
                 string myns = (string)ns() + "AllocIndexNamespaceNotQuantized";
 
                 db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( txn,
+                SimpleRecordStoreV1 rs( &txn,
                                         myns + ".$x",
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
                                         &db()->getExtentManager(),
                                         true );
 
                 BSONObj obj = docForRecordSize( 298 );
-                StatusWith<DiskLoc> result = rs.insertRecord( txn, obj.objdata(), obj.objsize(), 0 );
+                StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
                 ASSERT( result.isOK() );
 
                 ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
@@ -638,10 +644,12 @@ namespace NamespaceTests {
         class AllocUseNonQuantizedDeletedRecord : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 cookDeletedList( 310 );
 
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( docForRecordSize(300),
+                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
+                                                                                   docForRecordSize(300),
                                                                                    false );
                 ASSERT( actualLocation.isOK() );
                 Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
@@ -657,10 +665,12 @@ namespace NamespaceTests {
         class AllocExactSizeNonQuantizedDeletedRecord : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 cookDeletedList( 300 );
 
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( docForRecordSize(300),
+                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
+                                                                                   docForRecordSize(300),
                                                                                    false );
                 ASSERT( actualLocation.isOK() );
                 Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
@@ -678,10 +688,12 @@ namespace NamespaceTests {
         class AllocQuantizedWithExtra : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 cookDeletedList( 343 );
 
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( docForRecordSize(300),
+                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
+                                                                                   docForRecordSize(300),
                                                                                    false );
                 ASSERT( actualLocation.isOK() );
                 Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
@@ -699,13 +711,15 @@ namespace NamespaceTests {
         class AllocQuantizedWithoutExtra : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 cookDeletedList( 344 );
 
                 const RecordStore* rs = collection()->getRecordStore();
 
                 // The returned record is quantized from 300 to 320.
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( docForRecordSize(300),
+                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
+                                                                                   docForRecordSize(300),
                                                                                    false );
                 ASSERT( actualLocation.isOK() );
                 Record* rec = rs->recordFor( actualLocation.getValue() );
@@ -725,10 +739,12 @@ namespace NamespaceTests {
         class AllocNotQuantizedNearDeletedSize : public Base {
         public:
             void run() {
+                DurTransaction txn;
                 create();
                 cookDeletedList( 344 );
 
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( docForRecordSize(319),
+                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
+                                                                                   docForRecordSize(319),
                                                                                    false );
                 ASSERT( actualLocation.isOK() );
                 Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
@@ -749,6 +765,7 @@ namespace NamespaceTests {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
             }
             void pass(int p) {
+                DurTransaction txn;
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
@@ -761,7 +778,7 @@ namespace NamespaceTests {
                 //DiskLoc l[ 8 ];
                 for ( int i = 0; i < N; ++i ) {
                     BSONObj bb = bigObj();
-                    StatusWith<DiskLoc> status = collection()->insertDocument( bb, true );
+                    StatusWith<DiskLoc> status = collection()->insertDocument( &txn, bb, true );
                     ASSERT( status.isOK() );
                     DiskLoc a = status.getValue();
                     if( T == i )
@@ -790,7 +807,7 @@ namespace NamespaceTests {
                     ASSERT( first != last ) ;
                 }
 
-                collection()->temp_cappedTruncateAfter(truncAt, false);
+                collection()->temp_cappedTruncateAfter(&txn, truncAt, false);
                 ASSERT_EQUALS( collection()->numRecords() , 28u );
 
                 {
@@ -816,7 +833,7 @@ namespace NamespaceTests {
                 bob.appendOID("_id", 0, true);
                 bob.append( "a", string( MinExtentSize + 300, 'a' ) );
                 BSONObj bigger = bob.done();
-                StatusWith<DiskLoc> status = collection()->insertDocument( bigger, true );
+                StatusWith<DiskLoc> status = collection()->insertDocument( &txn, bigger, true );
                 ASSERT( !status.isOK() );
                 ASSERT_EQUALS( 0, nRecords() );
             }

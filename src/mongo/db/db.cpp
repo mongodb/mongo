@@ -74,6 +74,7 @@
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
@@ -365,6 +366,7 @@ namespace mongo {
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
         Lock::GlobalWrite lk;
+        DurTransaction txn;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
@@ -381,7 +383,7 @@ namespace mongo {
             }
 
             if (shouldClearNonLocalTmpCollections || dbName == "local")
-                ctx.db()->clearTmpCollections();
+                ctx.db()->clearTmpCollections(&txn);
 
             if (!h->isCurrentVersion() || mongodGlobalParams.repair) {
 

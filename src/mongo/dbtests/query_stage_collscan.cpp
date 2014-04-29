@@ -41,6 +41,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store.h"
 #include "mongo/dbtests/dbtests.h"
@@ -56,7 +57,7 @@ namespace QueryStageCollectionScan {
         QueryStageCollectionScanCappedBase() : _context(ns()) { }
 
         virtual ~QueryStageCollectionScanCappedBase() {
-            _context.db()->dropCollection( ns() );
+            _context.db()->dropCollection( &_txn, ns() );
         }
 
         void run() {
@@ -64,7 +65,7 @@ namespace QueryStageCollectionScan {
             stringstream spec;
             spec << "{\"capped\":true,\"size\":2000,\"$nExtents\":" << nExtents() << "}";
 
-            ASSERT( userCreateNS( db(), ns(), fromjson( spec.str() ), false ).isOK() );
+            ASSERT( userCreateNS( &_txn, db(), ns(), fromjson( spec.str() ), false ).isOK() );
 
             // Tell the test to add data/extents/etc.
             insertTestData();
@@ -172,6 +173,7 @@ namespace QueryStageCollectionScan {
 
         Lock::GlobalWrite lk_;
         Client::Context _context;
+        DurTransaction _txn;
     };
 
     class QueryStageCollscanEmpty : public QueryStageCollectionScanCappedBase {

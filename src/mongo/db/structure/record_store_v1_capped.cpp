@@ -164,7 +164,7 @@ namespace mongo {
                 }
 
                 DiskLoc fr = theCapExtent()->firstRecord;
-                _collection->deleteDocument( fr, true );
+                _collection->deleteDocument( txn, fr, true );
                 compact(txn);
                 if( ++passes > maxPasses ) {
                     StringBuilder sb;
@@ -474,7 +474,7 @@ namespace mongo {
 
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
-            _collection->deleteDocument( curr, true );
+            _collection->deleteDocument( txn, curr, true );
             compact(txn);
 
             // This is the case where we have not yet had to remove any

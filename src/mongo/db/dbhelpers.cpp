@@ -52,6 +52,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_logic.h"
@@ -217,6 +218,7 @@ namespace mongo {
 
         OpDebug debug;
         Client::Context context(ns);
+        DurTransaction txn; // XXX
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -229,12 +231,13 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(request, &debug);
+        update(&txn, request, &debug);
     }
 
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         OpDebug debug;
         Client::Context context(ns);
+        DurTransaction txn; // XXX
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -245,7 +248,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(request, &debug);
+        update(&txn, request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -253,6 +256,7 @@ namespace mongo {
     void Helpers::putSingletonGod(const char *ns, BSONObj obj, bool logTheOp) {
         OpDebug debug;
         Client::Context context(ns);
+        DurTransaction txn; // XXX
 
         const NamespaceString requestNs(ns);
         UpdateRequest request(requestNs);
@@ -262,7 +266,7 @@ namespace mongo {
         request.setUpsert();
         request.setUpdateOpLog(logTheOp);
 
-        update(request, &debug);
+        update(&txn, request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -352,7 +356,8 @@ namespace mongo {
             // Scoping for write lock.
             {
                 Client::WriteContext ctx(ns);
-                Collection* collection = ctx.ctx().db()->getCollection( ns );
+                DurTransaction txn;
+                Collection* collection = ctx.ctx().db()->getCollection( &txn, ns );
                 if ( !collection )
                     break;
 
@@ -424,7 +429,7 @@ namespace mongo {
                     callback->goingToDelete( obj );
 
                 logOp("d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
-                collection->deleteDocument( rloc );
+                collection->deleteDocument( &txn, rloc );
                 numDeleted++;
             }
 
@@ -544,7 +549,8 @@ namespace mongo {
 
     void Helpers::emptyCollection(const char *ns) {
         Client::Context context(ns);
-        deleteObjects(ns, BSONObj(), false);
+        DurTransaction txn; // XXX
+        deleteObjects(&txn, ns, BSONObj(), false);
     }
 
     Helpers::RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) 

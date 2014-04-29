@@ -39,6 +39,7 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {
@@ -51,7 +52,7 @@ namespace PdfileTests {
             virtual ~Base() {
                 if ( !collection() )
                     return;
-                _context.db()->dropCollection( ns() );
+                _context.db()->dropCollection( &_txn, ns() );
             }
         protected:
             const char *ns() {
@@ -63,6 +64,7 @@ namespace PdfileTests {
 
             Lock::GlobalWrite lk_;
             Client::Context _context;
+            DurTransaction _txn;
         };
 
         class InsertNoId : public Base {
@@ -70,15 +72,15 @@ namespace PdfileTests {
             void run() {
                 BSONObj x = BSON( "x" << 1 );
                 ASSERT( x["_id"].type() == 0 );
-                Collection* collection = _context.db()->getOrCreateCollection( ns() );
-                StatusWith<DiskLoc> dl = collection->insertDocument( x, true );
+                Collection* collection = _context.db()->getOrCreateCollection( &_txn, ns() );
+                StatusWith<DiskLoc> dl = collection->insertDocument( &_txn, x, true );
                 ASSERT( !dl.isOK() );
 
                 StatusWith<BSONObj> fixed = fixDocumentForInsert( x );
                 ASSERT( fixed.isOK() );
                 x = fixed.getValue();
                 ASSERT( x["_id"].type() == jstOID );
-                dl = collection->insertDocument( x, true );
+                dl = collection->insertDocument( &_txn, x, true );
                 ASSERT( dl.isOK() );
             }
         };

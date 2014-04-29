@@ -43,6 +43,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/background.h"
 
@@ -115,6 +116,7 @@ namespace mongo {
                 {
                     string ns = idx["ns"].String();
                     Client::WriteContext ctx( ns );
+                    DurTransaction txn;
                     Collection* collection = ctx.ctx().db()->getCollection( ns );
                     if ( !collection ) {
                         // collection was dropped
@@ -133,7 +135,7 @@ namespace mongo {
                         continue;
                     }
 
-                    n = deleteObjects( ns , query , false , true );
+                    n = deleteObjects( &txn, ns , query , false , true );
                     ttlDeletedDocuments.increment( n );
                 }
 
