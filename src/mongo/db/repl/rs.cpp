@@ -46,6 +46,7 @@
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/platform/bits.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/net/sock.h"
 
 using namespace std;

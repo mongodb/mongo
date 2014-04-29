@@ -55,6 +55,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/exit.h"
 
 namespace mongo {
 

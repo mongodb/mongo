@@ -87,6 +87,7 @@
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"

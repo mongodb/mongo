@@ -24,8 +24,9 @@
 
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"

@@ -33,6 +33,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/util/exit.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/stacktrace.h"
 

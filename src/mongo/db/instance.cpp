@@ -82,6 +82,7 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/gcov.h"

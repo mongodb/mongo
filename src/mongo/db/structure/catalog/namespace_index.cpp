@@ -34,6 +34,7 @@
 
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/util/exit.h"
 
 namespace mongo {
 

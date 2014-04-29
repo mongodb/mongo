@@ -76,10 +76,11 @@
 #include "mongo/s/type_chunk.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/startup_test.h"
-#include "mongo/util/fail_point_service.h"
 
 // Pause while a fail point is enabled.
 #define MONGO_FP_PAUSE_WHILE(symbol) while (MONGO_FAIL_POINT(symbol)) { sleepmillis(100); }

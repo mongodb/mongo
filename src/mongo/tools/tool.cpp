@@ -46,6 +46,7 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/exception_filter_win32.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"

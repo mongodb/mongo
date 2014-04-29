@@ -46,6 +46,7 @@
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/version_reporting.h"
 

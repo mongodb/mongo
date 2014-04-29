@@ -54,23 +54,11 @@
 #include "mongo/client/redef_macros.h"
 
 #include "mongo/client/export_macros.h"
-#include "mongo/util/exit_code.h"
 
 namespace mongo {
 
     using namespace std;
     using boost::shared_ptr;
-
-    void dbexit( ExitCode returnCode, const char *whyMsg = "" );
-
-    /**
-       this is here so you can't just type exit() to quit the program
-       you should either use dbexit to shutdown cleanly, or ::exit to tell the system to quit
-       if you use this, you'll get a link error since mongo::exit isn't defined
-     */
-    MONGO_CLIENT_API void exit( ExitCode returnCode );
-    MONGO_CLIENT_API bool inShutdown();
-
 }
 
 
