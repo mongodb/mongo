@@ -697,8 +697,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM fmt, plan;
 	WT_TABLE *table;
 	size_t size;
 	int cfg_cnt;
@@ -706,8 +706,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
 
-	WT_CLEAR(fmt);
-	WT_CLEAR(plan);
 	ctable = NULL;
 
 	tablename = uri;
@@ -743,13 +741,17 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	/* Handle projections. */
 	if (columns != NULL) {
+		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), NULL, 1, &fmt));
-		cursor->value_format = __wt_buf_steal(session, &fmt);
+		    columns, strlen(columns), NULL, 1, tmp));
+		WT_ERR(__wt_strndup(
+		    session, tmp->data, tmp->size, &cursor->value_format));
 
+		WT_ERR(__wt_buf_init(session, tmp, 0));
 		WT_ERR(__wt_struct_plan(session, table,
-		    columns, strlen(columns), 0, &plan));
-		ctable->plan = __wt_buf_steal(session, &plan);
+		    columns, strlen(columns), 0, tmp));
+		WT_ERR(__wt_strndup(
+		    session, tmp->data, tmp->size, &ctable->plan));
 	}
 
 	/*
@@ -798,5 +800,6 @@ err:		WT_TRET(__curtable_close(cursor));
 		*cursorp = NULL;
 	}
 
+	__wt_scr_free(&tmp);
 	return (ret);
 }

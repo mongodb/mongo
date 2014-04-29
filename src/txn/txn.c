@@ -339,6 +339,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_PUBLISH(txn_state->id, WT_TXN_NONE);
 	txn->id = WT_TXN_NONE;
 
+	/* Free the scratch buffer allocated for logging. */
+	__wt_logrec_free(session, &txn->logrec);
+
 	/*
 	 * Reset the transaction state to not running.
 	 *
@@ -439,7 +442,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		switch (op->type) {
 		case TXN_OP_BASIC:
 		case TXN_OP_INMEM:
-			op->u.op.upd->txnid = WT_TXN_ABORTED;
+			op->u.upd->txnid = WT_TXN_ABORTED;
 			break;
 		case TXN_OP_REF:
 			__wt_delete_page_rollback(session, op->u.ref);

@@ -364,9 +364,9 @@ __wt_btree_tree_open(
 
 	/* Read the page, then build the in-memory version of the page. */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, dsk.mem,
-	    F_ISSET(&dsk, WT_ITEM_MAPPED) ?
-	    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
+	    WT_DATA_IN_ITEM(&dsk) ?
+	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED , &page));
 
 	/* Finish initializing the root, root reference links. */
 	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);

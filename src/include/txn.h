@@ -88,11 +88,7 @@ struct __wt_txn_op {
 	} type;
 	union {
 		/* TXN_OP_BASIC, TXN_OP_INMEM */
-		struct {
-			WT_INSERT *ins;
-			WT_UPDATE *upd;
-			WT_ITEM key;
-		} op;
+		WT_UPDATE *upd;
 		/* TXN_OP_REF */
 		WT_REF *ref;
 		/* TXN_OP_TRUNCATE_COL */
@@ -135,6 +131,9 @@ struct __wt_txn {
 	WT_TXN_OP      *mod;
 	size_t		mod_alloc;
 	u_int		mod_count;
+
+	/* Scratch buffer for in-memory log records. */
+	WT_ITEM	       *logrec;
 
 	/* Requested notification when transactions are resolved. */
 	WT_TXN_NOTIFY *notify;

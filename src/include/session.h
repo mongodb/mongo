@@ -48,6 +48,8 @@ typedef	enum {
 struct __wt_session_impl {
 	WT_SESSION iface;
 
+	void	*lang_private;		/* Language specific private storage */
+
 	u_int active;			/* Non-zero if the session is in-use */
 
 	const char *name;		/* Name */
@@ -82,8 +84,6 @@ struct __wt_session_impl {
 
 	TAILQ_HEAD(__tables, __wt_table) tables;
 
-	WT_ITEM	logrec_buf;		/* Buffer for log records */
-
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */
 #ifdef HAVE_DIAGNOSTIC
@@ -102,7 +102,6 @@ struct __wt_session_impl {
 	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
 	u_int	ncursors;		/* Count of active file cursors. */
-	void	*lang_private;		/* Language specific private storage */
 
 	WT_REF **excl;			/* Eviction exclusive list */
 	u_int	 excl_next;		/* Next empty slot */

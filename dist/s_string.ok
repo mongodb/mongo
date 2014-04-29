@@ -599,6 +599,7 @@ logmgr
 lognum
 logput
 logread
+logrec
 lookup
 lookups
 lr

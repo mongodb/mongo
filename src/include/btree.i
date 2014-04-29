@@ -514,7 +514,7 @@ __wt_row_leaf_key(WT_SESSION_IMPL *session,
 	 * exists to inline fast-path checks for already instantiated keys and
 	 * on-page uncompressed keys.
 	 */
-retry:	ikey = WT_ROW_KEY_COPY(rip);
+	ikey = WT_ROW_KEY_COPY(rip);
 
 	/*
 	 * Key copied.
@@ -539,23 +539,8 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 	/*
 	 * We have to build the key (it's never been instantiated, and it's some
 	 * kind of compressed or overflow key).
-	 *
-	 * Magic: the row-store leaf page search loop calls us to instantiate
-	 * keys, and it's not prepared to handle memory being allocated in the
-	 * key's WT_ITEM.  Call __wt_row_leaf_key_work to instantiate the key
-	 * with no buffer reference, then retry to pick up a simple reference
-	 * to the instantiated key.
 	 */
-	if (instantiate) {
-		WT_RET(__wt_row_leaf_key_work(session, page, rip, NULL, 1));
-		goto retry;
-	}
-
-	/*
-	 * If instantiate wasn't set, our caller is prepared to handle memory
-	 * allocations in the key's WT_ITEM, pass the key.
-	 */
-	return (__wt_row_leaf_key_work(session, page, rip, key, 0));
+	return (__wt_row_leaf_key_work(session, page, rip, key, instantiate));
 }
 
 /*
@@ -577,7 +562,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
 		rip = &page->u.row.d[cbt->slot];
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
 		key->size = WT_INSERT_KEY_SIZE(cbt->ins);

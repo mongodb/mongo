@@ -32,11 +32,11 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	 */
 	if (btree->compressor == NULL) {
 		WT_RET(bm->read(bm, session, buf, addr, addr_size));
-		dsk = buf->mem;
+		dsk = (WT_PAGE_HEADER *)buf->data;
 	} else {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(bm->read(bm, session, tmp, addr, addr_size));
-		dsk = tmp->mem;
+		dsk = (WT_PAGE_HEADER *)tmp->data;
 	}
 
 	/*
@@ -67,10 +67,10 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 * byte length somehow, see the snappy compression extension for
 		 * an example.
 		 */
-		memcpy(buf->mem, tmp->mem, WT_BLOCK_COMPRESS_SKIP);
+		memcpy(buf->mem, tmp->data, WT_BLOCK_COMPRESS_SKIP);
 		WT_ERR(btree->compressor->decompress(
 		    btree->compressor, &session->iface,
-		    (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP,
+		    (uint8_t *)tmp->data + WT_BLOCK_COMPRESS_SKIP,
 		    tmp->size - WT_BLOCK_COMPRESS_SKIP,
 		    (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP,
 		    dsk->mem_size - WT_BLOCK_COMPRESS_SKIP,

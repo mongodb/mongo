@@ -236,9 +236,9 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			 * WT_ITEM->data field will not be the same as the
 			 * WT_ITEM->mem field: first copy the prefix into place.
 			 *
-			 * Care is required: the WT_ITEM_MAPPED flag may be set
-			 * if this is a memory-mapped file, so it is important
-			 * to copy the data before growing the buffer.
+			 * Care is required: this may be a memory-mapped file,
+			 * so it is important to copy the data before growing
+			 * the buffer.
 			 */
 			if (cbt->tmp.data != cbt->tmp.mem)
 				WT_RET(__wt_buf_set(session, &cbt->tmp,
