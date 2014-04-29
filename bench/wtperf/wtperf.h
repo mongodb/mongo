@@ -107,6 +107,7 @@ struct __config {			/* Configuration struction */
 	WORKLOAD	*workload;		/* Workloads */
 	u_int		 workload_cnt;
 
+	uint32_t	 use_asyncops;		/* Use async operations */
 	/* State tracking variables. */
 
 	uint64_t ckpt_ops;		/* checkpoint operations */
