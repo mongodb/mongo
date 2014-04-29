@@ -8,26 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_buf_clear --
- *	Clear a buffer.
- */
-void
-__wt_buf_clear(WT_ITEM *buf)
-{
-	buf->data = NULL;
-	buf->size = 0;
-
-	buf->mem = NULL;
-	buf->memsize = 0;
-
-	/*
-	 * Note: don't clear the flags, the buffer remains marked for aligned
-	 * use as well as "in-use".
-	 */
-	F_CLR(buf, WT_ITEM_MAPPED);
-}
-
-/*
  * __wt_buf_grow_worker --
  *	Grow a buffer that's currently in-use.
  */
@@ -68,45 +48,6 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 }
 
 /*
- * __wt_buf_steal --
- *	Steal a buffer for another purpose.
- */
-void *
-__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf)
-{
-	void *retp;
-
-	WT_ASSERT(session, !F_ISSET(buf, WT_ITEM_MAPPED));
-
-	/*
-	 * Sometimes we steal a buffer for a different purpose, for example,
-	 * we've read in an overflow item, and now it's going to become a key
-	 * on an in-memory page, eventually freed when the page is discarded.
-	 *
-	 * First, correct for the possibility the data field doesn't point to
-	 * the start of memory (if we only have a single memory reference, it
-	 * must point to the start of the memory chunk, otherwise freeing the
-	 * memory isn't going to work out).  This is possibly a common case:
-	 * it happens when we read in overflow items and we want to skip over
-	 * the page header, so buf->data references a location past buf->mem.
-	 */
-	if (buf->data != buf->mem) {
-		WT_ASSERT(session, buf->data > buf->mem &&
-		    WT_PTRDIFF(buf->data, buf->mem) + buf->size <=
-		    buf->memsize);
-		memmove(buf->mem, buf->data, buf->size);
-	}
-
-	/* Second, give our caller the buffer's memory. */
-	retp = buf->mem;
-
-	/* Third, discard the buffer's memory. */
-	__wt_buf_clear(buf);
-
-	return (retp);
-}
-
-/*
  * __wt_buf_fmt --
  *	Grow a buffer to accommodate a formatted string.
  */
@@ -116,10 +57,6 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 {
 	va_list ap;
 	size_t len;
-
-	/* Clear buffers previously used for mapped returns. */
-	if (F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_buf_clear(buf);
 
 	for (;;) {
 		va_start(ap, fmt);
@@ -153,9 +90,13 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 	size_t len, space;
 	char *p;
 
-	/* Clear buffers previously used for mapped returns. */
-	if (F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_buf_clear(buf);
+	/*
+	 * If we're appending data to an existing buffer, any data field should
+	 * point into the allocated memory.  (It wouldn't be insane to copy any
+	 * previously existing data at this point, if data wasn't in the local
+	 * buffer, but we don't and it would be bad if we didn't notice it.)
+	 */
+	WT_ASSERT(session, buf->data == NULL || WT_DATA_IN_ITEM(buf));
 
 	for (;;) {
 		va_start(ap, fmt);

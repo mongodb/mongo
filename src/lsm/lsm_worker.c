@@ -430,7 +430,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_BLOOM *bloom;
 	WT_CURSOR *src;
 	WT_DECL_RET;
-	WT_ITEM buf, key;
+	WT_ITEM key;
 	WT_SESSION *wt_session;
 	uint64_t insert_count;
 	int exist;
@@ -440,12 +440,9 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	 * allocated.  After an open, however, it may not have been.
 	 * Deal with that here.
 	 */
-	if (chunk->bloom_uri == NULL) {
-		WT_CLEAR(buf);
+	if (chunk->bloom_uri == NULL)
 		WT_RET(__wt_lsm_tree_bloom_name(
-		    session, lsm_tree, chunk->id, &buf));
-		chunk->bloom_uri = __wt_buf_steal(session, &buf);
-	}
+		    session, lsm_tree, chunk->id, &chunk->bloom_uri));
 
 	/*
 	 * Drop the bloom filter first - there may be some content hanging over
