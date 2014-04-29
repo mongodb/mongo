@@ -26,14 +26,10 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/btree_index_cursor.h"  // for aboutToDeleteBucket
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/storage/mmap_v1/dur_commitjob.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/btree/btree_logic.h"
@@ -173,7 +169,7 @@ namespace mongo {
                         DiskLoc ll = x->nextChild;
                         _getModifiableBucket(ll)->parent = upLoc;
                     }
-                    _logic->deallocBucket(x, xloc);
+                    _logic->deallocBucket(_trans, x, xloc);
                 }
                 xloc = nextLoc;
             }
@@ -1272,15 +1268,16 @@ namespace mongo {
         BucketType* p = getBucket(bucket->parent);
         int parentIdx = indexInParent(bucket, bucketLoc);
         *trans->writing(&childLocForPos(p, parentIdx)) = DiskLoc();
-        deallocBucket(bucket, bucketLoc);
+        deallocBucket(trans, bucket, bucketLoc);
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::deallocBucket(BucketType* bucket, const DiskLoc bucketLoc) {
-        DurTransaction txn; // XXX
+    void BtreeLogic<BtreeLayout>::deallocBucket(TransactionExperiment* txn,
+                                                BucketType* bucket,
+                                                const DiskLoc bucketLoc) {
         bucket->n = BtreeLayout::INVALID_N_SENTINEL;
         bucket->parent.Null();
-        _recordStore->deleteRecord(&txn, bucketLoc);
+        _recordStore->deleteRecord(txn, bucketLoc);
     }
 
     template <class BtreeLayout>
@@ -1452,7 +1449,7 @@ namespace mongo {
 
         *trans->writing(&getBucket(bucket->nextChild)->parent) = bucket->parent;
         BtreeIndexCursor::aboutToDeleteBucket(bucketLoc);
-        deallocBucket(bucket, bucketLoc);
+        deallocBucket(trans, bucket, bucketLoc);
     }
 
     template <class BtreeLayout>

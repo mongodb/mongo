@@ -1160,9 +1160,10 @@ namespace mongo {
 
     // ---------------------------
 
-    Status IndexCatalog::_indexRecord( IndexCatalogEntry* index,
-                                       const BSONObj& obj,
-                                       const DiskLoc &loc ) {
+    Status IndexCatalog::_indexRecord(TransactionExperiment* txn,
+                                      IndexCatalogEntry* index,
+                                      const BSONObj& obj,
+                                      const DiskLoc &loc ) {
         InsertDeleteOptions options;
         options.logIfError = false;
 
@@ -1173,18 +1174,19 @@ namespace mongo {
         options.dupsAllowed = ignoreUniqueIndex( index->descriptor() ) || !isUnique;
 
         int64_t inserted;
-        return index->accessMethod()->insert(obj, loc, options, &inserted);
+        return index->accessMethod()->insert(txn, obj, loc, options, &inserted);
     }
 
-    Status IndexCatalog::_unindexRecord( IndexCatalogEntry* index,
-                                         const BSONObj& obj,
-                                         const DiskLoc &loc,
-                                         bool logIfError ) {
+    Status IndexCatalog::_unindexRecord(TransactionExperiment* txn,
+                                        IndexCatalogEntry* index,
+                                        const BSONObj& obj,
+                                        const DiskLoc &loc,
+                                        bool logIfError) {
         InsertDeleteOptions options;
         options.logIfError = logIfError;
 
         int64_t removed;
-        Status status = index->accessMethod()->remove(obj, loc, options, &removed);
+        Status status = index->accessMethod()->remove(txn, obj, loc, options, &removed);
 
         if ( !status.isOK() ) {
             problem() << "Couldn't unindex record " << obj.toString()
@@ -1196,6 +1198,7 @@ namespace mongo {
 
 
     void IndexCatalog::indexRecord( const BSONObj& obj, const DiskLoc &loc ) {
+        DurTransaction txn;  // XXX
 
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
               i != _entries.end();
@@ -1204,7 +1207,7 @@ namespace mongo {
             IndexCatalogEntry* entry = *i;
 
             try {
-                Status s = _indexRecord( entry, obj, loc );
+                Status s = _indexRecord( &txn, entry, obj, loc );
                 uassert(s.location(), s.reason(), s.isOK() );
             }
             catch ( AssertionException& ae ) {
@@ -1218,7 +1221,7 @@ namespace mongo {
                     IndexCatalogEntry* toDelete = *j;
 
                     try {
-                        _unindexRecord( toDelete, obj, loc, false );
+                        _unindexRecord(&txn, toDelete, obj, loc, false);
                     }
                     catch ( DBException& e ) {
                         LOG(1) << "IndexCatalog::indexRecord rollback failed: " << e;
@@ -1235,6 +1238,8 @@ namespace mongo {
     }
 
     void IndexCatalog::unindexRecord( const BSONObj& obj, const DiskLoc& loc, bool noWarn ) {
+        DurTransaction txn;  // XXX
+
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
               i != _entries.end();
               ++i ) {
@@ -1243,7 +1248,7 @@ namespace mongo {
 
             // If it's a background index, we DO NOT want to log anything.
             bool logIfError = entry->isReady() ? !noWarn : false;
-            _unindexRecord( entry, obj, loc, logIfError );
+            _unindexRecord(&txn, entry, obj, loc, logIfError);
         }
 
     }

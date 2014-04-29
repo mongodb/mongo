@@ -27,7 +27,7 @@
  */
 
 #include "mongo/db/structure/btree/btree_interface.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/transaction.h"
 
 #include "mongo/db/structure/btree/btree_logic.h"
 
@@ -53,8 +53,8 @@ namespace mongo {
     private:
         typename BtreeLogic<OnDiskFormat>::Builder* _builder;
 
-        // XXX: this shouldn't be owned here eventually...
-        scoped_ptr<TransactionExperiment> _trans;
+        // Not owned here.
+        TransactionExperiment* _trans;
     };
 
     template <class OnDiskFormat>
@@ -73,21 +73,26 @@ namespace mongo {
 
         virtual ~BtreeInterfaceImpl() { }
 
-        virtual BtreeBuilderInterface* getBulkBuilder(bool dupsAllowed) {
-            // The BtreeBuilderInterfaceImpl (currently) takes ownership of the DurTransaction.
-            DurTransaction* trans = new DurTransaction();
+        virtual BtreeBuilderInterface* getBulkBuilder(TransactionExperiment* txn,
+                                                      bool dupsAllowed) {
+
             return new BtreeBuilderInterfaceImpl<OnDiskFormat>(
-                trans, _btree->newBuilder(trans, dupsAllowed));
+                txn, _btree->newBuilder(txn, dupsAllowed));
         }
 
-        virtual Status insert(const BSONObj& key, const DiskLoc& loc, bool dupsAllowed) {
-            DurTransaction trans;
-            return _btree->insert(&trans, key, loc, dupsAllowed);
+        virtual Status insert(TransactionExperiment* txn,
+                              const BSONObj& key,
+                              const DiskLoc& loc,
+                              bool dupsAllowed) {
+
+            return _btree->insert(txn, key, loc, dupsAllowed);
         }
 
-        virtual bool unindex(const BSONObj& key, const DiskLoc& loc) {
-            DurTransaction trans;
-            return _btree->unindex(&trans, key, loc);
+        virtual bool unindex(TransactionExperiment* txn,
+                             const BSONObj& key,
+                             const DiskLoc& loc) {
+
+            return _btree->unindex(txn, key, loc);
         }
 
         virtual void fullValidate(long long *numKeysOut) {
@@ -177,9 +182,8 @@ namespace mongo {
             _btree->restorePosition(saved.key, saved.loc, direction, bucketInOut, keyOffsetInOut);
         }
 
-        virtual Status initAsEmpty() {
-            DurTransaction trans;
-            return _btree->initAsEmpty(&trans);
+        virtual Status initAsEmpty(TransactionExperiment* txn) {
+            return _btree->initAsEmpty(txn);
         }
 
     private:

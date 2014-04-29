@@ -43,14 +43,20 @@ namespace mongo {
 
     class BtreeBasedBulkAccessMethod : public IndexAccessMethod {
     public:
-        BtreeBasedBulkAccessMethod(BtreeBasedAccessMethod* real,
+        /**
+         * Does not take ownership of any pointers.
+         * All pointers must outlive 'this'.
+         */
+        BtreeBasedBulkAccessMethod(TransactionExperiment* txn,
+                                   BtreeBasedAccessMethod* real,
                                    BtreeInterface* interface,
                                    const IndexDescriptor* descriptor,
                                    int numRecords);
 
         ~BtreeBasedBulkAccessMethod() {}
 
-        virtual Status insert(const BSONObj& obj,
+        virtual Status insert(TransactionExperiment* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted);
@@ -79,7 +85,8 @@ namespace mongo {
             return _notAllowed();
         }
 
-        virtual Status remove(const BSONObj& obj,
+        virtual Status remove(TransactionExperiment* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted) {
@@ -94,7 +101,9 @@ namespace mongo {
             return _notAllowed();
         }
 
-        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated) {
+        virtual Status update(TransactionExperiment* txn,
+                              const UpdateTicket& ticket,
+                              int64_t* numUpdated) {
             return _notAllowed();
         }
 
@@ -102,11 +111,11 @@ namespace mongo {
             return _notAllowed();
         }
 
-        virtual Status initializeAsEmpty() {
+        virtual Status initializeAsEmpty(TransactionExperiment* txn) {
             return _notAllowed();
         }
 
-        virtual IndexAccessMethod* initiateBulk() {
+        virtual IndexAccessMethod* initiateBulk(TransactionExperiment* txn) {
             return NULL;
         }
 
@@ -135,6 +144,8 @@ namespace mongo {
 
         // Does any document have >1 key?
         bool _isMultiKey;
+
+        TransactionExperiment* _txn;
     };
 
 }  // namespace mongo

@@ -56,10 +56,11 @@ namespace mongo {
     /**
      * Add the provided (obj, dl) pair to the provided index.
      */
-    static void addKeysToIndex( Collection* collection,
-                                const IndexDescriptor* descriptor,
-                                IndexAccessMethod* accessMethod,
-                                const BSONObj& obj, const DiskLoc &recordLoc ) {
+    static void addKeysToIndex(TransactionExperiment* txn,
+                               Collection* collection,
+                               const IndexDescriptor* descriptor,
+                               IndexAccessMethod* accessMethod,
+                               const BSONObj& obj, const DiskLoc &recordLoc ) {
 
         InsertDeleteOptions options;
         options.logIfError = false;
@@ -72,7 +73,7 @@ namespace mongo {
         }
 
         int64_t inserted;
-        Status ret = accessMethod->insert(obj, recordLoc, options, &inserted);
+        Status ret = accessMethod->insert(txn, obj, recordLoc, options, &inserted);
         uassertStatusOK( ret );
     }
 
@@ -80,6 +81,8 @@ namespace mongo {
                                            const IndexDescriptor* descriptor,
                                            IndexAccessMethod* accessMethod,
                                            bool shouldYield) {
+
+        DurTransaction txn; // XXX
 
         string ns = collection->ns().ns(); // our copy for sanity
 
@@ -121,10 +124,10 @@ namespace mongo {
             try {
                 if ( !dupsAllowed && dropDups ) {
                     LastError::Disabled led( lastError.get() );
-                    addKeysToIndex(collection, descriptor, accessMethod, js, loc);
+                    addKeysToIndex(&txn, collection, descriptor, accessMethod, js, loc);
                 }
                 else {
-                    addKeysToIndex(collection, descriptor, accessMethod, js, loc);
+                    addKeysToIndex(&txn, collection, descriptor, accessMethod, js, loc);
                 }
             }
             catch( AssertionException& e ) {
@@ -137,7 +140,6 @@ namespace mongo {
                     bool runnerEOF = runner->isEOF();
                     runner->saveState();
                     BSONObj toDelete;
-                    DurTransaction txn; // XXX
                     collection->deleteDocument( &txn, loc, false, true, &toDelete );
                     logOp( "d", ns.c_str(), toDelete );
 
@@ -217,8 +219,10 @@ namespace mongo {
         // things like in place updates, etc...
         collection->infoCache()->addedIndex();
 
+        DurTransaction txn;  // XXX
+
         if ( collection->numRecords() == 0 ) {
-            Status status = btreeState->accessMethod()->initializeAsEmpty();
+            Status status = btreeState->accessMethod()->initializeAsEmpty(&txn);
             massert( 17343,
                      str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
                      status.isOK() );
@@ -238,14 +242,14 @@ namespace mongo {
             log() << "\t building index in background";
         }
 
-        Status status = btreeState->accessMethod()->initializeAsEmpty();
+        Status status = btreeState->accessMethod()->initializeAsEmpty(&txn);
         massert( 17342,
                  str::stream()
                  << "IndexAccessMethod::initializeAsEmpty failed"
                  << status.toString(),
                  status.isOK() );
 
-        IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk();
+        IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk(&txn);
         scoped_ptr<IndexAccessMethod> bulkHolder(bulk);
         IndexAccessMethod* iam = bulk ? bulk : btreeState->accessMethod();
 
@@ -280,7 +284,6 @@ namespace mongo {
 
             for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
                 BSONObj toDelete;
-                DurTransaction txn; // XXX
                 collection->deleteDocument( &txn,
                                             *i,
                                             false /* cappedOk */,
@@ -308,8 +311,8 @@ namespace mongo {
 
     // ----------------------------
 
-    MultiIndexBlock::MultiIndexBlock( Collection* collection )
-        : _collection( collection ) {
+    MultiIndexBlock::MultiIndexBlock(TransactionExperiment* txn, Collection* collection)
+        : _collection(collection), _txn(txn) {
     }
 
     MultiIndexBlock::~MultiIndexBlock() {
@@ -320,7 +323,6 @@ namespace mongo {
     }
 
     Status MultiIndexBlock::init(std::vector<BSONObj>& indexSpecs) {
-
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
             BSONObj info = indexSpecs[i];
 
@@ -350,11 +352,11 @@ namespace mongo {
                 return status;
 
             state.real = state.block->getEntry()->accessMethod();
-            status = state.real->initializeAsEmpty();
+            status = state.real->initializeAsEmpty(_txn);
             if ( !status.isOK() )
                 return status;
 
-            state.bulk = state.real->initiateBulk();
+            state.bulk = state.real->initiateBulk(_txn);
 
             _states.push_back( state );
         }
@@ -367,7 +369,8 @@ namespace mongo {
                                     const InsertDeleteOptions& options ) {
 
         for ( size_t i = 0; i < _states.size(); i++ ) {
-            Status idxStatus = _states[i].forInsert()->insert( doc,
+            Status idxStatus = _states[i].forInsert()->insert( _txn,
+                                                               doc,
                                                                loc,
                                                                options,
                                                                NULL );

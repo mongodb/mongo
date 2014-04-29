@@ -473,11 +473,18 @@ namespace mongo {
                                const DiskLoc bucketLoc,
                                int keypos);
 
-        void delKeyAtPos(TransactionExperiment* trans, BucketType* bucket, const DiskLoc bucketLoc, int p);
+        void delKeyAtPos(TransactionExperiment* trans,
+                         BucketType* bucket,
+                         const DiskLoc bucketLoc,
+                         int p);
 
-        void delBucket(TransactionExperiment* trans, BucketType* bucket, const DiskLoc bucketLoc);
+        void delBucket(TransactionExperiment* trans,
+                       BucketType* bucket,
+                       const DiskLoc bucketLoc);
 
-        void deallocBucket(BucketType* bucket, const DiskLoc bucketLoc);
+        void deallocBucket(TransactionExperiment* trans,
+                           BucketType* bucket,
+                           const DiskLoc bucketLoc);
 
         // TODO 'this' for _ordering(?)
         int customBSONCmp(const BSONObj& l,

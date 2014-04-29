@@ -32,6 +32,7 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/transaction.h"
 
 namespace mongo {
 
@@ -64,7 +65,8 @@ namespace mongo {
          * 
          * The behavior of the insertion can be specified through 'options'.  
          */
-        virtual Status insert(const BSONObj& obj,
+        virtual Status insert(TransactionExperiment* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted) = 0;
@@ -73,7 +75,8 @@ namespace mongo {
          * Analogous to above, but remove the records instead of inserting them.  If not NULL,
          * numDeleted will be set to the number of keys removed from the index for the document.
          */
-        virtual Status remove(const BSONObj& obj,
+        virtual Status remove(TransactionExperiment* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted) = 0;
@@ -102,7 +105,9 @@ namespace mongo {
          * called.  If the index was changed, we may return an error, as our ticket may have been
          * invalidated.
          */
-        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated) = 0;
+        virtual Status update(TransactionExperiment* txn,
+                              const UpdateTicket& ticket,
+                              int64_t* numUpdated) = 0;
 
         /**
          * Fills in '*out' with an IndexCursor.  Return a status indicating success or reason of
@@ -118,7 +123,7 @@ namespace mongo {
          * only called once for the lifetime of the index
          * if called multiple times, is an error
          */
-        virtual Status initializeAsEmpty() = 0;
+        virtual Status initializeAsEmpty(TransactionExperiment* txn) = 0;
 
         /**
          * Try to page-in the pages that contain the keys generated from 'obj'.
@@ -151,10 +156,14 @@ namespace mongo {
          * Long term, you'll eventually be able to mix/match bulk, not bulk,
          * have as many as you want, etc..
          *
+         * Caller owns the returned IndexAccessMethod.
+         *
+         * The provided TransactionExperiment must outlive the IndexAccessMethod returned.
+         *
          * For now (1/8/14) you can only do bulk when the index is empty
          * it will fail if you try other times.
          */
-        virtual IndexAccessMethod* initiateBulk() = 0;
+        virtual IndexAccessMethod* initiateBulk(TransactionExperiment* txn) = 0;
 
         /**
          * Call this when you are ready to finish your bulk work.

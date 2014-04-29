@@ -31,7 +31,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile_private.h"  // This is for inDBRepair.
 #include "mongo/db/repl/rs.h"         // This is for ignoreUniqueIndex.
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
@@ -90,13 +90,14 @@ namespace mongo {
         return NULL;
     }
 
-    BtreeBasedBulkAccessMethod::BtreeBasedBulkAccessMethod(BtreeBasedAccessMethod* real,
-                         BtreeInterface* interface,
-                         const IndexDescriptor* descriptor,
-                         int numRecords) {
-
+    BtreeBasedBulkAccessMethod::BtreeBasedBulkAccessMethod(TransactionExperiment* txn,
+                                                           BtreeBasedAccessMethod* real,
+                                                           BtreeInterface* interface,
+                                                           const IndexDescriptor* descriptor,
+                                                           int numRecords) {
         _real = real;
         _interface = interface;
+        _txn = txn;
 
         _docsInserted = 0;
         _keysInserted = 0;
@@ -107,10 +108,11 @@ namespace mongo {
         _sorter->hintNumObjects(numRecords);
     }
 
-    Status BtreeBasedBulkAccessMethod::insert(const BSONObj& obj,
-                             const DiskLoc& loc,
-                             const InsertDeleteOptions& options,
-                             int64_t* numInserted) {
+    Status BtreeBasedBulkAccessMethod::insert(TransactionExperiment* txn,
+                                              const BSONObj& obj,
+                                              const DiskLoc& loc,
+                                              const InsertDeleteOptions& options,
+                                              int64_t* numInserted) {
         BSONObjSet keys;
         _real->getKeys(obj, &keys);
 
@@ -132,12 +134,12 @@ namespace mongo {
     }
 
     Status BtreeBasedBulkAccessMethod::commit(set<DiskLoc>* dupsToDrop, CurOp* op, bool mayInterrupt) {
-        DurTransaction txn; // XXX
         DiskLoc oldHead = _real->_btreeState->head();
+
         // XXX: do we expect the tree to be empty but have a head set?  Looks like so from old code.
         invariant(!oldHead.isNull());
         _real->_btreeState->setHead(DiskLoc());
-        _real->_btreeState->recordStore()->deleteRecord(&txn, oldHead);
+        _real->_btreeState->recordStore()->deleteRecord(_txn, oldHead);
 
         if (_isMultiKey) {
             _real->_btreeState->setMultikey();
@@ -162,7 +164,8 @@ namespace mongo {
                                            10);
 
         scoped_ptr<BtreeBuilderInterface> builder;
-        builder.reset(_interface->getBulkBuilder(dupsAllowed));
+
+        builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
 
         while (i->more()) {
             // Get the next datum and add it to the builder.

@@ -400,7 +400,7 @@ namespace mongo {
             IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
 
             int64_t updatedKeys;
-            Status ret = iam->update(*updateTickets.mutableMap()[descriptor], &updatedKeys);
+            Status ret = iam->update(txn, *updateTickets.mutableMap()[descriptor], &updatedKeys);
             if ( !ret.isOK() )
                 return StatusWith<DiskLoc>( ret );
             if ( debug )

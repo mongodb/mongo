@@ -29,6 +29,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/head_manager.h"
 #include "mongo/db/structure/record_store.h"
 
@@ -96,11 +97,17 @@ namespace mongo {
          * Caller owns returned pointer.
          * 'this' must outlive the returned pointer.
          */
-        virtual BtreeBuilderInterface* getBulkBuilder(bool dupsAllowed) = 0;
+        virtual BtreeBuilderInterface* getBulkBuilder(TransactionExperiment* txn,
+                                                      bool dupsAllowed) = 0;
 
-        virtual Status insert(const BSONObj& key, const DiskLoc& loc, bool dupsAllowed) = 0;
+        virtual Status insert(TransactionExperiment* txn,
+                              const BSONObj& key,
+                              const DiskLoc& loc,
+                              bool dupsAllowed) = 0;
 
-        virtual bool unindex(const BSONObj& key, const DiskLoc& loc) = 0;
+        virtual bool unindex(TransactionExperiment* txn,
+                             const BSONObj& key,
+                             const DiskLoc& loc) = 0;
 
         // TODO: Hide this by exposing an update method?
         virtual Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) = 0;
@@ -171,7 +178,7 @@ namespace mongo {
         // Index creation
         //
 
-        virtual Status initAsEmpty() = 0;
+        virtual Status initAsEmpty(TransactionExperiment* txn) = 0;
     };
 
 }  // namespace mongo

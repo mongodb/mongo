@@ -43,7 +43,7 @@
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
@@ -71,10 +71,11 @@ namespace mongo {
 
         class MyCompactAdaptor : public RecordStoreCompactAdaptor {
         public:
-            MyCompactAdaptor( Collection* collection,
-                              MultiIndexBlock* indexBlock )
+            MyCompactAdaptor(Collection* collection,
+                             MultiIndexBlock* indexBlock)
+
                 : _collection( collection ),
-                  _multiIndexBlock( indexBlock ) {
+                  _multiIndexBlock(indexBlock) {
             }
 
             virtual bool isDataValid( Record* rec ) {
@@ -95,6 +96,7 @@ namespace mongo {
 
         private:
             Collection* _collection;
+
             MultiIndexBlock* _multiIndexBlock;
         };
 
@@ -149,12 +151,12 @@ namespace mongo {
 
         CompactStats stats;
 
-        MultiIndexBlock multiIndexBlock( this );
+        MultiIndexBlock multiIndexBlock(txn, this);
         status = multiIndexBlock.init( indexSpecs );
         if ( !status.isOK() )
             return StatusWith<CompactStats>( status );
 
-        MyCompactAdaptor adaptor( this, &multiIndexBlock );
+        MyCompactAdaptor adaptor(this, &multiIndexBlock);
 
         _recordStore->compact( txn, &adaptor, compactOptions, &stats );
 
@@ -166,5 +168,4 @@ namespace mongo {
         return StatusWith<CompactStats>( stats );
     }
 
-
-}
+}  // namespace mongo

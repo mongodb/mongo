@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/storage/transaction.h"
 
 namespace mongo {
 
@@ -54,7 +55,8 @@ namespace mongo {
     class MultiIndexBlock {
         MONGO_DISALLOW_COPYING( MultiIndexBlock );
     public:
-        MultiIndexBlock( Collection* collection );
+        MultiIndexBlock(TransactionExperiment* txn,
+                        Collection* collection );
         ~MultiIndexBlock();
 
         Status init( std::vector<BSONObj>& specs );
@@ -81,6 +83,9 @@ namespace mongo {
         };
 
         std::vector<IndexState> _states;
+
+        // Not owned here, must outlive 'this'
+        TransactionExperiment* _txn;
     };
 
 } // namespace mongo

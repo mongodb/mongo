@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -287,9 +288,16 @@ namespace mongo {
         // meaning we shouldn't modify catalog
         Status _checkUnfinished() const;
 
-        Status _indexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc );
-        Status _unindexRecord( IndexCatalogEntry* index, const BSONObj& obj, const DiskLoc &loc,
-                               bool logIfError );
+        Status _indexRecord(TransactionExperiment* txn,
+                            IndexCatalogEntry* index,
+                            const BSONObj& obj,
+                            const DiskLoc &loc );
+
+        Status _unindexRecord(TransactionExperiment* txn,
+                              IndexCatalogEntry* index,
+                              const BSONObj& obj,
+                              const DiskLoc &loc,
+                              bool logIfError);
 
         /**
          * this does no sanity checks

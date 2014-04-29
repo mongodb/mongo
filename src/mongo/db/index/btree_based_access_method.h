@@ -60,12 +60,14 @@ namespace mongo {
 
         virtual ~BtreeBasedAccessMethod() { }
 
-        virtual Status insert(const BSONObj& obj,
+        virtual Status insert(TransactionExperiment* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted);
 
-        virtual Status remove(const BSONObj& obj,
+        virtual Status remove(TransactionExperiment* txn,
+                              const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted);
@@ -76,13 +78,15 @@ namespace mongo {
                                       const InsertDeleteOptions& options,
                                       UpdateTicket* ticket);
 
-        virtual Status update(const UpdateTicket& ticket, int64_t* numUpdated);
+        virtual Status update(TransactionExperiment* txn,
+                              const UpdateTicket& ticket,
+                              int64_t* numUpdated);
 
         virtual Status newCursor(IndexCursor **out) const;
 
-        virtual Status initializeAsEmpty();
+        virtual Status initializeAsEmpty(TransactionExperiment* txn);
 
-        virtual IndexAccessMethod* initiateBulk() ;
+        virtual IndexAccessMethod* initiateBulk(TransactionExperiment* txn) ;
 
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
@@ -115,7 +119,9 @@ namespace mongo {
         }
 
     private:
-        bool removeOneKey(const BSONObj& key, const DiskLoc& loc);
+        bool removeOneKey(TransactionExperiment* txn,
+                          const BSONObj& key,
+                          const DiskLoc& loc);
 
         scoped_ptr<BtreeInterface> _newInterface;
     };

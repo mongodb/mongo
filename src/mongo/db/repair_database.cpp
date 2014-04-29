@@ -375,7 +375,7 @@ namespace mongo {
 
                 // data
 
-                MultiIndexBlock indexBlock( tempCollection );
+                MultiIndexBlock indexBlock(&txn, tempCollection );
                 {
                     vector<BSONObj> indexes;
                     IndexCatalog::IndexIterator ii =

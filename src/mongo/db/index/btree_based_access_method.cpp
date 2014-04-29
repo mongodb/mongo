@@ -44,6 +44,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/btree/btree_interface.h"
 #include "mongo/util/progress_meter.h"
 
@@ -63,11 +64,11 @@ namespace mongo {
     }
 
     // Find the keys for obj, put them in the tree pointing to loc
-    Status BtreeBasedAccessMethod::insert(const BSONObj& obj,
+    Status BtreeBasedAccessMethod::insert(TransactionExperiment* txn,
+                                          const BSONObj& obj,
                                           const DiskLoc& loc,
                                           const InsertDeleteOptions& options,
                                           int64_t* numInserted) {
-
         *numInserted = 0;
 
         BSONObjSet keys;
@@ -76,7 +77,7 @@ namespace mongo {
 
         Status ret = Status::OK();
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            Status status = _newInterface->insert(*i, loc, options.dupsAllowed);
+            Status status = _newInterface->insert(txn, *i, loc, options.dupsAllowed);
 
             // Everything's OK, carry on.
             if (status.isOK()) {
@@ -108,7 +109,7 @@ namespace mongo {
 
             // Clean up after ourselves.
             for (BSONObjSet::const_iterator j = keys.begin(); j != i; ++j) {
-                removeOneKey(*j, loc);
+                removeOneKey(txn, *j, loc);
                 *numInserted = 0;
             }
 
@@ -116,17 +117,20 @@ namespace mongo {
         }
 
         if (*numInserted > 1) {
+            // XXX: this should use a txn?
             _btreeState->setMultikey();
         }
 
         return ret;
     }
 
-    bool BtreeBasedAccessMethod::removeOneKey(const BSONObj& key, const DiskLoc& loc) {
+    bool BtreeBasedAccessMethod::removeOneKey(TransactionExperiment* txn,
+                                              const BSONObj& key,
+                                              const DiskLoc& loc) {
         bool ret = false;
 
         try {
-            ret = _newInterface->unindex(key, loc);
+            ret = _newInterface->unindex(txn, key, loc);
         } catch (AssertionException& e) {
             problem() << "Assertion failure: _unindex failed "
                 << _descriptor->indexNamespace() << endl;
@@ -147,15 +151,18 @@ namespace mongo {
     }
 
     // Remove the provided doc from the index.
-    Status BtreeBasedAccessMethod::remove(const BSONObj &obj, const DiskLoc& loc,
-        const InsertDeleteOptions &options, int64_t* numDeleted) {
+    Status BtreeBasedAccessMethod::remove(TransactionExperiment* txn,
+                                          const BSONObj &obj,
+                                          const DiskLoc& loc,
+                                          const InsertDeleteOptions &options,
+                                          int64_t* numDeleted) {
 
         BSONObjSet keys;
         getKeys(obj, &keys);
         *numDeleted = 0;
 
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            bool thisKeyOK = removeOneKey(*i, loc);
+            bool thisKeyOK = removeOneKey(txn, *i, loc);
 
             if (thisKeyOK) {
                 ++*numDeleted;
@@ -189,8 +196,8 @@ namespace mongo {
         }
     }
 
-    Status BtreeBasedAccessMethod::initializeAsEmpty() {
-        return _newInterface->initAsEmpty();
+    Status BtreeBasedAccessMethod::initializeAsEmpty(TransactionExperiment* txn) {
+        return _newInterface->initAsEmpty(txn);
     }
 
     Status BtreeBasedAccessMethod::touch(const BSONObj& obj) {
@@ -271,7 +278,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeBasedAccessMethod::update(const UpdateTicket& ticket, int64_t* numUpdated) {
+    Status BtreeBasedAccessMethod::update(TransactionExperiment* txn,
+                                          const UpdateTicket& ticket,
+                                          int64_t* numUpdated) {
         if (!ticket._isValid) {
             return Status(ErrorCodes::InternalError, "Invalid UpdateTicket in update");
         }
@@ -284,11 +293,11 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < data->added.size(); ++i) {
-            _newInterface->insert(*data->added[i], data->loc, data->dupsAllowed);
+            _newInterface->insert(txn, *data->added[i], data->loc, data->dupsAllowed);
         }
 
         for (size_t i = 0; i < data->removed.size(); ++i) {
-            _newInterface->unindex(*data->removed[i], data->loc);
+            _newInterface->unindex(txn, *data->removed[i], data->loc);
         }
 
         *numUpdated = data->added.size();
@@ -296,14 +305,17 @@ namespace mongo {
         return Status::OK();
     }
 
-    IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk() {
+    IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk(TransactionExperiment* txn) {
         // If there's already data in the index, don't do anything.
         if (!_newInterface->isEmpty()) {
             return NULL;
         }
 
-        return new BtreeBasedBulkAccessMethod(
-            this, _newInterface.get(), _descriptor, _btreeState->collection()->numRecords());
+        return new BtreeBasedBulkAccessMethod(txn,
+                                              this,
+                                              _newInterface.get(),
+                                              _descriptor,
+                                              _btreeState->collection()->numRecords());
     }
 
     Status BtreeBasedAccessMethod::commitBulk(IndexAccessMethod* bulkRaw,
