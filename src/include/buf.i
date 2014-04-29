@@ -12,10 +12,6 @@
 static inline int
 __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
-	/* Clear buffers previously used for mapped returns. */
-	if (F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_buf_clear(buf);
-
 	return (size > buf->memsize ?
 	    __wt_buf_grow_worker(session, buf, size) : 0);
 }
@@ -101,9 +97,9 @@ __wt_buf_set_printable(
 static inline void
 __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
-	if (!F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_free(session, buf->mem);
-	__wt_buf_clear(buf);
+	__wt_free(session, buf->mem);
+
+	memset(buf, 0, sizeof(WT_ITEM));
 }
 
 /*
@@ -113,8 +109,13 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
 static inline void
 __wt_scr_free(WT_ITEM **bufp)
 {
-	if (*bufp == NULL)
-		return;
-	F_CLR(*bufp, WT_ITEM_INUSE);
-	*bufp = NULL;
+	WT_ITEM *buf;
+
+	if ((buf = *bufp) != NULL) {
+		*bufp = NULL;
+
+		buf->data = NULL;
+		buf->size = 0;
+		F_CLR(buf, WT_ITEM_INUSE);
+	}
 }

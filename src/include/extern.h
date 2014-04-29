@@ -365,7 +365,7 @@ extern int __wt_page_alloc(WT_SESSION_IMPL *session,
     WT_PAGE **pagep);
 extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_REF *ref,
-    WT_PAGE_HEADER *dsk,
+    const void *image,
     uint32_t flags,
     WT_PAGE **pagep);
 extern int __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref);
@@ -881,14 +881,14 @@ extern int __wt_curstat_lsm_init( WT_SESSION_IMPL *session,
     const char *uri,
     WT_CURSOR_STAT *cst);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
-extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
+extern int __wt_lsm_tree_bloom_name(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     uint32_t id,
-    WT_ITEM *buf);
-extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
+    const char **retp);
+extern int __wt_lsm_tree_chunk_name(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     uint32_t id,
-    WT_ITEM *buf);
+    const char **retp);
 extern int __wt_lsm_tree_set_chunk_size( WT_SESSION_IMPL *session,
     WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_setup_chunk( WT_SESSION_IMPL *session,
@@ -1067,7 +1067,9 @@ extern int __wt_mmap(WT_SESSION_IMPL *session,
     WT_FH *fh,
     void *mapp,
     size_t *lenp);
-extern int __wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size);
+extern int __wt_mmap_preload(WT_SESSION_IMPL *session,
+    const void *p,
+    size_t size);
 extern int __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size);
 extern int __wt_munmap(WT_SESSION_IMPL *session,
     WT_FH *fh,
@@ -1467,11 +1469,9 @@ extern uint32_t __wt_log2_int(uint32_t n);
 extern int __wt_ispo2(uint32_t v);
 extern uint32_t __wt_rduppo2(uint32_t n, uint32_t po2);
 extern uint32_t __wt_random(void);
-extern void __wt_buf_clear(WT_ITEM *buf);
 extern int __wt_buf_grow_worker(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     size_t size);
-extern void *__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern int __wt_buf_fmt(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const char *fmt,

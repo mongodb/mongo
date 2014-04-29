@@ -228,15 +228,18 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_PAGE_HEADER *dsk, uint32_t flags, WT_PAGE **pagep)
+__wt_page_inmem(WT_SESSION_IMPL *session,
+    WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_HEADER *dsk;
 	uint32_t alloc_entries;
 	size_t size;
 
 	*pagep = NULL;
+
+	dsk = (WT_PAGE_HEADER *)image;
 	alloc_entries = 0;
 
 	/*
