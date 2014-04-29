@@ -303,14 +303,18 @@ namespace mongo {
         }
         else {
             std::string srvSubjectName = getSSLManager()->getServerSubjectName();
-            std::string srvClusterId = srvSubjectName.substr(srvSubjectName.find(",OU="));
-            std::string peerClusterId = subjectName.substr(subjectName.find(",OU="));
+            
+            size_t srvClusterIdPos = srvSubjectName.find(",OU=");
+            size_t peerClusterIdPos = subjectName.find(",OU=");
 
-            fassert(17002, !srvClusterId.empty() && srvClusterId != srvSubjectName);
+            std::string srvClusterId = srvClusterIdPos != std::string::npos ? 
+                srvSubjectName.substr(srvClusterIdPos) : "";
+            std::string peerClusterId = peerClusterIdPos != std::string::npos ? 
+                subjectName.substr(peerClusterIdPos) : "";
 
             // Handle internal cluster member auth, only applies to server-server connections
             int clusterAuthMode = serverGlobalParams.clusterAuthMode.load(); 
-            if (srvClusterId == peerClusterId) {
+            if (srvClusterId == peerClusterId && !srvClusterId.empty()) {
                 if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
                     clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {
                     return Status(ErrorCodes::AuthenticationFailed, "The provided certificate " 
