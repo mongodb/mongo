@@ -124,7 +124,8 @@ namespace mongo {
 
         void increaseStorageSize( TransactionExperiment* txn, int size, int quotaMax );
 
-        virtual Status validate( bool full, bool scanData,
+        virtual Status validate( TransactionExperiment* txn,
+                                 bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
 

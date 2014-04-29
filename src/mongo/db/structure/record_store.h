@@ -155,7 +155,8 @@ namespace mongo {
          *         OK will be returned even if corruption is found
          *         deatils will be in result
          */
-        virtual Status validate( bool full, bool scanData,
+        virtual Status validate( TransactionExperiment* txn,
+                                 bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const = 0;
 

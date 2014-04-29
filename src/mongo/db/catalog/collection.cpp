@@ -575,11 +575,12 @@ namespace mongo {
         };
     }
 
-    Status Collection::validate( bool full, bool scanData,
+    Status Collection::validate( TransactionExperiment* txn,
+                                 bool full, bool scanData,
                                  ValidateResults* results, BSONObjBuilder* output ){
 
         MyValidateAdaptor adaptor;
-        Status status = _recordStore->validate( full, scanData, &adaptor, results, output );
+        Status status = _recordStore->validate( txn, full, scanData, &adaptor, results, output );
         if ( !status.isOK() )
             return status;
 

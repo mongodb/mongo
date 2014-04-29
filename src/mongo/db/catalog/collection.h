@@ -224,7 +224,8 @@ namespace mongo {
          *         OK will be returned even if corruption is found
          *         deatils will be in result
          */
-        Status validate( bool full, bool scanData,
+        Status validate( TransactionExperiment* txn,
+                         bool full, bool scanData,
                          ValidateResults* results, BSONObjBuilder* output );
 
         /**

@@ -34,6 +34,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {
@@ -76,6 +77,8 @@ namespace mongo {
             }
 
             Client::ReadContext ctx(ns_string.ns());
+            DurTransaction txn;
+
             Database* db = ctx.ctx().db();
             if ( !db ) {
                 errmsg = "database not found";
@@ -91,7 +94,7 @@ namespace mongo {
             result.append( "ns", ns );
 
             ValidateResults results;
-            Status status = collection->validate( full, scanData, &results, &result );
+            Status status = collection->validate( &txn, full, scanData, &results, &result );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 

@@ -46,6 +46,11 @@ namespace mongo {
         virtual bool isCommitNeeded() const;
 
         virtual void* writingPtr(void* data, size_t len);
+
+        virtual void checkForInterrupt() const;
+
+        virtual Status checkForInterruptNoAssert() const;
+
     };
 
 }  // namespace mongo

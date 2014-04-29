@@ -35,7 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
@@ -422,13 +421,13 @@ namespace mongo {
 
                     // remove the old records (orphan them) periodically so our commit block doesn't get too large
                     bool stopping = false;
-                    RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
+                    RARELY stopping = !txn->checkForInterruptNoAssert().isOK();
                     if( stopping || txn->isCommitNeeded() ) {
                         *txn->writing(&e->firstRecord) = L;
                         Record *r = recordFor(L);
                         txn->writingInt(r->prevOfs()) = DiskLoc::NullOfs;
                         txn->commitIfNeeded();
-                        killCurrentOp.checkForInterrupt();
+                        txn->checkForInterrupt();
                     }
                 }
             } // if !L.isNull()

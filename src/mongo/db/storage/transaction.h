@@ -31,6 +31,7 @@
 #include <stdlib.h>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
 
@@ -41,6 +42,21 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(TransactionExperiment);
     public:
         virtual ~TransactionExperiment() { }
+
+        // --- operation level info? ---
+
+        /**
+         * throws an exception if the operation is interrupted
+         */
+        virtual void checkForInterrupt() const = 0;
+
+        /**
+         * @return Status::OK() if not interrupted
+         *         otherwise returns reasons
+         */
+        virtual Status checkForInterruptNoAssert() const = 0;
+
+        // --- write unit of work methods ---
 
         /**
          * Commit if required.  May take a long time.  Returns true if committed.

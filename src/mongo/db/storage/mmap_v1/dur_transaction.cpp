@@ -28,6 +28,7 @@
 
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 
 namespace mongo {
@@ -42,6 +43,18 @@ namespace mongo {
 
     void* DurTransaction::writingPtr(void* data, size_t len) {
         return getDur().writingPtr(data, len);
+    }
+
+    void DurTransaction::checkForInterrupt() const {
+        killCurrentOp.checkForInterrupt();
+    }
+
+    Status DurTransaction::checkForInterruptNoAssert() const {
+        const char* killed = killCurrentOp.checkForInterruptNoAssert();
+        if ( !killed || !killed[0] )
+            return Status::OK();
+
+        return Status( ErrorCodes::Interrupted, killed );
     }
 
 }  // namespace mongo

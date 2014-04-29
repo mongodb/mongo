@@ -31,7 +31,6 @@
 #include "mongo/db/structure/record_store_v1_base.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
@@ -305,7 +304,8 @@ namespace mongo {
         addDeletedRec(txn, emptyLoc);
     }
 
-    Status RecordStoreV1Base::validate( bool full, bool scanData,
+    Status RecordStoreV1Base::validate( TransactionExperiment* txn,
+                                        bool full, bool scanData,
                                         ValidateAdaptor* adaptor,
                                         ValidateResults* results, BSONObjBuilder* output ) const {
 
@@ -380,7 +380,7 @@ namespace mongo {
                     }
                     extentDiskLoc = nextDiskLoc;
                     extentCount++;
-                    killCurrentOp.checkForInterrupt();
+                    txn->checkForInterrupt();
                 }
             }
             catch (const DBException& e) {
@@ -576,7 +576,7 @@ namespace mongo {
                         delSize += d->lengthWithHeaders();
                         loc = d->nextDeleted();
                         k++;
-                        killCurrentOp.checkForInterrupt();
+                        txn->checkForInterrupt();
                     }
                     delBucketSizes << k;
                 }
