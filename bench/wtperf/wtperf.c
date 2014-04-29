@@ -1189,15 +1189,13 @@ execute_populate(CONFIG *cfg)
 	struct timespec start, stop;
 	CONFIG_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
-	WT_SESSION *session;
 	double secs;
 	size_t i;
 	uint64_t last_ops;
 	uint32_t interval, tables;
-	int elapsed, ret, t_ret;
+	int elapsed, ret;
 	void *(*pfunc)(void *);
 
-	session = NULL;
 	lprintf(cfg, 0, 1,
 	    "Starting %" PRIu32
 	    " populate thread(s) for %" PRIu32 " items",
