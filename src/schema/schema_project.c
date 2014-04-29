@@ -356,9 +356,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 
 				len = __pack_size(session, &pv);
 				offset = WT_PTRDIFF(p, buf->data);
-				p = (uint8_t *)buf->data + offset;
 				WT_RET(__wt_buf_grow(session,
 				    buf, buf->size + len - old_len));
+				p = (uint8_t *)buf->data + offset;
 				/* Make room if we're inserting out-of-order. */
 				if (offset + old_len < buf->size)
 					memmove(p + len, p + old_len,
