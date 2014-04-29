@@ -1676,8 +1676,10 @@ namespace UpdateTests {
                                         << "z" << 5 ) );
             client().update( ns(), BSONObj(), BSON( "$set" << BSON( "x.b" << 1 << "x.c" << 1 ) ) );
             ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1
-                                << "x" << BSON( "b" << 1 << "c" << 1 ) << "x" << BSONObj()
-                                << "z" << 5 ),
+                                << "z" << 5
+                                << "x" << BSON( "b" << 1 )
+                                << "x" << BSON( "c" << 1 )
+                                ),
                           client().findOne( ns(), BSONObj() ) );
         }
     };
@@ -1692,8 +1694,10 @@ namespace UpdateTests {
             client().update( ns(), BSONObj(),
                             BSON( "$set" << BSON( "x.b" << 1 << "x.c" << 1 << "x.d" << 1 ) ) );
             ASSERT_EQUALS( BSON( "_id" << 0
-                                << "x" << BSON( "b" << 1 << "c" << 1 << "d" << 1 )
-                                << "x" << BSONObj() << "x" << BSONObj() ),
+                                << "x" << BSON( "b" << 1 )
+                                << "x" << BSON( "c" << 1 )
+                                << "x" << BSON( "d" << 1 )
+                                ),
                           client().findOne( ns(), BSONObj() ) );
         }
     };
