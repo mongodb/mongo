@@ -7,12 +7,13 @@
 
 /*
  * __wt_buf_grow --
- *	Grow a buffer that's currently in-use.
+ *	Grow a buffer that may be in-use, and ensure that all data is local to
+ * the buffer.
  */
 static inline int
 __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
-	return (size > buf->memsize ?
+	return (size > buf->memsize || !WT_DATA_IN_ITEM(buf) ?
 	    __wt_buf_grow_worker(session, buf, size) : 0);
 }
 
@@ -41,8 +42,8 @@ static inline int
 __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	buf->data = buf->mem;
+	buf->size = 0;				/* Clear existing data length */
 	WT_RET(__wt_buf_grow(session, buf, size));
-	buf->size = 0;				/* Clear the data length */
 
 	return (0);
 }
@@ -55,6 +56,7 @@ static inline int
 __wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	buf->data = buf->mem;
+	buf->size = 0;				/* Clear existing data length */
 	WT_RET(__wt_buf_grow(session, buf, size));
 	buf->size = size;			/* Set the data length. */
 

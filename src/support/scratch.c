@@ -9,40 +9,53 @@
 
 /*
  * __wt_buf_grow_worker --
- *	Grow a buffer that's currently in-use.
+ *	Grow a buffer that may be in-use, and ensure that all data is local to
+ * the buffer.
  */
 int
 __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	size_t offset;
-	int set_data;
-
-	WT_ASSERT(session, size > buf->memsize);
-	WT_ASSERT(session, buf->mem == NULL || buf->memsize > 0);
+	int copy_data;
 
 	/*
-	 * Grow the buffer's memory: if the data reference is not set or
-	 * references the buffer's memory, maintain it.
+	 * Maintain the existing data: there are 3 cases:
+	 *	No existing data: allocate the required memory, and initialize
+	 * the data to reference it.
+	 *	Existing data local to the buffer: set the data to the same
+	 * offset in the re-allocated memory.
+	 *	Existing data not-local to the buffer: copy the data into the
+	 * buffer and set the data to reference it.
 	 */
-	if (buf->data == NULL) {
-		offset = 0;
-		set_data = 1;
-	} else if (WT_DATA_IN_ITEM(buf)) {
+	if (WT_DATA_IN_ITEM(buf)) {
 		offset = WT_PTRDIFF(buf->data, buf->mem);
-		set_data = 1;
+		copy_data = 0;
 	} else {
 		offset = 0;
-		set_data = 0;
+		copy_data = buf->size ? 1 : 0;
 	}
 
-	if (F_ISSET(buf, WT_ITEM_ALIGNED))
-		WT_RET(__wt_realloc_aligned(
-		    session, &buf->memsize, size, &buf->mem));
-	else
-		WT_RET(__wt_realloc(session, &buf->memsize, size, &buf->mem));
+	/*
+	 * This function is also used to ensure data is local to the buffer,
+	 * check to see if we actually need to grow anything.
+	 */
+	if (size > buf->memsize) {
+		if (F_ISSET(buf, WT_ITEM_ALIGNED))
+			WT_RET(__wt_realloc_aligned(
+			    session, &buf->memsize, size, &buf->mem));
+		else
+			WT_RET(__wt_realloc(
+			    session, &buf->memsize, size, &buf->mem));
+	}
 
-	if (set_data)
+	if (buf->data == NULL) {
+		buf->data = buf->mem;
+		buf->size = 0;
+	} else {
+		if (copy_data)
+			memcpy(buf->mem, buf->data, buf->size);
 		buf->data = (uint8_t *)buf->mem + offset;
+	}
 
 	return (0);
 }

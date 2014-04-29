@@ -4185,28 +4185,21 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ASSERT(session, tmpkey->size != 0);
 
 				/*
-				 * If we previously built a prefix-compressed
-				 * key in the temporary buffer, WT_ITEM->data
-				 * will be the same as WT_ITEM->mem: grow the
-				 * buffer and copy the suffix into place.
+				 * Grow the buffer as necessary as well as
+				 * ensure data has been copied into local buffer
+				 * space, then append the suffix to the prefix
+				 * already in the buffer.
 				 *
-				 * If we previously pointed the temporary buffer
-				 * at an in-memory or on-page key, WT_ITEM->data
-				 * will not be the same as WT_ITEM->mem: grow
-				 * the buffer, copy the prefix into place, reset
-				 * the data field to point to the buffer memory,
-				 * then copy the suffix into place.
+				 * Don't grow the buffer unnecessarily or copy
+				 * data we don't need, truncate the item's data
+				 * length to the prefix bytes.
 				 */
+				tmpkey->size = kpack->prefix;
 				WT_ERR(__wt_buf_grow(session,
-				    tmpkey, kpack->prefix + kpack->size));
-				if (tmpkey->data != tmpkey->mem) {
-					memcpy(tmpkey->mem,
-					    tmpkey->data, kpack->prefix);
-					tmpkey->data = tmpkey->mem;
-				}
-				memcpy((uint8_t *)tmpkey->mem + kpack->prefix,
+				    tmpkey, tmpkey->size + kpack->size));
+				memcpy((uint8_t *)tmpkey->mem + tmpkey->size,
 				    kpack->data, kpack->size);
-				tmpkey->size = kpack->prefix + kpack->size;
+				tmpkey->size += kpack->size;
 			} else
 				WT_ERR(__wt_row_leaf_key_copy(
 				    session, page, rip, tmpkey));
