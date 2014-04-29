@@ -372,8 +372,12 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	/* Some data-sources don't support salvage. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	/*
+	 * Some data-sources don't support salvage.
+	 *
+	 * XXX excluding LSM is temporary.
+	 */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb") || DATASOURCE("lsm"))
 		return;
 
 	conn = g.wts_conn;
