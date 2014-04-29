@@ -168,13 +168,20 @@ for (i=0; i<num; i++) {
 }
 assert.writeOK(bulk.execute());
 
-var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
-var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
-var totalChunks = s.getDB("config").chunks.count({ns : "test.foo"});
+var d1Chunks;
+var d2Chunks;
+var totalChunks;
+assert.soon(function() {
+                d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
+                d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
+                totalChunks = s.getDB("config").chunks.count({ns : "test.foo"});
 
-print("chunks: " + d1Chunks+" "+d2Chunks+" "+totalChunks);
+                print("chunks: " + d1Chunks+" "+d2Chunks+" "+totalChunks);
 
-assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
+                return d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks;
+            }, "Chunks failed to balance: " + d1Chunks+" "+d2Chunks+" "+totalChunks,
+            60000,
+            5000);
 
 //SERVER-3645
 //assert.eq(s.getDB("test").foo.count(), num+1);
