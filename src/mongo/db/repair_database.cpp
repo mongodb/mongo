@@ -428,21 +428,32 @@ namespace mongo {
             Database::closeDatabase( dbName, reservedPathString );
         }
 
+        // at this point if we abort, we don't want to delete new files
+        // as they might be the only copies
+
+        if ( repairFileDeleter.get() )
+            repairFileDeleter->success();
+
         Client::Context ctx( dbName );
         Database::closeDatabase(dbName, storageGlobalParams.dbpath);
-
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );
         }
         else {
-            _deleteDataFiles( dbName );
-            MONGO_ASSERT_ON_EXCEPTION(
-                    boost::filesystem::create_directory(Path(storageGlobalParams.dbpath) / dbName));
-        }
+            // first make new directory before deleting data
+            Path newDir = Path(storageGlobalParams.dbpath) / dbName;
+            MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::create_directory(newDir));
 
-        if ( repairFileDeleter.get() )
-            repairFileDeleter->success();
+            // this deletes old files
+            _deleteDataFiles( dbName );
+
+            if ( !boost::filesystem::exists(newDir) ) {
+                // we deleted because of directoryperdb
+                // re-create
+                MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::create_directory(newDir));
+            }
+        }
 
         _replaceWithRecovered( dbName, reservedPathString.c_str() );
 
