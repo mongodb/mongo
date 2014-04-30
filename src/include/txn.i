@@ -6,11 +6,12 @@
  */
 
 static inline int  __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *, WT_ITEM *);
+static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 /*
- * __wt_txn_modify --
+ * __txn_next_op --
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
@@ -21,7 +22,13 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	txn = &session->txn;
 	*opp = NULL;
 
-	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_SNAPSHOT));
+        /* 
+         * We're about to perform an update.
+         * Make sure we have allocated a transaction ID.
+         */
+        WT_RET(__wt_txn_id_check(session));
+	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_ID));
+
 	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
 	    txn->mod_count + 1, &txn->mod));
 
@@ -42,7 +49,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_HAS_SNAPSHOT)) {
+	if (F_ISSET(txn, TXN_HAS_ID)) {
 		WT_ASSERT(session, txn->mod_count > 0);
 		txn->mod_count--;
 	}
@@ -172,29 +179,6 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_update_check --
- *	Check if the current transaction can update an item.
- */
-static inline int
-__wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
-			if (upd->txnid != WT_TXN_ABORTED) {
-				WT_STAT_FAST_DATA_INCR(
-				    session, txn_update_conflict);
-				return (WT_DEADLOCK);
-			}
-			upd = upd->next;
-		}
-
-	return (0);
-}
-
-/*
  * __wt_txn_autocommit_check --
  *  If an auto-commit transaction is required, start one.
 */
@@ -226,9 +210,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
-        WT_RET(__wt_txn_autocommit_check(session));
-
-	if (F_ISSET(txn, TXN_HAS_SNAPSHOT) && !F_ISSET(txn, TXN_HAS_ID)) {
+	if (!F_ISSET(txn, TXN_HAS_ID)) {
 		conn = S2C(session);
 		txn_global = &conn->txn_global;
 		txn_state = &txn_global->states[session->id];
@@ -271,6 +253,29 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_update_check --
+ *	Check if the current transaction can update an item.
+ */
+static inline int
+__wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (txn->isolation == TXN_ISO_SNAPSHOT)
+		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
+			if (upd->txnid != WT_TXN_ABORTED) {
+				WT_STAT_FAST_DATA_INCR(
+				    session, txn_update_conflict);
+				return (WT_DEADLOCK);
+			}
+			upd = upd->next;
+		}
+
+	return (0);
+}
+
+/*
  * __wt_txn_read_first --
  *	Called for the first page read for a session.
  */
@@ -289,13 +294,12 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	txn_state = &txn_global->states[session->id];
 
 	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
-	    (txn_state->id == WT_TXN_NONE &&
-	    txn_state->snap_min == WT_TXN_NONE));
+	    txn_state->snap_min == WT_TXN_NONE);
 	}
 #endif
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    (!F_ISSET(txn, TXN_HAS_SNAPSHOT) &&
+	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
 		__wt_txn_refresh(session, WT_TXN_NONE, 1);
 }
@@ -312,7 +316,7 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 
 	/* Release the snap_min ID we put in the global table. */
-	if (!F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
+	if (!F_ISSET(txn, TXN_RUNNING) ||
 	    txn->isolation != TXN_ISO_SNAPSHOT)
 		__wt_txn_release_snapshot(session);
 }
@@ -349,7 +353,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 * positioned on a value, it can't be freed.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, TXN_HAS_SNAPSHOT) &&
+	    !F_ISSET(txn, TXN_HAS_ID) &&
 	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
 }

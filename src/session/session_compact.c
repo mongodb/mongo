@@ -160,7 +160,7 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	 * transactional context.  Check now so the error message isn't
 	 * confusing.
 	 */
-	if (session->compact->file_count != 0 && F_ISSET(txn, TXN_HAS_SNAPSHOT))
+	if (session->compact->file_count != 0 && F_ISSET(txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL,
 		    " File compaction not permitted in a transaction");
 

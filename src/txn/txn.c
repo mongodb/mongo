@@ -39,6 +39,7 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 	txn->snap_max = snap_max;
 	txn->snap_min = (n > 0 && TXNID_LE(txn->snapshot[0], snap_max)) ?
 	    txn->snapshot[0] : snap_max;
+	F_SET(txn, TXN_HAS_SNAPSHOT);
 	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
 }
 
@@ -49,15 +50,19 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
+	WT_TXN *txn;
 	WT_TXN_STATE *txn_state;
 
+	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
+
 	if (txn_state->snap_min != WT_TXN_NONE) {
 		WT_ASSERT(session,
 		    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
 		    !__wt_txn_visible_all(session, txn_state->snap_min));
 		txn_state->snap_min = WT_TXN_NONE;
 	}
+	F_CLR(txn, TXN_HAS_SNAPSHOT);
 }
 
 /*
@@ -244,7 +249,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
 		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
 
-	F_SET(txn, TXN_HAS_SNAPSHOT);
+	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		__wt_txn_refresh(session, WT_TXN_NONE, 1);
 	return (0);
@@ -288,7 +293,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_OLDEST | TXN_HAS_SNAPSHOT);
+	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_OLDEST | TXN_RUNNING);
 }
 
 /*
@@ -308,7 +313,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	WT_ASSERT(session, !F_ISSET(txn, TXN_ERROR));
 
-	if (!F_ISSET(txn, TXN_HAS_SNAPSHOT))
+	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Commit notification. */
@@ -366,7 +371,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
-	if (!F_ISSET(txn, TXN_HAS_SNAPSHOT))
+	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Rollback notification. */
