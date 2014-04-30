@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+    class TransactionExperiment;
+
     namespace mr {
 
         typedef vector<BSONObj> BSONList;
@@ -234,7 +236,10 @@ namespace mongo {
          */
         class State {
         public:
-            State( const Config& c );
+            /**
+             * txn must outlive this State.
+             */
+            State( TransactionExperiment* txn, const Config& c );
             ~State();
 
             void init();
@@ -338,6 +343,7 @@ namespace mongo {
              */
             int _add(InMemory* im , const BSONObj& a);
 
+            TransactionExperiment* _txn;
             scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
 

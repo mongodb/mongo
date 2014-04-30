@@ -41,7 +41,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner.h"
@@ -341,28 +340,27 @@ namespace mongo {
             if (_useIncremental) {
                 // Create the inc collection and make sure we have index on "0" key.
                 Client::WriteContext incCtx( _config.incLong );
-                DurTransaction txn;
-                Collection* incColl = incCtx.ctx().db()->getCollection( &txn, _config.incLong );
+                Collection* incColl = incCtx.ctx().db()->getCollection( _txn, _config.incLong );
                 if ( !incColl ) {
                     CollectionOptions options;
                     options.setNoIdIndex();
                     options.temp = true;
-                    incColl = incCtx.ctx().db()->createCollection( &txn, _config.incLong, options );
+                    incColl = incCtx.ctx().db()->createCollection( _txn, _config.incLong, options );
 
                     // Log the createCollection operation.
                     BSONObjBuilder b;
                     b.append( "create", nsToCollectionSubstring( _config.incLong ));
                     b.appendElements( options.toBSON() );
                     string logNs = nsToDatabase( _config.incLong ) + ".$cmd";
-                    logOp( &txn, "c", logNs.c_str(), b.obj() );
+                    logOp( _txn, "c", logNs.c_str(), b.obj() );
                 }
 
                 BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
                                           << "name" << "_temp_0" );
-                Status status = incColl->getIndexCatalog()->createIndex(&txn, indexSpec, false);
+                Status status = incColl->getIndexCatalog()->createIndex(_txn, indexSpec, false);
                 // Log the createIndex operation.
                 string logNs = nsToDatabase( _config.incLong ) + ".system.indexes";
-                logOp( &txn, "i", logNs.c_str(), indexSpec );
+                logOp( _txn, "i", logNs.c_str(), indexSpec );
                 if ( !status.isOK() ) {
                     uasserted( 17305 , str::stream() << "createIndex failed for mr incLong ns: " <<
                             _config.incLong << " err: " << status.code() );
@@ -402,27 +400,26 @@ namespace mongo {
             {
                 // create temp collection and insert the indexes from temporary storage
                 Client::WriteContext tempCtx( _config.tempNamespace );
-                DurTransaction txn;
-                Collection* tempColl = tempCtx.ctx().db()->getCollection( &txn, _config.tempNamespace );
+                Collection* tempColl = tempCtx.ctx().db()->getCollection( _txn, _config.tempNamespace );
                 if ( !tempColl ) {
                     CollectionOptions options;
                     options.temp = true;
-                    tempColl = tempCtx.ctx().db()->createCollection( &txn, _config.tempNamespace, options );
+                    tempColl = tempCtx.ctx().db()->createCollection( _txn, _config.tempNamespace, options );
 
                     // Log the createCollection operation.
                     BSONObjBuilder b;
                     b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
                     b.appendElements( options.toBSON() );
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                    logOp( &txn, "c", logNs.c_str(), b.obj() );
+                    logOp( _txn, "c", logNs.c_str(), b.obj() );
                 }
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
                         it != indexesToInsert.end(); ++it ) {
-                    tempColl->getIndexCatalog()->createIndex(&txn, *it, false );
+                    tempColl->getIndexCatalog()->createIndex(_txn, *it, false );
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
-                    logOp( &txn, "i", logNs.c_str(), *it );
+                    logOp( _txn, "i", logNs.c_str(), *it );
                 }
             }
 
@@ -570,10 +567,9 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::DBWrite lock( _config.outputOptions.finalNamespace );
-                    DurTransaction txn; // XXX
                     BSONObj o = cursor->nextSafe();
-                    Helpers::upsert( &txn, _config.outputOptions.finalNamespace , o );
-                    getDur().commitIfNeeded();
+                    Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
+                    _txn->commitIfNeeded();
                     pm.hit();
                 }
                 _db.dropCollection( _config.tempNamespace );
@@ -589,7 +585,6 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock; // TODO(erh) why global?
-                    DurTransaction txn; // XXX
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
@@ -608,15 +603,15 @@ namespace mongo {
                         values.clear();
                         values.push_back( temp );
                         values.push_back( old );
-                        Helpers::upsert(&txn,
+                        Helpers::upsert(_txn,
                                         _config.outputOptions.finalNamespace,
                                         _config.reducer->finalReduce(values,
                                                                      _config.finalizer.get()));
                     }
                     else {
-                        Helpers::upsert( &txn, _config.outputOptions.finalNamespace , temp );
+                        Helpers::upsert( _txn, _config.outputOptions.finalNamespace , temp );
                     }
-                    getDur().commitIfNeeded();
+                    _txn->commitIfNeeded();
                     pm.hit();
                 }
                 pm.finished();
@@ -632,7 +627,6 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx( ns );
-            DurTransaction txn;
             Collection* coll = ctx.ctx().db()->getCollection( ns );
             if ( !coll )
                 uasserted(13630, str::stream() << "attempted to insert into nonexistent" <<
@@ -648,8 +642,8 @@ namespace mongo {
             b.appendElements(o);
             BSONObj bo = b.obj();
 
-            coll->insertDocument( &txn, bo, true );
-            logOp( &txn, "i", ns.c_str(), bo );
+            coll->insertDocument( _txn, bo, true );
+            logOp( _txn, "i", ns.c_str(), bo );
         }
 
         /**
@@ -659,21 +653,21 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx( _config.incLong );
-            DurTransaction txn;
             Collection* coll = ctx.ctx().db()->getCollection( _config.incLong );
             if ( !coll )
                 uasserted(13631, str::stream() << "attempted to insert into nonexistent"
                                                   " collection during a mr operation." <<
                                                   " collection expected: " << _config.incLong );
 
-            coll->insertDocument( &txn, o, true );
-            logOp( &txn, "i", _config.incLong.c_str(), o );
-            getDur().commitIfNeeded();
+            coll->insertDocument( _txn, o, true );
+            logOp( _txn, "i", _config.incLong.c_str(), o );
+            _txn->commitIfNeeded();
         }
 
-        State::State(const Config& c) :
+        State::State(TransactionExperiment* txn, const Config& c) :
                 _config(c),
                 _useIncremental(true),
+                _txn(txn),
                 _size(0),
                 _dupCount(0),
                 _numEmits(0) {
@@ -984,7 +978,7 @@ namespace mongo {
                     // object is same as previous, add to array
                     all.push_back( o );
                     if ( pm->hits() % 100 == 0 ) {
-                        killCurrentOp.checkForInterrupt();
+                        _txn->checkForInterrupt();
                     }
                     continue;
                 }
@@ -1012,7 +1006,7 @@ namespace mongo {
                     break;
                 }
 
-                killCurrentOp.checkForInterrupt();
+                _txn->checkForInterrupt();
             }
 
             {
@@ -1248,7 +1242,8 @@ namespace mongo {
 
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
-                State state( config );
+                DurTransaction txn;
+                State state( &txn, config );
                 if ( ! state.sourceExists() ) {
                     errmsg = "ns doesn't exist";
                     return false;
@@ -1356,7 +1351,7 @@ namespace mongo {
 
                                 reduceTime += t.micros();
 
-                                killCurrentOp.checkForInterrupt();
+                                txn.checkForInterrupt();
                             }
 
                             pm.hit();
@@ -1367,7 +1362,7 @@ namespace mongo {
                     }
                     pm.finished();
 
-                    killCurrentOp.checkForInterrupt();
+                    txn.checkForInterrupt();
 
                     // update counters
                     countsBuilder.appendNumber("input", numInputs);
@@ -1466,7 +1461,8 @@ namespace mongo {
                 CurOp * op = client.curop();
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
-                State state(config);
+                DurTransaction txn;
+                State state(&txn, config);
                 state.init();
 
                 // no need for incremental collection because records are already sorted
