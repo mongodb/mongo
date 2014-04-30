@@ -182,7 +182,7 @@ struct __wt_page_modify {
 	uint64_t rec_max_txn;
 
 	/* The smallest transaction ID skipped by reconciliation. */
-	uint64_t rec_min_skipped_txn;
+	uint64_t rec_skipped_txn;
 
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
@@ -485,7 +485,7 @@ struct __wt_page {
 	} u;
 
 	/* Page's on-disk representation: NULL for pages created in memory. */
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 
 	/* If/when the page is modified, we need lots more information. */
 	WT_PAGE_MODIFY *modify;

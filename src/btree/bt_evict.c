@@ -384,11 +384,11 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	txn->isolation = TXN_ISO_EVICTION;
 
 	/*
-	 * Sanity check: if a transaction is running, its updates should not
+	 * Sanity check: if a transaction has updates, its updates should not
 	 * be visible to eviction.
 	 */
 	WT_ASSERT(session,
-	    !F_ISSET(txn, TXN_RUNNING) || !__wt_txn_visible(session, txn->id));
+	    !F_ISSET(txn, TXN_HAS_ID) || !__wt_txn_visible(session, txn->id));
 
 	ret = __wt_rec_evict(session, ref, 0);
 	txn->isolation = saved_iso;
@@ -804,7 +804,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 */
 		if (!modified && page->modify != NULL &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
-		    !__wt_txn_visible_apps(session, page->modify->rec_max_txn))
+		    !__wt_txn_visible_all(session, page->modify->rec_max_txn))
 			continue;
 
 		/*

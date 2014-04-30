@@ -111,6 +111,7 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
 	if (txn->logrec != NULL)
 		return (0);
 
+	WT_ASSERT(session, txn->id != WT_TXN_NONE);
 	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->id));
 	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 
@@ -136,6 +137,9 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_ITEM *logrec;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
+
+	if (!S2C(session)->logging || F_ISSET(session, WT_SESSION_NO_LOGGING))
+		return (0);
 
 	txn = &session->txn;
 	WT_ASSERT(session, txn->mod_count > 0);

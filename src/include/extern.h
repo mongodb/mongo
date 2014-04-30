@@ -280,7 +280,7 @@ extern int __wt_debug_offset(WT_SESSION_IMPL *session,
     uint32_t cksum,
     const char *ofile);
 extern int __wt_debug_disk( WT_SESSION_IMPL *session,
-    WT_PAGE_HEADER *dsk,
+    const WT_PAGE_HEADER *dsk,
     const char *ofile);
 extern int __wt_debug_tree_shape( WT_SESSION_IMPL *session,
     WT_PAGE *page,
@@ -402,7 +402,7 @@ extern int __wt_col_modify(WT_SESSION_IMPL *session,
     int is_remove);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     uint64_t recno,
-    WT_REF *leaf_page,
+    WT_REF *leaf,
     WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session,
@@ -499,7 +499,7 @@ extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key,
-    WT_REF *leaf_page,
+    WT_REF *leaf,
     WT_CURSOR_BTREE *cbt);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,

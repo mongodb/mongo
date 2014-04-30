@@ -13,7 +13,7 @@ static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_leaf_entries(
-	WT_SESSION_IMPL *, WT_PAGE_HEADER *, uint32_t *);
+	WT_SESSION_IMPL *, const WT_PAGE_HEADER *, uint32_t *);
 
 /*
  * __wt_page_in_func --
@@ -233,13 +233,13 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	uint32_t alloc_entries;
 	size_t size;
 
 	*pagep = NULL;
 
-	dsk = (WT_PAGE_HEADER *)image;
+	dsk = image;
 	alloc_entries = 0;
 
 	/*
@@ -348,7 +348,7 @@ static void
 __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
@@ -366,7 +366,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	WT_PAGE_INDEX *pindex;
 	WT_REF **refp, *ref;
 	uint32_t i;
@@ -401,7 +401,7 @@ __inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	uint32_t i;
 
 	btree = S2BT(session);
@@ -431,7 +431,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_COL_RLE *repeats;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	uint64_t recno, rle;
 	size_t bytes_allocated;
 	uint32_t i, indx, n, repeat_off;
@@ -497,7 +497,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(current);
 	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref, **refp;
 	uint32_t i;
@@ -593,7 +593,7 @@ err:	__wt_scr_free(&current);
  */
 static int
 __inmem_row_leaf_entries(
-    WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, uint32_t *nindxp)
+    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint32_t *nindxp)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -643,7 +643,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	WT_ROW *rip;
 	uint32_t i;
 

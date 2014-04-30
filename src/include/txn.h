@@ -41,17 +41,6 @@ struct __wt_txn_global {
 	volatile uint64_t oldest_id;
 
 	/*
-	 * The oldest transaction ID not yet visible to transactions,
-	 * excluding any checkpoint in progress.
-	 */
-	uint64_t oldest_app_id;
-
-	/*
-	 * The transaction ID of a running checkpoint transaction (if any).
-	 */
-	uint64_t checkpoint_txn;
-
-	/*
 	 * The current checkpoint generation.  Use a 32-bit count for now: if
 	 * we can do 4 billion checkpoints without a restart, we'll be in good
 	 * shape.
@@ -144,9 +133,11 @@ struct __wt_txn {
 	uint32_t	ckpt_nsnapshot;
 	WT_ITEM		*ckpt_snapshot;
 
-#define	TXN_AUTOCOMMIT	0x01
-#define	TXN_ERROR	0x02
-#define	TXN_OLDEST	0x04
-#define	TXN_RUNNING	0x08
+#define	TXN_AUTOCOMMIT		0x01
+#define	TXN_ERROR		0x02
+#define	TXN_HAS_ID	        0x04
+#define	TXN_HAS_SNAPSHOT	0x08
+#define	TXN_OLDEST		0x10
+#define	TXN_RUNNING		0x20
 	uint32_t flags;
 };

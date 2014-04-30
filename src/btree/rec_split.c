@@ -427,6 +427,7 @@ __split_inmem_build(
 	uint32_t i, slot;
 
 	WT_CLEAR(cbt);
+	cbt.iface.session = &session->iface;
 	cbt.btree = S2BT(session);
 
 	/*
@@ -505,6 +506,8 @@ __split_inmem_build(
 	page->modify->checkpoint_gen = 0;
 
 err:	__wt_scr_free(&key);
+	/* Free any resources that may have been cached in the cursor. */
+	WT_TRET(__wt_btcur_close(&cbt));
 	return (ret);
 }
 
