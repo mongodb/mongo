@@ -94,6 +94,8 @@ namespace mongo {
 
         virtual Status touch(const BSONObj& obj);
 
+        virtual Status touch(TransactionExperiment* txn) const;
+
         virtual Status validate(int64_t* numKeys);
 
         // XXX: consider migrating callers to use IndexCursor instead

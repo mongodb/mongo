@@ -213,6 +213,10 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status BtreeBasedAccessMethod::touch( TransactionExperiment* txn ) const {
+        return _btreeState->recordStore()->touch( txn, NULL );
+    }
+
     DiskLoc BtreeBasedAccessMethod::findSingle(const BSONObj& key) const {
         DiskLoc bucket;
         int pos;

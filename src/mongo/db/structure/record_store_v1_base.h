@@ -129,6 +129,8 @@ namespace mongo {
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
 
+        virtual Status touch( TransactionExperiment* txn, BSONObjBuilder* output ) const;
+
         // TODO: another sad one
         virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 

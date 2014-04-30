@@ -134,6 +134,11 @@ namespace mongo {
         virtual Status touch(const BSONObj& obj) = 0;
 
         /**
+         * this pages in the entire index
+         */
+        virtual Status touch( TransactionExperiment* txn ) const = 0;
+
+        /**
          * Walk the entire index, checking the internal structure for consistency.
          * Set numKeys to the number of keys in the index.
          *

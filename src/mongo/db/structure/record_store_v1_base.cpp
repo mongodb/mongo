@@ -37,6 +37,8 @@
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store_v1_repair_iterator.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/touch_pages.h"
 
 namespace mongo {
 
@@ -602,6 +604,56 @@ namespace mongo {
         catch (AssertionException) {
             results->errors.push_back( "exception during validate" );
             results->valid = false;
+        }
+
+        return Status::OK();
+    }
+
+    namespace {
+        struct touch_location {
+            const char* root;
+            size_t length;
+        };
+    }
+
+    Status RecordStoreV1Base::touch( TransactionExperiment* txn, BSONObjBuilder* output ) const {
+        Timer t;
+
+        // Note: when this class has document level locking, we'll need a lock to get extents
+        // and then ideally only hold the collection lock from above while doing actual touching.
+
+        std::vector<touch_location> ranges;
+        {
+            Extent* ext = _getExtent( _details->firstExtent() );
+            while ( ext ) {
+                touch_location tl;
+                tl.root = reinterpret_cast<const char*>(ext);
+                tl.length = ext->length;
+                ranges.push_back(tl);
+                if ( ext->xnext.isNull() )
+                    ext = NULL;
+                else
+                    ext = _getExtent( ext->xnext );
+            }
+        }
+
+        /* TODO(ERH)
+        std::string progress_msg = "touch " + ns + " extents";
+        ProgressMeterHolder pm(cc().curop()->setMessage(progress_msg.c_str(),
+                                                        "Touch Progress",
+                                                        ranges.size()));
+        */
+
+        for ( std::vector<touch_location>::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
+            touch_pages( it->root, it->length );
+            //pm.hit();
+            txn->checkForInterrupt();
+        }
+        //pm.finished();
+
+        if ( output ) {
+            output->append( "numRanges", static_cast<int>( ranges.size() ) );
+            output->append( "millis", t.millis() );
         }
 
         return Status::OK();

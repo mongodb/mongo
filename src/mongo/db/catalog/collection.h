@@ -229,6 +229,13 @@ namespace mongo {
                          ValidateResults* results, BSONObjBuilder* output );
 
         /**
+         * forces data into cache
+         */
+        Status touch( TransactionExperiment* txn,
+                      bool touchData, bool touchIndexes,
+                      BSONObjBuilder* output ) const;
+
+        /**
          * Truncate documents newer than the document at 'end' from the capped
          * collection.  The collection cannot be completely emptied using this
          * function.  An assertion will be thrown if that is attempted.

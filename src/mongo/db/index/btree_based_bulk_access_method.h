@@ -81,6 +81,10 @@ namespace mongo {
             return _notAllowed();
         }
 
+        virtual Status touch(TransactionExperiment* txn) const {
+            return _notAllowed();
+        }
+
         virtual Status validate(int64_t* numKeys) {
             return _notAllowed();
         }

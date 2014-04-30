@@ -10,6 +10,5 @@ assert( !res.ok, tojson( res ) );
 
 res = t.runCommand( "touch", { data : true, index : true } );
 assert.eq( 1, res.data.numRanges, tojson( res ) );
-assert.eq( 2, res.indexes.numRanges, tojson( res ) );
 
 

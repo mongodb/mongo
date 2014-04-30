@@ -618,6 +618,35 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status Collection::touch( TransactionExperiment* txn,
+                              bool touchData, bool touchIndexes,
+                              BSONObjBuilder* output ) const {
+        if ( touchData ) {
+            BSONObjBuilder b;
+            Status status = _recordStore->touch( txn, &b );
+            output->append( "data", b.obj() );
+            if ( !status.isOK() )
+                return status;
+        }
+
+        if ( touchIndexes ) {
+            Timer t;
+            IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( false );
+            while ( ii.more() ) {
+                const IndexDescriptor* desc = ii.next();
+                const IndexAccessMethod* iam = _indexCatalog.getIndex( desc );
+                Status status = iam->touch( txn );
+                if ( !status.isOK() )
+                    return status;
+            }
+
+            output->append( "indexes", BSON( "num" << _indexCatalog.numIndexesTotal() <<
+                                             "millis" << t.millis() ) );
+        }
+
+        return Status::OK();
+    }
+
     bool Collection::isUserFlagSet( int flag ) const {
         return _details->isUserFlagSet( flag );
     }

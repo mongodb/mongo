@@ -160,6 +160,8 @@ namespace mongo {
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const = 0;
 
+        virtual Status touch( TransactionExperiment* txn, BSONObjBuilder* output ) const = 0;
+
         // TODO: this makes me sad, it shouldn't be in the interface
         // do not use this anymore
         virtual void increaseStorageSize( TransactionExperiment* txn,  int size, int quotaMax ) = 0;

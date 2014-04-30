@@ -50,55 +50,12 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
-
-    struct touch_location {
-        const char* root;
-        size_t length;
-    };
-
-    /** @return numRanges touched */
-    int touchNs( const std::string& ns ) {
-        std::vector< touch_location > ranges;
-        boost::scoped_ptr<LockMongoFilesShared> mongoFilesLock;
-        {
-            Client::ReadContext ctx(ns);
-
-            Database* db = ctx.ctx().db();
-            ExtentManager& em = db->getExtentManager();
-
-            Collection* collection = db->getCollection( ns );
-            uassert( 16154, "namespace does not exist", collection );
-
-            Extent* ext = em.getExtent( collection->details()->firstExtent() );
-            while ( ext ) {
-                touch_location tl;
-                tl.root = reinterpret_cast<const char*>(ext);
-                tl.length = ext->length;
-                ranges.push_back(tl);
-                ext = em.getNextExtent( ext );
-            }
-            mongoFilesLock.reset(new LockMongoFilesShared());
-        }
-        // DB read lock is dropped; no longer needed after this point.
-
-        std::string progress_msg = "touch " + ns + " extents";
-        ProgressMeterHolder pm(cc().curop()->setMessage(progress_msg.c_str(),
-                                                        "Touch Progress",
-                                                        ranges.size()));
-        for ( std::vector< touch_location >::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
-            touch_pages( it->root, it->length );
-            pm.hit();
-            killCurrentOp.checkForInterrupt();
-        }
-        pm.finished();
-
-        return static_cast<int>( ranges.size() );
-    }
 
     class TouchCmd : public Command {
     public:
@@ -121,20 +78,20 @@ namespace mongo {
         }
         TouchCmd() : Command("touch") { }
 
-        virtual bool run(const string& db, 
-                         BSONObj& cmdObj, 
-                         int, 
-                         string& errmsg, 
-                         BSONObjBuilder& result, 
+        virtual bool run(const string& dbname,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
                          bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
-            if( coll.empty() || db.empty() ) {
+            if( coll.empty() || dbname.empty() ) {
                 errmsg = "no collection name specified";
                 return false;
             }
-                        
-            string ns = db + '.' + coll;
-            if ( ! NamespaceString::normal(ns.c_str()) ) {
+
+            NamespaceString nss( dbname, coll );
+            if ( ! nss.isNormal() ) {
                 errmsg = "bad namespace name";
                 return false;
             }
@@ -146,59 +103,22 @@ namespace mongo {
                 errmsg = "must specify at least one of (data:true, index:true)";
                 return false;
             }
-            bool ok = touch( ns, errmsg, touch_data, touch_indexes, result );
-            return ok;
-        }
 
-        bool touch( std::string& ns, 
-                    std::string& errmsg, 
-                    bool touch_data, 
-                    bool touch_indexes, 
-                    BSONObjBuilder& result ) {
-
-            if (touch_data) {
-                log() << "touching namespace " << ns << endl;
-                Timer t;
-                int numRanges = touchNs( ns );
-                result.append( "data", BSON( "numRanges" << numRanges <<
-                                             "millis" << t.millis() ) );
-                log() << "touching namespace " << ns << " complete" << endl;
+            Client::ReadContext context( nss.ns() );
+            Database* db = context.ctx().db();
+            Collection* collection = db->getCollection( nss.ns() );
+            if ( !collection ) {
+                errmsg = "collection not found";
+                return false;
             }
 
-            if (touch_indexes) {
-                Timer t;
-                // enumerate indexes
-                std::vector< std::string > indexes;
-                {
-                    Client::ReadContext ctx(ns);
-                    Collection* collection = ctx.ctx().db()->getCollection( ns );
-                    massert( 16153, "namespace does not exist", collection );
-
-                    IndexCatalog::IndexIterator ii =
-                        collection->getIndexCatalog()->getIndexIterator( false );
-
-                    while ( ii.more() ) {
-                        IndexDescriptor* desc = ii.next();
-                        indexes.push_back( desc->indexNamespace() );
-                    }
-                }
-
-                int numRanges = 0;
-
-                for ( std::vector<std::string>::const_iterator it = indexes.begin(); 
-                      it != indexes.end(); 
-                      it++ ) {
-                    numRanges += touchNs( *it );
-                }
-
-                result.append( "indexes", BSON( "num" << static_cast<int>(indexes.size()) <<
-                                                "numRanges" << numRanges <<
-                                                "millis" << t.millis() ) );
-
-            }
-            return true;
+            DurTransaction txn;
+            return appendCommandStatus( result,
+                                        collection->touch( &txn,
+                                                           touch_data, touch_indexes,
+                                                           &result ) );
         }
-        
+
     };
     static TouchCmd touchCmd;
 }
