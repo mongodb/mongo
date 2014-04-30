@@ -106,7 +106,6 @@ namespace mongo {
         bool _done;
 
         const Collection* _collection;
-        const NamespaceDetails* _nsd;
 
         // We only go backwards via a collscan for a few seconds.
         Timer _timer;

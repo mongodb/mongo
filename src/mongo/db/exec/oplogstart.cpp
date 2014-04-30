@@ -43,7 +43,6 @@ namespace mongo {
           _extentHopping(false),
           _done(false),
           _collection(collection),
-          _nsd(NULL),
           _workingSet(ws),
           _filter(filter) { }
 
@@ -56,7 +55,6 @@ namespace mongo {
             params.collection = _collection;
             params.direction = CollectionScanParams::BACKWARD;
             _cs.reset(new CollectionScan(params, _workingSet, NULL));
-            _nsd = _collection->details();
             _needInit = false;
             _backwardsScanning = true;
             _timer.reset();
