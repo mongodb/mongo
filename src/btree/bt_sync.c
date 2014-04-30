@@ -88,6 +88,22 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			/*
 			 * Write dirty pages, unless we can be sure they only
 			 * became dirty after the checkpoint started.
+			 *
+			 * We can skip pages if:
+			 * (1) they are leaf pages;
+			 * (2) the global checkpoint generation has been
+			 *     incremented (otherwise we skip writing the
+			 *     metadata when first creating tables);
+			 * (3) the page's checkpoint generation is equal to
+			 *     the current checkpoint generation, so it has
+			 *     already been written since this checkpoint
+			 *     started; and
+			 * (4) there is a snapshot transaction active (which
+			 *     is the case in ordinary application checkpoints
+			 *     but not all internal cases); and
+			 * (5) any updates skipped by reconciliation were
+			 *     sufficiently recent that the checkpoint
+			 *     transaction would skip them.
 			 */
 			page = walk->page;
 			mod = page->modify;
