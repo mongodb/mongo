@@ -6,11 +6,12 @@
  */
 
 static inline int  __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *, WT_ITEM *);
+static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 /*
- * __wt_txn_modify --
+ * __txn_next_op --
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
@@ -21,7 +22,13 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	txn = &session->txn;
 	*opp = NULL;
 
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+        /* 
+         * We're about to perform an update.
+         * Make sure we have allocated a transaction ID.
+         */
+        WT_RET(__wt_txn_id_check(session));
+	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_ID));
+
 	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
 	    txn->mod_count + 1, &txn->mod));
 
@@ -42,7 +49,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
+	if (F_ISSET(txn, TXN_HAS_ID)) {
 		WT_ASSERT(session, txn->mod_count > 0);
 		txn->mod_count--;
 	}
@@ -94,20 +101,6 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 
 	oldest_id = S2C(session)->txn_global.oldest_id;
 	return (TXNID_LT(id, oldest_id));
-}
-
-/*
- * __wt_txn_visible_apps --
- *	Check if a given transaction ID is visible to all application
- *	transactions (that is, all transactions other than checkpoints).
- */
-static inline int
-__wt_txn_visible_apps(WT_SESSION_IMPL *session, uint64_t id)
-{
-	uint64_t oldest_app_id;
-
-	oldest_app_id = S2C(session)->txn_global.oldest_app_id;
-	return (TXNID_LT(id, oldest_app_id));
 }
 
 /*
@@ -186,6 +179,80 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
+ * __wt_txn_autocommit_check --
+ *  If an auto-commit transaction is required, start one.
+*/
+static inline int
+__wt_txn_autocommit_check(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
+		F_CLR(txn, TXN_AUTOCOMMIT);
+		return (__wt_txn_begin(session, NULL));
+	}
+        return (0);
+}
+
+/*
+ * __wt_txn_id_check --
+ *	A transaction is going to do an update, start an auto commit
+ *      transaction if required and allocate a transaction ID.
+ */
+static inline int
+__wt_txn_id_check(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
+
+	txn = &session->txn;
+
+	if (!F_ISSET(txn, TXN_HAS_ID)) {
+		conn = S2C(session);
+		txn_global = &conn->txn_global;
+		txn_state = &txn_global->states[session->id];
+
+		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
+
+		/*
+		 * Allocate a transaction ID.
+		 *
+		 * We use an atomic compare and swap to ensure that we get a
+		 * unique ID that is published before the global counter is
+		 * updated.
+		 *
+		 * If two threads race to allocate an ID, only the latest ID
+		 * will proceed.  The winning thread can be sure its snapshot
+		 * contains all of the earlier active IDs.  Threads that race
+		 * and get an earlier ID may not appear in the snapshot, but
+		 * they will loop and allocate a new ID before proceeding to
+		 * make any updates.
+		 *
+		 * This potentially wastes transaction IDs when threads race to
+		 * begin transactions: that is the price we pay to keep this
+		 * path latch free.
+		 */
+		do {
+			txn_state->id = txn->id = txn_global->current;
+		} while (!WT_ATOMIC_CAS(
+		    txn_global->current, txn->id, txn->id + 1));
+
+		/*
+		 * If we have used 64-bits of transaction IDs, there is nothing
+		 * more we can do.
+		 */
+		if (txn->id == WT_TXN_ABORTED)
+			WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
+		F_SET(txn, TXN_HAS_ID);
+	}
+
+	return (0);
+}
+
+/*
  * __wt_txn_update_check --
  *	Check if the current transaction can update an item.
  */
@@ -209,24 +276,6 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_autocommit_check --
- *	If an auto-commit transaction is required, start one.
- */
-static inline int
-__wt_txn_autocommit_check(WT_SESSION_IMPL *session)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
-		F_CLR(txn, TXN_AUTOCOMMIT);
-		return (__wt_txn_begin(session, NULL));
-	}
-
-	return (0);
-}
-
-/*
  * __wt_txn_read_first --
  *	Called for the first page read for a session.
  */
@@ -244,9 +293,8 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
 
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING) ||
-	    (txn_state->id == WT_TXN_NONE &&
-	    txn_state->snap_min == WT_TXN_NONE));
+	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
+	    txn_state->snap_min == WT_TXN_NONE);
 	}
 #endif
 
@@ -305,7 +353,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 * positioned on a value, it can't be freed.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, TXN_RUNNING) &&
+	    !F_ISSET(txn, TXN_HAS_ID) &&
 	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
 }

@@ -111,6 +111,7 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
 	if (txn->logrec != NULL)
 		return (0);
 
+	WT_ASSERT(session, txn->id != WT_TXN_NONE);
 	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->id));
 	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 

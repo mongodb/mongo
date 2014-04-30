@@ -328,7 +328,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * The page can never end up with changes older than the oldest
 		 * running transaction.
 		 */
-		if (F_ISSET(&session->txn, TXN_RUNNING))
+		if (F_ISSET(&session->txn, TXN_HAS_SNAPSHOT))
 			page->modify->disk_snap_min = session->txn.snap_min;
 
 		/*
