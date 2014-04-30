@@ -1416,6 +1416,88 @@ namespace {
         runQuery(fromjson("{a: {$elemMatch: {$not: {$gte: 6}}}}"));
     }
 
+    // SERVER-13789
+    TEST_F(QueryPlannerTest, ElemMatchIndexedNestedOr) {
+        addIndex(BSON("bar.baz" << 1));
+        runQuery(fromjson("{foo: 1, $and: [{bar: {$elemMatch: {$or: [{baz: 2}]}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and: [{foo:1},"
+                                               "{bar:{$elemMatch:{$or:[{baz:2}]}}}]}, "
+                                "node: {ixscan: {pattern: {'bar.baz': 1}, "
+                                                "bounds: {'bar.baz': [[2,2,true,true]]}}}}}");
+    }
+
+    // SERVER-13789
+    TEST_F(QueryPlannerTest, ElemMatchIndexedNestedOrMultiplePreds) {
+        addIndex(BSON("bar.baz" << 1));
+        addIndex(BSON("bar.z" << 1));
+        runQuery(fromjson("{foo: 1, $and: [{bar: {$elemMatch: {$or: [{baz: 2}, {z: 3}]}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and: [{foo:1},"
+                                               "{bar:{$elemMatch:{$or:[{baz:2},{z:3}]}}}]}, "
+                                "node: {or: {nodes: ["
+                                    "{ixscan: {pattern: {'bar.baz': 1}, "
+                                              "bounds: {'bar.baz': [[2,2,true,true]]}}},"
+                                    "{ixscan: {pattern: {'bar.z': 1}, "
+                                              "bounds: {'bar.z': [[3,3,true,true]]}}}]}}}}");
+    }
+
+    // SERVER-13789: Ensure that we properly compound in the multikey case when an
+    // $or is beneath an $elemMatch.
+    TEST_F(QueryPlannerTest, ElemMatchIndexedNestedOrMultikey) {
+        // true means multikey
+        addIndex(BSON("bar.baz" << 1 << "bar.z" << 1), true);
+        runQuery(fromjson("{foo: 1, $and: [{bar: {$elemMatch: {$or: [{baz: 2, z: 3}]}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and: [{foo:1},"
+                                "{bar: {$elemMatch: {$or: [{$and: [{baz:2}, {z:3}]}]}}}]},"
+                                "node: {ixscan: {pattern: {'bar.baz': 1, 'bar.z': 1}, "
+                                                "bounds: {'bar.baz': [[2,2,true,true]],"
+                                                         "'bar.z': [[3,3,true,true]]}}}}}");
+    }
+
+    // SERVER-13789: Right now we don't index $nor, but make sure that the planner
+    // doesn't get confused by a $nor beneath an $elemMatch.
+    TEST_F(QueryPlannerTest, ElemMatchIndexedNestedNor) {
+        addIndex(BSON("bar.baz" << 1));
+        runQuery(fromjson("{foo: 1, $and: [{bar: {$elemMatch: {$nor: [{baz: 2}, {baz: 3}]}}}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+    }
+
+    // SERVER-13789
+    TEST_F(QueryPlannerTest, ElemMatchIndexedNestedNE) {
+        addIndex(BSON("bar.baz" << 1));
+        runQuery(fromjson("{foo: 1, $and: [{bar: {$elemMatch: {baz: {$ne: 2}}}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and: [{foo:1},"
+                                               "{bar:{$elemMatch:{baz:{$ne:2}}}}]}, "
+                                "node: {ixscan: {pattern: {'bar.baz': 1}, "
+                                                "bounds: {'bar.baz': [['MinKey',2,true,false], "
+                                                "[2,'MaxKey',false,true]]}}}}}");
+    }
+
+    // SERVER-13789: Make sure we properly handle an $or below $elemMatch that is not
+    // tagged by the enumerator to use an index.
+    TEST_F(QueryPlannerTest, ElemMatchNestedOrNotIndexed) {
+        addIndex(BSON("a.b" << 1));
+        runQuery(fromjson("{c: 1, a: {$elemMatch: {b: 3, $or: [{c: 4}, {c: 5}]}}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b': 1}, bounds: "
+                                "{'a.b': [[3,3,true,true]]}}}}}");
+    }
+
     //
     // Geo
     // http://docs.mongodb.org/manual/reference/operator/query-geospatial/#geospatial-query-compatibility-chart

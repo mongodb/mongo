@@ -163,11 +163,15 @@ namespace mongo {
          * finding all predicates that can use an index directly and returning
          * them in the out-parameter vector 'out'.
          *
-         * Traverses only through $and and $elemMatch nodes, not through other
-         * logical or array nodes like $or and $all.
+         * Traverses only through $and and array nodes like $all.
+         *
+         * Other nodes (i.e. nodes which cannot use an index directly, and which are
+         * neither $and nor array nodes) are returned in 'subnodesOut' if they are
+         * tagged to use an index.
          */
         static void findElemMatchChildren(const MatchExpression* node,
-                                          vector<MatchExpression*>* out);
+                                          vector<MatchExpression*>* out,
+                                          vector<MatchExpression*>* subnodesOut);
 
         /**
          * Helper used by buildIndexedAnd and buildIndexedOr.
