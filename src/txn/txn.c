@@ -258,17 +258,9 @@ int
 __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
-	WT_TXN_STATE *txn_state;
 
-	conn = S2C(session);
 	txn = &session->txn;
-	txn_global = &conn->txn_global;
-	txn_state = &txn_global->states[session->id];
-
-	WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
 	WT_RET(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
 	if (cval.len == 0)
@@ -280,38 +272,9 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
 		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
 
-	/*
-	 * Allocate a transaction ID.
-	 *
-	 * We use an atomic compare and swap to ensure that we get a
-	 * unique ID that is published before the global counter is
-	 * updated.
-	 *
-	 * If two threads race to allocate an ID, only the latest ID
-	 * will proceed.  The winning thread can be sure its snapshot
-	 * contains all of the earlier active IDs.  Threads that race
-	 * and get an earlier ID may not appear in the snapshot, but
-	 * they will loop and allocate a new ID before proceeding to
-	 * make any updates.
-	 *
-	 * This potentially wastes transaction IDs when threads race to
-	 * begin transactions: that is the price we pay to keep this
-	 * path latch free.
-	 */
-	do {
-		txn_state->id = txn->id = txn_global->current;
-	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1));
-
-	/*
-	 * If we have used 64-bits of transaction IDs, there is nothing
-	 * more we can do.
-	 */
-	if (txn->id == WT_TXN_ABORTED)
-		WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
-
 	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		__wt_txn_refresh(session, WT_TXN_NONE, 1);
+		__wt_txn_refresh(session, WT_TXN_NONE, 0);
 	return (0);
 }
 
@@ -334,10 +297,12 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	txn_state = &txn_global->states[session->id];
 
 	/* Clear the transaction's ID from the global table. */
-	WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
-	    txn->id != WT_TXN_NONE);
-	WT_PUBLISH(txn_state->id, WT_TXN_NONE);
-	txn->id = WT_TXN_NONE;
+	if (F_ISSET(txn, TXN_ID_ALLOCATED)) {
+		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
+		    txn->id != WT_TXN_NONE);
+		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
+		txn->id = WT_TXN_NONE;
+	}
 
 	/* Free the scratch buffer allocated for logging. */
 	__wt_logrec_free(session, &txn->logrec);
@@ -351,7 +316,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_OLDEST | TXN_RUNNING);
+	F_CLR(txn, TXN_ERROR | TXN_ID_ALLOCATED | TXN_OLDEST | TXN_RUNNING);
 }
 
 /*

@@ -384,11 +384,12 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	txn->isolation = TXN_ISO_EVICTION;
 
 	/*
-	 * Sanity check: if a transaction is running, its updates should not
+	 * Sanity check: if a transaction has updates, its updates should not
 	 * be visible to eviction.
 	 */
 	WT_ASSERT(session,
-	    !F_ISSET(txn, TXN_RUNNING) || !__wt_txn_visible(session, txn->id));
+	    !F_ISSET(txn, TXN_ID_ALLOCATED) ||
+	    !__wt_txn_visible(session, txn->id));
 
 	ret = __wt_rec_evict(session, ref, 0);
 	txn->isolation = saved_iso;

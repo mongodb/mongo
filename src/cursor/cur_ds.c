@@ -16,7 +16,7 @@ __curds_txn_enter(WT_SESSION_IMPL *session, int update)
 {
 	/* Check if we need to start an autocommit transaction. */
 	if (update)
-		WT_RET(__wt_txn_autocommit_check(session));
+		WT_RET(__wt_txn_setup_updater(session));
 
 	if (session->ncursors++ == 0)			/* XXX */
 		__wt_txn_read_first(session);

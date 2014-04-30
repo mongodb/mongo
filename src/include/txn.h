@@ -144,9 +144,10 @@ struct __wt_txn {
 	uint32_t	ckpt_nsnapshot;
 	WT_ITEM		*ckpt_snapshot;
 
-#define	TXN_AUTOCOMMIT	0x01
-#define	TXN_ERROR	0x02
-#define	TXN_OLDEST	0x04
-#define	TXN_RUNNING	0x08
+#define	TXN_AUTOCOMMIT		0x01
+#define	TXN_ERROR		0x02
+#define	TXN_ID_ALLOCATED	0x04
+#define	TXN_OLDEST		0x08
+#define	TXN_RUNNING		0x10
 	uint32_t flags;
 };

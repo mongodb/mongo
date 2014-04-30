@@ -209,18 +209,61 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_autocommit_check --
- *	If an auto-commit transaction is required, start one.
+ * __wt_txn_setup_updater --
+ *	A transaction is going to do an update, start an auto commit
+ *      transaction if required and allocate a transaction ID.
  */
 static inline int
-__wt_txn_autocommit_check(WT_SESSION_IMPL *session)
+__wt_txn_setup_updater(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
+
 	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
 		F_CLR(txn, TXN_AUTOCOMMIT);
 		return (__wt_txn_begin(session, NULL));
+	}
+	if (F_ISSET(txn, TXN_RUNNING) && !F_ISSET(txn, TXN_ID_ALLOCATED)) {
+		conn = S2C(session);
+		txn_global = &conn->txn_global;
+		txn_state = &txn_global->states[session->id];
+
+		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
+
+		/*
+		 * Allocate a transaction ID.
+		 *
+		 * We use an atomic compare and swap to ensure that we get a
+		 * unique ID that is published before the global counter is
+		 * updated.
+		 *
+		 * If two threads race to allocate an ID, only the latest ID
+		 * will proceed.  The winning thread can be sure its snapshot
+		 * contains all of the earlier active IDs.  Threads that race
+		 * and get an earlier ID may not appear in the snapshot, but
+		 * they will loop and allocate a new ID before proceeding to
+		 * make any updates.
+		 *
+		 * This potentially wastes transaction IDs when threads race to
+		 * begin transactions: that is the price we pay to keep this
+		 * path latch free.
+		 */
+		do {
+			txn_state->id = txn->id = txn_global->current;
+		} while (!WT_ATOMIC_CAS(
+		    txn_global->current, txn->id, txn->id + 1));
+
+		/*
+		 * If we have used 64-bits of transaction IDs, there is nothing
+		 * more we can do.
+		 */
+		if (txn->id == WT_TXN_ABORTED)
+			WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
+		F_SET(txn, TXN_ID_ALLOCATED);
 	}
 
 	return (0);
