@@ -276,7 +276,7 @@ extern int __wt_debug_offset(WT_SESSION_IMPL *session,
     uint32_t cksum,
     const char *ofile);
 extern int __wt_debug_disk( WT_SESSION_IMPL *session,
-    WT_PAGE_HEADER *dsk,
+    const WT_PAGE_HEADER *dsk,
     const char *ofile);
 extern int __wt_debug_tree_shape( WT_SESSION_IMPL *session,
     WT_PAGE *page,

@@ -124,11 +124,11 @@ static int  __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, uint32_t);
 static int  __slvg_trk_init(WT_SESSION_IMPL *, uint8_t *,
 		size_t, uint32_t, uint64_t, WT_STUFF *, WT_TRACK **);
 static int  __slvg_trk_leaf(WT_SESSION_IMPL *,
-		WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
+		const WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
 static int  __slvg_trk_leaf_ovfl(
-		WT_SESSION_IMPL *, WT_PAGE_HEADER *, WT_TRACK *);
+		WT_SESSION_IMPL *, const WT_PAGE_HEADER *, WT_TRACK *);
 static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
-		WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
+		const WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
 
 /*
  * __wt_bt_salvage --
@@ -313,7 +313,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_DECL_ITEM(as);
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	size_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof;
@@ -356,7 +356,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * grow as little as possible, or shrink, and future salvage
 		 * calls don't need them either.
 		 */
-		dsk = buf->mem;
+		dsk = buf->data;
 		switch (dsk->type) {
 		case WT_PAGE_BLOCK_MANAGER:
 		case WT_PAGE_COL_INT:
@@ -457,7 +457,7 @@ err:	__wt_free(session, trk->addr.addr);
  */
 static int
 __slvg_trk_leaf(WT_SESSION_IMPL *session,
-    WT_PAGE_HEADER *dsk, uint8_t *addr, size_t addr_size, WT_STUFF *ss)
+    const WT_PAGE_HEADER *dsk, uint8_t *addr, size_t addr_size, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -573,7 +573,7 @@ err:		__wt_free(session, trk);
  */
 static int
 __slvg_trk_ovfl(WT_SESSION_IMPL *session,
-    WT_PAGE_HEADER *dsk, uint8_t *addr, size_t addr_size, WT_STUFF *ss)
+    const WT_PAGE_HEADER *dsk, uint8_t *addr, size_t addr_size, WT_STUFF *ss)
 {
 	WT_TRACK *trk;
 
@@ -597,7 +597,7 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session,
  */
 static int
 __slvg_trk_leaf_ovfl(
-    WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, WT_TRACK *trk)
+    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_TRACK *trk)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;

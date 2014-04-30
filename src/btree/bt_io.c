@@ -19,7 +19,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	size_t result_len;
 
 	btree = S2BT(session);
@@ -32,11 +32,11 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	 */
 	if (btree->compressor == NULL) {
 		WT_RET(bm->read(bm, session, buf, addr, addr_size));
-		dsk = (WT_PAGE_HEADER *)buf->data;
+		dsk = buf->data;
 	} else {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(bm->read(bm, session, tmp, addr, addr_size));
-		dsk = (WT_PAGE_HEADER *)tmp->data;
+		dsk = tmp->data;
 	}
 
 	/*
