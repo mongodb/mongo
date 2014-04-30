@@ -32,8 +32,12 @@ print("Force A to sync from B");
 A.runCommand({replSetSyncFrom : bAddress});
 assert.soon(
     function() {
-        return A.runCommand({replSetGetStatus : 1}).syncingTo == bAddress;
-    }
+        if (A.runCommand({replSetGetStatus : 1}).syncingTo === bAddress) {
+            return true;
+        }
+        A.runCommand({replSetSyncFrom : bAddress});
+        return false;
+    }, "A refused to sync from B", 30*1000, 1000
 );
 
 print("Black-hole B");
@@ -44,7 +48,7 @@ sleep(30000);
 
 assert.soon(
     function() {
-        return A.runCommand({replSetGetStatus : 1}).syncingTo == primaryAddress;
+        return A.runCommand({replSetGetStatus : 1}).syncingTo === primaryAddress;
     }
 );
 
