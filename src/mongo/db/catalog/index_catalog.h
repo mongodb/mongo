@@ -185,7 +185,9 @@ namespace mongo {
          * The specified index must already contain an expireAfterSeconds field, and the value in
          * that field and newExpireSecs must both be numeric.
          */
-        void updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds );
+        void updateTTLSetting( TransactionExperiment* txn,
+                               const IndexDescriptor* idx,
+                               long long newExpireSeconds );
 
         bool isMultikey( const IndexDescriptor* idex );
 

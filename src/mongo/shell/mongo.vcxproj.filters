@@ -1468,9 +1468,6 @@
     <ClInclude Include="..\db\jsobj.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\jsobjmanipulator.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\json.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>

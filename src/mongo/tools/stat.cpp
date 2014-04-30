@@ -35,7 +35,6 @@
 #include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/tools/stat_util.h"
@@ -201,8 +200,11 @@ namespace mongo {
             if ( e.isABSONObj() ) {
                 BSONObj x = e.Obj();
                 if ( x["width"].numberInt() < *maxWidth ) {
-                    BSONElementManipulator manip( x["width"] );
-                    manip.setNumber( *maxWidth );
+                    // TODO somthing less horrible.
+                    BSONElement width = x["width"];
+                    invariant(width.type() == NumberInt);
+                    char* nonConstPtr = const_cast<char*>(width.value());
+                    *reinterpret_cast<int*>(nonConstPtr) = *maxWidth;
                 }
                 else {
                     *maxWidth = x["width"].numberInt();

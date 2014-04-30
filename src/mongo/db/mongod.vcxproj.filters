@@ -3896,9 +3896,6 @@
     <ClInclude Include="filever.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="jsobjmanipulator.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="key.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>

@@ -58,7 +58,6 @@
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
-#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
@@ -114,22 +113,6 @@ namespace mongo {
 #endif
 
     MONGO_FP_DECLARE(rsStopGetMore);
-
-    void BSONElementManipulator::SetNumber(double d) {
-        if ( _element.type() == NumberDouble )
-            *getDur().writing( reinterpret_cast< double * >( value() )  ) = d;
-        else if ( _element.type() == NumberInt )
-            *getDur().writing( reinterpret_cast< int * >( value() ) ) = (int) d;
-        else verify(0);
-    }
-    void BSONElementManipulator::SetLong(long long n) {
-        verify( _element.type() == NumberLong );
-        *getDur().writing( reinterpret_cast< long long * >(value()) ) = n;
-    }
-    void BSONElementManipulator::SetInt(int n) {
-        verify( _element.type() == NumberInt );
-        getDur().writingInt( *reinterpret_cast< int * >( value() ) ) = n;
-    }
 
     void inProgCmd( Message &m, DbResponse &dbresponse ) {
         DbMessage d(m);

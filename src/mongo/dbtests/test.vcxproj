@@ -739,7 +739,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\interrupt_status.h" />
     <ClInclude Include="..\db\interrupt_status_mongod.h" />
     <ClInclude Include="..\db\intervalbtreecursor.h" />
-    <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\key.h" />
     <ClInclude Include="..\db\keypattern.h" />
     <ClInclude Include="..\db\kill_current_op.h" />

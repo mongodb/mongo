@@ -2025,7 +2025,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\index.h" />
     <ClInclude Include="..\db\instance.h" />
     <ClInclude Include="..\db\jsobj.h" />
-    <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\json.h" />
     <ClInclude Include="..\db\key.h" />
     <ClInclude Include="..\db\lasterror.h" />

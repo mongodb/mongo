@@ -4474,7 +4474,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index_update.h" />
     <ClInclude Include="initialize_server_global_state.h" />
     <ClInclude Include="intervalbtreecursor.h" />
-    <ClInclude Include="jsobjmanipulator.h" />
     <ClInclude Include="key.h" />
     <ClInclude Include="keypattern.h" />
     <ClInclude Include="kill_current_op.h" />

@@ -53,7 +53,6 @@
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/ops/delete.h"
@@ -962,7 +961,9 @@ namespace mongo {
         return toReturn;
     }
 
-    void IndexCatalog::updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds ) {
+    void IndexCatalog::updateTTLSetting( TransactionExperiment* txn,
+                                         const IndexDescriptor* idx,
+                                         long long newExpireSeconds ) {
         IndexDetails* indexDetails = _getIndexDetails( idx );
 
         const BSONElement oldExpireSecs = 
@@ -971,19 +972,19 @@ namespace mongo {
         // Important that we set the new value in-place.  We are writing directly to the
         // object here so must be careful not to overwrite with a longer numeric type.
 
-        BSONElementManipulator manip( oldExpireSecs );
+        char* nonConstPtr = const_cast<char*>(oldExpireSecs.value());
         switch( oldExpireSecs.type() ) {
         case EOO:
             massert( 16631, "index does not have an 'expireAfterSeconds' field", false );
             break;
         case NumberInt:
-            manip.SetInt( static_cast<int>( newExpireSeconds ) );
+            *txn->writing(reinterpret_cast<int*>(nonConstPtr)) = newExpireSeconds;
             break;
         case NumberDouble:
-            manip.SetNumber( static_cast<double>( newExpireSeconds ) );
+            *txn->writing(reinterpret_cast<double*>(nonConstPtr)) = newExpireSeconds;
             break;
         case NumberLong:
-            manip.SetLong( newExpireSeconds );
+            *txn->writing(reinterpret_cast<long long*>(nonConstPtr)) = newExpireSeconds;
             break;
         default:
             massert( 16632, "current 'expireAfterSeconds' is not a number", false );
