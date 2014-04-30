@@ -111,7 +111,8 @@
 #define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	TXN_API_CALL_NOCONF(s, cursor, n, cur,				\
-	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
+	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle);	\
+	WT_ERR(__wt_txn_setup_updater(session))
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\
 	TXN_API_END(s, ret)
