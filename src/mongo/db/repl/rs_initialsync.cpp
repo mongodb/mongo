@@ -98,6 +98,7 @@ namespace mongo {
                 sethbmsg( str::stream() << "initial sync cloning indexes for : " << db , 0);
 
             Client::WriteContext ctx(db);
+            DurTransaction txn;
 
             string err;
             int errCode;
@@ -112,7 +113,7 @@ namespace mongo {
             options.syncData = dataPass;
             options.syncIndexes = ! dataPass;
 
-            if (!cloner.go(ctx.ctx(), master, options, NULL, err, &errCode)) {
+            if (!cloner.go(&txn, ctx.ctx(), master, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "
                                        << (dataPass ? "cloning " : "indexing ") << db
                                        << ".  " << (err.empty() ? "" : err + ".  ")

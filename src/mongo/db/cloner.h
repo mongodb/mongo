@@ -40,6 +40,7 @@ namespace mongo {
     class DBClientBase;
     class DBClientCursor;
     class Query;
+    class TransactionExperiment;
 
     class Cloner: boost::noncopyable {
     public:
@@ -54,13 +55,20 @@ namespace mongo {
         void setConnection( DBClientBase *c ) { _conn.reset( c ); }
 
         /** copy the entire database */
-        bool go(Client::Context& ctx,
-                const string& masterHost, const CloneOptions& opts,
+        bool go(TransactionExperiment* txn,
+                Client::Context& ctx,
+                const string& masterHost,
+                const CloneOptions& opts,
                 set<string>* clonedColls,
                 string& errmsg, int *errCode = 0);
 
-        bool copyCollection(const string& ns, const BSONObj& query, string& errmsg,
-                            bool mayYield, bool mayBeInterrupted, bool copyIndexes = true,
+        bool copyCollection(TransactionExperiment* txn,
+                            const string& ns,
+                            const BSONObj& query,
+                            string& errmsg,
+                            bool mayYield,
+                            bool mayBeInterrupted,
+                            bool copyIndexes = true,
                             bool logForRepl = true );
         /**
          * validate the cloner query was successful
@@ -77,20 +85,31 @@ namespace mongo {
          *                      Currently this will only be set if there is an error in the initial
          *                      system.namespaces query.
          */
-        static bool cloneFrom(Client::Context& context,
-                              const string& masterHost, const CloneOptions& options,
-                              string& errmsg, int* errCode = 0,
+        static bool cloneFrom(TransactionExperiment* txn,
+                              Client::Context& context,
+                              const string& masterHost,
+                              const CloneOptions& options,
+                              string& errmsg,
+                              int* errCode = 0,
                               set<string>* clonedCollections = 0);
 
         /**
          * Copy a collection (and indexes) from a remote host
          */
-        static bool copyCollectionFromRemote(const string& host, const string& ns, string& errmsg);
+        static bool copyCollectionFromRemote(TransactionExperiment* txn,
+                                             const string& host, const string& ns, string& errmsg);
 
     private:
-        void copy(Client::Context& ctx,
-                  const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
-                  bool masterSameProcess, bool slaveOk, bool mayYield, bool mayBeInterrupted,
+        void copy(TransactionExperiment* txn,
+                  Client::Context& ctx,
+                  const char *from_ns,
+                  const char *to_ns,
+                  bool isindex,
+                  bool logForRepl,
+                  bool masterSameProcess,
+                  bool slaveOk,
+                  bool mayYield,
+                  bool mayBeInterrupted,
                   Query q);
 
         struct Fun;

@@ -413,7 +413,7 @@ namespace mongo {
                     {
                         string errmsg;
                         dbtemprelease r;
-                        bool ok = Cloner::copyCollectionFromRemote(them->getServerAddress(), ns, errmsg);
+                        bool ok = Cloner::copyCollectionFromRemote(&txn, them->getServerAddress(), ns, errmsg);
                         uassert(15909, str::stream() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg, ok);
                     }
                 }

@@ -361,7 +361,7 @@ namespace mongo {
     }
 
     /* grab initial copy of a database from the master */
-    void ReplSource::resync(const std::string& dbName) {
+    void ReplSource::resync(TransactionExperiment* txn, const std::string& dbName) {
         const std::string db(dbName);   // need local copy of the name, we're dropping the original
         resyncDrop( db );
         Client::Context ctx( db );
@@ -378,7 +378,7 @@ namespace mongo {
             cloneOptions.snapshot = true;
             cloneOptions.mayYield = true;
             cloneOptions.mayBeInterrupted = false;
-            bool ok = Cloner::cloneFrom(ctx,hostName, cloneOptions, errmsg, &errCode);
+            bool ok = Cloner::cloneFrom(txn, ctx,hostName, cloneOptions, errmsg, &errCode);
 
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
@@ -639,7 +639,7 @@ namespace mongo {
                 save();
                 Client::Context ctx(ns);
                 nClonedThisPass++;
-                resync(ctx.db()->name());
+                resync(&txn, ctx.db()->name());
                 addDbNextPass.erase(clientName);
                 incompleteCloneDbs.erase( clientName );
             }

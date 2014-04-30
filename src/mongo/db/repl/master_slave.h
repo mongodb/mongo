@@ -77,7 +77,7 @@ namespace mongo {
     class ReplSource {
         shared_ptr<threadpool::ThreadPool> tp;
 
-        void resync(const std::string& dbName);
+        void resync(TransactionExperiment* txn, const std::string& dbName);
 
         /** @param alreadyLocked caller already put us in write lock if true */
         void sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked);
