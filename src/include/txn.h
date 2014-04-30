@@ -41,17 +41,6 @@ struct __wt_txn_global {
 	volatile uint64_t oldest_id;
 
 	/*
-	 * The oldest transaction ID not yet visible to transactions,
-	 * excluding any checkpoint in progress.
-	 */
-	uint64_t oldest_app_id;
-
-	/*
-	 * The transaction ID of a running checkpoint transaction (if any).
-	 */
-	uint64_t checkpoint_txn;
-
-	/*
 	 * The current checkpoint generation.  Use a 32-bit count for now: if
 	 * we can do 4 billion checkpoints without a restart, we'll be in good
 	 * shape.

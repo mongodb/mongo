@@ -92,8 +92,8 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
-	uint64_t checkpoint_txn, current_id, id, oldest_app_id, oldest_id;
-	uint64_t prev_oldest_app_id, prev_oldest_id, snap_min;
+	uint64_t current_id, id, oldest_id;
+	uint64_t prev_oldest_id, snap_min;
 	uint32_t i, n, session_cnt;
 	int32_t count;
 
@@ -102,28 +102,16 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
 
-	checkpoint_txn = txn_global->checkpoint_txn;
 	current_id = snap_min = txn_global->current;
-	prev_oldest_app_id = txn_global->oldest_app_id;
 	prev_oldest_id = txn_global->oldest_id;
 
-	/* For pure read-only workloads, avoid updates to shared state. */
-	if (!get_snapshot) {
-		/*
-		 * If we are trying to update the oldest ID and it is already
-		 * equal to the current ID, there is no point scanning.
-		 */
-		if (prev_oldest_id == current_id)
-			return;
-	} else if (txn->id == max_id &&
-	    txn->snapshot_count == 0 &&
-	    txn->snap_min == snap_min &&
-	    TXNID_LE(prev_oldest_id, snap_min)) {
-		txn_state->snap_min = txn->snap_min;
-		/* If nothing has changed in the meantime, we're done. */
-		if (txn_global->scan_count == 0 &&
-		    txn_global->oldest_id == prev_oldest_id)
-			return;
+	/* For pure read-only workloads, avoid scanning. */
+	if (prev_oldest_id == current_id) {
+		if (get_snapshot) {
+			txn_state->snap_min = current_id;
+			__txn_sort_snapshot(session, 0, current_id);
+		}
+		return;
 	}
 
 	/*
@@ -144,9 +132,6 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	/* If the maximum ID is constrained, so is the oldest. */
 	oldest_id = (max_id != WT_TXN_NONE) ? max_id : snap_min;
 
-	/* The oldest application ID matches the oldest ID to start with. */
-	oldest_app_id = oldest_id;
-
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
@@ -163,8 +148,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 		 * never do application-visible updates.
 		 */
 		if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id &&
-		    TXNID_LE(prev_oldest_id, id) &&
-		    id != checkpoint_txn) {
+		    TXNID_LE(prev_oldest_id, id)) {
 			if (get_snapshot)
 				txn->snapshot[n++] = id;
 			if (TXNID_LT(id, snap_min))
@@ -177,15 +161,6 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 		 */
 		if (get_snapshot && s == txn_state)
 			continue;
-
-		/*
-		 * Skip the checkpoint transaction when calculating the oldest
-		 * application transaction.
-		 */
-		if ((id != checkpoint_txn || checkpoint_txn == WT_TXN_NONE) &&
-		    (id = s->snap_min) != WT_TXN_NONE &&
-		    TXNID_LT(id, oldest_app_id))
-			oldest_app_id = id;
 
 		/*
 		 * !!!
@@ -223,9 +198,8 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	 * make sure nobody else is using an earlier ID.
 	 */
 	if (max_id == WT_TXN_NONE &&
-	    (TXNID_LT(prev_oldest_app_id, oldest_app_id) ||
 	    (TXNID_LT(prev_oldest_id, oldest_id) &&
-	    (!get_snapshot || oldest_id - prev_oldest_id > 100))) &&
+	    (!get_snapshot || oldest_id - prev_oldest_id > 100)) &&
 	    WT_ATOMIC_CAS(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
@@ -236,8 +210,6 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 			    TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
-		if (TXNID_LT(txn_global->oldest_app_id, oldest_app_id))
-			txn_global->oldest_app_id = oldest_app_id;
 		if (TXNID_LT(txn_global->oldest_id, oldest_id))
 			txn_global->oldest_id = oldest_id;
 		txn_global->scan_count = 0;

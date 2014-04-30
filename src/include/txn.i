@@ -97,20 +97,6 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 }
 
 /*
- * __wt_txn_visible_apps --
- *	Check if a given transaction ID is visible to all application
- *	transactions (that is, all transactions other than checkpoints).
- */
-static inline int
-__wt_txn_visible_apps(WT_SESSION_IMPL *session, uint64_t id)
-{
-	uint64_t oldest_app_id;
-
-	oldest_app_id = S2C(session)->txn_global.oldest_app_id;
-	return (TXNID_LT(id, oldest_app_id));
-}
-
-/*
  * __wt_txn_visible --
  *	Can the current transaction see the given ID?
  */
