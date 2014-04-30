@@ -115,7 +115,7 @@ namespace mongo {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "'" << outerModElem.fieldName()
                                             << "' is empty. You must specify a field like so: "
-                                                    "{$mod: {<field>: ...}}");
+                                                    "{" << outerModElem.fieldName() << ": {<field>: ...}}");
             }
 
             BSONObjIterator innerIter(outerModElem.embeddedObject());
