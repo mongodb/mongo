@@ -1544,11 +1544,11 @@ int
 main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
-	size_t req_len;
+	size_t cc_len, req_len, tc_len;
 	int ch, monitor_set, ret;
 	char *cc_buf, *tc_buf;
 	const char *opts = "C:H:h:m:O:o:T:";
-	const char *config_opts, *user_cconfig, *user_tconfig;
+	const char *config_opts, *sep, *user_cconfig, *user_tconfig;
 
 	monitor_set = ret = 0;
 	cc_buf = tc_buf = NULL;
@@ -1564,7 +1564,17 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'C':
-			user_cconfig = optarg;
+			if (user_cconfig == NULL) {
+				sep = "";
+				cc_len = 0;
+			} else {
+				sep = ",";
+				cc_len = strlen(user_cconfig);
+			}
+			user_cconfig = realloc(user_cconfig,
+			    cc_len + strlen(optarg) + strlen(sep) + 1);
+			strncat(user_cconfig, sep, strlen(sep));
+			strncat(user_cconfig, optarg, strlen(optarg));
 			break;
 		case 'H':
 			cfg->helium_mount = optarg;
@@ -1573,7 +1583,17 @@ main(int argc, char *argv[])
 			config_opts = optarg;
 			break;
 		case 'T':
-			user_tconfig = optarg;
+			if (user_tconfig == NULL) {
+				sep = "";
+				tc_len = 0;
+			} else {
+				sep = ",";
+				tc_len = strlen(user_tconfig);
+			}
+			user_tconfig = realloc(user_tconfig,
+			    tc_len + strlen(optarg) + strlen(sep) + 1);
+			strncat(user_tconfig, sep, strlen(sep));
+			strncat(user_tconfig, optarg, strlen(optarg));
 			break;
 		case 'h':
 			cfg->home = optarg;
