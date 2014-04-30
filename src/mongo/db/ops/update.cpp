@@ -776,7 +776,7 @@ namespace mongo {
             }
 
             // Opportunity for journaling to write during the update.
-            getDur().commitIfNeeded();
+            txn->commitIfNeeded();
         }
 
         // TODO: Can this be simplified?

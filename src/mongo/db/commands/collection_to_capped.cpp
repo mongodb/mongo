@@ -108,7 +108,7 @@ namespace mongo {
                 toCollection->insertDocument( txn, obj, true );
                 if ( logForReplication )
                     logOp( txn, "i", toNs.c_str(), obj );
-                getDur().commitIfNeeded();
+                txn->commitIfNeeded();
             }
         }
 

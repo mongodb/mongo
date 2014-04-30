@@ -112,7 +112,7 @@ namespace replset {
         // to suppress errors when replaying oplog entries.
         bool ok = !applyOperation_inlock(&txn, ctx.db(), op, true, convertUpdateToUpsert);
         opsAppliedStats.increment();
-        getDur().commitIfNeeded();
+        txn.commitIfNeeded();
 
         return ok;
     }

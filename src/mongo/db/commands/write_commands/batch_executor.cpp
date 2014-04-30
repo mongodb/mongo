@@ -1024,7 +1024,7 @@ namespace mongo {
         }
         else {
             logOp( &txn, "i", insertNS.c_str(), docToInsert );
-            getDur().commitIfNeeded();
+            txn.commitIfNeeded();
             result->getStats().n = 1;
         }
     }

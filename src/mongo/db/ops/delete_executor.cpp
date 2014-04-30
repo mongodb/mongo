@@ -185,7 +185,7 @@ namespace mongo {
             }
 
             if (!_request->isGod()) {
-                getDur().commitIfNeeded();
+                txn->commitIfNeeded();
             }
 
             if (debug && _request->isGod() && nDeleted == 100) {
