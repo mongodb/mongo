@@ -18,14 +18,14 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_REF *walk_page;
+	WT_REF *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
 	uint32_t checkpoint_gen, flags;
 
 	btree = S2BT(session);
-	walk_page = NULL;
+	walk = NULL;
 	txn = &session->txn;
 
 	internal_bytes = leaf_bytes = 0;
@@ -40,13 +40,13 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		flags = WT_READ_CACHE |
 		    WT_READ_NO_GEN | WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
-		for (walk_page = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk_page, flags));
-			if (walk_page == NULL)
+		for (walk = NULL;;) {
+			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			if (walk == NULL)
 				break;
 
 			/* Write dirty pages if nobody beat us to it. */
-			page = walk_page->page;
+			page = walk->page;
 			if (__wt_page_is_modified(page)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_refresh(
@@ -54,7 +54,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
 				WT_ERR(__wt_rec_write(
-				    session, walk_page, NULL, 0));
+				    session, walk, NULL, 0));
 			}
 		}
 		break;
@@ -77,20 +77,18 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			__wt_evict_file_exclusive_off(session);
 		}
 
-		/*
-		 * Write all dirty in-cache pages.
-		 */
+		/* Write all dirty in-cache pages. */
 		flags = WT_READ_CACHE | WT_READ_NO_GEN;
-		for (walk_page = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk_page, flags));
-			if (walk_page == NULL)
+		for (walk = NULL;;) {
+			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			if (walk == NULL)
 				break;
 
 			/*
 			 * Write dirty pages, unless we can be sure they only
 			 * became dirty after the checkpoint started.
 			 */
-			page = walk_page->page;
+			page = walk->page;
 			if (__wt_page_is_modified(page) &&
 			    (WT_PAGE_IS_INTERNAL(page) ||
 			    page->modify->checkpoint_gen == 0 ||
@@ -106,7 +104,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 					++leaf_pages;
 				}
 				WT_ERR(__wt_rec_write(
-				    session, walk_page, NULL, 0));
+				    session, walk, NULL, 0));
 			}
 
 			/*
@@ -136,8 +134,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	}
 
 err:	/* On error, clear any left-over tree walk. */
-	if (walk_page != NULL)
-		WT_TRET(__wt_page_release(session, walk_page));
+	if (walk != NULL)
+		WT_TRET(__wt_page_release(session, walk));
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED && session->ncursors == 0)
 		__wt_txn_release_snapshot(session);

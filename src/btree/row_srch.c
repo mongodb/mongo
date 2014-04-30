@@ -114,7 +114,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
  */
 int
 __wt_row_search(WT_SESSION_IMPL *session,
-    WT_ITEM *srch_key, WT_REF *leaf_page, WT_CURSOR_BTREE *cbt)
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -148,8 +148,8 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	 * In the service of eviction splits, we're only searching a single leaf
 	 * page, not a full tree.
 	 */
-	if (leaf_page != NULL) {
-		child = leaf_page;
+	if (leaf != NULL) {
+		child = leaf;
 		goto leaf_only;
 	}
 
