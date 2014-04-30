@@ -56,9 +56,6 @@ namespace mongo {
 
     int tlogLevel = 0; // test log level. so we avoid overchattiness (somewhat) in the c++ unit tests
 
-    const char *default_getcurns() { return ""; }
-    const char * (*getcurns)() = default_getcurns;
-
     bool rotateLogs() {
         using logger::RotatableFileManager;
         RotatableFileManager* manager = logger::globalRotatableFileManager();

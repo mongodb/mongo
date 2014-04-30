@@ -293,7 +293,10 @@ namespace mongo {
 
         static void dump(BucketType* bucket, int depth = 0);
 
-        static void assertValid(BucketType* bucket, const Ordering& ordering, bool force = false);
+        static void assertValid(const std::string& ns, 
+                                BucketType* bucket, 
+                                const Ordering& ordering, 
+                                bool force = false);
 
         //
         // 'this'-specific helpers (require record store, catalog information, or ordering, or type

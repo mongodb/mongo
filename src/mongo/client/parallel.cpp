@@ -176,18 +176,9 @@ namespace mongo {
     }
 
     // --------  FilteringClientCursor -----------
-    FilteringClientCursor::FilteringClientCursor( const BSONObj filter )
-        : _matcher( filter ) , _pcmData( NULL ), _done( true ) {
+    FilteringClientCursor::FilteringClientCursor()
+        : _pcmData( NULL ), _done( true ) {
     }
-
-    FilteringClientCursor::FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter )
-        : _matcher( filter ) , _cursor( cursor ) , _pcmData( NULL ), _done( cursor.get() == 0 ) {
-    }
-
-    FilteringClientCursor::FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter )
-        : _matcher( filter ) , _cursor( cursor ) , _pcmData( NULL ), _done( cursor == 0 ) {
-    }
-
 
     FilteringClientCursor::~FilteringClientCursor() {
         // Don't use _pcmData
@@ -243,12 +234,10 @@ namespace mongo {
 
         while ( _cursor->more() ) {
             _next = _cursor->next();
-            if ( _matcher.matches( _next ) ) {
-                if ( ! _cursor->moreInCurrentBatch() )
-                    _next = _next.getOwned();
-                return;
+            if (!_cursor->moreInCurrentBatch()) {
+                _next = _next.getOwned();
             }
-            _next = BSONObj();
+            return;
         }
         _done = true;
     }

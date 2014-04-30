@@ -98,12 +98,8 @@ namespace logger {
     if ((!::mongo::debug && ((DLEVEL) > tlogLevel)) || !::mongo::logger::globalLogDomain()->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
     else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
 
-    /* default impl returns "" -- mongod overrides */
-    extern const char * (*getcurns)();
-
     inline LogstreamBuilder problem() {
-        std::string curns = getcurns();
-        return log().setBaseMessage(curns);
+        return log();
     }
 
     /**

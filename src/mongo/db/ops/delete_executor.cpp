@@ -171,7 +171,8 @@ namespace mongo {
 
             if (logop) {
                 if ( toDelete.isEmpty() ) {
-                    problem() << "deleted object without id, not logging" << endl;
+                    problem() << "Deleted object without id in collection " << collection->ns()
+                              << ", not logging.";
                 }
                 else {
                     bool replJustOne = true;

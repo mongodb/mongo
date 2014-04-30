@@ -100,7 +100,8 @@ namespace mongo {
                     int fileOffset = cur.getOfs();
                     if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
                         StringBuilder sb;
-                        sb << "Deleted record list corrupted in bucket " << b
+                        sb << "Deleted record list corrupted in collection " << _ns
+                           << ", bucket " << b
                            << ", link number " << chain
                            << ", invalid link is " << cur.toString()
                            << ", throwing Fatal Assertion";

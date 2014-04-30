@@ -1205,7 +1205,8 @@ namespace mongo {
 
         if ( !status.isOK() ) {
             problem() << "Couldn't unindex record " << obj.toString()
-                      << " status: " << status.toString();
+                      << " from collection " << _collection->ns()
+                      << ". Status: " << status.toString();
         }
 
         return Status::OK();

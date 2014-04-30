@@ -577,7 +577,7 @@ namespace mongo {
             invariant( foo >= 0 );
         }
         setPacked(bucket);
-        assertValid(bucket, _ordering);
+        assertValid(_indexName, bucket, _ordering);
     }
 
     template <class BtreeLayout>
@@ -1795,7 +1795,7 @@ namespace mongo {
         if (found) {
             BucketType* bucket = btreemod(trans, getBucket(loc));
             delKeyAtPos(trans, bucket, loc, pos);
-            assertValid(getRoot(), _ordering);
+            assertValid(_indexName, getRoot(), _ordering);
         }
         return found;
     }
@@ -1935,7 +1935,7 @@ namespace mongo {
             pushBack(r, kn.recordLoc, kn.data, kn.prevChildBucket);
         }
         r->nextChild = bucket->nextChild;
-        assertValid(r, _ordering);
+        assertValid(_indexName, r, _ordering);
 
         r = NULL;
         fixParentPtrs(trans, getBucket(rLoc), rLoc);
@@ -1953,7 +1953,7 @@ namespace mongo {
             BucketType* p = btreemod(trans, getBucket(L));
             pushBack(p, splitkey.recordLoc, splitkey.data, bucketLoc);
             p->nextChild = rLoc;
-            assertValid(p, _ordering);
+            assertValid(_indexName, p, _ordering);
             bucket->parent = L;
             _headManager->setHead(L);
             *trans->writing(&getBucket(rLoc)->parent) = bucket->parent;
@@ -2084,7 +2084,7 @@ namespace mongo {
                                                      bool dumpBuckets,
                                                      unsigned depth) {
         BucketType* bucket = getBucket(bucketLoc);
-        assertValid(bucket, _ordering, true);
+        assertValid(_indexName, bucket, _ordering, true);
 
         if (dumpBuckets) {
             log() << bucketLoc.toString() << ' ';
@@ -2138,9 +2138,10 @@ namespace mongo {
 
     // static
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::assertValid(BucketType* bucket,
-                                               const Ordering& ordering,
-                                               bool force) {
+    void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
+                                              BucketType* bucket,
+                                              const Ordering& ordering,
+                                              bool force) {
         if (!force) {
             return;
         }
@@ -2190,7 +2191,7 @@ namespace mongo {
                 int z = k1.data.woCompare(k2.data, ordering);
                 //wassert( z <= 0 );
                 if (z > 0) {
-                    problem() << "btree keys out of order" << '\n';
+                    problem() << "Btree keys out of order in collection " << ns;
                     ONCE {
                         dump(bucket);
                     }
@@ -2223,7 +2224,7 @@ namespace mongo {
                                 DiskLoc(),
                                 DiskLoc());
 
-        assertValid(getRoot(), _ordering);
+        assertValid(_indexName, getRoot(), _ordering);
         return status;
     }
 

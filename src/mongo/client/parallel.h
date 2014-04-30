@@ -258,9 +258,7 @@ namespace mongo {
     // TODO:  We probably don't really need this as a separate class.
     class MONGO_CLIENT_API FilteringClientCursor {
     public:
-        FilteringClientCursor( const BSONObj filter = BSONObj() );
-        FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter = BSONObj() );
-        FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter = BSONObj() );
+        FilteringClientCursor();
         ~FilteringClientCursor();
 
         void reset( auto_ptr<DBClientCursor> cursor );
@@ -283,7 +281,6 @@ namespace mongo {
     private:
         void _advance();
 
-        Matcher _matcher;
         auto_ptr<DBClientCursor> _cursor;
         ParallelConnectionMetadata* _pcmData;
 

@@ -242,7 +242,8 @@ namespace mongo {
             return;
         if ( msync(viewForFlushing(), len, sync ? MS_SYNC : MS_ASYNC) ) {
             // msync failed, this is very bad
-            problem() << "msync failed: " << errnoWithDescription();
+            problem() << "msync failed: " << errnoWithDescription()
+                      << " file: " << filename() << endl;
             dataSyncFailedHandler();
         }
     }

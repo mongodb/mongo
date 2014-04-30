@@ -124,14 +124,6 @@ namespace mongo {
 
     Timer startupSrandTimer;
 
-    const char *ourgetns() {
-        Client *c = currentClient.get();
-        if ( ! c )
-            return "";
-        Client::Context* cc = c->getContext();
-        return cc ? cc->ns() : "";
-    }
-
     struct MyStartupTests {
         MyStartupTests() {
             verify( sizeof(OID) == 12 );
@@ -967,8 +959,6 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 #if defined(_WIN32)
     mongo::reportEventToSystem = &mongo::reportEventToSystemImpl;
 #endif
-
-    getcurns = ourgetns;
 
     setupSignalHandlers();
 

@@ -294,11 +294,7 @@ namespace mongo {
             // cached plan runner to fall back on a different solution
             // if the best solution fails. Alternatively we could try to
             // defer cache insertion to be after the first produced result.
-            Database* db = cc().getContext()->db();
-            verify(NULL != db);
-            Collection* collection = db->getCollection(_query->ns());
-            verify(NULL != collection);
-            PlanCache* cache = collection->infoCache()->getPlanCache();
+            PlanCache* cache = _collection->infoCache()->getPlanCache();
             cache->remove(*_query);
 
             // Move the backup info into the bestPlan info and clear the backup
@@ -401,11 +397,7 @@ namespace mongo {
         const PlanStageStats* bestStats = _ranking->stats.vector()[0];
         if (PlanCache::shouldCacheQuery(*_query)
             && (!_alreadyProduced.empty() || bestStats->common.isEOF)) {
-            Database* db = cc().getContext()->db();
-            verify(NULL != db);
-            Collection* collection = db->getCollection(_query->ns());
-            verify(NULL != collection);
-            PlanCache* cache = collection->infoCache()->getPlanCache();
+            PlanCache* cache = _collection->infoCache()->getPlanCache();
             // Create list of candidate solutions for the cache with
             // the best solution at the front.
             std::vector<QuerySolution*> solutions;
