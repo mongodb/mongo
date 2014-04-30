@@ -337,7 +337,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		txn_global = &S2C(session)->txn_global;
 		page->modify->checkpoint_gen = txn_global->checkpoint_gen;
-		page->modify->rec_min_skipped_txn = txn_global->last_running;
+		page->modify->rec_skipped_txn = txn_global->last_running;
 	}
 
 	/* Check if this is the largest transaction ID to update the page. */

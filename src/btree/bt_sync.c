@@ -18,6 +18,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
 	WT_REF *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, leaf_bytes;
@@ -89,12 +90,13 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 * became dirty after the checkpoint started.
 			 */
 			page = walk->page;
+			mod = page->modify;
 			if (__wt_page_is_modified(page) &&
 			    (WT_PAGE_IS_INTERNAL(page) ||
-			    page->modify->checkpoint_gen == 0 ||
-			    page->modify->checkpoint_gen < checkpoint_gen ||
-			    TXNID_LE(page->modify->rec_min_skipped_txn,
-			    session->txn.snap_max))) {
+			    checkpoint_gen == 0 ||
+			    mod->checkpoint_gen < checkpoint_gen ||
+			    !F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
+			    TXNID_LE(mod->rec_skipped_txn, txn->snap_max))) {
 				if (WT_PAGE_IS_INTERNAL(page)) {
 					internal_bytes +=
 					    page->memory_footprint;
