@@ -1548,7 +1548,8 @@ main(int argc, char *argv[])
 	int ch, monitor_set, ret;
 	char *cc_buf, *tc_buf;
 	const char *opts = "C:H:h:m:O:o:T:";
-	const char *config_opts, *sep, *user_cconfig, *user_tconfig;
+	const char *config_opts, *sep;
+	char *user_cconfig, *user_tconfig;
 
 	monitor_set = ret = 0;
 	cc_buf = tc_buf = NULL;
