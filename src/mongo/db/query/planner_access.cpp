@@ -482,16 +482,20 @@ namespace mongo {
 
     // static
     void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
-                                                   vector<MatchExpression*>* out) {
+                                                   vector<MatchExpression*>* out,
+                                                   vector<MatchExpression*>* subnodesOut) {
         for (size_t i = 0; i < node->numChildren(); ++i) {
             MatchExpression* child = node->getChild(i);
-            if (Indexability::nodeCanUseIndexOnOwnField(child) &&
+            if (Indexability::isBoundsGenerating(child) &&
                 NULL != child->getTag()) {
                 out->push_back(child);
             }
             else if (MatchExpression::AND == child->matchType() ||
                      Indexability::arrayUsesIndexOnChildren(child)) {
-                findElemMatchChildren(child, out);
+                findElemMatchChildren(child, out, subnodesOut);
+            }
+            else if (NULL != child->getTag()) {
+                subnodesOut->push_back(child);
             }
         }
     }
@@ -545,10 +549,42 @@ namespace mongo {
                     // predicates from inside the $elemMatch, and try to merge them with
                     // the current index scan.
 
-                    // Populate 'emChildren' with tagged predicates from inside the
-                    // tree rooted at 'child.
+                    // Contains tagged predicates from inside the tree rooted at 'child'
+                    // which are logically part of the AND.
                     vector<MatchExpression*> emChildren;
-                    findElemMatchChildren(child, &emChildren);
+
+                    // Contains tagged nodes that are not logically part of the AND and
+                    // cannot use the index directly (e.g. OR nodes which are tagged to
+                    // be indexed).
+                    vector<MatchExpression*> emSubnodes;
+
+                    // Populate 'emChildren' and 'emSubnodes'.
+                    findElemMatchChildren(child, &emChildren, &emSubnodes);
+
+                    // Recursively build data access for the nodes inside 'emSubnodes'.
+                    for (size_t i = 0; i < emSubnodes.size(); ++i) {
+                        MatchExpression* subnode = emSubnodes[i];
+
+                        if (!Indexability::isBoundsGenerating(subnode)) {
+                            // Must pass true for 'inArrayOperator' because the subnode is
+                            // beneath an ELEM_MATCH_OBJECT.
+                            QuerySolutionNode* childSolution = buildIndexedDataAccess(query,
+                                                                                      subnode,
+                                                                                      true,
+                                                                                      indices);
+
+                            // buildIndexedDataAccess(...) returns NULL in error conditions, when
+                            // it is unable to construct a query solution from a tagged match
+                            // expression tree. If we are unable to construct a solution according
+                            // to the instructions from the enumerator, then we  bail out early
+                            // (by returning false) rather than continuing on and potentially
+                            // constructing an invalid solution tree.
+                            if (NULL == childSolution) { return false; }
+
+                            // Output the resulting solution tree.
+                            out->push_back(childSolution);
+                        }
+                    }
 
                     // For each predicate in 'emChildren', try to merge it with the
                     // current index scan.
