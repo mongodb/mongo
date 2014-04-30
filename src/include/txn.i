@@ -21,7 +21,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	txn = &session->txn;
 	*opp = NULL;
 
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_SNAPSHOT));
 	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
 	    txn->mod_count + 1, &txn->mod));
 
@@ -42,7 +42,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
+	if (F_ISSET(txn, TXN_HAS_SNAPSHOT)) {
 		WT_ASSERT(session, txn->mod_count > 0);
 		txn->mod_count--;
 	}
@@ -195,12 +195,29 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_setup_updater --
+ * __wt_txn_autocommit_check --
+ *  If an auto-commit transaction is required, start one.
+*/
+static inline int
+__wt_txn_autocommit_check(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
+		F_CLR(txn, TXN_AUTOCOMMIT);
+		return (__wt_txn_begin(session, NULL));
+	}
+        return (0);
+}
+
+/*
+ * __wt_txn_id_check --
  *	A transaction is going to do an update, start an auto commit
  *      transaction if required and allocate a transaction ID.
  */
 static inline int
-__wt_txn_setup_updater(WT_SESSION_IMPL *session)
+__wt_txn_id_check(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -209,11 +226,9 @@ __wt_txn_setup_updater(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
-	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
-		F_CLR(txn, TXN_AUTOCOMMIT);
-		return (__wt_txn_begin(session, NULL));
-	}
-	if (F_ISSET(txn, TXN_RUNNING) && !F_ISSET(txn, TXN_ID_ALLOCATED)) {
+        WT_RET(__wt_txn_autocommit_check(session));
+
+	if (F_ISSET(txn, TXN_HAS_SNAPSHOT) && !F_ISSET(txn, TXN_HAS_ID)) {
 		conn = S2C(session);
 		txn_global = &conn->txn_global;
 		txn_state = &txn_global->states[session->id];
@@ -249,7 +264,7 @@ __wt_txn_setup_updater(WT_SESSION_IMPL *session)
 		 */
 		if (txn->id == WT_TXN_ABORTED)
 			WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
-		F_SET(txn, TXN_ID_ALLOCATED);
+		F_SET(txn, TXN_HAS_ID);
 	}
 
 	return (0);
@@ -273,14 +288,14 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
 
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING) ||
+	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
 	    (txn_state->id == WT_TXN_NONE &&
 	    txn_state->snap_min == WT_TXN_NONE));
 	}
 #endif
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    (!F_ISSET(txn, TXN_HAS_SNAPSHOT) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
 		__wt_txn_refresh(session, WT_TXN_NONE, 1);
 }
@@ -297,7 +312,7 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 
 	/* Release the snap_min ID we put in the global table. */
-	if (!F_ISSET(txn, TXN_RUNNING) ||
+	if (!F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
 	    txn->isolation != TXN_ISO_SNAPSHOT)
 		__wt_txn_release_snapshot(session);
 }
@@ -334,7 +349,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 * positioned on a value, it can't be freed.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, TXN_RUNNING) &&
+	    !F_ISSET(txn, TXN_HAS_SNAPSHOT) &&
 	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
 }

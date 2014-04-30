@@ -89,7 +89,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 
 		/* Update the maximum transaction ID in the primary chunk. */
 		if (update && (chunk = clsm->primary_chunk) != NULL) {
-			WT_RET(__wt_txn_setup_updater(session));
+			WT_RET(__wt_txn_id_check(session));
 			for (id = chunk->txnid_max, myid = session->txn.id;
 			    !TXNID_LE(myid, id);
 			    id = chunk->txnid_max) {

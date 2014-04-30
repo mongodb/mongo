@@ -30,7 +30,7 @@
 	if ((s) != NULL) {						\
 		(s)->dhandle = __olddh;					\
 		(s)->name = __oldname;					\
-		if (F_ISSET(&(s)->txn, TXN_RUNNING) &&			\
+		if (F_ISSET(&(s)->txn, TXN_HAS_SNAPSHOT) &&			\
 		    (ret) != 0 &&					\
 		    (ret) != WT_NOTFOUND &&				\
 		    (ret) != WT_DUPLICATE_KEY)				\
@@ -42,7 +42,7 @@
 #define	TXN_API_CALL(s, h, n, cur, bt, config, cfg) do {		\
 	int __autotxn = 0;						\
 	API_CALL(s, h, n, bt, cur, config, cfg);			\
-	__autotxn = !F_ISSET(&(s)->txn, TXN_RUNNING);			\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_HAS_SNAPSHOT);			\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
@@ -50,7 +50,7 @@
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
 	int __autotxn = 0;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
-	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_HAS_SNAPSHOT);\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
@@ -112,7 +112,7 @@
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	TXN_API_CALL_NOCONF(s, cursor, n, cur,				\
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle);	\
-	WT_ERR(__wt_txn_setup_updater(session))
+	WT_ERR(__wt_txn_id_check(session))
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\
 	TXN_API_END(s, ret)

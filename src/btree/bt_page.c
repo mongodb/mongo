@@ -87,7 +87,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			}
 
 			/* Check if we need an autocommit transaction. */
-			if ((ret = __wt_txn_setup_updater(session)) != 0) {
+			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
 				WT_TRET(__wt_hazard_clear(session, page));
 				return (ret);
 			}

@@ -244,7 +244,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
 		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
 
-	F_SET(txn, TXN_RUNNING);
+	F_SET(txn, TXN_HAS_SNAPSHOT);
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		__wt_txn_refresh(session, WT_TXN_NONE, 1);
 	return (0);
@@ -269,7 +269,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	txn_state = &txn_global->states[session->id];
 
 	/* Clear the transaction's ID from the global table. */
-	if (F_ISSET(txn, TXN_ID_ALLOCATED)) {
+	if (F_ISSET(txn, TXN_HAS_ID)) {
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
@@ -288,7 +288,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_ID_ALLOCATED | TXN_OLDEST | TXN_RUNNING);
+	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_OLDEST | TXN_HAS_SNAPSHOT);
 }
 
 /*
@@ -308,7 +308,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	WT_ASSERT(session, !F_ISSET(txn, TXN_ERROR));
 
-	if (!F_ISSET(txn, TXN_RUNNING))
+	if (!F_ISSET(txn, TXN_HAS_SNAPSHOT))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Commit notification. */
@@ -366,7 +366,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
-	if (!F_ISSET(txn, TXN_RUNNING))
+	if (!F_ISSET(txn, TXN_HAS_SNAPSHOT))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Rollback notification. */

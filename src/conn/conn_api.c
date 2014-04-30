@@ -503,7 +503,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	 */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
 		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL) &&
-		    F_ISSET(&s->txn, TXN_RUNNING)) {
+		    F_ISSET(&s->txn, TXN_HAS_SNAPSHOT)) {
 			wt_session = &s->iface;
 			WT_TRET(wt_session->rollback_transaction(
 			    wt_session, NULL));

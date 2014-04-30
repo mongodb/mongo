@@ -297,7 +297,7 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	if (F_ISSET(txn, TXN_RUNNING))
+	if (F_ISSET(txn, TXN_HAS_SNAPSHOT))
 		__wt_txn_release(session);
 	else
 		__wt_txn_release_snapshot(session);

@@ -388,8 +388,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * be visible to eviction.
 	 */
 	WT_ASSERT(session,
-	    !F_ISSET(txn, TXN_ID_ALLOCATED) ||
-	    !__wt_txn_visible(session, txn->id));
+	    !F_ISSET(txn, TXN_HAS_ID) || !__wt_txn_visible(session, txn->id));
 
 	ret = __wt_rec_evict(session, ref, 0);
 	txn->isolation = saved_iso;
