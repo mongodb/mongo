@@ -554,7 +554,7 @@ namespace mongo {
                     Client::Context* ctx = cc().getContext();
                     verify( ctx );
                     IndexBuilder builder(o);
-                    Status status = builder.build( *ctx );
+                    Status status = builder.build(txn, *ctx);
                     if ( status.isOK() ) {
                         // yay
                     }

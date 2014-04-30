@@ -62,8 +62,9 @@ namespace mongo {
         cc().curop()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
         Client::WriteContext ctx(ns.getSystemIndexesCollection());
+        DurTransaction txn;
 
-        Status status = build( ctx.ctx() );
+        Status status = build(&txn, ctx.ctx());
         if ( !status.isOK() ) {
             log() << "IndexBuilder could not build index: " << status.toString();
         }
@@ -71,7 +72,9 @@ namespace mongo {
         cc().shutdown();
     }
 
-    Status IndexBuilder::build( Client::Context& context ) const {
+    Status IndexBuilder::build(TransactionExperiment* txn,
+                               Client::Context& context ) const {
+
         string ns = _index["ns"].String();
         Database* db = context.db();
         Collection* c = db->getCollection( ns );
@@ -83,8 +86,7 @@ namespace mongo {
         // Show which index we're building in the curop display.
         context.getClient()->curop()->setQuery(_index);
 
-        DurTransaction txn;  // XXX
-        Status status = c->getIndexCatalog()->createIndex( &txn,
+        Status status = c->getIndexCatalog()->createIndex( txn,
                                                            _index, 
                                                            true, 
                                                            IndexCatalog::SHUTDOWN_LEAVE_DIRTY );

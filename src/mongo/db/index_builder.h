@@ -41,6 +41,7 @@
 namespace mongo {
 
     class Collection;
+    class TransactionExperiment;
 
     class IndexBuilder : public BackgroundJob {
     public:
@@ -54,7 +55,7 @@ namespace mongo {
          */
         virtual std::string name() const;
 
-        Status build( Client::Context& context ) const;
+        Status build(TransactionExperiment* txn, Client::Context& context ) const;
 
         /**
          * Kill all in-progress indexes matching criteria, if non-empty:
