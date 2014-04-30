@@ -135,7 +135,7 @@ struct __wt_txn {
 
 #define	TXN_AUTOCOMMIT		0x01
 #define	TXN_ERROR		0x02
-#define TXN_HAS_ID	        0x04
+#define	TXN_HAS_ID	        0x04
 #define	TXN_HAS_SNAPSHOT	0x08
 #define	TXN_OLDEST		0x10
 #define	TXN_RUNNING		0x20

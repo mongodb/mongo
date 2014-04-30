@@ -22,11 +22,11 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	txn = &session->txn;
 	*opp = NULL;
 
-        /* 
-         * We're about to perform an update.
-         * Make sure we have allocated a transaction ID.
-         */
-        WT_RET(__wt_txn_id_check(session));
+	/* 
+	 * We're about to perform an update.
+	 * Make sure we have allocated a transaction ID.
+	 */
+	WT_RET(__wt_txn_id_check(session));
 	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_ID));
 
 	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
@@ -192,7 +192,7 @@ __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 		F_CLR(txn, TXN_AUTOCOMMIT);
 		return (__wt_txn_begin(session, NULL));
 	}
-        return (0);
+	return (0);
 }
 
 /*
