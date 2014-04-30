@@ -61,6 +61,8 @@ namespace mongo {
 
         /**
          * Commit if required.  May take a long time.  Returns true if committed.
+         *
+         * WARNING: Data *must* be in a crash-recoverable state when this is called.
          */
         virtual bool commitIfNeeded(bool force = false) = 0;
 
@@ -77,6 +79,8 @@ namespace mongo {
         /**
          * Commits pending changes, flushes all changes to main data files, then removes the
          * journal.
+         *
+         * WARNING: Data *must* be in a crash-recoverable state when this is called.
          *
          * This is useful as a "barrier" to ensure that writes before this call will never go
          * through recovery and be applied to files that have had changes made after this call
