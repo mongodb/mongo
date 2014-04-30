@@ -79,6 +79,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/util/processinfo.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
 
@@ -141,6 +142,7 @@ namespace mongo {
 
     void dropAllDatabasesExceptLocal() {
         Lock::GlobalWrite lk;
+        DurTransaction txn;
 
         vector<string> n;
         getDatabaseNames(n);
@@ -149,12 +151,12 @@ namespace mongo {
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
                 Client::Context ctx(*i);
-                dropDatabase(ctx.db());
+                dropDatabase(&txn, ctx.db());
             }
         }
     }
 
-    void dropDatabase(Database* db ) {
+    void dropDatabase(TransactionExperiment* txn, Database* db ) {
         invariant( db );
 
         string name = db->name(); // just to have safe
@@ -173,7 +175,7 @@ namespace mongo {
         //
         //  RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
 
-        getDur().syncDataAndTruncateJournal();
+        txn->syncDataAndTruncateJournal();
 
         Database::closeDatabase( name, db->path() );
         db = 0; // d is now deleted

@@ -100,7 +100,7 @@ namespace mongo {
 
         ReplSource();
 
-        void resyncDrop( const string& db );
+        void resyncDrop( TransactionExperiment* txn, const string& db );
         // call without the db mutex
         void syncToTailOfRemoteLog();
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
@@ -112,7 +112,10 @@ namespace mongo {
          * master.
          * @return true iff an op with the specified ns may be applied.
          */
-        bool handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db );
+        bool handleDuplicateDbName( TransactionExperiment* txn,
+                                    const BSONObj &op,
+                                    const char* ns,
+                                    const char* db );
 
         // populates _me so that it can be passed to oplogreader for handshakes
         void ensureMe();
@@ -157,9 +160,9 @@ namespace mongo {
             return wait > 0 ? wait : 0;
         }
 
-        static bool throttledForceResyncDead( const char *requester );
-        static void forceResyncDead( const char *requester );
-        void forceResync( const char *requester );
+        static bool throttledForceResyncDead( TransactionExperiment* txn, const char *requester );
+        static void forceResyncDead( TransactionExperiment* txn, const char *requester );
+        void forceResync( TransactionExperiment* txn, const char *requester );
     };
 
     /**

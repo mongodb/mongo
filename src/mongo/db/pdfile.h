@@ -47,7 +47,7 @@ namespace mongo {
     class Database;
     class TransactionExperiment;
 
-    void dropDatabase(Database* db);
+    void dropDatabase(TransactionExperiment* txn, Database* db);
 
     Status userCreateNS( TransactionExperiment* txn,
                          Database* db,

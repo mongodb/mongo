@@ -30,6 +30,7 @@
 #include "mongo/db/repl/master_slave.h"  // replSettings
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
 namespace mongo {
 
@@ -66,6 +67,7 @@ namespace mongo {
             const std::string ns = parseNs(dbname, cmdObj);
             Lock::GlobalWrite globalWriteLock;
             Client::Context ctx(ns);
+            DurTransaction txn;
 
             if (replSettings.usingReplSets()) {
                 if (theReplSet->isPrimary()) {
@@ -88,7 +90,7 @@ namespace mongo {
             if ( !waitForSyncToFinish( errmsg ) )
                 return false;
 
-            ReplSource::forceResyncDead( "client" );
+            ReplSource::forceResyncDead( &txn, "client" );
             result.append( "info", "triggered resync for all sources" );
             return true;
         }

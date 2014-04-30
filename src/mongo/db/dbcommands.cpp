@@ -215,7 +215,7 @@ namespace mongo {
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
                 stopIndexBuilds(context.db(), cmdObj);
-                dropDatabase(context.db());
+                dropDatabase(&txn, context.db());
 
                 log() << "dropDatabase " << dbname << " finished";
 

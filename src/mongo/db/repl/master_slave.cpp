@@ -303,28 +303,28 @@ namespace mongo {
         uassert(17066, "Internal error reading from local.sources", Runner::RUNNER_EOF == state);
     }
 
-    bool ReplSource::throttledForceResyncDead( const char *requester ) {
+    bool ReplSource::throttledForceResyncDead( TransactionExperiment* txn, const char *requester ) {
         if ( time( 0 ) - lastForcedResync > 600 ) {
-            forceResyncDead( requester );
+            forceResyncDead( txn, requester );
             lastForcedResync = time( 0 );
             return true;
         }
         return false;
     }
 
-    void ReplSource::forceResyncDead( const char *requester ) {
+    void ReplSource::forceResyncDead( TransactionExperiment* txn, const char *requester ) {
         if ( !replAllDead )
             return;
         SourceVector sources;
         ReplSource::loadAll(sources);
         for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
             log() << requester << " forcing resync from "  << (*i)->hostName << endl;
-            (*i)->forceResync( requester );
+            (*i)->forceResync( txn, requester );
         }
         replAllDead = 0;
     }
 
-    void ReplSource::forceResync( const char *requester ) {
+    void ReplSource::forceResync( TransactionExperiment* txn, const char *requester ) {
         BSONObj info;
         {
             dbtemprelease t;
@@ -344,7 +344,7 @@ namespace mongo {
             if ( !e.embeddedObject().getBoolField( "empty" ) ) {
                 if ( name != "local" ) {
                     if ( only.empty() || only == name ) {
-                        resyncDrop( name );
+                        resyncDrop( txn, name );
                     }
                 }
             }
@@ -354,16 +354,16 @@ namespace mongo {
         save();
     }
 
-    void ReplSource::resyncDrop( const string& db ) {
+    void ReplSource::resyncDrop( TransactionExperiment* txn, const string& db ) {
         log() << "resync: dropping database " << db;
         Client::Context ctx(db);
-        dropDatabase(ctx.db());
+        dropDatabase(txn, ctx.db());
     }
 
     /* grab initial copy of a database from the master */
     void ReplSource::resync(TransactionExperiment* txn, const std::string& dbName) {
         const std::string db(dbName);   // need local copy of the name, we're dropping the original
-        resyncDrop( db );
+        resyncDrop( txn, db );
         Client::Context ctx( db );
         {
             log() << "resync: cloning database " << db << " to get an initial copy" << endl;
@@ -382,7 +382,7 @@ namespace mongo {
 
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
-                    resyncDrop( db );
+                    resyncDrop( txn,  db );
                     log() << "resync: database " << db << " not valid on the master due to a name conflict, dropping." << endl;
                     return;
                 }
@@ -419,7 +419,10 @@ namespace mongo {
         }
     }
 
-    bool ReplSource::handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db ) {
+    bool ReplSource::handleDuplicateDbName( TransactionExperiment* txn,
+                                            const BSONObj &op,
+                                            const char* ns,
+                                            const char* db ) {
         if (dbHolder()._isLoaded(ns, storageGlobalParams.dbpath)) {
             // Database is already present.
             return true;   
@@ -492,7 +495,7 @@ namespace mongo {
             incompleteCloneDbs.erase(*i);
             addDbNextPass.erase(*i);
             Client::Context ctx(*i);
-            dropDatabase(ctx.db());
+            dropDatabase(txn, ctx.db());
         }
         
         massert( 14034, "Duplicate database names present after attempting to delete duplicates",
@@ -594,6 +597,7 @@ namespace mongo {
         }
 
         scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
+        DurTransaction txn; // XXX?
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -601,12 +605,11 @@ namespace mongo {
             throw SyncException();
         }
 
-        if ( !handleDuplicateDbName( op, ns, clientName ) ) {
+        if ( !handleDuplicateDbName( &txn, op, ns, clientName ) ) {
             return;   
         }
                 
         Client::Context ctx( ns );
-        DurTransaction txn;
         ctx.getClient()->curop()->reset();
 
         bool empty = ctx.db()->isEmpty();
@@ -1086,9 +1089,10 @@ namespace mongo {
             int s = 0;
             {
                 Lock::GlobalWrite lk;
+                DurTransaction txn;
                 if ( replAllDead ) {
                     // throttledForceResyncDead can throw
-                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) ) {
+                    if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( &txn, "auto" ) ) {
                         log() << "all sources dead: " << replAllDead << ", sleeping for 5 seconds" << endl;
                         break;
                     }
