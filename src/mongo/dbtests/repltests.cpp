@@ -69,7 +69,7 @@ namespace ReplTests {
             if ( ! c ) {
                 c = _context.db()->createCollection( &_txn, ns() );
             }
-            c->getIndexCatalog()->ensureHaveIdIndex();
+            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
         }
         ~Base() {
             try {

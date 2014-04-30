@@ -32,12 +32,13 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -83,6 +84,7 @@ namespace {
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
             Client::WriteContext wctx(systemUsers);
+            DurTransaction txn;
             Collection* collection = wctx.ctx().db()->getCollection(NamespaceString(systemUsers));
             if (!collection) {
                 return;
@@ -90,7 +92,7 @@ namespace {
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             IndexDescriptor* oldIndex = NULL;
             while ((oldIndex = indexCatalog->findIndexByKeyPattern(v1SystemUsersKeyPattern))) {
-                indexCatalog->dropIndex(oldIndex);
+                indexCatalog->dropIndex(&txn, oldIndex);
             }
         }
     }

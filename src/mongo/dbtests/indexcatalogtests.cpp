@@ -46,19 +46,20 @@ namespace IndexCatalogTests {
 
         void run() {
             Client::WriteContext ctx(_ns);
+            DurTransaction txn;
             int numFinishedIndexesStart = _catalog->numIndexesReady();
 
             BSONObjBuilder b1;
             b1.append("key", BSON("x" << 1));
             b1.append("ns", _ns);
             b1.append("name", "_x_0");
-            _catalog->createIndex(b1.obj(), true);
+            _catalog->createIndex(&txn, b1.obj(), true);
 
             BSONObjBuilder b2;
             b2.append("key", BSON("y" << 1));
             b2.append("ns", _ns);
             b2.append("name", "_y_0");
-            _catalog->createIndex(b2.obj(), true);
+            _catalog->createIndex(&txn, b2.obj(), true);
 
             ASSERT_TRUE(_catalog->numIndexesReady() == numFinishedIndexesStart+2);
 

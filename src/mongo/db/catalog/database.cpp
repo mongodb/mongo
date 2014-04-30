@@ -405,7 +405,7 @@ namespace mongo {
         audit::logDropCollection( currentClient.get(), fullns );
 
         try {
-            Status s = collection->getIndexCatalog()->dropAllIndexes( true );
+            Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
             if ( !s.isOK() ) {
                 warning() << "could not drop collection, trying to drop indexes"
                           << fullns << " because of " << s.toString();
@@ -759,7 +759,7 @@ namespace mongo {
             if ( collection->requiresIdIndex() ) {
                 if ( options.autoIndexId == CollectionOptions::YES ||
                      options.autoIndexId == CollectionOptions::DEFAULT ) {
-                    uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
+                    uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex(txn) );
                 }
             }
 

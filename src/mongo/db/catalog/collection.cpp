@@ -103,7 +103,7 @@ namespace mongo {
                                                          _ns.coll() == "system.indexes" ) );
         }
         _magic = 1357924;
-        _indexCatalog.init();
+        _indexCatalog.init(txn);
     }
 
     Collection::~Collection() {
@@ -251,7 +251,7 @@ namespace mongo {
         _infoCache.notifyOfWriteOp();
 
         try {
-            _indexCatalog.indexRecord( docToInsert, loc.getValue() );
+            _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
         }
         catch ( AssertionException& e ) {
             if ( _details->isCapped() ) {
@@ -293,7 +293,7 @@ namespace mongo {
         /* check if any cursors point to us.  if so, advance them. */
         _cursorCache.invalidateDocument(loc, INVALIDATION_DELETION);
 
-        _indexCatalog.unindexRecord( doc, loc, noWarn);
+        _indexCatalog.unindexRecord(txn, doc, loc, noWarn);
 
         _recordStore->deleteRecord( txn, loc );
 
@@ -365,7 +365,7 @@ namespace mongo {
             // unindex old record, don't delete
             // this way, if inserting new doc fails, we can re-index this one
             _cursorCache.invalidateDocument(oldLocation, INVALIDATION_DELETION);
-            _indexCatalog.unindexRecord( objOld, oldLocation, true );
+            _indexCatalog.unindexRecord(txn, objOld, oldLocation, true);
 
             if ( debug ) {
                 if (debug->nmoved == -1) // default of -1 rather than 0
@@ -383,7 +383,7 @@ namespace mongo {
             }
             else {
                 // new doc insert failed, so lets re-index the old document and location
-                _indexCatalog.indexRecord( objOld, oldLocation );
+                _indexCatalog.indexRecord(txn, objOld, oldLocation);
             }
 
             return loc;
@@ -531,7 +531,7 @@ namespace mongo {
         }
 
         // 2) drop indexes
-        Status status = _indexCatalog.dropAllIndexes( true );
+        Status status = _indexCatalog.dropAllIndexes(txn, true);
         if ( !status.isOK() )
             return status;
         _cursorCache.invalidateAll( false );
@@ -544,7 +544,7 @@ namespace mongo {
 
         // 4) re-create indexes
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
-            status = _indexCatalog.createIndex( indexSpecs[i], false );
+            status = _indexCatalog.createIndex(txn, indexSpecs[i], false);
             if ( !status.isOK() )
                 return status;
         }

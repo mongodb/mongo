@@ -1668,7 +1668,7 @@ namespace mongo {
                         return;
                     }
 
-                    Status status = collection->getIndexCatalog()->createIndex( idx, false );
+                    Status status = collection->getIndexCatalog()->createIndex(&txn, idx, false);
                     if ( !status.isOK() && status.code() != ErrorCodes::IndexAlreadyExists ) {
                         errmsg = str::stream() << "failed to create index before migrating data. "
                                                << " idx: " << idx

@@ -61,7 +61,7 @@ namespace mongo {
         ~IndexCatalog();
 
         // must be called before used
-        Status init();
+        Status init(TransactionExperiment* txn);
 
         bool ok() const;
 
@@ -139,28 +139,31 @@ namespace mongo {
 
         // ---- index set modifiers ------
 
-        Status ensureHaveIdIndex();
+        Status ensureHaveIdIndex(TransactionExperiment* txn);
 
         enum ShutdownBehavior {
             SHUTDOWN_CLEANUP, // fully clean up this build
             SHUTDOWN_LEAVE_DIRTY // leave as if kill -9 happened, so have to deal with on restart
         };
 
-        Status createIndex( BSONObj spec,
+        Status createIndex( TransactionExperiment* txn,
+                            BSONObj spec,
                             bool mayInterrupt,
                             ShutdownBehavior shutdownBehavior = SHUTDOWN_CLEANUP );
 
         StatusWith<BSONObj> prepareSpecForCreate( const BSONObj& original ) const;
 
-        Status dropAllIndexes( bool includingIdIndex );
+        Status dropAllIndexes(TransactionExperiment* txn,
+                              bool includingIdIndex );
 
-        Status dropIndex( IndexDescriptor* desc );
+        Status dropIndex(TransactionExperiment* txn,
+                         IndexDescriptor* desc );
 
         /**
          * will drop all incompleted indexes and return specs
          * after this, the indexes can be rebuilt
          */
-        vector<BSONObj> getAndClearUnfinishedIndexes();
+        vector<BSONObj> getAndClearUnfinishedIndexes(TransactionExperiment* txn);
 
 
         struct IndexKillCriteria {
@@ -200,8 +203,10 @@ namespace mongo {
          */
         class IndexBuildBlock {
         public:
-            IndexBuildBlock( Collection* collection,
-                             const BSONObj& spec );
+            IndexBuildBlock(TransactionExperiment* txn,
+                            Collection* collection,
+                            const BSONObj& spec );
+
             ~IndexBuildBlock();
 
             Status init();
@@ -234,14 +239,19 @@ namespace mongo {
 
             IndexCatalogEntry* _entry;
             bool _inProgress;
+
+            TransactionExperiment* _txn;
         };
 
         // ----- data modifiers ------
 
         // this throws for now
-        void indexRecord( const BSONObj& obj, const DiskLoc &loc );
+        void indexRecord(TransactionExperiment* txn, const BSONObj& obj, const DiskLoc &loc);
 
-        void unindexRecord( const BSONObj& obj, const DiskLoc& loc, bool noWarn );
+        void unindexRecord(TransactionExperiment* txn,
+                           const BSONObj& obj,
+                           const DiskLoc& loc,
+                           bool noWarn);
 
         /**
          * checks all unique indexes and checks for conflicts
@@ -268,7 +278,8 @@ namespace mongo {
         IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
                                                 IndexCatalogEntry* entry );
 
-        int _removeFromSystemIndexes( const StringData& indexName );
+        int _removeFromSystemIndexes(TransactionExperiment* txn,
+                                     const StringData& indexName );
 
         bool _shouldOverridePlugin( const BSONObj& keyPattern ) const;
 
@@ -302,16 +313,19 @@ namespace mongo {
         /**
          * this does no sanity checks
          */
-        Status _dropIndex( IndexCatalogEntry* entry );
+        Status _dropIndex(TransactionExperiment* txn,
+                          IndexCatalogEntry* entry );
 
         // just does disk hanges
         // doesn't change memory state, etc...
-        void _deleteIndexFromDisk( const string& indexName,
+        void _deleteIndexFromDisk( TransactionExperiment* txn,
+                                   const string& indexName,
                                    const string& indexNamespace,
                                    int idxNo );
 
         // descriptor ownership passes to _setupInMemoryStructures
-        IndexCatalogEntry* _setupInMemoryStructures( IndexDescriptor* descriptor );
+        IndexCatalogEntry* _setupInMemoryStructures(TransactionExperiment* txn,
+                                                    IndexDescriptor* descriptor );
 
         static BSONObj _fixIndexSpec( const BSONObj& spec );
 

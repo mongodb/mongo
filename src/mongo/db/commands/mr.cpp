@@ -359,7 +359,7 @@ namespace mongo {
 
                 BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
                                           << "name" << "_temp_0" );
-                Status status = incColl->getIndexCatalog()->createIndex( indexSpec, false );
+                Status status = incColl->getIndexCatalog()->createIndex(&txn, indexSpec, false);
                 // Log the createIndex operation.
                 string logNs = nsToDatabase( _config.incLong ) + ".system.indexes";
                 logOp( &txn, "i", logNs.c_str(), indexSpec );
@@ -419,7 +419,7 @@ namespace mongo {
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
                         it != indexesToInsert.end(); ++it ) {
-                    tempColl->getIndexCatalog()->createIndex( *it, false );
+                    tempColl->getIndexCatalog()->createIndex(&txn, *it, false );
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
                     logOp( &txn, "i", logNs.c_str(), *it );

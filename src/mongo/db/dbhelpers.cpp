@@ -72,7 +72,7 @@ namespace mongo {
         b.appendBool("unique", unique);
         BSONObj o = b.done();
 
-        Status status = collection->getIndexCatalog()->createIndex( o, false );
+        Status status = collection->getIndexCatalog()->createIndex(txn, o, false);
         if ( status.code() == ErrorCodes::IndexAlreadyExists )
             return;
         uassertStatusOK( status );

@@ -45,7 +45,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/processinfo.h"
@@ -77,12 +77,11 @@ namespace mongo {
         uassertStatusOK( ret );
     }
 
-    unsigned long long addExistingToIndex( Collection* collection,
+    unsigned long long addExistingToIndex( TransactionExperiment* txn,
+                                           Collection* collection,
                                            const IndexDescriptor* descriptor,
                                            IndexAccessMethod* accessMethod,
                                            bool shouldYield) {
-
-        DurTransaction txn; // XXX
 
         string ns = collection->ns().ns(); // our copy for sanity
 
@@ -124,10 +123,10 @@ namespace mongo {
             try {
                 if ( !dupsAllowed && dropDups ) {
                     LastError::Disabled led( lastError.get() );
-                    addKeysToIndex(&txn, collection, descriptor, accessMethod, js, loc);
+                    addKeysToIndex(txn, collection, descriptor, accessMethod, js, loc);
                 }
                 else {
-                    addKeysToIndex(&txn, collection, descriptor, accessMethod, js, loc);
+                    addKeysToIndex(txn, collection, descriptor, accessMethod, js, loc);
                 }
             }
             catch( AssertionException& e ) {
@@ -140,8 +139,8 @@ namespace mongo {
                     bool runnerEOF = runner->isEOF();
                     runner->saveState();
                     BSONObj toDelete;
-                    collection->deleteDocument( &txn, loc, false, true, &toDelete );
-                    logOp( &txn, "d", ns.c_str(), toDelete );
+                    collection->deleteDocument( txn, loc, false, true, &toDelete );
+                    logOp( txn, "d", ns.c_str(), toDelete );
 
                     if (!runner->restoreState()) {
                         // Runner got killed somehow.  This probably shouldn't happen.
@@ -200,7 +199,8 @@ namespace mongo {
     // ---------------------------
 
     // throws DBException
-    void buildAnIndex( Collection* collection,
+    void buildAnIndex( TransactionExperiment* txn,
+                       Collection* collection,
                        IndexCatalogEntry* btreeState,
                        bool mayInterrupt ) {
 
@@ -219,10 +219,8 @@ namespace mongo {
         // things like in place updates, etc...
         collection->infoCache()->addedIndex();
 
-        DurTransaction txn;  // XXX
-
         if ( collection->numRecords() == 0 ) {
-            Status status = btreeState->accessMethod()->initializeAsEmpty(&txn);
+            Status status = btreeState->accessMethod()->initializeAsEmpty(txn);
             massert( 17343,
                      str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
                      status.isOK() );
@@ -242,21 +240,22 @@ namespace mongo {
             log() << "\t building index in background";
         }
 
-        Status status = btreeState->accessMethod()->initializeAsEmpty(&txn);
+        Status status = btreeState->accessMethod()->initializeAsEmpty(txn);
         massert( 17342,
                  str::stream()
                  << "IndexAccessMethod::initializeAsEmpty failed"
                  << status.toString(),
                  status.isOK() );
 
-        IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk(&txn);
+        IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk(txn);
         scoped_ptr<IndexAccessMethod> bulkHolder(bulk);
         IndexAccessMethod* iam = bulk ? bulk : btreeState->accessMethod();
 
         if ( bulk )
             log() << "\t building index using bulk method";
 
-        unsigned long long n = addExistingToIndex( collection,
+        unsigned long long n = addExistingToIndex( txn,
+                                                   collection,
                                                    btreeState->descriptor(),
                                                    iam,
                                                    doInBackground );
@@ -284,13 +283,13 @@ namespace mongo {
 
             for( set<DiskLoc>::const_iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); ++i ) {
                 BSONObj toDelete;
-                collection->deleteDocument( &txn,
+                collection->deleteDocument( txn,
                                             *i,
                                             false /* cappedOk */,
                                             true /* noWarn */,
                                             &toDelete );
                 if ( isMaster( ns.c_str() ) ) {
-                    logOp( &txn, "d", ns.c_str(), toDelete );
+                    logOp( txn, "d", ns.c_str(), toDelete );
                 }
                 
                 getDur().commitIfNeeded();
@@ -346,7 +345,7 @@ namespace mongo {
             info = statusWithInfo.getValue();
 
             IndexState state;
-            state.block = new IndexCatalog::IndexBuildBlock( _collection, info );
+            state.block = new IndexCatalog::IndexBuildBlock(_txn, _collection, info);
             status = state.block->init();
             if ( !status.isOK() )
                 return status;

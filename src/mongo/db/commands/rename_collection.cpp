@@ -318,7 +318,7 @@ namespace mongo {
 
                 for ( vector<BSONObj>::iterator it = copiedIndexes.begin();
                                                 it != copiedIndexes.end(); ++it ) {
-                    Status s = targetColl->getIndexCatalog()->createIndex( *it, true );
+                    Status s = targetColl->getIndexCatalog()->createIndex(txn, *it, true );
                     if ( !s.isOK() ) {
                         indexSuccessful = false;
                         errmsg = s.toString();

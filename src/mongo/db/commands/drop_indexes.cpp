@@ -132,7 +132,7 @@ namespace mongo {
                 string indexToDelete = f.valuestr();
 
                 if ( indexToDelete == "*" ) {
-                    Status s = indexCatalog->dropAllIndexes( false );
+                    Status s = indexCatalog->dropAllIndexes(txn, false);
                     if ( !s.isOK() ) {
                         appendCommandStatus( anObjBuilder, s );
                         return false;
@@ -152,7 +152,7 @@ namespace mongo {
                     return false;
                 }
 
-                Status s = indexCatalog->dropIndex( desc );
+                Status s = indexCatalog->dropIndex(txn, desc);
                 if ( !s.isOK() ) {
                     appendCommandStatus( anObjBuilder, s );
                     return false;
@@ -174,7 +174,7 @@ namespace mongo {
                     return false;
                 }
 
-                Status s = indexCatalog->dropIndex( desc );
+                Status s = indexCatalog->dropIndex(txn, desc);
                 if ( !s.isOK() ) {
                     appendCommandStatus( anObjBuilder, s );
                     return false;
@@ -223,6 +223,7 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(toDeleteNs);
+            DurTransaction txn;
 
             Collection* collection = ctx.db()->getCollection( toDeleteNs );
 
@@ -254,7 +255,7 @@ namespace mongo {
             }
             result.appendNumber( "nIndexesWas", collection->getIndexCatalog()->numIndexesTotal() );
 
-            Status s = collection->getIndexCatalog()->dropAllIndexes( true );
+            Status s = collection->getIndexCatalog()->dropAllIndexes(&txn, true);
             if ( !s.isOK() ) {
                 errmsg = "dropIndexes failed";
                 return appendCommandStatus( result, s );
@@ -263,7 +264,7 @@ namespace mongo {
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
                 BSONObj o = *i;
                 LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
-                Status s = collection->getIndexCatalog()->createIndex( o, false );
+                Status s = collection->getIndexCatalog()->createIndex(&txn, o, false);
                 if ( !s.isOK() )
                     return appendCommandStatus( result, s );
             }

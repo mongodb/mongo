@@ -61,7 +61,7 @@
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
@@ -92,7 +92,7 @@ namespace mongo {
         _magic = 123456;
     }
 
-    Status IndexCatalog::init() {
+    Status IndexCatalog::init(TransactionExperiment* txn) {
 
         NamespaceDetails::IndexIterator ii = _details->ii(true);
         while ( ii.more() ) {
@@ -109,7 +109,7 @@ namespace mongo {
             IndexDescriptor* descriptor = new IndexDescriptor( _collection,
                                                                _getAccessMethodName(keyPattern),
                                                                ownedInfoObj );
-            IndexCatalogEntry* entry = _setupInMemoryStructures( descriptor );
+            IndexCatalogEntry* entry = _setupInMemoryStructures(txn, descriptor );
 
             fassert( 17340, entry->isReady()  );
         }
@@ -125,8 +125,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures( IndexDescriptor* descriptor ) {
-        DurTransaction txn; //XXX
+    IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(TransactionExperiment* txn,
+                                                              IndexDescriptor* descriptor) {
         auto_ptr<IndexDescriptor> descriptorCleanup( descriptor );
 
         NamespaceDetails* indexMetadata =
@@ -136,7 +136,7 @@ namespace mongo {
                  str::stream() << "no NamespaceDetails for index: " << descriptor->toString(),
                  indexMetadata );
 
-        auto_ptr<RecordStore> recordStore( new SimpleRecordStoreV1( &txn,
+        auto_ptr<RecordStore> recordStore( new SimpleRecordStoreV1( txn,
                                                                     descriptor->indexNamespace(),
                                                                     new NamespaceDetailsRSV1MetaData( indexMetadata ),
                                                                     _collection->getExtentManager(),
@@ -166,7 +166,7 @@ namespace mongo {
                 requirePowerOf2 = true;
 
             if ( requirePowerOf2 ) {
-                _collection->setUserFlag(&txn, NamespaceDetails::Flag_UsePowerOf2Sizes);
+                _collection->setUserFlag(txn, NamespaceDetails::Flag_UsePowerOf2Sizes);
             }
         }
 
@@ -306,10 +306,12 @@ namespace mongo {
         return StatusWith<BSONObj>( fixed );
     }
 
-    Status IndexCatalog::createIndex( BSONObj spec,
+    Status IndexCatalog::createIndex( TransactionExperiment* txn,
+                                      BSONObj spec,
                                       bool mayInterrupt,
                                       ShutdownBehavior shutdownBehavior ) {
         Lock::assertWriteLocked( _collection->_database->name() );
+
         _checkMagic();
         Status status = _checkUnfinished();
         if ( !status.isOK() )
@@ -329,7 +331,7 @@ namespace mongo {
         }
 
         // now going to touch disk
-        IndexBuildBlock indexBuildBlock( _collection, spec );
+        IndexBuildBlock indexBuildBlock(txn, _collection, spec);
         status = indexBuildBlock.init();
         if ( !status.isOK() )
             return status;
@@ -354,7 +356,7 @@ namespace mongo {
             // IndexCatalog can be dropped, which means both the Collection and IndexCatalog
             // can be destructed out from under us.  The runner used by the index build will
             // throw a particular exception when it detects that this occurred.
-            buildAnIndex( _collection, entry, mayInterrupt );
+            buildAnIndex( txn, _collection, entry, mayInterrupt );
             indexBuildBlock.success();
 
             InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
@@ -395,14 +397,16 @@ namespace mongo {
         }
     }
 
-    IndexCatalog::IndexBuildBlock::IndexBuildBlock( Collection* collection,
-                                                    const BSONObj& spec )
+    IndexCatalog::IndexBuildBlock::IndexBuildBlock(TransactionExperiment* txn,
+                                                   Collection* collection,
+                                                   const BSONObj& spec )
         : _collection( collection ),
           _catalog( collection->getIndexCatalog() ),
           _ns( _catalog->_collection->ns().ns() ),
           _spec( spec.getOwned() ),
           _entry( NULL ),
-          _inProgress( false ) {
+          _inProgress( false ),
+          _txn(txn) {
 
         invariant( collection );
     }
@@ -430,8 +434,7 @@ namespace mongo {
         Collection* systemIndexes = db->getOrCreateCollection( db->_indexesName );
         invariant( systemIndexes );
 
-        DurTransaction txn; //XXX
-        StatusWith<DiskLoc> systemIndexesEntry = systemIndexes->insertDocument( &txn, _spec, false );
+        StatusWith<DiskLoc> systemIndexesEntry = systemIndexes->insertDocument( _txn, _spec, false );
         if ( !systemIndexesEntry.isOK() )
             return systemIndexesEntry.getStatus();
 
@@ -444,7 +447,7 @@ namespace mongo {
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;
-            _catalog->_removeFromSystemIndexes( descriptor->indexName() );
+            _catalog->_removeFromSystemIndexes(_txn, descriptor->indexName());
             return Status( ErrorCodes::InternalError, e.toString() );
         }
 
@@ -455,7 +458,7 @@ namespace mongo {
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
             fassert( 17344, before == _collection->details()->_indexBuildsInProgress );
-            _catalog->_removeFromSystemIndexes( descriptor->indexName() );
+            _catalog->_removeFromSystemIndexes(_txn, descriptor->indexName());
             return Status( ErrorCodes::InternalError, e.toString() );
         }
 
@@ -469,11 +472,11 @@ namespace mongo {
         nsi.add_ns( descriptor->indexNamespace(), DiskLoc(), false );
 
         // 4) system.namespaces entry index ns
-        db->_addNamespaceToCatalog( &txn, descriptor->indexNamespace(), NULL );
+        db->_addNamespaceToCatalog(_txn, descriptor->indexNamespace(), NULL);
 
         /// ----------   setup in memory structures  ----------------
 
-        _entry = _catalog->_setupInMemoryStructures( descriptorCleaner.release() );
+        _entry = _catalog->_setupInMemoryStructures(_txn, descriptorCleaner.release());
 
         return Status::OK();
     }
@@ -515,10 +518,11 @@ namespace mongo {
         invariant( entry == _entry );
 
         if ( entry ) {
-            _catalog->_dropIndex( entry );
+            _catalog->_dropIndex(_txn, entry);
         }
         else {
-            _catalog->_deleteIndexFromDisk( _indexName,
+            _catalog->_deleteIndexFromDisk( _txn,
+                                            _indexName,
                                             _indexNamespace,
                                             idxNo );
         }
@@ -709,7 +713,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::ensureHaveIdIndex() {
+    Status IndexCatalog::ensureHaveIdIndex(TransactionExperiment* txn) {
         if ( _details->isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex ) )
             return Status::OK();
 
@@ -721,7 +725,7 @@ namespace mongo {
         b.append( "key", _idObj );
         BSONObj o = b.done();
 
-        Status s = createIndex( o, false );
+        Status s = createIndex(txn, o, false);
         if ( s.isOK() || s.code() == ErrorCodes::IndexAlreadyExists ) {
             _details->setSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
             return Status::OK();
@@ -730,7 +734,9 @@ namespace mongo {
         return s;
     }
 
-    Status IndexCatalog::dropAllIndexes( bool includingIdIndex ) {
+    Status IndexCatalog::dropAllIndexes(TransactionExperiment* txn,
+                                        bool includingIdIndex) {
+
         Lock::assertWriteLocked( _collection->_database->name() );
 
         BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
@@ -769,7 +775,7 @@ namespace mongo {
             LOG(1) << "\t dropAllIndexes dropping: " << desc->toString();
             IndexCatalogEntry* entry = _entries.find( desc );
             invariant( entry );
-            _dropIndex( entry );
+            _dropIndex(txn, entry);
         }
 
         // verify state is sane post cleaning
@@ -812,17 +818,23 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::dropIndex( IndexDescriptor* desc ) {
+    Status IndexCatalog::dropIndex(TransactionExperiment* txn,
+                                   IndexDescriptor* desc ) {
+
         Lock::assertWriteLocked( _collection->_database->name() );
         IndexCatalogEntry* entry = _entries.find( desc );
+
         if ( !entry )
             return Status( ErrorCodes::InternalError, "cannot find index to delete" );
+
         if ( !entry->isReady() )
             return Status( ErrorCodes::InternalError, "cannot delete not ready index" );
-        return _dropIndex( entry );
+
+        return _dropIndex(txn, entry);
     }
 
-    Status IndexCatalog::_dropIndex( IndexCatalogEntry* entry ) {
+    Status IndexCatalog::_dropIndex(TransactionExperiment* txn,
+                                    IndexCatalogEntry* entry ) {
         /**
          * IndexState in order
          *  <db>.system.indexes
@@ -864,7 +876,8 @@ namespace mongo {
             _details->clearSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
 
             // ****   this is the first disk change ****
-            _deleteIndexFromDisk( indexName,
+            _deleteIndexFromDisk( txn,
+                                  indexName,
                                   indexNamespace,
                                   idxNo );
         }
@@ -888,15 +901,15 @@ namespace mongo {
         return Status::OK();
     }
 
-    void IndexCatalog::_deleteIndexFromDisk( const string& indexName,
+    void IndexCatalog::_deleteIndexFromDisk( TransactionExperiment* txn,
+                                             const string& indexName,
                                              const string& indexNamespace,
                                              int idxNo ) {
         invariant( idxNo >= 0 );
         invariant(_details->_catalogFindIndexByName(_collection, indexName, true) == idxNo);
 
         // data + system.namespacesa
-        DurTransaction txn; // XXX
-        Status status = _collection->_database->_dropNS( &txn, indexNamespace );
+        Status status = _collection->_database->_dropNS( txn, indexNamespace );
         if ( status.code() == ErrorCodes::NamespaceNotFound ) {
             // this is ok, as we may be partially through index creation
         }
@@ -910,17 +923,17 @@ namespace mongo {
         // remove from system.indexes
         // n is how many things were removed from this
         // probably should clean this up
-        int n = _removeFromSystemIndexes( indexName );
+        int n = _removeFromSystemIndexes(txn, indexName);
         wassert( n == 1 );
     }
 
-    int IndexCatalog::_removeFromSystemIndexes( const StringData& indexName ) {
+    int IndexCatalog::_removeFromSystemIndexes(TransactionExperiment* txn,
+                                               const StringData& indexName) {
         BSONObjBuilder b;
         b.append( "ns", _collection->ns() );
         b.append( "name", indexName );
         BSONObj cond = b.obj(); // e.g.: { name: "ts_1", ns: "foo.coll" }
-        DurTransaction txn; // XXX
-        return static_cast<int>( deleteObjects( &txn,
+        return static_cast<int>( deleteObjects( txn,
                                                 _collection->_database->_indexesName,
                                                 cond,
                                                 false,
@@ -928,7 +941,7 @@ namespace mongo {
                                                 true ) );
     }
 
-    vector<BSONObj> IndexCatalog::getAndClearUnfinishedIndexes() {
+    vector<BSONObj> IndexCatalog::getAndClearUnfinishedIndexes(TransactionExperiment* txn) {
         vector<BSONObj> toReturn = _unfinishedIndexes;
         _unfinishedIndexes.clear();
         for ( size_t i = 0; i < toReturn.size(); i++ ) {
@@ -941,7 +954,8 @@ namespace mongo {
             invariant( idxNo >= 0 );
             invariant( idxNo >= numIndexesReady() );
 
-            _deleteIndexFromDisk( desc.indexName(),
+            _deleteIndexFromDisk( txn,
+                                  desc.indexName(),
                                   desc.indexNamespace(),
                                   idxNo );
         }
@@ -1198,8 +1212,9 @@ namespace mongo {
     }
 
 
-    void IndexCatalog::indexRecord( const BSONObj& obj, const DiskLoc &loc ) {
-        DurTransaction txn;  // XXX
+    void IndexCatalog::indexRecord(TransactionExperiment* txn,
+                                   const BSONObj& obj,
+                                   const DiskLoc &loc ) {
 
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
               i != _entries.end();
@@ -1208,7 +1223,7 @@ namespace mongo {
             IndexCatalogEntry* entry = *i;
 
             try {
-                Status s = _indexRecord( &txn, entry, obj, loc );
+                Status s = _indexRecord( txn, entry, obj, loc );
                 uassert(s.location(), s.reason(), s.isOK() );
             }
             catch ( AssertionException& ae ) {
@@ -1222,7 +1237,7 @@ namespace mongo {
                     IndexCatalogEntry* toDelete = *j;
 
                     try {
-                        _unindexRecord(&txn, toDelete, obj, loc, false);
+                        _unindexRecord(txn, toDelete, obj, loc, false);
                     }
                     catch ( DBException& e ) {
                         LOG(1) << "IndexCatalog::indexRecord rollback failed: " << e;
@@ -1238,8 +1253,10 @@ namespace mongo {
 
     }
 
-    void IndexCatalog::unindexRecord( const BSONObj& obj, const DiskLoc& loc, bool noWarn ) {
-        DurTransaction txn;  // XXX
+    void IndexCatalog::unindexRecord(TransactionExperiment* txn,
+                                     const BSONObj& obj,
+                                     const DiskLoc& loc,
+                                     bool noWarn) {
 
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
               i != _entries.end();
@@ -1249,9 +1266,8 @@ namespace mongo {
 
             // If it's a background index, we DO NOT want to log anything.
             bool logIfError = entry->isReady() ? !noWarn : false;
-            _unindexRecord(&txn, entry, obj, loc, logIfError);
+            _unindexRecord(txn, entry, obj, loc, logIfError);
         }
-
     }
 
     Status IndexCatalog::checkNoIndexConflicts( const BSONObj &obj ) {

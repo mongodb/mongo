@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -82,7 +83,9 @@ namespace mongo {
         // Show which index we're building in the curop display.
         context.getClient()->curop()->setQuery(_index);
 
-        Status status = c->getIndexCatalog()->createIndex( _index, 
+        DurTransaction txn;  // XXX
+        Status status = c->getIndexCatalog()->createIndex( &txn,
+                                                           _index, 
                                                            true, 
                                                            IndexCatalog::SHUTDOWN_LEAVE_DIRTY );
         if ( status.code() == ErrorCodes::IndexAlreadyExists )

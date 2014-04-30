@@ -1044,7 +1044,7 @@ namespace mongo {
 
         Lock::assertWriteLocked( indexNS );
 
-        Status status = collection->getIndexCatalog()->createIndex( indexDesc, true );
+        Status status = collection->getIndexCatalog()->createIndex(&txn, indexDesc, true);
 
         if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
             result->getStats().n = 0;

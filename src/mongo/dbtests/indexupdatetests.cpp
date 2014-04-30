@@ -318,7 +318,7 @@ namespace IndexUpdateTests {
             db->dropCollection( &_txn, _ns );
             Collection* coll = db->createCollection( &_txn, _ns );
             // Drop all indexes including id index.
-            coll->getIndexCatalog()->dropAllIndexes( true );
+            coll->getIndexCatalog()->dropAllIndexes(&_txn, true );
             // Insert some documents with enforceQuota=true.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
@@ -330,7 +330,7 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
             // The call is interrupted because mayInterrupt == true.
-            Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
+            Status status = coll->getIndexCatalog()->createIndex(&_txn, indexInfo, true );
             ASSERT_NOT_OK( status.code() );
             // only want to interrupt the index build
             killCurrentOp.reset();
@@ -347,7 +347,7 @@ namespace IndexUpdateTests {
             Database* db = _ctx.ctx().db();
             db->dropCollection( &_txn, _ns );
             Collection* coll = db->createCollection( &_txn, _ns );
-            coll->getIndexCatalog()->dropAllIndexes( true );
+            coll->getIndexCatalog()->dropAllIndexes(&_txn, true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
@@ -359,7 +359,7 @@ namespace IndexUpdateTests {
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
             // The call is not interrupted because mayInterrupt == false.
-            Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
+            Status status = coll->getIndexCatalog()->createIndex(&_txn, indexInfo, false );
             ASSERT_OK( status.code() );
             // only want to interrupt the index build
             killCurrentOp.reset();
@@ -379,7 +379,7 @@ namespace IndexUpdateTests {
             options.capped = true;
             options.cappedSize = 10 * 1024;
             Collection* coll = db->createCollection( &_txn, _ns, options );
-            coll->getIndexCatalog()->dropAllIndexes( true );
+            coll->getIndexCatalog()->dropAllIndexes(&_txn, true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
@@ -393,7 +393,7 @@ namespace IndexUpdateTests {
                                       "ns" << _ns <<
                                       "name" << "_id_" );
             // The call is interrupted because mayInterrupt == true.
-            Status status = coll->getIndexCatalog()->createIndex( indexInfo, true );
+            Status status = coll->getIndexCatalog()->createIndex(&_txn, indexInfo, true );
             ASSERT_NOT_OK( status.code() );
             // only want to interrupt the index build
             killCurrentOp.reset();
@@ -413,7 +413,7 @@ namespace IndexUpdateTests {
             options.capped = true;
             options.cappedSize = 10 * 1024;
             Collection* coll = db->createCollection( &_txn, _ns, options );
-            coll->getIndexCatalog()->dropAllIndexes( true );
+            coll->getIndexCatalog()->dropAllIndexes(&_txn, true );
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {
@@ -427,7 +427,7 @@ namespace IndexUpdateTests {
                                       "ns" << _ns <<
                                       "name" << "_id_" );
             // The call is not interrupted because mayInterrupt == false.
-            Status status = coll->getIndexCatalog()->createIndex( indexInfo, false );
+            Status status = coll->getIndexCatalog()->createIndex(&_txn, indexInfo, false );
             ASSERT_OK( status.code() );
             // only want to interrupt the index build
             killCurrentOp.reset();

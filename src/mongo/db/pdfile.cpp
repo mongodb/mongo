@@ -92,13 +92,6 @@ namespace mongo {
         return _dbHolder;
     }
 
-    void ensureIdIndexForNewNs( Collection* collection ) {
-        if ( collection->ns().isSystem() && !legalClientSystemNS( collection->ns().ns(), false ) )
-            return;
-
-        uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
-    }
-
     /*---------------------------------------------------------------------*/
 
     /** { ..., capped: true, size: ..., max: ... }

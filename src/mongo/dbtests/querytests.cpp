@@ -86,7 +86,7 @@ namespace QueryTests {
             b.append( "ns", ns() );
             b.append( "key", key );
             BSONObj o = b.done();
-            Status s = _collection->getIndexCatalog()->createIndex( o, false );
+            Status s = _collection->getIndexCatalog()->createIndex(&_txn, o, false);
             uassertStatusOK( s );
         }
         void insert( const char *s ) {

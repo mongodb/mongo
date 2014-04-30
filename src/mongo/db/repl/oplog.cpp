@@ -600,7 +600,7 @@ namespace mongo {
                     // probably don't need this since all replicated colls have _id indexes now
                     // but keep it just in case
                     RARELY if ( indexCatalog && !collection->isCapped() ) {
-                        indexCatalog->ensureHaveIdIndex();
+                        indexCatalog->ensureHaveIdIndex(txn);
                     }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
@@ -629,7 +629,7 @@ namespace mongo {
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
             RARELY if ( indexCatalog && !collection->isCapped() ) {
-                indexCatalog->ensureHaveIdIndex();
+                indexCatalog->ensureHaveIdIndex(txn);
             }
 
             OpDebug debug;

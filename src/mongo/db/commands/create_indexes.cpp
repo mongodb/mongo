@@ -191,7 +191,7 @@ namespace mongo {
                     }
                 }
 
-                status = collection->getIndexCatalog()->createIndex( spec, true );
+                status = collection->getIndexCatalog()->createIndex(&txn, spec, true);
                 if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
                     if ( !result.hasField( "note" ) )
                         result.append( "note", "index already exists" );

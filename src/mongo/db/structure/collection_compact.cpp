@@ -143,7 +143,7 @@ namespace mongo {
         // note that the drop indexes call also invalidates all clientcursors for the namespace,
         // which is important and wanted here
         log() << "compact dropping indexes" << endl;
-        Status status = _indexCatalog.dropAllIndexes( true );
+        Status status = _indexCatalog.dropAllIndexes(txn, true);
         if ( !status.isOK() ) {
             return StatusWith<CompactStats>( status );
         }

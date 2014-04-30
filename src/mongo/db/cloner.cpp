@@ -268,7 +268,7 @@ namespace mongo {
                     verify( collection );
                 }
 
-                Status status = collection->getIndexCatalog()->createIndex( spec, mayBeInterrupted );
+                Status status = collection->getIndexCatalog()->createIndex(txn, spec, mayBeInterrupted);
                 if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
                     // no-op
                 }
@@ -511,7 +511,7 @@ namespace mongo {
                     inDBRepair = true;
                     Collection* c = context.db()->getCollection( to_name );
                     if ( c )
-                        c->getIndexCatalog()->ensureHaveIdIndex();
+                        c->getIndexCatalog()->ensureHaveIdIndex(txn);
                     inDBRepair = old;
                 }
                 catch(...) {

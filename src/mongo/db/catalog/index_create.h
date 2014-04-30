@@ -37,18 +37,19 @@
 #include "mongo/base/status.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/storage/transaction.h"
 
 namespace mongo {
 
     class BSONObj;
     class Collection;
     class IndexCatalogEntry;
+    class TransactionExperiment;
 
     // Build an index in the foreground
     // If background is false, uses fast index builder
     // If background is true, uses background index builder; blocks until done.
-    void buildAnIndex( Collection* collection,
+    void buildAnIndex( TransactionExperiment* txn,
+                       Collection* collection,
                        IndexCatalogEntry* btreeState,
                        bool mayInterrupt );
 
