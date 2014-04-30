@@ -383,25 +383,18 @@ off_page:		ikey = key;
 			}
 
 			/*
-			 * We may only be referencing a key, get a copy of it
-			 * (this call cannot be combined with the buffer grow
-			 * we're about to do because this buffer may be mapped,
-			 * that is, it may have been used to read a mapped-in
-			 * overflow key).
+			 * Grow the buffer as necessary as well as ensure data
+			 * has been copied into local buffer space, then append
+			 * the suffix to the prefix already in the buffer.
+			 *
+			 * Don't grow the buffer unnecessarily or copy data we
+			 * don't need, truncate the item's data length to the
+			 * prefix bytes.
 			 */
-			if (retb->data != retb->mem)
-				WT_ERR(__wt_buf_set(
-				    session, retb, retb->data, retb->size));
-
-			/*
-			 * Extend the buffer as necessary to hold the key bytes
-			 * plus the prefix, append the key to the prefix already
-			 * in the buffer.
-			 */
-			WT_ERR(__wt_buf_grow(
-			    session, retb, size + unpack->prefix));
-			memcpy((uint8_t *)retb->data + unpack->prefix, p, size);
-			retb->size = size + unpack->prefix;
+			retb->size = unpack->prefix;
+			WT_ERR(__wt_buf_grow(session, retb, retb->size + size));
+			memcpy((uint8_t *)retb->data + retb->size, p, size);
+			retb->size += size;
 
 			if (slot_offset == 0)
 				break;
