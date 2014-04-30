@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 

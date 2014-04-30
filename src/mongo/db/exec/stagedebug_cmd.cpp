@@ -46,8 +46,6 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {

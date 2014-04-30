@@ -41,7 +41,6 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 

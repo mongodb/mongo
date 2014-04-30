@@ -79,7 +79,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/util/processinfo.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 

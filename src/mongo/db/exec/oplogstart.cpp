@@ -32,7 +32,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 
 namespace mongo {
 
