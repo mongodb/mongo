@@ -300,11 +300,8 @@ public:
      */
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
         Collection* collection = db->getCollection( ns );
-        const NamespaceDetails * nsd = collection->details();
-        toolInfoLog() << "nrecords: " << nsd->numRecords()
-                      << " datasize: " << nsd->dataSize()
-                      << " firstExtent: " << nsd->firstExtent()
-                      << " lastExtent: " << nsd->lastExtent()
+        toolInfoLog() << "nrecords: " << collection->numRecords()
+                      << " datasize: " << collection->dataSize()
                       << std::endl;
 
         outfile /= ( ns.substr( ns.find( "." ) + 1 ) + ".bson" );
@@ -313,7 +310,7 @@ public:
         FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
         // init with double the docs count because we make two passes 
-        ProgressMeter m( nsd->numRecords() * 2 );
+        ProgressMeter m( collection->numRecords() * 2 );
         m.setName("Repair Progress");
         m.setUnits("documents");
 
