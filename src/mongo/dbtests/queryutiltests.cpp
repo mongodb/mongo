@@ -1559,11 +1559,9 @@ namespace QueryUtilTests {
                 ASSERT( !frsp3.noNonUniversalRanges() );
                 // A single key invalid constraint is not universal.
                 FieldRangeSetPair frsp4( "", BSON( "a" << GT << 1 << LT << 0 ) );
-                ASSERT( frsp4.frsForIndex( 0, -1 ).matchPossible() );
                 ASSERT( !frsp4.noNonUniversalRanges() );
                 // Still not universal if multikey invalid constraint.
                 FieldRangeSetPair frsp5( "", BSON( "a" << BSON( "$in" << BSONArray() ) ) );
-                ASSERT( !frsp5.frsForIndex( 0, -1 ).matchPossible() );
                 ASSERT( !frsp5.noNonUniversalRanges() );
             }
         };
@@ -1577,9 +1575,6 @@ namespace QueryUtilTests {
                 // Match possible for single key invalid query.
                 FieldRangeSetPair frsp2( "", BSON( "a" << GT << 1 << LT << 0 ) );
                 ASSERT( frsp2.matchPossible() );
-                // Match not possible for multi key invalid query.
-                frsp1 -= frsp1.frsForIndex( 0, - 1 );
-                ASSERT( !frsp1.matchPossible() );
             }
         };
 
@@ -1625,24 +1620,7 @@ namespace QueryUtilTests {
             int indexNum_;
         };
         DBDirectClient IndexBase::client_;
-        
-        class MatchPossibleForIndex : public IndexBase {
-        public:
-            void run() {
-                int a = indexno( BSON( "a" << 1 ) );
-                int b = indexno( BSON( "b" << 1 ) );
-                IndexBase::client_.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) << "b" << 1 ) );
-                // Valid ranges match possible for both indexes.
-                FieldRangeSetPair frsp1( ns(), BSON( "a" << GT << 1 << LT << 4 << "b" << GT << 1 << LT << 4 ) );
-                ASSERT( frsp1.matchPossibleForIndex( nsd(), a, BSON( "a" << 1 ) ) );
-                ASSERT( frsp1.matchPossibleForIndex( nsd(), b, BSON( "b" << 1 ) ) );
-                // Single key invalid range means match impossible for single key index.
-                FieldRangeSetPair frsp2( ns(), BSON( "a" << GT << 4 << LT << 1 << "b" << GT << 4 << LT << 1 ) );
-                ASSERT( frsp2.matchPossibleForIndex( nsd(), a, BSON( "a" << 1 ) ) );
-                ASSERT( !frsp2.matchPossibleForIndex( nsd(), b, BSON( "b" << 1 ) ) );
-            }
-        };
-        
+
     } // namespace FieldRangeSetPairTests
     
     namespace FieldRangeVectorTests {
@@ -2922,7 +2900,6 @@ namespace QueryUtilTests {
             add<FieldRangeSetPairTests::ToString>();
             add<FieldRangeSetPairTests::NoNonUniversalRanges>();
             add<FieldRangeSetPairTests::MatchPossible>();
-            add<FieldRangeSetPairTests::MatchPossibleForIndex>();
             add<FieldRangeVectorTests::ToString>();
             add<FieldRangeVectorTests::HasAllIndexedRanges>();
             add<FieldRangeVectorTests::SingleInterval>();

@@ -121,24 +121,5 @@ namespace mongo {
         }
         return ret;
     }
-    
-    inline bool FieldRangeSetPair::matchPossibleForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
-        assertValidIndexOrNoIndex( d, idxNo );
-        if ( !matchPossible() ) {
-            return false;
-        }
-        if ( idxNo < 0 ) {
-            // multi key matchPossible() is true, so return true.
-            return true;   
-        }
-        return frsForIndex( d, idxNo ).matchPossibleForIndex( keyPattern );
-    }
 
-    inline void FieldRangeSetPair::assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const {
-        massert( 14049, "FieldRangeSetPair invalid index specified", idxNo >= -1 );
-        if ( idxNo >= 0 ) {
-            assertValidIndex( d, idxNo );   
-        }
-    }        
-    
 } // namespace mongo

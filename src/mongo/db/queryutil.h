@@ -350,8 +350,6 @@ namespace mongo {
         bool _boundElemMatch;
     };
 
-    class NamespaceDetails;
-    
     /**
      * A pair of FieldRangeSets, one representing constraints for single key
      * indexes and the other representing constraints for multi key indexes and
@@ -365,12 +363,6 @@ namespace mongo {
         FieldRangeSetPair( const char *ns, const BSONObj &query, bool optimize=true )
         :_singleKey( ns, query, true, optimize ), _multiKey( ns, query, false, optimize ) {}
 
-        /**
-         * @return the appropriate single or multi key FieldRangeSet for the specified index.
-         * @param idxNo -1 for non index scan.
-         */
-        const FieldRangeSet &frsForIndex( const NamespaceDetails* nsd, int idxNo ) const;
-
         /** @return a field range in the single key FieldRangeSet. */
         const FieldRange &shardKeyRange( const char *fieldName ) const {
             return _singleKey.range( fieldName );
@@ -383,8 +375,6 @@ namespace mongo {
          * @return false if a match is impossible on the specified index.
          * @param idxNo -1 for non index scan.
          */
-        bool matchPossibleForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const;
-        
         const char *ns() const { return _singleKey.ns(); }
 
         SpecialIndices getSpecial() const { return _singleKey.getSpecial(); }
@@ -410,8 +400,6 @@ namespace mongo {
     private:
         FieldRangeSetPair( const FieldRangeSet &singleKey, const FieldRangeSet &multiKey )
         :_singleKey( singleKey ), _multiKey( multiKey ) {}
-        void assertValidIndex( const NamespaceDetails *d, int idxNo ) const;
-        void assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const;
         /** matchPossibleForIndex() must be true. */
         FieldRangeSet _singleKey;
         FieldRangeSet _multiKey;
@@ -697,7 +685,6 @@ namespace mongo {
         /** @return true iff we are done scanning $or clauses, or if there are no $or clauses. */
         bool orRangesExhausted() const { return _orSets.empty(); }
         /** Iterates to the next $or clause by removing the current $or clause. */
-        void popOrClause( NamespaceDetails *nsd, int idxNo, const BSONObj &keyPattern );
         void popOrClauseSingleKey();
         /** @return FieldRangeSetPair for the current $or clause. */
         FieldRangeSetPair *topFrsp() const;
@@ -712,7 +699,7 @@ namespace mongo {
         SpecialIndices getSpecial() const { return _baseSet.getSpecial(); }
     private:
         void assertMayPopOrClause();
-        void _popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern );
+        void _popOrClause( const FieldRangeSet *toDiff, int idxNo, const BSONObj &keyPattern );
         FieldRangeSetPair _baseSet;
         list<FieldRangeSetPair> _orSets;
         list<FieldRangeSetPair> _originalOrSets;

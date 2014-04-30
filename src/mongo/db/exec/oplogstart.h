@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-    class NamespaceDetails;
-
     /**
      * OplogStart walks a collection backwards to find the first object in the collection that
      * matches the query.  It's used by replication to efficiently find where the oplog should be
