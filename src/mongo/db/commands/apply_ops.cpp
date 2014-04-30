@@ -80,6 +80,11 @@ namespace mongo {
                 }
             }
 
+            // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
+            // ns used so locking individually requires more analysis
+            Lock::GlobalWrite globalWriteLock;
+
+            // Preconditions check reads the database state, so needs to be done locked
             if ( cmdObj["preCondition"].type() == Array ) {
                 BSONObjIterator i( cmdObj["preCondition"].Obj() );
                 while ( i.more() ) {
@@ -105,9 +110,6 @@ namespace mongo {
             BSONArrayBuilder ab;
             const bool alwaysUpsert = cmdObj.hasField("alwaysUpsert") ?
                     cmdObj["alwaysUpsert"].trueValue() : true;
-
-            // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple ns used so locking individually requires more analysis
-            Lock::GlobalWrite globalWriteLock;
             
             while ( i.more() ) {
                 BSONElement e = i.next();
