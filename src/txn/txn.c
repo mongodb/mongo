@@ -274,7 +274,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		__wt_txn_refresh(session, WT_TXN_NONE, 0);
+		__wt_txn_refresh(session, WT_TXN_NONE, 1);
 	return (0);
 }
 
