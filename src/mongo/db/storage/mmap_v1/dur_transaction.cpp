@@ -45,6 +45,10 @@ namespace mongo {
         return getDur().writingPtr(data, len);
     }
 
+    void DurTransaction::createdFile(const std::string& filename, unsigned long long len) {
+        getDur().createdFile(filename, len);
+    }
+
     void DurTransaction::syncDataAndTruncateJournal() {
         return getDur().syncDataAndTruncateJournal();
     }

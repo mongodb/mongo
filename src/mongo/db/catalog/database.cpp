@@ -197,7 +197,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Database::Database(const char *nm, bool& newDb, const string& path )
+    Database::Database(TransactionExperiment* txn, const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
           _extentManager(new ExtentManager(_name, _path, storageGlobalParams.directoryperdb)),
@@ -221,14 +221,15 @@ namespace mongo {
             // there's a write, then open.
             if (!newDb) {
                 _namespaceIndex.init();
-                openAllFiles();
+                openAllFiles(txn);
 
                 // upgrade freelist
                 string oldFreeList = _name + ".$freelist";
                 NamespaceDetails* details = _namespaceIndex.details( oldFreeList );
                 if ( details ) {
                     if ( !details->firstExtent().isNull() ) {
-                        _extentManager->freeExtents(details->firstExtent(),
+                        _extentManager->freeExtents(txn,
+                                                    details->firstExtent(),
                                                     details->lastExtent());
                     }
                     _namespaceIndex.kill_ns( oldFreeList );
@@ -299,9 +300,9 @@ namespace mongo {
     // todo : we stop once a datafile dne.
     //        if one datafile were missing we should keep going for
     //        repair purposes yet we do not.
-    void Database::openAllFiles() {
+    void Database::openAllFiles(TransactionExperiment* txn) {
         verify(this);
-        Status s = _extentManager->init();
+        Status s = _extentManager->init(txn);
         if ( !s.isOK() ) {
             msgasserted( 16966, str::stream() << "_extentManager.init failed: " << s.toString() );
         }
@@ -812,7 +813,7 @@ namespace mongo {
 
         // free extents
         if( !d->firstExtent().isNull() ) {
-            _extentManager->freeExtents(d->firstExtent(), d->lastExtent());
+            _extentManager->freeExtents(txn, d->firstExtent(), d->lastExtent());
             d->setFirstExtentInvalid();
             d->setLastExtentInvalid();
         }
@@ -829,7 +830,8 @@ namespace mongo {
             *minor = 0;
             return;
         }
-        const DataFile* df = _extentManager->getFile( 0 );
+        DurTransaction txn; // TODO get rid of this once reads need transactions
+        const DataFile* df = _extentManager->getFile( &txn, 0 );
         *major = df->getHeader()->version;
         *minor = df->getHeader()->versionMinor;
     }

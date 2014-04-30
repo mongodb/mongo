@@ -241,7 +241,8 @@ namespace mongo {
 
     // ---------------------------
 
-    Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName ) {
+    Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( TransactionExperiment* txn,
+                                                               const string& newPluginName ) {
 
         // first check if requested index requires pdfile minor version to be bumped
         if ( IndexNames::existedBefore24(newPluginName) ) {
@@ -250,7 +251,7 @@ namespace mongo {
 
         Database* db = _collection->_database;
 
-        DataFileHeader* dfh = db->getExtentManager().getFile(0)->getHeader();
+        DataFileHeader* dfh = db->getExtentManager().getFile(txn, 0)->getHeader();
         if ( dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER ) {
             return Status::OK(); // these checks have already been done
         }
@@ -281,7 +282,7 @@ namespace mongo {
             warning() << "Internal error while reading system.indexes collection";
         }
 
-        getDur().writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
+        txn->writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
 
         return Status::OK();
     }
@@ -324,7 +325,7 @@ namespace mongo {
 
         string pluginName = IndexNames::findPluginName( spec["key"].Obj() );
         if ( pluginName.size() ) {
-            Status s = _upgradeDatabaseMinorVersionIfNeeded( pluginName );
+            Status s = _upgradeDatabaseMinorVersionIfNeeded( txn, pluginName );
             if ( !s.isOK() )
                 return s;
         }
@@ -441,8 +442,8 @@ namespace mongo {
         IndexDetails& indexDetails = _collection->detailsWritable()->getNextIndexDetails( _collection );
 
         try {
-            *getDur().writing( &indexDetails.info ) = systemIndexesEntry.getValue();
-            *getDur().writing( &indexDetails.head ) = DiskLoc();
+            *_txn->writing( &indexDetails.info ) = systemIndexesEntry.getValue();
+            *_txn->writing( &indexDetails.head ) = DiskLoc();
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;
@@ -452,7 +453,7 @@ namespace mongo {
 
         int before = _collection->details()->_indexBuildsInProgress;
         try {
-            getDur().writingInt( _collection->detailsWritable()->_indexBuildsInProgress ) += 1;
+            _txn->writingInt( _collection->detailsWritable()->_indexBuildsInProgress ) += 1;
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
@@ -556,8 +557,8 @@ namespace mongo {
             idxNo = nsd->getCompletedIndexCount();
         }
 
-        getDur().writingInt( nsd->_indexBuildsInProgress ) -= 1;
-        getDur().writingInt( nsd->_nIndexes ) += 1;
+        _txn->writingInt( nsd->_indexBuildsInProgress ) -= 1;
+        _txn->writingInt( nsd->_nIndexes ) += 1;
 
         _catalog->_collection->infoCache()->addedIndex();
 

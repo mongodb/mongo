@@ -231,15 +231,17 @@ namespace mongo {
         // indexFileVersion preserve
 
         // Reset all existing extents and recreate the deleted list.
-        for( DiskLoc ext = _details->firstExtent();
-             !ext.isNull();
-             ext = _extentManager->getExtent(ext)->xnext ) {
+        Extent* ext;
+        for( DiskLoc extLoc = _details->firstExtent();
+             !extLoc.isNull();
+             extLoc = ext->xnext ) {
+            ext = _extentManager->getExtent(extLoc);
 
-            DiskLoc prev = _extentManager->getExtent(ext)->xprev;
-            DiskLoc next = _extentManager->getExtent(ext)->xnext;
-            DiskLoc empty = _extentManager->getExtent(ext)->reuse( _ns, true );
-            *txn->writing(&_extentManager->getExtent(ext)->xprev) = prev;
-            *txn->writing(&_extentManager->getExtent(ext)->xnext) = next;
+            DiskLoc prev = ext->xprev;
+            DiskLoc next = ext->xnext;
+            DiskLoc empty = ext->reuse( txn, _ns, true );
+            *txn->writing(&ext->xprev) = prev;
+            *txn->writing(&ext->xnext) = next;
             addDeletedRec( txn, empty );
         }
 

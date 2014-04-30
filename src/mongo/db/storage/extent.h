@@ -35,6 +35,7 @@
 #include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {
+    class TransactionExperiment;
 
     /* extents are datafile regions where all the records within the region
        belong to the same namespace.
@@ -72,10 +73,15 @@ namespace mongo {
         Returns a DeletedRecord location which is the data in the extent ready for us.
         Caller will need to add that to the freelist structure in namespacedetail.
         */
-        DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset, bool capped);
+        DiskLoc init(TransactionExperiment* txn,
+                     const char *nsname,
+                     int _length,
+                     int _fileNo,
+                     int _offset,
+                     bool capped);
 
         /* like init(), but for a reuse case */
-        DiskLoc reuse(const StringData& nsname, bool newUseIsAsCapped);
+        DiskLoc reuse(TransactionExperiment* txn, const StringData& nsname, bool newUseIsAsCapped);
 
         /** caller must declare write intent first */
         void markEmpty();
@@ -111,7 +117,7 @@ namespace mongo {
             return reinterpret_cast<DeletedRecord*>( getRecord( dl ) );
         }
 
-        DiskLoc _reuse(const StringData& nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
+        DiskLoc _reuse(TransactionExperiment* txn, const StringData& nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
     };
 
 #pragma pack()

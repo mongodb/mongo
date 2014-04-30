@@ -275,7 +275,8 @@ namespace mongo {
     void RecordStoreV1Base::increaseStorageSize( TransactionExperiment* txn,
                                                  int size,
                                                  int quotaMax ) {
-        DiskLoc eloc = _extentManager->allocateExtent( _ns,
+        DiskLoc eloc = _extentManager->allocateExtent( txn,
+                                                       _ns,
                                                        isCapped(),
                                                        size,
                                                        quotaMax );
@@ -284,7 +285,7 @@ namespace mongo {
 
         invariant( e );
 
-        DiskLoc emptyLoc = txn->writing(e)->reuse( _ns, isCapped() );
+        DiskLoc emptyLoc = e->reuse(txn,  _ns, isCapped() );
 
         if ( _details->lastExtent().isNull() ) {
             verify( _details->firstExtent().isNull() );

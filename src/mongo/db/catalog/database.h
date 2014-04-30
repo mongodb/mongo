@@ -98,7 +98,9 @@ namespace mongo {
     class Database {
     public:
         // you probably need to be in dbHolderMutex when constructing this
-        Database(const char *nm, /*out*/ bool& newDb,
+        Database(TransactionExperiment* txn,
+                 const char *nm,
+                 /*out*/ bool& newDb,
                  const string& path = storageGlobalParams.dbpath);
 
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
@@ -222,7 +224,7 @@ namespace mongo {
          */
         void checkDuplicateUncasedNames(bool inholderlockalready) const;
 
-        void openAllFiles();
+        void openAllFiles(TransactionExperiment* txn);
 
         Status _renameSingleNamespace( TransactionExperiment* txn,
                                        const StringData& fromNS,

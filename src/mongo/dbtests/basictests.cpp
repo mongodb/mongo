@@ -32,6 +32,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/db.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/array.h"
 #include "mongo/util/base64.h"
@@ -376,11 +377,12 @@ namespace BasicTests {
     public:
         void run() {
             Lock::GlobalWrite lk;
+            DurTransaction txn;
             bool isNew = false;
             // this leaks as ~Database is private
             // if that changes, should put this on the stack
             {
-                Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
+                Database * db = new Database( &txn, "dbtests_basictests_ownsns" , isNew );
                 verify( isNew );
 
                 ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );

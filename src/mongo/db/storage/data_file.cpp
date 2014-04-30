@@ -37,6 +37,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/lockstate.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/util/file_allocator.h"
 
 namespace mongo {
@@ -87,7 +88,7 @@ namespace mongo {
     }
 
     /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-    Status DataFile::openExisting( const char *filename ) {
+    Status DataFile::openExisting( TransactionExperiment* txn, const char *filename ) {
         verify( _mb == 0 );
         if( !boost::filesystem::exists(filename) )
             return Status( ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist" );
@@ -113,11 +114,14 @@ namespace mongo {
             }
         }
         data_file_check(_mb);
-        header()->checkUpgrade();
+        header()->checkUpgrade(txn);
         return Status::OK();
     }
 
-    void DataFile::open( const char *filename, int minSize, bool preallocateOnly ) {
+    void DataFile::open( TransactionExperiment* txn,
+                         const char *filename,
+                         int minSize,
+                         bool preallocateOnly ) {
         long size = defaultSize( filename );
         while ( size < minSize ) {
             if ( size < maxSize() / 2 )
@@ -149,14 +153,14 @@ namespace mongo {
             size = (int) sz;
         }
         data_file_check(_mb);
-        header()->init(fileNo, size, filename);
+        header()->init(txn, fileNo, size, filename);
     }
 
     void DataFile::flush( bool sync ) {
         mmf.flush( sync );
     }
 
-    DiskLoc DataFile::allocExtentArea( int size ) {
+    DiskLoc DataFile::allocExtentArea( TransactionExperiment* txn, int size ) {
 
         massert( 10357, "shutdown in progress", !inShutdown() );
         massert( 10359, "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
@@ -166,15 +170,15 @@ namespace mongo {
         int offset = header()->unused.getOfs();
 
         DataFileHeader *h = header();
-        *getDur().writing(&h->unused) = DiskLoc( fileNo, offset + size );
-        getDur().writingInt(h->unusedLength) = h->unusedLength - size;
+        *txn->writing(&h->unused) = DiskLoc( fileNo, offset + size );
+        txn->writingInt(h->unusedLength) = h->unusedLength - size;
 
         return DiskLoc( fileNo, offset );
     }
 
     // -------------------------------------------------------------------------------
 
-    void DataFileHeader::init(int fileno, int filelength, const char* filename) {
+    void DataFileHeader::init(TransactionExperiment* txn, int fileno, int filelength, const char* filename) {
         if ( uninitialized() ) {
             DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
             if( !(filelength > 32768 ) ) {
@@ -196,9 +200,9 @@ namespace mongo {
                 }
             }
 
-            getDur().createdFile(filename, filelength);
+            txn->createdFile(filename, filelength);
             verify( HeaderSize == 8192 );
-            DataFileHeader *h = getDur().writing(this);
+            DataFileHeader *h = txn->writing(this);
             h->fileLength = filelength;
             h->version = PDFILE_VERSION;
             h->versionMinor = PDFILE_VERSION_MINOR_22_AND_OLDER; // All dbs start like this
@@ -209,16 +213,16 @@ namespace mongo {
             h->freeListEnd.Null();
         }
         else {
-            checkUpgrade();
+            checkUpgrade(txn);
         }
     }
 
-    void DataFileHeader::checkUpgrade() {
+    void DataFileHeader::checkUpgrade(TransactionExperiment* txn) {
         if ( freeListStart == minDiskLoc ) {
             // we are upgrading from 2.4 to 2.6
             invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real
-            *getDur().writing( &freeListStart ) = DiskLoc();
-            *getDur().writing( &freeListEnd ) = DiskLoc();
+            *txn->writing( &freeListStart ) = DiskLoc();
+            *txn->writing( &freeListEnd ) = DiskLoc();
         }
     }
 

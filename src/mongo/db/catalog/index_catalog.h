@@ -267,7 +267,8 @@ namespace mongo {
             return _getAccessMethodName( keyPattern );
         }
 
-        Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
+        Status _upgradeDatabaseMinorVersionIfNeeded( TransactionExperiment* txn,
+                                                     const string& newPluginName );
 
         // public static helpers
 

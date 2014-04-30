@@ -77,6 +77,15 @@ namespace mongo {
         virtual void* writingPtr(void* data, size_t len) = 0;
 
         /**
+         * Declare that a file has been created
+         *
+         * Normally writes are applied only after journaling, for safety.  But here the file
+         * is created first, and the journal will just replay the creation if the create didn't
+         * happen because of crashing.
+         */
+        virtual void createdFile(const std::string& filename, unsigned long long len) = 0;
+
+        /**
          * Commits pending changes, flushes all changes to main data files, then removes the
          * journal.
          *

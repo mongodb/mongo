@@ -367,7 +367,7 @@ namespace mongo {
             LOG(1) << "\t" << dbName << endl;
 
             Client::Context ctx( dbName );
-            DataFile *p = ctx.db()->getExtentManager().getFile( 0 );
+            DataFile *p = ctx.db()->getExtentManager().getFile( &txn, 0 );
             DataFileHeader *h = p->getHeader();
 
             if ( replSettings.usingReplSets() ) {

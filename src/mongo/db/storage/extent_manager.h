@@ -42,6 +42,8 @@
 namespace mongo {
 
     class DataFile;
+    class Record;
+    class TransactionExperiment;
 
     /**
      * ExtentManager basics
@@ -79,18 +81,22 @@ namespace mongo {
         /**
          * opens all current files
          */
-        Status init();
+        Status init(TransactionExperiment* txn);
 
         size_t numFiles() const;
         long long fileSize() const;
 
         // TODO: make private
-        DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false );
+        DataFile* getFile( TransactionExperiment* txn,
+                           int n,
+                           int sizeNeeded = 0,
+                           bool preallocateOnly = false );
 
         void flushFiles( bool sync );
 
         // must call Extent::reuse on the returned extent
-        DiskLoc allocateExtent( const string& ns,
+        DiskLoc allocateExtent( TransactionExperiment* txn,
+                                const string& ns,
                                 bool capped,
                                 int size,
                                 int quotaMax );
@@ -98,7 +104,7 @@ namespace mongo {
         /**
          * firstExt has to be == lastExt or a chain
          */
-        void freeExtents( DiskLoc firstExt, DiskLoc lastExt );
+        void freeExtents( TransactionExperiment* txn, DiskLoc firstExt, DiskLoc lastExt );
 
         void printFreeList() const;
 
@@ -143,24 +149,27 @@ namespace mongo {
         /**
          * will return NULL if nothing suitable in free list
          */
-        DiskLoc _allocFromFreeList( int approxSize, bool capped );
+        DiskLoc _allocFromFreeList( TransactionExperiment* txn, int approxSize, bool capped );
 
         /* allocate a new Extent, does not check free list
          * @param maxFileNoForQuota - 0 for unlimited
         */
-        DiskLoc _createExtent( int approxSize, int maxFileNoForQuota );
+        DiskLoc _createExtent( TransactionExperiment* txn, int approxSize, int maxFileNoForQuota );
 
-        DataFile* _addAFile( int sizeNeeded, bool preallocateNextFile );
+        DataFile* _addAFile( TransactionExperiment* txn, int sizeNeeded, bool preallocateNextFile );
 
         DiskLoc _getFreeListStart() const;
         DiskLoc _getFreeListEnd() const;
-        void _setFreeListStart( DiskLoc loc );
-        void _setFreeListEnd( DiskLoc loc );
+        void _setFreeListStart( TransactionExperiment* txn, DiskLoc loc );
+        void _setFreeListEnd( TransactionExperiment* txn, DiskLoc loc );
 
         const DataFile* _getOpenFile( int n ) const;
 
-        DiskLoc _createExtentInFile( int fileNo, DataFile* f,
-                                     int size, int maxFileNoForQuota );
+        DiskLoc _createExtentInFile( TransactionExperiment* txn,
+                                     int fileNo,
+                                     DataFile* f,
+                                     int size,
+                                     int maxFileNoForQuota );
 
         boost::filesystem::path fileName( int n ) const;
 

@@ -439,7 +439,7 @@ namespace mongo {
             _details->setFirstExtent( txn, newFirst );
             *txn->writing(&_extentManager->getExtent( newFirst )->xprev) = DiskLoc();
             txn->writing(e)->markEmpty();
-            _extentManager->freeExtents( diskloc, diskloc );
+            _extentManager->freeExtents( txn, diskloc, diskloc );
 
             txn->commitIfNeeded();
 

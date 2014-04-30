@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include <string>
+
 #include "mongo/db/storage/transaction.h"
 
 #pragma once
@@ -46,6 +48,8 @@ namespace mongo {
         virtual bool isCommitNeeded() const;
 
         virtual void* writingPtr(void* data, size_t len);
+
+        virtual void createdFile(const std::string& filename, unsigned long long len);
 
         virtual void syncDataAndTruncateJournal();
 

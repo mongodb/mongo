@@ -328,7 +328,7 @@ namespace mongo {
             string pluginName = IndexNames::findPluginName( info["key"].Obj() );
             if ( pluginName.size() ) {
                 Status s =
-                    _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(pluginName);
+                    _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(_txn, pluginName);
                 if ( !s.isOK() )
                     return s;
             }
