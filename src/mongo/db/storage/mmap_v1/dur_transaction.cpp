@@ -45,8 +45,12 @@ namespace mongo {
         return getDur().writingPtr(data, len);
     }
 
-    void DurTransaction::checkForInterrupt() const {
-        killCurrentOp.checkForInterrupt();
+    void DurTransaction::syncDataAndTruncateJournal() {
+        return getDur().syncDataAndTruncateJournal();
+    }
+
+    void DurTransaction::checkForInterrupt(bool heedMutex) const {
+        killCurrentOp.checkForInterrupt(heedMutex);
     }
 
     Status DurTransaction::checkForInterruptNoAssert() const {

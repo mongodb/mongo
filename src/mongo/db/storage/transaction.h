@@ -47,8 +47,9 @@ namespace mongo {
 
         /**
          * throws an exception if the operation is interrupted
+         * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
          */
-        virtual void checkForInterrupt() const = 0;
+        virtual void checkForInterrupt(bool heedMutex = true) const = 0;
 
         /**
          * @return Status::OK() if not interrupted
@@ -72,6 +73,16 @@ namespace mongo {
          * Declare that the data at [x, x + len) is being written.
          */
         virtual void* writingPtr(void* data, size_t len) = 0;
+
+        /**
+         * Commits pending changes, flushes all changes to main data files, then removes the
+         * journal.
+         *
+         * This is useful as a "barrier" to ensure that writes before this call will never go
+         * through recovery and be applied to files that have had changes made after this call
+         * applied.
+         */
+        virtual void syncDataAndTruncateJournal() = 0;
 
         //
         // Sugar methods

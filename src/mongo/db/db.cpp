@@ -301,6 +301,7 @@ namespace mongo {
 
     void doDBUpgrade( const string& dbName, DataFileHeader* h ) {
         static DBDirectClient db;
+        DurTransaction txn;
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
             verify( PDFILE_VERSION == 4 );
@@ -318,12 +319,12 @@ namespace mongo {
                 }
             }
 
-            getDur().writingInt(h->versionMinor) = 5;
+            txn.writingInt(h->versionMinor) = 5;
             return;
         }
 
         // do this in the general case
-        fassert( 17401, repairDatabase( dbName ) );
+        fassert( 17401, repairDatabase( &txn, dbName ) );
     }
 
     void checkForIdIndexes( Database* db ) {

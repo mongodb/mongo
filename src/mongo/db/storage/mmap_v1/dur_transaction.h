@@ -47,7 +47,9 @@ namespace mongo {
 
         virtual void* writingPtr(void* data, size_t len);
 
-        virtual void checkForInterrupt() const;
+        virtual void syncDataAndTruncateJournal();
+
+        virtual void checkForInterrupt(bool heedMutex = true) const;
 
         virtual Status checkForInterruptNoAssert() const;
 

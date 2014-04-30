@@ -36,6 +36,7 @@
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
+    class TransactionExperiment;
 
     // TODO: move
     intmax_t dbSize( const std::string& database );
@@ -44,7 +45,8 @@ namespace mongo {
     void _deleteDataFiles(const std::string& database);
 
     // must have a global lock
-    Status repairDatabase( std::string db,
+    Status repairDatabase( TransactionExperiment* txn,
+                           std::string db,
                            bool preserveClonedFilesOnFailure = false,
                            bool backupOriginalFiles = false );
 

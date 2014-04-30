@@ -40,8 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/kill_current_op.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 
@@ -228,10 +226,12 @@ namespace mongo {
 
     class RepairFileDeleter {
     public:
-        RepairFileDeleter( const string& dbName,
+        RepairFileDeleter( TransactionExperiment* txn,
+                           const string& dbName,
                            const string& pathString,
                            const Path& path )
-            : _dbName( dbName ),
+            : _txn(txn),
+              _dbName( dbName ),
               _pathString( pathString ),
               _path( path ),
               _success( false ) {
@@ -245,7 +245,7 @@ namespace mongo {
                   << "db: " << _dbName << " path: " << _pathString;
 
             try {
-                getDur().syncDataAndTruncateJournal();
+                _txn->syncDataAndTruncateJournal();
                 MongoFile::flushAll(true); // need both in case journaling is disabled
                 {
                     Client::Context tempContext( _dbName, _pathString );
@@ -265,16 +265,17 @@ namespace mongo {
         }
 
     private:
+        TransactionExperiment* _txn;
         string _dbName;
         string _pathString;
         Path _path;
         bool _success;
     };
 
-    Status repairDatabase( string dbName,
+    Status repairDatabase( TransactionExperiment* txn,
+                           string dbName,
                            bool preserveClonedFilesOnFailure,
                            bool backupOriginalFiles ) {
-        DurTransaction txn; // XXX
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
         doingRepair dr;
         dbName = nsToDatabase( dbName );
@@ -283,7 +284,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
-        getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
+        txn->syncDataAndTruncateJournal(); // Must be done before and after repair
 
         intmax_t totalSize = dbSize( dbName );
         intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
@@ -295,7 +296,7 @@ namespace mongo {
                            << " (bytes) because free disk space is: " << freeSize << " (bytes)" );
         }
 
-        killCurrentOp.checkForInterrupt();
+        txn->checkForInterrupt();
 
         Path reservedPath =
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
@@ -304,7 +305,8 @@ namespace mongo {
         string reservedPathString = reservedPath.string();
 
         if ( !preserveClonedFilesOnFailure )
-            repairFileDeleter.reset( new RepairFileDeleter( dbName,
+            repairFileDeleter.reset( new RepairFileDeleter( txn,
+                                                            dbName,
                                                             reservedPathString,
                                                             reservedPath ) );
 
@@ -366,16 +368,16 @@ namespace mongo {
                 Collection* tempCollection = NULL;
                 {
                     Client::Context tempContext( ns, tempDatabase );
-                    tempCollection = tempDatabase->createCollection( &txn, ns, options, true, false );
+                    tempCollection = tempDatabase->createCollection( txn, ns, options, true, false );
                 }
 
                 Client::Context readContext( ns, originalDatabase );
-                Collection* originalCollection = originalDatabase->getCollection( &txn, ns );
+                Collection* originalCollection = originalDatabase->getCollection( txn, ns );
                 invariant( originalCollection );
 
                 // data
 
-                MultiIndexBlock indexBlock(&txn, tempCollection );
+                MultiIndexBlock indexBlock(txn, tempCollection );
                 {
                     vector<BSONObj> indexes;
                     IndexCatalog::IndexIterator ii =
@@ -402,12 +404,12 @@ namespace mongo {
                     BSONObj doc = originalCollection->docFor( loc );
 
                     Client::Context tempContext( ns, tempDatabase );
-                    StatusWith<DiskLoc> result = tempCollection->insertDocument( &txn, doc, indexBlock );
+                    StatusWith<DiskLoc> result = tempCollection->insertDocument( txn, doc, indexBlock );
                     if ( !result.isOK() )
                         return result.getStatus();
 
-                    getDur().commitIfNeeded();
-                    killCurrentOp.checkForInterrupt(false);
+                    txn->commitIfNeeded();
+                    txn->checkForInterrupt(false);
                 }
 
                 {
@@ -419,10 +421,10 @@ namespace mongo {
 
             }
 
-            getDur().syncDataAndTruncateJournal();
+            txn->syncDataAndTruncateJournal();
             MongoFile::flushAll(true); // need both in case journaling is disabled
 
-            killCurrentOp.checkForInterrupt(false);
+            txn->checkForInterrupt(false);
 
             Client::Context tempContext( dbName, reservedPathString );
             Database::closeDatabase( dbName, reservedPathString );

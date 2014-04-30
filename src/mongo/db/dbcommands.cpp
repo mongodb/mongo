@@ -287,6 +287,7 @@ namespace mongo {
             // called within, and that requires a global lock i believe.
             Lock::GlobalWrite lk;
             Client::Context context( dbname );
+            DurTransaction txn;
 
             log() << "repairDatabase " << dbname;
             std::vector<BSONObj> indexesInProg = stopIndexBuilds(context.db(), cmdObj);
@@ -296,7 +297,7 @@ namespace mongo {
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
             Status status =
-                repairDatabase( dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
+                repairDatabase( &txn, dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
 
             IndexBuilder::restoreIndexes(indexesInProg);
 
