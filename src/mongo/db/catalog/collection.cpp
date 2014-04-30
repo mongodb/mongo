@@ -498,6 +498,18 @@ namespace mongo {
         return storageGlobalParams.quotaFiles;
     }
 
+    void Collection::appendCustomStats( BSONObjBuilder* result, double scale ) const {
+        result->append( "lastExtentSize", _details->lastExtentSize() / scale );
+        result->append( "paddingFactor", _details->paddingFactor() );
+        result->append( "systemFlags", _details->systemFlags() );
+        result->append( "userFlags", _details->userFlags() );
+
+        if ( isCapped() ) {
+            result->appendBool( "capped", true );
+            result->appendNumber( "max", _details->maxCappedDocs() );
+        }
+    }
+
     bool Collection::isCapped() const {
         return _details->isCapped();
     }

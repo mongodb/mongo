@@ -257,6 +257,12 @@ namespace mongo {
         // Stats
         //
 
+        /**
+         * @param scaleSize - amount by which to scale size metrics
+         * appends any custom stats from the RecordStore or other unique stats
+         */
+        void appendCustomStats( BSONObjBuilder* resuits, double scaleSize = 1 ) const;
+
         bool isCapped() const;
 
         uint64_t numRecords() const;
