@@ -139,18 +139,6 @@ namespace mongo {
          */
         BSONObj moveToFront(const BSONObj& obj) const;
 
-        /**@param queryConstraints a FieldRangeSet formed from parsing a query
-         * @return an ordered list of bounds generated using this KeyPattern
-         * and the constraints from the FieldRangeSet
-         *
-         * The value of frsp->matchPossibleForSingleKeyFRS(fromQuery) should be true,
-         * otherwise this function could throw.
-         *
-         */
-        BoundList keyBounds( const FieldRangeSet& queryConstraints ) const{
-            return pattern.keyBounds( queryConstraints );
-        }
-
     private:
         KeyPattern pattern;
         BSONObj gMin;

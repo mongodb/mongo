@@ -50,7 +50,6 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/queryutil.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
@@ -843,6 +842,30 @@ namespace mongo {
                 ActionSet actions;
                 actions.addAction(ActionType::find);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+            }
+            long long applySkipLimit( long long num , const BSONObj& cmd ) {
+                BSONElement s = cmd["skip"];
+                BSONElement l = cmd["limit"];
+
+                if ( s.isNumber() ) {
+                    num = num - s.numberLong();
+                    if ( num < 0 ) {
+                        num = 0;
+                    }
+                }
+
+                if ( l.isNumber() ) {
+                    long long limit = l.numberLong();
+                    if( limit < 0 ){
+                        limit = -limit;
+                    }
+
+                    if ( limit < num && limit != 0 ) { // 0 limit means no limit
+                        num = limit;
+                    }
+                }
+
+                return num;
             }
             bool run( const string& dbName,
                     BSONObj& cmdObj,

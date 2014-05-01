@@ -456,7 +456,6 @@ env.Library("coredb", [
         "db/pipeline/field_path.cpp",
         "db/pipeline/value.cpp",
         "db/projection.cpp",
-        "db/queryutil.cpp",
         "db/stats/timer_stats.cpp",
         "s/shardconnection.cpp",
         ]

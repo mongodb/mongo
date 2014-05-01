@@ -40,7 +40,6 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
-#include "mongo/db/queryutil.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
@@ -155,7 +154,7 @@ namespace mongo {
             }
 
             BSONObj queryModified = queryOriginal;
-            if ( found && doc["_id"].type() && ! isSimpleIdQuery( queryOriginal ) ) {
+            if ( found && doc["_id"].type() && ! CanonicalQuery::isSimpleIdQuery( queryOriginal ) ) {
                 // we're going to re-write the query to be more efficient
                 // we have to be a little careful because of positional operators
                 // maybe we can pass this all through eventually, but right now isn't an easy way

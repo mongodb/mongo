@@ -48,7 +48,6 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/runner_yield_policy.h"
-#include "mongo/db/queryutil.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"

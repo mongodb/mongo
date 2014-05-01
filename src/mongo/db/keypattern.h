@@ -38,9 +38,6 @@
 
 namespace mongo {
 
-    struct FieldInterval;
-    class FieldRangeSet;
-
     /**
      * A BoundList contains intervals specified by inclusive start
      * and end bounds.  The intervals should be nonoverlapping and occur in
@@ -61,6 +58,10 @@ namespace mongo {
      */
     class KeyPattern {
     public:
+
+        //maximum number of intervals produced by $in queries.
+        static const unsigned MAX_IN_COMBINATIONS = 4000000;
+
         /*
          * We are allowing implicit conversion from BSON
          */
@@ -148,32 +149,6 @@ namespace mongo {
          */
         BSONObj extractSingleKey( const BSONObj& doc ) const;
 
-        /**@param queryConstraints a FieldRangeSet, usually formed from parsing a query
-         * @return an ordered list of bounds generated using this KeyPattern and the
-         * constraints from the FieldRangeSet.  This function is used in sharding to
-         * determine where to route queries according to the shard key pattern.
-         *
-         * Examples:
-         * If this KeyPattern is { a : 1  }
-         * FieldRangeSet( {a : 5 } ) --> returns [{a : 5}, {a : 5 } ]
-         * FieldRangeSet( {a : {$gt : 3}} ) --> returns [({a : 3} , { a : MaxInt})]
-         *
-         * If this KeyPattern is { a : "hashed }
-         * FieldRangeSet( {a : 5 } --> returns [ ({ a : hash(5) }, {a : hash(5) }) ]
-         *
-         * The bounds returned by this function may be a superset of those defined
-         * by the constraints.  For instance, if this KeyPattern is {a : 1}
-         * FieldRanget( { a : {$in : [1,2]} , b : {$in : [3,4,5]} } )
-         *        --> returns [({a : 1 , b : 3} , {a : 1 , b : 5}]),
-         *                    [({a : 2 , b : 3} , {a : 2 , b : 5}])
-         *
-         * The queryConstraints should be defined for all the fields in this keypattern
-         * (i.e. the value of frsp->matchPossibleForSingleKeyFRS(_pattern) should be true,
-         * otherwise this function could throw).
-         *
-         */
-        BoundList keyBounds( const FieldRangeSet& queryConstraints ) const;
-
         /**
          * Return an ordered list of bounds generated using this KeyPattern and the
          * bounds from the IndexBounds.  This function is used in sharding to
@@ -227,13 +202,6 @@ namespace mongo {
         bool isDescending( const BSONElement& fieldExpression ) const {
             return ( fieldExpression.isNumber()  && fieldExpression.numberInt() == -1 );
         }
-
-        /* Takes a list of intervals corresponding to constraints on a given field
-         * in this keypattern, and transforms them into a list of bounds
-         * based on the expression for 'field'
-         */
-        BoundList _transformFieldBounds( const vector<FieldInterval>& oldIntervals ,
-                                         const BSONElement& field ) const;
 
     };
 

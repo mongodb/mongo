@@ -38,7 +38,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/queryutil.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
