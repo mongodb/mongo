@@ -231,7 +231,7 @@ add_option( "ssl" , "Enable SSL" , 0 , True )
 
 # library choices
 js_engine_choices = ['v8-3.12', 'v8-3.25', 'none']
-add_option( "js-engine", "JavaScript scripting engine implementation", 1, True,
+add_option( "js-engine", "JavaScript scripting engine implementation", 1, False,
            type='choice', default=js_engine_choices[0], choices=js_engine_choices)
 add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
