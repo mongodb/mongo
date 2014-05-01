@@ -624,7 +624,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * parent.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
-	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
+	btree->maxmempage = WT_MIN(S2C(session)->cache_size / 2,
+	    WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage));
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))

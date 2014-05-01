@@ -11,7 +11,6 @@
  * Tuning; global variables to allow the binary to be patched, we don't yet have
  * any real understanding of what might be useful to surface to applications.
  */
-static u_int __split_deepen_max_internal_image = 100;
 static u_int __split_deepen_min_child = 100;
 static u_int __split_deepen_per_child = 100;
 
@@ -34,22 +33,22 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	pindex = WT_INTL_INDEX_COPY(page);
 
 	/*
-	 * Don't deepen the tree if the page's memory footprint is less than N
-	 * times the maximum internal page size chunk in the backing file.
+	 * Deepen the tree if the page's memory footprint is larger than
+	 * the maximum size for a page in memory.
 	 */
-	if (page->memory_footprint <
-	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage)
-		return (0);
+	if (page->memory_footprint > S2BT(session)->maxmempage &&
+	    pindex->entries >= __split_deepen_min_child)
+		return (1);
 
 	/*
-	 * Don't deepen the tree unless the split will result in at least N
-	 * children in the newly created intermediate layer.
+	 * Deepen the tree unless the split will result in at least N children
+	 * in the newly created intermediate layer.
 	 */
-	if (pindex->entries <
+	if (pindex->entries >=
 	    (__split_deepen_per_child * __split_deepen_min_child))
-		return (0);
+		return (1);
 
-	return (1);
+	return (0);
 }
 
 /*
@@ -195,7 +194,12 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	panic = 0;
 
 	pindex = WT_INTL_INDEX_COPY(parent);
-	children = pindex->entries / __split_deepen_per_child;
+
+	/*
+	 * Create N children, unless we are dealing with  large page without
+	 * many entries, in which case split into 10 pages.
+	 */
+	children = WT_MAX(pindex->entries / __split_deepen_per_child, 10);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_VERBOSE_ERR(session, split,
