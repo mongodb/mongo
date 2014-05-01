@@ -104,6 +104,8 @@ namespace mongo {
             }
 
             Client::ReadContext context( nss.ns() );
+            DurTransaction txn;
+
             Database* db = context.ctx().db();
             Collection* collection = db->getCollection( nss.ns() );
             if ( !collection ) {
@@ -111,7 +113,6 @@ namespace mongo {
                 return false;
             }
 
-            DurTransaction txn;
             return appendCommandStatus( result,
                                         collection->touch( &txn,
                                                            touch_data, touch_indexes,
