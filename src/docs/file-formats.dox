@@ -58,8 +58,7 @@ compression is less useful.
   Applications may limit the use of prefix compression by configuring the
 minimum number of bytes that must be gained before prefix compression is
 used with the WT_SESSION::create method's \c prefix_compression_min
-configuration string, or turn off key prefix compression entirely using
-the WT_SESSION::create method's \c prefix_compression configuration string.
+configuration string.
 
   Key prefix compression is disabled by default.
 
