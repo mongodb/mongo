@@ -312,8 +312,12 @@ __rec_review(
 	 * is blocked by the exclusive lock.
 	 */
 	mod = page->modify;
+#ifdef EVICTION_DURING_CHECKPOINT
 	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
 	    mod->checkpoint_gen >= btree->checkpoint_gen;
+#else
+	behind_checkpoint = btree->checkpointing && (mod != NULL);
+#endif
 
 	if (behind_checkpoint && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
@@ -322,8 +326,8 @@ __rec_review(
 	}
 
 	/*
-	 * If we are checkpointing, we can't merge multiblock pages into their
-	 * parent.
+	 * If we behind a checkpoint, we can't merge multiblock pages into
+	 * their parent.
 	 */
 	if (behind_checkpoint && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
 		return (EBUSY);

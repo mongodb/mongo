@@ -132,7 +132,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (page->modify != NULL)
 				page->modify->checkpoint_gen = checkpoint_gen;
 		}
-                WT_ASSERT(session, checkpoint_gen == btree->checkpoint_gen);
+		WT_ASSERT(session, checkpoint_gen == btree->checkpoint_gen);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
