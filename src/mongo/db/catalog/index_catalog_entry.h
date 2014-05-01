@@ -43,6 +43,7 @@ namespace mongo {
     class IndexAccessMethod;
     class IndexDescriptor;
     class RecordStore;
+    class TransactionExperiment;
 
     class IndexCatalogEntry {
         MONGO_DISALLOW_COPYING( IndexCatalogEntry );
@@ -72,7 +73,7 @@ namespace mongo {
 
         const DiskLoc& head() const;
 
-        void setHead( DiskLoc newHead );
+        void setHead( TransactionExperiment* txn, DiskLoc newHead );
 
         void setIsReady( bool newIsReady );
 

@@ -138,7 +138,7 @@ namespace mongo {
 
         // XXX: do we expect the tree to be empty but have a head set?  Looks like so from old code.
         invariant(!oldHead.isNull());
-        _real->_btreeState->setHead(DiskLoc());
+        _real->_btreeState->setHead(_txn, DiskLoc());
         _real->_btreeState->recordStore()->deleteRecord(_txn, oldHead);
 
         if (_isMultiKey) {

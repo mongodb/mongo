@@ -125,7 +125,7 @@ namespace mongo {
         for (;;) {
             if (_getBucket(loc)->parent.isNull()) {
                 // only 1 bucket at this level. we are done.
-                _logic->_headManager->setHead(loc);
+                _logic->_headManager->setHead(_trans, loc);
                 break;
             }
 
@@ -1438,7 +1438,7 @@ namespace mongo {
         invariant(bucket->n == 0 && !bucket->nextChild.isNull() );
         if (bucket->parent.isNull()) {
             invariant(getRootLoc() == bucketLoc);
-            _headManager->setHead(bucket->nextChild);
+            _headManager->setHead(trans, bucket->nextChild);
         }
         else {
             BucketType* parentBucket = getBucket(bucket->parent);
@@ -1955,7 +1955,7 @@ namespace mongo {
             p->nextChild = rLoc;
             assertValid(_indexName, p, _ordering);
             bucket->parent = L;
-            _headManager->setHead(L);
+            _headManager->setHead(trans, L);
             *trans->writing(&getBucket(rLoc)->parent) = bucket->parent;
         }
         else {
@@ -2002,7 +2002,7 @@ namespace mongo {
             return Status(ErrorCodes::InternalError, "index already initialized");
         }
 
-        _headManager->setHead(addBucket(trans));
+        _headManager->setHead(trans, addBucket(trans));
         return Status::OK();
     }
 

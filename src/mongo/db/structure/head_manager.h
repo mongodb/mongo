@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    class TransactionExperiment;
+
     /**
      * An abstraction for setting and getting data about the 'head' of an index.  This is the data
      * that lives in the catalog to identify where an index lives.
@@ -42,7 +44,7 @@ namespace mongo {
 
         virtual const DiskLoc& getHead() const = 0;
 
-        virtual void setHead(const DiskLoc& newHead) = 0;
+        virtual void setHead(TransactionExperiment* txn, const DiskLoc& newHead) = 0;
     };
 
 }  // namespace mongo

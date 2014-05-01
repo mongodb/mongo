@@ -32,6 +32,7 @@
 
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/head_manager.h"
 
@@ -46,8 +47,8 @@ namespace mongo {
             return _catalogEntry->head();
         }
 
-        void setHead(const DiskLoc& newHead) {
-            _catalogEntry->setHead(newHead);
+        void setHead(TransactionExperiment* txn, const DiskLoc& newHead) {
+            _catalogEntry->setHead(txn, newHead);
         }
 
     private:
@@ -108,11 +109,11 @@ namespace mongo {
         verify( isReady() == newIsReady );
     }
 
-    void IndexCatalogEntry::setHead( DiskLoc newHead ) {
+    void IndexCatalogEntry::setHead( TransactionExperiment* txn, DiskLoc newHead ) {
         NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         IndexDetails& id = nsd->idx( idxNo );
-        *getDur().writing(&id.head) = newHead;
+        *txn->writing(&id.head) = newHead;
         _head = newHead;
     }
 
