@@ -369,32 +369,23 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t id, my_id;
+	uint64_t id;
 	uint32_t i, session_cnt;
 
-	/* Cache the result: if we're the oldest, don't keep checking. */
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_OLDEST))
-		return (1);
-
 	conn = S2C(session);
+	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
-	/*
-	 * Use this slightly convoluted way to get our ID, in case session->txn
-	 * has been hijacked for eviction.
-	 */
-	s = &txn_global->states[session->id];
-	if ((my_id = s->id) == WT_TXN_NONE)
+	if (txn->id == WT_TXN_NONE)
 		return (0);
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states;
 	    i < session_cnt;
 	    i++, s++)
-		if ((id = s->id) != WT_TXN_NONE && TXNID_LT(id, my_id))
+		if ((id = s->id) != WT_TXN_NONE &&
+		    TXNID_LT(id, txn->id))
 			return (0);
 
-	F_SET(txn, TXN_OLDEST);
 	return (1);
 }

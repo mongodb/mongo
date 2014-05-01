@@ -293,7 +293,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_OLDEST | TXN_RUNNING);
+	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_RUNNING);
 }
 
 /*
