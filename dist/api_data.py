@@ -565,7 +565,11 @@ methods = {
 'connection.add_compressor' : Method([]),
 'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
-'connection.close' : Method([]),
+'connection.close' : Method([
+	Config('leak_memory', 'false', r'''
+	    don't free memory during close''',
+	    type='boolean'),
+]),
 'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([

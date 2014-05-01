@@ -1206,7 +1206,10 @@ struct __wt_connection {
 	 * @snippet ex_all.c Close a connection
 	 *
 	 * @param connection the connection handle
-	 * @configempty{connection.close, see dist/api_data.py}
+	 * @configstart{connection.close, see dist/api_data.py}
+	 * @config{leak_memory, don't free memory during close., a boolean flag;
+	 * default \c false.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(close)(WT_HANDLE_CLOSED(WT_CONNECTION) *connection,

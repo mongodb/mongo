@@ -1052,6 +1052,11 @@ main(void)
 		(void)conn->close(conn, NULL);
 #endif
 
+	(void)wiredtiger_open(home, NULL, "create", &conn);
+	/*! [Connection close leaking memory] */
+	ret = conn->close(conn, "leak_memory=true");
+	/*! [Connection close leaking memory] */
+
 	/*! [Get the WiredTiger library version #1] */
 	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));
 	/*! [Get the WiredTiger library version #1] */
