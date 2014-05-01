@@ -328,10 +328,13 @@ wts_close(void)
 {
 	WT_CONNECTION *conn;
 	int ret;
+	const char *config;
 
 	conn = g.wts_conn;
 
-	if ((ret = conn->close(conn, NULL)) != 0)
+	config = MMRAND(0, 1) ? "leak_memory" : NULL;
+
+	if ((ret = conn->close(conn, config)) != 0)
 		die(ret, "connection.close");
 }
 

@@ -484,6 +484,7 @@ __conn_is_new(WT_CONNECTION *wt_conn)
 static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -493,7 +494,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
-	WT_UNUSED(cfg);
+
+	WT_ERR(__wt_config_gets(session, cfg, "leak_memory", &cval));
+	if (cval.len != 0)
+		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
 	/*
 	 * Rollback all running transactions.

@@ -9,6 +9,11 @@ static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_connection_close[] = {
+	{ "leak_memory", "boolean", NULL, NULL},
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_connection_load_extension[] = {
 	{ "config", "string", NULL, NULL},
 	{ "entry", "string", NULL, NULL},
@@ -309,8 +314,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "connection.close",
-	  "",
-	  NULL
+	  "leak_memory=0",
+	  confchk_connection_close
 	},
 	{ "connection.load_extension",
 	  "config=,entry=wiredtiger_extension_init,"
