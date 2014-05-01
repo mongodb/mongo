@@ -512,11 +512,13 @@ namespace mongo {
             currentOp->setQuery( currWrite.getUpdate()->getQuery() );
             currentOp->debug().query = currWrite.getUpdate()->getQuery();
             currentOp->debug().updateobj = currWrite.getUpdate()->getUpdateExpr();
+            // Note: debug().nMatched, nModified and nmoved are set internally in update
         }
         else {
             dassert( currWrite.getOpType() == BatchedCommandRequest::BatchType_Delete );
             currentOp->setQuery( currWrite.getDelete()->getQuery() );
             currentOp->debug().query = currWrite.getDelete()->getQuery();
+            currentOp->debug().ndeleted = 0;
         }
 
         return currentOp.release();
