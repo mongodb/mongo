@@ -70,7 +70,7 @@ namespace mongo {
             return b.obj();
         }
 
-        virtual bool run( const string& dbname, BSONObj& cmdObj, int options,
+        virtual bool newRun(TransactionExperiment* txn,  const string& dbname, BSONObj& cmdObj, int options,
                           string& errmsg, BSONObjBuilder& result,
                           bool fromRepl = false ) {
 
@@ -167,13 +167,12 @@ namespace mongo {
             Client::WriteContext writeContext( ns.ns(),
                                                storageGlobalParams.dbpath,
                                                false /* doVersion */ );
-            DurTransaction txn;
             Database* db = writeContext.ctx().db();
 
-            Collection* collection = db->getCollection( &txn, ns.ns() );
+            Collection* collection = db->getCollection( txn, ns.ns() );
             result.appendBool( "createdCollectionAutomatically", collection == NULL );
             if ( !collection ) {
-                collection = db->createCollection( &txn, ns.ns() );
+                collection = db->createCollection( txn, ns.ns() );
                 invariant( collection );
             }
 
@@ -191,7 +190,7 @@ namespace mongo {
                     }
                 }
 
-                status = collection->getIndexCatalog()->createIndex(&txn, spec, true);
+                status = collection->getIndexCatalog()->createIndex(txn, spec, true);
                 if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
                     if ( !result.hasField( "note" ) )
                         result.append( "note", "index already exists" );
@@ -205,7 +204,7 @@ namespace mongo {
 
                 if ( !fromRepl ) {
                     std::string systemIndexes = ns.getSystemIndexesCollection();
-                    logOp( &txn, "i", systemIndexes.c_str(), spec );
+                    logOp( txn, "i", systemIndexes.c_str(), spec );
                 }
             }
 

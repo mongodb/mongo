@@ -57,7 +57,8 @@ namespace mongo {
         }
 
         CmdResync() : Command("resync") { }
-        virtual bool run(const string& dbname,
+        virtual bool newRun(TransactionExperiment* txn,
+                         const string& dbname,
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
@@ -67,7 +68,6 @@ namespace mongo {
             const std::string ns = parseNs(dbname, cmdObj);
             Lock::GlobalWrite globalWriteLock;
             Client::Context ctx(ns);
-            DurTransaction txn;
 
             if (replSettings.usingReplSets()) {
                 if (theReplSet->isPrimary()) {
@@ -90,7 +90,7 @@ namespace mongo {
             if ( !waitForSyncToFinish( errmsg ) )
                 return false;
 
-            ReplSource::forceResyncDead( &txn, "client" );
+            ReplSource::forceResyncDead( txn, "client" );
             result.append( "info", "triggered resync for all sources" );
             return true;
         }

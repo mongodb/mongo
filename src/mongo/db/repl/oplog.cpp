@@ -705,7 +705,7 @@ namespace mongo {
             while (!done) {
                 BufBuilder bb;
                 BSONObjBuilder ob;
-                _runCommands(ns, o, bb, ob, true, 0);
+                _runCommands(txn, ns, o, bb, ob, true, 0);
                 // _runCommands takes care of adjusting opcounters for command counting.
                 Status status = Command::getStatusFromCommandResult(ob.done());
                 switch (status.code()) {

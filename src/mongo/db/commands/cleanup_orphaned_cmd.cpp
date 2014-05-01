@@ -61,7 +61,8 @@ namespace mongo {
      *
      * If the collection is not sharded, returns CleanupResult_Done.
      */
-    CleanupResult cleanupOrphanedData( const NamespaceString& ns,
+    CleanupResult cleanupOrphanedData( TransactionExperiment* txn,
+                                       const NamespaceString& ns,
                                        const BSONObj& startingFromKeyConst,
                                        bool secondaryThrottle,
                                        BSONObj* stoppedAtKey,
@@ -116,7 +117,8 @@ namespace mongo {
 
         // Metadata snapshot may be stale now, but deleter checks metadata again in write lock
         // before delete.
-        if ( !getDeleter()->deleteNow( ns.toString(),
+        if ( !getDeleter()->deleteNow( txn,
+                                       ns.toString(),
                                        orphanRange.minKey,
                                        orphanRange.maxKey,
                                        keyPattern,
@@ -177,7 +179,8 @@ namespace mongo {
         // Output
         static BSONField<BSONObj> stoppedAtKeyField;
 
-        bool run( string const &db,
+        bool newRun( TransactionExperiment* txn,
+                  string const &db,
                   BSONObj &cmdObj,
                   int,
                   string &errmsg,
@@ -231,7 +234,8 @@ namespace mongo {
             }
 
             BSONObj stoppedAtKey;
-            CleanupResult cleanupResult = cleanupOrphanedData( NamespaceString( ns ),
+            CleanupResult cleanupResult = cleanupOrphanedData( txn,
+                                                               NamespaceString( ns ),
                                                                startingFromKey,
                                                                secondaryThrottle,
                                                                &stoppedAtKey,

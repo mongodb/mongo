@@ -33,6 +33,7 @@ namespace mongo {
     class Client;
     class Database;
     class Timer;
+    class TransactionExperiment;
 
 namespace mutablebson {
     class Document;
@@ -70,8 +71,16 @@ namespace mutablebson {
                       normally do not want to log the command to the local oplog.
 
            return value is true if succeeded.  if false, set errmsg text.
+
+           Default impl forwards to private run(). It will go away soon.
         */
-        virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ) = 0;
+        virtual bool newRun(TransactionExperiment* txn,
+                         const string& db,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl = false );
 
         /**
          * This designation for the command is only used by the 'help' call and has nothing to do 
@@ -192,7 +201,8 @@ namespace mutablebson {
                                          int queryOptions = 0);
         static Command * findCommand( const string& name );
         // For mongod and webserver.
-        static void execCommand(Command* c,
+        static void execCommand(TransactionExperiment* txn,
+                                Command* c,
                                 Client& client,
                                 int queryOptions,
                                 const char *ns,
@@ -200,7 +210,8 @@ namespace mutablebson {
                                 BSONObjBuilder& result,
                                 bool fromRepl );
         // For mongos
-        static void execCommandClientBasic(Command* c,
+        static void execCommandClientBasic(TransactionExperiment* txn,
+                                           Command* c,
                                            ClientBasic& client,
                                            int queryOptions,
                                            const char *ns,
@@ -223,6 +234,11 @@ namespace mutablebson {
         static int testCommandsEnabled;
 
     private:
+        // This method is deprecated. It should only be used by commands that don't transactions
+        virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ) {
+            invariant(false);
+        }
+
         /**
          * Checks to see if the client is authorized to run the given command with the given
          * parameters on the given named database.
@@ -242,6 +258,12 @@ namespace mutablebson {
                                           bool fromRepl);
     };
 
-    bool _runCommands(const char *ns, BSONObj& jsobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions);
+    bool _runCommands(TransactionExperiment* txn,
+                      const char* ns,
+                      BSONObj& jsobj,
+                      BufBuilder& b,
+                      BSONObjBuilder& anObjBuilder,
+                      bool fromRepl,
+                      int queryOptions);
 
 } // namespace mongo

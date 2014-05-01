@@ -125,6 +125,23 @@ namespace mongo {
             return x;
         }
 
+        /**
+         * Returns a TransactionExperiment. Caller takes ownership.
+         *
+         * This interface is used for functions that need to create transactions (aka OpCtx), but
+         * don't know which implementation they should create. It allows the calling code to make
+         * that decision for them.
+         *
+         * TODO come up with a better Factory API once we split this class up (SERVER-13931).
+         */
+        typedef TransactionExperiment* (*Factory)();
+
+        /**
+         * A TransactionExperiment::Factory that always returns NULL. For things that shouldn't be
+         * touching their txns such as mongos or some unittests.
+         */
+        static TransactionExperiment* factoryNULL() { return NULL; }
+
     protected:
         TransactionExperiment() {}
     };

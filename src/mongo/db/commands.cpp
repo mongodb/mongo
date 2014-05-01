@@ -90,6 +90,15 @@ namespace mongo {
         return ResourcePattern::forExactNamespace(NamespaceString(ns));
     }
 
+    bool Command::newRun(TransactionExperiment* txn,
+                      const string& db,
+                      BSONObj& cmdObj,
+                      int options,
+                      string& errmsg,
+                      BSONObjBuilder& result,
+                      bool fromRepl) {
+        return run(db, cmdObj, options, errmsg, result, fromRepl);
+    }
 
     void Command::htmlHelp(stringstream& ss) const {
         string helpStr;

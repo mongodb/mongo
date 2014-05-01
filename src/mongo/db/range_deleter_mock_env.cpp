@@ -100,7 +100,8 @@ namespace mongo {
         return _deleteList.back();
     }
 
-    bool RangeDeleterMockEnv::deleteRange(const StringData& ns,
+    bool RangeDeleterMockEnv::deleteRange(TransactionExperiment* txn,
+                                          const StringData& ns,
                                           const BSONObj& min,
                                           const BSONObj& max,
                                           const BSONObj& shardKeyPattern,

@@ -55,7 +55,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "internal. for testing only.";
         }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "godinsert" ].valuestrsafe();
             log() << "test only command godinsert invoked coll:" << coll << endl;
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
@@ -64,17 +64,16 @@ namespace mongo {
 
             Lock::DBWrite lk(ns);
             Client::Context ctx( ns );
-            DurTransaction txn;
             Database* db = ctx.db();
             Collection* collection = db->getCollection( ns );
             if ( !collection ) {
-                collection = db->createCollection( &txn, ns );
+                collection = db->createCollection( txn, ns );
                 if ( !collection ) {
                     errmsg = "could not create collection";
                     return false;
                 }
             }
-            StatusWith<DiskLoc> res = collection->insertDocument( &txn, obj, false );
+            StatusWith<DiskLoc> res = collection->insertDocument( txn, obj, false );
             return appendCommandStatus( result, res.getStatus() );
         }
     };
@@ -134,7 +133,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "captrunc" ].valuestrsafe();
             uassert( 13416, "captrunc must specify a collection", !coll.empty() );
             NamespaceString nss( dbname, coll );
@@ -142,7 +141,6 @@ namespace mongo {
             bool inc = cmdObj.getBoolField( "inc" ); // inclusive range?
 
             Client::WriteContext ctx( nss.ns() );
-            DurTransaction txn;
             Collection* collection = ctx.ctx().db()->getCollection( nss.ns() );
             massert( 13417, "captrunc collection not found or empty", collection);
 
@@ -155,7 +153,7 @@ namespace mongo {
                 Runner::RunnerState state = runner->getNext(NULL, &end);
                 massert( 13418, "captrunc invalid n", Runner::RUNNER_ADVANCED == state);
             }
-            collection->temp_cappedTruncateAfter( &txn, end, inc );
+            collection->temp_cappedTruncateAfter( txn, end, inc );
             return true;
         }
     };
@@ -182,27 +180,26 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
             NamespaceString nss( dbname, coll );
 
             Client::WriteContext ctx( nss.ns() );
-            DurTransaction txn;
             Database* db = ctx.ctx().db();
             Collection* collection = db->getCollection( nss.ns() );
             massert( 13429, "emptycapped no such collection", collection );
 
             std::vector<BSONObj> indexes = stopIndexBuilds(db, cmdObj);
 
-            Status status = collection->truncate(&txn);
+            Status status = collection->truncate(txn);
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
             IndexBuilder::restoreIndexes(indexes);
 
             if (!fromRepl)
-                logOp(&txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             return true;
         }
     };

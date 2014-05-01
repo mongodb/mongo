@@ -2543,7 +2543,8 @@ namespace mongo {
         }
         ClientInfo *client = ClientInfo::get();
 
-        execCommandClientBasic(c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
+        TransactionExperiment* noTxn = NULL; // mongos doesn't use transactions SERVER-13931
+        execCommandClientBasic(noTxn, c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
     }
 
 } // namespace mongo

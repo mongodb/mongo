@@ -83,7 +83,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        virtual bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool newRun(TransactionExperiment* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
             if( coll.empty() || db.empty() ) {
                 errmsg = "no collection name specified";
@@ -145,7 +145,6 @@ namespace mongo {
             Lock::DBWrite lk(ns.ns());
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
             Client::Context ctx(ns);
-            DurTransaction txn;
 
             Collection* collection = ctx.db()->getCollection(ns.ns());
             if( ! collection ) {
@@ -162,7 +161,7 @@ namespace mongo {
 
             std::vector<BSONObj> indexesInProg = stopIndexBuilds(ctx.db(), cmdObj);
 
-            StatusWith<CompactStats> status = collection->compact( &txn, &compactOptions );
+            StatusWith<CompactStats> status = collection->compact( txn, &compactOptions );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status.getStatus() );
 

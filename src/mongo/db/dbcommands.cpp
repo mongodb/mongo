@@ -68,7 +68,6 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
@@ -192,7 +191,7 @@ namespace mongo {
 
         CmdDropDatabase() : Command("dropDatabase") {}
 
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // disallow dropping the config database
             if (serverGlobalParams.configsvr && (dbname == "config")) {
                 errmsg = "Cannot drop 'config' database if mongod started with --configsvr";
@@ -211,17 +210,16 @@ namespace mongo {
                 // and that may need a global lock.
                 Lock::GlobalWrite lk;
                 Client::Context context(dbname);
-                DurTransaction txn;
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
                 stopIndexBuilds(context.db(), cmdObj);
-                dropDatabase(&txn, context.db());
+                dropDatabase(txn, context.db());
 
                 log() << "dropDatabase " << dbname << " finished";
 
                 if (!fromRepl)
-                    logOp(&txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                    logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             }
 
             result.append( "dropped" , dbname );
@@ -277,7 +275,7 @@ namespace mongo {
             return allKilledIndexes;
         }
 
-        bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
             if ( e.numberInt() != 1 ) {
                 errmsg = "bad option";
@@ -288,7 +286,6 @@ namespace mongo {
             // called within, and that requires a global lock i believe.
             Lock::GlobalWrite lk;
             Client::Context context( dbname );
-            DurTransaction txn;
 
             log() << "repairDatabase " << dbname;
             std::vector<BSONObj> indexesInProg = stopIndexBuilds(context.db(), cmdObj);
@@ -298,7 +295,7 @@ namespace mongo {
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
             Status status =
-                repairDatabase( &txn, dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
+                repairDatabase( txn, dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
 
             IndexBuilder::restoreIndexes(indexesInProg);
 
@@ -354,13 +351,12 @@ namespace mongo {
 
         }
 
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
             //
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(dbname);
-            DurTransaction txn;
 
             BSONElement e = cmdObj.firstElement();
             result.append("was", ctx.db()->getProfilingLevel());
@@ -372,7 +368,7 @@ namespace mongo {
             if ( p == -1 )
                 ok = true;
             else if ( p >= 0 && p <= 2 ) {
-                ok = ctx.db()->setProfilingLevel( &txn, p , errmsg );
+                ok = ctx.db()->setProfilingLevel( txn, p , errmsg );
             }
 
             BSONElement slow = cmdObj["slowms"];
@@ -452,7 +448,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
         }
 
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
@@ -465,10 +461,9 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(nsToDrop);
-            DurTransaction txn;
             Database* db = ctx.db();
 
-            Collection* coll = db->getCollection( &txn, nsToDrop );
+            Collection* coll = db->getCollection( txn, nsToDrop );
             // If collection does not exist, short circuit and return.
             if ( !coll ) {
                 errmsg = "ns not found";
@@ -482,11 +477,11 @@ namespace mongo {
             result.append( "ns", nsToDrop );
             result.append( "nIndexesWas", numIndexes );
 
-            Status s = db->dropCollection( &txn, nsToDrop );
+            Status s = db->dropCollection( txn, nsToDrop );
 
             if ( s.isOK() ) {
                 if (!fromRepl)
-                    logOp(&txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                    logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
                 return true;
             }
             
@@ -600,7 +595,7 @@ namespace mongo {
 
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             BSONObjIterator it(cmdObj);
 
             // Extract ns from first cmdObj element.
@@ -630,11 +625,10 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(ns);
-            DurTransaction txn;
 
             // Create collection.
             return appendCommandStatus( result,
-                                        userCreateNS(&txn, ctx.db(), ns.c_str(), options, !fromRepl) );
+                                        userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl) );
         }
     } cmdCreate;
 
@@ -1150,12 +1144,11 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx( ns );
-            DurTransaction txn;
 
             Collection* coll = ctx.db()->getCollection( ns );
             if ( !coll ) {
@@ -1181,9 +1174,9 @@ namespace mongo {
                         result.appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
 
                         if ( newPowerOf2 )
-                            coll->setUserFlag( &txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
+                            coll->setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
                         else
-                            coll->clearUserFlag( &txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
+                            coll->clearUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
 
                         result.appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
                     }
@@ -1232,7 +1225,7 @@ namespace mongo {
                     if ( oldExpireSecs != newExpireSecs ) {
                         // change expireAfterSeconds
                         result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
-                        coll->getIndexCatalog()->updateTTLSetting( &txn, idx, newExpireSecs.numberLong() );
+                        coll->getIndexCatalog()->updateTTLSetting( txn, idx, newExpireSecs.numberLong() );
                         result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
                     }
                 }
@@ -1243,7 +1236,7 @@ namespace mongo {
             }
             
             if (ok && !fromRepl)
-                logOp(&txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
 
             return ok;
         }
@@ -1394,7 +1387,8 @@ namespace mongo {
     } cmdWhatsMyUri;
 
 
-    bool _execCommand(Command *c,
+    bool _execCommand(TransactionExperiment* txn,
+                      Command *c,
                       const string& dbname,
                       BSONObj& cmdObj,
                       int queryOptions,
@@ -1403,7 +1397,7 @@ namespace mongo {
                       bool fromRepl) {
 
         try {
-            return c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
+            return c->newRun(txn, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
         }
         catch ( SendStaleConfigException& e ){
             LOG(1) << "command failed because of stale config, can retry" << causedBy( e ) << endl;
@@ -1483,7 +1477,8 @@ namespace mongo {
      - context
      then calls run()
     */
-    void Command::execCommand(Command * c ,
+    void Command::execCommand(TransactionExperiment* txn,
+                              Command * c ,
                               Client& client,
                               int queryOptions,
                               const char *cmdns,
@@ -1585,7 +1580,7 @@ namespace mongo {
 
         client.curop()->ensureStarted();
 
-        retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
+        retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
 
         appendCommandStatus(result, retval, errmsg);
         
@@ -1608,7 +1603,12 @@ namespace mongo {
 
        returns true if ran a cmd
     */
-    bool _runCommands(const char *ns, BSONObj& _cmdobj, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
+    bool _runCommands(TransactionExperiment* txn,
+                      const char* ns,
+                      BSONObj& _cmdobj,
+                      BufBuilder& b,
+                      BSONObjBuilder& anObjBuilder,
+                      bool fromRepl, int queryOptions) {
         string dbname = nsToDatabase( ns );
 
         LOG(2) << "run command " << ns << ' ' << _cmdobj << endl;
@@ -1654,7 +1654,7 @@ namespace mongo {
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
 
         if ( c ) {
-            Command::execCommand(c, client, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
+            Command::execCommand(txn, c, client, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
         }
         else {
             Command::appendCommandStatus(anObjBuilder,

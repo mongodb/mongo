@@ -54,7 +54,8 @@ namespace mongo {
      * 5. Delete range.
      * 6. Wait until the majority of the secondaries catch up.
      */
-    bool RangeDeleterDBEnv::deleteRange(const StringData& ns,
+    bool RangeDeleterDBEnv::deleteRange(TransactionExperiment* txn,
+                                        const StringData& ns,
                                         const BSONObj& inclusiveLower,
                                         const BSONObj& exclusiveUpper,
                                         const BSONObj& keyPattern,
@@ -80,7 +81,8 @@ namespace mongo {
 
             try {
                 long long numDeleted =
-                        Helpers::removeRange(KeyRange(ns.toString(),
+                        Helpers::removeRange(txn,
+                                             KeyRange(ns.toString(),
                                                       inclusiveLower,
                                                       exclusiveUpper,
                                                       keyPattern),

@@ -74,4 +74,8 @@ namespace mongo {
         return Status( ErrorCodes::Interrupted, killed );
     }
 
+    TransactionExperiment* DurTransaction::factory() {
+        return new DurTransaction();
+    }
+
 }  // namespace mongo

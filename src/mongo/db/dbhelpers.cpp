@@ -318,7 +318,8 @@ namespace mongo {
         return true;
     }
 
-    long long Helpers::removeRange( const KeyRange& range,
+    long long Helpers::removeRange( TransactionExperiment* txn,
+                                    const KeyRange& range,
                                     bool maxInclusive,
                                     bool secondaryThrottle,
                                     RemoveSaver* callback,
@@ -366,8 +367,7 @@ namespace mongo {
             // Scoping for write lock.
             {
                 Client::WriteContext ctx(ns);
-                DurTransaction txn;
-                Collection* collection = ctx.ctx().db()->getCollection( &txn, ns );
+                Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                 if ( !collection )
                     break;
 
@@ -437,8 +437,8 @@ namespace mongo {
                 if ( callback )
                     callback->goingToDelete( obj );
 
-                logOp(&txn, "d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
-                collection->deleteDocument( &txn, rloc );
+                logOp(txn, "d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
+                collection->deleteDocument( txn, rloc );
                 numDeleted++;
             }
 

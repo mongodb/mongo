@@ -1208,7 +1208,7 @@ namespace mongo {
                 addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
             }
 
-            bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client& client = cc();
                 CurOp * op = client.curop();
@@ -1240,8 +1240,7 @@ namespace mongo {
 
                 BSONObjBuilder countsBuilder;
                 BSONObjBuilder timingBuilder;
-                DurTransaction txn;
-                State state( &txn, config );
+                State state( txn, config );
                 if ( ! state.sourceExists() ) {
                     errmsg = "ns doesn't exist";
                     return false;
@@ -1354,7 +1353,7 @@ namespace mongo {
 
                                 reduceTime += t.micros();
 
-                                txn.checkForInterrupt();
+                                txn->checkForInterrupt();
                             }
 
                             pm.hit();
@@ -1365,7 +1364,7 @@ namespace mongo {
                     }
                     pm.finished();
 
-                    txn.checkForInterrupt();
+                    txn->checkForInterrupt();
 
                     // update counters
                     countsBuilder.appendNumber("input", numInputs);
@@ -1447,7 +1446,7 @@ namespace mongo {
                 actions.addAction(ActionType::internal);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 ShardedConnectionInfo::addHook();
                 // legacy name
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
@@ -1464,8 +1463,7 @@ namespace mongo {
                 CurOp * op = client.curop();
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
-                DurTransaction txn;
-                State state(&txn, config);
+                State state(txn, config);
                 state.init();
 
                 // no need for incremental collection because records are already sorted

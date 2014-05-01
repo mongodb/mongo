@@ -29,6 +29,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
@@ -56,13 +57,14 @@ namespace mongo {
 
             {
                 // Remove _id range [_min, _max).
+                DurTransaction txn;
                 Lock::DBWrite lk( ns );
                 Client::Context ctx( ns );
                 KeyRange range( ns,
                                 BSON( "_id" << _min ),
                                 BSON( "_id" << _max ),
                                 BSON( "_id" << 1 ) );
-                Helpers::removeRange( range );
+                Helpers::removeRange( &txn, range );
             }
 
             // Check that the expected documents remain.

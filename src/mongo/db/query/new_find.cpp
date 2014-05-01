@@ -109,7 +109,8 @@ namespace {
 namespace mongo {
 
     // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
-    static bool runCommands(const char *ns,
+    static bool runCommands(TransactionExperiment* txn,
+                            const char *ns,
                             BSONObj& jsobj,
                             CurOp& curop,
                             BufBuilder &b,
@@ -117,7 +118,7 @@ namespace mongo {
                             bool fromRepl,
                             int queryOptions) {
         try {
-            return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
+            return _runCommands(txn, ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
         catch( SendStaleConfigException& ){
             throw;
@@ -397,7 +398,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+    std::string newRunQuery(TransactionExperiment* txn,
+                            Message& m,
+                            QueryMessage& q,
+                            CurOp& curop,
+                            Message &result) {
         // Validate the namespace.
         const char *ns = q.ns;
         uassert(16332, "can't have an empty ns", ns[0]);
@@ -424,7 +429,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult));
 
             BSONObjBuilder cmdResBuf;
-            if (!runCommands(ns, q.query, curop, bb, cmdResBuf, false, q.queryOptions)) {
+            if (!runCommands(txn, ns, q.query, curop, bb, cmdResBuf, false, q.queryOptions)) {
                 uasserted(13530, "bad or malformed command request?");
             }
 

@@ -558,7 +558,7 @@ namespace mongo {
             return Status::OK();
         }
         CmdClone() : Command("clone") { }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )
                 return false;
@@ -583,10 +583,9 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context context( dbname );
-            DurTransaction txn;
 
             Cloner cloner;
-            bool rval = cloner.go(&txn, context, from, opts, &clonedColls, errmsg);
+            bool rval = cloner.go(txn, context, from, opts, &clonedColls, errmsg);
 
             BSONArrayBuilder barr;
             barr.append( clonedColls );
@@ -630,7 +629,7 @@ namespace mongo {
                  "is placed at the same db.collection (namespace) as the source.\n"
                  ;
         }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() ) {
                 errmsg = "missing 'from' parameter";
@@ -666,8 +665,7 @@ namespace mongo {
 
             cloner.setConnection( myconn.release() );
 
-            DurTransaction txn;
-            return cloner.copyCollection(&txn, collection, query, errmsg, true, false, copyIndexes);
+            return cloner.copyCollection(txn, collection, query, errmsg, true, false, copyIndexes);
         }
     } cmdCloneCollection;
 
@@ -782,7 +780,7 @@ namespace mongo {
             help << "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
                  << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
         }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             bool fromSelf = fromhost.empty();
             if ( fromSelf ) {
@@ -813,7 +811,6 @@ namespace mongo {
                                              static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
                                              static_cast<Lock::ScopedLock*>( new Lock::DBWrite( todb ) ) );
 
-            DurTransaction txn;
 
             Cloner cloner;
             string username = cmdObj.getStringField( "username" );
@@ -847,7 +844,7 @@ namespace mongo {
                 cloner.setConnection(conn);
             }
             Client::Context ctx(todb);
-            return cloner.go(&txn, ctx, fromhost, cloneOptions, NULL, errmsg );
+            return cloner.go(txn, ctx, fromhost, cloneOptions, NULL, errmsg );
         }
     } cmdCopyDB;
 

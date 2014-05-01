@@ -142,7 +142,7 @@ namespace mongo {
                                              NamespaceString(dbname, collection)),
                                      targetActions));
         }
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string from = jsobj.getStringField( "cloneCollectionAsCapped" );
             string to = jsobj.getStringField( "toCollection" );
             double size = jsobj.getField( "size" ).number();
@@ -155,9 +155,8 @@ namespace mongo {
 
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(dbname);
-            DurTransaction txn;
 
-            Status status = cloneCollectionAsCapped( &txn, ctx.db(), from, to, size, temp, true );
+            Status status = cloneCollectionAsCapped( txn, ctx.db(), from, to, size, temp, true );
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -197,12 +196,11 @@ namespace mongo {
             return std::vector<BSONObj>();
         }
 
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             // calls renamecollection which does a global lock, so we must too:
             //
             Lock::GlobalWrite globalWriteLock;
             Client::Context ctx(dbname);
-            DurTransaction txn;
 
             Database* db = ctx.db();
 
@@ -222,28 +220,28 @@ namespace mongo {
             string longTmpName = str::stream() << dbname << "." << shortTmpName;
 
             if ( db->getCollection( longTmpName ) ) {
-                Status status = db->dropCollection( &txn, longTmpName );
+                Status status = db->dropCollection( txn, longTmpName );
                 if ( !status.isOK() )
                     return appendCommandStatus( result, status );
             }
 
-            Status status = cloneCollectionAsCapped( &txn, db, shortSource, shortTmpName, size, true, false );
+            Status status = cloneCollectionAsCapped( txn, db, shortSource, shortTmpName, size, true, false );
 
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
             verify( db->getCollection( longTmpName ) );
 
-            status = db->dropCollection( &txn, longSource );
+            status = db->dropCollection( txn, longSource );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
-            status = db->renameCollection( &txn, longTmpName, longSource, false );
+            status = db->renameCollection( txn, longTmpName, longSource, false );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
             if (!fromRepl)
-                logOp(&txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
             return true;
         }
     } cmdConvertToCapped;

@@ -188,6 +188,7 @@ namespace mongo {
         }
 
         virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
+            DurTransaction txn;
             while ( true ) {
                 if ( inShutdown() ) {
                     log() << "got request after shutdown()" << endl;
@@ -197,7 +198,7 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                assembleResponse( m, dbresponse, port->remote() );
+                assembleResponse( &txn, m, dbresponse, port->remote() );
 
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);
@@ -279,7 +280,9 @@ namespace mongo {
         logStartup();
         startReplication();
         if (serverGlobalParams.isHttpInterfaceEnabled)
-            boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
+            boost::thread web( boost::bind(&webServerThread,
+                                           new RestAdminAccess(), // takes ownership
+                                           DurTransaction::factory) ); // XXX SERVER-13931
 
 #if(TESTEXHAUST)
         boost::thread thr(testExhaust);
@@ -289,8 +292,8 @@ namespace mongo {
 
 
     void doDBUpgrade( const string& dbName, DataFileHeader* h ) {
-        static DBDirectClient db;
         DurTransaction txn;
+        DBDirectClient db(&txn);
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
             verify( PDFILE_VERSION == 4 );

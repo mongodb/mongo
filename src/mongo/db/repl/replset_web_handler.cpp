@@ -53,7 +53,8 @@ namespace {
             return startsWith( url , "/_replSet" );
         }
 
-        virtual void handle( const char *rq, const std::string& url, BSONObj params,
+        virtual void handle( TransactionExperiment* txn,
+                             const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
 

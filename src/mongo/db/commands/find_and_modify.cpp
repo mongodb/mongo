@@ -65,7 +65,7 @@ namespace mongo {
             find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
         }
         /* this will eventually replace run,  once sort is handled */
-        bool runNoDirectClient( const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool runNoDirectClient( TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             verify( cmdObj["sort"].eoo() );
 
             const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
@@ -96,7 +96,7 @@ namespace mongo {
             Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(ns);
             
-            return runNoDirectClient( ns , 
+            return runNoDirectClient( txn, ns , 
                                       query , fields , update , 
                                       upsert , returnNew , remove , 
                                       result , errmsg );
@@ -122,7 +122,8 @@ namespace mongo {
             result.append( "value" , p.transform( doc ) );
         }
 
-        static bool runNoDirectClient(const string& ns, 
+        static bool runNoDirectClient(TransactionExperiment* txn,
+                                      const string& ns, 
                                       const BSONObj& queryOriginal,
                                       const BSONObj& fields,
                                       const BSONObj& update,
@@ -134,8 +135,7 @@ namespace mongo {
 
             Lock::DBWrite lk( ns );
             Client::Context cx( ns );
-            DurTransaction txn;
-            Collection* collection = cx.db()->getCollection( &txn, ns );
+            Collection* collection = cx.db()->getCollection( txn, ns );
 
             const WhereCallbackReal whereCallback = WhereCallbackReal(StringData(ns));
 
@@ -222,7 +222,7 @@ namespace mongo {
             if ( remove ) {
                 _appendHelper(result, doc, found, fields, whereCallback);
                 if ( found ) {
-                    deleteObjects(&txn, cx.db(), ns, queryModified, true, true);
+                    deleteObjects(txn, cx.db(), ns, queryModified, true, true);
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
@@ -252,8 +252,7 @@ namespace mongo {
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = 
-                            mongo::update(&txn, cx.db(), request, &cc().curop()->debug());
+                    UpdateResult res = mongo::update(txn, cx.db(), request, &cc().curop()->debug());
                     if ( !collection ) {
                         // collection created by an upsert
                         collection = cx.db()->getCollection( ns );
@@ -298,11 +297,11 @@ namespace mongo {
             return true;
         }
         
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
-            static DBDirectClient db;
+        virtual bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
+            DBDirectClient db(txn);
 
             if (cmdObj["sort"].eoo()) {
-                return runNoDirectClient(dbname, cmdObj, x, errmsg, result, y);
+                return runNoDirectClient(txn, dbname, cmdObj, x, errmsg, result, y);
             }
 
             const string ns = dbname + '.' + cmdObj.firstElement().valuestr();

@@ -62,6 +62,11 @@ namespace mongo {
 
         virtual Status checkForInterruptNoAssert() const;
 
+        /**
+         * Returns a DurTransaction. Caller takes ownership.
+         */
+        static TransactionExperiment* factory();
+
     };
 
 }  // namespace mongo

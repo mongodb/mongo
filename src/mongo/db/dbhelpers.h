@@ -162,7 +162,8 @@ namespace mongo {
          * Does oplog the individual document deletions.
          * // TODO: Refactor this mechanism, it is growing too large
          */
-        static long long removeRange( const KeyRange& range,
+        static long long removeRange( TransactionExperiment* txn,
+                                      const KeyRange& range,
                                       bool maxInclusive = false,
                                       bool secondaryThrottle = false,
                                       RemoveSaver* callback = NULL,

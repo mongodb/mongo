@@ -96,11 +96,11 @@ namespace mongo {
     inline void opread(Message& m) { if( _diaglog.getLevel() & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
     inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.writeop((char *) m.singleData(), m.header()->len); }
 
-    void receivedKillCursors(Message& m);
-    void receivedUpdate(Message& m, CurOp& op);
-    void receivedDelete(Message& m, CurOp& op);
-    void receivedInsert(Message& m, CurOp& op);
-    bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop );
+    void receivedKillCursors(TransactionExperiment* txn, Message& m);
+    void receivedUpdate(TransactionExperiment* txn, Message& m, CurOp& op);
+    void receivedDelete(TransactionExperiment* txn, Message& m, CurOp& op);
+    void receivedInsert(TransactionExperiment* txn, Message& m, CurOp& op);
+    bool receivedGetMore(TransactionExperiment* txn, DbResponse& dbresponse, Message& m, CurOp& curop );
 
     int nloggedsome = 0;
 #define LOGWITHRATELIMIT if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
@@ -232,7 +232,7 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
-    static bool receivedQuery(Client& c, DbResponse& dbresponse, Message& m ) {
+    static bool receivedQuery(TransactionExperiment* txn, Client& c, DbResponse& dbresponse, Message& m ) {
         bool ok = true;
         MSGID responseTo = m.header()->id;
 
@@ -253,7 +253,7 @@ namespace mongo {
                 audit::logQueryAuthzCheck(client, ns, q.query, status.code());
                 uassertStatusOK(status);
             }
-            dbresponse.exhaustNS = newRunQuery(m, q, op, *resp);
+            dbresponse.exhaustNS = newRunQuery(txn, m, q, op, *resp);
             verify( !resp->empty() );
         }
         catch ( SendStaleConfigException& e ){
@@ -329,7 +329,10 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
+    void assembleResponse( TransactionExperiment* txn,
+                           Message& m,
+                           DbResponse& dbresponse,
+                           const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -418,10 +421,10 @@ namespace mongo {
         if ( op == dbQuery ) {
             if ( handlePossibleShardedMessage( m , &dbresponse ) )
                 return;
-            receivedQuery(c , dbresponse, m );
+            receivedQuery(txn, c , dbresponse, m );
         }
         else if ( op == dbGetMore ) {
-            if ( ! receivedGetMore(dbresponse, m, currentOp) )
+            if ( ! receivedGetMore(txn, dbresponse, m, currentOp) )
                 shouldLog = true;
         }
         else if ( op == dbMsg ) {
@@ -451,20 +454,20 @@ namespace mongo {
                 if ( op == dbKillCursors ) {
                     currentOp.ensureStarted();
                     logThreshold = 10;
-                    receivedKillCursors(m);
+                    receivedKillCursors(txn, m);
                 }
                 else if ( !nsString.isValid() ) {
                     // Only killCursors doesn't care about namespaces
                     uassert( 16257, str::stream() << "Invalid ns [" << ns << "]", false );
                 }
                 else if ( op == dbInsert ) {
-                    receivedInsert(m, currentOp);
+                    receivedInsert(txn, m, currentOp);
                 }
                 else if ( op == dbUpdate ) {
-                    receivedUpdate(m, currentOp);
+                    receivedUpdate(txn, m, currentOp);
                 }
                 else if ( op == dbDelete ) {
-                    receivedDelete(m, currentOp);
+                    receivedDelete(txn, m, currentOp);
                 }
                 else {
                     mongo::log() << "    operation isn't supported: " << op << endl;
@@ -503,8 +506,7 @@ namespace mongo {
                 LOG(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                DurTransaction txn;
-                profile(&txn, c, op, currentOp);
+                profile(txn, c, op, currentOp);
             }
         }
 
@@ -512,7 +514,7 @@ namespace mongo {
         debug.reset();
     } /* assembleResponse() */
 
-    void receivedKillCursors(Message& m) {
+    void receivedKillCursors(TransactionExperiment* txn, Message& m) {
         int *x = (int *) m.singleData()->_data;
         x++; // reserved
         int n = *x++;
@@ -561,7 +563,7 @@ namespace mongo {
         delete database; // closes files
     }
 
-    void receivedUpdate(Message& m, CurOp& op) {
+    void receivedUpdate(TransactionExperiment* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
@@ -609,15 +611,14 @@ namespace mongo {
             return;
 
         Client::Context ctx( ns );
-        DurTransaction txn;
 
-        UpdateResult res = executor.execute(&txn, ctx.db());
+        UpdateResult res = executor.execute(txn, ctx.db());
 
         // for getlasterror
         lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
     }
 
-    void receivedDelete(Message& m, CurOp& op) {
+    void receivedDelete(TransactionExperiment* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
@@ -649,16 +650,15 @@ namespace mongo {
             return;
 
         Client::Context ctx(ns);
-        DurTransaction txn;
 
-        long long n = executor.execute(&txn, ctx.db());
+        long long n = executor.execute(txn, ctx.db());
         lastError.getSafe()->recordDelete( n );
         op.debug().ndeleted = n;
     }
 
     QueryResult* emptyMoreResult(long long);
 
-    bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
+    bool receivedGetMore(TransactionExperiment* txn, DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
 
         DbMessage d(m);
@@ -854,7 +854,7 @@ namespace mongo {
         op.debug().ninserted = i;
     }
 
-    void receivedInsert(Message& m, CurOp& op) {
+    void receivedInsert(TransactionExperiment* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
         op.debug().ns = ns;
@@ -889,13 +889,12 @@ namespace mongo {
             return;
 
         Client::Context ctx(ns);
-        DurTransaction txn;
 
         if (multi.size() > 1) {
             const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-            insertMulti(&txn, ctx, keepGoing, ns, multi, op);
+            insertMulti(txn, ctx, keepGoing, ns, multi, op);
         } else {
-            checkAndInsert(&txn, ctx, ns, multi[0]);
+            checkAndInsert(txn, ctx, ns, multi[0]);
             globalOpCounters.incInsertInWriteLock(1);
             op.debug().ninserted = 1;
         }
@@ -942,6 +941,15 @@ namespace mongo {
         return false;
     }
 
+    DBDirectClient::DBDirectClient() 
+        : _txnOwned(new DurTransaction),
+          _txn(_txnOwned.get())
+    {}
+
+    DBDirectClient::DBDirectClient(TransactionExperiment* txn) 
+        : _txn(txn)
+    {}
+
     QueryOptions DBDirectClient::_lookupAvailableOptions() {
         // Exhaust mode is not available in DBDirectClient.
         return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);
@@ -965,11 +973,11 @@ namespace {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse , _clientHost );
+        assembleResponse( _txn, toSend, dbResponse , _clientHost );
         verify( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
-        getDur().commitIfNeeded();
+        _txn->commitIfNeeded();
         return true;
     }
 
@@ -978,8 +986,8 @@ namespace {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
-        assembleResponse( toSend, dbResponse , _clientHost );
-        getDur().commitIfNeeded();
+        assembleResponse( _txn, toSend, dbResponse , _clientHost );
+        _txn->commitIfNeeded();
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,

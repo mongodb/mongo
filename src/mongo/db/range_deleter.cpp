@@ -73,7 +73,8 @@ namespace mongo {
     struct RangeDeleter::RangeDeleteEntry {
         RangeDeleteEntry():
                 secondaryThrottle(true),
-                notifyDone(NULL) {
+                notifyDone(NULL),
+                transactionFactory(TransactionExperiment::factoryNULL) { // XXX SERVER-13931
         }
 
         std::string ns;
@@ -98,6 +99,8 @@ namespace mongo {
         // Not owned here.
         // Important invariant: Can only be set and used by one thread.
         Notification* notifyDone;
+
+        TransactionExperiment::Factory transactionFactory;
 
         // For debugging only
         BSONObj toBSON() const {
@@ -193,7 +196,8 @@ namespace mongo {
         }
     }
 
-    bool RangeDeleter::queueDelete(const std::string& ns,
+    bool RangeDeleter::queueDelete(TransactionExperiment::Factory transactionFactory,
+                                   const std::string& ns,
                                    const BSONObj& min,
                                    const BSONObj& max,
                                    const BSONObj& shardKeyPattern,
@@ -204,6 +208,7 @@ namespace mongo {
         if (errMsg == NULL) errMsg = &dummy;
 
         auto_ptr<RangeDeleteEntry> toDelete(new RangeDeleteEntry);
+        toDelete->transactionFactory = transactionFactory;
         toDelete->ns = ns;
         toDelete->min = min.getOwned();
         toDelete->max = max.getOwned();
@@ -247,7 +252,8 @@ namespace mongo {
         return true;
     }
 
-    bool RangeDeleter::deleteNow(const std::string& ns,
+    bool RangeDeleter::deleteNow(TransactionExperiment* txn,
+                                 const std::string& ns,
                                  const BSONObj& min,
                                  const BSONObj& max,
                                  const BSONObj& shardKeyPattern,
@@ -323,7 +329,7 @@ namespace mongo {
             sleepmillis(checkIntervalMillis);
         }
 
-        bool result = _env->deleteRange(ns, min, max, shardKeyPattern,
+        bool result = _env->deleteRange(txn, ns, min, max, shardKeyPattern,
                                         secondaryThrottle, errMsg);
 
         {
@@ -468,14 +474,18 @@ namespace mongo {
                 _stats->incInProgressDeletes_inlock();
             }
 
-            if (!_env->deleteRange(nextTask->ns,
-                                   nextTask->min,
-                                   nextTask->max,
-                                   nextTask->shardKeyPattern,
-                                   nextTask->secondaryThrottle,
-                                   &errMsg)) {
-                warning() << "Error encountered while trying to delete range: "
-                          << errMsg << endl;
+            {
+                boost::scoped_ptr<TransactionExperiment> txn(nextTask->transactionFactory()); // XXX SERVER-13931
+                if (!_env->deleteRange(txn.get(),
+                                       nextTask->ns,
+                                       nextTask->min,
+                                       nextTask->max,
+                                       nextTask->shardKeyPattern,
+                                       nextTask->secondaryThrottle,
+                                       &errMsg)) {
+                    warning() << "Error encountered while trying to delete range: "
+                              << errMsg << endl;
+                }
             }
 
             {

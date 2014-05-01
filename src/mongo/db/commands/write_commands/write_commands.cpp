@@ -102,7 +102,8 @@ namespace mongo {
     // Write commands are counted towards their corresponding opcounters, not command opcounters.
     bool WriteCmd::shouldAffectCommandCounter() const { return false; }
 
-    bool WriteCmd::run(const string& dbName,
+    bool WriteCmd::newRun(TransactionExperiment* txn,
+                       const string& dbName,
                        BSONObj& cmdObj,
                        int options,
                        string& errMsg,
@@ -132,7 +133,8 @@ namespace mongo {
         // TODO: fix this for sane behavior where we query repl set object
         if ( getLastErrorDefault ) defaultWriteConcern = *getLastErrorDefault;
 
-        WriteBatchExecutor writeBatchExecutor(defaultWriteConcern,
+        WriteBatchExecutor writeBatchExecutor(txn,
+                                              defaultWriteConcern,
                                               &cc(),
                                               &globalOpCounters,
                                               lastError.get());

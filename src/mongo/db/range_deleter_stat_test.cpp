@@ -48,6 +48,9 @@ namespace {
     using mongo::RangeDeleter;
     using mongo::RangeDeleterMockEnv;
     using mongo::RangeDeleterStats;
+    using mongo::TransactionExperiment;
+
+    TransactionExperiment* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
 
     TEST(NoDeletes, InitialState) {
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
@@ -85,7 +88,8 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns,
+        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL,
+                                        ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
                                         BSON("x" << 1),
@@ -127,7 +131,8 @@ namespace {
 
         Notification deleteDone;
         string errMsg;
-        ASSERT_TRUE(deleter.queueDelete(ns,
+        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+                                        ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
                                         BSON("x" << 1),
@@ -170,7 +175,8 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(ns,
+        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+                                        ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
                                         BSON("x" << 1),
@@ -213,6 +219,7 @@ namespace {
         string errMsg;
         boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
                                                                 &deleter,
+                                                                noTxn,
                                                                 ns,
                                                                 BSON("x" << 0),
                                                                 BSON("x" << 10),
@@ -256,6 +263,7 @@ namespace {
         string errMsg;
         boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
                                                                 &deleter,
+                                                                noTxn,
                                                                 ns,
                                                                 BSON("x" << 0),
                                                                 BSON("x" << 10),
@@ -296,7 +304,7 @@ namespace {
 
         const string ns("test.user");
         string errMsg;
-        ASSERT_TRUE(deleter.deleteNow(ns, BSON("x" << 0), BSON("x" << 10),
+        ASSERT_TRUE(deleter.deleteNow(noTxn, ns, BSON("x" << 0), BSON("x" << 10),
                                       BSON("x" << 1), true, &errMsg));
 
         const BSONObj stats(deleter.getStats()->toBSON());

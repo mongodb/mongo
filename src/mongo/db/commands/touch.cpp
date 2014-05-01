@@ -77,7 +77,8 @@ namespace mongo {
         }
         TouchCmd() : Command("touch") { }
 
-        virtual bool run(const string& dbname,
+        virtual bool newRun(TransactionExperiment* txn,
+                         const string& dbname,
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,
@@ -104,7 +105,6 @@ namespace mongo {
             }
 
             Client::ReadContext context( nss.ns() );
-            DurTransaction txn;
 
             Database* db = context.ctx().db();
             Collection* collection = db->getCollection( nss.ns() );
@@ -114,7 +114,7 @@ namespace mongo {
             }
 
             return appendCommandStatus( result,
-                                        collection->touch( &txn,
+                                        collection->touch( txn,
                                                            touch_data, touch_indexes,
                                                            &result ) );
         }
