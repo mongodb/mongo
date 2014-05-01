@@ -496,7 +496,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 
 	WT_ERR(__wt_config_gets(session, cfg, "leak_memory", &cval));
-	if (cval.len != 0)
+	if (cval.val != 0)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
 	/*
