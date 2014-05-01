@@ -111,9 +111,9 @@ namespace replset {
         // restart syncing
         void start();
 
+    public:
         bool isAssumingPrimary();
 
-    public:
         static BackgroundSync* get();
         static void shutdown();
         static void notify();

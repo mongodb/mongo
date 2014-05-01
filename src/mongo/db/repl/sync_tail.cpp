@@ -237,7 +237,7 @@ namespace replset {
                 }
             }
             setOplogVersion(ops.getDeque().front());
-            
+
             multiApply(ops.getDeque(), func);
 
             n += ops.getDeque().size();
@@ -377,8 +377,18 @@ namespace replset {
             // if we should crash and restart before updating the oplog
             theReplSet->setMinValid(lastOp);
 
+            if (BackgroundSync::get()->isAssumingPrimary()) {
+                LOG(1) << "about to apply batch up to optime: "
+                       << ops.getDeque().back()["ts"]._opTime().toStringPretty();
+            }
+            
             multiApply(ops.getDeque(), multiSyncApply);
 
+            if (BackgroundSync::get()->isAssumingPrimary()) {
+                LOG(1) << "about to update oplog to optime: "
+                       << ops.getDeque().back()["ts"]._opTime().toStringPretty();
+            }
+            
             applyOpsToOplog(&ops.getDeque());
 
             // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
@@ -474,6 +484,10 @@ namespace replset {
              }
         }
 
+        if (BackgroundSync::get()->isAssumingPrimary()) {
+            LOG(1) << "notifying BackgroundSync";
+        }
+            
         // Update write concern on primary
         BackgroundSync::notify();
     }
