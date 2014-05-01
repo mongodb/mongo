@@ -151,6 +151,12 @@ struct __wt_cursor_btree {
 	WT_ITEM tmp;
 
 	/*
+	 * A temporary buffer used for key values during binary searches of row-
+	 * store files.
+	 */
+	WT_ITEM srch;
+
+	/*
 	 * Fixed-length column-store items are a single byte, and it's simpler
 	 * and cheaper to allocate the space for it now than keep checking to
 	 * see if we need to grow the buffer.

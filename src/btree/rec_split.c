@@ -418,7 +418,8 @@ __split_inmem_build(
     WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref, WT_MULTI *multi)
 {
 	WT_CURSOR_BTREE cbt;
-	WT_ITEM key;
+	WT_DECL_ITEM(key);
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *skip;
@@ -426,8 +427,8 @@ __split_inmem_build(
 	uint32_t i, slot;
 
 	WT_CLEAR(cbt);
+	cbt.iface.session = &session->iface;
 	cbt.btree = S2BT(session);
-	WT_CLEAR(key);
 
 	/*
 	 * We can find unresolved updates when attempting to evict a page, which
@@ -450,6 +451,9 @@ __split_inmem_build(
 	 */
 	multi->skip_dsk = NULL;
 
+	if (orig->type == WT_PAGE_ROW_LEAF)
+		WT_RET(__wt_scr_alloc(session, 0, &key));
+
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip)
 		switch (orig->type) {
@@ -461,10 +465,10 @@ __split_inmem_build(
 			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
-			WT_RET(__wt_col_search(session, recno, ref, &cbt));
+			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_col_modify(
+			WT_ERR(__wt_col_modify(
 			    session, &cbt, recno, NULL, upd, 0));
 			break;
 		case WT_PAGE_ROW_LEAF:
@@ -474,24 +478,24 @@ __split_inmem_build(
 				upd = orig->pg_row_upd[slot];
 				orig->pg_row_upd[slot] = NULL;
 
-				WT_RET(__wt_row_leaf_key(
-				    session, orig, skip->rip, &key, 0));
+				WT_ERR(__wt_row_leaf_key(
+				    session, orig, skip->rip, key, 0));
 			} else {
 				upd = skip->ins->upd;
 				skip->ins->upd = NULL;
 
-				key.data = WT_INSERT_KEY(skip->ins);
-				key.size = WT_INSERT_KEY_SIZE(skip->ins);
+				key->data = WT_INSERT_KEY(skip->ins);
+				key->size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
 
 			/* Search the page. */
-			WT_RET(__wt_row_search(session, &key, ref, &cbt));
+			WT_ERR(__wt_row_search(session, key, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_row_modify(
-			    session, &cbt, &key, NULL, upd, 0));
+			WT_ERR(
+			    __wt_row_modify(session, &cbt, key, NULL, upd, 0));
 			break;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
 	/*
@@ -500,7 +504,11 @@ __split_inmem_build(
 	 * must write this page, so reset the checkpoint generation to zero.
 	 */
 	page->modify->checkpoint_gen = 0;
-	return (0);
+
+err:	__wt_scr_free(&key);
+	/* Free any resources that may have been cached in the cursor. */
+	WT_TRET(__wt_btcur_close(&cbt));
+	return (ret);
 }
 
 /*

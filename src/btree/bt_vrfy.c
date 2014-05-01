@@ -594,7 +594,7 @@ __verify_overflow_cell(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	uint32_t cell_num, i;
 
 	btree = S2BT(session);
@@ -642,7 +642,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size, WT_VSTUFF *vs)
 {
 	WT_BM *bm;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 
 	bm = S2BT(session)->bm;
 
@@ -654,7 +654,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	 * it was an overflow page, only that it was a valid page.  Confirm it's
 	 * the type of page we expected.
 	 */
-	dsk = vs->tmp1->mem;
+	dsk = vs->tmp1->data;
 	if (dsk->type != WT_PAGE_OVFL)
 		WT_RET_MSG(session, WT_ERROR,
 		    "overflow referenced page at %s is not an overflow page",

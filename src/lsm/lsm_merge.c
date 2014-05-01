@@ -56,7 +56,7 @@ __wt_lsm_merge(
 	WT_CURSOR *dest, *src;
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
-	WT_ITEM buf, key, value;
+	WT_ITEM key, value;
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
 	uint32_t generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
@@ -272,10 +272,8 @@ __wt_lsm_merge(
 	    ret = __wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 	WT_ERR(ret);
 	if (create_bloom) {
-		WT_CLEAR(buf);
 		WT_ERR(__wt_lsm_tree_bloom_name(
-		    session, lsm_tree, chunk->id, &buf));
-		chunk->bloom_uri = __wt_buf_steal(session, &buf);
+		    session, lsm_tree, chunk->id, &chunk->bloom_uri));
 
 		WT_ERR(__wt_bloom_create(session, chunk->bloom_uri,
 		    lsm_tree->bloom_config,
