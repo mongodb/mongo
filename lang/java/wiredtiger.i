@@ -210,6 +210,7 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 WT_CLASS(struct __wt_connection, WT_CONNECTION, connection, connCloseHandler($1))
 WT_CLASS(struct __wt_session, WT_SESSION, session, sessionCloseHandler($1))
 WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor, cursorCloseHandler($1))
+WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, asyncop, )
 
 %define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
 %javamethodmodifiers SIGNATURE_CLASS::METHOD "
@@ -231,6 +232,10 @@ WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor, cursorCloseHandler($1))
 %ignore __wt_async_op::remove;
 %ignore __wt_async_op::search;
 %ignore __wt_async_op::update;
+%immutable __wt_async_op::connection;
+%immutable __wt_async_op::key_format;
+%immutable __wt_async_op::value_format;
+
 %javamethodmodifiers __wt_async_op::key_format "protected";
 %javamethodmodifiers __wt_async_op::value_format "protected";
 
@@ -411,7 +416,8 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 
 	%javamethodmodifiers java_init "protected";
 	int java_init(jobject jasyncop) {
-		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
+		JAVA_CALLBACK *jcb =
+		    (JAVA_CALLBACK *)$self->c.lang_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jasyncop);
 		JCALL1(DeleteLocalRef, jcb->jnienv, jasyncop);
 		return (0);
@@ -436,7 +442,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
    valueFormat = getValue_format();
    keyPacker = new PackOutputStream(keyFormat);
    valuePacker = new PackOutputStream(valueFormat);
-   wiredtigerJNI.Asyncop_java_init(swigCPtr, this, this);
+   wiredtigerJNI.AsyncOp_java_init(swigCPtr, this, this);
  }
 
  protected static long getCPtr($javaclassname obj) {
@@ -466,7 +472,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append.
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putKeyByte(byte value)
+	public AsyncOp putKeyByte(byte value)
 	throws WiredTigerPackingException {
 		keyPacker.addByte(value);
 		return this;
@@ -478,7 +484,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append.
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putKeyByteArray(byte[] value)
+	public AsyncOp putKeyByteArray(byte[] value)
 	throws WiredTigerPackingException {
 		this.putKeyByteArray(value, 0, value.length);
 		return this;
@@ -492,7 +498,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param len The length of the byte array.
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putKeyByteArray(byte[] value, int off, int len)
+	public AsyncOp putKeyByteArray(byte[] value, int off, int len)
 	throws WiredTigerPackingException {
 		keyPacker.addByteArray(value, off, len);
 		return this;
@@ -504,7 +510,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putKeyInt(int value)
+	public AsyncOp putKeyInt(int value)
 	throws WiredTigerPackingException {
 		keyPacker.addInt(value);
 		return this;
@@ -516,7 +522,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putKeyLong(long value)
+	public AsyncOp putKeyLong(long value)
 	throws WiredTigerPackingException {
 		keyPacker.addLong(value);
 		return this;
@@ -528,7 +534,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putKeyShort(short value)
+	public AsyncOp putKeyShort(short value)
 	throws WiredTigerPackingException {
 		keyPacker.addShort(value);
 		return this;
@@ -540,7 +546,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putKeyString(String value)
+	public AsyncOp putKeyString(String value)
 	throws WiredTigerPackingException {
 		keyPacker.addString(value);
 		return this;
@@ -552,7 +558,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putValueByte(byte value)
+	public AsyncOp putValueByte(byte value)
 	throws WiredTigerPackingException {
 		valuePacker.addByte(value);
 		return this;
@@ -564,7 +570,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putValueByteArray(byte[] value)
+	public AsyncOp putValueByteArray(byte[] value)
 	throws WiredTigerPackingException {
 		this.putValueByteArray(value, 0, value.length);
 		return this;
@@ -578,7 +584,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param len The length of the byte array.
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putValueByteArray(byte[] value, int off, int len)
+	public AsyncOp putValueByteArray(byte[] value, int off, int len)
 	throws WiredTigerPackingException {
 		valuePacker.addByteArray(value, off, len);
 		return this;
@@ -590,7 +596,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putValueInt(int value)
+	public AsyncOp putValueInt(int value)
 	throws WiredTigerPackingException {
 		valuePacker.addInt(value);
 		return this;
@@ -602,7 +608,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putValueLong(long value)
+	public AsyncOp putValueLong(long value)
 	throws WiredTigerPackingException {
 		valuePacker.addLong(value);
 		return this;
@@ -614,7 +620,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putValueShort(short value)
+	public AsyncOp putValueShort(short value)
 	throws WiredTigerPackingException {
 		valuePacker.addShort(value);
 		return this;
@@ -626,7 +632,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 * \param value The value to append
 	 * \return This async_op object, so put calls can be chained.
 	 */
-	public Asyncop putValueString(String value)
+	public AsyncOp putValueString(String value)
 	throws WiredTigerPackingException {
 		valuePacker.addString(value);
 		return this;
@@ -840,38 +846,6 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	}
 
 	/**
-	 * Retrieve the next item in the table.
-	 *
-	 * \return The result of the comparison.
-	 */
-	public int next() {
-		int ret = next_wrap();
-		keyPacker.reset();
-		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
-		return ret;
-	}
-
-	/**
-	 * Retrieve the previous item in the table.
-	 *
-	 * \return The result of the comparison.
-	 */
-	public int prev() {
-		int ret = prev_wrap();
-		keyPacker.reset();
-		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
-		return ret;
-	}
-
-	/**
 	 * Search for an item in the table.
 	 *
 	 * \return The result of the comparison.
@@ -883,22 +857,6 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 		keyUnpacker = (ret == 0) ?
 		    new PackInputStream(keyFormat, get_key_wrap()) : null;
 		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
-		return ret;
-	}
-
-	/**
-	 * Search for an item in the table.
-	 *
-	 * \return The result of the comparison.
-	 */
-	public SearchStatus search_near() {
-		SearchStatus ret = search_near_wrap(keyPacker.getValue());
-		keyPacker.reset();
-		valuePacker.reset();
-		keyUnpacker = (ret != SearchStatus.NOTFOUND) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret != SearchStatus.NOTFOUND) ?
 		    new PackInputStream(valueFormat, get_value_wrap()) : null;
 		return ret;
 	}
@@ -1525,7 +1483,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
   public ";
 %rename(open_cursor) __wt_session::open_cursor_wrap;
 
-%rename(Asyncop) __wt_async_op;
+%rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
@@ -1593,18 +1551,19 @@ err:	if (ret != 0)
 }
 
 %extend __wt_connection {
-	WT_SESSION *async_new_opwrap(JNIEnv *jenv, const char *config) {
+	WT_SESSION *async_new_opwrap(JNIEnv *jenv, const char *uri,
+	    const char *config) {
 		extern WT_EVENT_HANDLER javaApiEventHandler;
 		WT_ASYNC_OP *asyncop = NULL;
                 WT_CONNECTION_IMPL *connimpl;
 		JAVA_CALLBACK *jcb;
 		int ret;
 
-		if ((ret = $self->async_new_op($self, &javaApiEventHandler, config, &asyncop)) != 0)
+		if ((ret = $self->async_new_op($self, uri, config, &javaApiEventHandler, &asyncop)) != 0)
 			goto err;
 
                 connimpl = (WT_CONNECTION_IMPL *)$self;
-		if ((ret = __wt_calloc_def(connimpl>default_session, 1, &jcb)) != 0)
+		if ((ret = __wt_calloc_def(connimpl->default_session, 1, &jcb)) != 0)
 			goto err;
 
 		jcb->jnienv = jenv;

@@ -59,7 +59,8 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 
-%typemap(in, numinputs=0) WT_ASYNC_CALLBACK * %{
+%typemap(in) WT_ASYNC_CALLBACK * (PyObject *callback_obj = NULL) %{
+	callback_obj = $input;
 	$1 = &pyApiAsyncCallback;
 %}
 
@@ -104,8 +105,11 @@ from packing import pack, unpack
 		if (__wt_calloc_def((WT_ASYNC_OP_IMPL *)(*$1), 1, &pcb) != 0)
 			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
 		else {
-			Py_XINCREF($result);
 			pcb->pyobj = $result;
+			Py_XINCREF(pcb->pyobj);
+			/* XXX Is there a way to avoid SWIG's numbering? */
+			pcb->pyasynccb = callback_obj5;
+			Py_XINCREF(pcb->pyasynccb);
 			(*$1)->c.lang_private = pcb;
 		}
 	}
@@ -200,7 +204,8 @@ DESTRUCTOR(__wt_session, close)
  * asttribute to None, and free the PY_CALLBACK.
  */
 typedef struct {
-	PyObject *pyobj;	/* the python Session/Cursor object */
+	PyObject *pyobj;	/* the python Session/Cursor/AsyncOp object */
+	PyObject *pyasynccb;	/* the callback to use for AsyncOp */
 } PY_CALLBACK;
 
 static PyObject *wtError;
@@ -239,6 +244,15 @@ class IterableCursor:
 			raise StopIteration
 		return self.cursor.get_keys() + self.cursor.get_values()
 ## @endcond
+
+# An abstract class, which must be subclassed with notify() overridden.
+class AsyncCallback:
+	def __init__(self):
+		raise NotImplementedError
+
+	def notify(self, op, op_ret, flags):
+		raise NotImplementedError
+
 %}
 
 /* Bail out if arg or arg.this is None, else set res to the C pointer. */
@@ -319,9 +333,16 @@ retry:
 	if (result != 0 && result != ENOMEM)
 		SWIG_ERROR_IF_NOT_SET(result);
         else if (result == ENOMEM) {
-                sleep(10000);
+                __wt_sleep(0, 10000);
                 goto retry;
         }
+}
+%enddef
+
+/* Any API that returns an enum type uses this. */
+%define ENUM_OK(m)
+%exception m {
+	$action
 }
 %enddef
 
@@ -344,6 +365,7 @@ retry:
 %enddef
 
 ENOMEM_OK(__wt_connection::async_new_op)
+ENUM_OK(__wt_async_op::get_type)
 NOTFOUND_OK(__wt_cursor::next)
 NOTFOUND_OK(__wt_cursor::prev)
 NOTFOUND_OK(__wt_cursor::remove)
@@ -370,6 +392,7 @@ COMPARE_OK(__wt_cursor::search_near)
 %ignore __wt_async_op::get_value;
 %ignore __wt_async_op::set_key;
 %ignore __wt_async_op::set_value;
+%immutable __wt_async_op::connection;
 
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
@@ -813,30 +836,24 @@ writeToPythonStream(const char *streamname, const char *message)
 		goto err;
 	if ((arglist = Py_BuildValue("(s)", msg)) == NULL)
 		goto err;
-	if ((arglist2 = Py_BuildValue("()", msg)) == NULL)
+	if ((arglist2 = Py_BuildValue("()")) == NULL)
 		goto err;
 
 	written = PyObject_CallObject(write_method, arglist);
 	(void)PyObject_CallObject(flush_method, arglist2);
 	ret = 0;
 
-err:    /* Release python Global Interpreter Lock */
+err:	Py_XDECREF(arglist2);
+	Py_XDECREF(arglist);
+	Py_XDECREF(flush_method);
+	Py_XDECREF(write_method);
+	Py_XDECREF(se);
+	Py_XDECREF(sys);
+	Py_XDECREF(written);
+
+	/* Release python Global Interpreter Lock */
 	SWIG_PYTHON_THREAD_END_BLOCK;
 
-	if (arglist2)
-		Py_XDECREF(arglist2);
-	if (arglist)
-		Py_XDECREF(arglist);
-	if (flush_method)
-		Py_XDECREF(flush_method);
-	if (write_method)
-		Py_XDECREF(write_method);
-	if (se)
-		Py_XDECREF(se);
-	if (sys)
-		Py_XDECREF(sys);
-	if (written)
-		Py_XDECREF(written);
 	if (msg)
 		free(msg);
 	return (ret);
@@ -876,6 +893,7 @@ pythonClose(PY_CALLBACK *pcb)
 		ret = EINVAL;  /* any non-zero value will do. */
 	}
 	Py_XDECREF(pcb->pyobj);
+	Py_XDECREF(pcb->pyasynccb);
 
 	SWIG_PYTHON_THREAD_END_BLOCK;
 
@@ -959,43 +977,73 @@ pythonCloseCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 	return (ret);
 }
 
-WT_EVENT_HANDLER pyApiEventHandler = {
+static WT_EVENT_HANDLER pyApiEventHandler = {
 	pythonErrorCallback, pythonMessageCallback, NULL, pythonCloseCallback
 };
 %}
 
 /* Add async callback support. */
 %{
+
 static int
-pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int ret,
+pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
     uint32_t flags)
 {
+	int ret, t_ret;
 	PY_CALLBACK *pcb;
+	PyObject *arglist, *notify_method, *pyresult;
         WT_ASYNC_OP_IMPL *op;
-        WT_ASYNC_OPTYPE type;
         WT_SESSION_IMPL *session;
 
+	/*
+	 * Ensure the global interpreter lock is held since we'll be
+	 * making Python calls now.
+	 */
+	SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+
         op = (WT_ASYNC_OP_IMPL *)asyncop;
-        type = asyncop->get_type(asyncop);
         session = O2S(op);
 	pcb = (PY_CALLBACK *)asyncop->c.lang_private;
 	asyncop->c.lang_private = NULL;
-        if (type == WT_AOP_SEARCH) {
-                /*
-                 * Get key/value out for search.
-                 */
-        }
-	if (pcb != NULL)
-		ret = pythonClose(pcb);
+	ret = 0;
+
+	if (pcb->pyasynccb == NULL)
+		goto err;
+	if ((arglist = Py_BuildValue("(Oii)", pcb->pyobj,
+	    opret, flags)) == NULL)
+		goto err;
+	if ((notify_method = PyObject_GetAttrString(pcb->pyasynccb,
+	    "notify")) == NULL)
+		goto err;
+
+	pyresult = PyEval_CallObject(notify_method, arglist);
+	if (pyresult == NULL || !PyArg_Parse(pyresult, "i", &ret))
+		goto err;
+
+	if (0) {
+		if (ret == 0)
+			ret = EINVAL;
+err:		__wt_err(session, ret, "python async callback error");
+	}
+	Py_XDECREF(pyresult);
+	Py_XDECREF(notify_method);
+	Py_XDECREF(arglist);
+
+	SWIG_PYTHON_THREAD_END_BLOCK;
+
+	if (pcb != NULL) {
+		if ((t_ret = pythonClose(pcb) != 0) && ret == 0)
+			ret = t_ret;
+	}
 	__wt_free(session, pcb);
 
-        if (ret == 0 || ret == WT_NOTFOUND)
+        if (ret == 0 && (opret == 0 || opret == WT_NOTFOUND))
 	        return (0);
         else
                 return (1);
 }
 
-WT_ASYNC_CALLBACK pyApiAsyncCallback = { pythonAsyncCallback };
+static WT_ASYNC_CALLBACK pyApiAsyncCallback = { pythonAsyncCallback };
 %}
 
 %pythoncode %{

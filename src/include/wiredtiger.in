@@ -1963,6 +1963,7 @@ int wiredtiger_open(const char *home,
  */
 const char *wiredtiger_strerror(int err);
 
+#if !defined(SWIG)
 /*!
  * The interface implemented by applications to accept notifications
  * of the completion of asynchronous operations.
@@ -1986,6 +1987,7 @@ struct __wt_async_callback {
 	int (*notify)(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op,
 	    int op_ret, uint32_t flags);
 };
+#endif
 
 /*!
  * The interface implemented by applications to handle error, informational and
