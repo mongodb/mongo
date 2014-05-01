@@ -34,7 +34,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
-#include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/heartbeat_info.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
@@ -256,8 +255,6 @@ namespace mongo {
 
         boost::thread producer(boost::bind(&replset::BackgroundSync::producerThread, sync));
         theReplSet->syncSourceFeedback.go();
-
-        task::fork(ghost);
 
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }

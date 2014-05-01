@@ -35,7 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/util/background.h"
 #include "mongo/util/mongoutils/str.h"
@@ -142,10 +141,14 @@ namespace mongo {
                 _slaves[ident] = last;
                 _dirty = true;
 
+                // update write concern tags if this node is primary
                 if (theReplSet && theReplSet->isPrimary()) {
-                    if (!theReplSet->ghost->updateSlave(ident.obj["_id"].OID(), last)) {
+                    const Member* mem = theReplSet->findById(ident.obj["config"]["_id"].Int());
+                    if (!mem) {
                         return false;
                     }
+                    ReplSetConfig::MemberCfg cfg = mem->config();
+                    cfg.updateGroups(last);
                 }
 
                 if ( ! _started ) {

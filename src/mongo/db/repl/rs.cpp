@@ -38,7 +38,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
-#include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/repl_start.h"
@@ -388,7 +387,6 @@ namespace {
 
     void ReplSetImpl::init(ReplSetCmdline& replSetCmdline) {
         mgr = new Manager(this);
-        ghost = new GhostSync(this);
 
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
@@ -441,7 +439,6 @@ namespace {
         _self(0),
         _maintenanceMode(0),
         mgr(0),
-        ghost(0),
         _writerPool(replWriterThreadCount),
         _prefetcherPool(replPrefetcherThreadCount),
         oplogVersion(0),
@@ -627,7 +624,6 @@ namespace {
                 // we have new configs for existing members, so we need to repopulate _members
                 // with the most recent configs
                 _members.orphanAll();
-                ghost->clearCache();
 
                 // for logging
                 string members = "";
@@ -684,10 +680,6 @@ namespace {
 
         endOldHealthTasks();
         
-        // Clear out our memory of who might have been syncing from us.
-        // Any incoming handshake connections after this point will be newly registered.
-        ghost->clearCache();
-
         int oldPrimaryId = -1;
         {
             const Member *p = box.getPrimary();
@@ -988,12 +980,9 @@ namespace {
     }
 
     bool ReplSetImpl::registerSlave(const BSONObj& rid, const int memberId) {
-        // To prevent race conditions with clearing the cache at reconfig time,
-        // we lock the replset mutex here.
         Member* member = NULL;
         {
             lock lk(this);
-            ghost->associateSlave(rid, memberId);
             member = getMutableMember(memberId);
         }
 

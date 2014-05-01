@@ -36,7 +36,6 @@
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/db/repl/ghost_sync.h"
 #include "mongo/db/repl/rs_base.h"
 #include "mongo/db/repl/repl_set_health_poll_task.h"
 #include "mongo/db/repl/state_box.h"
@@ -240,7 +239,6 @@ namespace mongo {
         // this is called from within a writelock in logOpRS
         unsigned selfId() const { return _id; }
         Manager *mgr;
-        GhostSync *ghost;
         /**
          * This forces a secondary to go into recovering state and stay there
          * until this is called again, passing in "false".  Multiple threads can
