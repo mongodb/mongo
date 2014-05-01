@@ -603,6 +603,8 @@ namespace mongo {
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
                 QLOG() << "Unable to find index for $geoNear query." << endl;
+                // Don't leave tags on query tree.
+                query.root()->resetTag();
                 return Status(ErrorCodes::BadValue, "unable to find index for $geoNear query");
             }
 

@@ -1,5 +1,6 @@
 // Tests distinct with geospatial field values.
 // 1. Test distinct with geo values for 'key' (SERVER-2135)
+// 2. Test distinct with geo predicates for 'query' (SERVER-13769)
 
 var coll = db.geo_distinct;
 var res;
@@ -46,3 +47,60 @@ assert.commandWorked( coll.ensureIndex( { 'loc.coordinates': '2d' } ) );
 res = coll.runCommand( 'distinct', { key: 'loc.coordinates' } );
 assert.commandWorked( res );
 assert.eq( res.values.sort(), [ 10, 20, 30 ] );
+
+//
+// 2. Test distinct with geo predicates for 'query'.
+//
+
+coll.drop();
+for (var i=0; i<50; ++i) {
+    coll.insert( { zone: 1, loc: { type: 'Point', coordinates: [ -20, -20 ] } } );
+    coll.insert( { zone: 2, loc: { type: 'Point', coordinates: [ -10, -10 ] } } );
+    coll.insert( { zone: 3, loc: { type: 'Point', coordinates: [ 0, 0 ] } } );
+    coll.insert( { zone: 4, loc: { type: 'Point', coordinates: [ 10, 10 ] } } );
+    coll.insert( { zone: 5, loc: { type: 'Point', coordinates: [ 20, 20 ] } } );
+}
+var originGeoJSON = { type: 'Point', coordinates: [ 0, 0 ] };
+
+// Test distinct with $nearSphere query predicate.
+
+// A. Unindexed key, no geo index on query predicate.
+res = coll.runCommand( 'distinct', { key: 'zone',
+                                     query: { loc: { $nearSphere: { $geometry: originGeoJSON,
+                                                                    $maxDistance: 1 } } } } );
+assert.commandFailed( res );
+// B. Unindexed key, with 2dsphere index on query predicate.
+assert.commandWorked( coll.ensureIndex( { loc: '2dsphere' } ) );
+res = coll.runCommand( 'distinct', { key: 'zone',
+                                     query: { loc: { $nearSphere: { $geometry: originGeoJSON,
+                                                                    $maxDistance: 1 } } } } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ 3 ] );
+// C. Indexed key, with 2dsphere index on query predicate.
+assert.commandWorked( coll.ensureIndex( { zone: 1 } ) );
+res = coll.runCommand( 'distinct', { key: 'zone',
+                                     query: { loc: { $nearSphere: { $geometry: originGeoJSON,
+                                                                    $maxDistance: 1 } } } } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ 3 ] );
+
+// Test distinct with $near query predicate (recall that $near returns the closest 100 points).
+
+coll.dropIndexes();
+
+// A. Unindexed key, no geo index on query predicate.
+res = coll.runCommand( 'distinct', { key: 'zone',
+                                     query: { 'loc.coordinates': { $near: [ 0, 0 ] } } } );
+assert.commandFailed( res );
+// B. Unindexed key, with 2d index on query predicate.
+assert.commandWorked( coll.ensureIndex( { 'loc.coordinates': '2d' } ) );
+res = coll.runCommand( 'distinct', { key: 'zone',
+                                     query: { 'loc.coordinates': { $near: [ 0, 0 ] } } } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ 2, 3, 4 ] );
+// C. Indexed key, with 2d index on query predicate.
+assert.commandWorked( coll.ensureIndex( { zone: 1 } ) );
+res = coll.runCommand( 'distinct', { key: 'zone',
+                                     query: { 'loc.coordinates': { $near: [ 0, 0 ] } } } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ 2, 3, 4 ] );
