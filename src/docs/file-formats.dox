@@ -45,13 +45,12 @@ dictionary compression, Huffman encoding and block compression.
 and on-disk objects by storing any identical key prefix only once per
 page.
 
-  The cost is minor additional CPU and some additional memory use when
-operating on the in-memory tree.  Specifically, sequential cursor
-movement through prefix-compressed page in reverse (but not forward)
-order, or the random lookup of a key/value pair will allocate sufficient
-memory to hold some number of uncompressed keys.  So, for example, if
-key prefix compression only saves a small number of bytes per key, the
-additional memory cost of instantiating the uncompressed key may mean
+  The cost is additional CPU and memory when operating on the in-memory tree.
+Specifically, sequential cursor movement through prefix-compressed page in
+reverse (but not forward) order, or the random lookup of a key/value pair will
+allocate sufficient memory to hold some number of uncompressed keys.  So, for
+example, if key prefix compression only saves a small number of bytes per key,
+the additional memory cost of instantiating the uncompressed key may mean
 prefix compression is not worthwhile.  Further, in cases where the
 on-disk cost is the primary concern, block compression may mean prefix
 compression is less useful.
@@ -62,7 +61,7 @@ used with the WT_SESSION::create method's \c prefix_compression_min
 configuration string, or turn off key prefix compression entirely using
 the WT_SESSION::create method's \c prefix_compression configuration string.
 
-  Key prefix compression is enabled by default.
+  Key prefix compression is disabled by default.
 
 - Dictionary compression reduces the size requirement of both the
 in-memory and on-disk objects by storing any identical value only once

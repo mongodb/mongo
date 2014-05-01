@@ -250,7 +250,7 @@ file_config = format_meta + [
 	    system buffer cache after that many bytes from this object are
 	    written into the buffer cache''',
 	    min=0),
-	Config('prefix_compression', 'true', r'''
+	Config('prefix_compression', 'false', r'''
 	    configure prefix compression on row-store leaf pages''',
 	    type='boolean'),
 	Config('prefix_compression_min', '4', r'''
