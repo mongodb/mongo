@@ -160,6 +160,11 @@ namespace mongo {
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const = 0;
 
+        /**
+         * Load all data into cache.
+         * What cache depends on implementation.
+         * @param output (optional) - where to put detailed stats
+         */
         virtual Status touch( TransactionExperiment* txn, BSONObjBuilder* output ) const = 0;
 
         // TODO: this makes me sad, it shouldn't be in the interface
