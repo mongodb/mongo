@@ -1546,14 +1546,13 @@ main(int argc, char *argv[])
 	CONFIG *cfg, _cfg;
 	size_t cc_len, req_len, tc_len;
 	int ch, monitor_set, ret;
-	char *cc_buf, *tc_buf;
 	const char *opts = "C:H:h:m:O:o:T:";
 	const char *config_opts, *sep;
-	char *user_cconfig, *user_tconfig;
+	char *cc_buf, *tc_buf, *user_cconfig, *user_tconfig;
 
 	monitor_set = ret = 0;
-	cc_buf = tc_buf = NULL;
-	config_opts = user_cconfig = user_tconfig = NULL;
+	config_opts = NULL;
+	cc_buf = tc_buf = user_cconfig = user_tconfig = NULL;
 
 	/* Setup the default configuration values. */
 	cfg = &_cfg;
@@ -1717,6 +1716,8 @@ einval:		ret = EINVAL;
 err:	config_free(cfg);
 	free(cc_buf);
 	free(tc_buf);
+	free(user_cconfig);
+	free(user_tconfig);
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
