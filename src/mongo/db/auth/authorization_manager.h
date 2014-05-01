@@ -434,6 +434,16 @@ namespace mongo {
         void _invalidateUserCache_inlock();
 
         /**
+         * Given the objects describing an oplog entry that affects authorization data, invalidates
+         * the portion of the user cache that is affected by that operation.  Should only be called
+         * with oplog entries that have been pre-verified to actually affect authorization data.
+         */
+        void _invalidateRelevantCacheData(const char* op,
+                                          const char* ns,
+                                          const BSONObj& o,
+                                          const BSONObj* o2);
+
+        /**
          * Fetches user information from a v2-schema user document for the named user,
          * and stores a pointer to a new user object into *acquiredUser on success.
          */

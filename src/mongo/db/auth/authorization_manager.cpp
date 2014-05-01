@@ -1376,6 +1376,7 @@ namespace {
         case 'i':
         case 'u':
         case 'd':
+            if (op[1] != '\0') return false; // "db" op type
             return isAuthzNamespace(ns);
         case 'c':
             return loggedCommandOperatesOnAuthzData(ns, o);
@@ -1386,7 +1387,55 @@ namespace {
             return true;
         }
     }
+
+    // Updates to users in the oplog are done by matching on the _id, which will always have the
+    // form "<dbname>.<username>".  This function extracts the UserName from that string.
+    StatusWith<UserName> extractUserNameFromIdString(const StringData& idstr) {
+        size_t splitPoint = idstr.find('.');
+        if (splitPoint == string::npos) {
+            return StatusWith<UserName>(
+                    ErrorCodes::FailedToParse,
+                    mongoutils::str::stream() << "_id entries for user documents must be of "
+                            "the form <dbname>.<username>.  Found: " << idstr);
+        }
+        return StatusWith<UserName>(UserName(idstr.substr(splitPoint),
+                                             idstr.substr(0, splitPoint)));
+    }
+
 }  // namespace
+
+    void AuthorizationManager::_invalidateRelevantCacheData(const char* op,
+                                                            const char* ns,
+                                                            const BSONObj& o,
+                                                            const BSONObj* o2) {
+        if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
+                ns == AuthorizationManager::versionCollectionNamespace.ns()) {
+            invalidateUserCache();
+            return;
+        }
+
+        if (*op == 'i' || *op == 'd' || *op == 'u') {
+            // If you got into this function isAuthzNamespace() must have returned true, and we've
+            // already checked that it's not the roles or version collection.
+            invariant(ns == AuthorizationManager::usersCollectionNamespace.ns());
+
+            StatusWith<UserName> userName(Status::OK());
+            if (*op == 'u') {
+                userName = extractUserNameFromIdString((*o2)["_id"].str());
+            } else {
+                userName = extractUserNameFromIdString(o["_id"].str());
+            }
+            if (!userName.isOK()) {
+                warning() << "Invalidating user cache based on user being updated failed, will "
+                        "invalidate the entire cache instead: " << userName.getStatus() << endl;
+                invalidateUserCache();
+                return;
+            }
+            invalidateUserByName(userName.getValue());
+        } else {
+            invalidateUserCache();
+        }
+    }
 
     void AuthorizationManager::logOp(
             const char* op,
@@ -1397,8 +1446,7 @@ namespace {
 
         _externalState->logOp(op, ns, o, o2, b);
         if (appliesToAuthzData(op, ns, o)) {
-            CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
-            _invalidateUserCache_inlock();
+            _invalidateRelevantCacheData(op, ns, o, o2);
         }
     }
 

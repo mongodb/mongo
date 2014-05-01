@@ -158,10 +158,13 @@ namespace {
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                                        BSON("user" << "v0RW" << "pwd" << "password"),
+                                        BSON("_id" << "test.v0RW" <<
+                                             "user" << "v0RW" <<
+                                             "pwd" << "password"),
                                         BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
-                                        BSON("user" << "v0AdminRO" <<
+                                        BSON("_id" << "admin.v0AdminRO" <<
+                                             "user" << "v0AdminRO" <<
                                              "pwd" << "password" <<
                                              "readOnly" << true),
                                         BSONObj()));
@@ -194,12 +197,14 @@ namespace {
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                                        BSON("user" << "v1read" <<
+                                        BSON("_id" << "test.v1read" <<
+                                             "user" << "v1read" <<
                                              "pwd" << "password" <<
                                              "roles" << BSON_ARRAY("read")),
                                         BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
-                                        BSON("user" << "v1cluster" <<
+                                        BSON("_id" << "admin.v1cluster" <<
+                                             "user" << "v1cluster" <<
                                              "pwd" << "password" <<
                                              "roles" << BSON_ARRAY("clusterAdmin")),
                                         BSONObj()));
@@ -232,22 +237,26 @@ namespace {
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                                        BSON("user" << "readOnly" <<
+                                        BSON("_id" << "test.readOnly" <<
+                                             "user" << "readOnly" <<
                                              "pwd" << "password" <<
                                              "roles" << BSON_ARRAY("read")),
                                         BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
-                                        BSON("user" << "clusterAdmin" <<
+                                        BSON("_id" << "admin.clusterAdmin" <<
+                                             "user" << "clusterAdmin" <<
                                              "userSource" << "$external" <<
                                              "roles" << BSON_ARRAY("clusterAdmin")),
                                         BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                                        BSON("user" << "readWriteMultiDB" <<
+                                        BSON("_id" << "test.readWriteMultiDB" <<
+                                             "user" << "readWriteMultiDB" <<
                                              "pwd" << "password" <<
                                              "roles" << BSON_ARRAY("readWrite")),
                                         BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
-                                        BSON("user" << "readWriteMultiDB" <<
+                                        BSON("_id" << "test2.readWriteMultiDB" <<
+                                             "user" << "readWriteMultiDB" <<
                                              "userSource" << "test" <<
                                              "roles" << BSON_ARRAY("readWrite")),
                                         BSONObj()));
@@ -320,14 +329,16 @@ namespace {
 
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 "admin",
-                BSON("user" << "v2read" <<
+                BSON("_id" << "admin.v2read" <<
+                     "user" << "v2read" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "password") <<
                      "roles" << BSON_ARRAY(BSON("role" << "read" << "db" << "test"))),
                 BSONObj()));
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 "admin",
-                BSON("user" << "v2cluster" <<
+                BSON("_id" << "admin.v2cluster" <<
+                     "user" << "v2cluster" <<
                      "db" << "admin" <<
                      "credentials" << BSON("MONGODB-CR" << "password") <<
                      "roles" << BSON_ARRAY(BSON("role" << "clusterAdmin" << "db" << "admin"))),
@@ -362,38 +373,44 @@ namespace {
 
             // Docs for "readOnly@test"
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                              BSON("user" << "readOnly" <<
+                              BSON("_id" << "test.readOnly" <<
+                                   "user" << "readOnly" <<
                                    "pwd" << "password" <<
                                    "roles" << BSON_ARRAY("read")),
                               BSONObj()));
 
             // Docs for "clusterAdmin@$external"
             ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
-                              BSON("user" << "clusterAdmin" <<
+                              BSON("_id" << "admin.clusterAdmin" <<
+                                   "user" << "clusterAdmin" <<
                                    "userSource" << "$external" <<
                                    "roles" << BSON_ARRAY("clusterAdmin")),
                               BSONObj()));
 
             // Docs for "readWriteMultiDB@test"
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                              BSON("user" << "readWriteMultiDB" <<
+                              BSON("_id" << "test.readWriteMultiDB" <<
+                                   "user" << "readWriteMultiDB" <<
                                    "pwd" << "password" <<
                                    "roles" << BSON_ARRAY("readWrite")),
                               BSONObj()));
             ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
-                              BSON("user" << "readWriteMultiDB" <<
+                              BSON("_id" << "test2.readWriteMultiDB" <<
+                                   "user" << "readWriteMultiDB" <<
                                    "userSource" << "test" <<
                                    "roles" << BSON_ARRAY("readWrite")),
                               BSONObj()));
 
             // Docs for otherdbroles@test
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                              BSON("user" << "otherdbroles" <<
+                              BSON("_id" << "test.otherdbroles" <<
+                                   "user" << "otherdbroles" <<
                                    "pwd" << "password" <<
                                    "roles" << BSON_ARRAY("readWrite")),
                               BSONObj()));
             ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
-                              BSON("user" << "otherdbroles" <<
+                              BSON("_id" << "admin.otherdbroles" <<
+                                   "user" << "otherdbroles" <<
                                    "userSource" << "test" <<
                                    "roles" << BSONArray() <<
                                    "otherDBRoles" << BSON("test3" << BSON_ARRAY("readWrite"))),
@@ -401,12 +418,14 @@ namespace {
 
             // Docs for mixedroles@test
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                              BSON("user" << "mixedroles" <<
+                              BSON("_id" << "test.mixedroles" <<
+                                   "user" << "mixedroles" <<
                                    "pwd" << "password" <<
                                    "roles" << BSON_ARRAY("readWrite")),
                               BSONObj()));
             ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
-                              BSON("user" << "mixedroles" <<
+                              BSON("_id" << "admin.mixedroles" <<
+                                   "user" << "mixedroles" <<
                                    "userSource" << "test" <<
                                    "roles" << BSONArray() <<
                                    "otherDBRoles" << BSON("test3" << BSON_ARRAY("readWrite" <<
@@ -414,7 +433,8 @@ namespace {
                                                           "test2" << BSON_ARRAY("readWrite"))),
                               BSONObj()));
             ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
-                              BSON("user" << "mixedroles" <<
+                              BSON("_id" << "test2.mixedroles" <<
+                                   "user" << "mixedroles" <<
                                    "userSource" << "test" <<
                                    "roles" << BSON_ARRAY("readWrite")),
                               BSONObj()));
