@@ -291,7 +291,11 @@ namespace mongo {
 
         set<Shard> shards;
         if ( _manager ) {
-            _manager->getShardsForQuery( shards, query );
+            try {
+                _manager->getShardsForQuery( shards, query );
+            } catch ( const DBException& ex ) {
+                return ex.toStatus();
+            }
         }
         else {
             shards.insert( *_primary );
