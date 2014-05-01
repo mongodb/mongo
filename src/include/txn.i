@@ -210,6 +210,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
 	if (!F_ISSET(txn, TXN_HAS_ID)) {
 		conn = S2C(session);
 		txn_global = &conn->txn_global;
