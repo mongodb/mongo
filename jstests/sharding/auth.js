@@ -245,11 +245,11 @@ d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 )
 d1.getMaster().getDB(adminUser.db).createUser({user: adminUser.username,
                                                pwd: adminUser.password,
                                                roles: jsTest.adminUserRoles},
-                                              {w: 3, wtimeout: 30000});
+                                              {w: 3, wtimeout: 60000});
 d2.getMaster().getDB(adminUser.db).createUser({user: adminUser.username,
                                                pwd: adminUser.password,
                                                roles: jsTest.adminUserRoles},
-                                              {w: 3, wtimeout: 30000});
+                                              {w: 3, wtimeout: 60000});
 
 login(testUser);
 print( "testing map reduce" );
