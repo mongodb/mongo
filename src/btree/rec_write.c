@@ -4669,7 +4669,7 @@ err:			__wt_scr_free(&tkey);
 	 * Set the checkpoint generation, used to determine whether we can skip
 	 * writing this page again.
 	 */
-	mod->checkpoint_gen = S2C(session)->txn_global.checkpoint_gen;
+	mod->checkpoint_gen = btree->checkpoint_gen;
 
 	return (0);
 }

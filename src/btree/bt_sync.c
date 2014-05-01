@@ -70,7 +70,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * eviction to complete.
 		 */
 		btree->checkpointing = 1;
-		checkpoint_gen = S2C(session)->txn_global.checkpoint_gen;
+		checkpoint_gen = ++btree->checkpoint_gen;
 
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 			WT_ERR(__wt_evict_file_exclusive_on(session));
@@ -132,6 +132,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (page->modify != NULL)
 				page->modify->checkpoint_gen = checkpoint_gen;
 		}
+                WT_ASSERT(session, checkpoint_gen == btree->checkpoint_gen);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}

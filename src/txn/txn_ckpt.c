@@ -233,9 +233,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	wt_session = &session->iface;
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
-	/* Increment the global checkpoint generation. */
-	++conn->txn_global.checkpoint_gen;
-
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full) {
 		WT_ERR(__wt_txn_checkpoint_log(

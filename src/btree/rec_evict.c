@@ -313,7 +313,7 @@ __rec_review(
 	 */
 	mod = page->modify;
 	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
-	    mod->checkpoint_gen >= S2C(session)->txn_global.checkpoint_gen;
+	    mod->checkpoint_gen >= btree->checkpoint_gen;
 
 	if (behind_checkpoint && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
