@@ -1,14 +1,48 @@
-// Test distinct with geo queries SERVER-2135
+// Tests distinct with geospatial field values.
+// 1. Test distinct with geo values for 'key' (SERVER-2135)
 
-t = db.commits
-t.drop()
+var coll = db.geo_distinct;
+var res;
 
-t.save( { _id : ObjectId( "4ce63ec2f360622431000013" ), loc : [ 55.59664, 13.00156 ], author : "FredrikL" } )
+//
+// 1. Test distinct with geo values for 'key'.
+//
 
-assert.commandWorked( db.runCommand( { distinct : 'commits', key : 'loc' } ) );
+coll.drop();
+coll.insert( { loc: { type: 'Point', coordinates: [ 10, 20 ] } } );
+coll.insert( { loc: { type: 'Point', coordinates: [ 10, 20 ] } } );
+coll.insert( { loc: { type: 'Point', coordinates: [ 20, 30 ] } } );
+coll.insert( { loc: { type: 'Point', coordinates: [ 20, 30 ] } } );
+assert.eq( 4, coll.count() );
 
-t.ensureIndex( { loc : '2d' } )
+// Test distinct on GeoJSON points with/without a 2dsphere index.
 
-printjson( t.getIndexes() )
+res = coll.runCommand( 'distinct', { key: 'loc' } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ { type: 'Point', coordinates: [ 10, 20 ] },
+                                { type: 'Point', coordinates: [ 20, 30 ] } ] );
 
-assert.commandWorked( db.runCommand( { distinct : 'commits', key : 'loc' } ) );
+assert.commandWorked( coll.ensureIndex( { loc: '2dsphere' } ) );
+
+res = coll.runCommand( 'distinct', { key: 'loc' } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ { type: 'Point', coordinates: [ 10, 20 ] },
+                                { type: 'Point', coordinates: [ 20, 30 ] } ] );
+
+// Test distinct on legacy points with/without a 2d index.
+
+// (Note that distinct on a 2d-indexed field doesn't produce a list of coordinate pairs, since
+// distinct logically operates on unique values in an array.  Hence, the results are unintuitive and
+// not semantically meaningful.)
+
+coll.dropIndexes();
+
+res = coll.runCommand( 'distinct', { key: 'loc.coordinates' } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ 10, 20, 30 ] );
+
+assert.commandWorked( coll.ensureIndex( { 'loc.coordinates': '2d' } ) );
+
+res = coll.runCommand( 'distinct', { key: 'loc.coordinates' } );
+assert.commandWorked( res );
+assert.eq( res.values.sort(), [ 10, 20, 30 ] );
