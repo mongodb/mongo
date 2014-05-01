@@ -608,6 +608,6 @@ testUpdate({
 replTest.stopSet();
 }
 
-testUpdates("latest", "2.4");
-testUpdates("2.4", "latest");
+testUpdates("2.6", "2.4");
+testUpdates("2.4", "2.6");
 testUpdates("2.4", "2.4");
