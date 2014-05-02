@@ -12,8 +12,10 @@ while ( bigString.length < 1024 * 50 )
 db = s.getDB( "test" )
 coll = db.foo;
 
-var i=0;
+// Temporarily disable balancer so it will not interfere with auto-splitting
+s.stopBalancer();
 
+var i=0;
 for ( j=0; j<30; j++ ){
     print( "j:" + j + " : " + 
            Date.timeFunc( 
@@ -28,6 +30,9 @@ for ( j=0; j<30; j++ ){
            ) );
     
 }
+
+s.startBalancer();
+
 assert.eq( i , j * 100 , "setup" );
 // Until SERVER-9715 is fixed, the sync command must be run on a diff connection
 new Mongo( s.s.host ).adminCommand( "connpoolsync" );
