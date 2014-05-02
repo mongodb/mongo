@@ -54,9 +54,8 @@ class Callback(wiredtiger.AsyncCallback):
         try:
             key = op.get_key()
             value = op.get_value()
-            optype = op.get_type(op)
+            optype = op.get_type()
 
-            ## TODO: get rid of extra self argument for get_type().
             if optype == wiredtiger.WT_AOP_INSERT:
                 self.lock.acquire()
                 self.ninsert += 1
@@ -168,7 +167,7 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
             v = self.genvalue(i)
             op.set_key(k)
             op.set_value(v)
-            op.insert(op)
+            op.insert()
 
         # Wait for all outstanding async ops to finish.
         self.conn.async_flush()
@@ -180,7 +179,7 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
             op = self.conn.async_new_op(tablearg, None, callback)
             k = self.genkey(i)
             op.set_key(k)
-            op.search(op)
+            op.search()
 
         # Wait for all outstanding async ops to finish.
         self.conn.async_flush()

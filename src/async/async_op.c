@@ -29,12 +29,15 @@ __async_get_key(WT_ASYNC_OP *asyncop, ...)
 static void
 __async_set_key(WT_ASYNC_OP *asyncop, ...)
 {
+	WT_CURSOR *c;
 	va_list ap;
 
+	c = &asyncop->c;
 	va_start(ap, asyncop);
-	__wt_cursor_set_keyv(&asyncop->c, asyncop->c.flags, ap);
-	__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &asyncop->c.key,
-	    asyncop->c.key.data, asyncop->c.key.size);
+	__wt_cursor_set_keyv(c, c->flags, ap);
+	if (!WT_DATA_IN_ITEM(&c->key) && !WT_CURSOR_RECNO(c))
+		__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &c->key,
+		    c->key.data, c->key.size);
 	va_end(ap);
 }
 
@@ -61,12 +64,16 @@ __async_get_value(WT_ASYNC_OP *asyncop, ...)
 static void
 __async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
+	WT_CURSOR *c;
 	va_list ap;
 
+	c = &asyncop->c;
 	va_start(ap, asyncop);
-	__wt_cursor_set_valuev(&asyncop->c, ap);
-	__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &asyncop->c.value,
-	    asyncop->c.value.data, asyncop->c.value.size);
+	__wt_cursor_set_valuev(c, ap);
+	/* Copy the data, if it is pointing at data elsewhere. */
+	if (!WT_DATA_IN_ITEM(&c->value))
+		__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop),
+		    &c->value, c->value.data, c->value.size);
 	va_end(ap);
 }
 

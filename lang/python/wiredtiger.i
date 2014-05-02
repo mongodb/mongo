@@ -300,7 +300,7 @@ class AsyncCallback:
 %enddef
 
 SELFHELPER(struct __wt_connection, connection)
-SELFHELPER(struct __wt_async_op, asyncop)
+SELFHELPER(struct __wt_async_op, op)
 SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
 

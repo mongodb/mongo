@@ -164,9 +164,13 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * If needed, also set the value.
 	 */
 	if (op->optype != WT_AOP_COMPACT) {
-		__wt_cursor_set_raw_key(cursor, &asyncop->c.key);
-		if (op->optype != WT_AOP_SEARCH && op->optype != WT_AOP_REMOVE)
-			__wt_cursor_set_raw_value(cursor, &asyncop->c.value);
+		__wt_cursor_get_raw_key(&asyncop->c, &val);
+		__wt_cursor_set_raw_key(cursor, &val);
+		if (op->optype == WT_AOP_INSERT ||
+		    op->optype == WT_AOP_UPDATE) {
+			__wt_cursor_get_raw_value(&asyncop->c, &val);
+			__wt_cursor_set_raw_value(cursor, &val);
+		}
 	}
 	switch (op->optype) {
 		case WT_AOP_COMPACT:
