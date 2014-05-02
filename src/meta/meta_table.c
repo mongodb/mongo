@@ -123,7 +123,7 @@ __wt_metadata_update(
 	WT_DECL_RET;
 
 	WT_VERBOSE_RET(session, metadata,
-	    "Update: key: %s, value: %s, tracking: %s, %sturtle",
+	    "Update: key: %s, value: %s, tracking: %s, %s" "turtle",
 	    key, value, WT_META_TRACKING(session) ? "true" : "false",
 	    __metadata_turtle(key) ? "" : "not ");
 
@@ -153,7 +153,7 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 	WT_DECL_RET;
 
 	WT_VERBOSE_RET(session, metadata,
-	    "Remove: key: %s, tracking: %s, %sturtle",
+	    "Remove: key: %s, tracking: %s, %s" "turtle",
 	    key, WT_META_TRACKING(session) ? "true" : "false",
 	    __metadata_turtle(key) ? "" : "not ");
 
@@ -188,7 +188,7 @@ __wt_metadata_search(
 	*valuep = NULL;
 
 	WT_VERBOSE_RET(session, metadata,
-	    "Search: key: %s, tracking: %s, %sturtle",
+	    "Search: key: %s, tracking: %s, %s" "turtle",
 	    key, WT_META_TRACKING(session) ? "true" : "false",
 	    __metadata_turtle(key) ? "" : "not ");
 
