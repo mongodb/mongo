@@ -204,7 +204,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	pindex = WT_INTL_INDEX_COPY(parent);
 
 	/*
-	 * Create N children, unless we are dealing with  large page without
+	 * Create N children, unless we are dealing with a large page without
 	 * many entries, in which case split into the minimum number of pages.
 	 */
 	children = WT_MAX(pindex->entries / __split_deepen_per_child,
