@@ -563,10 +563,10 @@ session_ops(WT_SESSION *session)
 	/*! [Configure dictionary compression on] */
 	ret = session->drop(session, "table:mytable", NULL);
 
-	/*! [Configure key prefix compression off] */
+	/*! [Configure key prefix compression on] */
 	ret = session->create(session, "table:mytable",
-	    "key_format=S,value_format=S,prefix_compression=false");
-	/*! [Configure key prefix compression off] */
+	    "key_format=S,value_format=S,prefix_compression=true");
+	/*! [Configure key prefix compression on] */
 	ret = session->drop(session, "table:mytable", NULL);
 
 #ifdef MIGHT_NOT_RUN

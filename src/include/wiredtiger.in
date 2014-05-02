@@ -888,7 +888,7 @@ struct __wt_session {
 	 * that many bytes from this object are read or written into the buffer
 	 * cache., an integer greater than or equal to 0; default \c 0.}
 	 * @config{prefix_compression, configure prefix compression on row-store
-	 * leaf pages., a boolean flag; default \c true.}
+	 * leaf pages., a boolean flag; default \c false.}
 	 * @config{prefix_compression_min, minimum gain before prefix
 	 * compression will be used on row-store leaf pages., an integer greater
 	 * than or equal to 0; default \c 4.}
