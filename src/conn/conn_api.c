@@ -962,6 +962,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
+		{ "api",		WT_VERB_api },
 		{ "block",		WT_VERB_block },
 		{ "checkpoint",		WT_VERB_checkpoint },
 		{ "compact",		WT_VERB_compact },
@@ -1123,10 +1124,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_CKPT_SYNC);
-
-	WT_ERR(__wt_config_gets(session, cfg, "api_trace", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_TRACE_API);
 
 	WT_ERR(__wt_conn_verbose_config(session, cfg));
 

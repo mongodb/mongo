@@ -55,6 +55,7 @@ flags = {
 		'TXN_LOG_CKPT_STOP',
 	],
 	'verbose' : [
+		'VERB_api',
 		'VERB_block',
 		'VERB_checkpoint',
 		'VERB_compact',
@@ -87,7 +88,6 @@ flags = {
 		'CONN_LSM_MERGE',
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',
-		'CONN_TRACE_API',
 	],
 	'session' : [
 		'SESSION_INTERNAL',

@@ -13,36 +13,20 @@
 	(s)->dhandle = (dh);						\
 	(s)->name = #h "." #n;
 
-#define	API_CALL_NOCONF_BASE(s, h, n, cur, dh) do {			\
+#define	API_CALL_NOCONF(s, h, n, cur, dh) do {				\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
-	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0)	\
+	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
+	WT_VERBOSE_ERR((s), api, "CALL: " #h ":" #n)
 
-#define	API_CALL_BASE(s, h, n, cur, dh, config, cfg) do {		\
+#define	API_CALL(s, h, n, cur, dh, config, cfg) do {			\
 	const char *cfg[] =						\
 	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
 	WT_ERR(((config) != NULL) ?					\
 	    __wt_config_check((s),					\
-	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0)
-
-#ifdef HAVE_DIAGNOSTIC
-#define API_CALL_NOCONF(s, h, n, cur, dh)				\
-	API_CALL_NOCONF_BASE(s, h, n, cur, dh);				\
-	if (F_ISSET(S2C(s), WT_CONN_TRACE_API))				\
-		__wt_msg((s), "CALL: " #h ":" #n)
-
-#define	API_CALL(s, h, n, cur, dh, config, cfg)				\
-	API_CALL_BASE(s, h, n, cur, dh, config, cfg);			\
-	if (F_ISSET(S2C(s), WT_CONN_TRACE_API))				\
-		__wt_msg((s), "CALL: " #h ":" #n)
-#else
-#define API_CALL_NOCONF(s, h, n, cur, dh)				\
-	API_CALL_NOCONF_BASE(s, h, n, cur, dh)
-
-#define	API_CALL(s, h, n, cur, dh, config, cfg)				\
-	API_CALL_BASE(s, h, n, cur, dh, config, cfg)
-#endif
+	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0);		\
+	WT_VERBOSE_ERR((s), api, "CALL: " #h ":" #n)
 
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\

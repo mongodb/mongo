@@ -297,10 +297,6 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
-	Config('api_trace', 'false', r'''
-	    output an information message for each API call made. Only
-		available when configured with --enable-diagnostic''',
-	    type='boolean'),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',
@@ -359,6 +355,7 @@ connection_runtime_config = [
 	    enable messages for various events.  Options are given as a
 	    list, such as <code>"verbose=[evictserver,read]"</code>''',
 	    type='list', choices=[
+	        'api',
 	        'block',
 	        'checkpoint',
 	        'compact',
