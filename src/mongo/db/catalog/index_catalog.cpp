@@ -934,6 +934,7 @@ namespace mongo {
         b.append( "name", indexName );
         BSONObj cond = b.obj(); // e.g.: { name: "ts_1", ns: "foo.coll" }
         return static_cast<int>( deleteObjects( txn,
+                                                _collection->_database,
                                                 _collection->_database->_indexesName,
                                                 cond,
                                                 false,

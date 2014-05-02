@@ -31,6 +31,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
@@ -64,7 +65,9 @@ namespace mongo {
         Client::WriteContext ctx(ns.getSystemIndexesCollection());
         DurTransaction txn;
 
-        Status status = build(&txn, ctx.ctx());
+        Database* db = dbHolder().get(ns.db().toString(), storageGlobalParams.dbpath);
+
+        Status status = build(&txn, db);
         if ( !status.isOK() ) {
             log() << "IndexBuilder could not build index: " << status.toString();
         }
@@ -72,11 +75,9 @@ namespace mongo {
         cc().shutdown();
     }
 
-    Status IndexBuilder::build(TransactionExperiment* txn,
-                               Client::Context& context ) const {
+    Status IndexBuilder::build(TransactionExperiment* txn, Database* db) const {
+        const string ns = _index["ns"].String();
 
-        string ns = _index["ns"].String();
-        Database* db = context.db();
         Collection* c = db->getCollection( ns );
         if ( !c ) {
             c = db->getOrCreateCollection( ns );
@@ -84,7 +85,7 @@ namespace mongo {
         }
 
         // Show which index we're building in the curop display.
-        context.getClient()->curop()->setQuery(_index);
+        cc().curop()->setQuery(_index);
 
         Status status = c->getIndexCatalog()->createIndex( txn,
                                                            _index, 

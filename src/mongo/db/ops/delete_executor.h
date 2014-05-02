@@ -33,9 +33,11 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 
+
 namespace mongo {
 
     class CanonicalQuery;
+    class Database;
     class DeleteRequest;
     class TransactionExperiment;
 
@@ -90,7 +92,7 @@ namespace mongo {
          *
          * Returns the number of documents deleted.
          */
-        long long execute(TransactionExperiment* txn);
+        long long execute(TransactionExperiment* txn, Database* db);
 
     private:
         /// Unowned pointer to the request object that this executor will process.

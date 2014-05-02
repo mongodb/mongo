@@ -204,7 +204,7 @@ namespace mongo {
             request.setUpdates(o);
             request.setUpsert();
 
-            UpdateResult res = update(&txn, request, &debug);
+            UpdateResult res = update(&txn, ctx.db(), request, &debug);
 
             verify( ! res.modifiers );
             verify( res.numMatched == 1 );

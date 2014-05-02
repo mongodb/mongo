@@ -62,9 +62,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    UpdateResult UpdateExecutor::execute(TransactionExperiment* txn) {
+    UpdateResult UpdateExecutor::execute(TransactionExperiment* txn, Database* db) {
         uassertStatusOK(prepare());
         return update(txn,
+                      db,
                       *_request,
                       _opDebug,
                       &_driver,

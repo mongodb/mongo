@@ -91,7 +91,7 @@ namespace mongo {
          * Execute an update.  Requires the caller to hold the database lock on the
          * appropriate resources for the request.
          */
-        UpdateResult execute(TransactionExperiment* txn);
+        UpdateResult execute(TransactionExperiment* txn, Database* db);
 
     private:
         /**

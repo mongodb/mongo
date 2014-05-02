@@ -39,6 +39,7 @@ namespace mongo {
        god:     allow access to system namespaces, and don't yield
     */
     long long deleteObjects(TransactionExperiment* txn,
+                            Database* db,
                             const StringData& ns,
                             BSONObj pattern,
                             bool justOne,
@@ -51,7 +52,7 @@ namespace mongo {
         request.setUpdateOpLog(logop);
         request.setGod(god);
         DeleteExecutor executor(&request);
-        return executor.execute(txn);
+        return executor.execute(txn, db);
     }
 
 }  // namespace mongo

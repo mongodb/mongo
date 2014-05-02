@@ -563,10 +563,8 @@ namespace mongo {
                     builder->go();
                 }
                 else {
-                    Client::Context* ctx = cc().getContext();
-                    verify( ctx );
                     IndexBuilder builder(o);
-                    Status status = builder.build(txn, *ctx);
+                    Status status = builder.build(txn, db);
                     if ( status.isOK() ) {
                         // yay
                     }
@@ -602,7 +600,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(txn, request, &debug);
+                    update(txn, db, request, &debug);
 
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
@@ -631,7 +629,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(txn, request, &debug);
+                    update(txn, db, request, &debug);
                 }
             }
         }
@@ -658,7 +656,7 @@ namespace mongo {
             UpdateLifecycleImpl updateLifecycle(true, requestNs);
             request.setLifecycle(&updateLifecycle);
 
-            UpdateResult ur = update(txn, request, &debug);
+            UpdateResult ur = update(txn, db, request, &debug);
 
             if( ur.numMatched == 0 ) {
                 if( ur.modifiers ) {
@@ -699,7 +697,7 @@ namespace mongo {
         else if ( *opType == 'd' ) {
             opCounters->gotDelete();
             if ( opType[1] == 0 )
-                deleteObjects(txn, ns, o, /*justOne*/ valueB);
+                deleteObjects(txn, db, ns, o, /*justOne*/ valueB);
             else
                 verify( opType[1] == 'b' ); // "db" advertisement
         }

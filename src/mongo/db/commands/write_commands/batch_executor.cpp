@@ -1093,7 +1093,7 @@ namespace mongo {
         DurTransaction txn;
 
         try {
-            UpdateResult res = executor.execute(&txn);
+            UpdateResult res = executor.execute(&txn, ctx.db());
 
             const long long numDocsModified = res.numDocsModified;
             const long long numMatched = res.numMatched;
@@ -1156,7 +1156,7 @@ namespace mongo {
         DurTransaction txn;
 
         try {
-            result->getStats().n = executor.execute(&txn);
+            result->getStats().n = executor.execute(&txn, writeContext.db());
         }
         catch ( const DBException& ex ) {
             status = ex.toStatus();

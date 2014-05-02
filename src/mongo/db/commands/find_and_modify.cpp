@@ -215,7 +215,7 @@ namespace mongo {
             if ( remove ) {
                 _appendHelper( result , doc , found , fields );
                 if ( found ) {
-                    deleteObjects( &txn, ns , queryModified , true , true );
+                    deleteObjects(&txn, cx.db(), ns, queryModified, true, true);
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
@@ -245,7 +245,8 @@ namespace mongo {
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = mongo::update(&txn, request, &cc().curop()->debug());
+                    UpdateResult res = 
+                            mongo::update(&txn, cx.db(), request, &cc().curop()->debug());
                     if ( !collection ) {
                         // collection created by an upsert
                         collection = cx.db()->getCollection( ns );

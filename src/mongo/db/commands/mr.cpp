@@ -1252,7 +1252,7 @@ namespace mongo {
                 if (replSet && state.isOnDisk()) {
                     // this means that it will be doing a write operation, make sure we are on Master
                     // ideally this check should be in slaveOk(), but at that point config is not known
-                    if (!isMaster(dbname.c_str())) {
+                    if (!isMasterNs(dbname.c_str())) {
                         errmsg = "not master";
                         return false;
                     }

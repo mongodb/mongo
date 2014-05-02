@@ -567,7 +567,7 @@ namespace mongo {
                     return s;
             }
 
-            deleteObjects( txn, _indexesName, oldIndexSpec, true, false, true );
+            deleteObjects(txn, this, _indexesName, oldIndexSpec, true, false, true);
         }
 
         Top::global.collectionDropped( fromNS.toString() );
@@ -654,7 +654,7 @@ namespace mongo {
 
         _addNamespaceToCatalog( txn, toNSString, newSpec.isEmpty() ? 0 : &newSpec );
 
-        deleteObjects( txn, _namespacesName, BSON( "name" << fromNS ), false, false, true );
+        deleteObjects(txn, this, _namespacesName, BSON("name" << fromNS), false, false, true);
 
         return Status::OK();
     }
@@ -808,7 +808,7 @@ namespace mongo {
         {
             // remove from the system catalog
             BSONObj cond = BSON( "name" << ns );   // { name: "colltodropname" }
-            deleteObjects( txn, _namespacesName, cond, false, false, true);
+            deleteObjects(txn, this, _namespacesName, cond, false, false, true);
         }
 
         // free extents

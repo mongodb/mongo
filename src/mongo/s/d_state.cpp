@@ -982,7 +982,7 @@ namespace mongo {
             }
 
             // we can run on a slave up to here
-            if ( ! isMaster( "admin" ) ) {
+            if (!_isMaster()) {
                 result.append( "errmsg" , "not master" );
                 result.append( "note" , "from post init in setShardVersion" );
                 return false;
@@ -1039,10 +1039,7 @@ namespace mongo {
             }
 
             // step 4
-            
-            // this is because of a weird segfault I saw and I can't see why this should ever be set
-            massert( 13647 , str::stream() << "context should be empty here, is: " << cc().getContext()->ns() , cc().getContext() == 0 ); 
-        
+
             if ( oldVersion.isSet() && ! globalVersion.isSet() ) {
                 // this had been reset
                 info->setVersion( ns , ChunkVersion( 0, OID() ) );

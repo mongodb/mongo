@@ -89,7 +89,7 @@ namespace mongo {
 
             if (ErrorCodes::KeyTooLong == status.code()) {
                 // Ignore this error if we're on a secondary.
-                if (!isMaster(NULL)) {
+                if (!isMasterNs(collection()->ns().ns().c_str())) {
                     continue;
                 }
 

@@ -288,7 +288,7 @@ namespace mongo {
                                             false /* cappedOk */,
                                             true /* noWarn */,
                                             &toDelete );
-                if ( isMaster( ns.c_str() ) ) {
+                if (isMasterNs(ns.c_str())) {
                     logOp( txn, "d", ns.c_str(), toDelete );
                 }
                 

@@ -37,6 +37,7 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/ops/update_driver.h"
@@ -401,8 +402,10 @@ namespace mongo {
                               "Demoted from primary while performing update on " << nsString.ns());
             }
 
+            Database* db = dbHolder().get(nsString.db().toString(), storageGlobalParams.dbpath);
+
             Collection* oldCollection = collection;
-            collection = cc().getContext()->db()->getCollection(nsString.ns());
+            collection = db->getCollection(nsString.ns());
 
             // We should not get a new pointer to the same collection...
             if (oldCollection && (oldCollection != collection))
@@ -480,15 +483,17 @@ namespace mongo {
     } // namespace
 
     UpdateResult update(TransactionExperiment* txn,
+                        Database* db,
                         const UpdateRequest& request,
                         OpDebug* opDebug) {
 
         UpdateExecutor executor(&request, opDebug);
-        return executor.execute(txn);
+        return executor.execute(txn, db);
     }
 
     UpdateResult update(
             TransactionExperiment* txn,
+            Database* db,
             const UpdateRequest& request,
             OpDebug* opDebug,
             UpdateDriver* driver,
@@ -500,7 +505,8 @@ namespace mongo {
         const NamespaceString& nsString = request.getNamespaceString();
         UpdateLifecycle* lifecycle = request.getLifecycle();
         const CurOp* curOp = cc().curop();
-        Collection* collection = cc().getContext()->db()->getCollection(nsString.ns());
+
+        Collection* collection = db->getCollection(nsString.ns());
 
         validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
@@ -860,7 +866,6 @@ namespace mongo {
 
         // Only create the collection if the doc will be inserted.
         if (!collection) {
-            Database* db = cc().getContext()->db();
             collection = db->getCollection(request.getNamespaceString().ns());
             if (!collection) {
                 collection = db->createCollection(txn, request.getNamespaceString().ns());

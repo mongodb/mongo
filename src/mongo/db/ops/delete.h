@@ -32,12 +32,15 @@
 
 #include "mongo/db/jsobj.h"
 
+
 namespace mongo {
 
+    class Database;
     class TransactionExperiment;
 
     // If justOne is true, deletedId is set to the id of the deleted object.
     long long deleteObjects(TransactionExperiment* txn,
+                            Database* db,
                             const StringData& ns,
                             BSONObj pattern,
                             bool justOne,

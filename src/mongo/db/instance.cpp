@@ -608,7 +608,7 @@ namespace mongo {
         Client::Context ctx( ns );
         DurTransaction txn;
 
-        UpdateResult res = executor.execute(&txn);
+        UpdateResult res = executor.execute(&txn, ctx.db());
 
         // for getlasterror
         lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
@@ -648,7 +648,7 @@ namespace mongo {
         Client::Context ctx(ns);
         DurTransaction txn;
 
-        long long n = executor.execute(&txn);
+        long long n = executor.execute(&txn, ctx.db());
         lastError.getSafe()->recordDelete( n );
         op.debug().ndeleted = n;
     }

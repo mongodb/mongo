@@ -38,11 +38,11 @@
 namespace mongo {
 
     /** we allow queries to SimpleSlave's */
-    void replVerifyReadsOk(const LiteParsedQuery* pq) {
+    void replVerifyReadsOk(const std::string& ns, const LiteParsedQuery* pq) {
         if( replSet ) {
             // todo: speed up the secondary case.  as written here there are 2 mutex entries, it
             // can b 1.
-            if( isMaster() ) return;
+            if (isMasterNs(ns.c_str())) return;
             if ( cc().isGod() ) return;
 
             uassert(NotMasterNoSlaveOkCode, "not master and slaveOk=false",
@@ -54,10 +54,11 @@ namespace mongo {
         else {
             // master/slave
             uassert(NotMaster,
-                     "not master", 
-                     isMaster() || 
-                     (!pq || pq->hasOption(QueryOption_SlaveOk)) ||
-                     replSettings.slave == SimpleSlave );
+                    "not master",
+                    isMasterNs(ns.c_str()) ||
+                        pq == NULL || 
+                        pq->hasOption(QueryOption_SlaveOk) ||
+                        replSettings.slave == SimpleSlave );
         }
     }
 

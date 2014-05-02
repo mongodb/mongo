@@ -1551,7 +1551,7 @@ namespace mongo {
         }
 
         bool canRunHere =
-            isMaster( dbname.c_str() ) ||
+            isMasterNs(dbname.c_str()) ||
             c->slaveOk() ||
             ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
             fromRepl;
@@ -1562,7 +1562,7 @@ namespace mongo {
             return;
         }
 
-        if ( ! c->maintenanceOk() && theReplSet && ! isMaster( dbname.c_str() ) && ! theReplSet->isSecondary() ) {
+        if ( ! c->maintenanceOk() && theReplSet && ! isMasterNs( dbname.c_str() ) && ! theReplSet->isSecondary() ) {
             result.append( "note" , "from execCommand" );
             appendCommandStatus(result, false, "node is recovering");
             return;

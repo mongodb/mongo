@@ -37,14 +37,10 @@
 
 namespace mongo {
 
-    /* note we always return true for the "local" namespace.
-
-       we should not allow most operations when not the master
+    /* We should not allow most operations when not the master
        also we report not master if we are "dead".
 
        See also CmdIsMaster.
-
-       If 'client' is not specified, the current client is used.
     */
     inline bool _isMaster() {
         if( replSet ) {
@@ -70,20 +66,7 @@ namespace mongo {
 
         return false;
     }
-    inline bool isMaster(const char * dbname = 0) {
-        if( _isMaster() )
-            return true;
-        if ( ! dbname ) {
-            // XXX: remove this magic and make dbname required?
-            if ( cc().getContext() ) {
-                Database *database = cc().getContext()->db();
-                if ( database ) {
-                    dbname = database->name().c_str();
-                }
-            }
-        }
-        return strcmp( dbname, "local" ) == 0;
-    }
+
     inline bool isMasterNs( const char *ns ) {
         if ( _isMaster() )
             return true;

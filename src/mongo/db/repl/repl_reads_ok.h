@@ -28,11 +28,14 @@
 
 #pragma once
 
+#include <string>
+
+
 namespace mongo {
 
     class LiteParsedQuery;
 
     // Check to see if slaveOk reads are allowed,
     // based on read preference and query options
-    void replVerifyReadsOk(const LiteParsedQuery* pq = 0);
+    void replVerifyReadsOk(const std::string& ns, const LiteParsedQuery* pq);
 }

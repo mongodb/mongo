@@ -238,7 +238,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(txn, request, &debug);
+        update(txn, context.db(), request, &debug);
     }
 
     void Helpers::putSingleton(TransactionExperiment* txn, const char *ns, BSONObj obj) {
@@ -254,7 +254,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, requestNs);
         request.setLifecycle(&updateLifecycle);
 
-        update(txn, request, &debug);
+        update(txn, context.db(), request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -271,7 +271,7 @@ namespace mongo {
         request.setUpsert();
         request.setUpdateOpLog(logTheOp);
 
-        update(txn, request, &debug);
+        update(txn, context.db(), request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -554,7 +554,7 @@ namespace mongo {
 
     void Helpers::emptyCollection(TransactionExperiment* txn, const char *ns) {
         Client::Context context(ns);
-        deleteObjects(txn, ns, BSONObj(), false);
+        deleteObjects(txn, context.db(), ns, BSONObj(), false);
     }
 
     Helpers::RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) 

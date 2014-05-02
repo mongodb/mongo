@@ -31,7 +31,6 @@
 #include "mongo/db/ops/delete_executor.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/ops/delete_request.h"
@@ -80,7 +79,7 @@ namespace mongo {
         return status;
     }
 
-    long long DeleteExecutor::execute(TransactionExperiment* txn) {
+    long long DeleteExecutor::execute(TransactionExperiment* txn, Database* db) {
         uassertStatusOK(prepare());
         uassert(17417,
                 mongoutils::str::stream() <<
@@ -100,13 +99,6 @@ namespace mongo {
             }
         }
 
-        Database* db = currentClient.get()->getContext()->db();
-
-        massert(17418,
-                mongoutils::str::stream() <<
-                "dbname = " << db->name() <<
-                "; ns = " << ns.ns(),
-                db->name() == nsToDatabaseSubstring(ns.ns()));
         Collection* collection = db->getCollection(ns.ns());
         if (NULL == collection) {
             return 0;

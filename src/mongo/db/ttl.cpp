@@ -134,7 +134,7 @@ namespace mongo {
                         continue;
                     }
 
-                    n = deleteObjects( &txn, ns , query , false , true );
+                    n = deleteObjects(&txn, ctx.ctx().db(), ns, query, false, true);
                     ttlDeletedDocuments.increment( n );
                 }
 

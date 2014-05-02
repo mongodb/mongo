@@ -546,7 +546,13 @@ namespace mongo {
                         else {
                             try {
                                 deletes++;
-                                deleteObjects(&txn, d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
+                                deleteObjects(&txn, 
+                                              c.db(),
+                                              d.ns,
+                                              pattern,
+                                              true,     /*justone*/
+                                              false,    /*logop*/
+                                              true);    /*god*/
                             }
                             catch(...) {
                                 log() << "replSet error rollback delete failed ns:" << d.ns << rsLog;
@@ -589,7 +595,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(&txn, request, &debug);
+                    update(&txn, c.db(), request, &debug);
 
                 }
             }

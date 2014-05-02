@@ -55,7 +55,7 @@ namespace mongo {
          */
         virtual std::string name() const;
 
-        Status build(TransactionExperiment* txn, Client::Context& context ) const;
+        Status build(TransactionExperiment* txn, Database* db) const;
 
         /**
          * Kill all in-progress indexes matching criteria, if non-empty:
