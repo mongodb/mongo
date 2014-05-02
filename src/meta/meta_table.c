@@ -92,7 +92,7 @@ __wt_metadata_insert(
 	WT_DECL_RET;
 
 	WT_VERBOSE_RET(session, metadata,
-	    "Insert: key: %s, value: %s, tracking: %s, %sturtle",
+	    "Insert: key: %s, value: %s, tracking: %s, %s" "turtle",
 	    key, value, WT_META_TRACKING(session) ? "true" : "false",
 	    __metadata_turtle(key) ? "" : "not ");
 
