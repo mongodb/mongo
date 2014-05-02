@@ -37,6 +37,7 @@ static const WT_CONFIG_CHECK confchk_shared_cache_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
+	{ "api_trace", "boolean", NULL, NULL},
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
 	{ "error_prefix", "string", NULL, NULL},
 	{ "eviction_dirty_target", "int", "min=10,max=99", NULL},
@@ -251,6 +252,7 @@ static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
+	{ "api_trace", "boolean", NULL, NULL},
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL},
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
 	{ "checkpoint", "category", NULL, confchk_checkpoint_subconfigs}
@@ -329,10 +331,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_connection_open_session
 	},
 	{ "connection.reconfigure",
-	  "cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
-	  "eviction_target=80,eviction_trigger=95,eviction_workers=0,"
-	  "shared_cache=(chunk=10MB,name=,reserve=0,size=500MB),"
-	  "statistics=none,verbose=",
+	  "api_trace=0,cache_size=100MB,error_prefix=,"
+	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
+	  "eviction_workers=0,shared_cache=(chunk=10MB,name=,reserve=0,"
+	  "size=500MB),statistics=none,verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",
@@ -435,7 +437,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_table_meta
 	},
 	{ "wiredtiger_open",
-	  "buffer_alignment=-1,cache_size=100MB,"
+	  "api_trace=0,buffer_alignment=-1,cache_size=100MB,"
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),"
 	  "checkpoint_sync=,create=0,direct_io=,error_prefix=,"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"

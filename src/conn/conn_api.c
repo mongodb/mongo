@@ -1124,6 +1124,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_CKPT_SYNC);
 
+	WT_ERR(__wt_config_gets(session, cfg, "api_trace", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_TRACE_API);
+
 	WT_ERR(__wt_conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));

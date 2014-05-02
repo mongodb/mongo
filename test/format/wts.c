@@ -35,9 +35,10 @@ handle_message(WT_EVENT_HANDLER *handler,
 	WT_UNUSED(session);
 
 	if (g.logfp != NULL)
-		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
+		return (fprintf(
+		    g.logfp, "%p:%s\n", session, message) < 0 ? -1 : 0);
 
-	return (printf("%s\n", message) < 0 ? -1 : 0);
+	return (printf("%p:%s\n", session, message) < 0 ? -1 : 0);
 }
 
 /*
