@@ -36,7 +36,6 @@
 
 const char *home = NULL;
 const char *uri = "table:async";
-uint64_t search_id = -1;
 int global_error = 0;
 
 /*! [example callback implementation] */
