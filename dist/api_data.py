@@ -355,6 +355,7 @@ connection_runtime_config = [
 	    enable messages for various events.  Options are given as a
 	    list, such as <code>"verbose=[evictserver,read]"</code>''',
 	    type='list', choices=[
+	        'api',
 	        'block',
 	        'checkpoint',
 	        'compact',
@@ -363,6 +364,7 @@ connection_runtime_config = [
 	        'fileops',
 	        'log',
 	        'lsm',
+	        'metadata',
 	        'mutex',
 	        'overflow',
 	        'read',

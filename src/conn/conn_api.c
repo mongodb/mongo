@@ -962,6 +962,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
+		{ "api",		WT_VERB_api },
 		{ "block",		WT_VERB_block },
 		{ "checkpoint",		WT_VERB_checkpoint },
 		{ "compact",		WT_VERB_compact },
@@ -970,6 +971,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_fileops },
 		{ "log",		WT_VERB_log },
 		{ "lsm",		WT_VERB_lsm },
+		{ "metadata",		WT_VERB_metadata },
 		{ "mutex",		WT_VERB_mutex },
 		{ "overflow",		WT_VERB_overflow },
 		{ "read",		WT_VERB_read },
