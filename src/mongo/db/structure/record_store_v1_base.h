@@ -44,8 +44,6 @@ namespace mongo {
     public:
         virtual ~RecordStoreV1MetaData(){}
 
-        virtual int bucket(int size) const = 0;
-
         virtual const DiskLoc& capExtent() const = 0;
         virtual void setCapExtent( TransactionExperiment* txn, const DiskLoc& loc ) = 0;
 
@@ -91,12 +89,22 @@ namespace mongo {
 
         virtual void setPaddingFactor( TransactionExperiment* txn, double paddingFactor ) = 0;
 
-        virtual int quantizePowerOf2AllocationSpace(int allocSize) const = 0;
-
     };
 
     class RecordStoreV1Base : public RecordStore {
     public:
+
+        static const int Buckets;
+        static const int MaxBucket;
+
+        static const int bucketSizes[];
+
+        enum UserFlags {
+            Flag_UsePowerOf2Sizes = 1 << 0
+        };
+
+        // ------------
+
         class IntraExtentIterator;
 
         RecordStoreV1Base( const StringData& ns,
@@ -150,6 +158,20 @@ namespace mongo {
 
         DiskLoc getNextRecordInExtent( const DiskLoc& loc ) const;
         DiskLoc getPrevRecordInExtent( const DiskLoc& loc ) const;
+
+        /* @return the size for an allocated record quantized to 1/16th of the BucketSize.
+           @param allocSize    requested size to allocate
+           The returned size will be greater than or equal to 'allocSize'.
+        */
+        static int quantizeAllocationSpace(int allocSize);
+
+        /**
+         * Quantize 'allocSize' to the nearest bucketSize (or nearest 1mb boundary for large sizes).
+         */
+        static int quantizePowerOf2AllocationSpace(int allocSize);
+
+        /* return which "deleted bucket" for this size object */
+        static int bucket(int size);
 
     protected:
 

@@ -256,7 +256,7 @@ namespace NamespaceTests {
 
                 // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
                 // new size.
-                nsd()->setDeletedListEntry(NamespaceDetails::bucket(newDeletedRecordSize), deleted);
+                nsd()->setDeletedListEntry(RecordStoreV1Base::bucket(newDeletedRecordSize), deleted);
             }
         };
 
@@ -338,146 +338,6 @@ namespace NamespaceTests {
         private:
             virtual string spec() const {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
-            }
-        };
-
-
-        /**
-         * Test  Quantize record allocation size for various buckets
-         *       @see NamespaceDetails::quantizeAllocationSpace()
-         */
-        class QuantizeFixedBuckets : public Base {
-        public:
-            void run() {
-                create();
-                // explicitly test for a set of known values
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(33),       36);
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1000),     1024);
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(10001),    10240);
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(100000),   106496);
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1000001),  1048576);
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(10000000), 10223616);
-            }
-        };
-
-
-        /**
-         * Test  Quantize min/max record allocation size
-         *       @see NamespaceDetails::quantizeAllocationSpace()
-         */
-        class QuantizeMinMaxBound : public Base {
-        public:
-            void run() {
-                create();
-                // test upper and lower bound
-                const int maxSize = 16 * 1024 * 1024;
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1), 2);
-                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(maxSize), maxSize);
-            }
-        };
-
-        /**
-         * Test  Quantize record allocation on every boundary, as well as boundary-1
-         *       @see NamespaceDetails::quantizeAllocationSpace()
-         */
-        class QuantizeRecordBoundary : public Base {
-        public:
-            void run() {
-                create();
-                for (int iBucket = 0; iBucket <= MaxBucket; ++iBucket) {
-                    // for each bucket in range [min, max)
-                    const int bucketSize = bucketSizes[iBucket];
-                    const int prevBucketSize = (iBucket - 1 >= 0) ? bucketSizes[iBucket - 1] : 0;
-                    const int intervalSize = bucketSize / 16;
-                    for (int iBoundary = prevBucketSize;
-                         iBoundary < bucketSize;
-                         iBoundary += intervalSize) {
-                        // for each quantization boundary within the bucket
-                        for (int iSize = iBoundary - 1; iSize <= iBoundary; ++iSize) {
-                            // test the quantization boundary - 1, and the boundary itself
-                            const int quantized =
-                                    NamespaceDetails::quantizeAllocationSpace(iSize);
-                            // assert quantized size is greater than or equal to requested size
-                            ASSERT(quantized >= iSize);
-                            // assert quantized size is within one quantization interval of
-                            // the requested size
-                            ASSERT(quantized - iSize <= intervalSize);
-                            // assert quantization is an idempotent operation
-                            ASSERT(quantized ==
-                                   NamespaceDetails::quantizeAllocationSpace(quantized));
-                        }
-                    }
-                }
-            }
-        };
-
-        /**
-         * Except for the largest bucket, quantizePowerOf2AllocationSpace quantizes to the nearest
-         * bucket size.
-         */
-        class QuantizePowerOf2ToBucketSize : public Base {
-        public:
-            void run() {
-                create();
-                for( int iBucket = 0; iBucket < MaxBucket - 1; ++iBucket ) {
-                    int bucketSize = bucketSizes[ iBucket ];
-                    int nextBucketSize = bucketSizes[ iBucket + 1 ];
-
-                    // bucketSize - 1 is quantized to bucketSize.
-                    ASSERT_EQUALS( bucketSize,
-                                   NamespaceDetails::quantizePowerOf2AllocationSpace
-                                           ( bucketSize - 1 ) );
-
-                    // bucketSize is quantized to nextBucketSize.
-                    // Descriptive rather than normative test.
-                    // SERVER-8311 A pre quantized size is rounded to the next quantum level.
-                    ASSERT_EQUALS( nextBucketSize,
-                                   NamespaceDetails::quantizePowerOf2AllocationSpace
-                                           ( bucketSize ) );
-
-                    // bucketSize + 1 is quantized to nextBucketSize.
-                    ASSERT_EQUALS( nextBucketSize,
-                                   NamespaceDetails::quantizePowerOf2AllocationSpace
-                                           ( bucketSize + 1 ) );
-                }
-
-                // The next to largest bucket size - 1 is quantized to the next to largest bucket
-                // size.
-                ASSERT_EQUALS( bucketSizes[ MaxBucket - 1 ],
-                               NamespaceDetails::quantizePowerOf2AllocationSpace
-                                       ( bucketSizes[ MaxBucket - 1 ] - 1 ) );
-            }
-        };
-
-        /**
-         * Within the largest bucket, quantizePowerOf2AllocationSpace quantizes to the nearest
-         * megabyte boundary.
-         */
-        class QuantizeLargePowerOf2ToMegabyteBoundary : public Base {
-        public:
-            void run() {
-                create();
-                
-                // Iterate iSize over all 1mb boundaries from the size of the next to largest bucket
-                // to the size of the largest bucket + 1mb.
-                for( int iSize = bucketSizes[ MaxBucket - 1 ];
-                     iSize <= bucketSizes[ MaxBucket ] + 0x100000;
-                     iSize += 0x100000 ) {
-
-                    // iSize - 1 is quantized to iSize.
-                    ASSERT_EQUALS( iSize,
-                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize - 1 ) );
-
-                    // iSize is quantized to iSize + 1mb.
-                    // Descriptive rather than normative test.
-                    // SERVER-8311 A pre quantized size is rounded to the next quantum level.
-                    ASSERT_EQUALS( iSize + 0x100000,
-                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize ) );
-
-                    // iSize + 1 is quantized to iSize + 1mb.
-                    ASSERT_EQUALS( iSize + 0x100000,
-                                   NamespaceDetails::quantizePowerOf2AllocationSpace( iSize + 1 ) );
-                }
             }
         };
 
@@ -949,11 +809,6 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
-            add< NamespaceDetailsTests::QuantizeMinMaxBound >();
-            add< NamespaceDetailsTests::QuantizeFixedBuckets >();
-            add< NamespaceDetailsTests::QuantizeRecordBoundary >();
-            add< NamespaceDetailsTests::QuantizePowerOf2ToBucketSize >();
-            add< NamespaceDetailsTests::QuantizeLargePowerOf2ToMegabyteBoundary >();
             add< NamespaceDetailsTests::GetRecordAllocationSizeNoPadding >();
             add< NamespaceDetailsTests::GetRecordAllocationSizeWithPadding >();
             add< NamespaceDetailsTests::GetRecordAllocationSizePowerOf2 >();

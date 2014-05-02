@@ -309,28 +309,6 @@ namespace mongo {
         bool clearUserFlag( int flag );
         bool replaceUserFlags( int flags );
 
-        /* return which "deleted bucket" for this size object */
-        static int bucket(int size) {
-            for ( int i = 0; i < Buckets; i++ ) {
-                if ( bucketSizes[i] > size ) {
-                    // Return the first bucket sized _larger_ than the requested size.
-                    return i;
-                }
-            }
-            return MaxBucket;
-        }
-
-        /* @return the size for an allocated record quantized to 1/16th of the BucketSize.
-           @param allocSize    requested size to allocate
-           The returned size will be greater than or equal to 'allocSize'.
-        */
-        static int quantizeAllocationSpace(int allocSize);
-
-        /**
-         * Quantize 'allocSize' to the nearest bucketSize (or nearest 1mb boundary for large sizes).
-         */
-        static int quantizePowerOf2AllocationSpace(int allocSize);
-
         NamespaceDetails *writingWithoutExtra() {
             return ( NamespaceDetails* ) getDur().writingPtr( this, sizeof( NamespaceDetails ) );
         }

@@ -39,7 +39,6 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/transaction.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store_v1_simple_iterator.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/touch_pages.h"
@@ -90,7 +89,7 @@ namespace mongo {
             DiskLoc *bestprev = 0;
             DiskLoc bestmatch;
             int bestmatchlen = 0x7fffffff;
-            int b = _details->bucket(lenToAlloc);
+            int b = bucket(lenToAlloc);
             DiskLoc cur = _details->deletedListEntry(b);
             int extra = 5; // look for a better fit, a little.
             int chain = 0;
@@ -161,9 +160,9 @@ namespace mongo {
             }
             else {
                 // should be the front of a free-list
-                int bucket = _details->bucket(bmr->lengthWithHeaders());
-                invariant( _details->deletedListEntry(bucket) == bestmatch );
-                _details->setDeletedListEntry(txn, bucket, bmr->nextDeleted());
+                int myBucket = bucket(bmr->lengthWithHeaders());
+                invariant( _details->deletedListEntry(myBucket) == bestmatch );
+                _details->setDeletedListEntry(txn, myBucket, bmr->nextDeleted());
             }
             *txn->writing(&bmr->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
             invariant(bmr->extentOfs() < bestmatch.getOfs());
@@ -196,7 +195,7 @@ namespace mongo {
             // we quantize here so that it only impacts newly sized records
             // this prevents oddities with older records and space re-use SERVER-8435
             lenToAlloc = std::min( r->lengthWithHeaders(),
-                                   NamespaceDetails::quantizeAllocationSpace( lenToAlloc ) );
+                                   quantizeAllocationSpace( lenToAlloc ) );
             left = regionlen - lenToAlloc;
 
             if ( left < 24 ) {
@@ -277,7 +276,7 @@ namespace mongo {
         }
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
 
-        int b = _details->bucket(d->lengthWithHeaders());
+        int b = bucket(d->lengthWithHeaders());
         d->nextDeleted() = _details->deletedListEntry(b);
         _details->setDeletedListEntry(txn, b, dloc);
     }
@@ -391,8 +390,8 @@ namespace mongo {
 
                         switch( compactOptions->paddingMode ) {
                         case CompactOptions::NONE:
-                            if ( _details->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes) )
-                                lenWPadding = _details->quantizePowerOf2AllocationSpace(lenWPadding);
+                            if ( _details->isUserFlagSet(Flag_UsePowerOf2Sizes) )
+                                lenWPadding = quantizePowerOf2AllocationSpace(lenWPadding);
                             break;
                         case CompactOptions::PRESERVE:
                             // if we are preserving the padding, the record should not change size

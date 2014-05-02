@@ -47,10 +47,6 @@ namespace mongo {
 
         virtual ~NamespaceDetailsRSV1MetaData(){}
 
-        virtual int bucket(int size) const {
-            return _details->bucket( size );
-        }
-
         virtual const DiskLoc& capExtent() const {
             return _details->capExtent();
         }
@@ -151,10 +147,6 @@ namespace mongo {
 
         virtual void setPaddingFactor( TransactionExperiment* txn, double paddingFactor ) {
             _details->setPaddingFactor( paddingFactor );
-        }
-
-        virtual int quantizePowerOf2AllocationSpace(int allocSize) const {
-            return _details->quantizePowerOf2AllocationSpace( allocSize );
         }
 
     private:

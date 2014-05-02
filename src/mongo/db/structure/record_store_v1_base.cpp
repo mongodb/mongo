@@ -35,12 +35,26 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/transaction.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store_v1_repair_iterator.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
+
+    const int RecordStoreV1Base::Buckets = 19;
+    const int RecordStoreV1Base::MaxBucket = 18;
+
+    /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
+       contains records up to that size.  All records >= 4mb are placed into the 16mb bucket.
+    */
+    const int RecordStoreV1Base::bucketSizes[] = {
+        0x20,     0x40,     0x80,     0x100,
+        0x200,    0x400,    0x800,    0x1000,
+        0x2000,   0x4000,   0x8000,   0x10000,
+        0x20000,  0x40000,  0x80000,  0x100000,
+        0x200000, 0x400000, 0x1000000,
+     };
+
 
     RecordStoreV1Base::RecordStoreV1Base( const StringData& ns,
                                           RecordStoreV1MetaData* details,
@@ -480,16 +494,14 @@ namespace mongo {
                     nlen += r->netLength();
 
                     if ( r->lengthWithHeaders() ==
-                         NamespaceDetails::quantizeAllocationSpace
-                         ( r->lengthWithHeaders() ) ) {
+                         quantizeAllocationSpace( r->lengthWithHeaders() ) ) {
                         // Count the number of records having a size consistent with
                         // the quantizeAllocationSpace quantization implementation.
                         ++nQuantizedSize;
                     }
 
                     if ( r->lengthWithHeaders() ==
-                         NamespaceDetails::quantizePowerOf2AllocationSpace
-                         ( r->lengthWithHeaders() - 1 ) ) {
+                         quantizePowerOf2AllocationSpace( r->lengthWithHeaders() - 1 ) ) {
                         // Count the number of records having a size consistent with the
                         // quantizePowerOf2AllocationSpace quantization implementation.
                         // Because of SERVER-8311, power of 2 quantization is not idempotent and
@@ -667,9 +679,9 @@ namespace mongo {
 
         invariant( _details->paddingFactor() >= 1 );
 
-        if ( _details->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
+        if ( _details->isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
             // quantize to the nearest bucketSize (or nearest 1mb boundary for large sizes).
-            return _details->quantizePowerOf2AllocationSpace(minRecordSize);
+            return quantizePowerOf2AllocationSpace(minRecordSize);
         }
 
         // adjust for padding factor
@@ -691,4 +703,45 @@ namespace mongo {
         if (dl == _curr)
             getNext();
     }
+
+    /* @return the size for an allocated record quantized to 1/16th of the BucketSize
+       @param allocSize    requested size to allocate
+    */
+    int RecordStoreV1Base::quantizeAllocationSpace(int allocSize) {
+        const int bucketIdx = bucket(allocSize);
+        int bucketSize = bucketSizes[bucketIdx];
+        int quantizeUnit = bucketSize / 16;
+        if (allocSize >= (1 << 22)) // 4mb
+            // all allocatons >= 4mb result in 4mb/16 quantization units, even if >= 8mb.  idea is
+            // to reduce quantization overhead of large records at the cost of increasing the
+            // DeletedRecord size distribution in the largest bucket by factor of 4.
+            quantizeUnit = (1 << 18); // 256k
+        if (allocSize % quantizeUnit == 0)
+            // size is already quantized
+            return allocSize;
+        const int quantizedSpace = (allocSize | (quantizeUnit - 1)) + 1;
+        fassert(16484, quantizedSpace >= allocSize);
+        return quantizedSpace;
+    }
+
+    int RecordStoreV1Base::quantizePowerOf2AllocationSpace(int allocSize) {
+        int allocationSize = bucketSizes[ bucket( allocSize ) ];
+        if ( allocationSize == bucketSizes[MaxBucket] ) {
+            // if we get here, it means we're allocating more than 4mb, so round
+            // to the nearest megabyte
+            allocationSize = 1 + ( allocSize | ( ( 1 << 20 ) - 1 ) );
+        }
+        return allocationSize;
+    }
+
+    int RecordStoreV1Base::bucket(int size) {
+        for ( int i = 0; i < Buckets; i++ ) {
+            if ( bucketSizes[i] > size ) {
+                // Return the first bucket sized _larger_ than the requested size.
+                return i;
+            }
+        }
+        return MaxBucket;
+    }
+
 }
