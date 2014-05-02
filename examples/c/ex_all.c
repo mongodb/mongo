@@ -1052,8 +1052,8 @@ main(void)
 		(void)conn->close(conn, NULL);
 
 	/*
-	 * Don't run this code, because valgrind gets very upset when we leak
-	 * memory.
+	 * Don't run this code, because memory checkers get very upset when we
+	 * leak memory.
 	 */
 	(void)wiredtiger_open(home, NULL, "create", &conn);
 	/*! [Connection close leaking memory] */
