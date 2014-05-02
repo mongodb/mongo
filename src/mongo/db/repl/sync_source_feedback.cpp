@@ -275,6 +275,7 @@ namespace mongo {
                 if (!replHandshake()) {
                     boost::unique_lock<boost::mutex> lock(_mtx);
                     _handshakeNeeded = true;
+                    continue;
                 }
             }
             if (positionChanged) {
