@@ -364,6 +364,7 @@ connection_runtime_config = [
 	        'fileops',
 	        'log',
 	        'lsm',
+	        'metadata',
 	        'mutex',
 	        'overflow',
 	        'read',

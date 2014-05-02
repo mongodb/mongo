@@ -971,6 +971,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_fileops },
 		{ "log",		WT_VERB_log },
 		{ "lsm",		WT_VERB_lsm },
+		{ "metadata",		WT_VERB_metadata },
 		{ "mutex",		WT_VERB_mutex },
 		{ "overflow",		WT_VERB_overflow },
 		{ "read",		WT_VERB_read },
