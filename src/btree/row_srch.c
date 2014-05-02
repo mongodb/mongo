@@ -128,7 +128,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	int cmp, depth;
 
 	btree = S2BT(session);
-	item = &cbt->srch;
+	item = &cbt->search_key;
 	rip = NULL;
 	match = 0;				/* -Wuninitialized */
 
@@ -459,7 +459,9 @@ restart:
 		pindex = WT_INTL_INDEX_COPY(btree->root.page);
 		cbt->slot = pindex->entries < 2 ?
 		    __wt_random() % page->pg_row_entries : 0;
-		return (0);
+		
+		return (__wt_row_leaf_key(session,
+		    page, page->pg_row_d + cbt->slot, &cbt->search_key, 0));
 	}
 
 	/*
