@@ -89,21 +89,20 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
     Test basic operations
     """
     table_name1 = 'test_async01'
-    #TODO nentries = 100
-    nentries = 40
+    nentries = 100
     async_ops = nentries / 2
     async_threads = 3
     current = {}
 
     scenarios = [
-        #('file-col', dict(tablekind='col',uri='file')),
-        #('file-fix', dict(tablekind='fix',uri='file')),
+        ('file-col', dict(tablekind='col',uri='file')),
+        ('file-fix', dict(tablekind='fix',uri='file')),
         ('file-row', dict(tablekind='row',uri='file')),
         ('lsm-row', dict(tablekind='row',uri='lsm')),
-        #('table-col', dict(tablekind='col',uri='table')),
-        #('table-fix', dict(tablekind='fix',uri='table')),
-        ('table-row', dict(tablekind='row',uri='table'))
-        ]
+        ('table-col', dict(tablekind='col',uri='table')),
+        ('table-fix', dict(tablekind='fix',uri='table')),
+        ('table-row', dict(tablekind='row',uri='table')),
+    ]
 
     # Overrides WiredTigerTestCase so that we can configure
     # async operations.
