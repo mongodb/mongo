@@ -1,5 +1,15 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
+extern void __wt_async_stats_update(WT_SESSION_IMPL *session);
+extern int __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_async_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_async_flush(WT_CONNECTION_IMPL *conn);
+extern int __wt_async_new_op(WT_CONNECTION_IMPL *conn,
+    const char *uri,
+    const char *config,
+    const char *cfg[],
+    WT_ASYNC_CALLBACK *cb,
+    WT_ASYNC_OP_IMPL **opp);
 extern int __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
     WT_ASYNC_OP_IMPL *op);
 extern int __wt_async_op_init(WT_CONNECTION_IMPL *conn);
@@ -584,16 +594,6 @@ extern int __wt_conn_remove_data_source( WT_CONNECTION_IMPL *conn,
     WT_NAMED_DATA_SOURCE *ndsrc);
 extern int __wt_conn_verbose_config(WT_SESSION_IMPL *session,
     const char *cfg[]);
-extern void __wt_async_stats_update(WT_SESSION_IMPL *session);
-extern int __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern int __wt_async_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_async_flush(WT_CONNECTION_IMPL *conn);
-extern int __wt_async_new_op(WT_CONNECTION_IMPL *conn,
-    const char *uri,
-    const char *config,
-    const char *cfg[],
-    WT_ASYNC_CALLBACK *cb,
-    WT_ASYNC_OP_IMPL **opp);
 extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_SESSION_IMPL *session);
