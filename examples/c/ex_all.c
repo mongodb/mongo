@@ -1050,12 +1050,16 @@ main(void)
 	/*! [Statistics logging with path] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
-#endif
 
+	/*
+	 * Don't run this code, because valgrind gets very upset when we leak
+	 * memory.
+	 */
 	(void)wiredtiger_open(home, NULL, "create", &conn);
 	/*! [Connection close leaking memory] */
 	ret = conn->close(conn, "leak_memory=true");
 	/*! [Connection close leaking memory] */
+#endif
 
 	/*! [Get the WiredTiger library version #1] */
 	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));
