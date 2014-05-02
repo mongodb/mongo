@@ -11,8 +11,10 @@
  * Tuning; global variables to allow the binary to be patched, we don't yet have
  * any real understanding of what might be useful to surface to applications.
  */
-static u_int __split_deepen_min_child = 100;
+static u_int __split_deepen_max_internal_image = 100;
+static u_int __split_deepen_min_child = 10;
 static u_int __split_deepen_per_child = 100;
+static u_int __split_deepen_split_child = 100;
 
 /*
  * __split_should_deepen --
@@ -33,19 +35,25 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	pindex = WT_INTL_INDEX_COPY(page);
 
 	/*
-	 * Deepen the tree if the page's memory footprint is larger than
-	 * the maximum size for a page in memory.
+	 * Deepen the tree if the page's memory footprint is larger than the
+	 * maximum size for a page in memory.  We need an absolute minimum
+	 * number of entries in order to split the page: if there is a single
+	 * huge key, splitting won't help.
 	 */
 	if (page->memory_footprint > S2BT(session)->maxmempage &&
 	    pindex->entries >= __split_deepen_min_child)
 		return (1);
 
 	/*
-	 * Deepen the tree unless the split will result in at least N children
-	 * in the newly created intermediate layer.
+	 * Deepen the tree if the page's memory footprint is at least N
+	 * times the maximum internal page size chunk in the backing file and
+	 * the split will result in at least N children in the newly created
+	 * intermediate layer.
 	 */
-	if (pindex->entries >=
-	    (__split_deepen_per_child * __split_deepen_min_child))
+	if (page->memory_footprint >
+	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage &&
+	    pindex->entries >=
+	    (__split_deepen_per_child * __split_deepen_split_child))
 		return (1);
 
 	return (0);
@@ -197,9 +205,10 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 	/*
 	 * Create N children, unless we are dealing with  large page without
-	 * many entries, in which case split into 10 pages.
+	 * many entries, in which case split into the minimum number of pages.
 	 */
-	children = WT_MAX(pindex->entries / __split_deepen_per_child, 10);
+	children = WT_MAX(pindex->entries / __split_deepen_per_child,
+	    __split_deepen_min_child);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_VERBOSE_ERR(session, split,
