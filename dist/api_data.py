@@ -333,6 +333,9 @@ connection_runtime_config = [
 	    trigger eviction when the cache becomes this full (as a
 	    percentage)''',
 	    min=10, max=99),
+	Config('eviction_workers', '0', r'''
+	    additional threads to help evict pages from cache''',
+	    min=0, max=20),
 	Config('statistics', 'none', r'''
 	    Maintain database statistics, which may impact performance.
 	    Choosing "all" maintains all statistics regardless of cost,
