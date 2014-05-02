@@ -144,6 +144,30 @@ assert(gle.singleShard);
 assert.eq(coll.count(), 0);
 
 //
+// Geo $near is not supported on mongos
+coll.ensureIndex( { loc: "2dsphere" } );
+coll.remove({});
+var query = {
+  loc : {
+    $near : {
+      $geometry : {
+        type : "Point" ,
+        coordinates : [ 0 , 0 ]
+      },
+      $maxDistance : 1000,
+    }
+  }
+}
+printjson(coll.remove(query));
+printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
+assert(gle.ok);
+assert(gle.err);
+assert(gle.code);
+assert(!gle.errmsg);
+assert(gle.shards);
+assert.eq(coll.count(), 0);
+
+//
 // First shard down
 //
 
