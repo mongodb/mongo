@@ -200,9 +200,6 @@ namespace mongo {
     /** called as the health threads get new results */
     void Manager::msgCheckNewState() {
         {
-            theReplSet->assertValid();
-            rs->assertValid();
-
             RSBase::lock lk(rs);
 
             if( busyWithElectSelf ) return;

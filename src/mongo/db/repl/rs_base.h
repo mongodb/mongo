@@ -39,15 +39,12 @@ namespace mongo {
      * Order of locking: lock the replica set, then take a rwlock.
      */
     class RSBase : boost::noncopyable {
-    public:
-        const unsigned magic;
-        void assertValid() { verify( magic == 0x12345677 ); }
     private:
         mongo::mutex m;
         int _locked;
         ThreadLocalValue<bool> _lockedByMe;
     protected:
-        RSBase() : magic(0x12345677), m("RSBase"), _locked(0) { }
+        RSBase() : m("RSBase"), _locked(0) { }
         ~RSBase() {
             // this can happen if we throw in the constructor; otherwise never happens.  thus we
             // logit as it is quite unusual.
