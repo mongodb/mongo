@@ -18,7 +18,7 @@ static void *__evict_worker(void *);
 
 typedef struct {
 	WT_CONNECTION_IMPL *conn;
-	int id;
+	u_int id;
 
 	pthread_t tid;
 } WT_EVICTION_WORKER;
