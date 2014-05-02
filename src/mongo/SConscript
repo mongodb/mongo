@@ -1052,7 +1052,7 @@ env.Library('mocklib', [
 
 test = testEnv.Install(
     '#/',
-    testEnv.Program("test",
+    testEnv.Program("dbtest",
                     [ f for f in Glob("dbtests/*.cpp")
                       if not str(f).endswith('framework.cpp') and
                          not str(f).endswith('framework_options.cpp') and
@@ -1074,7 +1074,7 @@ test = testEnv.Install(
                        "$BUILD_DIR/mongo/db/query/query"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):
-    testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
+    testEnv.Alias( "dbtest", "#/${PROGPREFIX}dbtest${PROGSUFFIX}" )
 
 env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
 

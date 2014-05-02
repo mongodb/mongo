@@ -46,7 +46,7 @@ def addSmoketest( name, deps, extraSmokeArgs=[] ):
     target = name
     if name.startswith("smoke"):
         if name == "smoke":
-            target = File("test").path
+            target = File("dbtest").path
         else:
             target = name[5].lower() + name[6:]
 
@@ -66,7 +66,7 @@ def addSmokeSuite( name, suitefile, needMongod=False ):
         smoke_args.append('--dont-start-mongod')
     addTest(name, [suitefile], utils.run_smoke_command(*smoke_args))
 
-addSmoketest( "smoke", [ add_exe( "test" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
+addSmoketest( "smoke", [ add_exe( "dbtest" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
 addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
 
 addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])

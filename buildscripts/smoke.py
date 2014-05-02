@@ -495,7 +495,7 @@ def runTest(test, result):
         argv += [path]
     elif ext in ["", ".exe"]:
         # Blech.
-        if os.path.basename(path) in ["test", "test.exe", "perftest", "perftest.exe"]:
+        if os.path.basename(path) in ["dbtest", "dbtest.exe", "perftest", "perftest.exe"]:
             argv = [path]
             # default data directory for test and perftest is /tmp/unittest
             if smoke_db_prefix:
@@ -550,7 +550,7 @@ def runTest(test, result):
 
         argv = argv + [ '--eval', evalString]
 
-    if argv[0].endswith( 'test' ) or argv[0].endswith( 'test.exe' ):
+    if argv[0].endswith( 'dbtest' ) or argv[0].endswith( 'dbtest.exe' ):
         if no_preallocj :
             argv = argv + [ '--nopreallocj' ]
         if temp_path:
@@ -902,7 +902,7 @@ def expand_suites(suites,expandUseDB=True):
     module_suites = get_module_suites()
     for suite in suites:
         if suite == 'all':
-            return expand_suites(['test', 
+            return expand_suites(['dbtest',
                                   'perf', 
                                   'jsCore', 
                                   'jsPerf', 
@@ -917,11 +917,11 @@ def expand_suites(suites,expandUseDB=True):
                                   'slow2',
                                   'tool'],
                                  expandUseDB=expandUseDB)
-        if suite == 'test':
+        if suite == 'dbtest' or suite == 'test':
             if os.sys.platform == "win32":
-                program = 'test.exe'
+                program = 'dbtest.exe'
             else:
-                program = 'test'
+                program = 'dbtest'
             (globstr, usedb) = (program, False)
         elif suite == 'perf':
             if os.sys.platform == "win32":
@@ -1083,7 +1083,7 @@ def run_old_fails():
                 continue
 
             filename = os.path.basename(path)
-            if filename in ('test', 'test.exe') or filename.endswith('.js'):
+            if filename in ('dbtest', 'dbtest.exe') or filename.endswith('.js'):
                 set_globals(options, [filename])
                 oldWinners = len(winners)
                 run_tests([test])
