@@ -131,13 +131,13 @@ namespace mongo {
                     log() << "replSet error while handshaking the upstream updater: "
                         << res["errmsg"].valuestrsafe();
 
-                    resetConnection();
+                    _resetConnection();
                     return false;
                 }
             }
             catch (const DBException& e) {
                 log() << "SyncSourceFeedback error sending handshake: " << e.what() << endl;
-                resetConnection();
+                _resetConnection();
                 return false;
             }
         }
@@ -153,7 +153,7 @@ namespace mongo {
         string errmsg;
         if (!_connection->connect(hostName.c_str(), errmsg) ||
             (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
-            resetConnection();
+            _resetConnection();
             log() << "repl: " << errmsg << endl;
             return false;
         }
@@ -214,12 +214,12 @@ namespace mongo {
         }
         catch (const DBException& e) {
             log() << "SyncSourceFeedback error sending update: " << e.what() << endl;
-            resetConnection();
+            _resetConnection();
             return false;
         }
         if (!ok) {
             log() << "SyncSourceFeedback error sending update, response: " << res.toString() <<endl;
-            resetConnection();
+            _resetConnection();
             return false;
         }
         return true;
@@ -256,7 +256,7 @@ namespace mongo {
             }
             const Member* target = replset::BackgroundSync::get()->getSyncTarget();
             if (_syncTarget != target) {
-                resetConnection();
+                _resetConnection();
                 _syncTarget = target;
             }
             if (!hasConnection()) {

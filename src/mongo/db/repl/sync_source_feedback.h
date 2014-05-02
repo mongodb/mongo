@@ -60,11 +60,6 @@ namespace mongo {
             updateMap(_me["_id"].OID(), ot);
         }
 
-        void resetConnection() {
-            LOG(1) << "resetting connection in sync source feedback";
-            _connection.reset();
-        }
-
         /// Updates the _slaveMap to be forwarded to the sync target.
         void updateMap(const mongo::OID& rid, const OpTime& ot);
 
@@ -74,6 +69,11 @@ namespace mongo {
         void run();
 
     private:
+        void _resetConnection() {
+            LOG(1) << "resetting connection in sync source feedback";
+            _connection.reset();
+        }
+
         /**
          * Authenticates _connection using the server's cluster-membership credentials.
          *
