@@ -599,6 +599,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
+	uint64_t cache_size;
 	uint32_t intl_split_size, leaf_split_size;
 	const char **cfg;
 
@@ -624,8 +625,17 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * parent.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
-	btree->maxmempage = WT_MIN(S2C(session)->cache_size / 2,
-	    WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage));
+	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
+
+	/*
+	 * Don't let pages grow to more than half the cache size.  Otherwise,
+	 * with very small caches, we can end up in a situation where nothing
+	 * can be evicted.  Take care getting the cache size: with a shared
+	 * cache, it may not have been set.
+	 */
+	cache_size = S2C(session)->cache_size;
+	if (cache_size > 0)
+		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 2);
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))
