@@ -195,7 +195,7 @@ __wt_cache_evict_server(void *arg)
 
 err:	WT_VERBOSE_TRET(session, evictserver, "waiting for helper threads");
 	for (i = 0; i < cache->eviction_workers; i++) {
-		__wt_cond_signal(session, cache->evict_waiter_cond);
+		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		WT_TRET(__wt_thread_join(session, workers[i].tid));
 	}
 	__wt_free(session, workers);
@@ -252,7 +252,8 @@ __evict_worker(void *arg)
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		WT_VERBOSE_ERR(session, evictserver, "worker sleeping");
-		__wt_cond_wait(session, cache->evict_waiter_cond, 100000);
+		WT_ERR(
+		    __wt_cond_wait(session, cache->evict_waiter_cond, 100000));
 		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
 			break;
 		WT_VERBOSE_ERR(session, evictserver, "worker waking");
