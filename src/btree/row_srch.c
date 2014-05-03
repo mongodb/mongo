@@ -459,7 +459,7 @@ restart:
 		pindex = WT_INTL_INDEX_COPY(btree->root.page);
 		cbt->slot = pindex->entries < 2 ?
 		    __wt_random() % page->pg_row_entries : 0;
-		
+
 		return (__wt_row_leaf_key(session,
 		    page, page->pg_row_d + cbt->slot, &cbt->search_key, 0));
 	}
