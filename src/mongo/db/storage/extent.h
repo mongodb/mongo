@@ -44,7 +44,7 @@ namespace mongo {
     (11:12:55 AM) dm10gen: and that is placed on the free list
     */
 #pragma pack(1)
-    class Extent {
+    struct Extent {
     public:
         enum { extentSignature = 0x41424344 };
         unsigned magic;
@@ -88,7 +88,6 @@ namespace mongo {
         static int initialSize(int len);
 
     };
-
 #pragma pack()
 
 }

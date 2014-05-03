@@ -34,6 +34,8 @@ namespace mongo {
 
     class CappedRecordStoreV1;
 
+    struct Extent;
+
     /**
      * This class iterates over a capped collection identified by 'ns'.
      * The collection must exist when the constructor is called.

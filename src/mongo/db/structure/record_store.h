@@ -39,6 +39,7 @@ namespace mongo {
     class Collection;
     struct CompactOptions;
     struct CompactStats;
+    class DeletedRecord;
     class DocWriter;
     class ExtentManager;
     class MAdvise;

@@ -45,6 +45,8 @@ namespace mongo {
     class Record;
     class TransactionExperiment;
 
+    struct Extent;
+
     /**
      * ExtentManager basics
      *  - one per database

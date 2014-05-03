@@ -40,6 +40,8 @@ namespace mongo {
     class Record;
     class TransactionExperiment;
 
+    struct Extent;
+
     class RecordStoreV1MetaData {
     public:
         virtual ~RecordStoreV1MetaData(){}

@@ -40,11 +40,6 @@
 
 namespace mongo {
 
-    class DeletedRecord;
-    class Extent;
-    class DataFile;
-    class DiskLoc;
-
     template< class Version > class BtreeBucket;
 
 #pragma pack(1)

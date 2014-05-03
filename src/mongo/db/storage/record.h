@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    class DeletedRecord;
+
     /* Record is a record in a datafile.  DeletedRecord is similar but for deleted space.
 
     *11:03:20 AM) dm10gen: regarding extentOfs...
