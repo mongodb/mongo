@@ -43,25 +43,6 @@ namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
 
-    static void extent_getEmptyLoc(const StringData& ns,
-                                   const DiskLoc extentLoc,
-                                   int extentLength,
-                                   bool capped,
-                                   /*out*/DiskLoc& emptyLoc,
-                                   /*out*/int& delRecLength) {
-        emptyLoc = extentLoc;
-        emptyLoc.inc( Extent::HeaderSize() );
-        delRecLength = extentLength - Extent::HeaderSize();
-        if( delRecLength >= 32*1024 && ns.find('$') != string::npos && !capped ) {
-            // probably an index. so skip forward to keep its records page aligned
-            int& ofs = emptyLoc.GETOFS();
-            int newOfs = (ofs + 0xfff) & ~0xfff;
-            delRecLength -= (newOfs-ofs);
-            dassert( delRecLength > 0 );
-            ofs = newOfs;
-        }
-    }
-
     int Extent::initialSize(int len) {
         verify( len <= maxSize() );
 
@@ -121,68 +102,6 @@ namespace mongo {
         s << "    size:" << length
           << " firstRecord:" << firstRecord.toString()
           << " lastRecord:" << lastRecord.toString() << '\n';
-    }
-
-    void Extent::markEmpty() {
-        xnext.Null();
-        xprev.Null();
-        firstRecord.Null();
-        lastRecord.Null();
-    }
-
-    DiskLoc Extent::reuse(TransactionExperiment* txn, const StringData& nsname, bool capped) {
-        return txn->writing(this)->_reuse(txn, nsname, capped);
-    }
-
-    DiskLoc Extent::_reuse(TransactionExperiment* txn, const StringData& nsname, bool capped) {
-        LOG(3) << "_reuse extent was:" << nsDiagnostic.toString() << " now:" << nsname << endl;
-        if (magic != extentSignature) {
-            StringBuilder sb;
-            sb << "bad extent signature " << integerToHex(magic)
-               << " for namespace '" << nsDiagnostic.toString()
-               << "' found in Extent::_reuse";
-            msgasserted(10360, sb.str());
-        }
-        nsDiagnostic = nsname;
-        markEmpty();
-
-        DiskLoc emptyLoc;
-        int delRecLength;
-        extent_getEmptyLoc(nsname, myLoc, length, capped, emptyLoc, delRecLength);
-
-        // todo: some dup code here and below in Extent::init
-        DeletedRecord* empty = txn->writing(getDeletedRecord(emptyLoc));
-        empty->lengthWithHeaders() = delRecLength;
-        empty->extentOfs() = myLoc.getOfs();
-        empty->nextDeleted().Null();
-        return emptyLoc;
-    }
-
-    /* assumes already zeroed -- insufficient for block 'reuse' perhaps */
-    DiskLoc Extent::init(TransactionExperiment* txn,
-                         const char *nsname,
-                         int _length,
-                         int _fileNo,
-                         int _offset,
-                         bool capped) {
-        magic = extentSignature;
-        myLoc.set(_fileNo, _offset);
-        xnext.Null();
-        xprev.Null();
-        nsDiagnostic = nsname;
-        length = _length;
-        firstRecord.Null();
-        lastRecord.Null();
-
-        DiskLoc emptyLoc;
-        int delRecLength;
-        extent_getEmptyLoc(nsname, myLoc, _length, capped, emptyLoc, delRecLength);
-
-        DeletedRecord* empty = txn->writing(getDeletedRecord(emptyLoc));
-        empty->lengthWithHeaders() = delRecLength;
-        empty->extentOfs() = myLoc.getOfs();
-        empty->nextDeleted().Null();
-        return emptyLoc;
     }
 
     bool Extent::validates(const DiskLoc diskLoc, vector<string>* errors) const {

@@ -198,6 +198,12 @@ namespace mongo {
         DiskLoc _getNextRecordInExtent( const DiskLoc& loc ) const;
         DiskLoc _getPrevRecordInExtent( const DiskLoc& loc ) const;
 
+        /**
+         * finds the first suitable DiskLoc for data
+         * will return the DiskLoc of a newly created DeletedRecord
+         */
+        DiskLoc _findFirstSpot( TransactionExperiment* txn, const DiskLoc& extDiskLoc, Extent* e );
+
         /** add a record to the end of the linked list chain within this extent.
             require: you must have already declared write intent for the record header.
         */

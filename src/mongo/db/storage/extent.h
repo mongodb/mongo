@@ -69,23 +69,6 @@ namespace mongo {
 
         void dump(iostream& s) const;
 
-        /* assumes already zeroed -- insufficient for block 'reuse' perhaps
-        Returns a DeletedRecord location which is the data in the extent ready for us.
-        Caller will need to add that to the freelist structure in namespacedetail.
-        */
-        DiskLoc init(TransactionExperiment* txn,
-                     const char *nsname,
-                     int _length,
-                     int _fileNo,
-                     int _offset,
-                     bool capped);
-
-        /* like init(), but for a reuse case */
-        DiskLoc reuse(TransactionExperiment* txn, const StringData& nsname, bool newUseIsAsCapped);
-
-        /** caller must declare write intent first */
-        void markEmpty();
-
         bool isOk() const { return magic == extentSignature; }
         void assertOk() const { verify(isOk()); }
 
@@ -104,20 +87,6 @@ namespace mongo {
          */
         static int initialSize(int len);
 
-    private:
-        Record* getRecord(DiskLoc dl) {
-            verify( !dl.isNull() );
-            verify( dl.sameFile(myLoc) );
-            int x = dl.getOfs() - myLoc.getOfs();
-            verify( x > 0 );
-            return (Record *) (((char *) this) + x);
-        }
-
-        DeletedRecord* getDeletedRecord(const DiskLoc& dl ) {
-            return reinterpret_cast<DeletedRecord*>( getRecord( dl ) );
-        }
-
-        DiskLoc _reuse(TransactionExperiment* txn, const StringData& nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
     };
 
 #pragma pack()

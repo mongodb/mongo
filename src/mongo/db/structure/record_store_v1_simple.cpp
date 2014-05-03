@@ -437,8 +437,7 @@ namespace mongo {
             DiskLoc newFirst = e->xnext;
             _details->setFirstExtent( txn, newFirst );
             *txn->writing(&_extentManager->getExtent( newFirst )->xprev) = DiskLoc();
-            txn->writing(e)->markEmpty();
-            _extentManager->freeExtents( txn, diskloc, diskloc );
+            _extentManager->freeExtent( txn, diskloc );
 
             txn->commitIfNeeded();
 

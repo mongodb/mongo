@@ -106,6 +106,12 @@ namespace mongo {
          */
         void freeExtents( TransactionExperiment* txn, DiskLoc firstExt, DiskLoc lastExt );
 
+        /**
+         * frees a single extent
+         * ignores all fields in the Extent except: magic, myLoc, length
+         */
+        void freeExtent( TransactionExperiment* txn, DiskLoc extent );
+
         void printFreeList() const;
 
         void freeListStats( int* numExtents, int64_t* totalFreeSize ) const;

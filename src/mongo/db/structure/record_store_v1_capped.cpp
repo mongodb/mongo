@@ -237,12 +237,10 @@ namespace mongo {
              extLoc = ext->xnext ) {
             ext = _extentManager->getExtent(extLoc);
 
-            DiskLoc prev = ext->xprev;
-            DiskLoc next = ext->xnext;
-            DiskLoc empty = ext->reuse( txn, _ns, true );
-            *txn->writing(&ext->xprev) = prev;
-            *txn->writing(&ext->xnext) = next;
-            addDeletedRec( txn, empty );
+            txn->writing( &ext->firstRecord )->Null();
+            txn->writing( &ext->lastRecord )->Null();
+
+            addDeletedRec( txn, _findFirstSpot( txn, extLoc, ext ) );
         }
 
         return Status::OK();

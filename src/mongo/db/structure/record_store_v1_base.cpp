@@ -131,6 +131,28 @@ namespace mongo {
 
     }
 
+    DiskLoc RecordStoreV1Base::_findFirstSpot( TransactionExperiment* txn,
+                                               const DiskLoc& extDiskLoc, Extent* e ) {
+        DiskLoc emptyLoc = extDiskLoc;
+        emptyLoc.inc( Extent::HeaderSize() );
+        int delRecLength = e->length - Extent::HeaderSize();
+        if ( delRecLength >= 32*1024 && _ns.find('$') != string::npos && !isCapped() ) {
+            // probably an index. so skip forward to keep its records page aligned
+            int& ofs = emptyLoc.GETOFS();
+            int newOfs = (ofs + 0xfff) & ~0xfff;
+            delRecLength -= (newOfs-ofs);
+            dassert( delRecLength > 0 );
+            ofs = newOfs;
+        }
+
+        DeletedRecord* empty = txn->writing(drec(emptyLoc));
+        empty->lengthWithHeaders() = delRecLength;
+        empty->extentOfs() = e->myLoc.getOfs();
+        empty->nextDeleted().Null();
+        return emptyLoc;
+
+    }
+
     DiskLoc RecordStoreV1Base::getNextRecordInExtent( const DiskLoc& loc ) const {
         int nextOffset = recordFor( loc )->nextOfs();
 
@@ -295,11 +317,17 @@ namespace mongo {
                                                        size,
                                                        quotaMax );
 
-        Extent *e = _extentManager->getExtent( eloc, false );
-
+        Extent *e = _extentManager->getExtent( eloc );
         invariant( e );
 
-        DiskLoc emptyLoc = e->reuse(txn,  _ns, isCapped() );
+        *txn->writing( &e->nsDiagnostic ) = _ns;
+
+        txn->writing( &e->xnext )->Null();
+        txn->writing( &e->xprev )->Null();
+        txn->writing( &e->firstRecord )->Null();
+        txn->writing( &e->lastRecord )->Null();
+
+        DiskLoc emptyLoc = _findFirstSpot( txn, eloc, e );
 
         if ( _details->lastExtent().isNull() ) {
             verify( _details->firstExtent().isNull() );

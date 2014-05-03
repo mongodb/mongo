@@ -299,7 +299,9 @@ namespace mongo {
         Extent *e = getExtent( loc, false );
         verify( e );
 
-        txn->writing(e)->init(txn, "", size, fileNo, loc.getOfs(), false);
+        *txn->writing(&e->magic) = Extent::extentSignature;
+        *txn->writing(&e->myLoc) = loc;
+        *txn->writing(&e->length) = size;
 
         return loc;
     }
@@ -452,6 +454,28 @@ namespace mongo {
                << " eloc: " << eloc;
 
         return eloc;
+    }
+
+    void ExtentManager::freeExtent(TransactionExperiment* txn, DiskLoc firstExt ) {
+        Extent* e = getExtent( firstExt );
+        txn->writing( &e->xnext )->Null();
+        txn->writing( &e->xprev )->Null();
+        txn->writing( &e->firstRecord )->Null();
+        txn->writing( &e->lastRecord )->Null();
+
+
+        if( _getFreeListStart().isNull() ) {
+            _setFreeListStart( txn, firstExt );
+            _setFreeListEnd( txn, firstExt );
+        }
+        else {
+            DiskLoc a = _getFreeListStart();
+            invariant( getExtent( a )->xprev.isNull() );
+            *txn->writing( &getExtent( a )->xprev ) = firstExt;
+            *txn->writing( &getExtent( firstExt )->xnext ) = a;
+            _setFreeListStart( txn, firstExt );
+        }
+
     }
 
     void ExtentManager::freeExtents(TransactionExperiment* txn, DiskLoc firstExt, DiskLoc lastExt) {
