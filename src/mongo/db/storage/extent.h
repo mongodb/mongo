@@ -30,8 +30,10 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "mongo/db/diskloc.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {

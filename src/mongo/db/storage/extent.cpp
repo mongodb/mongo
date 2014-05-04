@@ -28,15 +28,10 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/storage/extent.h"
 
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/record.h"
-#include "mongo/db/storage/transaction.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
