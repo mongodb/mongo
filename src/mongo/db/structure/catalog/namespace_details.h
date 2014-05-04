@@ -89,7 +89,7 @@ namespace mongo {
 
         double _paddingFactor;                 // 1.0 = no padding.
         // ofs 368 (16)
-        int _systemFlags; // things that the system sets/cares about
+        int _systemFlagsOld; // things that the system sets/cares about
 
         DiskLoc _capExtent; // the "current" extent we're writing too for a capped collection
         DiskLoc _capFirstNewRecord;
@@ -206,13 +206,6 @@ namespace mongo {
 
         int getIndexBuildsInProgress() const { return _indexBuildsInProgress; }
 
-        /* NOTE: be careful with flags.  are we manipulating them in read locks?  if so,
-                 this isn't thread safe.  TODO
-        */
-        enum SystemFlags {
-            Flag_HaveIdIndex = 1 << 0 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
-        };
-
         enum UserFlags {
             Flag_UsePowerOf2Sizes = 1 << 0
         };
@@ -286,12 +279,6 @@ namespace mongo {
                 setPaddingFactor( x );
             }
         }
-
-        int systemFlags() const { return _systemFlags; }
-        bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }
-        void setSystemFlag( int flag );
-        void clearSystemFlag( int flag );
-        void clearSystemFlags();
 
         int userFlags() const { return _userFlags; }
         bool isUserFlagSet( int flag ) const { return _userFlags & flag; }

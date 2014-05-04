@@ -714,7 +714,7 @@ namespace mongo {
     }
 
     Status IndexCatalog::ensureHaveIdIndex(TransactionExperiment* txn) {
-        if ( _details->isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex ) )
+        if ( haveIdIndex() )
             return Status::OK();
 
         dassert( _idObj["_id"].type() == NumberInt );
@@ -727,7 +727,6 @@ namespace mongo {
 
         Status s = createIndex(txn, o, false);
         if ( s.isOK() || s.code() == ErrorCodes::IndexAlreadyExists ) {
-            _details->setSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
             return Status::OK();
         }
 
@@ -873,7 +872,6 @@ namespace mongo {
         entry = NULL;
 
         try {
-            _details->clearSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
 
             // ****   this is the first disk change ****
             _deleteIndexFromDisk( txn,
@@ -1011,8 +1009,7 @@ namespace mongo {
     }
 
     bool IndexCatalog::haveIdIndex() const {
-        return _details->isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex )
-            || findIdIndex() != NULL;
+        return findIdIndex() != NULL;
     }
 
     IndexCatalog::IndexIterator::IndexIterator( const IndexCatalog* cat,

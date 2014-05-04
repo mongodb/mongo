@@ -224,7 +224,6 @@ namespace mongo {
         // capped preserve true
         // max preserve
         _details->setPaddingFactor( txn, 1.0 );
-        _details->clearSystemFlags(txn);
         _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
         setLastDelRecLastExtent( txn, DiskLoc().setInvalid() );
         // dataFileVersion preserve

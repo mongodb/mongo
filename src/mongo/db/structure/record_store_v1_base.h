@@ -53,7 +53,6 @@ namespace mongo {
         virtual void setCapFirstNewRecord( TransactionExperiment* txn, const DiskLoc& loc ) = 0;
 
         virtual bool capLooped() const = 0;
-        virtual void clearSystemFlags(TransactionExperiment* txn) = 0;
 
         virtual long long dataSize() const = 0;
         virtual long long numRecords() const = 0;

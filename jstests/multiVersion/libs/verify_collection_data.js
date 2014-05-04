@@ -107,6 +107,10 @@ function CollectionDataValidator() {
         // XXX: in 2.4 avgObjSize was a double, but in 2.6 it is an int
         newCollectionStats['avgObjSize'] = Math.floor(newCollectionStats['avgObjSize']);
 
+        // as of 2.7.1, we no longer use systemFlags
+        delete collectionStats.systemFlags;
+        delete newCollectionStats.systemFlags;
+
         assert.docEq(collectionStats, newCollectionStats, "collection metadata not equal");
 
         // Get the indexes for this collection

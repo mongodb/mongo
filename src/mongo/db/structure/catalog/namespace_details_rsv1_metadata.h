@@ -67,10 +67,6 @@ namespace mongo {
             return _details->capLooped();
         }
 
-        virtual void clearSystemFlags(TransactionExperiment* txn) {
-            _details->clearSystemFlags();
-        }
-
         virtual long long dataSize() const {
             return _details->dataSize();
         }

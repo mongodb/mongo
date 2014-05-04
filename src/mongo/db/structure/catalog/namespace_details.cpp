@@ -63,7 +63,7 @@ namespace mongo {
         _isCapped = capped;
         _maxDocsInCapped = 0x7fffffff; // no limit (value is for pre-v2.3.2 compatibility)
         _paddingFactor = 1.0;
-        _systemFlags = 0;
+        _systemFlagsOld = 0;
         _userFlags = 0;
         _capFirstNewRecord = DiskLoc();
         // Signal that we are on first allocation iteration through extents.
@@ -275,18 +275,6 @@ namespace mongo {
     }
 
     /* ------------------------------------------------------------------------- */
-
-    void NamespaceDetails::setSystemFlag( int flag ) {
-        getDur().writingInt(_systemFlags) |= flag;
-    }
-
-    void NamespaceDetails::clearSystemFlag( int flag ) {
-        getDur().writingInt(_systemFlags) &= ~flag;
-    }
-
-    void NamespaceDetails::clearSystemFlags() {
-        getDur().writingInt(_systemFlags) = 0;
-    }
 
     void NamespaceDetails::setLastExtentSize( int newMax ) {
         if ( _lastExtentSize == newMax )
