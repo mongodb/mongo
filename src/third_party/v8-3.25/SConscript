@@ -74,6 +74,9 @@ LIBRARY_FLAGS = {
     'arch:x64': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_X64'],
     },
+    'arch:arm64': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_ARM64'],
+    },
   },
   'msvc': {
     'all': {
@@ -282,6 +285,29 @@ SOURCES = {
     x64/regexp-macro-assembler-x64.cc
     x64/stub-cache-x64.cc
     """),
+  'arch:arm64': Split("""
+    arm64/assembler-arm64.cc
+    arm64/builtins-arm64.cc
+    arm64/code-stubs-arm64.cc
+    arm64/codegen-arm64.cc
+    arm64/cpu-arm64.cc
+    arm64/debug-arm64.cc
+    arm64/decoder-arm64.cc
+    arm64/deoptimizer-arm64.cc
+    arm64/disasm-arm64.cc
+    arm64/frames-arm64.cc
+    arm64/full-codegen-arm64.cc
+    arm64/ic-arm64.cc
+    arm64/instructions-arm64.cc
+    arm64/instrument-arm64.cc
+    arm64/lithium-arm64.cc
+    arm64/lithium-codegen-arm64.cc
+    arm64/lithium-gap-resolver-arm64.cc
+    arm64/macro-assembler-arm64.cc
+    arm64/regexp-macro-assembler-arm64.cc
+    arm64/stub-cache-arm64.cc
+    arm64/utils-arm64.cc
+    """),
   'os:freebsd': ['platform-freebsd.cc', 'platform-posix.cc'],
   'os:openbsd': ['platform-openbsd.cc', 'platform-posix.cc'],
   'os:linux':   ['platform-linux.cc', 'platform-posix.cc'],
@@ -334,6 +360,8 @@ def get_options():
         arch_string = 'arch:x64'
     elif processor == 'amd64':
         arch_string = 'arch:x64'
+    elif processor == 'aarch64':
+        arch_string = 'arch:arm64'
     else:
         assert False, "Unsupported architecture: " + processor
 
