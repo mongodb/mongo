@@ -127,9 +127,8 @@ main(int argc, char *argv[])
 	path_setup(home);
 
 	printf("%s: process %" PRIu64 "\n", g.progname, (uint64_t)getpid());
-	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
-		printf(
-		    "    %d: %u workers, %u tables\n",
+	for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
+		printf("    %d: %u workers, %u tables\n",
 		    cnt, g.nworkers, g.ntables);
 
 		(void)cleanup();		/* Clean up previous runs */
