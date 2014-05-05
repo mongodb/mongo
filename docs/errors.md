@@ -90,7 +90,7 @@ src/mongo/client/dbclient.cpp
 * 10006 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L533) listDatabases.databases not array" , info["databases
 * 10007 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L887) dropIndex failed
 * 10008 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L894) dropIndexes failed
-* 10276 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L594) DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: 
+* 10276 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L877) DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: 
 * 10278 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L1028) dbclient error communicating with server: 
 * 10337 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L980) object not valid
 * 11010 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/dbclient.cpp#L307) count fails:
