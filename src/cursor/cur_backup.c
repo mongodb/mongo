@@ -201,6 +201,14 @@ __backup_start(
 	/* Create the hot backup file. */
 	WT_ERR(__backup_file_create(session, cb));
 
+	/* Add log files if logging is on and we're doing a full backup. */
+	if (!target_list && conn->log) {
+		WT_ERR(
+		    __wt_log_get_active_files(session, &logfiles, &logcount));
+		for (i = 0; i < logcount; i++)
+			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
+	}
+
 	/*
 	 * If a list of targets was specified, work our way through them.
 	 * Else, generate a list of all database objects.
@@ -213,14 +221,6 @@ __backup_start(
 	/* Add the hot backup and single-threading file to the list. */
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
 	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
-
-	/* Add log files if logging is on and we're doing a full backup. */
-	if (!target_list && conn->log) {
-		WT_ERR(
-		    __wt_log_get_active_files(session, &logfiles, &logcount));
-		for (i = 0; i < logcount; i++)
-			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
-	}
 
 err:	/* Close the hot backup file. */
 	if (cb->bfp != NULL) {
