@@ -384,11 +384,9 @@ __cache_pool_assess(uint64_t *phighest)
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
-	WT_SESSION_IMPL *session;
 	uint64_t entries, highest, new;
 
 	cp = __wt_process.cache_pool;
-	session = cp->session;
 	entries = highest = 0;
 
 	/* Generate read pressure information. */
@@ -408,7 +406,7 @@ __cache_pool_assess(uint64_t *phighest)
 		if (cache->cp_current_evict > highest)
 			highest = cache->cp_current_evict;
 	}
-	WT_VERBOSE_RET(session, shared_cache,
+	WT_VERBOSE_RET(cp->session, shared_cache,
 	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
 	    highest, entries);
 	/* Normalize eviction information across connections. */
@@ -431,19 +429,17 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
-	WT_SESSION_IMPL *session;
 	uint64_t adjusted, reserved, read_pressure;
 	int force, grew;
 
 	cp = __wt_process.cache_pool;
-	session = cp->session;
 	reserved = read_pressure = 0;
 	grew = 0;
 	force = (cp->currently_used > cp->size);
-	if (WT_VERBOSE_ISSET(session, shared_cache)) {
-		WT_VERBOSE_RET(session, shared_cache,
+	if (WT_VERBOSE_ISSET(cp->session, shared_cache)) {
+		WT_VERBOSE_RET(cp->session, shared_cache,
 		    "Cache pool distribution: ");
-		WT_VERBOSE_RET(session, shared_cache,
+		WT_VERBOSE_RET(cp->session, shared_cache,
 		    "\t" "cache_size, read_pressure, skips: ");
 	}
 
@@ -453,7 +449,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 		adjusted = 0;
 
 		read_pressure = cache->cp_current_evict / highest;
-		WT_VERBOSE_RET(session, shared_cache,
+		WT_VERBOSE_RET(cp->session, shared_cache,
 		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
 		    entry->cache_size, read_pressure, cache->cp_skip_count);
 
@@ -502,7 +498,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 				entry->cache_size -= adjusted;
 				cp->currently_used -= adjusted;
 			}
-			WT_VERBOSE_RET(session, shared_cache,
+			WT_VERBOSE_RET(cp->session, shared_cache,
 			    "Allocated %s%" PRId64 " to %s",
 			    grew ? "" : "-", adjusted, entry->home);
 			/*

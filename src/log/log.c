@@ -741,10 +741,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	if (func == NULL)
 		return (0);
 
-	if (LF_ISSET(WT_LOGSCAN_RECOVER))
+	if (LF_ISSET(WT_LOGSCAN_RECOVER)) {
 		WT_VERBOSE_RET(session, log,
 		    "__wt_log_scan truncating to %u/%" PRIuMAX,
 		    log->trunc_lsn.file, (uintmax_t)log->trunc_lsn.offset);
+	}
 
 	if (log != NULL) {
 		allocsize = log->allocsize;

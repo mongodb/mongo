@@ -167,12 +167,13 @@ __wt_lsm_merge_worker(void *vargs)
 			old_aggressive = aggressive;
 			aggressive = chunk_wait / lsm_tree->merge_min;
 
-			if (aggressive > old_aggressive)
+			if (aggressive > old_aggressive) {
 				WT_VERBOSE_ERR(session, lsm,
 				     "LSM merge got aggressive (%u), "
 				     "%u / %" PRIu64,
 				     aggressive, stallms,
 				     lsm_tree->chunk_fill_ms);
+			}
 		}
 	}
 

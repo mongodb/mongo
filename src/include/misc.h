@@ -125,6 +125,7 @@
 #define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
 
 /* Verbose messages. */
+#ifdef HAVE_VERBOSE
 #define	WT_VERBOSE_ISSET(session, f)					\
 	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
 #define	WT_VERBOSE_ERR(session, f, ...) do {				\
@@ -139,6 +140,12 @@
 	if (WT_VERBOSE_ISSET(session, f))				\
 		WT_TRET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
+#else
+#define	WT_VERBOSE_ISSET(session, f)	0
+#define	WT_VERBOSE_ERR(session, f, ...)
+#define	WT_VERBOSE_RET(session, f, ...)
+#define	WT_VERBOSE_TRET(session, f, ...)
+#endif
 
 /*
  * Clear a structure, two flavors: inline when we want to guarantee there's

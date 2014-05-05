@@ -1021,6 +1021,8 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	uint64_t r;
 	uint32_t i;
 
+	WT_UNUSED(session);	/* Required if verbose is disabled */
+
 	for (i = 0, r = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
@@ -1242,6 +1244,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 	uint64_t recno, start, stop;
 	uint32_t i;
 
+	WT_UNUSED(trk);		/* Required if verbose is disabled */
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
@@ -1904,6 +1907,8 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
 	WT_ROW *rip;
+
+	WT_UNUSED(trk);		/* Required if verbose is disabled */
 
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;

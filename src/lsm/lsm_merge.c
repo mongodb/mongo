@@ -411,12 +411,13 @@ err:	if (src != NULL)
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
 
-		if (ret == EINTR)
+		if (ret == EINTR) {
 			WT_VERBOSE_TRET(session, lsm,
 			    "Merge aborted due to close");
-		else
+		} else {
 			WT_VERBOSE_TRET(session, lsm,
 			    "Merge failed with %s", wiredtiger_strerror(ret));
+		}
 		F_CLR(session, WT_SESSION_NO_CACHE);
 	}
 	return (ret);
