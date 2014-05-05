@@ -184,15 +184,14 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_SESSION *wt_session;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
+	const char *txn_cfg[3];
 	void *saved_meta_next;
 	int full, started, tracking;
 
 	conn = S2C(session);
 	saved_isolation = session->isolation;
-	wt_session = &session->iface;
 	txn = &session->txn;
 	full = started = tracking = 0;
 
@@ -230,8 +229,17 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
-	/* Start a snapshot transaction for the checkpoint. */
-	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
+	/*
+	 * Start a snapshot transaction for the checkpoint.
+	 *
+	 * Note: we don't go through the public API calls because they have
+	 * side effects on cursors, which applications can hold open across
+	 * calls to checkpoint.
+	 */
+	txn_cfg[0] = WT_CONFIG_BASE(session, session_begin_transaction);
+	txn_cfg[1] = "isolation=snapshot";
+	txn_cfg[2] = NULL;
+	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full) {
@@ -243,7 +251,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
 	/* Commit the transaction before syncing the file(s). */
-	WT_ERR(wt_session->commit_transaction(wt_session, NULL));
+	WT_ERR(__wt_txn_commit(session, NULL));
 
 	/*
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
@@ -295,7 +303,7 @@ err:	/*
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	if (F_ISSET(txn, TXN_RUNNING))
-		WT_ERR(wt_session->rollback_transaction(wt_session, NULL));
+		WT_TRET(__wt_txn_rollback(session, NULL));
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && started)
