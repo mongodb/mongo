@@ -308,8 +308,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN_OP *op;
 	u_int i;
 
-	WT_UNUSED(cfg);
-
 	txn = &session->txn;
 	WT_ASSERT(session, !F_ISSET(txn, TXN_ERROR));
 
