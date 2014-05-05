@@ -1,0 +1,15 @@
+
+Import("env")
+
+env.Library(
+    target= 'extent',
+    source= [
+        'extent.cpp',
+        'extent_manager.cpp',
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/foundation',
+        ]
+    )
+

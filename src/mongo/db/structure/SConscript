@@ -1,0 +1,35 @@
+
+Import("env")
+
+env.Library(
+    target= 'record_store',
+    source= [
+        'record_store.cpp',
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/storage/extent',
+        '$BUILD_DIR/mongo/foundation',
+        ]
+    )
+
+env.Library(
+    target= 'record_store_v1',
+    source= [
+        'record_store_v1_base.cpp',
+        'record_store_v1_simple.cpp',
+        'record_store_v1_simple_iterator.cpp',
+        'record_store_v1_repair_iterator.cpp',
+        ],
+    LIBDEPS= [
+        'record_store',
+        ]
+    )
+
+#env.CppUnitTest(
+#    target='record_store_v1_simple_test',
+#    source='record_store_v1_simple_test.cpp',
+#    LIBDEPS=[
+#        'record_store_v1'
+#        ]
+#    )

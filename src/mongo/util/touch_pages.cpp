@@ -16,15 +16,13 @@
 
 #include "mongo/util/touch_pages.h"
 
-#include "mongo/util/mmap.h"
-
 namespace mongo {
 
     char _touch_pages_char_reader; // goes in .bss
 
-    void touch_pages( const char* buf, size_t length ) {
+    void touch_pages( const char* buf, size_t length, size_t pageSize ) {
         // read first byte of every page, in order
-        for( size_t i = 0; i < length; i += g_minOSPageSizeBytes ) {
+        for( size_t i = 0; i < length; i += pageSize ) {
             _touch_pages_char_reader += buf[i];
         }
     }
