@@ -731,7 +731,11 @@ namespace mongo {
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
-        snapshotThread.go();
+        // The snapshot thread provides historical collection level and lock statistics for use
+        // by the web interface. Only needed when HTTP is enabled.
+        if (serverGlobalParams.isHttpInterfaceEnabled)
+            snapshotThread.go();
+
         d.clientCursorMonitor.go();
         PeriodicTask::startRunningPeriodicTasks();
         if (missingRepl) {
