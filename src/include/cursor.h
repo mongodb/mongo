@@ -102,6 +102,14 @@ struct __wt_cursor_btree {
 	int	compare;
 
 	/*
+	 * The key value from a binary search of a row-store files; we keep a
+	 * copy of the last key we retrieved in the search, it avoids having
+	 * doing the additional work of getting the key again for return to
+	 * the application.
+	 */
+	WT_ITEM search_key;
+
+	/*
 	 * It's relatively expensive to calculate the last record on a variable-
 	 * length column-store page because of the repeat values.  Calculate it
 	 * once per page and cache it.  This value doesn't include the skiplist
@@ -149,12 +157,6 @@ struct __wt_cursor_btree {
 	 * files, and caching the last-returned keys for row-store files.
 	 */
 	WT_ITEM tmp;
-
-	/*
-	 * A temporary buffer used for key values during binary searches of row-
-	 * store files.
-	 */
-	WT_ITEM srch;
 
 	/*
 	 * Fixed-length column-store items are a single byte, and it's simpler

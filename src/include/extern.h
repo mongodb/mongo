@@ -452,11 +452,11 @@ extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_leaf_key_copy( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
-    WT_ITEM *retb);
+    WT_ITEM *keyb);
 extern int __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
-    WT_ITEM *retb,
+    WT_ITEM *keyb,
     int instantiate);
 extern int __wt_row_ikey_incr(WT_SESSION_IMPL *session,
     WT_PAGE *page,
