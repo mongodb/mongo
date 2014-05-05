@@ -74,18 +74,24 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the key and
-		 * related WT_UPDATE item.   Otherwise, take the key from the
-		 * original page, and the value from any related WT_UPDATE item,
-		 * or the page if the key was never updated.
+		 * related WT_UPDATE item.  Otherwise, if we have an exact
+		 * match, we already stashed a copy of the key: use that.  If
+		 * we don't have an exact match, take the key from the original
+		 * page.  Use the value from any related WT_UPDATE item, or the
+		 * page if the key was never updated.
 		 */
-		if (cbt->ins == NULL) {
+		if (cbt->ins != NULL) {
+			cursor->key.data = WT_INSERT_KEY(cbt->ins);
+			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+			upd = __wt_txn_read(session, cbt->ins->upd);
+		} else if (cbt->compare == 0) {
 			cursor->key.data = cbt->search_key.data;
 			cursor->key.size = cbt->search_key.size;
 			upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		} else {
-			cursor->key.data = WT_INSERT_KEY(cbt->ins);
-			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
-			upd = __wt_txn_read(session, cbt->ins->upd);
+			WT_RET(__wt_row_leaf_key(
+			    session, page, rip, &cursor->key, 0));
+			upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		}
 		if (upd != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
