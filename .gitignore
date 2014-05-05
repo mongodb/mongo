@@ -115,7 +115,7 @@ scratch
 /tutorial
 
 #tests
-/test
+/dbtest
 /authTest
 /perftest
 /clientTest
