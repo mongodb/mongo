@@ -213,6 +213,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	WT_ASYNC_OP *asyncop;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	int cb_ret;
 
 	asyncop = (WT_ASYNC_OP *)op;
@@ -220,8 +221,9 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	ret = 0;
 	cb_ret = 0;
 
+	wt_session = &session->iface;
 	if (op->optype != WT_AOP_COMPACT)
-		WT_RET(__wt_txn_begin(session, NULL));
+		WT_RET(wt_session->begin_transaction(wt_session, NULL));
 	WT_ASSERT(session, op->state == WT_ASYNCOP_WORKING);
 	WT_RET(__async_worker_cursor(session, op, worker, &cursor));
 	/*
@@ -237,9 +239,11 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 */
 	if (op->optype != WT_AOP_COMPACT) {
 		if ((ret == 0 || ret == WT_NOTFOUND) && cb_ret == 0)
-			WT_TRET(__wt_txn_commit(session, NULL));
+			WT_TRET(wt_session->commit_transaction(
+			    wt_session, NULL));
 		else
-			WT_TRET(__wt_txn_rollback(session, NULL));
+			WT_TRET(wt_session->rollback_transaction(
+			    wt_session, NULL));
 		F_CLR(&asyncop->c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		cursor->reset(cursor);
 	}
@@ -277,9 +281,15 @@ __wt_async_worker(void *arg)
 	STAILQ_INIT(&worker.cursorqh);
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		WT_ERR(__async_op_dequeue(conn, session, &op));
-		if (op != NULL && op != &async->flush_op)
-			WT_ERR(__async_worker_op(session, op, &worker));
-		else if (async->flush_state == WT_ASYNC_FLUSHING) {
+		if (op != NULL && op != &async->flush_op) {
+			/*
+			 * If an operation fails, we want the worker thread to
+			 * keep running, unless there is a panic.
+			 */
+			(void)__async_worker_op(session, op, &worker);
+			if (F_ISSET(conn, WT_CONN_PANIC))
+				__wt_panic(session);
+		} else if (async->flush_state == WT_ASYNC_FLUSHING) {
 			/*
 			 * Worker flushing going on.  Last worker to the party
 			 * needs to clear the FLUSHING flag and signal the cond.

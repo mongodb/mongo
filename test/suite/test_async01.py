@@ -68,6 +68,7 @@ class Callback(wiredtiger.AsyncCallback):
                 self.notify_error(key, value, optype, 'unexpected optype')
                 self.lock.acquire()
                 self.nerror += 1
+                self.lock.release()
             if self.current[key] != value:
                 self.notify_error(key, value, optype, 'unexpected value')
                 self.lock.acquire()
