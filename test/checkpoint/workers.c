@@ -70,11 +70,11 @@ start_workers(table_type type)
 	int i, ret;
 	void *thread_ret;
 
+	ret = 0;
+
 	/* Create statistics and thread structures. */
-	if ((tids = calloc((size_t)(g.nworkers), sizeof(*tids))) == NULL) {
-		(void)log_print_err("calloc", errno, 1);
-		goto err;
-	}
+	if ((tids = calloc((size_t)(g.nworkers), sizeof(*tids))) == NULL)
+		return (log_print_err("calloc", errno, 1));
 
 	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0) {
 		(void)log_print_err("conn.open_session", ret, 1);
@@ -115,8 +115,7 @@ start_workers(table_type type)
 	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	printf("Ran workers for: %f seconds\n", seconds);
 
-err:	if (tids != NULL)
-		free(tids);
+err:	free(tids);
 
 	return (ret);
 }
