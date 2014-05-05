@@ -148,6 +148,8 @@ verify_checkpoint(WT_SESSION *session)
 	key_count = 0;
 	snprintf(ckpt, 128, "checkpoint=%s", g.checkpoint_name);
 	cursors = calloc((size_t)g.ntables, sizeof(*cursors));
+	if (cursors == NULL)
+		return (log_print_err("verify_checkpoint", ENOMEM, 1));
 
 	for (i = 0; i < g.ntables; i++) {
 		/*
@@ -158,17 +160,21 @@ verify_checkpoint(WT_SESSION *session)
 			continue;
 		snprintf(next_uri, 128, "table:__wt%04d", i);
 		if ((ret = session->open_cursor(
-		    session, next_uri, NULL, ckpt, &cursors[i])) != 0)
-			return (log_print_err(
-			    "verify_checkpoint:session.open_cursor", ret, 1));
+		    session, next_uri, NULL, ckpt, &cursors[i])) != 0) {
+			(void)log_print_err(
+			    "verify_checkpoint:session.open_cursor", ret, 1);
+			goto err;
+		}
 	}
 
 	while (ret == 0) {
 		ret = cursors[0]->next(cursors[0]);
 		if (ret == 0)
 			++key_count;
-		else if (ret != WT_NOTFOUND)
-			return (log_print_err("cursor->next", ret, 1));
+		else if (ret != WT_NOTFOUND) {
+			(void)log_print_err("cursor->next", ret, 1);
+			goto err;
+		}
 		/*
 		 * Check to see that all remaining cursors have the
 		 * same key/value pair.
@@ -181,15 +187,19 @@ verify_checkpoint(WT_SESSION *session)
 			if (g.cookies[i].type == LSM)
 				continue;
 			t_ret = cursors[i]->next(cursors[i]);
-			if (t_ret != 0 && t_ret != WT_NOTFOUND)
-				return (log_print_err("cursor->next", ret, 1));
+			if (t_ret != 0 && t_ret != WT_NOTFOUND) {
+				(void)log_print_err("cursor->next", ret, 1);
+				goto err;
+			}
 
 			if (ret == WT_NOTFOUND && t_ret == WT_NOTFOUND)
 				continue;
-			else if (ret == WT_NOTFOUND || t_ret == WT_NOTFOUND)
-				return (log_print_err(
+			else if (ret == WT_NOTFOUND || t_ret == WT_NOTFOUND) {
+				(void)log_print_err(
 				    "verify_checkpoint tables with different"
-				    " amount of data", EFAULT, 1));
+				    " amount of data", EFAULT, 1);
+				goto err;
+			}
 
 			type0 = type_to_string(g.cookies[0].type);
 			typei = type_to_string(g.cookies[i].type);
@@ -197,21 +207,23 @@ verify_checkpoint(WT_SESSION *session)
 			    cursors[0], type0, cursors[i], typei)) != 0) {
 				(void)diagnose_key_error(
 				    cursors[0], 0, cursors[i], i);
-				return (log_print_err(
+				(void)log_print_err(
 				    "verify_checkpoint - mismatching data",
-				    EFAULT, 1));
+				    EFAULT, 1);
+				goto err;
 			}
 		}
 	}
-	for (i = 0; i < g.ntables; i++) {
-		if (cursors[i] != NULL &&
-		    (ret = cursors[i]->close(cursors[i])) != 0)
-			return (log_print_err(
-			    "verify_checkpoint:cursor close", ret, 1));
-	}
-	free(cursors);
 	printf("Finished verifying a checkpoint with %d tables and %" PRIu64
 	    " keys\n", g.ntables, key_count);
+
+err:	for (i = 0; i < g.ntables; i++) {
+		if (cursors[i] != NULL &&
+		    (ret = cursors[i]->close(cursors[i])) != 0)
+			(void)log_print_err(
+			    "verify_checkpoint:cursor close", ret, 1);
+	}
+	free(cursors);
 	return (0);
 }
 

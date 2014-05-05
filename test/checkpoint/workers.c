@@ -63,7 +63,6 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 int
 start_workers(table_type type)
 {
-	COOKIE *cookies;
 	WT_SESSION *session;
 	struct timeval start, stop;
 	double seconds;
@@ -72,40 +71,39 @@ start_workers(table_type type)
 	void *thread_ret;
 
 	/* Create statistics and thread structures. */
-	if ((cookies = calloc(
-	    (size_t)(g.ntables), sizeof(COOKIE))) == NULL ||
-	    (tids = calloc((size_t)(g.nworkers), sizeof(*tids))) == NULL)
-		return (log_print_err("calloc", errno, 1));
-
-	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
-		return (log_print_err("conn.open_session", ret, 1));
-	/* Setup the cookies */
-	for (i = 0; i < g.ntables; ++i) {
-		cookies[i].id = i;
-		if (type == MIX)
-			cookies[i].type = (i % MAX_TABLE_TYPE) + 1;
-		else
-			cookies[i].type = type;
-		(void)snprintf(cookies[i].uri, 128,
-		    "%s%04d", URI_BASE, cookies[i].id);
-
-		/* Should probably be atomic to avoid races. */
-		if ((ret = create_table(session, &cookies[i])) != 0)
-			return (ret);
+	if ((tids = calloc((size_t)(g.nworkers), sizeof(*tids))) == NULL) {
+		(void)log_print_err("calloc", errno, 1);
+		goto err;
 	}
 
-	/*
-	 * Install the cookies in the global array.
-	 */
-	g.cookies = cookies;
+	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0) {
+		(void)log_print_err("conn.open_session", ret, 1);
+		goto err;
+	}
+	/* Setup the cookies */
+	for (i = 0; i < g.ntables; ++i) {
+		g.cookies[i].id = i;
+		if (type == MIX)
+			g.cookies[i].type = (i % MAX_TABLE_TYPE) + 1;
+		else
+			g.cookies[i].type = type;
+		(void)snprintf(g.cookies[i].uri, 128,
+		    "%s%04d", URI_BASE, g.cookies[i].id);
+
+		/* Should probably be atomic to avoid races. */
+		if ((ret = create_table(session, &g.cookies[i])) != 0)
+			goto err;
+	}
 
 	(void)gettimeofday(&start, NULL);
 
 	/* Create threads. */
 	for (i = 0; i < g.nworkers; ++i) {
 		if ((ret = pthread_create(
-		    &tids[i], NULL, worker, &cookies[i])) != 0)
-			return (log_print_err("pthread_create", ret, 1));
+		    &tids[i], NULL, worker, &g.cookies[i])) != 0) {
+			(void)log_print_err("pthread_create", ret, 1);
+			goto err;
+		}
 	}
 
 	/* Wait for the threads. */
@@ -117,9 +115,10 @@ start_workers(table_type type)
 	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	printf("Ran workers for: %f seconds\n", seconds);
 
-	free(tids);
+err:	if (tids != NULL)
+		free(tids);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -171,20 +170,26 @@ real_worker(void)
 	WT_CURSOR **cursors;
 	WT_SESSION *session;
 	u_int i, keyno;
-	int j, ret;
+	int j, ret, t_ret;
+
+	ret = t_ret = 0;
 
 	if ((cursors = calloc(
 	    (size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
 		return (log_print_err("malloc", ENOMEM, 1));
 
 	if ((ret = g.conn->open_session(
-	    g.conn, NULL, "isolation=snapshot", &session)) != 0)
-		return (log_print_err("conn.open_session", ret, 1));
+	    g.conn, NULL, "isolation=snapshot", &session)) != 0) {
+		(void)log_print_err("conn.open_session", ret, 1);
+		goto err;
+	}
 
 	for (j = 0; j < g.ntables; j++)
-		if ((ret = session->open_cursor(
-		    session, g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0)
-			return (log_print_err("session.open_cursor", ret, 1));
+		if ((ret = session->open_cursor(session,
+		    g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0) {
+			(void)log_print_err("session.open_cursor", ret, 1);
+			goto err;
+		}
 
 	for (i = 0; i < g.nops && g.running; ++i, sched_yield()) {
 		session->begin_transaction(session, NULL);
@@ -202,9 +207,12 @@ real_worker(void)
 			break;
 		}
 	}
-	free(cursors);
-	if ((ret = session->close(session, NULL)) != 0)
-		return (log_print_err("session.close", ret, 1));
 
-	return (0);
+err:	if ((t_ret = session->close(session, NULL)) != 0 && ret == 0) {
+		ret = t_ret;
+		(void)log_print_err("session.close", ret, 1);
+	}
+	free(cursors);
+
+	return (ret);
 }

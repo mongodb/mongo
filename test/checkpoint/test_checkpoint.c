@@ -132,6 +132,14 @@ main(int argc, char *argv[])
 		    cnt, g.nworkers, g.ntables);
 
 		(void)cleanup();		/* Clean up previous runs */
+
+		/* Setup a fresh set of cookies in the global array. */
+		if ((g.cookies = calloc(
+		    (size_t)(g.ntables), sizeof(COOKIE))) == NULL) {
+			(void)log_print_err("No memory", ENOMEM, 1);
+			break;
+		}
+
 		g.running = 1;
 
 		if ((ret = wt_connect(config_open)) != 0) {
