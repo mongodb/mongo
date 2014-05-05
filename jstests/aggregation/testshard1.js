@@ -149,6 +149,7 @@ var a4 = aggregateNoOrder(db.ts1, [
     }
 ]);
 
+assert.eq(a4.length, 6, tojson(a4));
 for(i = 0; i < 6; ++i) {
     c = a4[i].counter;
     printjson({c:c})
