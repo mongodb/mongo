@@ -328,13 +328,12 @@ __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block,
 {
 	uint64_t f, frag, frags, i;
 
-	WT_UNUSED(type);		/* If verbose is disabled */
-	WT_VERBOSE_RET(session, verify,
+	WT_RET(__wt_verbose(session, WT_VERB_VERIFY,
 	    "add file block%s%s%s at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
 	    type == NULL ? "" : " (",
 	    type == NULL ? "" : type,
 	    type == NULL ? "" : ")",
-	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
+	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size));
 
 	/* Check each chunk against the total file size. */
 	if (offset + size > block->fh->size)
@@ -406,7 +405,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			__bit_set(block->fragfile, last);
 		}
 
-		if (!WT_VERBOSE_ISSET(session, verify))
+		if (!WT_VERBOSE_ISSET(session, WT_VERB_VERIFY))
 			continue;
 
 		__wt_errx(session,
@@ -432,9 +431,9 @@ __verify_ckptfrag_add(
 {
 	uint64_t f, frag, frags, i;
 
-	WT_VERBOSE_RET(session, verify,
+	WT_RET(__wt_verbose(session, WT_VERB_VERIFY,
 	    "add checkpoint block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
-	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
+	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size));
 
 	/*
 	 * Check each chunk against the checkpoint's size, a checkpoint should
@@ -497,7 +496,7 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			__bit_clear(block->fragckpt, last);
 		}
 
-		if (!WT_VERBOSE_ISSET(session, verify))
+		if (!WT_VERBOSE_ISSET(session, WT_VERB_VERIFY))
 			continue;
 
 		__wt_errx(session,

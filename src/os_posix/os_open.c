@@ -74,7 +74,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	fd = -1;
 	path = NULL;
 
-	WT_VERBOSE_RET(session, fileops, "%s: open", name);
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: open", name));
 
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;

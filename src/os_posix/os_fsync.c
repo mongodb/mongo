@@ -16,7 +16,7 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_RET(session, fileops, "%s: fsync", fh->name);
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: fsync", fh->name));
 
 #ifdef HAVE_FDATASYNC
 	WT_SYSCALL_RETRY(fdatasync(fh->fd), ret);

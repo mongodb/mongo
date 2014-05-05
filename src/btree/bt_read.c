@@ -67,8 +67,8 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_ERR(__wt_delete_page_instantiate(session, ref));
 	}
 
-	WT_VERBOSE_ERR(session, read,
-	    "page %p: %s", page, __wt_page_type_string(page->type));
+	WT_ERR(__wt_verbose(session, WT_VERB_READ,
+	    "page %p: %s", page, __wt_page_type_string(page->type)));
 
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 	return (0);

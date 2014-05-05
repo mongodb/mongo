@@ -179,6 +179,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COMPRESSOR *ncomp;
+	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
 	const char **cfg;
@@ -188,19 +189,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	cfg = btree->dhandle->cfg;
 
 	/* Dump out format information. */
-#ifdef	HAVE_VERBOSE
-	{
-	int64_t maj_version, min_version;
-	if (WT_VERBOSE_ISSET(session, version)) {
+	if (WT_VERBOSE_ISSET(session, WT_VERB_VERSION)) {
 		WT_RET(__wt_config_gets(session, cfg, "version.major", &cval));
 		maj_version = cval.val;
 		WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
 		min_version = cval.val;
-		WT_VERBOSE_RET(session, version,
-		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
+		WT_RET(__wt_verbose(session, WT_VERB_VERSION,
+		    "%" PRIu64 ".%" PRIu64, maj_version, min_version));
 	}
-	}
-#endif
 
 	/* Get the file ID. */
 	WT_RET(__wt_config_gets(session, cfg, "id", &cval));

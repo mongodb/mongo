@@ -30,8 +30,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	page = ref->page;
 	istree = 0;
 
-	WT_VERBOSE_RET(session, evict,
-	    "page %p (%s)", page, __wt_page_type_string(page->type));
+	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
+	    "page %p (%s)", page, __wt_page_type_string(page->type)));
 
 	/*
 	 * Pin the oldest transaction ID: eviction looks at page structures
@@ -460,7 +460,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_hazard);
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_hazard);
 
-	WT_VERBOSE_RET(
-	    session, evict, "page %p hazard request failed", ref->page);
+	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
+	    "page %p hazard request failed", ref->page));
 	return (EBUSY);
 }

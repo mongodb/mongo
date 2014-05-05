@@ -127,24 +127,9 @@
 /* Verbose messages. */
 #ifdef HAVE_VERBOSE
 #define	WT_VERBOSE_ISSET(session, f)					\
-	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
-#define	WT_VERBOSE_ERR(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_ERR(__wt_verbose(session, #f ": " __VA_ARGS__));	\
-} while (0)
-#define	WT_VERBOSE_RET(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
-} while (0)
-#define	WT_VERBOSE_TRET(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_TRET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
-} while (0)
+	(FLD_ISSET(S2C(session)->verbose, f))
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
-#define	WT_VERBOSE_ERR(session, f, ...)
-#define	WT_VERBOSE_RET(session, f, ...)
-#define	WT_VERBOSE_TRET(session, f, ...)
 #endif
 
 /*

@@ -86,8 +86,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		WT_VERBOSE_ERR(session, verify,
-		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name);
+		WT_ERR(__wt_verbose(session, WT_VERB_VERIFY,
+		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name));
 
 		/* Fake checkpoints require no work. */
 		if (F_ISSET(ckpt, WT_CKPT_FAKE))
@@ -260,9 +260,9 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	unpack = &_unpack;
 	WT_CLEAR(*unpack);	/* -Wuninitialized */
 
-	WT_VERBOSE_RET(session, verify, "%s %s",
+	WT_RET(__wt_verbose(session, WT_VERB_VERIFY, "%s %s",
 	    __wt_page_addr_string(session, ref, vs->tmp1),
-	    __wt_page_type_string(page->type));
+	    __wt_page_type_string(page->type)));
 #ifdef HAVE_DIAGNOSTIC
 	if (vs->dump_address)
 		WT_RET(__wt_msg(session, "%s %s",

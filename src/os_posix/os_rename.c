@@ -17,7 +17,8 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	WT_DECL_RET;
 	char *from_path, *to_path;
 
-	WT_VERBOSE_RET(session, fileops, "rename %s to %s", from, to);
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_FILEOPS, "rename %s to %s", from, to));
 
 	from_path = to_path = NULL;
 

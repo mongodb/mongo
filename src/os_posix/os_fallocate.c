@@ -20,9 +20,8 @@ __wt_fallocate(WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, off_t len)
 {
 	WT_DECL_RET;
 
-	WT_UNUSED(session);		/* If verbose is disabled */
-
-	WT_VERBOSE_RET(session, fileops, "%s: fallocate", fh->name);
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
 
 	/*
 	 * Prefer the non-portable Linux fallocate call if it's available,

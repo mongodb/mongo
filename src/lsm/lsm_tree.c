@@ -764,10 +764,10 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    nchunks + 1, &lsm_tree->chunk));
 
-	WT_VERBOSE_ERR(session, lsm,
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 	    "Tree switch to: %" PRIu32 ", checkpoint throttle %ld, "
 	    "merge throttle %ld",
-	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle);
+	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle));
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;

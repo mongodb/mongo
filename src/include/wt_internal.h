@@ -268,6 +268,7 @@ struct __wt_update;
 #include "verify_build.h"
 
 #include "buf.i"
+#include "misc.i"
 #include "intpack.i"			/* required by cell.i, packing.i */
 #include "packing.i"
 #include "cell.i"			/* required by btree.i */

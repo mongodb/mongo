@@ -16,7 +16,7 @@
 #define	API_CALL_NOCONF(s, h, n, cur, dh) do {				\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
-	WT_VERBOSE_ERR((s), api, "CALL: " #h ":" #n)
+	WT_ERR(__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n))
 
 #define	API_CALL(s, h, n, cur, dh, config, cfg) do {			\
 	const char *cfg[] =						\
@@ -26,7 +26,7 @@
 	WT_ERR(((config) != NULL) ?					\
 	    __wt_config_check((s),					\
 	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0);		\
-	WT_VERBOSE_ERR((s), api, "CALL: " #h ":" #n)
+	WT_ERR(__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n))
 
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
