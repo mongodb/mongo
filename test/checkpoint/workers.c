@@ -44,7 +44,7 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,value_format=S",
-	    cookie->type == COL ? "r" : "u");
+	    cookie->type == COL ? "r" : "q");
 	if (cookie->type == LSM)
 		(void)snprintf(p, (size_t)(end - p), ",type=lsm");
 
@@ -86,7 +86,7 @@ start_workers(table_type type)
 			cookies[i].type = (i % MAX_TABLE_TYPE) + 1;
 		else
 			cookies[i].type = type;
-		snprintf(cookies[i].uri, 128,
+		(void)snprintf(cookies[i].uri, 128,
 		    "%s%04d", URI_BASE, cookies[i].id);
 
 		/* Should probably be atomic to avoid races. */
@@ -127,44 +127,13 @@ start_workers(table_type type)
  *	Write operation.
  */
 static inline int
-worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
+worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 {
-	WT_ITEM *key, _key, *value, _value;
-	u_int new_val;
 	int ret;
-	char *old_val;
-	char keybuf[64], valuebuf[64];
+	char valuebuf[64];
 
-	key = &_key;
-	value = &_value;
-
-	if (cookie->type == COL)
-		cursor->set_key(cursor, (uint32_t)keyno);
-	else {
-		key->data = keybuf;
-		key->size = (uint32_t)
-		    snprintf(keybuf, sizeof(keybuf), "%017u", keyno);
-		cursor->set_key(cursor, key);
-	}
-	new_val = keyno;
-	if ((ret = cursor->search(cursor)) == 0) {
-		cursor->get_value(cursor, &old_val);
-		new_val = (u_int)atol(old_val) + 1;
-	} else if (ret == WT_DEADLOCK)
-		return (ret);
-	else if (ret != WT_NOTFOUND)
-		return (log_print_err("cursor.search", ret, 1));
-	/*
-	 * The search cleared the key from our cursor - set it again. It would
-	 * be nice if we didn't need to.
-	 */
-	if (cookie->type == COL)
-		cursor->set_key(cursor, (uint32_t)keyno);
-	else
-		cursor->set_key(cursor, key);
-
-	value->data = valuebuf;
-	value->size = (uint32_t)snprintf(
+	cursor->set_key(cursor, keyno);
+	(void)snprintf(
 	    valuebuf, sizeof(valuebuf), "%037u", new_val);
 	cursor->set_value(cursor, valuebuf);
 	if ((ret = cursor->insert(cursor)) != 0) {
@@ -221,8 +190,7 @@ real_worker(void)
 		session->begin_transaction(session, NULL);
 		keyno = __wt_random() % g.nkeys + 1;
 		for (j = 0; j < g.ntables; j++) {
-			if ((ret = worker_op(
-			    cursors[j], &g.cookies[j], keyno)) != 0)
+			if ((ret = worker_op(cursors[j], keyno, i)) != 0)
 				break;
 		}
 		if (ret == 0)
