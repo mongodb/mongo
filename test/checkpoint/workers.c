@@ -44,7 +44,7 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,value_format=S",
-	    cookie->type == COL ? "r" : "u");
+	    cookie->type == COL ? "r" : "q");
 	if (cookie->type == LSM)
 		(void)snprintf(p, (size_t)(end - p), ",type=lsm");
 
@@ -63,7 +63,6 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 int
 start_workers(table_type type)
 {
-	COOKIE *cookies;
 	WT_SESSION *session;
 	struct timeval start, stop;
 	double seconds;
@@ -71,41 +70,40 @@ start_workers(table_type type)
 	int i, ret;
 	void *thread_ret;
 
+	ret = 0;
+
 	/* Create statistics and thread structures. */
-	if ((cookies = calloc(
-	    (size_t)(g.ntables), sizeof(COOKIE))) == NULL ||
-	    (tids = calloc((size_t)(g.nworkers), sizeof(*tids))) == NULL)
+	if ((tids = calloc((size_t)(g.nworkers), sizeof(*tids))) == NULL)
 		return (log_print_err("calloc", errno, 1));
 
-	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0)
-		return (log_print_err("conn.open_session", ret, 1));
+	if ((ret = g.conn->open_session(g.conn, NULL, NULL, &session)) != 0) {
+		(void)log_print_err("conn.open_session", ret, 1);
+		goto err;
+	}
 	/* Setup the cookies */
 	for (i = 0; i < g.ntables; ++i) {
-		cookies[i].id = i;
+		g.cookies[i].id = i;
 		if (type == MIX)
-			cookies[i].type = (i % MAX_TABLE_TYPE) + 1;
+			g.cookies[i].type = (i % MAX_TABLE_TYPE) + 1;
 		else
-			cookies[i].type = type;
-		snprintf(cookies[i].uri, 128,
-		    "%s%04d", URI_BASE, cookies[i].id);
+			g.cookies[i].type = type;
+		(void)snprintf(g.cookies[i].uri, 128,
+		    "%s%04d", URI_BASE, g.cookies[i].id);
 
 		/* Should probably be atomic to avoid races. */
-		if ((ret = create_table(session, &cookies[i])) != 0)
-			return (ret);
+		if ((ret = create_table(session, &g.cookies[i])) != 0)
+			goto err;
 	}
-
-	/*
-	 * Install the cookies in the global array.
-	 */
-	g.cookies = cookies;
 
 	(void)gettimeofday(&start, NULL);
 
 	/* Create threads. */
 	for (i = 0; i < g.nworkers; ++i) {
 		if ((ret = pthread_create(
-		    &tids[i], NULL, worker, &cookies[i])) != 0)
-			return (log_print_err("pthread_create", ret, 1));
+		    &tids[i], NULL, worker, &g.cookies[i])) != 0) {
+			(void)log_print_err("pthread_create", ret, 1);
+			goto err;
+		}
 	}
 
 	/* Wait for the threads. */
@@ -117,9 +115,9 @@ start_workers(table_type type)
 	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	printf("Ran workers for: %f seconds\n", seconds);
 
-	free(tids);
+err:	free(tids);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -127,44 +125,13 @@ start_workers(table_type type)
  *	Write operation.
  */
 static inline int
-worker_op(WT_CURSOR *cursor, COOKIE *cookie, u_int keyno)
+worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 {
-	WT_ITEM *key, _key, *value, _value;
-	u_int new_val;
 	int ret;
-	char *old_val;
-	char keybuf[64], valuebuf[64];
+	char valuebuf[64];
 
-	key = &_key;
-	value = &_value;
-
-	if (cookie->type == COL)
-		cursor->set_key(cursor, (uint32_t)keyno);
-	else {
-		key->data = keybuf;
-		key->size = (uint32_t)
-		    snprintf(keybuf, sizeof(keybuf), "%017u", keyno);
-		cursor->set_key(cursor, key);
-	}
-	new_val = keyno;
-	if ((ret = cursor->search(cursor)) == 0) {
-		cursor->get_value(cursor, &old_val);
-		new_val = (u_int)atol(old_val) + 1;
-	} else if (ret == WT_DEADLOCK)
-		return (ret);
-	else if (ret != WT_NOTFOUND)
-		return (log_print_err("cursor.search", ret, 1));
-	/*
-	 * The search cleared the key from our cursor - set it again. It would
-	 * be nice if we didn't need to.
-	 */
-	if (cookie->type == COL)
-		cursor->set_key(cursor, (uint32_t)keyno);
-	else
-		cursor->set_key(cursor, key);
-
-	value->data = valuebuf;
-	value->size = (uint32_t)snprintf(
+	cursor->set_key(cursor, keyno);
+	(void)snprintf(
 	    valuebuf, sizeof(valuebuf), "%037u", new_val);
 	cursor->set_value(cursor, valuebuf);
 	if ((ret = cursor->insert(cursor)) != 0) {
@@ -202,41 +169,63 @@ real_worker(void)
 	WT_CURSOR **cursors;
 	WT_SESSION *session;
 	u_int i, keyno;
-	int j, ret;
+	int j, ret, t_ret;
+
+	ret = t_ret = 0;
 
 	if ((cursors = calloc(
 	    (size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
 		return (log_print_err("malloc", ENOMEM, 1));
 
 	if ((ret = g.conn->open_session(
-	    g.conn, NULL, "isolation=snapshot", &session)) != 0)
-		return (log_print_err("conn.open_session", ret, 1));
+	    g.conn, NULL, "isolation=snapshot", &session)) != 0) {
+		(void)log_print_err("conn.open_session", ret, 1);
+		goto err;
+	}
 
 	for (j = 0; j < g.ntables; j++)
-		if ((ret = session->open_cursor(
-		    session, g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0)
-			return (log_print_err("session.open_cursor", ret, 1));
+		if ((ret = session->open_cursor(session,
+		    g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0) {
+			(void)log_print_err("session.open_cursor", ret, 1);
+			goto err;
+		}
 
 	for (i = 0; i < g.nops && g.running; ++i, sched_yield()) {
-		session->begin_transaction(session, NULL);
+		if ((ret = session->begin_transaction(session, NULL)) != 0) {
+			(void)log_print_err(
+			    "real_worker:begin_transaction", ret, 1);
+			goto err;
+		}
 		keyno = __wt_random() % g.nkeys + 1;
 		for (j = 0; j < g.ntables; j++) {
-			if ((ret = worker_op(
-			    cursors[j], &g.cookies[j], keyno)) != 0)
+			if ((ret = worker_op(cursors[j], keyno, i)) != 0)
 				break;
 		}
-		if (ret == 0)
-			session->commit_transaction(session, NULL);
-		else if (ret == WT_DEADLOCK)
-			session->rollback_transaction(session, NULL);
-		else {
+		if (ret == 0) {
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0) {
+				(void)log_print_err(
+				    "real_worker:commit_transaction", ret, 1);
+				goto err;
+			    }
+		} else if (ret == WT_DEADLOCK) {
+			if ((ret = session->rollback_transaction(
+			   session, NULL)) != 0) {
+				(void)log_print_err(
+				    "real_worker:rollback_transaction", ret, 1);
+				goto err;
+			    }
+		} else {
 			(void)log_print_err("worker op failed", ret, 1);
-			break;
+			goto err;
 		}
 	}
-	free(cursors);
-	if ((ret = session->close(session, NULL)) != 0)
-		return (log_print_err("session.close", ret, 1));
 
-	return (0);
+err:	if ((t_ret = session->close(session, NULL)) != 0 && ret == 0) {
+		ret = t_ret;
+		(void)log_print_err("session.close", ret, 1);
+	}
+	free(cursors);
+
+	return (ret);
 }

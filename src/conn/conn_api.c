@@ -524,6 +524,7 @@ __conn_is_new(WT_CONNECTION *wt_conn)
 static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -533,7 +534,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
-	WT_UNUSED(cfg);
+
+	WT_ERR(__wt_config_gets(session, cfg, "leak_memory", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
 	/*
 	 * Rollback all running transactions.
@@ -998,6 +1002,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
+		{ "api",		WT_VERB_api },
 		{ "block",		WT_VERB_block },
 		{ "checkpoint",		WT_VERB_checkpoint },
 		{ "compact",		WT_VERB_compact },
@@ -1006,6 +1011,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_fileops },
 		{ "log",		WT_VERB_log },
 		{ "lsm",		WT_VERB_lsm },
+		{ "metadata",		WT_VERB_metadata },
 		{ "mutex",		WT_VERB_mutex },
 		{ "overflow",		WT_VERB_overflow },
 		{ "read",		WT_VERB_read },

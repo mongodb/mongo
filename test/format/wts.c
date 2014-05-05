@@ -35,9 +35,10 @@ handle_message(WT_EVENT_HANDLER *handler,
 	WT_UNUSED(session);
 
 	if (g.logfp != NULL)
-		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
+		return (fprintf(
+		    g.logfp, "%p:%s\n", session, message) < 0 ? -1 : 0);
 
-	return (printf("%s\n", message) < 0 ? -1 : 0);
+	return (printf("%p:%s\n", session, message) < 0 ? -1 : 0);
 }
 
 /*
@@ -328,10 +329,13 @@ wts_close(void)
 {
 	WT_CONNECTION *conn;
 	int ret;
+	const char *config;
 
 	conn = g.wts_conn;
 
-	if ((ret = conn->close(conn, NULL)) != 0)
+	config = MMRAND(0, 1) ? "leak_memory" : NULL;
+
+	if ((ret = conn->close(conn, config)) != 0)
 		die(ret, "connection.close");
 }
 

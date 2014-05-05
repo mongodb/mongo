@@ -267,7 +267,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn->mod_count = 0;
+	WT_ASSERT(session, txn->mod_count == 0);
 	txn->notify = NULL;
 
 	txn_global = &S2C(session)->txn_global;
@@ -293,7 +293,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_OLDEST | TXN_RUNNING);
+	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_RUNNING);
 }
 
 /*
@@ -307,8 +307,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	u_int i;
-
-	WT_UNUSED(cfg);
 
 	txn = &session->txn;
 	WT_ASSERT(session, !F_ISSET(txn, TXN_ERROR));
@@ -341,6 +339,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Free memory associated with updates. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
 		__wt_txn_op_free(session, op);
+	txn->mod_count = 0;
 
 	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the
@@ -350,7 +349,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the cursor.  Get the new snapshot before releasing the ID for the
 	 * commit.
 	 */
-	if (session->ncursors > 0 && txn->isolation != TXN_ISO_READ_UNCOMMITTED)
+	if (session->ncursors > 0 &&
+	    F_ISSET(txn, TXN_HAS_ID) &&
+	    txn->isolation != TXN_ISO_READ_UNCOMMITTED)
 		__wt_txn_refresh(session, txn->id + 1, 1);
 	__wt_txn_release(session);
 	return (0);
@@ -403,6 +404,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		/* Free any memory allocated for the operation. */
 		__wt_txn_op_free(session, op);
 	}
+	txn->mod_count = 0;
 
 	__wt_txn_release(session);
 	return (ret);

@@ -1139,10 +1139,11 @@ struct __wt_session {
 	 * @config{ ),,}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
-	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>. This
-	 * limit is soft - it is possible for pages to be temporarily larger
-	 * than this value.  This setting is ignored for LSM trees\, see \c
-	 * chunk_size., an integer between 512B and 10TB; default \c 5MB.}
+	 * adjusted to a lower bound of <code>50 * leaf_page_max</code>\, and an
+	 * upper bound of <code>cache_size / 2</code>. This limit is soft - it
+	 * is possible for pages to be temporarily larger than this value.  This
+	 * setting is ignored for LSM trees\, see \c chunk_size., an integer
+	 * between 512B and 10TB; default \c 5MB.}
 	 * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\,
 	 * in bytes.  If non-zero\, schedule writes for dirty blocks belonging
 	 * to this object in the system buffer cache after that many bytes from
@@ -1153,7 +1154,7 @@ struct __wt_session {
 	 * that many bytes from this object are read or written into the buffer
 	 * cache., an integer greater than or equal to 0; default \c 0.}
 	 * @config{prefix_compression, configure prefix compression on row-store
-	 * leaf pages., a boolean flag; default \c true.}
+	 * leaf pages., a boolean flag; default \c false.}
 	 * @config{prefix_compression_min, minimum gain before prefix
 	 * compression will be used on row-store leaf pages., an integer greater
 	 * than or equal to 0; default \c 4.}
@@ -1519,7 +1520,10 @@ struct __wt_connection {
 	 * @snippet ex_all.c Close a connection
 	 *
 	 * @param connection the connection handle
-	 * @configempty{connection.close, see dist/api_data.py}
+	 * @configstart{connection.close, see dist/api_data.py}
+	 * @config{leak_memory, don't free memory during close., a boolean flag;
+	 * default \c false.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(close)(WT_HANDLE_CLOSED(WT_CONNECTION) *connection,
@@ -1558,6 +1562,8 @@ struct __wt_connection {
 	 * @config{eviction_trigger, trigger eviction when the cache becomes
 	 * this full (as a percentage)., an integer between 10 and 99; default
 	 * \c 95.}
+	 * @config{eviction_workers, additional threads to help evict pages from
+	 * cache., an integer between 0 and 20; default \c 0.}
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both., a set of related configuration options defined below.}
@@ -1590,11 +1596,12 @@ struct __wt_connection {
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
-	 * chosen from the following options: \c "block"\, \c "checkpoint"\, \c
-	 * "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "log"\,
-	 * \c "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\,
-	 * \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\,
-	 * \c "split"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
+	 * chosen from the following options: \c "api"\, \c "block"\, \c
+	 * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c
+	 * "fileops"\, \c "log"\, \c "lsm"\, \c "metadata"\, \c "mutex"\, \c
+	 * "overflow"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+	 * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
+	 * "verify"\, \c "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1842,6 +1849,8 @@ struct __wt_connection {
  * integer between 10 and 99; default \c 80.}
  * @config{eviction_trigger, trigger eviction when the cache becomes this full
  * (as a percentage)., an integer between 10 and 99; default \c 95.}
+ * @config{eviction_workers, additional threads to help evict pages from cache.,
+ * an integer between 0 and 20; default \c 0.}
  * @config{extensions, list of shared library extensions to load (using dlopen).
  * Any values specified to an library extension are passed to
  * WT_CONNECTION::load_extension as the \c config parameter (for example\,
@@ -1934,11 +1943,12 @@ struct __wt_connection {
  * information., a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
- * values chosen from the following options: \c "block"\, \c "checkpoint"\, \c
- * "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "log"\, \c
- * "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\, \c
- * "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
- * \c "verify"\, \c "version"\, \c "write"; default empty.}
+ * values chosen from the following options: \c "api"\, \c "block"\, \c
+ * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
+ * \c "log"\, \c "lsm"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
+ * "read"\, \c "readserver"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
+ * "shared_cache"\, \c "split"\, \c "verify"\, \c "version"\, \c "write";
+ * default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file

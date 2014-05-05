@@ -13,6 +13,13 @@ We are now also enforcing that only one of \c cache_size and \c shared_cache
 are specified in the ::wiredtiger_open configuration string.
 </dd>
 
+<dt>WT_SESSION::create prefix_compression disabled by default</dt>
+<dd>
+In the 2.1.2 release, prefix compression default to \c false.  Applications
+that benefit from prefix compression will need to explicitly set
+\c prefix_compression=true when creating tables.
+</dd>
+
 @section version_211 Upgrading to Version 2.1.1
 <dl>
 

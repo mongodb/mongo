@@ -235,9 +235,10 @@ file_config = format_meta + [
 	Config('memory_page_max', '5MB', r'''
 	    the maximum size a page can grow to in memory before being
 	    reconciled to disk.  The specified size will be adjusted to a lower
-	    bound of <code>50 * leaf_page_max</code>.  This limit is soft - it
-	    is possible for pages to be temporarily larger than this value.
-	    This setting is ignored for LSM trees, see \c chunk_size''',
+	    bound of <code>50 * leaf_page_max</code>, and an upper bound of
+	    <code>cache_size / 2</code>.  This limit is soft - it is possible
+	    for pages to be temporarily larger than this value.  This setting
+	    is ignored for LSM trees, see \c chunk_size''',
 	    min='512B', max='10TB'),
 	Config('os_cache_max', '0', r'''
 	    maximum system buffer cache usage, in bytes.  If non-zero, evict
@@ -250,7 +251,7 @@ file_config = format_meta + [
 	    system buffer cache after that many bytes from this object are
 	    written into the buffer cache''',
 	    min=0),
-	Config('prefix_compression', 'true', r'''
+	Config('prefix_compression', 'false', r'''
 	    configure prefix compression on row-store leaf pages''',
 	    type='boolean'),
 	Config('prefix_compression_min', '4', r'''
@@ -347,6 +348,9 @@ connection_runtime_config = [
 	    trigger eviction when the cache becomes this full (as a
 	    percentage)''',
 	    min=10, max=99),
+	Config('eviction_workers', '0', r'''
+	    additional threads to help evict pages from cache''',
+	    min=0, max=20),
 	Config('statistics', 'none', r'''
 	    Maintain database statistics, which may impact performance.
 	    Choosing "all" maintains all statistics regardless of cost,
@@ -365,6 +369,7 @@ connection_runtime_config = [
 	    enable messages for various events.  Options are given as a
 	    list, such as <code>"verbose=[evictserver,read]"</code>''',
 	    type='list', choices=[
+	        'api',
 	        'block',
 	        'checkpoint',
 	        'compact',
@@ -373,6 +378,7 @@ connection_runtime_config = [
 	        'fileops',
 	        'log',
 	        'lsm',
+	        'metadata',
 	        'mutex',
 	        'overflow',
 	        'read',
@@ -601,7 +607,11 @@ methods = {
 	    value. A value of zero disables the timeout''',
 	    type='int'),
 ]),
-'connection.close' : Method([]),
+'connection.close' : Method([
+	Config('leak_memory', 'false', r'''
+	    don't free memory during close''',
+	    type='boolean'),
+]),
 'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([

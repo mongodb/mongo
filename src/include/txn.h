@@ -40,13 +40,6 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
-	/*
-	 * The current checkpoint generation.  Use a 32-bit count for now: if
-	 * we can do 4 billion checkpoints without a restart, we'll be in good
-	 * shape.
-	 */
-	uint32_t checkpoint_gen;
-
 	/* Count of scanning threads, or -1 for exclusive access. */
 	volatile int32_t scan_count;
 
@@ -137,7 +130,6 @@ struct __wt_txn {
 #define	TXN_ERROR		0x02
 #define	TXN_HAS_ID	        0x04
 #define	TXN_HAS_SNAPSHOT	0x08
-#define	TXN_OLDEST		0x10
-#define	TXN_RUNNING		0x20
+#define	TXN_RUNNING		0x10
 	uint32_t flags;
 };
