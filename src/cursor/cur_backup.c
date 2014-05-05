@@ -202,21 +202,28 @@ __backup_start(
 	WT_ERR(__backup_file_create(session, cb));
 
 	/* Add log files if logging is enabled. */
-	if (conn->log) {
-		WT_ERR(
-		    __wt_log_get_active_files(session, &logfiles, &logcount));
-		for (i = 0; i < logcount; i++)
-			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
-	}
 
 	/*
 	 * If a list of targets was specified, work our way through them.
 	 * Else, generate a list of all database objects.
+	 *
+	 * Include log files if doing a full backup, and copy them before
+	 * copying data files to avoid rolling the metadata forward across
+	 * a checkpoint that completes during the backup.
 	 */
 	target_list = 0;
 	WT_ERR(__backup_uri(session, cb, cfg, &target_list));
-	if (!target_list)
+	if (!target_list) {
+		if (conn->log) {
+			WT_ERR(__wt_log_get_active_files(
+			    session, &logfiles, &logcount));
+			for (i = 0; i < logcount; i++)
+				WT_ERR(__backup_list_append(
+				    session, cb, logfiles[i]));
+		}
+
 		WT_ERR(__backup_all(session, cb));
+	}
 
 	/* Add the hot backup and single-threading file to the list. */
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
