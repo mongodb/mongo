@@ -201,8 +201,8 @@ __backup_start(
 	/* Create the hot backup file. */
 	WT_ERR(__backup_file_create(session, cb));
 
-	/* Add log files if logging is on and we're doing a full backup. */
-	if (!target_list && conn->log) {
+	/* Add log files if logging is enabled. */
+	if (conn->log) {
 		WT_ERR(
 		    __wt_log_get_active_files(session, &logfiles, &logcount));
 		for (i = 0; i < logcount; i++)
