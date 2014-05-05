@@ -305,7 +305,6 @@ commonFiles = [ "pch.cpp",
                 "util/histogram.cpp",
                 "util/text_startuptest.cpp",
                 'util/signal_win32.cpp',
-                "util/stack_introspect.cpp",
                 "util/version_reporting.cpp",
                 ]
 
