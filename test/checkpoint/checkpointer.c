@@ -28,9 +28,9 @@
 #include "test_checkpoint.h"
 
 static void *checkpointer(void *);
-static int compare_cursors(WT_CURSOR *, int, WT_CURSOR *, int);
+static int compare_cursors(
+    WT_CURSOR *, const char *, WT_CURSOR *, const char *);
 static int diagnose_key_error(WT_CURSOR *, int, WT_CURSOR *, int);
-static int get_key_int(WT_CURSOR *, int, u_int *);
 static int real_checkpointer(void);
 static int verify_checkpoint(WT_SESSION *);
 
@@ -139,6 +139,7 @@ static int
 verify_checkpoint(WT_SESSION *session)
 {
 	WT_CURSOR **cursors;
+	const char *type0, *typei;
 	char next_uri[128], ckpt[128];
 	int i, ret, t_ret;
 	uint64_t key_count;
@@ -190,11 +191,12 @@ verify_checkpoint(WT_SESSION *session)
 				    "verify_checkpoint tables with different"
 				    " amount of data", EFAULT, 1));
 
+			type0 = type_to_string(g.cookies[0].type);
+			typei = type_to_string(g.cookies[i].type);
 			if ((ret = compare_cursors(
-			    cursors[0], 0, cursors[i], i)) != 0) {
-				if (ret == ERR_KEY_MISMATCH)
-					(void)diagnose_key_error(
-					    cursors[0], 0, cursors[i], i);
+			    cursors[0], type0, cursors[i], typei)) != 0) {
+				(void)diagnose_key_error(
+				    cursors[0], 0, cursors[i], i);
 				return (log_print_err(
 				    "verify_checkpoint - mismatching data",
 				    EFAULT, 1));
@@ -214,77 +216,44 @@ verify_checkpoint(WT_SESSION *session)
 }
 
 /*
- * get_key_int --
- *     Column stores have a different format than all others, but the
- *     underlying value should still match. Copy the string out of a
- *     non-column store in that case to ensure that it's nul terminated.
- */
-static int
-get_key_int(WT_CURSOR *cursor, int table_index, u_int *rval)
-{
-	WT_ITEM key;
-	uint64_t val;
-	char buf[128];
-
-	if (g.cookies[table_index].type == COL)
-		cursor->get_key(cursor, &val);
-	else {
-		cursor->get_key(cursor, &key);
-		memset(buf, 0, 128);
-		memcpy(buf, key.data, key.size);
-		val = (uint64_t)atol(buf);
-	}
-
-	*rval = (u_int)val;
-	return (0);
-}
-
-/*
  * compare_cursors --
  *     Compare the key/value pairs from two cursors.
  */
 static int
 compare_cursors(
-    WT_CURSOR *first, int first_index,
-    WT_CURSOR *second, int second_index)
+    WT_CURSOR *cursor1, const char *type1,
+    WT_CURSOR *cursor2, const char *type2)
 {
-	u_int first_key_int, second_key_int;
-	char *first_value, *second_value;
+	uint64_t key1, key2;
+	char *val1, *val2;
 	char buf[128];
 
 	memset(buf, 0, 128);
 
-	if (get_key_int(first, first_index, &first_key_int) != 0 ||
-	    get_key_int(second, second_index, &second_key_int) != 0)
-		return (log_print_err("Error decoding key", EINVAL, 1));
+	if (cursor1->get_key(cursor1, &key1) != 0 ||
+	    cursor2->get_key(cursor2, &key2) != 0)
+		return (log_print_err("Error getting keys", EINVAL, 1));
 
-	if (first_key_int != second_key_int) {
-		printf("Key mismatch %" PRIu32 " from a %s table "
-		    "is not %" PRIu32 " from a %s table\n",
-		    first_key_int,
-		    type_to_string(g.cookies[first_index].type),
-		    second_key_int,
-		    type_to_string(g.cookies[second_index].type));
+	if (key1 != key2) {
+		printf("Key mismatch %" PRIu64 " from a %s table "
+		    "is not %" PRIu64 " from a %s table\n",
+		    key1, type1, key2, type2);
 
 		return (ERR_KEY_MISMATCH);
 	}
 
 	/* Now check the values. */
-	first->get_value(first, &first_value);
-	second->get_value(second, &second_value);
+	cursor1->get_value(cursor1, &val1);
+	cursor2->get_value(cursor2, &val2);
 	if (g.logfp != NULL)
-		fprintf(g.logfp, "k1: %" PRIu32 " k2: %" PRIu32
+		fprintf(g.logfp, "k1: %" PRIu64 " k2: %" PRIu64
 		    " val1: %s val2: %s \n",
-		    first_key_int, second_key_int,
-		    first_value, second_value);
-	if (strlen(first_value) != strlen(second_value) ||
-	    strcmp(first_value, second_value) != 0) {
-		printf("Value mismatch %s from a %s table "
-		    "is not %s from a %s table\n",
-		    first_value,
-		    type_to_string(g.cookies[first_index].type),
-		    second_value,
-		    type_to_string(g.cookies[second_index].type));
+		    key1, key2, val1, val2);
+	if (strlen(val1) != strlen(val2) ||
+	    strcmp(val1, val2) != 0) {
+		printf("Value mismatch for key %" PRIu64
+		    ", %s from a %s table is not %s from a %s table\n",
+		    key1, val1, type1, val2, type2);
 		return (ERR_DATA_MISMATCH);
 	}
 
@@ -298,76 +267,93 @@ compare_cursors(
  */
 static int
 diagnose_key_error(
-    WT_CURSOR *first, int first_index,
-    WT_CURSOR *second, int second_index)
+    WT_CURSOR *cursor1, int index1,
+    WT_CURSOR *cursor2, int index2)
 {
 	WT_CURSOR *c;
-	WT_ITEM first_key, second_key;
 	WT_SESSION *session;
-	u_int key1i, key2i;
+	uint64_t key1, key1_orig, key2, key2_orig;
 	char next_uri[128], ckpt[128];
 	int ret;
 
 	/* Hack to avoid passing session as parameter. */
-	session = first->session;
+	session = cursor1->session;
 
 	snprintf(ckpt, 128, "checkpoint=%s", g.checkpoint_name);
 
 	/* Save the failed keys. */
-	first->get_key(first, &first_key);
-	second->get_key(second, &second_key);
+	cursor1->get_key(cursor1, &key1_orig);
+	cursor2->get_key(cursor2, &key2_orig);
+
+	if (key1_orig == key2_orig)
+		goto live_check;
 
 	/* See if previous values are still valid. */
-	if (first->prev(first) != 0 || second->prev(second) != 0)
+	if (cursor1->prev(cursor1) != 0 || cursor2->prev(cursor2) != 0)
 		return (1);
-	if (get_key_int(first, first_index, &key1i) != 0 ||
-	    get_key_int(second, second_index, &key2i) != 0)
+	if (cursor1->get_key(cursor1, &key1) != 0 ||
+	    cursor2->get_key(cursor2, &key2) != 0)
 		log_print_err("Error decoding key", EINVAL, 1);
-	else if (key1i != key2i)
+	else if (key1 != key2)
 		log_print_err("Now previous keys don't match", EINVAL, 0);
 
-	if (first->next(first) != 0 || second->next(second) != 0)
+	if (cursor1->next(cursor1) != 0 || cursor2->next(cursor2) != 0)
 		return (1);
-	if (get_key_int(first, first_index, &key1i) != 0 ||
-	    get_key_int(second, second_index, &key2i) != 0)
+	if (cursor1->get_key(cursor1, &key1) != 0 ||
+	    cursor2->get_key(cursor2, &key2) != 0)
 		log_print_err("Error decoding key", EINVAL, 1);
-	else if (key1i == key2i)
+	else if (key1 == key2)
 		log_print_err("After prev/next keys match", EINVAL, 0);
 
-	if (first->next(first) != 0 || second->next(second) != 0)
+	if (cursor1->next(cursor1) != 0 || cursor2->next(cursor2) != 0)
 		return (1);
-	if (get_key_int(first, first_index, &key1i) != 0 ||
-	    get_key_int(second, second_index, &key2i) != 0)
+	if (cursor1->get_key(cursor1, &key1) != 0 ||
+	    cursor2->get_key(cursor2, &key2) != 0)
 		log_print_err("Error decoding key", EINVAL, 1);
-	else if (key1i == key2i)
+	else if (key1 == key2)
 		log_print_err("After prev/next/next keys match", EINVAL, 0);
 
 	/*
 	 * Now try opening new cursors on the checkpoints and see if we
 	 * get the same missing key via searching.
 	 */
-	snprintf(next_uri, 128, "table:__wt%04d", first_index);
+	snprintf(next_uri, 128, "table:__wt%04d", index1);
 	if (session->open_cursor(session, next_uri, NULL, ckpt, &c) != 0)
 		return (1);
-	c->set_key(c, &first_key);
+	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
 		log_print_err("1st cursor didn't find 1st key\n", ret, 0);
-	if (g.cookies[first_index].type == g.cookies[second_index].type) {
-		c->set_key(c, &second_key);
-		if ((ret = c->search(c)) != 0)
-			log_print_err(
-			    "1st cursor didn't find 2nd key\n", ret, 0);
-	}
+	c->set_key(c, key2_orig);
+	if ((ret = c->search(c)) != 0)
+		log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
 	c->close(c);
-	snprintf(next_uri, 128, "table:__wt%04d", second_index);
+
+	snprintf(next_uri, 128, "table:__wt%04d", index2);
 	ret = session->open_cursor(session, next_uri, NULL, ckpt, &c);
-	if (g.cookies[first_index].type == g.cookies[second_index].type) {
-		c->set_key(c, &first_key);
-		if ((ret = c->search(c)) != 0)
-			log_print_err(
-			    "2nd cursor didn't find 1st key\n", ret, 0);
-	}
-	c->set_key(c, &second_key);
+	c->set_key(c, key1_orig);
+	if ((ret = c->search(c)) != 0)
+		log_print_err("2nd cursor didn't find 1st key\n", ret, 0);
+	c->set_key(c, key2_orig);
+	if ((ret = c->search(c)) != 0)
+		log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+	c->close(c);
+
+live_check:
+	/*
+	 * Now try opening cursors on the live checkpoint to see if we get the
+	 * same missing key via searching.
+	 */
+	snprintf(next_uri, 128, "table:__wt%04d", index1);
+	if (session->open_cursor(session, next_uri, NULL, NULL, &c) != 0)
+		return (1);
+	c->set_key(c, key1_orig);
+	if ((ret = c->search(c)) != 0)
+		log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+	c->close(c);
+
+	snprintf(next_uri, 128, "table:__wt%04d", index2);
+	ret = session->open_cursor(session, next_uri, NULL, NULL, &c);
+	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
 		log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
 	c->close(c);
