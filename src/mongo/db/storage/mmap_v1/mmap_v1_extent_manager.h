@@ -1,4 +1,4 @@
-// extent_manager.h
+// mmap_v1_extent_manager.h
 
 /**
 *    Copyright (C) 2013 10gen Inc.
@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/storage/extent_manager.h"
 
 namespace mongo {
 
@@ -61,48 +62,60 @@ namespace mongo {
      * implementation:
      *  - ExtentManager holds a list of DataFile
      */
-    class ExtentManager {
-        MONGO_DISALLOW_COPYING( ExtentManager );
-
+    class MmapV1ExtentManager : public ExtentManager {
+        MONGO_DISALLOW_COPYING( MmapV1ExtentManager );
     public:
-        ExtentManager(){}
+        /**
+         * @param freeListDetails this is a reference into the .ns file
+         *        while a bit odd, this is not a layer violation as extents
+         *        are a peer to the .ns file, without any layering
+         */
+        MmapV1ExtentManager( const StringData& dbname, const StringData& path,
+                       bool directoryPerDB );
 
-        virtual ~ExtentManager(){}
+        virtual ~MmapV1ExtentManager();
 
         /**
          * deletes all state and puts back to original state
          */
-        //void reset();
+        void reset();
 
         /**
          * opens all current files
          */
-        virtual Status init(TransactionExperiment* txn) = 0;
+        Status init(TransactionExperiment* txn);
 
-        virtual size_t numFiles() const = 0;
-        virtual long long fileSize() const = 0;
+        size_t numFiles() const;
+        long long fileSize() const;
 
-        virtual void flushFiles( bool sync ) = 0;
+        // TODO: make private
+        DataFile* getFile( TransactionExperiment* txn,
+                           int n,
+                           int sizeNeeded = 0,
+                           bool preallocateOnly = false );
+
+        void flushFiles( bool sync );
 
         // must call Extent::reuse on the returned extent
-        virtual DiskLoc allocateExtent( TransactionExperiment* txn,
-                                        bool capped,
-                                        int size,
-                                        int quotaMax ) = 0;
+        DiskLoc allocateExtent( TransactionExperiment* txn,
+                                bool capped,
+                                int size,
+                                int quotaMax );
 
         /**
          * firstExt has to be == lastExt or a chain
          */
-        virtual void freeExtents( TransactionExperiment* txn,
-                                  DiskLoc firstExt, DiskLoc lastExt ) = 0;
+        void freeExtents( TransactionExperiment* txn, DiskLoc firstExt, DiskLoc lastExt );
 
         /**
          * frees a single extent
          * ignores all fields in the Extent except: magic, myLoc, length
          */
-        virtual void freeExtent( TransactionExperiment* txn, DiskLoc extent ) = 0;
+        void freeExtent( TransactionExperiment* txn, DiskLoc extent );
 
-        virtual void freeListStats( int* numExtents, int64_t* totalFreeSize ) const = 0;
+        void printFreeList() const;
+
+        void freeListStats( int* numExtents, int64_t* totalFreeSize ) const;
 
         /**
          * @param loc - has to be for a specific Record
@@ -111,38 +124,73 @@ namespace mongo {
          * from an extent.  This intrinsically links an original record store to the original extent
          * manager.
          */
-        virtual Record* recordForV1( const DiskLoc& loc ) const = 0;
+        Record* recordForV1( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
          * Note(erh) see comment on recordFor
          */
-        virtual Extent* extentForV1( const DiskLoc& loc ) const = 0;
+        Extent* extentForV1( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
          * Note(erh) see comment on recordFor
          */
-        virtual DiskLoc extentLocForV1( const DiskLoc& loc ) const = 0;
+        DiskLoc extentLocForV1( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Extent
          */
-        virtual Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const = 0;
+        Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const;
 
-        virtual Extent* getNextExtent( Extent* ) const = 0;
-        virtual Extent* getPrevExtent( Extent* ) const = 0;
-
-        // TODO: remove
-        DataFile* getFile( TransactionExperiment* txn,
-                           int n,
-                           int sizeNeeded = 0,
-                           bool preallocateOnly = false );
+        Extent* getNextExtent( Extent* ) const;
+        Extent* getPrevExtent( Extent* ) const;
 
         /**
          * quantizes extent size to >= min + page boundary
          */
         static int quantizeExtentSize( int size );
+
+    private:
+
+        /**
+         * will return NULL if nothing suitable in free list
+         */
+        DiskLoc _allocFromFreeList( TransactionExperiment* txn, int approxSize, bool capped );
+
+        /* allocate a new Extent, does not check free list
+         * @param maxFileNoForQuota - 0 for unlimited
+        */
+        DiskLoc _createExtent( TransactionExperiment* txn, int approxSize, int maxFileNoForQuota );
+
+        DataFile* _addAFile( TransactionExperiment* txn, int sizeNeeded, bool preallocateNextFile );
+
+        DiskLoc _getFreeListStart() const;
+        DiskLoc _getFreeListEnd() const;
+        void _setFreeListStart( TransactionExperiment* txn, DiskLoc loc );
+        void _setFreeListEnd( TransactionExperiment* txn, DiskLoc loc );
+
+        const DataFile* _getOpenFile( int n ) const;
+
+        DiskLoc _createExtentInFile( TransactionExperiment* txn,
+                                     int fileNo,
+                                     DataFile* f,
+                                     int size,
+                                     int maxFileNoForQuota );
+
+        boost::filesystem::path fileName( int n ) const;
+
+// -----
+
+        std::string _dbname; // i.e. "test"
+        std::string _path; // i.e. "/data/db"
+        bool _directoryPerDB;
+
+        // must be in the dbLock when touching this (and write locked when writing to of course)
+        // however during Database object construction we aren't, which is ok as it isn't yet visible
+        //   to others and we are in the dbholder lock then.
+        std::vector<DataFile*> _files;
+
     };
 
 }

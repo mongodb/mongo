@@ -38,9 +38,10 @@
 namespace mongo {
 
     class Collection;
-    class ExtentManager;
     class DataFile;
+    class ExtentManager;
     class IndexCatalog;
+    class MmapV1ExtentManager;
     class NamespaceDetails;
     class TransactionExperiment;
 
@@ -152,8 +153,8 @@ namespace mongo {
         NamespaceIndex& namespaceIndex() { return _namespaceIndex; }
 
         // TODO: do not think this method should exist, so should try and encapsulate better
-        ExtentManager& getExtentManager() { return *_extentManager; }
-        const ExtentManager& getExtentManager() const { return *_extentManager; }
+        MmapV1ExtentManager* getExtentManager() { return _extentManager.get(); }
+        const MmapV1ExtentManager* getExtentManager() const { return _extentManager.get(); }
 
         Status dropCollection( TransactionExperiment* txn, const StringData& fullns );
 
@@ -234,7 +235,7 @@ namespace mongo {
         const string _path; // "/data/db"
 
         NamespaceIndex _namespaceIndex;
-        boost::scoped_ptr<ExtentManager> _extentManager;
+        boost::scoped_ptr<MmapV1ExtentManager> _extentManager;
 
         const string _profileName; // "alleyinsider.system.profile"
         const string _namespacesName; // "alleyinsider.system.namespaces"

@@ -60,6 +60,7 @@
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
@@ -251,7 +252,7 @@ namespace mongo {
 
         Database* db = _collection->_database;
 
-        DataFileHeader* dfh = db->getExtentManager().getFile(txn, 0)->getHeader();
+        DataFileHeader* dfh = db->getExtentManager()->getFile(txn, 0)->getHeader();
         if ( dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER ) {
             return Status::OK(); // these checks have already been done
         }

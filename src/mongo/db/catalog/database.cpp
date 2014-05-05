@@ -52,6 +52,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
@@ -200,7 +201,7 @@ namespace mongo {
     Database::Database(TransactionExperiment* txn, const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
-          _extentManager(new ExtentManager(_name, _path, storageGlobalParams.directoryperdb)),
+          _extentManager(new MmapV1ExtentManager(_name, _path, storageGlobalParams.directoryperdb)),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
           _indexesName(_name + ".system.indexes"),

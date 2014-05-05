@@ -312,7 +312,6 @@ namespace mongo {
                                                  int size,
                                                  int quotaMax ) {
         DiskLoc eloc = _extentManager->allocateExtent( txn,
-                                                       _ns,
                                                        isCapped(),
                                                        size,
                                                        quotaMax );

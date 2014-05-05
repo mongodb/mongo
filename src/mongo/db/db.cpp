@@ -75,6 +75,7 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
@@ -361,7 +362,7 @@ namespace mongo {
             LOG(1) << "\t" << dbName << endl;
 
             Client::Context ctx( dbName );
-            DataFile *p = ctx.db()->getExtentManager().getFile( &txn, 0 );
+            DataFile *p = ctx.db()->getExtentManager()->getFile( &txn, 0 );
             DataFileHeader *h = p->getHeader();
 
             if ( replSettings.usingReplSets() ) {

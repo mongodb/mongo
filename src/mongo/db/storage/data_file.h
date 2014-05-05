@@ -90,7 +90,7 @@ namespace mongo {
 
     class DataFile {
         friend class BasicCursor;
-        friend class ExtentManager;
+        friend class MmapV1ExtentManager;
     public:
         DataFile(int fn) : _mb(0), fileNo(fn) { }
 

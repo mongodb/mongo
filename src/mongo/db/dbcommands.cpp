@@ -69,6 +69,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/write_concern.h"
@@ -1321,7 +1322,7 @@ namespace mongo {
             Client::ReadContext ctx(ns);
             Database* d = ctx.ctx().db();
 
-            if ( d && ( d->isEmpty() || d->getExtentManager().numFiles() == 0 ) )
+            if ( d && ( d->isEmpty() || d->getExtentManager()->numFiles() == 0 ) )
                 d = NULL;
 
             if ( d )
@@ -1386,7 +1387,7 @@ namespace mongo {
             if ( d ){
                 int freeListSize = 0;
                 int64_t freeListSpace = 0;
-                d->getExtentManager().freeListStats( &freeListSize, &freeListSpace );
+                d->getExtentManager()->freeListStats( &freeListSize, &freeListSpace );
 
                 BSONObjBuilder extentFreeList( result.subobjStart( "extentFreeList" ) );
                 extentFreeList.append( "num", freeListSize );

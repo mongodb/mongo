@@ -42,6 +42,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
 #include "mongo/db/structure/catalog/namespace.h"
@@ -152,7 +153,7 @@ namespace NamespaceTests {
                 for ( DiskLoc extLoc = nsd()->firstExtent();
                         !extLoc.isNull();
                         extLoc = ext->xnext) {
-                    ext = extentManager().getExtent(extLoc);
+                    ext = extentManager()->getExtent(extLoc);
                     int fileNo = ext->firstRecord.a();
                     if ( fileNo == -1 )
                         continue;
@@ -168,7 +169,7 @@ namespace NamespaceTests {
                 int count = 0;
                 for ( DiskLoc extLoc = nsd()->firstExtent();
                         !extLoc.isNull();
-                        extLoc = extentManager().getExtent(extLoc)->xnext ) {
+                        extLoc = extentManager()->getExtent(extLoc)->xnext ) {
                     ++count;
                 }
                 return count;
@@ -198,7 +199,7 @@ namespace NamespaceTests {
             Database* db() const {
                 return _context.db();
             }
-            const ExtentManager& extentManager() const {
+            const ExtentManager* extentManager() const {
                 return db()->getExtentManager();
             }
             Collection* collection() const {
@@ -419,7 +420,7 @@ namespace NamespaceTests {
                 SimpleRecordStoreV1 rs( &txn,
                                         myns,
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
-                                        &db()->getExtentManager(),
+                                        db()->getExtentManager(),
                                         false );
 
                 BSONObj obj = docForRecordSize( 300 );
@@ -465,7 +466,7 @@ namespace NamespaceTests {
                 SimpleRecordStoreV1 rs( &txn,
                                         myns + ".$x",
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
-                                        &db()->getExtentManager(),
+                                        db()->getExtentManager(),
                                         false );
 
                 BSONObj obj = docForRecordSize( 300 );
@@ -489,7 +490,7 @@ namespace NamespaceTests {
                 SimpleRecordStoreV1 rs( &txn,
                                         myns + ".$x",
                                         new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
-                                        &db()->getExtentManager(),
+                                        db()->getExtentManager(),
                                         true );
 
                 BSONObj obj = docForRecordSize( 298 );

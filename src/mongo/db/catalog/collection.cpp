@@ -48,6 +48,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage/record.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
@@ -92,14 +93,14 @@ namespace mongo {
                                                          this,
                                                          _ns.ns(),
                                                          new NamespaceDetailsRSV1MetaData( details ),
-                                                         &database->getExtentManager(),
+                                                         database->getExtentManager(),
                                                          _ns.coll() == "system.indexes" ) );
         }
         else {
             _recordStore.reset( new SimpleRecordStoreV1( txn,
                                                          _ns.ns(),
                                                          new NamespaceDetailsRSV1MetaData( details ),
-                                                         &database->getExtentManager(),
+                                                         database->getExtentManager(),
                                                          _ns.coll() == "system.indexes" ) );
         }
         _magic = 1357924;
@@ -473,12 +474,12 @@ namespace mongo {
 
     ExtentManager* Collection::getExtentManager() {
         verify( ok() );
-        return &_database->getExtentManager();
+        return _database->getExtentManager();
     }
 
     const ExtentManager* Collection::getExtentManager() const {
         verify( ok() );
-        return &_database->getExtentManager();
+        return _database->getExtentManager();
     }
 
     void Collection::increaseStorageSize(TransactionExperiment* txn, int size, bool enforceQuota) {
