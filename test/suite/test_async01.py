@@ -39,7 +39,9 @@ class Callback(wiredtiger.AsyncCallback):
     def __init__(self, current):
         self.current = current
         self.ninsert = 0
+        self.nremove = 0
         self.nsearch = 0
+        self.nupdate = 0
         self.nerror = 0
         self.lock = threading.RLock()
 
@@ -53,16 +55,31 @@ class Callback(wiredtiger.AsyncCallback):
         # exceptions would be swallowed by a non-python worker thread.
         try:
             key = op.get_key()
-            value = op.get_value()
             optype = op.get_type()
+            #
+            # Remove does not set a value.  Just set it from the
+            # reference list.
+            #
+            if optype != wiredtiger.WT_AOP_REMOVE:
+                value = op.get_value()
+            else:
+                value = self.current[key]
 
             if optype == wiredtiger.WT_AOP_INSERT:
                 self.lock.acquire()
                 self.ninsert += 1
                 self.lock.release()
+            elif optype == wiredtiger.WT_AOP_REMOVE:
+                self.lock.acquire()
+                self.nremove += 1
+                self.lock.release()
             elif optype == wiredtiger.WT_AOP_SEARCH:
                 self.lock.acquire()
                 self.nsearch += 1
+                self.lock.release()
+            elif optype == wiredtiger.WT_AOP_UPDATE:
+                self.lock.acquire()
+                self.nupdate += 1
                 self.lock.release()
             else:
                 self.notify_error(key, value, optype, 'unexpected optype')
@@ -175,7 +192,6 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Now test async search and check key/value in the callback.
         for i in range(0, self.nentries):
-            self.pr('creating async op')
             op = self.conn.async_new_op(tablearg, None, callback)
             k = self.genkey(i)
             op.set_key(k)
@@ -185,9 +201,52 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.async_flush()
         self.pr('flushed')
 
+        # Reset the reference table for the update.
+        for i in range(0, self.nentries):
+            k = self.genkey(i)
+            v = self.genvalue(i+10)
+            self.current[k] = v
+
+        for i in range(0, self.nentries):
+            self.pr('creating async op')
+            op = self.conn.async_new_op(tablearg, None, callback)
+            k = self.genkey(i)
+            v = self.genvalue(i+10)
+            op.set_key(k)
+            op.set_value(v)
+            op.update()
+
+        # Wait for all outstanding async ops to finish.
+        self.conn.async_flush()
+        self.pr('flushed')
+
+        # Now test async search and check key/value in the callback.
+        for i in range(0, self.nentries):
+            op = self.conn.async_new_op(tablearg, None, callback)
+            k = self.genkey(i)
+            op.set_key(k)
+            op.search()
+
+        # Wait for all outstanding async ops to finish.
+        self.conn.async_flush()
+        self.pr('flushed')
+
+        for i in range(0, self.nentries):
+            self.pr('creating async op')
+            op = self.conn.async_new_op(tablearg, None, callback)
+            k = self.genkey(i)
+            op.set_key(k)
+            op.remove()
+
+        # Wait for all outstanding async ops to finish.
+        self.conn.async_flush()
+        self.pr('flushed')
+
         # Make sure all callbacks went according to plan.
         self.assertTrue(callback.ninsert == self.nentries)
-        self.assertTrue(callback.nsearch == self.nentries)
+        self.assertTrue(callback.nremove == self.nentries)
+        self.assertTrue(callback.nsearch == self.nentries * 2)
+        self.assertTrue(callback.nupdate == self.nentries)
         self.assertTrue(callback.nerror == 0)
 
 
