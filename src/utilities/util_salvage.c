@@ -34,7 +34,7 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the file name. */
 	if (argc != 1)
 		return (usage());
-	if ((name = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
+	if ((name = util_name(*argv, "file", UTIL_ALL_OK)) == NULL)
 		return (1);
 
 	if ((ret = session->salvage(session, name, force)) != 0) {
