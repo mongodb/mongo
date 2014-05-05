@@ -33,8 +33,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/filesystem/path.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/diskloc.h"
@@ -58,8 +56,6 @@ namespace mongo {
      *  - this structure is NOT stored on disk
      *  - this class is NOT thread safe, locking should be above (for now)
      *
-     * implementation:
-     *  - ExtentManager holds a list of DataFile
      */
     class ExtentManager {
         MONGO_DISALLOW_COPYING( ExtentManager );
@@ -68,11 +64,6 @@ namespace mongo {
         ExtentManager(){}
 
         virtual ~ExtentManager(){}
-
-        /**
-         * deletes all state and puts back to original state
-         */
-        //void reset();
 
         /**
          * opens all current files

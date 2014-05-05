@@ -37,7 +37,6 @@
 #include "mongo/db/structure/catalog/namespace.h"
 
 namespace mongo {
-    class TransactionExperiment;
 
     /* extents are datafile regions where all the records within the region
        belong to the same namespace.
@@ -47,11 +46,13 @@ namespace mongo {
     */
 #pragma pack(1)
     struct Extent {
-    public:
         enum { extentSignature = 0x41424344 };
         unsigned magic;
         DiskLoc myLoc;
-        DiskLoc xnext, xprev; /* next/prev extent for this namespace */
+
+        /* next/prev extent for this namespace */
+        DiskLoc xnext;
+        DiskLoc xprev;
 
         /* which namespace this extent is for.  this is just for troubleshooting really
            and won't even be correct if the collection were renamed!
