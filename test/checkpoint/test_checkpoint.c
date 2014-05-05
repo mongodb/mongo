@@ -35,7 +35,7 @@ static void onint(int);
 static int  path_setup(const char *);
 static int  cleanup(void);
 static int  usage(void);
-static int  wt_connect(char *);
+static int  wt_connect(const char *);
 static int  wt_shutdown(void);
 
 int
@@ -43,7 +43,7 @@ main(int argc, char *argv[])
 {
 	table_type ttype;
 	int ch, cnt, ret, runs;
-	char *config_open, *home;
+	const char *config_open, *home;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -117,14 +117,14 @@ main(int argc, char *argv[])
 		}
 
 	argc -= optind;
-	argv += optind;
 	if (argc != 0)
 		return (usage());
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
 
-	path_setup(home);
+	if ((ret = path_setup(home)) != 0)
+		return (ret);
 
 	printf("%s: process %" PRIu64 "\n", g.progname, (uint64_t)getpid());
 	for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
@@ -147,7 +147,10 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		start_checkpoints();
+		if ((ret = start_checkpoints()) != 0) {
+			(void)log_print_err("Start checkpoints failed", ret, 1);
+			break;
+		}
 		if ((ret = start_workers(ttype)) != 0) {
 			(void)log_print_err("Start workers failed", ret, 1);
 			break;
@@ -167,16 +170,12 @@ main(int argc, char *argv[])
 		}
 	}
 	if (g.logfp != NULL)
-		fclose(g.logfp);
-	/*
-	 * Attempt to cleanup on error. Ideally we'd wait to know that the
-	 * checkpoint and worker threads are all done.
-	 */
-	if (ret != 0) {
-		(void)wt_shutdown();
-		if (g.cookies != NULL)
-			free(g.cookies);
-	}
+		(void)fclose(g.logfp);
+
+	/* Ensure that cleanup is done on error. */
+	(void)wt_shutdown();
+	if (g.cookies != NULL)
+		free(g.cookies);
 	return (g.status);
 }
 
@@ -185,7 +184,7 @@ main(int argc, char *argv[])
  *	Configure the WiredTiger connection.
  */
 static int
-wt_connect(char *config_open)
+wt_connect(const char *config_open)
 {
 	static WT_EVENT_HANDLER event_handler = {
 		handle_error,
@@ -217,8 +216,13 @@ wt_shutdown(void)
 {
 	int ret;
 
+	if (g.conn == NULL)
+		return (0);
+
 	printf("Closing connection\n");
-	if ((ret = g.conn->close(g.conn, NULL)) != 0)
+	ret = g.conn->close(g.conn, NULL);
+	g.conn = NULL;
+	if (ret != 0)
 		return (log_print_err("conn.close", ret, 1));
 	return (0);
 }

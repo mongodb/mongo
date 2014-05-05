@@ -191,19 +191,33 @@ real_worker(void)
 		}
 
 	for (i = 0; i < g.nops && g.running; ++i, sched_yield()) {
-		session->begin_transaction(session, NULL);
+		if ((ret = session->begin_transaction(session, NULL)) != 0) {
+			(void)log_print_err(
+			    "real_worker:begin_transaction", ret, 1);
+			goto err;
+		}
 		keyno = __wt_random() % g.nkeys + 1;
 		for (j = 0; j < g.ntables; j++) {
 			if ((ret = worker_op(cursors[j], keyno, i)) != 0)
 				break;
 		}
-		if (ret == 0)
-			session->commit_transaction(session, NULL);
-		else if (ret == WT_DEADLOCK)
-			session->rollback_transaction(session, NULL);
-		else {
+		if (ret == 0) {
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0) {
+				(void)log_print_err(
+				    "real_worker:commit_transaction", ret, 1);
+				goto err;
+			    }
+		} else if (ret == WT_DEADLOCK) {
+			if ((ret = session->rollback_transaction(
+			   session, NULL)) != 0) {
+				(void)log_print_err(
+				    "real_worker:rollback_transaction", ret, 1);
+				goto err;
+			    }
+		} else {
 			(void)log_print_err("worker op failed", ret, 1);
-			break;
+			goto err;
 		}
 	}
 

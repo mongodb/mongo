@@ -255,8 +255,10 @@ compare_cursors(
 	}
 
 	/* Now check the values. */
-	cursor1->get_value(cursor1, &val1);
-	cursor2->get_value(cursor2, &val2);
+	if (cursor1->get_value(cursor1, &val1) != 0 ||
+	    cursor2->get_value(cursor2, &val2) != 0)
+		return (log_print_err("Error getting values", EINVAL, 1));
+
 	if (g.logfp != NULL)
 		fprintf(g.logfp, "k1: %" PRIu64 " k2: %" PRIu64
 		    " val1: %s val2: %s \n",
@@ -290,12 +292,16 @@ diagnose_key_error(
 
 	/* Hack to avoid passing session as parameter. */
 	session = cursor1->session;
+	key1_orig = key2_orig = 0;
 
 	snprintf(ckpt, 128, "checkpoint=%s", g.checkpoint_name);
 
 	/* Save the failed keys. */
-	cursor1->get_key(cursor1, &key1_orig);
-	cursor2->get_key(cursor2, &key2_orig);
+	if (cursor1->get_key(cursor1, &key1_orig) != 0 ||
+	    cursor2->get_key(cursor2, &key2_orig) != 0) {
+		(void)log_print_err("Error retrieving key.", EINVAL, 0);
+		goto live_check;
+	}
 
 	if (key1_orig == key2_orig)
 		goto live_check;
@@ -305,25 +311,26 @@ diagnose_key_error(
 		return (1);
 	if (cursor1->get_key(cursor1, &key1) != 0 ||
 	    cursor2->get_key(cursor2, &key2) != 0)
-		log_print_err("Error decoding key", EINVAL, 1);
+		(void)log_print_err("Error decoding key", EINVAL, 1);
 	else if (key1 != key2)
-		log_print_err("Now previous keys don't match", EINVAL, 0);
+		(void)log_print_err("Now previous keys don't match", EINVAL, 0);
 
 	if (cursor1->next(cursor1) != 0 || cursor2->next(cursor2) != 0)
 		return (1);
 	if (cursor1->get_key(cursor1, &key1) != 0 ||
 	    cursor2->get_key(cursor2, &key2) != 0)
-		log_print_err("Error decoding key", EINVAL, 1);
+		(void)log_print_err("Error decoding key", EINVAL, 1);
 	else if (key1 == key2)
-		log_print_err("After prev/next keys match", EINVAL, 0);
+		(void)log_print_err("After prev/next keys match", EINVAL, 0);
 
 	if (cursor1->next(cursor1) != 0 || cursor2->next(cursor2) != 0)
 		return (1);
 	if (cursor1->get_key(cursor1, &key1) != 0 ||
 	    cursor2->get_key(cursor2, &key2) != 0)
-		log_print_err("Error decoding key", EINVAL, 1);
+		(void)log_print_err("Error decoding key", EINVAL, 1);
 	else if (key1 == key2)
-		log_print_err("After prev/next/next keys match", EINVAL, 0);
+		(void)log_print_err(
+		    "After prev/next/next keys match", EINVAL, 0);
 
 	/*
 	 * Now try opening new cursors on the checkpoints and see if we
@@ -334,21 +341,21 @@ diagnose_key_error(
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 1st key\n", ret, 0);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
 	c->close(c);
 
 	snprintf(next_uri, 128, "table:__wt%04d", index2);
 	ret = session->open_cursor(session, next_uri, NULL, ckpt, &c);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		log_print_err("2nd cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("2nd cursor didn't find 1st key\n", ret, 0);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
-	c->close(c);
+		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+	(void)c->close(c);
 
 live_check:
 	/*
@@ -360,15 +367,15 @@ live_check:
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		log_print_err("1st cursor didn't find 1st key\n", ret, 0);
-	c->close(c);
+		(void)log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+	(void)c->close(c);
 
 	snprintf(next_uri, 128, "table:__wt%04d", index2);
 	ret = session->open_cursor(session, next_uri, NULL, NULL, &c);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
-	c->close(c);
+		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+	(void)c->close(c);
 
 	return (0);
 }
