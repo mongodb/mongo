@@ -476,12 +476,17 @@ namespace mongo {
             verify(registry._handles.count(pid));
             HANDLE h = registry._handles[pid];
 
-            if (block)
-                WaitForSingleObject(h, INFINITE);
+            if (block) {
+                if (WaitForSingleObject(h, INFINITE)) {
+                    log() << "WaitForSingleObject failed: " << errnoWithDescription();
+                }
+            }
 
             DWORD tmp;
             if(GetExitCodeProcess(h, &tmp)) {
                 if ( tmp == STILL_ACTIVE ) {
+                    if (block)
+                        log() << "Process is STILL_ACTIVE even after blocking";
                     return false;
                 }
                 CloseHandle(h);
@@ -491,6 +496,7 @@ namespace mongo {
                 return true;
             }
             else {
+                log() << "GetExitCodeProcess failed: " << errnoWithDescription();
                 return false;
             }
 #else
@@ -538,7 +544,7 @@ namespace mongo {
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            int exit_code;
+            int exit_code = -123456; // sentinel value
             wait_for_pid( r.pid(), true, &exit_code );
             if ( r.port() > 0 ) {
                 registry.deletePort( r.port() );
@@ -553,7 +559,7 @@ namespace mongo {
             ProgramRunner r( a );
             r.start();
             boost::thread t( r );
-            int exit_code;
+            int exit_code = -123456; // sentinel value
             wait_for_pid(r.pid(), true,  &exit_code);
             registry.deletePid( r.pid() );
             return BSON( string( "" ) << exit_code );
