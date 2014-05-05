@@ -97,7 +97,7 @@ namespace mongo {
                         current->unlock();
                     }
                 }
-                catch ( const LockException& ex ) {
+                catch ( const DBException& ex ) {
                     log() << "*** !Could not try distributed lock." << causedBy( ex ) << endl;
                 }
             }
@@ -296,7 +296,7 @@ namespace mongo {
                     }
 
                 }
-                catch( const LockException& ex ) {
+                catch( const DBException& ex ) {
                     log() << "*** !Could not try distributed lock." << causedBy( ex ) << endl;
                     break;
                 }
