@@ -192,6 +192,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 	saved_isolation = session->isolation;
+	wt_session = &session->iface;
 	txn = &session->txn;
 	full = started = tracking = 0;
 
@@ -230,7 +231,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
 	/* Start a snapshot transaction for the checkpoint. */
-	wt_session = &session->iface;
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
 	/* Tell logging that we have started a database checkpoint. */
@@ -242,8 +242,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
-	/* Release the snapshot transaction, before syncing the file(s). */
-	__wt_txn_release(session);
+	/* Commit the transaction before syncing the file(s). */
+	WT_ERR(wt_session->commit_transaction(wt_session, NULL));
 
 	/*
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
@@ -294,10 +294,8 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	if (F_ISSET(txn, TXN_HAS_SNAPSHOT))
-		__wt_txn_release(session);
-	else
-		__wt_txn_release_snapshot(session);
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_ERR(wt_session->rollback_transaction(wt_session, NULL));
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && started)

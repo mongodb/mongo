@@ -142,6 +142,11 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		return (0);
 
 	txn = &session->txn;
+
+	/* We'd better have a transaction. */
+	WT_ASSERT(session,
+	    F_ISSET(txn, TXN_RUNNING) && F_ISSET(txn, TXN_HAS_ID));
+
 	WT_ASSERT(session, txn->mod_count > 0);
 	op = txn->mod + txn->mod_count - 1;
 
