@@ -2194,7 +2194,9 @@ __rec_raw_decompress(
 	if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
 		WT_ERR(__wt_illegal_value(session, btree->dhandle->name));
 
-	ret = __wt_strndup(session, tmp->data, result_len, retp);
+	WT_ERR(__wt_strndup(session, tmp->data, result_len, retp));
+	WT_ASSERT(session, __wt_verify_dsk_image(
+	    session, "[raw evict split]", tmp->data, result_len) == 0);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -2513,11 +2515,12 @@ skip_check_complete:
 		if (bnd->already_compressed)
 			WT_ERR(__rec_raw_decompress(
 			    session, buf->data, buf->size, &bnd->dsk));
-		else
+		else {
 			WT_ERR(__wt_strndup(
 			    session, buf->data, buf->size, &bnd->dsk));
-		WT_ASSERT(session, __wt_verify_dsk_image(
-		    session, "[evict split]", buf->data, buf->size) == 0);
+			WT_ASSERT(session, __wt_verify_dsk_image(session,
+			    "[evict split]", buf->data, buf->size) == 0);
+		}
 		goto done;
 	}
 

@@ -94,9 +94,12 @@ class test_priv01(wttest.WiredTigerTestCase):
             os.unsetenv('WIREDTIGER_HOME')
         else:
             os.putenv('WIREDTIGER_HOME', homeenv)
-        self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
-        self.session = self.conn.open_session(None)
-        self.populate_and_check()
+        try:
+            self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
+            self.session = self.conn.open_session(None)
+            self.populate_and_check()
+        finally:
+            os.unsetenv('WIREDTIGER_HOME')
 
     def test_home_and_env_conf_priv(self):
         # If homedir is set, the environment is ignored
