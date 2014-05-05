@@ -195,9 +195,8 @@ verify_checkpoint(WT_SESSION *session)
 			typei = type_to_string(g.cookies[i].type);
 			if ((ret = compare_cursors(
 			    cursors[0], type0, cursors[i], typei)) != 0) {
-				if (ret == ERR_KEY_MISMATCH)
-					(void)diagnose_key_error(
-					    cursors[0], 0, cursors[i], i);
+				(void)diagnose_key_error(
+				    cursors[0], 0, cursors[i], i);
 				return (log_print_err(
 				    "verify_checkpoint - mismatching data",
 				    EFAULT, 1));
@@ -286,6 +285,9 @@ diagnose_key_error(
 	cursor1->get_key(cursor1, &key1_orig);
 	cursor2->get_key(cursor2, &key2_orig);
 
+	if (key1_orig == key2_orig)
+		goto live_check;
+
 	/* See if previous values are still valid. */
 	if (cursor1->prev(cursor1) != 0 || cursor2->prev(cursor2) != 0)
 		return (1);
@@ -331,6 +333,26 @@ diagnose_key_error(
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
 		log_print_err("2nd cursor didn't find 1st key\n", ret, 0);
+	c->set_key(c, key2_orig);
+	if ((ret = c->search(c)) != 0)
+		log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+	c->close(c);
+
+live_check:
+	/*
+	 * Now try opening cursors on the live checkpoint to see if we get the
+	 * same missing key via searching.
+	 */
+	snprintf(next_uri, 128, "table:__wt%04d", index1);
+	if (session->open_cursor(session, next_uri, NULL, NULL, &c) != 0)
+		return (1);
+	c->set_key(c, key1_orig);
+	if ((ret = c->search(c)) != 0)
+		log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+	c->close(c);
+
+	snprintf(next_uri, 128, "table:__wt%04d", index2);
+	ret = session->open_cursor(session, next_uri, NULL, NULL, &c);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
 		log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
