@@ -604,6 +604,7 @@ __wt_ovfl_reuse_free(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 #if 0
 /*
+ * __ovfl_txnc_dump --
  *	Debugging information.
  */
 static void
