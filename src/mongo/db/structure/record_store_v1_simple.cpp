@@ -230,8 +230,8 @@ namespace mongo {
         LOG(1) << "allocating new extent";
 
         increaseStorageSize( txn,
-                             Extent::followupSize( lengthWithHeaders,
-                                                   _details->lastExtentSize()),
+                             _extentManager->followupSize( lengthWithHeaders,
+                                                           _details->lastExtentSize()),
                              quotaMax );
 
         loc = _allocFromExistingExtents( txn, lengthWithHeaders );
@@ -248,8 +248,8 @@ namespace mongo {
             log() << "try #" << z << endl;
 
             increaseStorageSize( txn,
-                                 Extent::followupSize( lengthWithHeaders,
-                                                       _details->lastExtentSize()),
+                                 _extentManager->followupSize( lengthWithHeaders,
+                                                               _details->lastExtentSize()),
                                  quotaMax );
 
             loc = _allocFromExistingExtents( txn, lengthWithHeaders );

@@ -10,6 +10,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/storage/extent',
         '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/mongocommon',
         ]
     )
 

@@ -34,27 +34,66 @@
 
 namespace mongo {
 
-    int ExtentManager::quantizeExtentSize( int size ) {
+    int ExtentManager::quantizeExtentSize( int size ) const {
 
-        if ( size == Extent::maxSize() ) {
+        if ( size == maxSize() ) {
             // no point doing quantizing for the entire file
             return size;
         }
 
-        verify( size <= Extent::maxSize() );
+        invariant( size <= maxSize() );
 
         // make sizes align with VM page size
         int newSize = (size + 0xfff) & 0xfffff000;
 
-        if ( newSize > Extent::maxSize() ) {
-            return Extent::maxSize();
+        if ( newSize > maxSize() ) {
+            return maxSize();
         }
 
-        if ( newSize < Extent::minSize() ) {
-            return Extent::minSize();
+        if ( newSize < minSize() ) {
+            return minSize();
         }
 
         return newSize;
     }
 
+    int ExtentManager::followupSize( int len, int lastExtentLen ) const {
+        invariant( len < maxSize() );
+        int x = initialSize(len);
+        // changed from 1.20 to 1.35 in v2.1.x to get to larger extent size faster
+        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.35);
+        int sz = y > x ? y : x;
+
+        if ( sz < lastExtentLen ) {
+            // this means there was an int overflow
+            // so we should turn it into maxSize
+            return maxSize();
+        }
+        else if ( sz > maxSize() ) {
+            return maxSize();
+        }
+
+        sz = quantizeExtentSize( sz );
+        verify( sz >= len );
+
+        return sz;
+    }
+
+    int ExtentManager::initialSize( int len ) const {
+        invariant( len <= maxSize() );
+
+        long long sz = len * 16;
+        if ( len < 1000 )
+            sz = len * 64;
+
+        if ( sz >= maxSize() )
+            return maxSize();
+
+        if ( sz <= minSize() )
+            return minSize();
+
+        int z = ExtentManager::quantizeExtentSize( sz );
+        verify( z >= len );
+        return z;
+    }
 }

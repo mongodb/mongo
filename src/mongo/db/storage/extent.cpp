@@ -30,53 +30,12 @@
 
 #include "mongo/db/storage/extent.h"
 
-#include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
-
-    int Extent::initialSize(int len) {
-        verify( len <= maxSize() );
-
-        long long sz = len * 16;
-        if ( len < 1000 )
-            sz = len * 64;
-
-        if ( sz >= maxSize() )
-            return maxSize();
-
-        if ( sz <= minSize() )
-            return minSize();
-
-        int z = ExtentManager::quantizeExtentSize( sz );
-        verify( z >= len );
-        return z;
-    }
-
-    int Extent::followupSize(int len, int lastExtentLen) {
-        verify( len < Extent::maxSize() );
-        int x = initialSize(len);
-        // changed from 1.20 to 1.35 in v2.1.x to get to larger extent size faster
-        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.35);
-        int sz = y > x ? y : x;
-
-        if ( sz < lastExtentLen ) {
-            // this means there was an int overflow
-            // so we should turn it into maxSize
-            return Extent::maxSize();
-        }
-        else if ( sz > Extent::maxSize() ) {
-            return Extent::maxSize();
-        }
-
-        sz = ExtentManager::quantizeExtentSize( sz );
-        verify( sz >= len );
-
-        return sz;
-    }
 
     BSONObj Extent::dump() const {
         return BSON( "loc" << myLoc.toString()
@@ -136,22 +95,18 @@ namespace mongo {
             }
             extentOk = false;
         }
-        if (length < minSize()) {
+        static const int minSize = 0x1000;
+        if (length < minSize) {
             if (errors) {
                 StringBuilder sb;
                 sb << "length of extent " << diskLoc.toString()
                     << " is " << length
-                    << ", which is less than minimum length of " << minSize();
+                    << ", which is less than minimum length of " << minSize;
                 errors->push_back( sb.str() );
             }
             extentOk = false;
         }
         return extentOk;
     }
-
-    int Extent::maxSize() {
-        return DataFile::maxSize() - DataFileHeader::HeaderSize - 16;
-    }
-
 
 }

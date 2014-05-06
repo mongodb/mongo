@@ -76,20 +76,6 @@ namespace mongo {
         void assertOk() const { verify(isOk()); }
 
         static int HeaderSize() { return sizeof(Extent)-4; }
-
-        static int maxSize();
-        static int minSize() { return 0x1000; }
-        /**
-         * @param len lengt of record we need
-         * @param lastRecord size of last extent which is a factor in next extent size
-         */
-        static int followupSize(int len, int lastExtentLen);
-
-        /** get a suggested size for the first extent in a namespace
-         *  @param len length of record we need to insert
-         */
-        static int initialSize(int len);
-
     };
 #pragma pack()
 

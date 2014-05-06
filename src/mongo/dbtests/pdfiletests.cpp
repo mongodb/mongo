@@ -40,6 +40,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PdfileTests {
@@ -132,25 +133,29 @@ namespace PdfileTests {
         void run() {
             SmallFilesControl c;
 
-            ASSERT_EQUALS( Extent::maxSize(),
-                           ExtentManager::quantizeExtentSize( Extent::maxSize() ) );
+            Client::ReadContext ctx( "local" );
+            Database* db = ctx.ctx().db();
+            ExtentManager* em = db->getExtentManager();
+
+            ASSERT_EQUALS( em->maxSize(),
+                           em->quantizeExtentSize( em->maxSize() ) );
 
             // test that no matter what we start with, we always get to max extent size
             for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ) {
 
-                int sz = Extent::initialSize( obj );
+                int sz = em->initialSize( obj );
 
                 double totalExtentSize = sz;
 
                 int numFiles = 1;
-                int sizeLeftInExtent = Extent::maxSize() - 1;
+                int sizeLeftInExtent = em->maxSize() - 1;
 
                 for ( int i=0; i<100; i++ ) {
-                    sz = Extent::followupSize( obj , sz );
+                    sz = em->followupSize( obj , sz );
                     ASSERT( sz >= obj );
-                    ASSERT( sz >= Extent::minSize() );
-                    ASSERT( sz <= Extent::maxSize() );
-                    ASSERT( sz <= DataFile::maxSize() );
+                    ASSERT( sz >= em->minSize() );
+                    ASSERT( sz <= em->maxSize() );
+                    ASSERT( sz <= em->maxSize() );
 
                     totalExtentSize += sz;
 
@@ -159,12 +164,12 @@ namespace PdfileTests {
                     }
                     else {
                         numFiles++;
-                        sizeLeftInExtent = Extent::maxSize() - sz;
+                        sizeLeftInExtent = em->maxSize() - sz;
                     }
                 }
-                ASSERT_EQUALS( Extent::maxSize() , sz );
+                ASSERT_EQUALS( em->maxSize() , sz );
 
-                double allocatedOnDisk = (double)numFiles * Extent::maxSize();
+                double allocatedOnDisk = (double)numFiles * em->maxSize();
 
                 ASSERT( ( totalExtentSize / allocatedOnDisk ) > .95 );
 

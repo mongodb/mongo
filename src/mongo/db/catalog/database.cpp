@@ -80,8 +80,6 @@ namespace mongo {
                     return Status( ErrorCodes::BadValue, "size has to be >= 0" );
                 cappedSize += 0xff;
                 cappedSize &= 0xffffffffffffff00LL;
-                if ( cappedSize < Extent::minSize() )
-                    cappedSize = Extent::minSize();
             }
             else if ( fieldName == "max" ) {
                 if ( !e.isNumber() )
@@ -673,11 +671,11 @@ namespace mongo {
     }
 
     namespace {
-        int _massageExtentSize( long long size ) {
-            if ( size < Extent::minSize() )
-                return Extent::minSize();
-            if ( size > Extent::maxSize() )
-                return Extent::maxSize();
+        int _massageExtentSize( const ExtentManager* em, long long size ) {
+            if ( size < em->minSize() )
+                return em->minSize();
+            if ( size > em->maxSize() )
+                return em->maxSize();
             return static_cast<int>( size );
         }
     }
@@ -732,7 +730,8 @@ namespace mongo {
 
         if ( allocateDefaultSpace ) {
             if ( options.initialNumExtents > 0 ) {
-                int size = _massageExtentSize( options.cappedSize );
+                int size = _massageExtentSize( _extentManager.get(),
+                                               options.cappedSize );
                 for ( int i = 0; i < options.initialNumExtents; i++ ) {
                     collection->increaseStorageSize( txn, size, false );
                 }
@@ -740,20 +739,22 @@ namespace mongo {
             else if ( !options.initialExtentSizes.empty() ) {
                 for ( size_t i = 0; i < options.initialExtentSizes.size(); i++ ) {
                     int size = options.initialExtentSizes[i];
-                    size = _massageExtentSize( size );
+                    size = _massageExtentSize( _extentManager.get(),
+                                               size );
                     collection->increaseStorageSize( txn, size, false );
                 }
             }
             else if ( options.capped ) {
                 // normal
                 while ( collection->storageSize() < options.cappedSize ) {
-                    int sz = _massageExtentSize( options.cappedSize - collection->storageSize() );
+                    int sz = _massageExtentSize( _extentManager.get(),
+                                                 options.cappedSize - collection->storageSize() );
                     sz &= 0xffffff00;
                     collection->increaseStorageSize( txn, sz, true );
                 }
             }
             else {
-                collection->increaseStorageSize( txn, Extent::initialSize( 128 ), false );
+                collection->increaseStorageSize( txn, _extentManager->initialSize( 128 ), false );
             }
         }
 

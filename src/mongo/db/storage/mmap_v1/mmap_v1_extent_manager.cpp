@@ -235,31 +235,12 @@ namespace mongo {
         return e;
     }
 
-    int MmapV1ExtentManager::quantizeExtentSize( int size ) {
-
-        if ( size == Extent::maxSize() ) {
-            // no point doing quantizing for the entire file
-            return size;
-        }
-
-        verify( size <= Extent::maxSize() );
-
-        // make sizes align with VM page size
-        int newSize = (size + 0xfff) & 0xfffff000;
-
-        if ( newSize > Extent::maxSize() ) {
-            return Extent::maxSize();
-        }
-
-        if ( newSize < Extent::minSize() ) {
-            return Extent::minSize();
-        }
-
-        return newSize;
-    }
-
     void _quotaExceeded() {
         uasserted(12501, "quota exceeded");
+    }
+
+    int MmapV1ExtentManager::maxSize() const {
+        return DataFile::maxSize() - DataFileHeader::HeaderSize - 16;
     }
 
     DiskLoc MmapV1ExtentManager::_createExtentInFile( TransactionExperiment* txn,
@@ -279,7 +260,7 @@ namespace mongo {
             }
         }
 
-        massert( 10358, "bad new extent size", size >= Extent::minSize() && size <= Extent::maxSize() );
+        massert( 10358, "bad new extent size", size >= minSize() && size <= maxSize() );
 
         DiskLoc loc = f->allocExtentArea( txn, size );
         loc.assertOk();
@@ -300,8 +281,8 @@ namespace mongo {
                                           int maxFileNoForQuota ) {
         size = quantizeExtentSize( size );
 
-        if ( size > Extent::maxSize() )
-            size = Extent::maxSize();
+        if ( size > maxSize() )
+            size = maxSize();
 
         verify( size < DataFile::maxSize() );
 
@@ -352,11 +333,11 @@ namespace mongo {
         }
         if ( high <= 0 ) {
             // overflowed
-            high = max(approxSize, Extent::maxSize());
+            high = max(approxSize, maxSize());
         }
-        if ( high <= Extent::minSize() ) {
+        if ( high <= minSize() ) {
             // the minimum extent size is 4097
-            high = Extent::minSize() + 1;
+            high = minSize() + 1;
         }
 
         // scan free list looking for something suitable
