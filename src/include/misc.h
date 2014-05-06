@@ -142,9 +142,15 @@
 } while (0)
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
-#define	WT_VERBOSE_ERR(session, f, ...)
-#define	WT_VERBOSE_RET(session, f, ...)
-#define	WT_VERBOSE_TRET(session, f, ...)
+#define	WT_VERBOSE_ERR(session, f, ...) do {				\
+	WT_UNUSED(session);						\
+} while (0)
+#define	WT_VERBOSE_RET(session, f, ...) do {				\
+	WT_UNUSED(session);						\
+} while (0)
+#define	WT_VERBOSE_TRET(session, f, ...) do {				\
+	WT_UNUSED(session);						\
+} while (0)
 #endif
 
 /*

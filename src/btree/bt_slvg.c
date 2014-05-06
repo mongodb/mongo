@@ -1021,8 +1021,6 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	uint64_t r;
 	uint32_t i;
 
-	WT_UNUSED(session);	/* Required if verbose is disabled */
-
 	for (i = 0, r = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
