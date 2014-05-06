@@ -108,6 +108,10 @@ namespace mongo {
 
         class IntraExtentIterator;
 
+        /**
+         * @param details - takes ownership
+         * @param em - does NOT take ownership
+         */
         RecordStoreV1Base( const StringData& ns,
                            RecordStoreV1MetaData* details,
                            ExtentManager* em,

@@ -30,6 +30,8 @@
 
 #include "mongo/db/structure/record_store_v1_simple.h"
 
+#include "mongo/db/storage/record.h"
+#include "mongo/db/structure/record_store_v1_test_help.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -110,4 +112,24 @@ namespace {
         }
     }
 
+    // -----------------
+
+    TEST( SimpleRecordStoreV1, FullSimple1 ) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn,
+                                "test.foo",
+                                md,
+                                &em,
+                                false );
+
+
+        ASSERT_EQUALS( 0, md->numRecords() );
+        StatusWith<DiskLoc> result = rs.insertRecord( &txn, "abc", 4, 1000 );
+        ASSERT_TRUE( result.isOK() );
+        ASSERT_EQUALS( 1, md->numRecords() );
+        Record* record = rs.recordFor( result.getValue() );
+        ASSERT_EQUALS( string("abc"), string(record->data()) );
+    }
 }

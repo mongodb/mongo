@@ -121,12 +121,6 @@ namespace mongo {
          */
         virtual Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const = 0;
 
-        // TODO: remove
-        DataFile* getFile( TransactionExperiment* txn,
-                           int n,
-                           int sizeNeeded = 0,
-                           bool preallocateOnly = false );
-
         /**
          * @return maximum size of an Extent
          */

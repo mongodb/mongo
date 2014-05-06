@@ -30,7 +30,9 @@ env.Library(
 
 env.CppUnitTest(
     target='record_store_v1_simple_test',
-    source='record_store_v1_simple_test.cpp',
+    source=['record_store_v1_simple_test.cpp',
+            'record_store_v1_test_help.cpp',
+            ],
     LIBDEPS=[
         'record_store_v1'
         ]
