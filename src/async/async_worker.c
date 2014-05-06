@@ -36,7 +36,7 @@ retry:
 		WT_ORDERED_READ(last_consume, async->alloc_tail);
 	}
 	if (F_ISSET(conn, WT_CONN_PANIC))
-		__wt_panic(session);
+		return (__wt_panic(session));
 	if (tries >= max_tries ||
 	    async->flush_state == WT_ASYNC_FLUSHING)
 		return (0);
@@ -154,7 +154,6 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
     WT_CURSOR *cursor)
 {
 	WT_ASYNC_OP *asyncop;
-	WT_DECL_RET;
 	WT_ITEM val;
 	WT_SESSION *wt_session;
 
@@ -164,42 +163,42 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * If needed, also set the value.
 	 */
 	if (op->optype != WT_AOP_COMPACT) {
-		__wt_cursor_get_raw_key(&asyncop->c, &val);
+		WT_RET(__wt_cursor_get_raw_key(&asyncop->c, &val));
 		__wt_cursor_set_raw_key(cursor, &val);
 		if (op->optype == WT_AOP_INSERT ||
 		    op->optype == WT_AOP_UPDATE) {
-			__wt_cursor_get_raw_value(&asyncop->c, &val);
+			WT_RET(__wt_cursor_get_raw_value(&asyncop->c, &val));
 			__wt_cursor_set_raw_value(cursor, &val);
 		}
 	}
 	switch (op->optype) {
 		case WT_AOP_COMPACT:
 			wt_session = &session->iface;
-			WT_ERR(wt_session->compact(wt_session,
+			WT_RET(wt_session->compact(wt_session,
 			    op->format->uri, op->format->config));
 			break;
 		case WT_AOP_INSERT:
 		case WT_AOP_UPDATE:
-			WT_ERR(cursor->insert(cursor));
+			WT_RET(cursor->insert(cursor));
 			break;
 		case WT_AOP_REMOVE:
-			WT_ERR(cursor->remove(cursor));
+			WT_RET(cursor->remove(cursor));
 			break;
 		case WT_AOP_SEARCH:
-			WT_ERR(cursor->search(cursor));
+			WT_RET(cursor->search(cursor));
 			/*
 			 * Get the value from the cursor and put it into
 			 * the op for op->get_value.
 			 */
-			__wt_cursor_get_raw_value(cursor, &val);
+			WT_RET(__wt_cursor_get_raw_value(cursor, &val));
 			__wt_cursor_set_raw_value(&asyncop->c, &val);
 			break;
+		case WT_AOP_NONE:
 		default:
-			WT_ERR_MSG(session, EINVAL, "Unknown async optype %d\n",
+			WT_RET_MSG(session, EINVAL, "Unknown async optype %d\n",
 			    op->optype);
 	}
-err:
-	return (ret);
+	return (0);
 }
 
 /*
@@ -245,7 +244,7 @@ __async_worker_op(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			WT_TRET(wt_session->rollback_transaction(
 			    wt_session, NULL));
 		F_CLR(&asyncop->c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-		cursor->reset(cursor);
+		WT_TRET(cursor->reset(cursor));
 	}
 	/*
 	 * After the callback returns, and the transaction resolved release
@@ -271,7 +270,6 @@ __wt_async_worker(void *arg)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t flush_gen;
-	uint32_t fc;
 
 	session = arg;
 	conn = S2C(session);
@@ -288,7 +286,7 @@ __wt_async_worker(void *arg)
 			 */
 			(void)__async_worker_op(session, op, &worker);
 			if (F_ISSET(conn, WT_CONN_PANIC))
-				__wt_panic(session);
+				WT_ERR(__wt_panic(session));
 		} else if (async->flush_state == WT_ASYNC_FLUSHING) {
 			/*
 			 * Worker flushing going on.  Last worker to the party
@@ -297,7 +295,7 @@ __wt_async_worker(void *arg)
 			 * the queue.
 			 */
 			WT_ORDERED_READ(flush_gen, async->flush_gen);
-			if ((fc = WT_ATOMIC_ADD(async->flush_count, 1)) ==
+			if (WT_ATOMIC_ADD(async->flush_count, 1) ==
 			    conn->async_workers) {
 				/*
 				 * We're last.  All workers accounted for so

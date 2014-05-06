@@ -164,6 +164,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 			if (ret == 0) {
 				if ((t_ret = op->get_value(
 				    op, &value)) != 0) {
+					ret = t_ret;
 					lprintf(cfg, ret, 0,
 					    "get_value in read.");
 					goto err;
@@ -371,7 +372,9 @@ op_err:			lprintf(cfg, ret, 0,
 			op = thread->workload->ops;
 	}
 
-	conn->async_flush(conn);
+	if (conn->async_flush(conn) != 0)
+		goto err;
+
 	/* Notify our caller we failed and shut the system down. */
 	if (0) {
 err:		cfg->error = cfg->stop = 1;
@@ -941,7 +944,8 @@ retry:		if ((ret = conn->async_new_op(
 	 * async_flush and those calls will convoy.  That is not the
 	 * most efficient way, but we want to flush before measuring latency.
 	 */
-	conn->async_flush(conn);
+	if (conn->async_flush(conn) != 0)
+		goto err;
 	if (measure_latency) {
 		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
 			lprintf(cfg, ret, 0,
@@ -1297,15 +1301,21 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 				 * error, return.
 				 */
 				if (ret == ENOMEM) {
-					usleep(10000);
+					(void)usleep(10000);
 					goto retry;
 				}
 				return (ret);
 			}
 			asyncop->c.lang_private = &tables;
-			asyncop->compact(asyncop);
+			if ((ret = asyncop->compact(asyncop)) != 0) {
+				lprintf(cfg, ret, 0, "Async compact failed.");
+				return (ret);
+			}
 		}
-		cfg->conn->async_flush(cfg->conn);
+		if ((ret = cfg->conn->async_flush(cfg->conn)) != 0) {
+			lprintf(cfg, ret, 0, "Populate async flush failed.");
+			return (ret);
+		}
 		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
 			lprintf(cfg, ret, 0, "Get time failed in populate.");
 			return (ret);

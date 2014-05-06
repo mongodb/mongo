@@ -22,11 +22,10 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 	uint64_t cfg_hash, uri_hash;
-	int have_cursor;
 
 	async = conn->async;
+	c = NULL;
 	op->format = NULL;
-	have_cursor = 0;
 
 	if (uri != NULL)
 		uri_hash = __wt_hash_city64(uri, strlen(uri));
@@ -66,11 +65,10 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 */
 	wt_session = &session->iface;
 	WT_ERR(wt_session->open_cursor(wt_session, uri, NULL, NULL, &c));
-	have_cursor = 1;
 	WT_ERR(__wt_strdup(session, c->key_format, &af->key_format));
 	WT_ERR(__wt_strdup(session, c->value_format, &af->value_format));
 	WT_ERR(c->close(c));
-	have_cursor = 0;
+	c = NULL;
 
 	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
 	__wt_spin_unlock(session, &async->ops_lock);
@@ -89,8 +87,8 @@ setup:	op->format = af;
 	return (0);
 
 err:
-	if (have_cursor)
-		c->close(c);
+	if (c != NULL)
+		(void)c->close(c);
 	__wt_free(session, af->uri);
 	__wt_free(session, af->config);
 	__wt_free(session, af->key_format);
@@ -117,6 +115,7 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
 	session = conn->default_session;
 	WT_STAT_FAST_CONN_INCR(conn->default_session, async_op_alloc);
 	*opp = NULL;
+	op = NULL;
 retry:
 	ret = 0;
 	WT_ORDERED_READ(save_i, async->ops_index);
@@ -376,7 +375,7 @@ retry:
 	 * things off the work queue with the lock.
 	 */
 	async->flush_count = 0;
-	WT_ATOMIC_ADD(async->flush_gen, 1);
+	(void)WT_ATOMIC_ADD(async->flush_gen, 1);
 	WT_ASSERT(conn->default_session,
 	    async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;

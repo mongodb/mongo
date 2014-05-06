@@ -30,15 +30,18 @@ static void
 __async_set_key(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_CURSOR *c;
+	WT_DECL_RET;
 	va_list ap;
 
 	c = &asyncop->c;
 	va_start(ap, asyncop);
 	__wt_cursor_set_keyv(c, c->flags, ap);
 	if (!WT_DATA_IN_ITEM(&c->key) && !WT_CURSOR_RECNO(c))
-		__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &c->key,
-		    c->key.data, c->key.size);
+		WT_ERR(__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &c->key,
+		    c->key.data, c->key.size));
 	va_end(ap);
+	if (0)
+err:		c->saved_err = ret;
 }
 
 /*
@@ -65,6 +68,7 @@ static void
 __async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_CURSOR *c;
+	WT_DECL_RET;
 	va_list ap;
 
 	c = &asyncop->c;
@@ -72,9 +76,11 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 	__wt_cursor_set_valuev(c, ap);
 	/* Copy the data, if it is pointing at data elsewhere. */
 	if (!WT_DATA_IN_ITEM(&c->value))
-		__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop),
-		    &c->value, c->value.data, c->value.size);
+		WT_ERR(__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop),
+		    &c->value, c->value.data, c->value.size));
 	va_end(ap);
+	if (0)
+err:		c->saved_err = ret;
 }
 
 /*
@@ -236,7 +242,7 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop->c.get_value = __wt_cursor_get_value;
 	asyncop->c.set_value = __wt_cursor_set_value;
 	asyncop->c.recno = 0;
-	memset(&asyncop->c.raw_recno_buf, 0, sizeof(asyncop->c.raw_recno_buf));
+	memset(asyncop->c.raw_recno_buf, 0, sizeof(asyncop->c.raw_recno_buf));
 	memset(&asyncop->c.key, 0, sizeof(asyncop->c.key));
 	memset(&asyncop->c.value, 0, sizeof(asyncop->c.value));
 	asyncop->c.session = (WT_SESSION *)conn->default_session;
@@ -286,7 +292,7 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
 #ifdef	HAVE_DIAGNOSTIC
 	WT_ORDERED_READ(my_op, async->async_queue[my_slot]);
 	if (my_op != NULL)
-		__wt_panic(conn->default_session);
+		return (__wt_panic(conn->default_session));
 #endif
 	WT_PUBLISH(async->async_queue[my_slot], op);
 	op->state = WT_ASYNCOP_ENQUEUED;
@@ -314,13 +320,14 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 {
 	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
+	WT_DECL_RET;
 	uint32_t i;
 
 	async = conn->async;
 	/*
 	 * Initialize the flush op structure.
 	 */
-	__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX);
+	WT_RET(__async_op_init(conn, &async->flush_op, OPS_INVALID_INDEX));
 
 	/*
 	 * Allocate and initialize the work queue.  This is sized so that
@@ -333,11 +340,21 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	/*
 	 * Allocate and initialize all the user ops.
 	 */
-	WT_RET(__wt_calloc_def(conn->default_session,
+	WT_ERR(__wt_calloc_def(conn->default_session,
 	    conn->async_size, &async->async_ops));
 	for (i = 0; i < conn->async_size; i++) {
 		op = &async->async_ops[i];
-		__async_op_init(conn, op, i);
+		WT_ERR(__async_op_init(conn, op, i));
 	}
 	return (0);
+err:
+	if (async->async_ops != NULL) {
+		__wt_free(conn->default_session, async->async_ops);
+		async->async_ops = NULL;
+	}
+	if (async->async_queue != NULL) {
+		__wt_free(conn->default_session, async->async_queue);
+		async->async_queue = NULL;
+	}
+	return (ret);
 }
