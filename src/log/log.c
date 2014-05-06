@@ -812,6 +812,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
 	do {
 		if (rd_lsn.offset >= log_size) {
+advance:
 			/*
 			 * If we read the last record, go to the next file.
 			 */
@@ -839,6 +840,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * Read the minimum allocation size a record could be.
 		 */
 		WT_ASSERT(session, buf.memsize >= allocsize);
+		/*
+		 * The log file end could be the middle of a log record.
+		 */
+		if (rd_lsn.offset + allocsize >= log_size)
+			goto advance;
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
 		/*
@@ -861,6 +867,12 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);
 		if (reclen > allocsize) {
+			/*
+			 * The log file end could be the middle of this
+			 * log record.
+			 */
+			if (rd_lsn.offset + rdup_len >= log_size)
+				goto advance;
 			/*
 			 * We need to round up and read in the full padded
 			 * record, especially for direct I/O.
