@@ -27,12 +27,11 @@ __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp)
 	 * We always NUL-terminate the returned string (even if it's empty),
 	 * make sure there's buffer space for a trailing NUL in all cases.
 	 */
-	WT_RET(__wt_buf_init(session, buf, 10));
+	WT_RET(__wt_buf_init(session, buf, 100));
 
 	while ((c = fgetc(fp)) != EOF) {
 		/* Leave space for a trailing NUL. */
-		if (buf->size + 1 >= buf->memsize)
-			WT_RET(__wt_buf_grow(session, buf, buf->size + 1024));
+		WT_RET(__wt_buf_extend(session, buf, buf->size + 2));
 		if (c == '\n') {
 			if (buf->size == 0)
 				continue;

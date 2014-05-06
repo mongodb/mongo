@@ -114,11 +114,11 @@ __wt_search_insert(WT_SESSION_IMPL *session,
  */
 int
 __wt_row_search(WT_SESSION_IMPL *session,
-    WT_ITEM *srch_key, WT_REF *leaf_page, WT_CURSOR_BTREE *cbt)
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_ITEM *item, _item;
+	WT_ITEM *item;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *child, *parent;
@@ -128,15 +128,12 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	int cmp, depth;
 
 	btree = S2BT(session);
+	item = &cbt->search_key;
 	rip = NULL;
 	match = 0;				/* -Wuninitialized */
 
 	__cursor_search_clear(cbt);
 
-	item = &_item;
-	WT_CLEAR_INLINE(WT_ITEM, *item);
-
-restart:
 	/*
 	 * The row-store search routine uses a different comparison API.
 	 * The assumption is we're comparing more than a few keys with
@@ -151,8 +148,8 @@ restart:
 	 * In the service of eviction splits, we're only searching a single leaf
 	 * page, not a full tree.
 	 */
-	if (leaf_page != NULL) {
-		child = leaf_page;
+	if (leaf != NULL) {
+		child = leaf;
 		goto leaf_only;
 	}
 
@@ -160,7 +157,7 @@ restart:
 	cmp = -1;
 	parent = child = &btree->root;
 	for (depth = 2;; ++depth) {
-		page = parent->page;
+restart:	page = parent->page;
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
@@ -270,24 +267,21 @@ restart:
 descend:	WT_ASSERT(session, child != NULL);
 
 		/*
-		 * Swap the parent page for the child page; if the page splits
-		 * while we're waiting for it, restart the search, otherwise
-		 * return on error, the swap call ensures we're holding nothing
-		 * on failure.
+		 * Swap the parent page for the child page. If the page splits
+		 * while we're retrieving it, restart the search in the parent
+		 * page; otherwise return on error, the swap call ensures we're
+		 * holding nothing on failure.
 		 */
-		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+		switch (ret = __wt_page_swap(session, parent, child, 0)) {
+		case 0:
 			parent = child;
-			continue;
-		}
-		/*
-		 * Restart is returned if we find a page that's been split; the
-		 * held page isn't discarded when restart is returned, discard
-		 * it and restart the search from the top of the tree.
-		 */
-		if (ret == WT_RESTART &&
-		    (ret = __wt_page_release(session, parent)) == 0)
+			break;
+		case WT_RESTART:
+			skiphigh = skiplow = 0;
 			goto restart;
-		return (ret);
+		default:
+			return (ret);
+		}
 	}
 
 	/* Track how deep the tree gets. */
@@ -342,21 +336,6 @@ leaf_only:
 			base = indx + 1;
 			--limit;
 		}
-
-	/*
-	 * We don't expect the search item to have any allocated memory (it's a
-	 * performance problem if it does).  Trust, but verify, and complain if
-	 * there's a problem.
-	 */
-	if (item->mem != NULL) {
-		static int complain = 1;
-		if (complain) {
-			__wt_errx(session,
-			    "unexpected key item memory allocation in search");
-			complain = 0;
-		}
-		__wt_buf_free(session, item);
-	}
 
 	/*
 	 * The best case is finding an exact match in the page's WT_ROW slot
@@ -480,7 +459,9 @@ restart:
 		pindex = WT_INTL_INDEX_COPY(btree->root.page);
 		cbt->slot = pindex->entries < 2 ?
 		    __wt_random() % page->pg_row_entries : 0;
-		return (0);
+
+		return (__wt_row_leaf_key(session,
+		    page, page->pg_row_d + cbt->slot, &cbt->search_key, 0));
 	}
 
 	/*

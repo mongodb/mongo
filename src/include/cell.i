@@ -529,7 +529,7 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
 	 *
 	 * !!!
 	 * This line of code is really a call to __wt_off_page, but we know the
-	 * cell we're given with either be on the page or past the end of page,
+	 * cell we're given will either be on the page or past the end of page,
 	 * so it's a simpler check.  (I wouldn't bother, but the real problem is
 	 * we can't call __wt_off_page directly, it's in btree.i which requires
 	 * this file be included first.)

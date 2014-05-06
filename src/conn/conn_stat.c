@@ -25,6 +25,7 @@
 void
 __wt_conn_stat_init(WT_SESSION_IMPL *session)
 {
+	__wt_async_stats_update(session);
 	__wt_cache_stats_update(session);
 }
 

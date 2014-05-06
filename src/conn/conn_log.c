@@ -259,6 +259,7 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 	}
 
 	WT_TRET(__wt_log_slot_destroy(session));
+	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);

@@ -83,7 +83,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 		/* Allocate a WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
-		WT_ERR(__wt_txn_modify(session, cbt, upd));
+		WT_ERR(__wt_txn_modify(session, upd));
 		logged = 1;
 
 		/*
@@ -133,7 +133,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		if (upd == NULL) {
 			WT_ERR(
 			    __wt_update_alloc(session, value, &upd, &upd_size));
-			WT_ERR(__wt_txn_modify(session, cbt, upd));
+			WT_ERR(__wt_txn_modify(session, upd));
 			logged = 1;
 		} else
 			upd_size = sizeof(WT_UPDATE) + upd->size;
@@ -172,6 +172,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			    session, page, cbt->ins_head, cbt->ins_stack,
 			    &ins, ins_size, skipdepth));
 	}
+
+	/* If the update was successful, add it to the in-memory log. */
+	if (logged)
+		WT_ERR(__wt_txn_log_op(session, cbt));
 
 	if (0) {
 err:		/*

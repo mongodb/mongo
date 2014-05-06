@@ -17,6 +17,7 @@ int
 __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_ROW *rip;
@@ -47,8 +48,9 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Allocate a bit array and figure out the set of "interesting" keys,
 	 * marking up the array.
 	 */
-	WT_RET(__wt_scr_alloc(
-	    session, (uint32_t)__bitstr_size(page->pg_row_entries), &tmp));
+	WT_RET(__wt_scr_alloc(session, 0, &key));
+	WT_RET(__wt_scr_alloc(session,
+	    (uint32_t)__bitstr_size(page->pg_row_entries), &tmp));
 
 	if ((gap = btree->key_gap) == 0)
 		gap = 1;
@@ -58,11 +60,12 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (rip = page->pg_row_d, i = 0; i < page->pg_row_entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_leaf_key_work(
-			    session, page, rip, NULL, 1));
+			    session, page, rip, key, 1));
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(&key);
+	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -106,13 +109,13 @@ __inmem_row_leaf_slots(
  */
 int
 __wt_row_leaf_key_copy(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb)
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *keyb)
 {
-	WT_RET(__wt_row_leaf_key_work(session, page, rip_arg, retb, 0));
+	WT_RET(__wt_row_leaf_key_work(session, page, rip_arg, keyb, 0));
 
 	/* The return buffer may only hold a reference to a key, copy it. */
-	if (!WT_DATA_IN_ITEM(retb))
-		WT_RET(__wt_buf_set(session, retb, retb->data, retb->size));
+	if (!WT_DATA_IN_ITEM(keyb))
+		WT_RET(__wt_buf_set(session, keyb, keyb->data, keyb->size));
 
 	return (0);
 }
@@ -124,30 +127,32 @@ __wt_row_leaf_key_copy(
  */
 int
 __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb_arg, int instantiate)
+    WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *keyb, int instantiate)
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_BTREE *btree;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_DECL_ITEM(retb);
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ROW *rip;
-	int slot_offset;
+	WT_ROW *rip, *jump_rip;
+	size_t size;
+	u_int last_prefix;
+	int jump_slot_offset, slot_offset;
 	void *key;
+	const void *p;
 
 	btree = S2BT(session);
 	unpack = &_unpack;
 	rip = rip_arg;
 
-	/* If the caller didn't pass us a buffer, allocate a scratch one. */
-	if ((retb = retb_arg) == NULL)
-		WT_ERR(__wt_scr_alloc(session, 0, &retb));
+	jump_rip = NULL;
+	jump_slot_offset = 0;
+	last_prefix = 0;
 
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
-		key = WT_ROW_KEY_COPY(rip);
+jump_slot:	key = WT_ROW_KEY_COPY(rip);
 
 		/*
 		 * Key copied.
@@ -183,8 +188,8 @@ off_page:		ikey = key;
 			 * Take a copy and wrap up.
 			 */
 			if (slot_offset == 0) {
-				retb->data = WT_IKEY_DATA(ikey);
-				retb->size = ikey->size;
+				keyb->data = WT_IKEY_DATA(ikey);
+				keyb->size = ikey->size;
 
 				/*
 				 * The key is already instantiated, ignore the
@@ -219,8 +224,8 @@ off_page:		ikey = key;
 			 * In short: if it's not an overflow key, take a copy
 			 * and roll forward.
 			 */
-			retb->data = WT_IKEY_DATA(ikey);
-			retb->size = ikey->size;
+			keyb->data = WT_IKEY_DATA(ikey);
+			keyb->size = ikey->size;
 			direction = FORWARD;
 			goto next;
 		}
@@ -247,17 +252,17 @@ off_page:		ikey = key;
 			 */
 			if (slot_offset == 0) {
 				WT_ERR(__wt_readlock(
-				    session, S2BT(session)->ovfl_lock));
+				    session, btree->ovfl_lock));
 				key = WT_ROW_KEY_COPY(rip);
 				if (__wt_off_page(page, key)) {
-					WT_ERR(__wt_rwunlock(session,
-					    S2BT(session)->ovfl_lock));
+					WT_ERR(__wt_rwunlock(
+					    session, btree->ovfl_lock));
 					goto off_page;
 				}
 				ret = __wt_dsk_cell_data_ref(
-				    session, WT_PAGE_ROW_LEAF, unpack, retb);
-				WT_TRET(__wt_rwunlock(session,
-				    S2BT(session)->ovfl_lock));
+				    session, WT_PAGE_ROW_LEAF, unpack, keyb);
+				WT_TRET(__wt_rwunlock(
+				    session, btree->ovfl_lock));
 				WT_ERR(ret);
 				break;
 			}
@@ -286,15 +291,20 @@ off_page:		ikey = key;
 			 * what we want.  Take a copy and wrap up.
 			 *
 			 * If we wanted a different key, this key has a valid
-			 * prefix we can use it.
+			 * prefix, we can use it.
 			 *	If rolling backward, take a copy of the key and
 			 * switch directions, we can roll forward from this key.
 			 *	If rolling forward there's a bug, we should have
 			 * found this key while rolling backwards and switched
 			 * directions then.
 			 */
-			WT_ERR(__wt_dsk_cell_data_ref(
-			    session, WT_PAGE_ROW_LEAF, unpack, retb));
+			if (btree->huffman_key == NULL) {
+				keyb->data = unpack->data;
+				keyb->size = unpack->size;
+			} else
+				WT_ERR(__wt_dsk_cell_data_ref(
+				    session, WT_PAGE_ROW_LEAF, unpack, keyb));
+
 			if (slot_offset == 0) {
 				/*
 				 * If we have an uncompressed, on-page key with
@@ -310,7 +320,20 @@ off_page:		ikey = key;
 
 			WT_ASSERT(session, direction == BACKWARD);
 			direction = FORWARD;
-			goto next;
+
+			/*
+			 * Switching to the forward roll; skip over any list of
+			 * keys with compatible prefixes.
+			 */
+			rip = jump_rip;
+			slot_offset = jump_slot_offset;
+
+			/*
+			 * I'm using an explicit branch instead of a continue,
+			 * it needs to be obvious that new code at the top of
+			 * this loop is problematical.
+			 */
+			goto jump_slot;
 		}
 
 		/*
@@ -320,31 +343,58 @@ off_page:		ikey = key;
 		 *	If rolling forward, build the full key and keep rolling
 		 * forward.
 		 */
+		if (direction == BACKWARD) {
+			/*
+			 * If there's a set of keys with identical prefixes, we
+			 * don't want to instantiate each one, the prefixes are
+			 * all the same.
+			 *
+			 * As we roll backward through the page, track the last
+			 * time the prefix decreased in size, so we can start
+			 * with that key during our roll-forward.  For a page
+			 * populated with a single key prefix, we'll be able to
+			 * instantiate the key we want as soon as we find a key
+			 * without a prefix.
+			 */
+			if (slot_offset == 0)
+				last_prefix = unpack->prefix;
+			if (slot_offset == 0 || last_prefix > unpack->prefix) {
+				jump_rip = rip;
+				jump_slot_offset = slot_offset;
+				last_prefix = unpack->prefix;
+			}
+		}
 		if (direction == FORWARD) {
-			/* Get a reference to the current key's bytes. */
-			if (tmp == NULL)
-				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			WT_ERR(__wt_dsk_cell_data_ref(
-			    session, WT_PAGE_ROW_LEAF, unpack, tmp));
+			/*
+			 * Get a reference to the current key's bytes.  Usually
+			 * we want bytes from the page, fast-path that case.
+			 */
+			if (btree->huffman_key == NULL) {
+				p = unpack->data;
+				size = unpack->size;
+			} else {
+				if (tmp == NULL)
+					WT_ERR(
+					__wt_scr_alloc(session, 0, &tmp));
+				WT_ERR(__wt_dsk_cell_data_ref(
+				    session, WT_PAGE_ROW_LEAF, unpack, tmp));
+				p = tmp->data;
+				size = tmp->size;
+			}
 
 			/*
-			 * The return buffer may only hold a reference to a key,
-			 * if we've not actually rolled forward until now.  Copy
-			 * the data into real buffer memory.
+			 * Grow the buffer as necessary as well as ensure data
+			 * has been copied into local buffer space, then append
+			 * the suffix to the prefix already in the buffer.
+			 *
+			 * Don't grow the buffer unnecessarily or copy data we
+			 * don't need, truncate the item's data length to the
+			 * prefix bytes.
 			 */
-			if (retb->data != retb->mem)
-				WT_ERR(__wt_buf_set(
-				    session, retb, retb->data, retb->size));
-
-			/*
-			 * Ensure the buffer can hold the key's bytes plus the
-			 *    prefix (and also setting the final buffer size);
-			 * Append the key to the prefix (already in the buffer).
-			 */
-			WT_ERR(__wt_buf_initsize(
-			    session, retb, tmp->size + unpack->prefix));
-			memcpy((uint8_t *)
-			    retb->data + unpack->prefix, tmp->data, tmp->size);
+			keyb->size = unpack->prefix;
+			WT_ERR(__wt_buf_grow(session, keyb, keyb->size + size));
+			memcpy((uint8_t *)keyb->data + keyb->size, p, size);
+			keyb->size += size;
 
 			if (slot_offset == 0)
 				break;
@@ -362,13 +412,26 @@ next:		switch (direction) {
 		}
 	}
 
-	/* Optionally instantiate the key. */
+	/*
+	 * Optionally instantiate the key: there's a cost to figuring out a key
+	 * value in a leaf page with prefix-compressed or Huffman encoded keys,
+	 * amortize the cost by instantiating a copy of the calculated key in
+	 * allocated memory.  We don't instantiate keys when pages are first
+	 * brought into memory because it's wasted effort if the page is only
+	 * read by a cursor in sorted order.  If, instead, the page is read by a
+	 * cursor in reverse order, we immediately instantiate periodic keys for
+	 * the page (otherwise the reverse walk would be insanely slow).  If,
+	 * instead, the page is randomly searched, we instantiate keys as they
+	 * are accessed (meaning, for example, as long as the binary search only
+	 * touches one-half of the page, the only keys we instantiate will be in
+	 * that half of the page).
+	 */
 	if (instantiate) {
 		key = WT_ROW_KEY_COPY(rip_arg);
 		if (!__wt_off_page(page, key)) {
 			WT_ERR(__wt_row_ikey(session,
 			    WT_PAGE_DISK_OFFSET(page, key),
-			    retb->data, retb->size, &ikey));
+			    keyb->data, keyb->size, &ikey));
 
 			/*
 			 * Serialize the swap of the key into place: on success,
@@ -384,9 +447,6 @@ next:		switch (direction) {
 	}
 
 err:	__wt_scr_free(&tmp);
-	if (retb != retb_arg)
-		__wt_scr_free(&retb);
-
 	return (ret);
 }
 

@@ -58,9 +58,9 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 		WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
 
 		/* Build the in-memory version of the page. */
-		WT_ERR(__wt_page_inmem(session, ref, tmp.mem,
-		    F_ISSET(&tmp, WT_ITEM_MAPPED) ?
-		    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
+		WT_ERR(__wt_page_inmem(session, ref, tmp.data,
+		    WT_DATA_IN_ITEM(&tmp) ?
+		    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 
 		/* If the page was deleted, instantiate that information. */
 		if (previous_state == WT_REF_DELETED)

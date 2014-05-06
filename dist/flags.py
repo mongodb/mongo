@@ -43,7 +43,6 @@ flags = {
 	'rec_write' : [
 		'EVICTION_LOCKED',
 		'SKIP_UPDATE_ERR',
-		'SKIP_UPDATE_OK',
 		'SKIP_UPDATE_RESTORE'
 	],
 	'shared_cache' : [
@@ -56,6 +55,7 @@ flags = {
 		'TXN_LOG_CKPT_STOP',
 	],
 	'verbose' : [
+		'VERB_api',
 		'VERB_block',
 		'VERB_checkpoint',
 		'VERB_compact',
@@ -64,6 +64,7 @@ flags = {
 		'VERB_fileops',
 		'VERB_log',
 		'VERB_lsm',
+		'VERB_metadata',
 		'VERB_mutex',
 		'VERB_overflow',
 		'VERB_read',
@@ -84,6 +85,7 @@ flags = {
 		'CONN_CACHE_POOL',
 		'CONN_CKPT_SYNC',
 		'CONN_EVICTION_RUN',
+		'CONN_LEAK_MEMORY',
 		'CONN_LSM_MERGE',
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',

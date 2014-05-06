@@ -253,6 +253,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
+	j = 0;
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
 
@@ -399,13 +400,23 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointed %u", i);
 		}
+keep_going:
 		__lsm_unpin_chunks(session, &cookie);
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
 	}
-err:	__lsm_unpin_chunks(session, &cookie);
+
+err:	/*
+	 * XXX an EBUSY is being returned from somewhere.  Until we can track
+	 * it down, don't have the worker thread give up (and panic).  Just
+	 * keep going.
+	 */
+	if (ret == EBUSY)
+		goto keep_going;
+
+	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
 	/*
 	 * The thread will only exit with failure if we run out of memory or
@@ -430,7 +441,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_BLOOM *bloom;
 	WT_CURSOR *src;
 	WT_DECL_RET;
-	WT_ITEM buf, key;
+	WT_ITEM key;
 	WT_SESSION *wt_session;
 	uint64_t insert_count;
 	int exist;
@@ -440,12 +451,9 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	 * allocated.  After an open, however, it may not have been.
 	 * Deal with that here.
 	 */
-	if (chunk->bloom_uri == NULL) {
-		WT_CLEAR(buf);
+	if (chunk->bloom_uri == NULL)
 		WT_RET(__wt_lsm_tree_bloom_name(
-		    session, lsm_tree, chunk->id, &buf));
-		chunk->bloom_uri = __wt_buf_steal(session, &buf);
-	}
+		    session, lsm_tree, chunk->id, &chunk->bloom_uri));
 
 	/*
 	 * Drop the bloom filter first - there may be some content hanging over

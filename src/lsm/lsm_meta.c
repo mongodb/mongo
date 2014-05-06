@@ -17,13 +17,10 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_CONFIG cparser, lparser;
 	WT_CONFIG_ITEM ck, cv, lk, lv;
 	WT_DECL_RET;
-	WT_ITEM buf;
 	WT_LSM_CHUNK *chunk;
 	WT_NAMED_COLLATOR *ncoll;
 	const char *lsmconfig;
 	u_int nchunks;
-
-	WT_CLEAR(buf);
 
 	WT_RET(__wt_metadata_search(session, lsm_tree->name, &lsmconfig));
 	WT_ERR(__wt_config_init(session, &cparser, lsmconfig));
@@ -98,18 +95,15 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					lsm_tree->chunk[nchunks++] = chunk;
 					chunk->id = (uint32_t)lv.val;
 					WT_ERR(__wt_lsm_tree_chunk_name(session,
-					    lsm_tree, chunk->id, &buf));
-					chunk->uri =
-					    __wt_buf_steal(session, &buf);
+					    lsm_tree, chunk->id, &chunk->uri));
 					F_SET(chunk,
 					    WT_LSM_CHUNK_ONDISK |
 					    WT_LSM_CHUNK_STABLE);
 				} else if (WT_STRING_MATCH(
 				    "bloom", lk.str, lk.len)) {
-					WT_ERR(__wt_lsm_tree_bloom_name(session,
-					    lsm_tree, chunk->id, &buf));
-					chunk->bloom_uri =
-					    __wt_buf_steal(session, &buf);
+					WT_ERR(__wt_lsm_tree_bloom_name(
+					    session, lsm_tree,
+					    chunk->id, &chunk->bloom_uri));
 					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 					continue;
 				} else if (WT_STRING_MATCH(

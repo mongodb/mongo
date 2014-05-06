@@ -27,13 +27,13 @@ typedef struct {
 static const					/* Output separator */
     char * const sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 
-static int  __debug_cell(WT_DBG *, WT_PAGE_HEADER *, WT_CELL_UNPACK *);
+static int  __debug_cell(WT_DBG *, const WT_PAGE_HEADER *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(
 	WT_DBG *, WT_PAGE *, int type, const char *, WT_CELL_UNPACK *);
 static void __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
-static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_HEADER *);
-static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_HEADER *);
+static int  __debug_dsk_cell(WT_DBG *, const WT_PAGE_HEADER *);
+static void __debug_dsk_col_fix(WT_DBG *, const WT_PAGE_HEADER *);
 static void __debug_ikey(WT_DBG *, WT_IKEY *);
 static void __debug_item(WT_DBG *, const char *, const void *, size_t);
 static int  __debug_page(WT_DBG *, WT_PAGE *, uint32_t);
@@ -278,7 +278,7 @@ err:	__wt_scr_free(&buf);
  */
 int
 __wt_debug_disk(
-    WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, const char *ofile)
+    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, const char *ofile)
 {
 	WT_DBG *ds, _ds;
 	WT_DECL_RET;
@@ -327,7 +327,7 @@ __wt_debug_disk(
  *	Dump a WT_PAGE_COL_FIX page.
  */
 static void
-__debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_HEADER *dsk)
+__debug_dsk_col_fix(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
 	uint32_t i;
@@ -347,7 +347,7 @@ __debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_HEADER *dsk)
  *	Dump a page of WT_CELL's.
  */
 static int
-__debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
+__debug_dsk_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -590,6 +590,10 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", disk-mapped");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 		__dmsg(ds, ", evict-lru");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SCANNING))
+		__dmsg(ds, ", scanning");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLITTING))
+		__dmsg(ds, ", splitting");
 
 	if (mod != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {
@@ -622,7 +626,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT *ins;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	WT_SESSION_IMPL *session;
 	uint64_t recno;
 	uint32_t i;
@@ -910,7 +914,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
  *	Dump a single unpacked WT_CELL.
  */
 static int
-__debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
+__debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;

@@ -15,7 +15,8 @@
 
 #define	API_CALL_NOCONF(s, h, n, cur, dh) do {				\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
-	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0)
+	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
+	WT_VERBOSE_ERR((s), api, "CALL: " #h ":" #n)
 
 #define	API_CALL(s, h, n, cur, dh, config, cfg) do {			\
 	const char *cfg[] =						\
@@ -24,7 +25,8 @@
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
 	WT_ERR(((config) != NULL) ?					\
 	    __wt_config_check((s),					\
-	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0)
+	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0);		\
+	WT_VERBOSE_ERR((s), api, "CALL: " #h ":" #n)
 
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
@@ -42,7 +44,7 @@
 #define	TXN_API_CALL(s, h, n, cur, bt, config, cfg) do {		\
 	int __autotxn = 0;						\
 	API_CALL(s, h, n, bt, cur, config, cfg);			\
-	__autotxn = !F_ISSET(&(s)->txn, TXN_RUNNING);			\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
@@ -50,7 +52,7 @@
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
 	int __autotxn = 0;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
-	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);  \
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
@@ -115,3 +117,7 @@
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\
 	TXN_API_END(s, ret)
+
+#define	ASYNCOP_API_CALL(conn, s, n)					\
+	s = (conn)->default_session;					\
+	API_CALL_NOCONF(s, asyncop, n, NULL, NULL)

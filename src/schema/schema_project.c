@@ -55,7 +55,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 				WT_RET(__pack_init(
 				    session, &pack, c->key_format));
 			buf = &c->key;
-			p = (uint8_t *)buf->mem;
+			p = (uint8_t *)buf->data;
 			end = p + buf->size;
 			continue;
 
@@ -63,7 +63,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
 			buf = &c->value;
-			p = (uint8_t *)buf->mem;
+			p = (uint8_t *)buf->data;
 			end = p + buf->size;
 			continue;
 		}
@@ -169,8 +169,6 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 		switch (*proj) {
 		case WT_PROJ_KEY:
 			c = cp[arg];
-			p = (uint8_t *)c->key.data;
-			end = p + c->key.size;
 			if (WT_CURSOR_RECNO(c)) {
 				c->key.data = &c->recno;
 				c->key.size = sizeof(c->recno);
@@ -178,13 +176,15 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 			} else
 				WT_RET(__pack_init(
 				    session, &pack, c->key_format));
+			p = (uint8_t *)c->key.data;
+			end = p + c->key.size;
 			continue;
 
 		case WT_PROJ_VALUE:
 			c = cp[arg];
+			WT_RET(__pack_init(session, &pack, c->value_format));
 			p = (uint8_t *)c->value.data;
 			end = p + c->value.size;
-			WT_RET(__pack_init(session, &pack, c->value_format));
 			continue;
 		}
 
@@ -356,8 +356,15 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 
 				len = __pack_size(session, &pv);
 				offset = WT_PTRDIFF(p, buf->data);
-				WT_RET(__wt_buf_grow(session,
-				    buf, buf->size + len - old_len));
+				/*
+				 * Avoid growing the buffer if the value fits.
+				 * This is not just a performance issue: it
+				 * covers the case of record number keys, which
+				 * have to be written to cursor->recno.
+				 */
+				if (len > old_len)
+					WT_RET(__wt_buf_grow(session,
+					    buf, buf->size + len - old_len));
 				p = (uint8_t *)buf->data + offset;
 				/* Make room if we're inserting out-of-order. */
 				if (offset + old_len < buf->size)

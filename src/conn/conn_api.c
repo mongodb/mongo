@@ -438,6 +438,46 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __conn_async_flush --
+ *	WT_CONNECTION.async_flush method.
+ */
+static int
+__conn_async_flush(WT_CONNECTION *wt_conn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL_NOCONF(conn, session, async_flush);
+	WT_ERR(__wt_async_flush(conn));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_async_new_op --
+ *	WT_CONNECTION.async_new_op method.
+ */
+static int
+__conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
+    WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP **asyncopp)
+{
+	WT_ASYNC_OP_IMPL *op;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL(conn, session, async_new_op, config, cfg);
+	WT_ERR(__wt_async_new_op(conn, uri, config, cfg, callback, &op));
+
+	*asyncopp = &op->iface;
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __conn_get_home --
  *	WT_CONNECTION.get_home method.
  */
@@ -484,6 +524,7 @@ __conn_is_new(WT_CONNECTION *wt_conn)
 static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -493,7 +534,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
-	WT_UNUSED(cfg);
+
+	WT_ERR(__wt_config_gets(session, cfg, "leak_memory", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
 	/*
 	 * Rollback all running transactions.
@@ -958,6 +1002,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
+		{ "api",		WT_VERB_api },
 		{ "block",		WT_VERB_block },
 		{ "checkpoint",		WT_VERB_checkpoint },
 		{ "compact",		WT_VERB_compact },
@@ -966,6 +1011,7 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "fileops",		WT_VERB_fileops },
 		{ "log",		WT_VERB_log },
 		{ "lsm",		WT_VERB_lsm },
+		{ "metadata",		WT_VERB_metadata },
 		{ "mutex",		WT_VERB_mutex },
 		{ "overflow",		WT_VERB_overflow },
 		{ "read",		WT_VERB_read },
@@ -1006,6 +1052,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
 	static const WT_CONNECTION stdc = {
+		__conn_async_flush,
+		__conn_async_new_op,
 		__conn_close,
 		__conn_reconfigure,
 		__conn_get_home,

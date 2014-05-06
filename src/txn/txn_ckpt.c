@@ -184,9 +184,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_SESSION *wt_session;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
+	const char *txn_cfg[3];
 	void *saved_meta_next;
 	int full, started, tracking;
 
@@ -229,16 +229,17 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
-	/* Start a snapshot transaction for the checkpoint. */
-	wt_session = &session->iface;
-	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
-
-	/* Set the global checkpoint transaction ID. */
-	WT_ASSERT(session, conn->txn_global.checkpoint_txn == WT_TXN_NONE);
-	conn->txn_global.checkpoint_txn = txn->id;
-
-	/* Increment the global checkpoint generation. */
-	++conn->txn_global.checkpoint_gen;
+	/*
+	 * Start a snapshot transaction for the checkpoint.
+	 *
+	 * Note: we don't go through the public API calls because they have
+	 * side effects on cursors, which applications can hold open across
+	 * calls to checkpoint.
+	 */
+	txn_cfg[0] = WT_CONFIG_BASE(session, session_begin_transaction);
+	txn_cfg[1] = "isolation=snapshot";
+	txn_cfg[2] = NULL;
+	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full) {
@@ -249,9 +250,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
 
-	/* Release the snapshot transaction, before syncing the file(s). */
-	conn->txn_global.checkpoint_txn = WT_TXN_NONE;
-	__wt_txn_release(session);
+	/* Commit the transaction before syncing the file(s). */
+	WT_ERR(__wt_txn_commit(session, NULL));
 
 	/*
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
@@ -302,11 +302,8 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	conn->txn_global.checkpoint_txn = WT_TXN_NONE;
 	if (F_ISSET(txn, TXN_RUNNING))
-		__wt_txn_release(session);
-	else
-		__wt_txn_release_snapshot(session);
+		WT_TRET(__wt_txn_rollback(session, NULL));
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && started)

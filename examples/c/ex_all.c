@@ -563,10 +563,10 @@ session_ops(WT_SESSION *session)
 	/*! [Configure dictionary compression on] */
 	ret = session->drop(session, "table:mytable", NULL);
 
-	/*! [Configure key prefix compression off] */
+	/*! [Configure key prefix compression on] */
 	ret = session->create(session, "table:mytable",
-	    "key_format=S,value_format=S,prefix_compression=false");
-	/*! [Configure key prefix compression off] */
+	    "key_format=S,value_format=S,prefix_compression=true");
+	/*! [Configure key prefix compression on] */
 	ret = session->drop(session, "table:mytable", NULL);
 
 #ifdef MIGHT_NOT_RUN
@@ -1050,6 +1050,15 @@ main(void)
 	/*! [Statistics logging with path] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
+
+	/*
+	 * Don't run this code, because memory checkers get very upset when we
+	 * leak memory.
+	 */
+	(void)wiredtiger_open(home, NULL, "create", &conn);
+	/*! [Connection close leaking memory] */
+	ret = conn->close(conn, "leak_memory=true");
+	/*! [Connection close leaking memory] */
 #endif
 
 	/*! [Get the WiredTiger library version #1] */

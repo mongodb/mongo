@@ -832,6 +832,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	ret = __curfile_leave(cbt);
+	__wt_buf_free(session, &cbt->search_key);
 	__wt_buf_free(session, &cbt->tmp);
 
 	return (ret);

@@ -35,9 +35,10 @@ handle_message(WT_EVENT_HANDLER *handler,
 	WT_UNUSED(session);
 
 	if (g.logfp != NULL)
-		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
+		return (fprintf(
+		    g.logfp, "%p:%s\n", session, message) < 0 ? -1 : 0);
 
-	return (printf("%s\n", message) < 0 ? -1 : 0);
+	return (printf("%p:%s\n", session, message) < 0 ? -1 : 0);
 }
 
 /*
@@ -84,15 +85,16 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
-	    "%s,%s,%s,"
+	    "%s,%s,%s,%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
-	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
+	    g.c_data_extend ? "file_extend=(data=8MB)" : "",
+	    g.c_logging ? "log=(enabled=true)" : "",
 	    g.c_mmap ? "mmap=true" : "mmap=false",
-	    g.c_statistics ? "statistics=(fast)," : "statistics=(none)",
+	    g.c_statistics ? "statistics=(fast)" : "statistics=(none)",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
@@ -327,10 +329,13 @@ wts_close(void)
 {
 	WT_CONNECTION *conn;
 	int ret;
+	const char *config;
 
 	conn = g.wts_conn;
 
-	if ((ret = conn->close(conn, NULL)) != 0)
+	config = MMRAND(0, 1) ? "leak_memory" : NULL;
+
+	if ((ret = conn->close(conn, config)) != 0)
 		die(ret, "connection.close");
 }
 
@@ -371,8 +376,12 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	/* Some data-sources don't support salvage. */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+	/*
+	 * Some data-sources don't support salvage.
+	 *
+	 * XXX excluding LSM is temporary.
+	 */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb") || DATASOURCE("lsm"))
 		return;
 
 	conn = g.wts_conn;

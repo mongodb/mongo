@@ -13,7 +13,7 @@
  */
 int
 __wt_col_search(WT_SESSION_IMPL *session,
-    uint64_t recno, WT_REF *leaf_page, WT_CURSOR_BTREE *cbt)
+    uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -34,16 +34,15 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	 * In the service of eviction splits, we're only searching a single leaf
 	 * page, not a full tree.
 	 */
-	if (leaf_page != NULL) {
-		child = leaf_page;
+	if (leaf != NULL) {
+		child = leaf;
 		goto leaf_only;
 	}
 
-restart:
 	/* Search the internal pages of the tree. */
 	parent = child = &btree->root;
 	for (depth = 2;; ++depth) {
-		page = parent->page;
+restart:	page = parent->page;
 		if (page->type != WT_PAGE_COL_INT)
 			break;
 
@@ -90,23 +89,20 @@ descend:	WT_ASSERT(session, child != NULL);
 		}
 
 		/*
-		 * Swap the parent page for the child page; if the page splits
-		 * while we're waiting for it, restart the search, otherwise
-		 * return on error.
+		 * Swap the parent page for the child page. If the page splits
+		 * while we're retrieving it, restart the search in the parent
+		 * page; otherwise return on error, the swap call ensures we're
+		 * holding nothing on failure.
 		 */
-		if ((ret = __wt_page_swap(session, parent, child, 0)) == 0) {
+		switch (ret = __wt_page_swap(session, parent, child, 0)) {
+		case 0:
 			parent = child;
-			continue;
-		}
-		/*
-		 * Restart is returned if we find a page that's been split; the
-		 * held page isn't discarded when restart is returned, discard
-		 * it and restart the search from the top of the tree.
-		 */
-		if (ret == WT_RESTART &&
-		    (ret = __wt_page_release(session, parent)) == 0)
+			break;
+		case WT_RESTART:
 			goto restart;
-		return (ret);
+		default:
+			return (ret);
+		}
 	}
 
 	/* Track how deep the tree gets. */

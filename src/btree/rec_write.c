@@ -28,7 +28,7 @@ typedef struct {
 
 	/* Track whether all changes to the page are written. */
 	uint64_t max_txn;
-	uint64_t min_skipped_txn;
+	uint64_t skipped_txn;
 	uint32_t orig_write_gen;
 
 	/*
@@ -634,7 +634,7 @@ __rec_write_init(
 	 * Running transactions may update the page after we write it, so
 	 * this is the highest ID we can be confident we will see.
 	 */
-	r->min_skipped_txn = S2C(session)->txn_global.last_running;
+	r->skipped_txn = S2C(session)->txn_global.last_running;
 
 	return (0);
 }
@@ -788,7 +788,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_PAGE *page;
 	WT_UPDATE *upd, *upd_list, *upd_ovfl;
 	size_t notused;
-	uint64_t max_txn, min_skipped, min_txn, txnid;
+	uint64_t max_txn, min_txn, txnid;
+	int skipped;
 
 	*updp = NULL;
 
@@ -799,20 +800,21 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * list, else is an on-page row-store WT_UPDATE list.
 	 */
 	upd_list = ins == NULL ? WT_ROW_UPDATE(page, rip) : ins->upd;
+	skipped = 0;
 
-	for (max_txn = WT_TXN_NONE, min_skipped = min_txn = UINT64_MAX,
-	    upd = upd_list; upd != NULL; upd = upd->next) {
+	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX, upd = upd_list;
+	    upd != NULL; upd = upd->next) {
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
 		/* Track the largest/smallest transaction IDs on the list. */
 		if (TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
-		if (!TXNID_LT(min_txn, txnid))
+		if (TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (TXNID_LT(txnid, min_skipped) &&
+		if (TXNID_LT(txnid, r->skipped_txn) &&
 		    !__wt_txn_visible_all(session, txnid))
-			min_skipped = txnid;
+			r->skipped_txn = txnid;
 
 		/*
 		 * Record whether any updates were skipped on the way to finding
@@ -828,7 +830,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			if (__wt_txn_visible(session, txnid))
 				*updp = upd;
 			else
-				r->leave_dirty = 1;
+				skipped = 1;
 		}
 	}
 
@@ -841,33 +843,31 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
-	if (TXNID_LT(min_skipped, r->min_skipped_txn))
-		r->min_skipped_txn = min_skipped;
-
 	/*
-	 * If all updates are globally visible, the page can be marked clean and
-	 * we're done, regardless of whether we're evicting or checkpointing.
+	 * If all updates are globally visible and no updates were skipped, the
+	 * page can be marked clean and we're done, regardless of whether we're
+	 * evicting or checkpointing.
+	 *
+	 * The oldest transaction ID may have moved while we were scanning the
+	 * page, so it is possible to skip an update but then find that by the
+	 * end of the scan, all updates are stable.
 	 */
-	if (__wt_txn_visible_all(session, max_txn))
+	if (__wt_txn_visible_all(session, max_txn) && !skipped)
 		return (0);
 
 	/*
-	 * If not all updates are globally visible, the page cannot be marked
-	 * clean.
+	 * If some updates are not globally visible, or were skipped, the page
+	 * cannot be marked clean.
 	 */
 	r->leave_dirty = 1;
 
-	/*
-	 * If not all updates are globally visible and checkpointing: continue,
-	 * we'll write what we can.
-	 */
-	if (!F_ISSET(r, WT_EVICTION_LOCKED) || F_ISSET(r, WT_SKIP_UPDATE_OK))
+	/* If we are checkpointing, continue: we'll write what we can. */
+	if (!F_ISSET(r, WT_EVICTION_LOCKED))
 		return (0);
 
 	/*
-	 * If not all updates are globally visible and evicting: if we aren't
-	 * able to save/restore the not-yet-visible updates, the page can't be
-	 * evicted.
+	 * If we are evicting and we aren't able to save/restore the
+	 * not-yet-visible updates, the page can't be evicted.
 	 */
 	if (!F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
@@ -1152,8 +1152,7 @@ __rec_child_deleted(
 			    "reconciliation illegally skipped an update");
 
 		/* If this page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTION_LOCKED) &&
-		    !F_ISSET(r, WT_SKIP_UPDATE_OK))
+		if (F_ISSET(r, WT_EVICTION_LOCKED))
 			return (EBUSY);
 	}
 
@@ -1572,14 +1571,14 @@ __rec_split_row_promote(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ITEM *key, uint8_t type)
 {
 	WT_BTREE *btree;
-	WT_ITEM update, *max;
+	WT_DECL_ITEM(update);
+	WT_DECL_RET;
+	WT_ITEM *max;
 	WT_UPD_SKIPPED *skip;
 	size_t cnt, len, size;
 	uint32_t i;
 	const uint8_t *pa, *pb;
 	int cmp;
-
-	btree = S2BT(session);
 
 	/*
 	 * For a column-store, the promoted key is the recno and we already have
@@ -1616,6 +1615,9 @@ __rec_split_row_promote(
 	if (type != WT_PAGE_ROW_LEAF || !r->key_sfx_compress)
 		return (__wt_buf_set(session, key, r->cur->data, r->cur->size));
 
+	btree = S2BT(session);
+	WT_RET(__wt_scr_alloc(session, 0, &update));
+
 	/*
 	 * Note #2: if we skipped updates, an update key may be larger than the
 	 * last key stored in the previous block (probable for append-centric
@@ -1626,24 +1628,24 @@ __rec_split_row_promote(
 	for (i = r->skip_next; i > 0; --i) {
 		skip = &r->skip[i - 1];
 		if (skip->ins == NULL)
-			WT_RET(__wt_row_leaf_key(
-			    session, r->page, skip->rip, &update, 0));
+			WT_ERR(__wt_row_leaf_key(
+			    session, r->page, skip->rip, update, 0));
 		else {
-			update.data = WT_INSERT_KEY(skip->ins);
-			update.size = WT_INSERT_KEY_SIZE(skip->ins);
+			update->data = WT_INSERT_KEY(skip->ins);
+			update->size = WT_INSERT_KEY_SIZE(skip->ins);
 		}
 
 		/* Compare against the current key, it must be less. */
-		WT_RET(WT_LEX_CMP(
-		    session, btree->collator, &update, r->cur, cmp));
+		WT_ERR(WT_LEX_CMP(
+		    session, btree->collator, update, r->cur, cmp));
 		if (cmp >= 0)
 			continue;
 
 		/* Compare against the last key, it must be greater. */
-		WT_RET(WT_LEX_CMP(
-		    session, btree->collator, &update, r->last, cmp));
+		WT_ERR(WT_LEX_CMP(
+		    session, btree->collator, update, r->last, cmp));
 		if (cmp >= 0)
-			max = &update;
+			max = update;
 
 		/*
 		 * The skipped updates are in key-sort order so the entry we're
@@ -1673,7 +1675,10 @@ __rec_split_row_promote(
 			}
 			break;
 		}
-	return (__wt_buf_set(session, key, r->cur->data, size));
+	ret = __wt_buf_set(session, key, r->cur->data, size);
+
+err:	__wt_scr_free(&update);
+	return (ret);
 }
 
 /*
@@ -2189,7 +2194,9 @@ __rec_raw_decompress(
 	if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
 		WT_ERR(__wt_illegal_value(session, btree->dhandle->name));
 
-	ret = __wt_strndup(session, tmp->data, result_len, retp);
+	WT_ERR(__wt_strndup(session, tmp->data, result_len, retp));
+	WT_ASSERT(session, __wt_verify_dsk_image(
+	    session, "[raw evict split]", tmp->data, result_len) == 0);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -2392,7 +2399,8 @@ __rec_split_write(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int final)
 {
 	WT_BTREE *btree;
-	WT_ITEM key;
+	WT_DECL_ITEM(key);
+	WT_DECL_RET;
 	WT_MULTI *multi;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
@@ -2408,6 +2416,8 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	dsk = buf->mem;
 	page = r->page;
 	mod = page->modify;
+
+	WT_RET(__wt_scr_alloc(session, 0, &key));
 
 	/* Set the zero-length value flag in the page header. */
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
@@ -2431,7 +2441,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	case WT_PAGE_ROW_INT:
 		bnd->addr.type = WT_ADDR_INT;
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 	bnd->size = (uint32_t)buf->size;
@@ -2448,7 +2458,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	for (i = 0, skip = r->skip; i < r->skip_next; ++i, ++skip) {
 		/* The final block gets all remaining skipped updates. */
 		if (final) {
-			WT_RET(__rec_skip_update_move(session, bnd, skip));
+			WT_ERR(__rec_skip_update_move(session, bnd, skip));
 			continue;
 		}
 
@@ -2467,21 +2477,22 @@ __rec_split_write(WT_SESSION_IMPL *session,
 			break;
 		case WT_PAGE_ROW_LEAF:
 			if (skip->ins == NULL)
-				WT_RET(__wt_row_leaf_key(
-				    session, page, skip->rip, &key, 0));
+				WT_ERR(__wt_row_leaf_key(
+				    session, page, skip->rip, key, 0));
 			else {
-				key.data = WT_INSERT_KEY(skip->ins);
-				key.size = WT_INSERT_KEY_SIZE(skip->ins);
+				key->data = WT_INSERT_KEY(skip->ins);
+				key->size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
-			WT_RET(WT_LEX_CMP(session,
-			    btree->collator, &key, &(bnd + 1)->key, cmp));
+			WT_ERR(WT_LEX_CMP(session,
+			    btree->collator, key, &(bnd + 1)->key, cmp));
 			if (cmp >= 0)
 				goto skip_check_complete;
 			break;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
-		WT_RET(__rec_skip_update_move(session, bnd, skip));
+		WT_ERR(__rec_skip_update_move(session, bnd, skip));
 	}
+
 skip_check_complete:
 	/*
 	 * If there are updates that weren't moved to the block, shuffle them to
@@ -2502,14 +2513,15 @@ skip_check_complete:
 	 */
 	if (bnd->skip != NULL) {
 		if (bnd->already_compressed)
-			WT_RET(__rec_raw_decompress(
+			WT_ERR(__rec_raw_decompress(
 			    session, buf->data, buf->size, &bnd->dsk));
-		else
-			WT_RET(__wt_strndup(
+		else {
+			WT_ERR(__wt_strndup(
 			    session, buf->data, buf->size, &bnd->dsk));
-		WT_ASSERT(session, __wt_verify_dsk_image(
-		    session, "[evict split]", buf->data, buf->size) == 0);
-		return (0);
+			WT_ASSERT(session, __wt_verify_dsk_image(session,
+			    "[evict split]", buf->data, buf->size) == 0);
+		}
+		goto done;
 	}
 
 	/*
@@ -2545,16 +2557,19 @@ skip_check_complete:
 				bnd->addr = multi->addr;
 
 				WT_STAT_FAST_DATA_INCR(session, rec_page_match);
-				return (0);
+				goto done;
 			}
 		}
 	}
 
-	WT_RET(__wt_bt_write(session,
+	WT_ERR(__wt_bt_write(session,
 	    buf, addr, &addr_size, 0, bnd->already_compressed));
-	WT_RET(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
+	WT_ERR(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
 	bnd->addr.size = (uint8_t)addr_size;
-	return (0);
+
+done:
+err:	__wt_scr_free(&key);
+	return (ret);
 }
 
 /*
@@ -4092,7 +4107,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					if (ikey == NULL)
 						WT_ERR(__wt_row_leaf_key_work(
 						    session,
-						    page, rip, NULL, 1));
+						    page, rip, tmpkey, 1));
 
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
@@ -4173,28 +4188,21 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ASSERT(session, tmpkey->size != 0);
 
 				/*
-				 * If we previously built a prefix-compressed
-				 * key in the temporary buffer, WT_ITEM->data
-				 * will be the same as WT_ITEM->mem: grow the
-				 * buffer and copy the suffix into place.
+				 * Grow the buffer as necessary as well as
+				 * ensure data has been copied into local buffer
+				 * space, then append the suffix to the prefix
+				 * already in the buffer.
 				 *
-				 * If we previously pointed the temporary buffer
-				 * at an in-memory or on-page key, WT_ITEM->data
-				 * will not be the same as WT_ITEM->mem: grow
-				 * the buffer, copy the prefix into place, reset
-				 * the data field to point to the buffer memory,
-				 * then copy the suffix into place.
+				 * Don't grow the buffer unnecessarily or copy
+				 * data we don't need, truncate the item's data
+				 * length to the prefix bytes.
 				 */
+				tmpkey->size = kpack->prefix;
 				WT_ERR(__wt_buf_grow(session,
-				    tmpkey, kpack->prefix + kpack->size));
-				if (tmpkey->data != tmpkey->mem) {
-					memcpy(tmpkey->mem,
-					    tmpkey->data, kpack->prefix);
-					tmpkey->data = tmpkey->mem;
-				}
-				memcpy((uint8_t *)tmpkey->mem + kpack->prefix,
+				    tmpkey, tmpkey->size + kpack->size));
+				memcpy((uint8_t *)tmpkey->mem + tmpkey->size,
 				    kpack->data, kpack->size);
-				tmpkey->size = kpack->prefix + kpack->size;
+				tmpkey->size += kpack->size;
 			} else
 				WT_ERR(__wt_row_leaf_key_copy(
 				    session, page, rip, tmpkey));
@@ -4639,7 +4647,7 @@ err:			__wt_scr_free(&tkey);
 			WT_PANIC_RETX(session,
 			    "reconciliation illegally skipped an update");
 
-		mod->rec_min_skipped_txn = r->min_skipped_txn;
+		mod->rec_skipped_txn = r->skipped_txn;
 
 		btree->modified = 1;
 		WT_FULL_BARRIER();
@@ -4664,7 +4672,7 @@ err:			__wt_scr_free(&tkey);
 	 * Set the checkpoint generation, used to determine whether we can skip
 	 * writing this page again.
 	 */
-	mod->checkpoint_gen = S2C(session)->txn_global.checkpoint_gen;
+	mod->checkpoint_gen = btree->checkpoint_gen;
 
 	return (0);
 }

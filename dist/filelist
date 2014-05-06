@@ -3,6 +3,9 @@
 
 src/api/api_strerror.c
 src/api/api_version.c
+src/async/async_api.c
+src/async/async_op.c
+src/async/async_worker.c
 src/block/block_addr.c
 src/block/block_ckpt.c
 src/block/block_compact.c
