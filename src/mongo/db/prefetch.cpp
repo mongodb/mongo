@@ -37,7 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 
 namespace mongo {
 

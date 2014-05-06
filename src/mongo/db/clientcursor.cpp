@@ -41,6 +41,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/db.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"

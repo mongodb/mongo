@@ -36,7 +36,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"

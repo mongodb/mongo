@@ -34,7 +34,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/fsync.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"

@@ -29,7 +29,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/base/counter.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/kill_current_op.h"

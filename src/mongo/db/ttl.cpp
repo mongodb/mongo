@@ -37,7 +37,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
