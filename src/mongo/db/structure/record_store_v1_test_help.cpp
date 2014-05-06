@@ -196,7 +196,10 @@ namespace mongo {
     // -----------------------------------------
 
     DummyExtentManager::~DummyExtentManager() {
-
+        for ( size_t i = 0; i < _extents.size(); i++ ) {
+            if ( _extents[i].data )
+                free( _extents[i].data );
+        }
     }
 
     Status DummyExtentManager::init(TransactionExperiment* txn) {
