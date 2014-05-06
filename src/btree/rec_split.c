@@ -530,7 +530,7 @@ err:	__wt_scr_free(&key);
  */
 int
 __wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *orig, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
+    WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
 	WT_REF *ref;
@@ -570,9 +570,9 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		    multi->addr.addr, addr->size, &addr->addr));
 		incr += sizeof(WT_ADDR) + addr->size;
 	} else
-		WT_RET(__split_inmem_build(session, orig, ref, multi));
+		WT_RET(__split_inmem_build(session, page, ref, multi));
 
-	switch (orig->type) {
+	switch (page->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_strndup(session,
