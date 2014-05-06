@@ -132,15 +132,15 @@ namespace mongo {
         virtual int minSize() const { return 0x1000; }
 
         /**
-         * @param len lengt of record we need
-         * @param lastRecord size of last extent which is a factor in next extent size
+         * @param recordLen length of record we need
+         * @param lastExt size of last extent which is a factor in next extent size
          */
-        virtual int followupSize( int len, int lastExtentLen ) const;
+        virtual int followupSize( int recordLen, int lastExtentLen ) const;
 
         /** get a suggested size for the first extent in a namespace
-         *  @param len length of record we need to insert
+         *  @param recordLen length of record we need to insert
          */
-        virtual int initialSize( int len ) const;
+        virtual int initialSize( int recordLen ) const;
 
         /**
          * quantizes extent size to >= min + page boundary
