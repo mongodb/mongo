@@ -211,9 +211,9 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    __split_deepen_min_child);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
-	WT_VERBOSE_ERR(session, split,
+	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
-	    parent, pindex->entries, children);
+	    parent, pindex->entries, children));
 
 	/*
 	 * If the workload is prepending/appending to the tree, we could deepen
@@ -797,11 +797,11 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
-	WT_VERBOSE_ERR(session, split,
+	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %s split into parent %p %" PRIu32 " -> %" PRIu32
 	    " (%" PRIu32 ")",
 	    child, __wt_page_type_string(child->type), parent, parent_entries,
-	    result_entries, result_entries - parent_entries);
+	    result_entries, result_entries - parent_entries));
 
 	/*
 	 * Simple page splits trickle up the tree, that is, as leaf pages grow

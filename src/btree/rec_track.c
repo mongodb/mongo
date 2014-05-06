@@ -24,33 +24,6 @@ __ovfl_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	return (__wt_calloc_def(session, 1, &page->modify->ovfl_track));
 }
 
-#ifndef HAVE_VERBOSE
-#define	OVFL_VERBOSE_DISCARD(s, p, c, t)
-#define	OVFL_VERBOSE_REUSE(s, p, r, t) do {				\
-	WT_UNUSED((s));							\
-} while (0)
-#define	OVFL_VERBOSE_TXNC(s, p, txn, t)
-#else
-static int __ovfl_discard_verbose(
-    WT_SESSION_IMPL *, WT_PAGE *, WT_CELL *, const char *);
-static int __ovfl_reuse_verbose(
-    WT_SESSION_IMPL *, WT_PAGE *, WT_OVFL_REUSE *, const char *);
-static int __ovfl_txnc_verbose(
-    WT_SESSION_IMPL *, WT_PAGE *, WT_OVFL_TXNC *, const char *);
-
-#define	OVFL_VERBOSE_DISCARD(s, p, c, t) do {				\
-	if (WT_VERBOSE_ISSET((s), overflow))				\
-		WT_RET(__ovfl_discard_verbose((s), (p), (c), (t)));	\
-} while (0)
-#define	OVFL_VERBOSE_REUSE(s, p, r, t) do {				\
-	if (WT_VERBOSE_ISSET((s), overflow))				\
-		WT_RET(__ovfl_reuse_verbose((s), (p), (r), (t)));	\
-} while (0)
-#define	OVFL_VERBOSE_TXNC(s, p, txn, t) do {				\
-	if (WT_VERBOSE_ISSET((s), overflow))				\
-		WT_RET(__ovfl_txnc_verbose((s), (p), (txn), (t)));	\
-} while (0)
-
 /*
  * __ovfl_discard_verbose --
  *	Dump information about a discard overflow record.
@@ -68,74 +41,16 @@ __ovfl_discard_verbose(
 	unpack = &_unpack;
 	__wt_cell_unpack(cell, unpack);
 
-	WT_VERBOSE_ERR(session, overflow,
+	WT_ERR(__wt_verbose(session, WT_VERB_OVERFLOW,
 	    "discard: %s%s%p %s",
 	    tag == NULL ? "" : tag,
 	    tag == NULL ? "" : ": ",
 	    page,
-	    __wt_addr_string(session, unpack->data, unpack->size, tmp));
+	    __wt_addr_string(session, unpack->data, unpack->size, tmp)));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
 }
-
-/*
- * __ovfl_reuse_verbose --
- *	Dump information about a reuse overflow record.
- */
-static int
-__ovfl_reuse_verbose(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_OVFL_REUSE *reuse, const char *tag)
-{
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-
-	WT_RET(__wt_scr_alloc(session, 64, &tmp));
-
-	WT_VERBOSE_ERR(session, overflow,
-	    "reuse: %s%s%p %s (%s%s%s) {%.*s}",
-	    tag == NULL ? "" : tag,
-	    tag == NULL ? "" : ": ",
-	    page,
-	    __wt_addr_string(
-		session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size, tmp),
-	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) ? "inuse" : "",
-	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) &&
-	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? ", " : "",
-	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? "just-added" : "",
-	    WT_MIN(reuse->value_size, 40), (char *)WT_OVFL_REUSE_VALUE(reuse));
-
-err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-
-/*
- * __ovfl_txnc_verbose --
- *	Dump information about a transaction-cached overflow record.
- */
-static int
-__ovfl_txnc_verbose(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_OVFL_TXNC *txnc, const char *tag)
-{
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-
-	WT_RET(__wt_scr_alloc(session, 64, &tmp));
-
-	WT_VERBOSE_ERR(session, overflow,
-	    "txn-cache: %s%s%p %s %" PRIu64 " {%.*s}",
-	    tag == NULL ? "" : tag,
-	    tag == NULL ? "" : ": ",
-	    page,
-	    __wt_addr_string(
-		session, WT_OVFL_TXNC_ADDR(txnc), txnc->addr_size, tmp),
-	    txnc->current,
-	    WT_MIN(txnc->value_size, 40), (char *)WT_OVFL_TXNC_VALUE(txnc));
-
-err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-#endif
 
 #if 0
 /*
@@ -155,7 +70,7 @@ __ovfl_discard_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 	track = page->modify->ovfl_track;
 	for (i = 0, cellp = track->discard;
 	    i < track->discard_entries; ++i, ++cellp)
-		OVFL_VERBOSE_DISCARD(sssion, page, *cellp, "dump");
+		(void)__ovfl_discard_verbose(session, page, *cellp, "dump");
 }
 #endif
 
@@ -174,10 +89,12 @@ __ovfl_discard_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	track = page->modify->ovfl_track;
 	for (i = 0, cellp = track->discard;
 	    i < track->discard_entries; ++i, ++cellp) {
-		OVFL_VERBOSE_DISCARD(session, page, *cellp, "free");
+		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+			WT_RET(__ovfl_discard_verbose(
+			    session, page, *cellp, "free"));
 
 		/* Discard each cell's overflow item. */
-		WT_TRET(__wt_ovfl_discard(session, *cellp));
+		WT_RET(__wt_ovfl_discard(session, *cellp));
 	}
 
 	__wt_free(session, track->discard);
@@ -221,7 +138,8 @@ __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
 	    track->discard_entries + 1, &track->discard));
 	track->discard[track->discard_entries++] = cell;
 
-	OVFL_VERBOSE_DISCARD(session, page, cell, "add");
+	if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+		WT_RET(__ovfl_discard_verbose(session, page, cell, "add"));
 
 	return (0);
 }
@@ -244,6 +162,36 @@ __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page)
 	track->discard_entries = track->discard_allocated = 0;
 }
 
+/*
+ * __ovfl_reuse_verbose --
+ *	Dump information about a reuse overflow record.
+ */
+static int
+__ovfl_reuse_verbose(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_OVFL_REUSE *reuse, const char *tag)
+{
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	WT_RET(__wt_scr_alloc(session, 64, &tmp));
+
+	WT_ERR(__wt_verbose(session, WT_VERB_OVERFLOW,
+	    "reuse: %s%s%p %s (%s%s%s) {%.*s}",
+	    tag == NULL ? "" : tag,
+	    tag == NULL ? "" : ": ",
+	    page,
+	    __wt_addr_string(
+		session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size, tmp),
+	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) ? "inuse" : "",
+	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) &&
+	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? ", " : "",
+	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? "just-added" : "",
+	    WT_MIN(reuse->value_size, 40), (char *)WT_OVFL_REUSE_VALUE(reuse)));
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
+}
+
 #if 0
 /*
  * __ovfl_reuse_dump --
@@ -259,7 +207,7 @@ __ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 	head = page->modify->ovfl_track->ovfl_reuse;
 
 	for (reuse = head[0]; reuse != NULL; reuse = reuse->next[0])
-		OVFL_VERBOSE_REUSE(session, page, reuse, "dump");
+		(void)__ovfl_reuse_verbose(session, page, reuse, "dump");
 }
 #endif
 
@@ -423,7 +371,9 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		decr += WT_OVFL_SIZE(WT_OVFL_REUSE) +
 		    reuse->addr_size + reuse->value_size;
 
-		OVFL_VERBOSE_REUSE(session, page, reuse, "free");
+		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+			WT_RET(
+			    __ovfl_reuse_verbose(session, page, reuse, "free"));
 		WT_RET(bm->free(
 		    bm, session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size));
 		__wt_free(session, reuse);
@@ -479,7 +429,9 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 		*e = (*e)->next[0];
 
-		OVFL_VERBOSE_REUSE(session, page, reuse, "free");
+		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+			WT_RET(
+			    __ovfl_reuse_verbose(session, page, reuse, "free"));
 		WT_TRET(bm->free(
 		    bm, session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size));
 		__wt_free(session, reuse);
@@ -517,7 +469,8 @@ __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
 	*addr_sizep = reuse->addr_size;
 	F_SET(reuse, WT_OVFL_REUSE_INUSE);
 
-	OVFL_VERBOSE_REUSE(session, page, reuse, "reclaim");
+	if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "reclaim"));
 	return (1);
 }
 
@@ -575,7 +528,8 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 		*stack[i] = reuse;
 	}
 
-	OVFL_VERBOSE_REUSE(session, page, reuse, "add");
+	if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "add"));
 
 	return (0);
 }
@@ -602,6 +556,33 @@ __wt_ovfl_reuse_free(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 }
 
+/*
+ * __ovfl_txnc_verbose --
+ *	Dump information about a transaction-cached overflow record.
+ */
+static int
+__ovfl_txnc_verbose(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_OVFL_TXNC *txnc, const char *tag)
+{
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	WT_RET(__wt_scr_alloc(session, 64, &tmp));
+
+	WT_ERR(__wt_verbose(session, WT_VERB_OVERFLOW,
+	    "txn-cache: %s%s%p %s %" PRIu64 " {%.*s}",
+	    tag == NULL ? "" : tag,
+	    tag == NULL ? "" : ": ",
+	    page,
+	    __wt_addr_string(
+		session, WT_OVFL_TXNC_ADDR(txnc), txnc->addr_size, tmp),
+	    txnc->current,
+	    WT_MIN(txnc->value_size, 40), (char *)WT_OVFL_TXNC_VALUE(txnc)));
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
+}
+
 #if 0
 /*
  * __ovfl_txnc_dump --
@@ -617,7 +598,7 @@ __ovfl_txnc_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 	head = page->modify->ovfl_track->ovfl_txnc;
 
 	for (txnc = head[0]; txnc != NULL; txnc = txnc->next[0])
-		OVFL_VERBOSE_TXNC(session, page, txnc, "dump");
+		(void)__ovfl_txnc_verbose(session, page, txnc, "dump");
 }
 #endif
 
@@ -746,7 +727,9 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		decr += WT_OVFL_SIZE(WT_OVFL_TXNC) +
 		    txnc->addr_size + txnc->value_size;
 
-		OVFL_VERBOSE_TXNC(session, page, txnc, "free");
+		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+			WT_RET(
+			    __ovfl_txnc_verbose(session, page, txnc, "free"));
 		__wt_free(session, txnc);
 	}
 
@@ -836,7 +819,8 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 		*stack[i] = txnc;
 	}
 
-	OVFL_VERBOSE_TXNC(session, page, txnc, "add");
+	if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
+		WT_RET(__ovfl_txnc_verbose(session, page, txnc, "add"));
 
 	return (0);
 }

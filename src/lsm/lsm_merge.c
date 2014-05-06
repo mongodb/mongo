@@ -245,10 +245,10 @@ __wt_lsm_merge(
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	WT_VERBOSE_RET(session, lsm,
+	WT_RET(__wt_verbose(session, WT_VERB_LSM,
 	    "Merging chunks %u-%u into %u (%" PRIu64 " records)"
 	    ", generation %" PRIu32,
-	    start_chunk, end_chunk, dest_id, record_count, generation);
+	    start_chunk, end_chunk, dest_id, record_count, generation));
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = dest_id;
@@ -312,9 +312,9 @@ __wt_lsm_merge(
 	WT_STAT_FAST_CONN_INCRV(session,
 	    lsm_rows_merged, insert_count % LSM_MERGE_CHECK_INTERVAL);
 	++lsm_tree->merge_progressing;
-	WT_VERBOSE_ERR(session, lsm,
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
-	    record_count, insert_count);
+	    record_count, insert_count));
 
 	/*
 	 * We've successfully created the new chunk.  Now install it.  We need
@@ -411,13 +411,12 @@ err:	if (src != NULL)
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
 
-		if (ret == EINTR) {
-			WT_VERBOSE_TRET(session, lsm,
-			    "Merge aborted due to close");
-		} else {
-			WT_VERBOSE_TRET(session, lsm,
-			    "Merge failed with %s", wiredtiger_strerror(ret));
-		}
+		if (ret == EINTR)
+			WT_TRET(__wt_verbose(session, WT_VERB_LSM,
+			    "Merge aborted due to close"));
+		else
+			WT_TRET(__wt_verbose(session, WT_VERB_LSM,
+			    "Merge failed with %s", wiredtiger_strerror(ret)));
 		F_CLR(session, WT_SESSION_NO_CACHE);
 	}
 	return (ret);

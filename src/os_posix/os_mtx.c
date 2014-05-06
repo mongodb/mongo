@@ -74,8 +74,8 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	 * This function MUST handle a NULL session handle.
 	 */
 	if (session != NULL) {
-		WT_VERBOSE_RET(
-		    session, mutex, "wait %s cond (%p)", cond->name, cond);
+		WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
+		    "wait %s cond (%p)", cond->name, cond));
 		WT_STAT_FAST_CONN_INCR(session, cond_wait);
 	}
 
@@ -126,9 +126,9 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
-	if (session != NULL && WT_VERBOSE_ISSET(session, mutex))
-		WT_RET(__wt_verbose(
-		    session, "signal %s cond (%p)", cond->name, cond));
+	if (session != NULL)
+		WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
+		    "signal %s cond (%p)", cond->name, cond));
 
 	/* Fast path if already signalled. */
 	if (cond->waiters == -1)
@@ -185,8 +185,8 @@ __wt_rwlock_alloc(
 	rwlock->name = name;
 	*rwlockp = rwlock;
 
-	WT_VERBOSE_ERR(session, mutex,
-	    "rwlock: alloc %s (%p)", rwlock->name, rwlock);
+	WT_ERR(__wt_verbose(session, WT_VERB_MUTEX,
+	    "rwlock: alloc %s (%p)", rwlock->name, rwlock));
 
 	if (0) {
 err:		__wt_free(session, rwlock);
@@ -203,8 +203,8 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_RET(session, mutex,
-	    "rwlock: readlock %s (%p)", rwlock->name, rwlock);
+	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
+	    "rwlock: readlock %s (%p)", rwlock->name, rwlock));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	if ((ret = pthread_rwlock_rdlock(&rwlock->rwlock)) == 0)
@@ -221,8 +221,8 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_RET(session, mutex,
-	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock);
+	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
+	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	if ((ret =
@@ -240,8 +240,8 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_RET(session, mutex,
-	    "rwlock: writelock %s (%p)", rwlock->name, rwlock);
+	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
+	    "rwlock: writelock %s (%p)", rwlock->name, rwlock));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	if ((ret = pthread_rwlock_wrlock(&rwlock->rwlock)) == 0)
@@ -258,8 +258,8 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_RET(session, mutex,
-	    "rwlock: unlock %s (%p)", rwlock->name, rwlock);
+	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
+	    "rwlock: unlock %s (%p)", rwlock->name, rwlock));
 
 	if ((ret = pthread_rwlock_unlock(&rwlock->rwlock)) == 0)
 		return (0);
@@ -281,8 +281,8 @@ __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 		return (0);
 	*rwlockp = NULL;
 
-	WT_VERBOSE_RET(session, mutex,
-	    "rwlock: destroy %s (%p)", rwlock->name, rwlock);
+	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
+	    "rwlock: destroy %s (%p)", rwlock->name, rwlock));
 
 	if ((ret = pthread_rwlock_destroy(&rwlock->rwlock)) == 0) {
 		__wt_free(session, rwlock);

@@ -80,7 +80,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 
 	__wt_spin_lock(session, &block->live_lock);
 
-	if (WT_VERBOSE_ISSET(session, compact))
+	if (WT_VERBOSE_ISSET(session, WT_VERB_COMPACT))
 		WT_ERR(__block_dump_avail(session, block));
 
 	/* Sum the number of available bytes in the first 90% of the file. */
@@ -99,14 +99,14 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	if (avail >= fh->size / 10)
 		*skipp = 0;
 
-	WT_VERBOSE_ERR(session, compact,
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
 	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
 	    "90%% of the file, require 10%% or %" PRIuMAX "MB (%" PRIuMAX
 	    ") to perform compaction, compaction %s",
 	    block->name,
 	    (uintmax_t)avail / WT_MEGABYTE, (uintmax_t)avail,
 	    (uintmax_t)(fh->size / 10) / WT_MEGABYTE, (uintmax_t)fh->size / 10,
-	    *skipp ? "skipped" : "proceeding");
+	    *skipp ? "skipped" : "proceeding"));
 
 err:	__wt_spin_unlock(session, &block->live_lock);
 
@@ -175,8 +175,8 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	el = &block->live.avail;
 	size = block->fh->size;
 
-	WT_RET(__wt_verbose(
-	    session, "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+	    "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX
 	    "%% space available %" PRIuMAX "MB (%" PRIuMAX ")",
 	    (uintmax_t)size / WT_MEGABYTE, (uintmax_t)size,
 	    ((uintmax_t)el->bytes * 100) / (uintmax_t)size,
@@ -201,8 +201,8 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 #ifdef __VERBOSE_OUTPUT_PERCENTILE
 	for (i = 0; i < WT_ELEMENTS(percentile); ++i) {
 		v = percentile[i] * 512;
-		WT_RET(__wt_verbose(
-		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+		    "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
 		    (uintmax_t)((v * 100) / (off_t)el->bytes)));
@@ -210,8 +210,8 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 #endif
 	for (i = 0; i < WT_ELEMENTS(decile); ++i) {
 		v = decile[i] * 512;
-		WT_RET(__wt_verbose(
-		    session, "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+		    "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i * 10, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
 		    (uintmax_t)((v * 100) / (off_t)el->bytes)));

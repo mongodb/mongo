@@ -92,8 +92,8 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		    "cache pool server", 0, &cp->cache_pool_cond));
 
 		__wt_process.cache_pool = cp;
-		WT_VERBOSE_ERR(session, shared_cache,
-		    "Created cache pool %s.", cp->name);
+		WT_ERR(__wt_verbose(session,
+		    WT_VERB_SHARED_CACHE, "Created cache pool %s", cp->name));
 	} else if (!reconfiguring && !WT_STRING_MATCH(
 	    __wt_process.cache_pool->name, pool_name, strlen(pool_name)))
 		/* Only a single cache pool is supported. */
@@ -163,10 +163,9 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	cp->size = size;
 	cp->chunk = chunk;
 
-	WT_VERBOSE_ERR(session, shared_cache,
+	WT_ERR(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Configured cache pool %s. Size: %" PRIu64
-	    ", chunk size: %" PRIu64,
-	    cp->name, cp->size, cp->chunk);
+	    ", chunk size: %" PRIu64, cp->name, cp->size, cp->chunk));
 
 	F_SET(conn, WT_CONN_CACHE_POOL);
 err:	__wt_spin_unlock(session, &__wt_process.spinlock);
@@ -204,8 +203,8 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
 
-	WT_VERBOSE_RET(session, shared_cache,
-	    "Added %s to cache pool %s.", conn->home, cp->name);
+	WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
+	    "Added %s to cache pool %s", conn->home, cp->name));
 
 	/* Start the cache pool server if required. */
 	if (create_server) {
@@ -254,8 +253,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	 * queue.  We did increment the reference count, so proceed regardless.
 	 */
 	if (found) {
-		WT_VERBOSE_TRET(session, shared_cache,
-		    "Removing %s from cache pool.", entry->home);
+		WT_TRET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
+		    "Removing %s from cache pool", entry->home));
 		TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
 
 		/* Give the connection's resources back to the pool. */
@@ -282,16 +281,16 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	 * connection. A new one will be created by the next balance pass.
 	 */
 	if (cp->session != NULL && conn == S2C(cp->session)) {
-		WT_VERBOSE_TRET(cp->session, shared_cache,
-		    "Freeing a cache pool session due to connection close.");
+		WT_TRET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
+		    "Freeing a cache pool session due to connection close"));
 		wt_session = &cp->session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 		cp->session = NULL;
 	}
 
 	if (!F_ISSET(cp, WT_CACHE_POOL_RUN)) {
-		WT_VERBOSE_TRET(
-		    session, shared_cache, "Destroying cache pool.");
+		WT_TRET(__wt_verbose(
+		    session, WT_VERB_SHARED_CACHE, "Destroying cache pool"));
 		__wt_spin_lock(session, &__wt_process.spinlock);
 		/*
 		 * We have been holding the pool lock - no connections could
@@ -406,9 +405,9 @@ __cache_pool_assess(uint64_t *phighest)
 		if (cache->cp_current_evict > highest)
 			highest = cache->cp_current_evict;
 	}
-	WT_VERBOSE_RET(cp->session, shared_cache,
+	WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
 	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
-	    highest, entries);
+	    highest, entries));
 	/* Normalize eviction information across connections. */
 	highest = highest / (entries + 1);
 	++highest; /* Avoid divide by zero. */
@@ -436,11 +435,11 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 	reserved = read_pressure = 0;
 	grew = 0;
 	force = (cp->currently_used > cp->size);
-	if (WT_VERBOSE_ISSET(cp->session, shared_cache)) {
-		WT_VERBOSE_RET(cp->session, shared_cache,
-		    "Cache pool distribution: ");
-		WT_VERBOSE_RET(cp->session, shared_cache,
-		    "\t" "cache_size, read_pressure, skips: ");
+	if (WT_VERBOSE_ISSET(cp->session, WT_VERB_SHARED_CACHE)) {
+		WT_RET(__wt_verbose(cp->session,
+		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
+		WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
+		    "\t" "cache_size, read_pressure, skips: "));
 	}
 
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
@@ -449,9 +448,9 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 		adjusted = 0;
 
 		read_pressure = cache->cp_current_evict / highest;
-		WT_VERBOSE_RET(cp->session, shared_cache,
+		WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
 		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
-		    entry->cache_size, read_pressure, cache->cp_skip_count);
+		    entry->cache_size, read_pressure, cache->cp_skip_count));
 
 		/* Allow to stabilize after changes. */
 		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
@@ -498,9 +497,9 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 				entry->cache_size -= adjusted;
 				cp->currently_used -= adjusted;
 			}
-			WT_VERBOSE_RET(cp->session, shared_cache,
+			WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
 			    "Allocated %s%" PRId64 " to %s",
-			    grew ? "" : "-", adjusted, entry->home);
+			    grew ? "" : "-", adjusted, entry->home));
 			/*
 			 * TODO: Add a loop waiting for connection to give up
 			 * cache.
