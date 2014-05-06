@@ -1,5 +1,19 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
+extern void __wt_async_stats_update(WT_SESSION_IMPL *session);
+extern int __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_async_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_async_flush(WT_CONNECTION_IMPL *conn);
+extern int __wt_async_new_op(WT_CONNECTION_IMPL *conn,
+    const char *uri,
+    const char *config,
+    const char *cfg[],
+    WT_ASYNC_CALLBACK *cb,
+    WT_ASYNC_OP_IMPL **opp);
+extern int __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn,
+    WT_ASYNC_OP_IMPL *op);
+extern int __wt_async_op_init(WT_CONNECTION_IMPL *conn);
+extern void *__wt_async_worker(void *arg);
 extern int __wt_block_addr_to_buffer(WT_BLOCK *block,
     uint8_t **pp,
     off_t offset,
@@ -683,7 +697,9 @@ extern void __wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value);
 extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
+extern int __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
+extern void __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
 extern int __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor);
 extern int __wt_cursor_init(WT_CURSOR *cursor,

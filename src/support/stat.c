@@ -309,6 +309,20 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	/* Clear, so can also be called for reinitialization. */
 	memset(stats, 0, sizeof(*stats));
 
+	stats->async_alloc_race.desc =
+	    "async: number of allocation state races";
+	stats->async_alloc_view.desc =
+	    "async: number of op slots viewed for alloc";
+	stats->async_cur_queue.desc = "async: current work queue length";
+	stats->async_flush.desc = "async: number of async flush calls";
+	stats->async_full.desc = "async: number of times op allocation failed";
+	stats->async_max_queue.desc = "async: maximum work queue length";
+	stats->async_op_alloc.desc = "async op allocation";
+	stats->async_op_compact.desc = "async op compact calls";
+	stats->async_op_insert.desc = "async op insert calls";
+	stats->async_op_remove.desc = "async op remove calls";
+	stats->async_op_search.desc = "async op search calls";
+	stats->async_op_update.desc = "async op update calls";
 	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
 	stats->block_byte_read.desc = "block manager: bytes read";
 	stats->block_byte_write.desc = "block manager: bytes written";
@@ -421,6 +435,18 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	WT_CONNECTION_STATS *stats;
 
 	stats = (WT_CONNECTION_STATS *)stats_arg;
+	stats->async_alloc_race.v = 0;
+	stats->async_alloc_view.v = 0;
+	stats->async_cur_queue.v = 0;
+	stats->async_flush.v = 0;
+	stats->async_full.v = 0;
+	stats->async_max_queue.v = 0;
+	stats->async_op_alloc.v = 0;
+	stats->async_op_compact.v = 0;
+	stats->async_op_insert.v = 0;
+	stats->async_op_remove.v = 0;
+	stats->async_op_search.v = 0;
+	stats->async_op_update.v = 0;
 	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;

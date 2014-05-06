@@ -13,6 +13,7 @@ JDOCDIR = $(top_srcdir)/docs/java
 
 javadir = $(datadir)/java/$(PACKAGE)-$(PACKAGE_VERSION)
 JAVA_SRC = \
+		$(JAVADESTFULL)/AsyncOp.java \
 		$(JAVADESTFULL)/Connection.java \
 		$(JAVADESTFULL)/Cursor.java \
 		$(JAVADESTFULL)/SearchStatus.java \
@@ -26,6 +27,7 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java \
+		$(JAVADESTFULL)/WT_ASYNC_OPTYPE.java \
 		$(JAVAEXAMPLES)/ex_access.java
 
 JAVA_JUNIT = \

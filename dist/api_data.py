@@ -297,6 +297,20 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
+	Config('async', '', r'''
+	    asynchronous operations configuration options.''',
+	    type='category', subconfig=[
+	    Config('enabled', 'false', r'''
+	        enable asynchronous operation''',
+	        type='boolean'),
+	    Config('ops_max', '1024', r'''
+	        maximum number of expected simultaneous asynchronous
+                operations.''', min='10', max='4096'),
+	    Config('threads', '2', r'''
+	        the number of worker threads to service asynchronous
+                requests''',
+                min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
+            ]),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',
@@ -571,6 +585,28 @@ methods = {
 'connection.add_compressor' : Method([]),
 'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
+'connection.async_new_op' : Method([
+	Config('append', 'false', r'''
+	    append the value as a new record, creating a new record
+	    number key; valid only for operations with record number keys''',
+	    type='boolean'),
+	Config('overwrite', 'true', r'''
+	    configures whether the cursor's insert, update and remove
+	    methods check the existing state of the record.  If \c overwrite
+	    is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
+	    if the record exists, WT_CURSOR::update and WT_CURSOR::remove
+	    fail with ::WT_NOTFOUND if the record does not exist''',
+	    type='boolean'),
+	Config('raw', 'false', r'''
+	    ignore the encodings for the key and value, manage data as if
+	    the formats were \c "u".  See @ref cursor_raw for details''',
+	    type='boolean'),
+	Config('timeout', '1200', r'''
+	    maximum amount of time to allow for compact in seconds. The
+	    actual amount of time spent in compact may exceed the configured
+	    value. A value of zero disables the timeout''',
+	    type='int'),
+]),
 'connection.close' : Method([
 	Config('leak_memory', 'false', r'''
 	    don't free memory during close''',

@@ -70,6 +70,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* We're shutting down.  Make sure everything gets freed. */
 	__wt_txn_update_oldest(session);
 
+	/* Clear any pending async ops. */
+	WT_TRET(__wt_async_flush(conn));
+
 	/*
 	 * Shut down server threads other than the eviction server, which is
 	 * needed later to close btree handles.  Some of these threads access
@@ -77,6 +80,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * exit before files are closed.
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
+	WT_TRET(__wt_async_destroy(conn));
 	WT_TRET(__wt_checkpoint_destroy(conn));
 	WT_TRET(__wt_statlog_destroy(conn));
 
@@ -216,6 +220,9 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	 * other optional threads can know if statistics are enabled or not.
 	 */
 	WT_RET(__wt_statlog_create(conn, cfg));
+
+	/* Start the optional async threads. */
+	WT_RET(__wt_async_create(conn, cfg));
 
 	/* Start the optional logging/archive thread. */
 	WT_RET(__wt_logmgr_create(conn, cfg));
