@@ -58,7 +58,7 @@ namespace mongo {
                 Extent* e = em->getExtent( _recordStore->details()->firstExtent() );
 
                 while (e->firstRecord.isNull() && !e->xnext.isNull()) {
-                    e = em->getNextExtent( e );
+                    e = em->getExtent( e->xnext );
                 }
 
                 // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
@@ -73,7 +73,7 @@ namespace mongo {
                 // TODO ELABORATE
                 // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
                 while (e->lastRecord.isNull() && !e->xprev.isNull()) {
-                    e = em->getPrevExtent( e );
+                    e = em->getExtent( e->xprev );
                 }
 
                 // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no

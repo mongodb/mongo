@@ -463,7 +463,11 @@ namespace mongo {
                 extentInfo->append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
             }
 
-            e = getExtentManager()->getNextExtent( e );
+            if ( e->xnext.isNull() )
+                e = NULL;
+            else
+                e = getExtentManager()->getExtent( e->xnext );
+
         }
 
         if ( numExtents )

@@ -121,9 +121,6 @@ namespace mongo {
          */
         virtual Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const = 0;
 
-        virtual Extent* getNextExtent( Extent* ) const = 0;
-        virtual Extent* getPrevExtent( Extent* ) const = 0;
-
         // TODO: remove
         DataFile* getFile( TransactionExperiment* txn,
                            int n,

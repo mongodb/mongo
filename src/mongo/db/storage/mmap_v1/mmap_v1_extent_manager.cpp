@@ -235,18 +235,6 @@ namespace mongo {
         return e;
     }
 
-    Extent* MmapV1ExtentManager::getNextExtent( Extent* e ) const {
-        if ( e->xnext.isNull() )
-            return NULL;
-        return getExtent( e->xnext );
-    }
-
-    Extent* MmapV1ExtentManager::getPrevExtent( Extent* e ) const {
-        if ( e->xprev.isNull() )
-            return NULL;
-        return getExtent( e->xprev );
-    }
-
     int MmapV1ExtentManager::quantizeExtentSize( int size ) {
 
         if ( size == Extent::maxSize() ) {

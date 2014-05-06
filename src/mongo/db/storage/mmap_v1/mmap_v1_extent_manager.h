@@ -143,9 +143,6 @@ namespace mongo {
          */
         Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const;
 
-        Extent* getNextExtent( Extent* ) const;
-        Extent* getPrevExtent( Extent* ) const;
-
         /**
          * quantizes extent size to >= min + page boundary
          */
