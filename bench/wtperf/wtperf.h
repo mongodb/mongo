@@ -116,7 +116,6 @@ struct __config {			/* Configuration struction */
 	uint64_t update_ops;		/* update operations */
 
 	uint64_t insert_key;		/* insert key */
-	uint64_t insert_complete;	/* async insert ops complete */
 
 	volatile int ckpt;		/* checkpoint in progress */
 	volatile int error;		/* thread error */

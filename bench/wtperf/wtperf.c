@@ -50,7 +50,6 @@ static const CONFIG default_cfg = {
 	0,				/* read operations */
 	0,				/* update operations */
 	0,				/* insert key */
-	0,				/* async insert complete */
 	0,				/* checkpoint in progress */
 	0,				/* thread error */
 	0,				/* notify threads to stop */
