@@ -638,9 +638,6 @@ namespace {
                     if (m.h.isSelf()) {
                         verify(me++ == 0);
                         mi = new Member(m.h, m._id, &m, true);
-                        if (!reconf) {
-                            log() << "replSet I am " << m.h.toString() << rsLog;
-                        }
                         setSelfTo(mi);
                     }
                     else {
