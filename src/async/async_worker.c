@@ -58,7 +58,7 @@ retry:
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
 	WT_ASSERT(session, (*op)->state == WT_ASYNCOP_ENQUEUED);
-	WT_ATOMIC_SUB(async->cur_queue, 1);
+	(void)WT_ATOMIC_SUB(async->cur_queue, 1);
 	(*op)->state = WT_ASYNCOP_WORKING;
 
 	if (*op == &async->flush_op)

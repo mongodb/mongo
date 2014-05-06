@@ -175,7 +175,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 			break;
 		case WT_AOP_COMPACT:
 			tables = (uint32_t *)op->c.lang_private;
-			ATOMIC_ADD(*tables, -1);
+			ATOMIC_ADD(*tables, (uint32_t)-1);
 			break;
 		case WT_AOP_REMOVE:
 		case WT_AOP_NONE:
