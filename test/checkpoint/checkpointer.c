@@ -345,7 +345,7 @@ diagnose_key_error(
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
 		(void)log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
-	c->close(c);
+	(void)c->close(c);
 
 	snprintf(next_uri, 128, "table:__wt%04d", index2);
 	ret = session->open_cursor(session, next_uri, NULL, ckpt, &c);

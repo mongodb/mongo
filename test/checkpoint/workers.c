@@ -84,7 +84,8 @@ start_workers(table_type type)
 	for (i = 0; i < g.ntables; ++i) {
 		g.cookies[i].id = i;
 		if (type == MIX)
-			g.cookies[i].type = (i % MAX_TABLE_TYPE) + 1;
+			g.cookies[i].type =
+			    (table_type)((i % MAX_TABLE_TYPE) + 1);
 		else
 			g.cookies[i].type = type;
 		(void)snprintf(g.cookies[i].uri, 128,

@@ -300,7 +300,7 @@ log_print_err(const char *m, int e, int fatal)
  * path_setup --
  *	Build the standard paths and shell commands we use.
  */
-int
+static int
 path_setup(const char *home)
 {
 	size_t len;
