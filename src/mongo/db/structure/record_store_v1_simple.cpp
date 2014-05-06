@@ -32,15 +32,14 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/record_store_v1_simple_iterator.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
@@ -482,9 +481,9 @@ namespace mongo {
         // as we're about to tally them up again for each new extent
         _details->setStats( txn, 0, 0 );
 
-        ProgressMeterHolder pm(cc().curop()->setMessage("compact extent",
-                                                        "Extent Compacting Progress",
-                                                        extents.size()));
+        ProgressMeterHolder pm(*txn->setMessage("compact extent",
+                                                "Extent Compacting Progress",
+                                                extents.size()));
 
         int extentNumber = 0;
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) {

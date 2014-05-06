@@ -47,6 +47,11 @@ namespace mongo {
 
         virtual bool isCommitNeeded() const;
 
+        virtual ProgressMeter* setMessage(const char* msg,
+                                          const std::string& name ,
+                                          unsigned long long progressMeterTotal,
+                                          int secondsBetween);
+
         virtual void* writingPtr(void* data, size_t len);
 
         virtual void createdFile(const std::string& filename, unsigned long long len);

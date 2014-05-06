@@ -28,6 +28,8 @@
 
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 
@@ -39,6 +41,13 @@ namespace mongo {
 
     bool DurTransaction::isCommitNeeded() const {
         return getDur().isCommitNeeded();
+    }
+
+    ProgressMeter* DurTransaction::setMessage(const char* msg,
+                                              const std::string& name,
+                                              unsigned long long progressMeterTotal,
+                                              int secondsBetween) {
+        return &cc().curop()->setMessage( msg, name, progressMeterTotal, secondsBetween );
     }
 
     void* DurTransaction::writingPtr(void* data, size_t len) {

@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    class ProgressMeter;
+
     /**
      * This name and this class are both a work in progress.
      */
@@ -56,6 +58,14 @@ namespace mongo {
          *         otherwise returns reasons
          */
         virtual Status checkForInterruptNoAssert() const = 0;
+
+        /**
+         * TODO(ERH): this should move to some CurOp like context.
+         */
+        virtual ProgressMeter* setMessage(const char* msg,
+                                          const std::string& name = "Progress",
+                                          unsigned long long progressMeterTotal = 0,
+                                          int secondsBetween = 3) = 0;
 
         // --- write unit of work methods ---
 
