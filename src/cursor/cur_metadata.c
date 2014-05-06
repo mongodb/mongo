@@ -267,10 +267,20 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 		*exact = 1;
 	} else {
 		WT_ERR(file_cursor->search_near(file_cursor, exact));
+		/* Make the key/value visible. */
+		cursor->key.data = file_cursor->key.data;
+		cursor->key.size = file_cursor->key.size;
+		cursor->value.data = file_cursor->value.data;
+		cursor->value.size = file_cursor->value.size;
+		F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 		F_SET(mdc, WT_MDC_POSITIONED);
 	}
 
-err:	API_END(session, ret);
+err:	if (ret != 0) {
+		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+	}
+	API_END(session, ret);
 	return (ret);
 }
 

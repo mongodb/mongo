@@ -265,6 +265,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    !WT_PREFIX_MATCH(uri, "index:") &&
 		    !WT_PREFIX_MATCH(uri, "file:") &&
 		    !WT_PREFIX_MATCH(uri, "lsm:") &&
+		    !WT_PREFIX_MATCH(uri, "metadata:") &&
 		    !WT_PREFIX_MATCH(uri, "table:") &&
 		    __wt_schema_get_source(session, uri) == NULL)
 			WT_ERR(__wt_bad_object_type(session, uri));
