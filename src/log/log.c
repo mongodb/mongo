@@ -843,7 +843,7 @@ advance:
 		/*
 		 * The log file end could be the middle of a log record.
 		 */
-		if (rd_lsn.offset + allocsize >= log_size)
+		if (rd_lsn.offset + allocsize > log_size)
 			goto advance;
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
@@ -871,7 +871,7 @@ advance:
 			 * The log file end could be the middle of this
 			 * log record.
 			 */
-			if (rd_lsn.offset + rdup_len >= log_size)
+			if (rd_lsn.offset + rdup_len > log_size)
 				goto advance;
 			/*
 			 * We need to round up and read in the full padded
