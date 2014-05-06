@@ -1832,14 +1832,13 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 /*
  * __rec_split_raw_worker --
- *	Raw compression split routine.
  *	Handle the raw compression page reconciliation bookkeeping.
  */
 static int
 __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 {
 	WT_BM *bm;
-	WT_BOUNDARY *bnd;
+	WT_BOUNDARY *last, *next;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -1861,31 +1860,9 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	unpack = &_unpack;
 	dsk = r->dsk.mem;
 
-	bnd = &r->bnd[r->bnd_next];
-	switch (dsk->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-		recno = bnd->recno;
-		break;
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		recno = 0;
-
-		/*
-		 * Set the promotion key for the chunk.  Repeated each time we
-		 * try and split, which might be wasted work, but detecting
-		 * repeated key-building is probably more complicated than it's
-		 * worth.  Don't bother doing the work for the first boundary,
-		 * that key is taken from the parent: see the comment in the
-		 * code that splits the row-store page for details.
-		 */
-		if (r->bnd_next == 0)
-			break;
-
-		WT_RET(__rec_split_row_promote_cell(session, dsk, &bnd->key));
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
+	WT_RET(__rec_split_bnd_grow(session, r));
+	last = &r->bnd[r->bnd_next];
+	next = last + 1;
 
 	/*
 	 * Build arrays of offsets and cumulative counts of cells and rows in
@@ -1915,8 +1892,15 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 */
 	dsk->u.entries = r->entries;
 
-	slots = 0;
-	entry = 0;
+	/*
+	 * We track the record number at each column-store split point, set an
+	 * initial value.
+	 */
+	recno = 0;
+	if (dsk->type == WT_PAGE_COL_VAR)
+		recno = last->recno;
+
+	entry = slots = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++entry;
 
@@ -2029,8 +2013,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		result_slots = 0;
 	}
 	WT_ERR(ret);
-	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
+	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 	if (result_slots != 0) {
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_ok);
 
@@ -2038,7 +2022,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 * Compression succeeded: finalize the header information.
 		 */
 		dsk_dst = dst->mem;
-		dsk_dst->recno = bnd->recno;
+		dsk_dst->recno = last->recno;
 		dsk_dst->mem_size =
 		    r->raw_offsets[result_slots] + WT_BLOCK_COMPRESS_SKIP;
 		dsk_dst->u.entries = r->raw_entries[result_slots - 1];
@@ -2061,19 +2045,26 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		r->space_avail =
 		    r->page_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
 
+		/*
+		 * Set the key for the next chunk (before writing the block, a
+		 * key range is needed in that code).
+		 */
 		switch (dsk->type) {
 		case WT_PAGE_COL_INT:
-			recno = r->raw_recnos[result_slots];
+			next->recno = r->raw_recnos[result_slots];
 			break;
 		case WT_PAGE_COL_VAR:
-			recno = r->raw_recnos[result_slots - 1];
+			next->recno = r->raw_recnos[result_slots - 1];
 			break;
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			recno = 0;
+			next->recno = 0;
+			if (!final)
+				WT_RET(__rec_split_row_promote_cell(
+				    session, dsk, &next->key));
 			break;
 		}
-		bnd->already_compressed = 1;
+		last->already_compressed = 1;
 	} else if (final) {
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
 
@@ -2081,7 +2072,7 @@ too_small:	/*
 		 * Compression wasn't even attempted, or failed and there are no
 		 * more rows to accumulate, write the original buffer instead.
 		 */
-		dsk->recno = bnd->recno;
+		dsk->recno = last->recno;
 		dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
 		dsk->u.entries = r->entries;
 
@@ -2089,18 +2080,7 @@ too_small:	/*
 		r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
 		r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
-		switch (dsk->type) {
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_COL_VAR:
-			recno = r->recno;
-			break;
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			recno = 0;
-			break;
-		}
-
-		bnd->already_compressed = 0;
+		last->already_compressed = 0;
 	} else {
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail_temporary);
 
@@ -2119,10 +2099,13 @@ more_rows:	/*
 		goto done;
 	}
 
+	/* We have a chunk, update the boundary counter. */
+	++r->bnd_next;
+
 	/*
 	 * Check for writing the whole page in our first/only attempt.
 	 */
-	single = final && r->entries == 0 && r->bnd_next == 0;
+	single = final && r->entries == 0 && r->bnd_next == 1;
 
 	/*
 	 * If we're doing an eviction, and we skipped an update, it only pays
@@ -2142,18 +2125,13 @@ more_rows:	/*
 	 * write from that buffer.  If not a checkpoint, write the newly created
 	 * compressed page.
 	 */
-	if (single && __rec_is_checkpoint(r, bnd)) {
-		if (bnd->already_compressed)
+	if (single && __rec_is_checkpoint(r, last)) {
+		if (last->already_compressed)
 			WT_ERR(__wt_buf_set(
 			    session, &r->dsk, dst->mem, dst->size));
 	} else
 		WT_ERR(__rec_split_write(session,
-		    r, bnd, bnd->already_compressed ? dst : &r->dsk, final));
-
-	/* We wrote something, move to the next boundary. */
-	WT_ERR(__rec_split_bnd_grow(session, r));
-	bnd = &r->bnd[++r->bnd_next];
-	bnd->recno = recno;
+		    r, last, last->already_compressed ? dst : &r->dsk, final));
 
 done:
 err:	__wt_scr_free(&dst);
