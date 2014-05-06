@@ -2060,7 +2060,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		case WT_PAGE_ROW_LEAF:
 			next->recno = 0;
 			if (!final)
-				WT_RET(__rec_split_row_promote_cell(
+				WT_ERR(__rec_split_row_promote_cell(
 				    session, dsk, &next->key));
 			break;
 		}
