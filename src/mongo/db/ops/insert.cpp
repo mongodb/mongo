@@ -56,7 +56,6 @@ namespace mongo {
                     // we replace Timestamp(0,0) at the top level with a correct value
                     // in the fast pass, we just mark that we want to swap
                     hasTimestampToFix = true;
-                    break;
                 }
 
                 const char* fieldName = e.fieldName();
