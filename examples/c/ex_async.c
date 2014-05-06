@@ -63,14 +63,14 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (1);
 	}
 	if (type == WT_AOP_SEARCH) {
-		/*! [Get the op's string key] */
+		/*! [Get the operation's string key] */
 		t_ret = op->get_key(op, &k);
 		key = k.data;
-		/*! [Get the op's string key] */
-		/*! [Get the op's string value] */
+		/*! [Get the operation's string key] */
+		/*! [Get the operation's string value] */
 		t_ret = op->get_value(op, &v);
 		value = v.data;
-		/*! [Get the op's string value] */
+		/*! [Get the operation's string value] */
 		printf("Id %" PRIu64 " got record: %s : %s\n", id, key, value);
 	}
 	return (t_ret);
@@ -122,12 +122,12 @@ retry:
 		/*! [Allocate a handle] */
 		snprintf(k[i], sizeof(k), "key%d", i);
 		snprintf(v[i], sizeof(v), "value%d", i);
-		/*! [Set the op's string key] */
+		/*! [Set the operation's string key] */
 		op->set_key(op, k[i]);
-		/*! [Set the op's string key] */
-		/*! [Set the op's string value] */
+		/*! [Set the operation's string key] */
+		/*! [Set the operation's string value] */
 		op->set_value(op, v[i]);
-		/*! [Set the op's string value] */
+		/*! [Set the operation's string value] */
 		/*! [example insert] */
 		ret = op->insert(op);
 		/*! [example insert] */

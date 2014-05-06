@@ -588,7 +588,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the key for the current record.
 	 *
-	 * @snippet ex_async.c Get the op's string key
+	 * @snippet ex_async.c Get the operation's string key
 	 *
 	 * @param op the operation handle
 	 * @param ... pointers to hold key fields corresponding to
@@ -600,7 +600,7 @@ struct __wt_async_op {
 	/*!
 	 * Get the value for the current record.
 	 *
-	 * @snippet ex_async.c Get the op's string value
+	 * @snippet ex_async.c Get the operation's string value
 	 *
 	 * @param op the operation handle
 	 * @param ... pointers to hold value fields corresponding to
@@ -612,7 +612,7 @@ struct __wt_async_op {
 	/*!
 	 * Set the key for the next operation.
 	 *
-	 * @snippet ex_async.c Set the op's string key
+	 * @snippet ex_async.c Set the operation's string key
 	 *
 	 * @param op the operation handle
 	 * @param ... key fields corresponding to WT_ASYNC_OP::key_format.
@@ -626,7 +626,7 @@ struct __wt_async_op {
 	/*!
 	 * Set the value for the next operation.
 	 *
-	 * @snippet ex_async.c Set the op's string value
+	 * @snippet ex_async.c Set the operation's string value
 	 *
 	 * @param op the operation handle
 	 * @param ... value fields corresponding to WT_ASYNC_OP::value_format.
