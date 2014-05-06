@@ -28,7 +28,6 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/instance.h" // needed for DBDirectClient
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/distlock.h"
@@ -40,8 +39,6 @@ namespace mongo {
 
     using std::string;
     using mongoutils::str::stream;
-
-    static const int kMaxChunksToMerge = 2;
 
     static BSONObj buildApplyOpsCmd( const OwnedPointerVector<ChunkType>&,
                                      const ChunkVersion&,
@@ -57,7 +54,6 @@ namespace mongo {
                       const BSONObj& minKey,
                       const BSONObj& maxKey,
                       const OID& epoch,
-                      bool onlyMergeEmpty,
                       string* errMsg ) {
 
         //
@@ -231,16 +227,6 @@ namespace mongo {
             return false;
         }
 
-        if ( chunksToMerge.size() > static_cast<unsigned int>( kMaxChunksToMerge ) ) {
-
-            *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                               << " has more than " << kMaxChunksToMerge
-                               << " chunks between " << rangeToString( minKey, maxKey );
-
-            warning() << *errMsg << endl;
-            return false;
-        }
-
         bool holeInRange = false;
 
         // Look for hole in range
@@ -268,42 +254,6 @@ namespace mongo {
 
             warning() << *errMsg << endl;
             return false;
-        }
-
-        //
-        // If required, verify that the chunks are empty
-        //
-
-        if ( onlyMergeEmpty ) {
-
-            int numFullChunks = 0;
-            try {
-
-                for ( OwnedPointerVector<ChunkType>::const_iterator it = chunksToMerge.begin();
-                        it != chunksToMerge.end(); ++it ) {
-
-                    if ( !isEmptyChunk( **it ) ) numFullChunks++;
-                    if ( numFullChunks > 1 ) break;
-                }
-            }
-            catch ( const DBException& ex ) {
-
-                *errMsg = stream() << "could not merge chunks, could not count docs in "
-                                   << nss.ns() << causedBy( ex );
-
-                warning() << *errMsg << endl;
-                return false;
-            }
-
-            if ( numFullChunks > 1 ) {
-
-                *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                                   << " has more than one non-empty chunk between "
-                                   << rangeToString( minKey, maxKey );
-
-                warning() << *errMsg << endl;
-                return false;
-            }
         }
 
         //
@@ -355,21 +305,6 @@ namespace mongo {
         configServer.logChange( "merge", nss.ns(), mergeLogEntry );
 
         return true;
-    }
-
-    // Determines if chunk is actually empty
-    // THROWS EXCEPTIONS
-    // Currently need to use min(), max() query operators, since $gte/$lt don't easily work for
-    // compound shard key patterns and min()/max() don't work for count.
-    // TODO: Cleaner mechanism coming here
-    bool isEmptyChunk( const ChunkType& chunk ) {
-        DBDirectClient direct;
-        Query query;
-        query.minKey( chunk.getMin() );
-        query.maxKey( chunk.getMax() );
-        vector<BSONObj> found;
-        direct.findN( found, chunk.getNS(), query, 1 /* limit */ );
-        return found.size() == 0;
     }
 
     //

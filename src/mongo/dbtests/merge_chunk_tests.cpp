@@ -162,29 +162,29 @@ namespace mongo {
         string errMsg;
         bool result;
 
-        result = mergeChunks( nss, BSON( "x" << 5 ), BSON( "x" << 20 ), epoch, false, &errMsg );
+        result = mergeChunks( nss, BSON( "x" << 5 ), BSON( "x" << 20 ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
 
-        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 15 ), epoch, false, &errMsg );
+        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 15 ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
 
-        result = mergeChunks( nss, BSON( "x" << -10 ), BSON( "x" << 20 ), epoch, false, &errMsg );
+        result = mergeChunks( nss, BSON( "x" << -10 ), BSON( "x" << 20 ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
 
-        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 30 ), epoch, false, &errMsg );
+        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 30 ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
 
-        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 10 ), epoch, false, &errMsg );
+        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 10 ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
 
         // Wrong epoch
         result = mergeChunks( nss, BSON( "x" << 0 ),
-                                   BSON( "x" << 10 ), OID::gen(), false, &errMsg );
+                                   BSON( "x" << 10 ), OID::gen(), &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
     }
@@ -204,7 +204,7 @@ namespace mongo {
         // Do bad merge with hole
         string errMsg;
         bool result;
-        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 20 ), epoch, false, &errMsg );
+        result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 20 ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
     }
@@ -225,74 +225,12 @@ namespace mongo {
         string errMsg;
         bool result;
         result = mergeChunks( nss, BSON( "x" << -1 ),
-                                   BSON( "x" << MAXKEY ), epoch, false, &errMsg );
+                                   BSON( "x" << MAXKEY ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
 
         result = mergeChunks( nss, BSON( "x" << MINKEY ),
-                                   BSON( "x" << 1 ), epoch, false, &errMsg );
-        ASSERT_NOT_EQUALS( errMsg, "" );
-        ASSERT( !result );
-    }
-
-    TEST_F(MergeChunkTests, MergeEmpty) {
-
-        const NamespaceString nss( "foo.bar" );
-        const BSONObj kp = BSON( "x" << 1 );
-        const OID epoch = OID::gen();
-        vector<KeyRange> ranges;
-
-        // Setup chunk metadata
-        ranges.push_back( KeyRange( nss, BSON( "x" << 0 ), BSON( "x" << 10 ), kp ) );
-        ranges.push_back( KeyRange( nss, BSON( "x" << 10 ), BSON( "x" << 20 ), kp ) );
-        ranges.push_back( KeyRange( nss, BSON( "x" << 20 ), BSON( "x" << 30 ), kp ) );
-        ranges.push_back( KeyRange( nss, BSON( "x" << 30 ), BSON( "x" << 40 ), kp ) );
-        storeCollectionRanges( nss, shardName(), ranges, ChunkVersion( 1, 0, epoch ) );
-
-        // Get latest version
-        ChunkVersion latestVersion;
-        shardingState.refreshMetadataNow( nss, &latestVersion );
-        shardingState.resetMetadata( nss );
-
-        // Insert doc into each chunk
-        client().insert( nss, BSON( "x" << 1 ) );
-        client().insert( nss, BSON( "x" << 11 ) );
-        // Create an index so we don't just get an exception
-        ASSERT( client().ensureIndex( nss, BSON( "x" << 1 ) ) );
-
-        // Merge two empty chunks
-        string errMsg;
-        bool result = mergeChunks( nss, BSON( "x" << 20 ),
-                                        BSON( "x" << 40 ), epoch, true, &errMsg );
-
-        // Verify result
-        CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( nss );
-
-        ASSERT_EQUALS( errMsg, "" );
-        ASSERT( result );
-        ASSERT_EQUALS( metadata->getNumChunks(), 3u );
-        ASSERT_EQUALS( metadata->getShardVersion().majorVersion(), latestVersion.majorVersion() );
-        ASSERT_GREATER_THAN( metadata->getShardVersion().minorVersion(),
-                             latestVersion.minorVersion() );
-        latestVersion = metadata->getShardVersion();
-
-        // Merge one empty chunk with a non-empty chunk
-        result = mergeChunks( nss, BSON( "x" << 10 ),
-                                   BSON( "x" << 40 ), epoch, true, &errMsg );
-
-        // Verify result
-        metadata = shardingState.getCollectionMetadata( nss );
-
-        ASSERT_EQUALS( errMsg, "" );
-        ASSERT( result );
-        ASSERT_EQUALS( metadata->getNumChunks(), 2u );
-        ASSERT_EQUALS( metadata->getShardVersion().majorVersion(), latestVersion.majorVersion() );
-        ASSERT_GREATER_THAN( metadata->getShardVersion().minorVersion(),
-                             latestVersion.minorVersion() );
-
-        // Ensure merge fails if we're only merging empty chunks
-        result = mergeChunks( nss, BSON( "x" << 0 ),
-                                   BSON( "x" << 40 ), epoch, true, &errMsg );
+                                   BSON( "x" << 1 ), epoch, &errMsg );
         ASSERT_NOT_EQUALS( errMsg, "" );
         ASSERT( !result );
     }
@@ -316,7 +254,7 @@ namespace mongo {
 
         // Do merge
         string errMsg;
-        bool result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 2 ), epoch, false, &errMsg );
+        bool result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 2 ), epoch, &errMsg );
         ASSERT_EQUALS( errMsg, "" );
         ASSERT( result );
 
@@ -356,7 +294,7 @@ namespace mongo {
         // Do merge
         string errMsg;
         bool result = mergeChunks( nss, BSON( "x" << MINKEY ),
-                                        BSON( "x" << MAXKEY ), epoch, false, &errMsg );
+                                        BSON( "x" << MAXKEY ), epoch, &errMsg );
         ASSERT_EQUALS( errMsg, "" );
         ASSERT( result );
 
@@ -398,7 +336,7 @@ namespace mongo {
         // Do merge
         string errMsg;
         bool result = mergeChunks( nss, BSON( "x" << 0 << "y" << 1 ),
-                                        BSON( "x" << 2 << "y" << 1 ), epoch, false, &errMsg );
+                                        BSON( "x" << 2 << "y" << 1 ), epoch, &errMsg );
         ASSERT_EQUALS( errMsg, "" );
         ASSERT( result );
 

@@ -160,7 +160,7 @@ namespace mongo {
                 return false;
             }
 
-            return mergeChunks( NamespaceString( ns ), minKey, maxKey, epoch, true, &errmsg );
+            return mergeChunks( NamespaceString( ns ), minKey, maxKey, epoch, &errmsg );
         }
     };
 

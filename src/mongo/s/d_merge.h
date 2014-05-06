@@ -55,6 +55,5 @@ namespace mongo {
                       const BSONObj& minKey,
                       const BSONObj& maxKey,
                       const OID& epoch,
-                      bool onlyMergeEmpty,
                       std::string* errMsg );
 }

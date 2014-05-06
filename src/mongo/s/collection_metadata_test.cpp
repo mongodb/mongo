@@ -1387,4 +1387,19 @@ namespace {
         ASSERT_EQUALS( cloned->getShardVersion().majorVersion(), 6 );
     }
 
+    TEST_F(ThreeChunkWithRangeGapFixture, CannotMergeWithHole) {
+
+        string errMsg;
+        ChunkVersion newShardVersion( 5, 0, getCollMetadata().getShardVersion().epoch() );
+
+        // Try to merge middle two chunks with a hole in the middle.
+        newShardVersion.incMajor();
+        CollectionMetadata* result = getCollMetadata().cloneMerge( BSON( "a" << 10 ),
+                                                                   BSON( "a" << 30 ),
+                                                                   newShardVersion,
+                                                                   &errMsg );
+        ASSERT( result == NULL );
+        ASSERT( !errMsg.empty() );
+    }
+
 } // unnamed namespace
