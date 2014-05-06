@@ -6,11 +6,10 @@ s = "";
 while ( s.length < 10000 )
     s += ".";
 
-var bulk = t.initializeUnorderedBulkOp();
 for ( i = 0; i < 8000; i++ ) {
-    bulk.insert({ x: i, s: s });
+    t.insert( { x : i, s : s } );
  }
-assert.writeOK(bulk.execute());
+
 
 function iterateSliced() {
     var res = t.runCommand( "parallelCollectionScan", { numCursors : 3 } );

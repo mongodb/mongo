@@ -29,33 +29,33 @@ coll.ensureIndex({ insert : 1 })
 print( "starting insertion phase" )
 
 // Insert a bunch of data
-var toInsert = 2000;
-var bulk = coll.initializedUnorderedBulkOp();
+var toInsert = 2000
 for( var i = 0; i < toInsert; i++ ){
-    bulk.insert({ my: "test", data: "to", insert: i });
+    coll.insert({ my : "test", data : "to", insert : i })
 }
-assert.writeOK(bulk.execute());
+
+assert.eq( coll.getDB().getLastError(), null )
 
 print( "starting updating phase" )
 
 // Update a bunch of data
-var toUpdate = toInsert;
-bulk = coll.initializedUnorderedBulkOp();
+var toUpdate = toInsert
 for( var i = 0; i < toUpdate; i++ ){
-    var id = coll.findOne({ insert : i })._id;
-    bulk.update({ insert : i, _id : id }, { $inc : { counter : 1 } });
+    var id = coll.findOne({ insert : i })._id
+    coll.update({ insert : i, _id : id }, { $inc : { counter : 1 } })
 }
-assert.writeOK(bulk.execute());
+
+assert.eq( coll.getDB().getLastError(), null )
 
 print( "starting deletion" )
 
 // Remove a bunch of data
-var toDelete = toInsert / 2;
-bulk = coll.initializedUnorderedBulkOp();
+var toDelete = toInsert / 2
 for( var i = 0; i < toDelete; i++ ){
-    bulk.remove({ insert : i });
+    coll.remove({ insert : i })
 }
-assert.writeOK(bulk.execute());
+
+assert.eq( coll.getDB().getLastError(), null )
 
 // Make sure the right amount of data is there
 assert.eq( coll.find().count(), toInsert / 2 )

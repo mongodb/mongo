@@ -5,11 +5,10 @@ s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true, _noslee
 
 
 db = s.getDB( "test" );
-var bulk = db.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 2100; i++) {
-    bulk.insert({ _id: i, x: i });
+for ( i=0; i<2100; i++ ) {
+    db.foo.insert( { _id : i , x : i } );
 }
-assert.writeOK(bulk.execute());
+db.getLastError();
 
 serverName = s.getServerName( "test" ) 
 other = s.config.shards.findOne( { _id : { $ne : serverName } } );

@@ -17,7 +17,8 @@ var primeSystemReplset = function() {
 
     print("create a TTL collection");
     var testDB = conn.getDB("test");
-    assert.commandWorked(testDB.foo.ensureIndex({ x: 1 }, { expireAfterSeconds: 2 }));
+    testDB.foo.ensureIndex({x:1}, {expireAfterSeconds : 2});
+    testDB.getLastError();
 };
 
 var restartWithConfig = function() {
@@ -37,7 +38,8 @@ var restartWithConfig = function() {
 
 var restartWithoutConfig = function() {
     var localDB = conn.getDB("local");
-    assert.writeOK(localDB.system.replset.remove({}));
+    localDB.system.replset.remove({});
+    localDB.getLastError();
 
     stopMongod(runner.port(), 15);
 

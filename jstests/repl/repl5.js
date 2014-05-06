@@ -14,10 +14,8 @@ doTest = function(signal, extraOpts) {
     m = rt.start( true );
     
     ma = m.getDB( "a" ).a;
-    var bulk = ma.initializeUnorderedBulkOp();
     for( i = 0; i < 10000; ++i )
-        bulk.insert({ i: i });
-    assert.writeOK(bulk.execute());
+        ma.save( { i:i } );
     
     s = rt.start(false, extraOpts);
     soonCountAtLeast( "a", "a", 1 );

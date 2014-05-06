@@ -104,30 +104,25 @@ function doIt( indexVersion ) {
         }
     }
 
-    var bulk = t.initializeUnorderedBulkOp();
     for( var i = 0; i < 10000; ++i ) {
-        bulk.insert( obj() );
+        t.save( obj() );
     }
-    assert.writeOK(bulk.execute());
 
     t.ensureIndex( idx , { v : indexVersion } );
     check();
 
-    bulk = t.initializeUnorderedBulkOp();
     for( var i = 0; i < 10000; ++i ) {
         if ( Random.rand() > 0.9 ) {
-            bulk.insert( obj() );
+            t.save( obj() );
         } else {
-            bulk.find( obj() ).remove(); // improve
+            t.remove( obj() ); // improve
         }
         if( Random.rand() > 0.999 ) {
             print( i );
-            assert.writeOK(bulk.execute());
             check();
-            bulk = t.initializeUnorderedBulkOp();
         }
     }
-    assert.writeOK(bulk.execute());
+
     check();
 
 }

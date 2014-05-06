@@ -35,12 +35,12 @@ counts = {}
 //
 
 
-function doUpdate( bulk, includeString, optionalId ){
+function doUpdate( includeString, optionalId ){
     var up = { $inc : { x : 1 } }
     if ( includeString )
         up["$set"] = { s : bigString };
     var myid = optionalId == undefined ? Random.randInt( N ) : optionalId
-    bulk.find({ _id : myid }).upsert().update( up );
+    db.foo.update( { _id : myid } , up , true );
 
     counts[myid] = ( counts[myid] ? counts[myid] : 0 ) + 1;
     return myid;
@@ -48,15 +48,14 @@ function doUpdate( bulk, includeString, optionalId ){
 
 // Initially update all documents from 1 to N, otherwise later checks can fail because no document
 // previously existed
-var bulk = db.foo.initializeUnorderedBulkOp();
 for ( i = 0; i < N; i++ ){
-    doUpdate( bulk, true, i );
+    doUpdate( true, i )
 }
 
 for ( i=0; i<N*9; i++ ){
-    doUpdate( bulk, false );
+    doUpdate( false )
 }
-assert.writeOK(bulk.execute());
+db.getLastError();
 
 for ( var i=0; i<50; i++ ){
     s.printChunks( "test.foo" )
@@ -110,15 +109,25 @@ function check( msg , dontAssert ){
 function diff1(){
     
     jsTest.log("Running diff1...")
+    
+    var myid = doUpdate( false )
+    var le = db.getLastErrorCmd();
 
-    bulk = db.foo.initializeUnorderedBulkOp();
-    var myid = doUpdate( bulk, false );
-    var res = assert.writeOK(bulk.execute());
+    if ( le.err )
+        print( "ELIOT ELIOT : " + tojson( le ) + "\t" + myid );
 
-    assert.eq( 1, res.nModified,
-               "diff myid: " + myid + " 2: " + res.toString() + "\n" +
-               " correct count is: " + counts[myid] +
-               " db says count is: " + tojson(db.foo.findOne({ _id: myid })) );
+    if ( ! le.updatedExisting || le.n != 1 ) {
+        print( "going to assert for id: " + myid + " correct count is: " + counts[myid] + " db says count is: " + tojson(db.foo.findOne( { _id : myid } )) );
+    }
+
+    assert( le.updatedExisting , "GLE diff myid: " + myid + " 1: " + tojson(le) )
+    assert.eq( 1 , le.n , "GLE diff myid: " + myid + " 2: " + tojson(le) )
+
+
+    if ( Math.random() > .99 ){
+        db.getLastError()
+        check( "random late check" ); // SERVER-1430 
+    }
 
     var x = s.chunkCounts( "foo" )
     if ( Math.random() > .999 )

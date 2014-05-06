@@ -22,15 +22,14 @@ function checkDb2DirAbsent() {
 var m = startMongod( "--smallfiles", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 db2 = m.getDB( baseName2 );
-var bulk = db[ baseName ].initializeUnorderedBulkOp();
-var bulk2 = db2[ baseName2 ].initializeUnorderedBulkOp();
-var big = new Array( 5000 ).toString();
+c = db[ baseName ];
+c2 = db2[ baseName2 ];
+big = new Array( 5000 ).toString();
 for( var i = 0; i < 3000; ++i ) {
-    bulk.insert({ b:big });
-    bulk2.insert({ b:big });
+    c.save( { b:big } );
+    c2.save( { b:big } );
+    db.getLastError();
 }
-assert.writeOK(bulk.execute());
-assert.writeOK(bulk2.execute());
 
 // Due to our write pattern, we expect db2's .3 file to be queued up in the file
 // allocator behind db's .3 file at the time db2 is dropped.  This will
@@ -44,7 +43,8 @@ db.dropDatabase();
 // Try writing a new database, to ensure file allocator is still working.
 db3 = m.getDB( baseName3 );
 c3 = db[ baseName3 ];
-assert.writeOK(c3.insert( {} ));
+c3.save( {} );
+assert( !db3.getLastError() );
 assert.eq( 1, c3.count() );
 
 checkDb2DirAbsent();

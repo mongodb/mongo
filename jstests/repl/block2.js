@@ -18,14 +18,33 @@ function check( msg ){
     assert.eq( tm.count() , ts.count() , "check: " + msg );
 }
 
+function worked( w , wtimeout ){
+    var gle = dbm.getLastError( w , wtimeout );
+    if (gle != null) {
+        printjson(gle);
+    }
+    return gle == null;
+}
+
 check( "A" );
 
-assert.writeOK(tm.insert({ x: 1 }, { writeConcern: { w: 2 }}));
-assert.writeOK(tm.insert({ x: 2 }, { writeConcern: { w: 2, wtimeout: 3000 }}));
+tm.save( { x : 1 } );
+assert( worked( 2 ) , "B" );
+
+tm.save( { x : 2 } );
+assert( worked( 2 , 3000 ) , "C" )
 
 rt.stop( false );
-assert.writeError(tm.insert({ x: 3 }, { writeConcern: { w: 2, wtimeout: 3000 }}));
+tm.save( { x : 3 } )
 assert.eq( 3 , tm.count() , "D1" );
+assert( ! worked( 2 , 3000 ) , "D2" )
+
+s = rt.start( false )
+setup();
+assert( worked( 2 , 30000 ) , "E" )
 
 rt.stop();
+
+
+
 

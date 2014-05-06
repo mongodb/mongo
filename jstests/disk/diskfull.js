@@ -22,16 +22,16 @@ if ( doIt ) {
     m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1", '--nojournal' );
     d = m.getDB( "diskfulltest" );
     c = d.getCollection( "diskfulltest" );
-    assert.writeError(c.insert( { a: 6 } ));
-
+    c.save( { a: 6 } );
+    assert(d.getLastError().length );
+    printjson( d.getLastErrorObj() );
     assert.soon(
         function() { c.save( { a : 6 } );
                      return rawMongoProgramOutput().match( /file allocation failure/ );
                    },
         "didn't see 'file allocation failure'" );
-    res = assert.writeError(c.insert({ a: 6 }));
-    var errmsg = res.getWriteError().errmsg;
-    assert.eq(errmsg, "Can't take a write lock while out of disk space"); // every following fail
+    c.save( { a: 6 } );
+    assert.eq(d.getLastError(), "Can't take a write lock while out of disk space"); // every following fail
 
 
     sleep( 3000 );

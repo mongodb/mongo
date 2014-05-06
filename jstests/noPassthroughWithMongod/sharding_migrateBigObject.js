@@ -22,11 +22,11 @@ for( var i = 0; i < nsq; i++ ) data += data
 dataObj = {}
 for( var i = 0; i < n; i++ ) dataObj["data-" + i] = data
 
-var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < 40; i++ ) {
-    bulk.insert({ data: dataObj });
+        if(i != 0 && i % 10 == 0) printjson( coll.stats() )
+        coll.save({ data : dataObj })
 }
-assert.writeOK(bulk.execute());
+db.getLastError();
 
 assert.eq( 40 , coll.count() , "prep1" );
 
@@ -46,9 +46,9 @@ assert.soon(
         // On *extremely* slow or variable systems, we've seen migrations fail in the critical section and
         // kill the server.  Do an explicit check for this. SERVER-8781
         // TODO: Remove once we can better specify what systems to run what tests on.
-        try {
-            assert.commandWorked(shardA.getDB("admin").runCommand({ ping: 1 }));
-            assert.commandWorked(shardB.getDB("admin").runCommand({ ping: 1 }));
+        try { 
+            assert.eq(null, shardA.getDB("admin").getLastError());
+            assert.eq(null, shardB.getDB("admin").getLastError());
         }
         catch(e) {
             print("An error occurred contacting a shard during balancing," +

@@ -25,15 +25,20 @@ st.printShardingStatus();
 jsTest.log("Testing multi-update...");
 
 // Put data on all shards
-assert.writeOK(st.shard0.getCollection(coll.toString()).insert({ _id : 0, skey : -1, x : 1 }));
-assert.writeOK(st.shard1.getCollection(coll.toString()).insert({ _id : 1, skey : 1, x : 1 }));
+st.shard0.getCollection(coll.toString()).insert({ _id : 0, skey : -1, x : 1 });
+assert.gleOK(st.shard0.getCollection(coll.toString()).getDB().getLastErrorObj());
+st.shard1.getCollection(coll.toString()).insert({ _id : 1, skey : 1, x : 1 });
+assert.gleOK(st.shard1.getCollection(coll.toString()).getDB().getLastErrorObj());
 // Data not in chunks
-assert.writeOK(st.shard2.getCollection(coll.toString()).insert({ _id : 0, x : 1 }));
+st.shard2.getCollection(coll.toString()).insert({ _id : 0, x : 1 });
+assert.gleOK(st.shard2.getCollection(coll.toString()).getDB().getLastErrorObj());
 
 // Non-multi-update doesn't work without shard key
-assert.writeError(coll.update({ x : 1 }, { $set : { updated : true } }, { multi : false }));
+coll.update({ x : 1 }, { $set : { updated : true } }, { multi : false });
+assert.gleError(coll.getDB().getLastErrorObj());
 
-assert.writeOK(coll.update({ x : 1 }, { $set : { updated : true } }, { multi : true }));
+coll.update({ x : 1 }, { $set : { updated : true } }, { multi : true });
+assert.gleOK(coll.getDB().getLastErrorObj());
 
 // Ensure update goes to *all* shards
 assert.neq(null, st.shard0.getCollection(coll.toString()).findOne({ updated : true }));
@@ -41,7 +46,8 @@ assert.neq(null, st.shard1.getCollection(coll.toString()).findOne({ updated : tr
 assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({ updated : true }));
 
 // _id update works, and goes to all shards
-assert.writeOK(coll.update({ _id : 0 }, { $set : { updatedById : true } }, { multi : false }));
+coll.update({ _id : 0 }, { $set : { updatedById : true } }, { multi : false });
+assert.gleOK(coll.getDB().getLastErrorObj());
 
 // Ensure _id update goes to *all* shards
 assert.neq(null, st.shard0.getCollection(coll.toString()).findOne({ updatedById : true }));
@@ -50,9 +56,11 @@ assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({ updatedById 
 jsTest.log("Testing multi-delete...");
 
 // non-multi-delete doesn't work without shard key
-assert.writeError(coll.remove({ x : 1 }, { justOne : true }));
+coll.remove({ x : 1 }, { justOne : true });
+assert.gleError(coll.getDB().getLastErrorObj());
 
-assert.writeOK(coll.remove({ x : 1 }, { justOne : false }));
+coll.remove({ x : 1 }, { justOne : false });
+assert.gleOK(coll.getDB().getLastErrorObj());
 
 // Ensure delete goes to *all* shards
 assert.eq(null, st.shard0.getCollection(coll.toString()).findOne({ x : 1 }));
@@ -60,12 +68,16 @@ assert.eq(null, st.shard1.getCollection(coll.toString()).findOne({ x : 1 }));
 assert.eq(null, st.shard2.getCollection(coll.toString()).findOne({ x : 1 }));
 
 // Put more on all shards
-assert.writeOK(st.shard0.getCollection(coll.toString()).insert({ _id : 0, skey : -1, x : 1 }));
-assert.writeOK(st.shard1.getCollection(coll.toString()).insert({ _id : 1, skey : 1, x : 1 }));
+st.shard0.getCollection(coll.toString()).insert({ _id : 0, skey : -1, x : 1 });
+assert.gleOK(st.shard0.getCollection(coll.toString()).getDB().getLastErrorObj());
+st.shard1.getCollection(coll.toString()).insert({ _id : 1, skey : 1, x : 1 });
+assert.gleOK(st.shard1.getCollection(coll.toString()).getDB().getLastErrorObj());
 // Data not in chunks
-assert.writeOK(st.shard2.getCollection(coll.toString()).insert({ _id : 0, x : 1 }));
+st.shard2.getCollection(coll.toString()).insert({ _id : 0, x : 1 });
+assert.gleOK(st.shard2.getCollection(coll.toString()).getDB().getLastErrorObj());
 
-assert.writeOK(coll.remove({ _id : 0 }, { justOne : true }));
+coll.remove({ _id : 0 }, { justOne : true });
+assert.gleOK(coll.getDB().getLastErrorObj());
 
 // Ensure _id delete goes to *all* shards
 assert.eq(null, st.shard0.getCollection(coll.toString()).findOne({ x : 1 }));

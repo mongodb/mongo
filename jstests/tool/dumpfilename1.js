@@ -7,8 +7,9 @@ t = new ToolTest( "dumpfilename1" );
 
 t.startDB( "foo" );
 c = t.db;
-assert.writeOK(c.getCollection("df/").insert({ a: 3 }));
-assert.writeOK(c.getCollection("df").insert({ a: 2 }));
+c.getCollection("df/").insert({a:3});
+c.getCollection("df").insert({a:2});
+t.db.getLastError(); // Ensure data is written before dumping it through a spawned process.
 
 t.runTool( "dump" , "--out" , t.ext );
 

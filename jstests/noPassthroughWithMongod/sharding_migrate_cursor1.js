@@ -23,11 +23,11 @@ numDocs = 20 * docsPerChunk
 
 print( "stringSize: " + stringSize + " docsPerChunk: " + docsPerChunk + " numDocs: " + numDocs )
 
-var bulk = t.initializeUnorderedBulkOp();
-for (var i = 0; i < numDocs; i++){
-    bulk.insert({ _id: i, s: bigString });
+for ( i=0; i<numDocs; i++ ){
+    t.insert( { _id : i , s : bigString } );
 }
-assert.writeOK(bulk.execute());
+
+db.getLastError();
 
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 

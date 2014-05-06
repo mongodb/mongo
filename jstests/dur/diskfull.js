@@ -50,12 +50,15 @@ function work() {
     log("work");
     try {
         var d = conn.getDB("test");
-        var big = new Array( 5000 ).toString();
-        var bulk = d.foo.initializeUnorderedBulkOp();
+        
+        big = new Array( 5000 ).toString();
         for( i = 0; i < 10000; ++i ) {
-            bulk.insert({ _id: i, b: big });
+            d.foo.insert( { _id:i, b:big } );
         }
-        assert.writeOK(bulk.execute());
+        
+        gle = d.getLastError();
+        if ( gle )
+            throw gle;
     } catch ( e ) {
         print( e );
         raise( e );

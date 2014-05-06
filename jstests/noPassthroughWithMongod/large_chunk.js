@@ -20,12 +20,11 @@ while ( bigString.length < 10000 )
 
 inserted = 0;
 num = 0;
-var bulk = db.foo.initializeUnorderedBulkOp();
 while ( inserted < ( 400 * 1024 * 1024 ) ){
-    bulk.insert({ _id: num++, s: bigString });
+    db.foo.insert( { _id : num++ , s : bigString } );
     inserted += bigString.length;
 }
-assert.writeOK(bulk.execute());
+db.getLastError();
 
 // Turn on sharding on the 'test.foo' collection and generate a large chunk
 s.adminCommand( { enablesharding : "test" } );

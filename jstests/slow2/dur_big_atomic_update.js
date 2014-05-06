@@ -8,29 +8,26 @@ conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--durOption
 d = conn.getDB("test");
 d.foo.drop();
 
-var bulk = d.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 1024; i++){
-    bulk.insert({ _id: i });
+for (var i=0; i<1024; i++){
+    d.foo.insert({_id:i});
 }
-assert.writeOK(bulk.execute());
 
 big_string = 'xxxxxxxxxxxxxxxx';
 while (big_string.length < 1024*1024) {
     big_string += big_string;
 }
 
-var res = assert.writeOK(d.foo.update({ $atomic: 1 },
-                                      { $set: { big_string: big_string }},
-                                      false, true /* multi */ ));
-assert.eq(1024, res.nModified);
+d.foo.update({$atomic:1}, {$set: {big_string: big_string}}, false, /*multi*/true);
+err = d.getLastErrorObj();
+
+assert(err.err == null);
+assert(err.n == 1024);
 
 d.dropDatabase();
 
-bulk = d.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < 1024; i++){
-    bulk.insert({ _id: i });
+for (var i=0; i<1024; i++){
+    d.foo.insert({_id:i});
 }
-assert.writeOK(bulk.execute());
 
 // Do it again but in a db.eval
 d.eval(

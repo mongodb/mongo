@@ -64,11 +64,9 @@
     var size = 500000;
 
     jsTest.log("creating test data " + size + " documents");
-    var bulk = masterDB.jstests_bgsec.initializeUnorderedBulkOp();
     for( i = 0; i < size; ++i ) {
-        bulk.insert({ i : i });
+        masterDB.jstests_bgsec.save( {i:i} );
     }
-    assert.writeOK(bulk.execute());
 
     jsTest.log("Starting background indexing");
     masterDB.jstests_bgsec.ensureIndex( {i:1}, {background:true} );
@@ -84,7 +82,8 @@
 
     // Make sure a journal flush for the oplog occurs, by doing a local journaled write to the
     // secondary
-    assert.writeOK(second.getDB('local').foo.insert({ a: 1 }, { writeConcern: { j: true }}));
+    second.getDB('local').foo.insert({a:1});
+    second.getDB('local').runCommand( { getLastError: 1, j: true } );
 
     // restart secondary and reconnect
     jsTest.log("Restarting secondary");

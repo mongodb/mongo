@@ -3,11 +3,9 @@
 t = db.foo;
 t.remove({});
 
-var bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < 1000000; i++) {
-    bulk.insert({ _id: i, x: 'a                                                              b' });
+    t.insert({ _id: i, x: 'a                                                                               b' });
 }
-assert.writeOK(bulk.execute());
 
 print("1 insert done count: " + t.count());
 

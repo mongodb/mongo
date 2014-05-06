@@ -20,12 +20,11 @@ s.adminCommand( { shardcollection : ns , key: { _id : 1 } } );
 
 // insert 24 docs, with timestamps at one hour intervals
 var now = (new Date()).getTime();
-var bulk = t.initializeUnorderedBulkOp();
-for (var i = 0; i < 24; i++) {
+for ( i=0; i<24; i++ ){
     var past = new Date( now - ( 3600 * 1000 * i ) );
-    bulk.insert({ _id: i,  x: past  });
+    t.insert( {_id : i ,  x : past  } );
 }
-assert.writeOK(bulk.execute());
+s.getDB( dbname ).getLastError();
 assert.eq( t.count() , 24 , "initial docs not inserted");
 
 // create the TTL index which delete anything older than ~5.5 hours

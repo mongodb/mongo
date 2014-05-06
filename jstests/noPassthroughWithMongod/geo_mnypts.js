@@ -6,12 +6,10 @@ coll.drop()
 var totalPts = 500 * 1000
 
 // Add points in a 100x100 grid
-var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < totalPts; i++ ){
     var ii = i % 10000
-    bulk.insert({ loc : [ ii % 100, Math.floor( ii / 100 ) ] });
+    coll.insert({ loc : [ ii % 100, Math.floor( ii / 100 ) ] })
 }
-assert.writeOK(bulk.execute());
 
 coll.ensureIndex({ loc : "2d" })
 

@@ -958,11 +958,10 @@ ReplSetTest.prototype.overflow = function( secondaries ){
     while (count != prevCount) {
       
       print("ReplSetTest overflow inserting 10000");
-      var bulk = overflowColl.initializeUnorderedBulkOp();
+      
       for (var i = 0; i < 10000; i++) {
-          bulk.insert({ overflow : "value" });
+          overflowColl.insert({ overflow : "value" });
       }
-      bulk.execute();
       prevCount = count;
       this.awaitReplication();
       

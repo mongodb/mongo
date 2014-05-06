@@ -12,16 +12,16 @@ GeoNearRandomTest = function(name) {
 
 
 GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds){
-    if(!indexBounds){
-        scale = scale || 1; // scale is good for staying away from edges
-        return [((Random.rand() * 359.8) - 179.9) * scale, ((Random.rand() * 180) - 90) * scale];
-    }
-    else{
-        var range = indexBounds.max - indexBounds.min;
-        var eps = Math.pow(2, -40);
-        // Go very close to the borders but not quite there.
-        return [( Random.rand() * (range - eps) + eps) + indexBounds.min, ( Random.rand() * (range - eps) + eps ) + indexBounds.min];
-    }
+	if(!indexBounds){
+		scale = scale || 1; // scale is good for staying away from edges
+    	return [((Random.rand() * 359.8) - 179.9) * scale, ((Random.rand() * 180) - 90) * scale];
+	}
+	else{
+		var range = indexBounds.max - indexBounds.min;
+		var eps = Math.pow(2, -40);
+		// Go very close to the borders but not quite there.
+		return [( Random.rand() * (range - eps) + eps) + indexBounds.min, ( Random.rand() * (range - eps) + eps ) + indexBounds.min];
+	}
     
 }
 
@@ -29,29 +29,27 @@ GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
     assert.eq(this.nPts, 0, "insertPoints already called");
     this.nPts = nPts;
 
-    var bulk = this.t.initializeUnorderedBulkOp();
     for (var i=0; i<nPts; i++){
-        bulk.insert({ _id: i, loc: this.mkPt(scale, indexBounds) });
+        this.t.insert({_id: i, loc: this.mkPt(scale, indexBounds)});
     }
-    assert.writeOK(bulk.execute());
     
     if(!indexBounds)
-        this.t.ensureIndex({loc: '2d'});
+    	this.t.ensureIndex({loc: '2d'});
     else
-        this.t.ensureIndex({loc: '2d'}, indexBounds)
+    	this.t.ensureIndex({loc: '2d'}, indexBounds)
 }
 
 GeoNearRandomTest.prototype.assertIsPrefix = function(short, long) {
     for (var i=0; i < short.length; i++){
-        
-        var xS = short[i].obj ? short[i].obj.loc[0] : short[i].loc[0]
-        var yS = short[i].obj ? short[i].obj.loc[1] : short[i].loc[1]
-        var dS = short[i].obj ? short[i].dis : 1
-        
-        var xL = long[i].obj ? long[i].obj.loc[0] : long[i].loc[0]
-        var yL = long[i].obj ? long[i].obj.loc[1] : long[i].loc[1]
-        var dL = long[i].obj ? long[i].dis : 1
-        
+    	
+    	var xS = short[i].obj ? short[i].obj.loc[0] : short[i].loc[0]
+    	var yS = short[i].obj ? short[i].obj.loc[1] : short[i].loc[1]
+    	var dS = short[i].obj ? short[i].dis : 1
+    	
+		var xL = long[i].obj ? long[i].obj.loc[0] : long[i].loc[0]
+    	var yL = long[i].obj ? long[i].obj.loc[1] : long[i].loc[1]
+    	var dL = long[i].obj ? long[i].dis : 1
+    	
         assert.eq([xS, yS, dS], [xL, yL, dL]);
     }
 } 

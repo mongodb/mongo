@@ -42,11 +42,9 @@ var dc = {dropIndexes: collection, index: "i_1"};
 // set up collections
 masterDB.dropDatabase();
 jsTest.log("creating test data " + size + " documents");
-var bulk = masterDB.getCollection(collection).initializeUnorderedBulkOp();
 for( i = 0; i < size; ++i ) {
-    bulk.insert({ i: Random.rand() });
+	masterDB.getCollection(collection).save( {i: Random.rand()} );
 }
-assert.writeOK(bulk.execute());
 
 jsTest.log("Starting background indexing for test of: " + tojson(dc));
 // Add another index to be sure the drop command works.

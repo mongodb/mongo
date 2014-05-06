@@ -30,7 +30,8 @@ for ( var opt in options ) {
     assert.eq(options[opt], cappedOptions[opt],
               'invalid option:' + tojson(options) + " " + tojson(cappedOptions));
 }
-assert.writeOK(db.capped.insert({ x: 1 }));
+db.capped.insert({ x: 1 });
+db.getLastError()
 
 // Full dump/restore
 
@@ -57,7 +58,8 @@ var cappedOptions = db.capped.exists().options;
 for ( var opt in options ) {
   assert.eq(options[opt], cappedOptions[opt], 'invalid option')
 }
-assert.writeOK(db.capped.insert({ x: 1 }));
+db.capped.insert({ x: 1 });
+db.getLastError()
 
 dumppath = t.ext + "noOptionsSingleDump/";
 mkdir(dumppath);
@@ -85,8 +87,8 @@ var cappedOptions = db.capped.exists().options;
 for ( var opt in options ) {
   assert.eq(options[opt], cappedOptions[opt], 'invalid option')
 }
-
-assert.writeOK(db.capped.insert({ x: 1 }));
+db.capped.insert({ x: 1 });
+db.getLastError()
 
 dumppath = t.ext + "noOptionsSingleColDump/";
 mkdir(dumppath);

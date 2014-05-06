@@ -46,7 +46,12 @@ while( docsInserted < numDocs ){
         bulk.push({ hi : "there", at : docsInserted, i : i, x : x })
     }
     
-    assert.writeOK(coll.insert( bulk ));
+    coll.insert( bulk )
+    var result = db.getLastError( 1 )
+    if( result != null ){
+        printjson( result )
+        throw result
+    }
     
     if( Math.floor( docsInserted / 10000 ) != Math.floor( ( docsInserted + currBulkSize ) / 10000 ) ){
         print( "Inserted " + (docsInserted + currBulkSize) + " documents." )

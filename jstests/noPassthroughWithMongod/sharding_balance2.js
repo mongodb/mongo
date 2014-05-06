@@ -26,12 +26,12 @@ while ( bigString.length < 10000 )
 
 inserted = 0;
 num = 0;
-var bulk = db.foo.initializeUnorderedBulkOp();
 while ( inserted < ( 40 * 1024 * 1024 ) ){
-    bulk.insert({ _id: num++, s: bigString });
+    db.foo.insert( { _id : num++ , s : bigString } );
     inserted += bigString.length;
 }
-assert.writeOK(bulk.execute());
+
+db.getLastError();
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 

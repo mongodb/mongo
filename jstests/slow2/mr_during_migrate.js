@@ -17,13 +17,11 @@ var dataSize = 1024 // bytes, must be power of 2
 var data = "x"
 while( data.length < dataSize ) data += data
 
-var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < numDocs; i++ ){
-    bulk.insert({ _id: i, data: data });
+    coll.insert({ _id : i, data : data })
 }
-assert.writeOK(bulk.execute());
-
 // Make sure everything got inserted
+assert.eq( null, coll.getDB().getLastError() )
 assert.eq( numDocs, coll.find().itcount() )
 
 

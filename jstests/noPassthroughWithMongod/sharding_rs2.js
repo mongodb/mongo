@@ -92,12 +92,11 @@ assert.lte( before.query + 10 , after.query , "B3" )
 
 db.foo.ensureIndex( { x : 1 } )
 
-var bulk = db.foo.initializeUnorderedBulkOp();
 for ( i=0; i<100; i++ ){
     if ( i == 17 ) continue;
-    bulk.insert({ x: i });
+    db.foo.insert( { x : i } )
 }
-assert.writeOK(bulk.execute({ w: 3 }));
+db.getLastError( 3 , 10000 );
 
 // Counts pass the options of the connection - which is slaveOk'd, so we need to wait for 
 // replication for this and future tests to pass

@@ -43,9 +43,11 @@ m.getDB( "local" ).runCommand( {godinsert:"oplog.$main", obj:op} );
 rt.stop( true );
 m = rt.start( true, null, true );
 assert.eq( op.ts.i, lastop().ts.i );
+am().save( {} );
 
+// The above write should cause the server to terminate
 assert.throws(function() {
-    am().save( {} ); // triggers fassert because ofclock skew
+    am().findOne();
 });
 
 assert.neq(0, rt.stop( true )); // fasserted

@@ -16,36 +16,31 @@ while ( s.length < 1024 )
 
 state = {}
 
-var bulk = t.initializeUnorderedBulkOp();
-for (var i = 0; i < N; i++) {
-    bulk.insert({ _id: i, s: s });
-}
-assert.writeOK(bulk.execute());
+for ( i=0; i<N; i++ )
+    t.insert( { _id : i , s : s } );
 
 orig = t.stats();
 
 t.remove({});
 
-bulk = t.initializeUnorderedBulkOp();
-for (i = 0; i < N; i++) {
-    bulk.insert({ _id: i, s: s });
-}
-assert.writeOK(bulk.execute());
+for ( i=0; i<N; i++ )
+    t.insert( { _id : i , s : s } );
 
 assert.eq( orig.storageSize , t.stats().storageSize , "A" )
 
-for (j = 0; j < 100; j++){
-    for (i = 0; i < N; i++){
-        bulk = t.initializeUnorderedBulkOp();
+for ( j=0; j<100; j++ ){
+    for ( i=0; i<N; i++ ){
         var r = Math.random();
         if ( r > .5 )
-            bulk.find({ _id: i }).remove();
+            t.remove( { _id : i } )
         else
-            bulk.find({ _id: i }).upsert().updateOne({ _id: i, s: s });
+            t.insert( { _id : i , s : s } )
     }
 
-    assert.writeOK(bulk.execute());
+    //printjson( t.stats() );    
+
     assert.eq( orig.storageSize , t.stats().storageSize , "B" + j  )
 }
+
 
 test.stop();

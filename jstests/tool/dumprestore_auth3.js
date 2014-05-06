@@ -71,7 +71,8 @@ function runTest(shutdownServer) {
     // Re-create user data
     db.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
     db.createRole({role: 'role', roles: [], privileges:[]});
-    assert.writeOK(db.system.users.insert({user:'dbuser', pwd: 'pwd', roles: ['readWrite']}));
+    db.system.users.insert({user:'dbuser', pwd: 'pwd', roles: ['readWrite']});
+    assert.gleSuccess(db);
 
     assert.eq(1, db.bar.findOne().a);
     assert.eq(1, db.getUsers().length, "didn't create user");
