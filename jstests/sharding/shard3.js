@@ -109,21 +109,6 @@ s.printCollectionInfo( "test.foo" , "after counts" );
 assert.eq( 0 , primary.count() , "p count after drop" )
 assert.eq( 0 , secondary.count() , "s count after drop" )
 
-// NOTE
-//   the following bypasses the sharding layer and writes straight to the servers
-//   this is not supported at all but we'd like to leave this backdoor for now
-primary.save( { num : 1 } );
-secondary.save( { num : 4 } );
-assert.eq( 1 , primary.count() , "p count after drop and save" )
-assert.eq( 1 , secondary.count() , "s count after drop and save " )
-
-print("*** makes sure that sharded access respects the drop command" );
-
-assert.isnull( a.findOne() , "lookup via mongos 'a' accessed dropped data" );
-assert.isnull( b.findOne() , "lookup via mongos 'b' accessed dropped data" );
-
-s.printCollectionInfo( "test.foo" , "after b findOne tests" );
-
 print( "*** dropDatabase setup" )
 
 s.printShardingStatus()

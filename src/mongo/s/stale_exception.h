@@ -105,7 +105,7 @@ namespace mongo {
          * true if this exception would require a full reload of config data to resolve
          */
         bool requiresFullReload() const {
-            return ! _received.hasCompatibleEpoch( _wanted ) ||
+            return ! _received.hasEqualEpoch( _wanted ) ||
                      _received.isSet() != _wanted.isSet();
         }
 

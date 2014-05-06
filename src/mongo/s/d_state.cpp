@@ -1017,56 +1017,51 @@ namespace mongo {
             const ChunkVersion globalVersion = shardingState.getVersion(ns);
 
             oldVersion.addToBSON( result, "oldVersion" );
-            
-            if ( globalVersion.isSet() && version.isSet() ) {
-                // this means there is no reset going on an either side
-                // so its safe to make some assumptions
 
-                if ( version.isWriteCompatibleWith( globalVersion ) ) {
-                    // mongos and mongod agree!
-                    if ( ! oldVersion.isWriteCompatibleWith( version ) ) {
-                        if ( oldVersion < globalVersion &&
-                             oldVersion.hasCompatibleEpoch(globalVersion) )
-                        {
-                            info->setVersion( ns , version );
-                        }
-                        else if ( authoritative ) {
-                            // this means there was a drop and our version is reset
-                            info->setVersion( ns , version );
-                        }
-                        else {
-                            result.append( "ns" , ns );
-                            result.appendBool( "need_authoritative" , true );
-                            errmsg = "verifying drop on '" + ns + "'";
-                            return false;
-                        }
+            if ( version.isWriteCompatibleWith( globalVersion )) {
+                // mongos and mongod agree!
+                if ( !oldVersion.isWriteCompatibleWith( version )) {
+                    if ( oldVersion < globalVersion &&
+                            oldVersion.hasEqualEpoch( globalVersion )) {
+                        info->setVersion( ns, version );
                     }
-                    return true;
+                    else if ( authoritative ) {
+                        // this means there was a drop and our version is reset
+                        info->setVersion( ns, version );
+                    }
+                    else {
+                        result.append( "ns", ns );
+                        result.appendBool( "need_authoritative", true );
+                        errmsg = "verifying drop on '" + ns + "'";
+                        return false;
+                    }
                 }
-                
-            }
 
-            // step 4
-
-            if ( oldVersion.isSet() && ! globalVersion.isSet() ) {
-                // this had been reset
-                info->setVersion( ns , ChunkVersion( 0, OID() ) );
-            }
-
-            if ( ! version.isSet() && ! globalVersion.isSet() ) {
-                // this connection is cleaning itself
-                info->setVersion( ns , ChunkVersion( 0, OID() ) );
                 return true;
             }
 
+            // step 4
             // Cases below all either return OR fall-through to remote metadata reload.
-            if ( version.isSet() || !globalVersion.isSet() ) {
+            const bool isDropRequested = !version.isSet() && globalVersion.isSet();
 
+            if (isDropRequested) {
+                if ( ! authoritative ) {
+                    result.appendBool( "need_authoritative" , true );
+                    result.append( "ns" , ns );
+                    globalVersion.addToBSON( result, "globalVersion" );
+                    errmsg = "dropping needs to be authoritative";
+                    return false;
+                }
+
+                // Fall through to metadata reload below
+            }
+            else {
                 // Not Dropping
 
                 // TODO: Refactor all of this
-                if ( version < oldVersion && version.hasCompatibleEpoch( oldVersion ) ) {
-                    errmsg = "this connection already had a newer version of collection '" + ns + "'";
+                if ( version < oldVersion && version.hasEqualEpoch( oldVersion ) ) {
+                    errmsg = str::stream() << "this connection already had a newer version "
+                                           << "of collection '" << ns << "'";
                     result.append( "ns" , ns );
                     version.addToBSON( result, "newVersion" );
                     globalVersion.addToBSON( result, "globalVersion" );
@@ -1074,12 +1069,13 @@ namespace mongo {
                 }
 
                 // TODO: Refactor all of this
-                if ( version < globalVersion && version.hasCompatibleEpoch( globalVersion ) ) {
+                if ( version < globalVersion && version.hasEqualEpoch( globalVersion ) ) {
                     while ( shardingState.inCriticalMigrateSection() ) {
                         log() << "waiting till out of critical section" << endl;
                         shardingState.waitTillNotInCriticalSection( 10 );
                     }
-                    errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
+                    errmsg = str::stream() << "shard global version for collection is higher "
+                                           << "than trying to set to '" << ns << "'";
                     result.append( "ns" , ns );
                     version.addToBSON( result, "version" );
                     globalVersion.addToBSON( result, "globalVersion" );
@@ -1088,8 +1084,8 @@ namespace mongo {
                 }
 
                 if ( ! globalVersion.isSet() && ! authoritative ) {
-                    // Needed b/c when the last chunk is moved off a shard, the version gets reset to zero, which
-                    // should require a reload.
+                    // Needed b/c when the last chunk is moved off a shard,
+                    // the version gets reset to zero, which should require a reload.
                     while ( shardingState.inCriticalMigrateSection() ) {
                         log() << "waiting till out of critical section" << endl;
                         shardingState.waitTillNotInCriticalSection( 10 );
@@ -1099,20 +1095,6 @@ namespace mongo {
                     result.append( "ns" , ns );
                     result.appendBool( "need_authoritative" , true );
                     errmsg = "first time for collection '" + ns + "'";
-                    return false;
-                }
-
-                // Fall through to metadata reload below
-            }
-            else {
-
-                // Dropping
-
-                if ( ! authoritative ) {
-                    result.appendBool( "need_authoritative" , true );
-                    result.append( "ns" , ns );
-                    globalVersion.addToBSON( result, "globalVersion" );
-                    errmsg = "dropping needs to be authoritative";
                     return false;
                 }
 
@@ -1299,7 +1281,7 @@ namespace mongo {
 
         // Check epoch first, to send more meaningful message, since other parameters probably
         // won't match either
-        if( ! wanted.hasCompatibleEpoch( received ) ){
+        if( ! wanted.hasEqualEpoch( received ) ){
             errmsg = str::stream() << "version epoch mismatch detected for " << ns << ", "
                                    << "the collection may have been dropped and recreated";
             return false;

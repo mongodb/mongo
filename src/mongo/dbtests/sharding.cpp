@@ -32,10 +32,13 @@
 
 #include "mongo/client/dbclientmockcursor.h"
 #include "mongo/client/parallel.h"
+#include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_collection.h"
 
 namespace ShardingTests {
 
@@ -78,13 +81,6 @@ namespace ShardingTests {
     class ChunkManagerTest : public ConnectionString::ConnectionHook {
     public:
 
-        class CustomDirectClient : public DBDirectClient {
-        public:
-            virtual ConnectionString::ConnectionType type() const {
-                return ConnectionString::CUSTOM;
-            }
-        };
-
         CustomDirectClient _client;
         Shard _shard;
 
@@ -114,6 +110,7 @@ namespace ShardingTests {
             client().ensureIndex( ChunkType::ConfigNS, // br
                                   BSON( ChunkType::ns() << 1 << // br
                                           ChunkType::DEPRECATED_lastmod() << 1 ) );
+            configServer.init("$dummy:1000");
         }
 
         virtual ~ChunkManagerTest() {
@@ -255,8 +252,18 @@ namespace ShardingTests {
                                                           ChunkType::DEPRECATED_lastmod());
 
             // Make manager load existing chunks
-            ChunkManagerPtr manager( new ChunkManager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false ) );
-            ((ChunkManager*) manager.get())->loadExistingRanges( shard().getConnString() );
+            BSONObjBuilder collDocBuilder;
+            collDocBuilder << CollectionType::ns(collName());
+            collDocBuilder << CollectionType::keyPattern(BSON( "_id" << 1 ));
+            collDocBuilder << CollectionType::unique(false);
+            collDocBuilder << CollectionType::dropped(false);
+            collDocBuilder << CollectionType::DEPRECATED_lastmod(jsTime());
+            collDocBuilder << CollectionType::DEPRECATED_lastmodEpoch(version.epoch());
+
+            BSONObj collDoc(collDocBuilder.done());
+
+            ChunkManagerPtr manager( new ChunkManager(collDoc) );
+            const_cast<ChunkManager *>(manager.get())->loadExistingRanges(shard().getConnString());
 
             ASSERT( manager->getVersion().epoch() == version.epoch() );
             ASSERT( manager->getVersion().minorVersion() == ( numChunks - 1 ) );

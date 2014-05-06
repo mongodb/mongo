@@ -26,15 +26,30 @@ assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._c
                          shard: "shard0000" , shardHost: "localhost:30000" } ) , 
         "should have failed because version is config is 1|0" );
 
-assert.commandWorked( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , 
-                                      version : new NumberLong( 4294967296 ), // 1|0
-                                      authoritative : true , shard: "shard0000" , shardHost: "localhost:30000" } ) , 
+var epoch = s.getDB('config').chunks.findOne().lastmodEpoch;
+assert.commandWorked( a.runCommand({ setShardVersion: "alleyinsider.foo",
+                                     configdb: s._configDB,
+                                     version: new NumberLong( 4294967296 ), // 1|0
+                                     versionEpoch: epoch,
+                                     authoritative: true,
+                                     shard: "shard0000",
+                                     shardHost: "localhost:30000" }),
                      "should have worked" );
 
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : "a" , version : 2 } ).ok == 0 , "A" );
+assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
+                       configdb: "a",
+                       version: 2,
+                       versionEpoch: epoch }).ok == 0, "A" );
 
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , version : 2 } ).ok == 0 , "B" );
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , version : 1 } ).ok == 0 , "C" );
+assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
+                       configdb: s._configDB,
+                       version: 2,
+                       versionEpoch: epoch }).ok == 0, "B" );
+
+assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
+                       configdb: s._configDB,
+                       version: 1,
+                       versionEpoch: epoch }).ok == 0, "C" );
 
 // the only way that setSharVersion passes is if the shard agrees with the version
 // the shard takes its version from config directly

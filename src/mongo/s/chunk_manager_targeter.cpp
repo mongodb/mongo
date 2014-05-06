@@ -419,7 +419,7 @@ namespace mongo {
                                             const ChunkVersion& shardVersionB ) {
 
             // Collection may have been dropped
-            if ( !shardVersionA.hasCompatibleEpoch( shardVersionB ) ) return CompareResult_Unknown;
+            if ( !shardVersionA.hasEqualEpoch( shardVersionB ) ) return CompareResult_Unknown;
 
             // Zero shard versions are only comparable to themselves
             if ( !shardVersionA.isSet() || !shardVersionB.isSet() ) {
@@ -568,7 +568,7 @@ namespace mongo {
         }
         else {
             ChunkVersion& previouslyNotedVersion = it->second;
-            if ( previouslyNotedVersion.hasCompatibleEpoch( remoteShardVersion )) {
+            if ( previouslyNotedVersion.hasEqualEpoch( remoteShardVersion )) {
                 if ( previouslyNotedVersion.isOlderThan( remoteShardVersion )) {
                     remoteShardVersion.cloneTo( &previouslyNotedVersion );
                 }

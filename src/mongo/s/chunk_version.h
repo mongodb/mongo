@@ -178,13 +178,13 @@ namespace mongo {
 
         // Can we write to this data and not have a problem?
         bool isWriteCompatibleWith( const ChunkVersion& otherVersion ) const {
-            if( ! hasCompatibleEpoch( otherVersion ) ) return false;
+            if( ! hasEqualEpoch( otherVersion ) ) return false;
             return otherVersion._major == _major;
         }
 
         // Is this the same version?
         bool isEquivalentTo( const ChunkVersion& otherVersion ) const {
-            if( ! hasCompatibleEpoch( otherVersion ) ) return false;
+            if( ! hasEqualEpoch( otherVersion ) ) return false;
             return otherVersion._combined == _combined;
         }
 
@@ -214,14 +214,12 @@ namespace mongo {
         }
 
         // Is this in the same epoch?
-        bool hasCompatibleEpoch( const ChunkVersion& otherVersion ) const {
-            return hasCompatibleEpoch( otherVersion._epoch );
+        bool hasEqualEpoch( const ChunkVersion& otherVersion ) const {
+            return hasEqualEpoch( otherVersion._epoch );
         }
 
-        bool hasCompatibleEpoch( const OID& otherEpoch ) const {
-            // TODO : Change logic from eras are not-unequal to eras are equal
-            if( otherEpoch.isSet() && _epoch.isSet() && otherEpoch != _epoch ) return false;
-            return true;
+        bool hasEqualEpoch( const OID& otherEpoch ) const {
+            return _epoch == otherEpoch;
         }
 
         //

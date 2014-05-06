@@ -425,7 +425,7 @@ namespace mongo {
                     // Only reload if the version we found is newer than our own in the same
                     // epoch
                     if( currentVersion <= ci.getCM()->getVersion() &&
-                        ci.getCM()->getVersion().hasCompatibleEpoch( currentVersion ) )
+                        ci.getCM()->getVersion().hasEqualEpoch( currentVersion ) )
                     {
                         return ci.getCM();
                     }

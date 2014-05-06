@@ -153,7 +153,7 @@ namespace mongo {
                 continue;
             }
 
-            if( ! chunkVersion.isSet() || ! chunkVersion.hasCompatibleEpoch( currEpoch ) ){
+            if( ! chunkVersion.isSet() || ! chunkVersion.hasEqualEpoch( currEpoch ) ){
 
                 warning() << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
                           << " when trying to load differing chunks at version "

@@ -23,8 +23,9 @@ var getDirectShardedConn = function( st, collName ) {
     var maxChunk = st.s0.getCollection( "config.chunks" )
                    .find({ ns : collName }).sort({ lastmod : -1 }).next();
     
-    var ssvInitCmd = { setShardVersion : collName, 
-                       configdb : configConnStr, 
+    var ssvInitCmd = { setShardVersion : collName,
+                       authoritative : true,
+                       configdb : configConnStr,
                        serverID : mockServerId,
                        version : maxChunk.lastmod,
                        versionEpoch : maxChunk.lastmodEpoch };

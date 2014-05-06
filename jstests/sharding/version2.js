@@ -13,9 +13,14 @@ a = s._connections[0].getDB( "admin" );
 assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).mine.i, 0 );
 assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" , configdb : s._configDB } ).global.i, 0 );
 
-assert( a.runCommand( { "setShardVersion" : "alleyinsider.foo" , configdb : s._configDB , authoritative : true ,
-                        version : new NumberLong( 4294967296 ), // 1|0
-                        shard: "shard0000" , shardHost: "localhost:30000" } ).ok == 1 );
+var fooEpoch = s.getDB('config').chunks.findOne({ ns: 'alleyinsider.foo' }).lastmodEpoch;
+assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
+                       configdb: s._configDB,
+                       authoritative: true,
+                       version: new NumberLong( 4294967296 ), // 1|0
+                       versionEpoch: fooEpoch,
+                       shard: "shard0000",
+                       shardHost: "localhost:30000" }).ok == 1 );
 
 printjson( s.config.chunks.findOne() );
 
@@ -33,7 +38,13 @@ function simpleFindOne(){
     return a2.getMongo().getDB( "alleyinsider" ).foo.findOne();
 }
 
-assert.commandWorked( a2.runCommand( { "setShardVersion" : "alleyinsider.bar" , configdb : s._configDB , version : new NumberLong( 4294967296 ) , authoritative : true } ) , "setShardVersion bar temp");
+var barEpoch = s.getDB('config').chunks.findOne({ ns: 'alleyinsider.bar' }).lastmodEpoch;
+assert.commandWorked( a2.runCommand({ setShardVersion: "alleyinsider.bar",
+                                      configdb: s._configDB,
+                                      version: new NumberLong( 4294967296 ),
+                                      versionEpoch: barEpoch,
+                                      authoritative: true }),
+                      "setShardVersion bar temp" );
 
 assert.throws( simpleFindOne , [] , "should complain about not in sharded mode 1" );
 

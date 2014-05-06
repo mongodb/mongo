@@ -215,7 +215,7 @@ namespace mongo {
         if ( oldMetadata ) {
 
             // If our epochs are compatible, it's useful to use the old metadata for diffs
-            if ( oldMetadata->getCollVersion().hasCompatibleEpoch( epoch ) ) {
+            if ( oldMetadata->getCollVersion().hasEqualEpoch( epoch ) ) {
 
                 fullReload = false;
                 dassert( oldMetadata->isValid() );
