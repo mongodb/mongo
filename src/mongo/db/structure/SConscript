@@ -5,6 +5,7 @@ env.Library(
     target= 'record_store',
     source= [
         'record_store.cpp',
+        'record_store_heap.cpp',
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/bson',
