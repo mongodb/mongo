@@ -717,9 +717,9 @@ namespace mongo {
                 }
                 case ErrorCodes::BackgroundOperationInProgressForNamespace: {
                     dbtemprelease release;
-                    BackgroundOperation::awaitNoBgOpInProgForNs(
-                            Command::findCommand(o.firstElement().fieldName())->parseNs(
-                                    nsToDatabase(ns), o));
+                    Command* cmd = Command::findCommand(o.firstElement().fieldName());
+                    invariant(cmd);
+                    BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));
                     break;
                 }
                 default:
