@@ -38,6 +38,7 @@ def tty_pr(s):
 class Callback(wiredtiger.AsyncCallback):
     def __init__(self, current):
         self.current = current
+        self.ncompact = 0
         self.ninsert = 0
         self.nremove = 0
         self.nsearch = 0
@@ -54,21 +55,28 @@ class Callback(wiredtiger.AsyncCallback):
         # Note: we are careful not to throw any errors here.  Any
         # exceptions would be swallowed by a non-python worker thread.
         try:
-            key = op.get_key()
             optype = op.get_type()
-            #
-            # Remove does not set a value.  Just set it from the
-            # reference list.
-            #
-            if optype != wiredtiger.WT_AOP_REMOVE:
-                value = op.get_value()
-            else:
-                value = self.current[key]
+            if optype != wiredtiger.WT_AOP_COMPACT:
+                key = op.get_key()
+                #
+                # Remove does not set a value.  Just set it from the
+                # reference list.
+                #
+                if optype != wiredtiger.WT_AOP_REMOVE:
+                    value = op.get_value()
+                else:
+                    value = self.current[key]
 
             if optype == wiredtiger.WT_AOP_INSERT:
                 self.lock.acquire()
                 self.ninsert += 1
                 self.lock.release()
+            elif optype == wiredtiger.WT_AOP_COMPACT:
+                self.lock.acquire()
+                self.ncompact += 1
+                self.lock.release()
+                # Skip checking key/value.
+                return 0
             elif optype == wiredtiger.WT_AOP_REMOVE:
                 self.lock.acquire()
                 self.nremove += 1
@@ -164,6 +172,7 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_ops(self):
         tablearg = self.uri + ':' + self.table_name1
+        ncompact = 0
         self.create_session(tablearg)
 
         # Populate our reference table first, so we don't need to
@@ -186,7 +195,11 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
             op.set_value(v)
             op.insert()
 
+        # Compact after insert.
         # Wait for all outstanding async ops to finish.
+        op = self.conn.async_new_op(tablearg, None, callback)
+        op.compact()
+        ncompact += 1
         self.conn.async_flush()
         self.pr('flushed')
 
@@ -216,7 +229,11 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
             op.set_value(v)
             op.update()
 
+        # Compact after update.
         # Wait for all outstanding async ops to finish.
+        op = self.conn.async_new_op(tablearg, None, callback)
+        op.compact()
+        ncompact += 1
         self.conn.async_flush()
         self.pr('flushed')
 
@@ -243,6 +260,7 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('flushed')
 
         # Make sure all callbacks went according to plan.
+        self.assertTrue(callback.ncompact == ncompact)
         self.assertTrue(callback.ninsert == self.nentries)
         self.assertTrue(callback.nremove == self.nentries)
         self.assertTrue(callback.nsearch == self.nentries * 2)
