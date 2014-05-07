@@ -29,7 +29,7 @@
 	    WT_CURSTD_VALUE_EXT);					\
 } while (0)
 
-#define WT_MD_SET_KEY_VALUE(c, mc, fc) do {				\
+#define	WT_MD_SET_KEY_VALUE(c, mc, fc) do {				\
 	(c)->key.data = (fc)->key.data;					\
 	(c)->key.size = (fc)->key.size;					\
 	(c)->value.data = (fc)->value.data;				\

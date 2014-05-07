@@ -7,6 +7,9 @@
 
 #include "wt_internal.h"
 
+#define	WT_BASECONFIG	"WiredTiger.basecfg"
+#define	WT_USERCONFIG	"WiredTiger.config"
+
 static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
@@ -646,12 +649,13 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  *	Read in any WiredTiger_config file in the home directory.
  */
 static int
-__conn_config_file(
-    WT_SESSION_IMPL *session, WT_ITEM **cbufp, const char **cfgend)
+__conn_config_file(WT_SESSION_IMPL *session,
+    const char *filename, const char **cfg, WT_ITEM **cbufp)
 {
 	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_FH *fh;
+	const char **cfgend;
 	off_t size;
 	size_t len;
 	int exist, quoted;
@@ -662,13 +666,12 @@ __conn_config_file(
 	fh = NULL;
 
 	/* Check for an optional configuration file. */
-#define	WT_CONFIGFILE	"WiredTiger.config"
-	WT_RET(__wt_exist(session, WT_CONFIGFILE, &exist));
+	WT_RET(__wt_exist(session, filename, &exist));
 	if (!exist)
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, 0, 0, &fh));
+	WT_RET(__wt_open(session, filename, 0, 0, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;
@@ -681,7 +684,7 @@ __conn_config_file(
 	 * and a waste of time.)
 	 */
 	if (size > 100 * 1024)
-		WT_ERR_MSG(session, EFBIG, WT_CONFIGFILE);
+		WT_ERR_MSG(session, EFBIG, filename);
 	len = (size_t)size;
 
 	/*
@@ -771,6 +774,10 @@ __conn_config_file(
 	WT_ERR(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), cbuf->data, 0));
 
+	/* Move to the end of the list, insert before the last entry. */
+	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
+		;
+	cfgend[1] = *cfgend;
 	*cfgend = cbuf->data;
 	*cbufp = cbuf;
 
@@ -788,11 +795,10 @@ err:		if (cbuf != NULL)
  *	Read configuration from an environment variable, if set.
  */
 static int
-__conn_config_env(
-    WT_SESSION_IMPL *session, const char *cfg[], const char **cfgend)
+__conn_config_env(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	const char *env_config;
+	const char **cfgend, *env_config;
 
 	if ((env_config = getenv("WIREDTIGER_CONFIG")) == NULL ||
 	    strlen(env_config) == 0)
@@ -814,6 +820,10 @@ __conn_config_env(
 	WT_RET(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
 
+	/* Move to the end of the list, insert before the last entry. */
+	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
+		;
+	cfgend[1] = *cfgend;
 	*cfgend = env_config;
 	return (0);
 }
@@ -1051,6 +1061,55 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __conn_write_config --
+ *	Save the configuration used to create a database.
+ */
+static int
+__conn_write_config(
+    WT_SESSION_IMPL *session, const char *filename, const char *config)
+{
+	FILE *fp;
+	WT_CONFIG parser;
+	WT_CONFIG_ITEM ckey, cval;
+	WT_DECL_RET;
+	char *path;
+
+	/* If there is no configuration, don't bother creating an empty file. */
+	if (config == NULL)
+		return (0);
+
+	WT_RET(__wt_filename(session, filename, &path));
+	if ((fp = fopen(path, "w")) == NULL)
+		ret = __wt_errno();
+	__wt_free(session, path);
+	if (fp == NULL)
+		return (ret);
+
+	fprintf(fp, "# This file is created by WiredTiger.  Do not edit\n");
+	fprintf(fp, "# Instead, create and edit a WiredTiger.config file to\n");
+	fprintf(fp, "# persistently override database settings\n");
+
+	WT_ERR(__wt_config_init(session, &parser, config));
+	while ((ret = __wt_config_next(&parser, &ckey, &cval)) == 0) {
+		/* Skip "create". */
+		if (WT_STRING_MATCH("create", ckey.str, ckey.len))
+			continue;
+
+		/* Fix quoting for non-trivial settings. */
+		if (cval.type == WT_CONFIG_ITEM_STRING) {
+			--cval.str;
+			cval.len += 2;
+		}
+		fprintf(fp, "%.*s=%.*s\n",
+		    (int)ckey.len, ckey.str, (int)cval.len, cval.str);
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	WT_TRET(fclose(fp));
+	return (ret);
+}
+
+/*
  * wiredtiger_open --
  *	Main library entry point: open a new connection to a WiredTiger
  *	database.
@@ -1089,7 +1148,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	const char *cfg[5], **cfgend;
+	/* Leave space for optional additional configuration. */
+	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
 
 	*wt_connp = NULL;
 
@@ -1123,8 +1183,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    WT_CONFIG_REF(session, wiredtiger_open), config, 0));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
-	/* Leave space for optional additional configuration. */
-	cfg[2] = cfg[3] = cfg[4] = NULL;
 
 	/* Finish configuring error messages so we get them right early. */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
@@ -1139,25 +1197,25 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_single(session, cfg));
 
 	/*
-	 * Build the configuration stack.
+	 * Build the configuration stack, in the following order (where later
+	 * entries override earlier entries):
 	 *
-	 * The configuration file falls between the default configuration and
-	 * the wiredtiger_open() configuration, overriding the defaults but not
-	 * overriding the value passed by the application.  The environment
-	 * setting overrides the configuration file (if any), but not the
-	 * config passed by the application.
+	 * 1. default wiredtiger_open configuration
+	 * 2. base configuration file, created with the database (optional)
+	 * 3. user configuration file (optional)
+	 * 4. environment variable settings (optional)
+	 * 5. the config passed in by the application.
 	 *
 	 * Track the end of the stack, which always points to the config passed
 	 * by the application.
 	 */
-	cfgend = &cfg[1];
-	WT_ERR(__conn_config_file(session, &cbuf, cfgend));
-	if (*cfgend != config)
-		*++cfgend = config;
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbuf));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cbuf));
+	WT_ERR(__conn_config_env(session, cfg));
 
-	WT_ERR(__conn_config_env(session, cfg, cfgend));
-	if (*cfgend != config)
-		*++cfgend = config;
+	/* Write the base configuration file, if we're creating the database. */
+	if (conn->is_new)
+		WT_ERR(__conn_write_config(session, WT_BASECONFIG, config));
 
 	/*
 	 * Configuration ...
