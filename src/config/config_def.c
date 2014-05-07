@@ -43,6 +43,12 @@ static const WT_CONFIG_CHECK confchk_async_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
+	{ "name", "string", NULL, NULL },
+	{ "wait", "int", "min=0,max=100000", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_shared_cache_subconfigs[] = {
 	{ "chunk", "int", "min=1MB,max=10TB", NULL },
 	{ "name", "string", NULL, NULL },
@@ -54,6 +60,8 @@ static const WT_CONFIG_CHECK confchk_shared_cache_subconfigs[] = {
 static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs},
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
+	{ "checkpoint", "category", NULL, confchk_checkpoint_subconfigs}
+	    ,
 	{ "error_prefix", "string", NULL, NULL},
 	{ "eviction_dirty_target", "int", "min=10,max=99", NULL},
 	{ "eviction_target", "int", "min=10,max=99", NULL},
@@ -245,12 +253,6 @@ static const WT_CONFIG_CHECK confchk_table_meta[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
-	{ "name", "string", NULL, NULL },
-	{ "wait", "int", "min=1,max=100000", NULL },
-	{ NULL, NULL, NULL, NULL }
-};
-
 static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ "archive", "boolean", NULL, NULL },
 	{ "enabled", "boolean", NULL, NULL },
@@ -352,9 +354,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "connection.reconfigure",
 	  "async=(enabled=0,ops_max=1024,threads=2),cache_size=100MB,"
-	  "error_prefix=,eviction_dirty_target=80,eviction_target=80,"
-	  "eviction_trigger=95,eviction_workers=0,shared_cache=(chunk=10MB,"
-	  "name=,reserve=0,size=500MB),statistics=none,verbose=",
+	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),error_prefix=,"
+	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
+	  "eviction_workers=0,shared_cache=(chunk=10MB,name=,reserve=0,"
+	  "size=500MB),statistics=none,verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",

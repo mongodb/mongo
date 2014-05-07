@@ -89,6 +89,7 @@ flags = {
 		'CONN_LSM_MERGE',
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',
+		'CONN_SERVER_CHECKPOINT',
 	],
 	'session' : [
 		'SESSION_INTERNAL',

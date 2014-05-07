@@ -1554,6 +1554,14 @@ struct __wt_connection {
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both., an integer between 1MB and 10TB; default \c 100MB.}
+	 * @config{checkpoint = (, periodically checkpoint the database., a set
+	 * of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name., a string;
+	 * default \c "WiredTigerCheckpoint".}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
+	 * checkpoint; setting this value above 0 configures periodic
+	 * checkpoints., an integer between 0 and 100000; default \c 0.}
+	 * @config{ ),,}
 	 * @config{error_prefix, prefix string for error messages., a string;
 	 * default empty.}
 	 * @config{eviction_dirty_target, continue evicting until the cache has
@@ -1826,8 +1834,8 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name., a string; default
  * \c "WiredTigerCheckpoint".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to
- * wait between each checkpoint; setting this value configures periodic
- * checkpoints., an integer between 1 and 100000; default \c 0.}
+ * wait between each checkpoint; setting this value above 0 configures periodic
+ * checkpoints., an integer between 0 and 100000; default \c 0.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
