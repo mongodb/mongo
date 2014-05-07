@@ -277,13 +277,13 @@ namespace mongo {
                 // We want a well-formed *indexed* solution.
                 if (NULL == autoSoln->cacheData.get()) {
                     // For example, we don't cache things for 2d indices.
-                    QLOG() << "Subplanner: No cache data for subchild " << orChildCQ->toString();
+                    QLOG() << "Subplanner: No cache data for subchild " << orChild->toString();
                     return false;
                 }
 
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != autoSoln->cacheData->solnType) {
                     QLOG() << "Subplanner: No indexed cache data for subchild "
-                           << orChildCQ->toString();
+                           << orChild->toString();
                     return false;
                 }
 
@@ -292,8 +292,8 @@ namespace mongo {
                     orChild, autoSoln->cacheData->tree.get(), _indexMap);
 
                 if (!tagStatus.isOK()) {
-                    QLOG() << "Subplanner: Failed to extract indices from subchild"
-                           << orChildCQ->toString();
+                    QLOG() << "Subplanner: Failed to extract indices from subchild "
+                           << orChild->toString();
                     return false;
                 }
 
@@ -326,7 +326,7 @@ namespace mongo {
                 BSONObj errorObj;
                 if (!mpr->pickBestPlan(&bestPlan, &errorObj)) {
                     QLOG() << "Subplanner: Failed to pick best plan for subchild "
-                           << orChildCQ->toString()
+                           << orChild->toString()
                            << " error obj is " << errorObj.toString();
                     return false;
                 }
@@ -334,7 +334,7 @@ namespace mongo {
                 // pickBestPlan can yield.  Make sure we're not dead any which way.
                 if (_killed) {
                     QLOG() << "Subplanner: Killed while picking best plan for subchild "
-                           << orChildCQ->toString();
+                           << orChild->toString();
                     return false;
                 }
 
@@ -342,7 +342,7 @@ namespace mongo {
 
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
                     QLOG() << "Subplanner: No indexed cache data for subchild "
-                           << orChildCQ->toString();
+                           << orChild->toString();
                     return false;
                 }
 
@@ -351,8 +351,8 @@ namespace mongo {
                     orChild, bestSoln->cacheData->tree.get(), _indexMap);
 
                 if (!tagStatus.isOK()) {
-                    QLOG() << "Subplanner: Failed to extract indices from subchild"
-                           << orChildCQ->toString();
+                    QLOG() << "Subplanner: Failed to extract indices from subchild "
+                           << orChild->toString();
                     return false;
                 }
 
