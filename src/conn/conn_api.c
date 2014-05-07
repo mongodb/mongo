@@ -1031,19 +1031,18 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if ((ret = __wt_config_gets(session, cfg, "verbose", &cval)) != 0)
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
-#ifndef HAVE_VERBOSE
-	WT_RET(__wt_msg(session,
-	    "Verbose option specified when WiredTiger built without verbose "
-	    "support. Add --enable-verbose to configure command and rebuild "
-	    "to include support for verbose messages"));
-	return (0);
-#endif
-
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
-		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0) {
+#ifndef HAVE_VERBOSE
+			WT_RET_MSG(session, EINVAL,
+			    "Verbose option specified when WiredTiger built "
+			    "without verbose support. Add --enable-verbose to "
+			    "configure command and rebuild to include support "
+			    "for verbose messages");
+#endif
 			FLD_SET(conn->verbose, ft->flag);
-		else
+		} else
 			FLD_CLR(conn->verbose, ft->flag);
 
 		WT_RET_NOTFOUND_OK(ret);
