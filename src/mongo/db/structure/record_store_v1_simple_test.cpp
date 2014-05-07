@@ -112,6 +112,277 @@ namespace {
         }
     }
 
+    BSONObj docForRecordSize( int size ) {
+        BSONObjBuilder b;
+        b.append( "_id", 5 );
+        b.append( "x", string( size - Record::HeaderSize - 22, 'x' ) );
+        BSONObj x = b.obj();
+        ASSERT_EQUALS( Record::HeaderSize + x.objsize(), size );
+        return x;
+    }
+
+    /** alloc() quantizes the requested size using quantizeAllocationSpace() rules. */
+    TEST(SimpleRecordStoreV1, AllocQuantized) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+
+        string myns = "test.AllocQuantized";
+        SimpleRecordStoreV1 rs( &txn, myns, md, &em, false );
+
+        BSONObj obj = docForRecordSize( 300 );
+        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
+        ASSERT( result.isOK() );
+
+        // The length of the allocated record is quantized.
+        ASSERT_EQUALS( 320, rs.recordFor( result.getValue() )->lengthWithHeaders() );
+    }
+
+    /**
+     * alloc() does not quantize records in index collections using quantizeAllocationSpace()
+     * rules.
+     */
+    TEST(SimpleRecordStoreV1, AllocIndexNamespaceNotQuantized) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+
+        string myns = "test.AllocIndexNamespaceNotQuantized";
+        SimpleRecordStoreV1 rs( &txn, myns + "$x", md, &em, false );
+
+        BSONObj obj = docForRecordSize( 300 );
+        StatusWith<DiskLoc> result = rs.insertRecord(&txn,  obj.objdata(), obj.objsize(), 0 );
+        ASSERT( result.isOK() );
+
+        // The length of the allocated record is not quantized.
+        ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
+
+    }
+
+    /** alloc() quantizes records in index collections to the nearest multiple of 4. */
+    TEST(SimpleRecordStoreV1, AllocIndexNamespaceSlightlyQuantized) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+
+        string myns = "test.AllocIndexNamespaceNotQuantized";
+        SimpleRecordStoreV1 rs( &txn, myns + "$x", md, &em, false );
+
+        BSONObj obj = docForRecordSize( 298 );
+        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
+        ASSERT( result.isOK() );
+
+        ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
+    }
+
+    /**
+     * 'cook' the deletedList by shrinking the smallest deleted record to size
+     * 'newDeletedRecordSize'.
+     */
+    void cookDeletedList(TransactionExperiment* txn,
+                         RecordStoreV1Base* rs,
+                         RecordStoreV1MetaData* md,
+                         int newDeletedRecordSize) {
+
+        if (md->firstExtent().isNull())
+            rs->increaseStorageSize(txn, newDeletedRecordSize * 2, 0);
+
+        // Extract the first DeletedRecord from the deletedList.
+        DiskLoc deleted;
+        for( int i = 0; i < RecordStoreV1Base::Buckets; ++i ) {
+            if ( !md->deletedListEntry( i ).isNull() ) {
+                deleted = md->deletedListEntry( i );
+                md->setDeletedListEntry(txn, i, DiskLoc());
+                break;
+            }
+        }
+        ASSERT( !deleted.isNull() );
+
+        // Shrink the DeletedRecord's size to newDeletedRecordSize.
+        ASSERT_GREATER_THAN_OR_EQUALS( rs->deletedRecordFor( deleted )->lengthWithHeaders(),
+                                       newDeletedRecordSize );
+        DeletedRecord* dr = const_cast<DeletedRecord*>( rs->deletedRecordFor( deleted ) );
+        txn->writingInt( dr->lengthWithHeaders() ) = newDeletedRecordSize;
+
+        // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
+        // new size.
+        md->setDeletedListEntry(txn, RecordStoreV1Base::bucket(newDeletedRecordSize), deleted);
+    }
+
+    /** Return the smallest DeletedRecord in deletedList, or DiskLoc() if none. */
+    DiskLoc smallestDeletedRecord(const RecordStoreV1MetaData* md) {
+        for( int i = 0; i < RecordStoreV1Base::Buckets; ++i ) {
+            if ( !md->deletedListEntry( i ).isNull() ) {
+                return md->deletedListEntry( i );
+            }
+        }
+        return DiskLoc();
+    }
+
+    /** alloc() returns a non quantized record larger than the requested size. */
+    TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecord) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        cookDeletedList( &txn, &rs, md, 310 );
+        BSONObj obj = docForRecordSize( 300 );
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+
+        ASSERT( actualLocation.isOK() );
+        Record* rec = rs.recordFor( actualLocation.getValue() );
+        ASSERT_EQUALS( 310, rec->lengthWithHeaders() );
+
+        // No deleted records remain after alloc returns the non quantized record.
+        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+    }
+
+    /** alloc() returns a non quantized record equal to the requested size. */
+    TEST(SimpleRecordStoreV1, AllocExactSizeNonQuantizedDeletedRecord) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        cookDeletedList( &txn, &rs, md, 300 );
+        BSONObj obj = docForRecordSize( 300 );
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+
+        ASSERT( actualLocation.isOK() );
+        Record* rec = rs.recordFor( actualLocation.getValue() );
+        ASSERT_EQUALS( 300, rec->lengthWithHeaders() );
+
+        // No deleted records remain after alloc returns the non quantized record.
+        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+    }
+
+    /**
+     * alloc() returns a non quantized record equal to the quantized size plus some extra space
+     * too small to make a DeletedRecord.
+     */
+    TEST(SimpleRecordStoreV1, AllocQuantizedWithExtra) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        cookDeletedList( &txn, &rs, md, 343 );
+        BSONObj obj = docForRecordSize( 300 );
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+
+        ASSERT( actualLocation.isOK() );
+        Record* rec = rs.recordFor( actualLocation.getValue() );
+        ASSERT_EQUALS( 343, rec->lengthWithHeaders() );
+
+        // No deleted records remain after alloc returns the non quantized record.
+        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+    }
+
+    /**
+     * alloc() returns a quantized record when the extra space in the reclaimed deleted record
+     * is large enough to form a new deleted record.
+     */
+    TEST(SimpleRecordStoreV1, AllocQuantizedWithoutExtra) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        cookDeletedList( &txn, &rs, md, 344 );
+        BSONObj obj = docForRecordSize( 300 );
+
+        // The returned record is quantized from 300 to 320.
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+
+        ASSERT( actualLocation.isOK() );
+        Record* rec = rs.recordFor( actualLocation.getValue() );
+        ASSERT_EQUALS( 320, rec->lengthWithHeaders() );
+
+        // A new 24 byte deleted record is split off.
+        ASSERT_EQUALS( 24,
+                       rs.deletedRecordFor(smallestDeletedRecord(md))->lengthWithHeaders() );
+    }
+
+    /**
+     * A non quantized deleted record within 1/8 of the requested size is returned as is, even
+     * if a quantized portion of the deleted record could be used instead.
+     */
+    TEST(SimpleRecordStoreV1, AllocNotQuantizedNearDeletedSize) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        cookDeletedList( &txn, &rs, md, 344 );
+        BSONObj obj = docForRecordSize( 319 );
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+
+        ASSERT( actualLocation.isOK() );
+        Record* rec = rs.recordFor( actualLocation.getValue() );
+
+        // Even though 319 would be quantized to 320 and 344 - 320 == 24 could become a new
+        // deleted record, the entire deleted record is returned because
+        // ( 344 - 320 ) < ( 320 >> 3 ).
+        ASSERT_EQUALS( 344, rec->lengthWithHeaders() );
+        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+    }
+
+    /** getRecordAllocationSize() returns its argument when the padding factor is 1.0. */
+    TEST(SimpleRecordStoreV1, GetRecordAllocationSizeNoPadding) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+        ASSERT_EQUALS( 1.0, md->paddingFactor() );
+        ASSERT_EQUALS( 300, rs.getRecordAllocationSize( 300 ) );
+    }
+
+    /** getRecordAllocationSize() multiplies by a padding factor > 1.0. */
+    TEST(SimpleRecordStoreV1, GetRecordAllocationSizeWithPadding) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+        double paddingFactor = 1.2;
+        md->setPaddingFactor( &txn, paddingFactor );
+        ASSERT_EQUALS( paddingFactor, md->paddingFactor() );
+        ASSERT_EQUALS( int(300 * paddingFactor), rs.getRecordAllocationSize( 300 ) );
+    }
+
+    /**
+     * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
+     * is set.
+     */
+    TEST(SimpleRecordStoreV1, GetRecordAllocationSizePowerOf2) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(
+                                                false,
+                                                RecordStoreV1Base::Flag_UsePowerOf2Sizes );
+
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+        ASSERT_EQUALS( 512, rs.getRecordAllocationSize( 300 ) );
+    }
+
+    /**
+     * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
+     * is set, ignoring the padding factor.
+     */
+    TEST(SimpleRecordStoreV1, GetRecordAllocationSizePowerOf2PaddingIgnored) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(
+                                                false,
+                                                RecordStoreV1Base::Flag_UsePowerOf2Sizes );
+
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+        md->setPaddingFactor( &txn, 2.0 );
+        ASSERT_EQUALS( 2.0, md->paddingFactor() );
+        ASSERT_EQUALS( 512, rs.getRecordAllocationSize( 300 ) );
+    }
+
+
     // -----------------
 
     TEST( SimpleRecordStoreV1, FullSimple1 ) {

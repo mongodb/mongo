@@ -143,9 +143,7 @@ namespace NamespaceTests {
                 DurTransaction txn;
                 ASSERT( userCreateNS( &txn, db(), ns(), fromjson( spec() ), false ).isOK() );
             }
-            virtual string spec() const {
-                return "{\"capped\":true,\"size\":512,\"$nExtents\":1}";
-            }
+            virtual string spec() const = 0;
             int nRecords() const {
                 int count = 0;
                 const Extent* ext;
@@ -173,9 +171,6 @@ namespace NamespaceTests {
                 }
                 return count;
             }
-            static int min( int a, int b ) {
-                return a < b ? a : b;
-            }
             const char *ns() const {
                 return ns_;
             }
@@ -191,10 +186,6 @@ namespace NamespaceTests {
                     return NULL;
                 return c->getRecordStore();
             }
-            const RecordStoreV1Base* cheatRecordStore() const {
-                return dynamic_cast<const RecordStoreV1Base*>( recordStore() );
-            }
-
             Database* db() const {
                 return _context.db();
             }
@@ -203,12 +194,6 @@ namespace NamespaceTests {
             }
             Collection* collection() const {
                 return db()->getCollection( ns() );
-            }
-            IndexCatalog* indexCatalog() const { 
-                return collection()->getIndexCatalog();
-            }
-            CollectionInfoCache* infoCache() const {
-                return collection()->infoCache();
             }
 
             static BSONObj bigObj() {
@@ -219,45 +204,6 @@ namespace NamespaceTests {
                 return b.obj();
             }
 
-            /** Return the smallest DeletedRecord in deletedList, or DiskLoc() if none. */
-            DiskLoc smallestDeletedRecord() {
-                for( int i = 0; i < Buckets; ++i ) {
-                    if ( !nsd()->deletedListEntry( i ).isNull() ) {
-                        return nsd()->deletedListEntry( i );
-                    }
-                }
-                return DiskLoc();
-            }
-
-            /**
-             * 'cook' the deletedList by shrinking the smallest deleted record to size
-             * 'newDeletedRecordSize'.
-             */
-            void cookDeletedList( int newDeletedRecordSize ) {
-
-                // Extract the first DeletedRecord from the deletedList.
-                DiskLoc deleted;
-                for( int i = 0; i < Buckets; ++i ) {
-                    if ( !nsd()->deletedListEntry( i ).isNull() ) {
-                        deleted = nsd()->deletedListEntry( i );
-                        nsd()->setDeletedListEntry(i, DiskLoc());
-                        break;
-                    }
-                }
-                ASSERT( !deleted.isNull() );
-
-                const RecordStoreV1Base* rs = cheatRecordStore();
-
-                // Shrink the DeletedRecord's size to newDeletedRecordSize.
-                ASSERT_GREATER_THAN_OR_EQUALS( rs->deletedRecordFor( deleted )->lengthWithHeaders(),
-                                               newDeletedRecordSize );
-                DeletedRecord* dr = const_cast<DeletedRecord*>( rs->deletedRecordFor( deleted ) );
-                getDur().writingInt( dr->lengthWithHeaders() ) = newDeletedRecordSize;
-
-                // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
-                // new size.
-                nsd()->setDeletedListEntry(RecordStoreV1Base::bucket(newDeletedRecordSize), deleted);
-            }
         };
 
         class Create : public Base {
@@ -271,6 +217,7 @@ namespace NamespaceTests {
                 initial.setInvalid();
                 ASSERT( initial == nsd()->capFirstNewRecord() );
             }
+            virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
         };
 
         class SingleAlloc : public Base {
@@ -282,6 +229,7 @@ namespace NamespaceTests {
                 ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
                 ASSERT_EQUALS( 1, nRecords() );
             }
+            virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
         };
 
         class Realloc : public Base {
@@ -305,6 +253,7 @@ namespace NamespaceTests {
                         ASSERT( l[ i ] == l[ i - Q] );
                 }
             }
+            virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
         };
 
         class TwoExtent : public Base {
@@ -341,63 +290,6 @@ namespace NamespaceTests {
             }
         };
 
-        /** getRecordAllocationSize() returns its argument when the padding factor is 1.0. */
-        class GetRecordAllocationSizeNoPadding : public Base {
-        public:
-            void run() {
-                create();
-                ASSERT( nsd()->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
-                ASSERT_EQUALS( 1.0, nsd()->paddingFactor() );
-                ASSERT_EQUALS( 300, cheatRecordStore()->getRecordAllocationSize( 300 ) );
-            }
-            virtual string spec() const { return ""; }
-        };
-
-        /** getRecordAllocationSize() multiplies by a padding factor > 1.0. */
-        class GetRecordAllocationSizeWithPadding : public Base {
-        public:
-            void run() {
-                create();
-                double paddingFactor = 1.2;
-                nsd()->setPaddingFactor( paddingFactor );
-                ASSERT( nsd()->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
-                ASSERT_EQUALS( paddingFactor, nsd()->paddingFactor() );
-                ASSERT_EQUALS( static_cast<int>( 300 * paddingFactor ),
-                               cheatRecordStore()->getRecordAllocationSize( 300 ) );
-            }
-            virtual string spec() const { return ""; }
-        };
-
-        /**
-         * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
-         * is set.
-         */
-        class GetRecordAllocationSizePowerOf2 : public Base {
-        public:
-            void run() {
-                create();
-                ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
-                ASSERT_EQUALS( 512, cheatRecordStore()->getRecordAllocationSize( 300 ) );
-            }
-            virtual string spec() const { return ""; }
-        };
-
-        
-        /**
-         * getRecordAllocationSize() quantizes to the nearest power of 2 when Flag_UsePowerOf2Sizes
-         * is set, ignoring the padding factor.
-         */
-        class GetRecordAllocationSizePowerOf2PaddingIgnored : public Base {
-        public:
-            void run() {
-                create();
-                ASSERT( nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
-                nsd()->setPaddingFactor( 2.0 );
-                ASSERT_EQUALS( 2.0, nsd()->paddingFactor() );
-                ASSERT_EQUALS( 512, cheatRecordStore()->getRecordAllocationSize( 300 ) );
-            }
-            virtual string spec() const { return ""; }
-        };
 
         BSONObj docForRecordSize( int size ) {
             BSONObjBuilder b;
@@ -408,31 +300,11 @@ namespace NamespaceTests {
             return x;
         }
 
-        /** alloc() quantizes the requested size using quantizeAllocationSpace() rules. */
-        class AllocQuantized : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-
-                string myns = (string)ns() + "AllocQuantized";
-                db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( &txn,
-                                        myns,
-                                        new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
-                                        db()->getExtentManager(),
-                                        false );
-
-                BSONObj obj = docForRecordSize( 300 );
-                StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
-                ASSERT( result.isOK() );
-
-                // The length of the allocated record is quantized.
-                ASSERT_EQUALS( 320, rs.recordFor( result.getValue() )->lengthWithHeaders() );
-            }
-            virtual string spec() const { return ""; }
-        };
-
-        /** alloc() does not quantize records in capped collections. */
+        /** 
+         * alloc() does not quantize records in capped collections.
+         * NB: this actually tests that the code in Database::createCollection doesn't set
+         * PowerOf2Sizes for capped collections.
+         */
         class AllocCappedNotQuantized : public Base {
         public:
             void run() {
@@ -451,172 +323,6 @@ namespace NamespaceTests {
             virtual string spec() const { return "{capped:true,size:2048}"; }
         };
 
-        /**
-         * alloc() does not quantize records in index collections using quantizeAllocationSpace()
-         * rules.
-         */
-        class AllocIndexNamespaceNotQuantized : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-                string myns = (string)ns() + "AllocIndexNamespaceNotQuantized";
-
-                db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( &txn,
-                                        myns + ".$x",
-                                        new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
-                                        db()->getExtentManager(),
-                                        false );
-
-                BSONObj obj = docForRecordSize( 300 );
-                StatusWith<DiskLoc> result = rs.insertRecord(&txn,  obj.objdata(), obj.objsize(), 0 );
-                ASSERT( result.isOK() );
-
-                // The length of the allocated record is not quantized.
-                ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
-
-            }
-        };
-
-        /** alloc() quantizes records in index collections to the nearest multiple of 4. */
-        class AllocIndexNamespaceSlightlyQuantized : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-                string myns = (string)ns() + "AllocIndexNamespaceNotQuantized";
-
-                db()->namespaceIndex().add_ns( myns, DiskLoc(), false );
-                SimpleRecordStoreV1 rs( &txn,
-                                        myns + ".$x",
-                                        new NamespaceDetailsRSV1MetaData( db()->namespaceIndex().details( myns ) ),
-                                        db()->getExtentManager(),
-                                        true );
-
-                BSONObj obj = docForRecordSize( 298 );
-                StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), 0 );
-                ASSERT( result.isOK() );
-
-                ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
-            }
-        };
-
-        /** alloc() returns a non quantized record larger than the requested size. */
-        class AllocUseNonQuantizedDeletedRecord : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-                create();
-                cookDeletedList( 310 );
-
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
-                                                                                   docForRecordSize(300),
-                                                                                   false );
-                ASSERT( actualLocation.isOK() );
-                Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
-                ASSERT_EQUALS( 310, rec->lengthWithHeaders() );
-
-                // No deleted records remain after alloc returns the non quantized record.
-                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
-            }
-            virtual string spec() const { return "{ flags : 0 }"; }
-        };
-
-        /** alloc() returns a non quantized record equal to the requested size. */
-        class AllocExactSizeNonQuantizedDeletedRecord : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-                create();
-                cookDeletedList( 300 );
-
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
-                                                                                   docForRecordSize(300),
-                                                                                   false );
-                ASSERT( actualLocation.isOK() );
-                Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
-                ASSERT_EQUALS( 300, rec->lengthWithHeaders() );
-
-                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
-            }
-            virtual string spec() const { return "{ flags : 0 }"; }
-        };
-
-        /**
-         * alloc() returns a non quantized record equal to the quantized size plus some extra space
-         * too small to make a DeletedRecord.
-         */
-        class AllocQuantizedWithExtra : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-                create();
-                cookDeletedList( 343 );
-
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
-                                                                                   docForRecordSize(300),
-                                                                                   false );
-                ASSERT( actualLocation.isOK() );
-                Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
-                ASSERT_EQUALS( 343, rec->lengthWithHeaders() );
-
-                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
-            }
-            virtual string spec() const { return "{ flags : 0 }"; }
-        };
-
-        /**
-         * alloc() returns a quantized record when the extra space in the reclaimed deleted record
-         * is large enough to form a new deleted record.
-         */
-        class AllocQuantizedWithoutExtra : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-                create();
-                cookDeletedList( 344 );
-
-                const RecordStoreV1Base* rs = cheatRecordStore();
-
-                // The returned record is quantized from 300 to 320.
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
-                                                                                   docForRecordSize(300),
-                                                                                   false );
-                ASSERT( actualLocation.isOK() );
-                Record* rec = rs->recordFor( actualLocation.getValue() );
-                ASSERT_EQUALS( 320, rec->lengthWithHeaders() );
-
-                // A new 24 byte deleted record is split off.
-                ASSERT_EQUALS( 24,
-                               rs->deletedRecordFor(smallestDeletedRecord())->lengthWithHeaders() );
-            }
-            virtual string spec() const { return "{ flags : 0 }"; }
-        };
-
-        /**
-         * A non quantized deleted record within 1/8 of the requested size is returned as is, even
-         * if a quantized portion of the deleted record could be used instead.
-         */
-        class AllocNotQuantizedNearDeletedSize : public Base {
-        public:
-            void run() {
-                DurTransaction txn;
-                create();
-                cookDeletedList( 344 );
-
-                StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,
-                                                                                   docForRecordSize(319),
-                                                                                   false );
-                ASSERT( actualLocation.isOK() );
-                Record* rec = collection()->getRecordStore()->recordFor( actualLocation.getValue() );
-
-                // Even though 319 would be quantized to 320 and 344 - 320 == 24 could become a new
-                // deleted record, the entire deleted record is returned because
-                // ( 344 - 320 ) < ( 320 >> 3 ).
-                ASSERT_EQUALS( 344, rec->lengthWithHeaders() );
-                ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord() );
-            }
-            virtual string spec() const { return "{ flags : 0 }"; }
-        };
 
         /* test  NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc)
         */
@@ -757,13 +463,6 @@ namespace NamespaceTests {
         //            }
         //        };
 
-        class Size {
-        public:
-            void run() {
-                ASSERT_EQUALS( 496U, sizeof( NamespaceDetails ) );
-            }
-        };
-        
         class SwapIndexEntriesTest : public Base {
         public:
             void run() {
@@ -796,6 +495,7 @@ namespace NamespaceTests {
                 ASSERT(nsd->isMultikey(47));
                 ASSERT(!nsd->isMultikey(43));
             }
+            virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
         };
 
     } // namespace NamespaceDetailsTests
@@ -806,32 +506,20 @@ namespace NamespaceTests {
         }
 
         void setupTests() {
+            add< MissingFieldTests::BtreeIndexMissingField >();
+            add< MissingFieldTests::TwoDIndexMissingField >();
+            add< MissingFieldTests::HashedIndexMissingField >();
+            add< MissingFieldTests::HashedIndexMissingFieldAlternateSeed >();
+
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
-            add< NamespaceDetailsTests::GetRecordAllocationSizeNoPadding >();
-            add< NamespaceDetailsTests::GetRecordAllocationSizeWithPadding >();
-            add< NamespaceDetailsTests::GetRecordAllocationSizePowerOf2 >();
-            add< NamespaceDetailsTests::GetRecordAllocationSizePowerOf2PaddingIgnored >();
-            add< NamespaceDetailsTests::AllocQuantized >();
             add< NamespaceDetailsTests::AllocCappedNotQuantized >();
-            add< NamespaceDetailsTests::AllocIndexNamespaceNotQuantized >();
-            add< NamespaceDetailsTests::AllocIndexNamespaceSlightlyQuantized >();
-            add< NamespaceDetailsTests::AllocUseNonQuantizedDeletedRecord >();
-            add< NamespaceDetailsTests::AllocExactSizeNonQuantizedDeletedRecord >();
-            add< NamespaceDetailsTests::AllocQuantizedWithExtra >();
-            add< NamespaceDetailsTests::AllocQuantizedWithoutExtra >();
-            add< NamespaceDetailsTests::AllocNotQuantizedNearDeletedSize >();
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::TruncateCapped >();
             //add< NamespaceDetailsTests::Migrate >();
             add< NamespaceDetailsTests::SwapIndexEntriesTest >();
             //            add< NamespaceDetailsTests::BigCollection >();
-            add< NamespaceDetailsTests::Size >();
-            add< MissingFieldTests::BtreeIndexMissingField >();
-            add< MissingFieldTests::TwoDIndexMissingField >();
-            add< MissingFieldTests::HashedIndexMissingField >();
-            add< MissingFieldTests::HashedIndexMissingFieldAlternateSeed >();
         }
     } myall;
 } // namespace NamespaceTests
