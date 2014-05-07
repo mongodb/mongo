@@ -151,9 +151,8 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 	}
 	/*
 	 * Search for the object itself, just to make sure it exists, we don't
-	 * want to output a header if the user entered the wrong name. This
-	 * where we find out a table object doesn't exist, use a simple error
-	 * message.
+	 * want to output a header if the user entered the wrong name. This is
+	 * where we find out a table doesn't exist, use a simple error message.
 	 */
 	cursor->set_key(cursor, uri);
 	if ((ret = cursor->search(cursor)) == 0) {
