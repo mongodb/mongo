@@ -684,7 +684,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 * and a waste of time.)
 	 */
 	if (size > 100 * 1024)
-		WT_ERR_MSG(session, EFBIG, filename);
+		WT_ERR_MSG(
+		    session, EFBIG, "Configuration file too big: %s", filename);
 	len = (size_t)size;
 
 	/*
@@ -895,7 +896,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the end-of-file.
 	 */
 	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0)
-		WT_ERR_MSG(session, EBUSY, "%s",
+		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
 
@@ -909,7 +910,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 	if (ret != 0)
-		WT_ERR_MSG(session, EBUSY, "%s",
+		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "thread in this process");
 
