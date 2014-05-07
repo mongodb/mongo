@@ -80,22 +80,37 @@ namespace mongo {
 
         /**
          * Should we try to expand the index scan(s) in 'solnRoot' to pull out an indexed sort?
+         *
+         * Returns the node which should be replaced by the merge sort of exploded scans
+         * in the out-parameter 'toReplace'.
          */
-        bool structureOKForExplode(QuerySolutionNode* solnRoot) {
+        bool structureOKForExplode(QuerySolutionNode* solnRoot, QuerySolutionNode** toReplace) {
             // For now we only explode if we *know* we will pull the sort out.  We can look at
             // more structure (or just explode and recalculate properties and see what happens)
             // but for now we just explode if it's a sure bet.
             //
-            // TODO: Can also try exploding if root is OR and children are ixscans, or root is
-            // AND_HASH (last child dictates order.), or other less obvious cases...
+            // TODO: Can also try exploding if root is AND_HASH (last child dictates order.),
+            // or other less obvious cases...
             if (STAGE_IXSCAN == solnRoot->getType()) {
+                *toReplace = solnRoot;
                 return true;
             }
 
             if (STAGE_FETCH == solnRoot->getType()) {
                  if (STAGE_IXSCAN == solnRoot->children[0]->getType()) {
+                     *toReplace = solnRoot->children[0];
                      return true;
                  }
+            }
+
+            if (STAGE_OR == solnRoot->getType()) {
+                for (size_t i = 0; i < solnRoot->children.size(); ++i) {
+                    if (STAGE_IXSCAN != solnRoot->children[i]->getType()) {
+                        return false;
+                    }
+                }
+                *toReplace = solnRoot;
+                return true;
             }
 
             return false;
@@ -151,8 +166,9 @@ namespace mongo {
         }
 
         /**
-         * Take the provided index scan node 'isn' and return a logically equivalent node that
-         * provides the same data but provides the sort order 'sort'.
+         * Take the provided index scan node 'isn'. Returns a list of index scans which are
+         * logically equivalent to 'isn' if joined by a MergeSort through the out-parameter
+         * 'explosionResult'. These index scan instances are owned by the caller.
          *
          * fieldsToExplode is a count of how many fields in the scan's bounds are the union of point
          * intervals.  This is computed beforehand and provided as a small optimization.
@@ -164,21 +180,18 @@ namespace mongo {
          * 'sort' will be {b: 1}
          * 'fieldsToExplode' will be 1 (as only one field isUnionOfPoints).
          *
-         * The solution returned will be a mergesort of the two scans:
+         * On return, 'explosionResult' will contain the following two scans:
          * a:[[1,1]], b:[MinKey, MaxKey]
          * a:[[2,2]], b:[MinKey, MaxKey]
          */
-        QuerySolutionNode* explodeScan(IndexScanNode* isn,
-                                       const BSONObj& sort,
-                                       size_t fieldsToExplode) {
+        void explodeScan(IndexScanNode* isn,
+                         const BSONObj& sort,
+                         size_t fieldsToExplode,
+                         vector<QuerySolutionNode*>* explosionResult) {
 
             // Turn the compact bounds in 'isn' into a bunch of points...
             vector<PointPrefix> prefixForScans;
             makeCartesianProduct(isn->bounds, fieldsToExplode, &prefixForScans);
-
-            // And merge-sort the scans over those points.
-            auto_ptr<MergeSortNode> merge(new MergeSortNode());
-            merge->sort = sort;
 
             for (size_t i = 0; i < prefixForScans.size(); ++i) {
                 const PointPrefix& prefix = prefixForScans[i];
@@ -201,11 +214,8 @@ namespace mongo {
                 for (size_t j = fieldsToExplode; j < isn->bounds.fields.size(); ++j) {
                     child->bounds.fields[j] = isn->bounds.fields[j];
                 }
-                merge->children.push_back(child);
+                explosionResult->push_back(child);
             }
-
-            merge->computeProperties();
-            return merge.release();
         }
 
         /**
@@ -245,7 +255,8 @@ namespace mongo {
                                               QuerySolutionNode** solnRoot) {
         vector<QuerySolutionNode*> leafNodes;
 
-        if (!structureOKForExplode(*solnRoot)) {
+        QuerySolutionNode* toReplace;
+        if (!structureOKForExplode(*solnRoot, &toReplace)) {
             return false;
         }
 
@@ -336,14 +347,19 @@ namespace mongo {
 
         // If we're here, we can (probably?  depends on how restrictive the structure check is)
         // get our sort order via ixscan blow-up.
+        MergeSortNode* merge = new MergeSortNode();
+        merge->sort = desiredSort;
         for (size_t i = 0; i < leafNodes.size(); ++i) {
             IndexScanNode* isn = static_cast<IndexScanNode*>(leafNodes[i]);
-            QuerySolutionNode* newNode = explodeScan(isn, desiredSort, fieldsToExplode[i]);
-            // Replace 'isn' with 'newNode'
-            replaceNodeInTree(solnRoot, isn, newNode);
-            // And get rid of the old data access node.
-            delete isn;
+            explodeScan(isn, desiredSort, fieldsToExplode[i], &merge->children);
         }
+
+        merge->computeProperties();
+
+        // Replace 'toReplace' with the new merge sort node.
+        replaceNodeInTree(solnRoot, toReplace, merge);
+        // And get rid of the node that got replaced.
+        delete toReplace;
 
         return true;
     }
