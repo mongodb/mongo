@@ -1159,11 +1159,11 @@ namespace mongo {
     }
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
-        CanonicalQuery* canonicalQuery;
+        CanonicalQuery* canonicalQuery = NULL;
         Status status = CanonicalQuery::canonicalize(_ns, query, &canonicalQuery);
-        uassert(status.code(), status.reason(), status.isOK());
-
         boost::scoped_ptr<CanonicalQuery> canonicalQueryPtr(canonicalQuery);
+
+        uassert(status.code(), status.reason(), status.isOK());
 
         // Query validation
         if (QueryPlannerCommon::hasNode(canonicalQuery->root(), MatchExpression::GEO_NEAR)) {
@@ -1248,8 +1248,8 @@ namespace mongo {
         IndexEntry indexEntry(key, accessMethod, false /* multiKey */, false /* sparse */, "shardkey", BSONObj());
         plannerParams.indices.push_back(indexEntry);
 
-        vector<QuerySolution*> solutions;
-        Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
+        OwnedPointerVector<QuerySolution> solutions;
+        Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions.mutableVector());
         uassert(status.code(), status.reason(), status.isOK());
 
         IndexBounds bounds;
