@@ -178,8 +178,10 @@ __async_worker_execop(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 			    op->format->uri, op->format->config));
 			break;
 		case WT_AOP_INSERT:
-		case WT_AOP_UPDATE:
 			WT_RET(cursor->insert(cursor));
+			break;
+		case WT_AOP_UPDATE:
+			WT_RET(cursor->update(cursor));
 			break;
 		case WT_AOP_REMOVE:
 			WT_RET(cursor->remove(cursor));
