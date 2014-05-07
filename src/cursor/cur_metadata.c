@@ -13,18 +13,18 @@
  */
 #define	WT_MD_CURSOR_NEEDKEY(cursor) do {				\
 	WT_CURSOR_NEEDKEY(cursor);					\
-	__wt_buf_set(session,						\
+	WT_ERR(__wt_buf_set(session,					\
 	    &((WT_CURSOR_METADATA *)(cursor))->file_cursor->key,	\
-	    cursor->key.data, cursor->key.size);			\
+	    cursor->key.data, cursor->key.size));			\
 	F_SET(((WT_CURSOR_METADATA *)(cursor))->file_cursor,		\
 	    WT_CURSTD_KEY_EXT);						\
 } while (0)
 
 #define	WT_MD_CURSOR_NEEDVALUE(cursor) do {				\
 	WT_CURSOR_NEEDVALUE(cursor);					\
-	__wt_buf_set(session,						\
+	WT_ERR(__wt_buf_set(session,					\
 	    &((WT_CURSOR_METADATA *)(cursor))->file_cursor->value,	\
-	    cursor->value.data, cursor->value.size);			\
+	    cursor->value.data, cursor->value.size));			\
 	F_SET(((WT_CURSOR_METADATA *)(cursor))->file_cursor,		\
 	    WT_CURSTD_VALUE_EXT);					\
 } while (0)
@@ -47,12 +47,11 @@ static int
 __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_METADATA *mdc;
-	char *value;
+	const char *value;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	/* The metadata search interface allocates a new string in value */
-	WT_RET(__wt_metadata_search(
-	    session, WT_METADATA_URI, (const char **)&value));
+	WT_RET(__wt_metadata_search(session, WT_METADATA_URI, &value));
 	/*
 	 * Copy the value in the underlying btree cursors tmp item
 	 * which will be free'd when the cursor is closed.
@@ -303,8 +302,8 @@ __curmetadata_insert(WT_CURSOR *cursor)
 	 * Since the key/value formats are 's' the WT_ITEMs must contain a
 	 * NULL terminated string.
 	 */
-	ret =__wt_metadata_insert(session,
-	    (const char *)cursor->key.data, (const char *)cursor->value.data);
+	ret =
+	    __wt_metadata_insert(session, cursor->key.data, cursor->value.data);
 
 err:	API_END(session, ret);
 	return (ret);
@@ -334,8 +333,8 @@ __curmetadata_update(WT_CURSOR *cursor)
 	 * Since the key/value formats are 's' the WT_ITEMs must contain a
 	 * NULL terminated string.
 	 */
-	ret = __wt_metadata_update(session,
-	    (const char *)cursor->key.data, (const char *)cursor->value.data);
+	ret =
+	    __wt_metadata_update(session, cursor->key.data, cursor->value.data);
 
 err:	API_END(session, ret);
 	return (ret);
@@ -364,7 +363,7 @@ __curmetadata_remove(WT_CURSOR *cursor)
 	 * Since the key format is 's' the WT_ITEM must contain a NULL
 	 * terminated string.
 	 */
-	ret = __wt_metadata_remove(session, (const char *)cursor->key.data);
+	ret = __wt_metadata_remove(session, cursor->key.data);
 
 err:	API_END(session, ret);
 	return (ret);
