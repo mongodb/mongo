@@ -159,7 +159,9 @@ namespace mongo {
         }
         else if (_query->getProj()->requiresDocument() || _query->getProj()->wantIndexKey()) {
             // Not a simple projection, so fallback on the regular projection path.
-            ProjectionExec projExec(projObj, _query->root());
+            ProjectionExec projExec(projObj,
+                                    _query->root(),
+                                    WhereCallbackReal(_collection->ns().db()));
             projExec.transform(docAtLoc, objOut);
         }
         else {

@@ -41,7 +41,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/is_master.h"
@@ -957,8 +957,16 @@ namespace mongo {
                                         "M/R: (3/3) Final Reduce Progress",
                                         _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
 
+            const NamespaceString nss(_config.incLong);
+            const WhereCallbackReal whereCallback(nss.db());
+
             CanonicalQuery* cq;
-            verify(CanonicalQuery::canonicalize(_config.incLong, BSONObj(), sortKey, BSONObj(), &cq).isOK());
+            verify(CanonicalQuery::canonicalize(_config.incLong,
+                                                BSONObj(),
+                                                sortKey,
+                                                BSONObj(),
+                                                &cq,
+                                                whereCallback).isOK());
 
             Runner* rawRunner;
             verify(getRunner(ctx.ctx().db()->getCollection(_config.incLong),
@@ -1295,8 +1303,16 @@ namespace mongo {
                         // open cursor
                         Client::Context ctx(config.ns, storageGlobalParams.dbpath, false);
 
+                        const NamespaceString nss(config.ns);
+                        const WhereCallbackReal whereCallback(nss.db());
+
                         CanonicalQuery* cq;
-                        if (!CanonicalQuery::canonicalize(config.ns, config.filter, config.sort, BSONObj(), &cq).isOK()) {
+                        if (!CanonicalQuery::canonicalize(config.ns,
+                                                          config.filter,
+                                                          config.sort,
+                                                          BSONObj(),
+                                                          &cq,
+                                                          whereCallback).isOK()) {
                             uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                             return 0;
                         }

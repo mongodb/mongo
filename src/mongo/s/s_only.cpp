@@ -24,7 +24,6 @@
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/matcher.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
@@ -55,7 +54,6 @@ namespace mongo {
 
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
-        _context(0),
         _shutdown(false),
         _desc(desc),
         _god(0),

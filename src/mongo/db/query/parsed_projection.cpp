@@ -42,8 +42,10 @@ namespace mongo {
      * Returns a Status indicating how it's invalid otherwise.
      */
     // static
-    Status ParsedProjection::make(const BSONObj& spec, const MatchExpression* const query,
-                                  ParsedProjection** out) {
+    Status ParsedProjection::make(const BSONObj& spec, 
+                                  const MatchExpression* const query,
+                                  ParsedProjection** out,
+                                  const MatchExpressionParser::WhereCallback& whereCallback) {
         // Are we including or excluding fields?  Values:
         // -1 when we haven't initialized it.
         // 1 when we're including
@@ -127,7 +129,8 @@ namespace mongo {
                     verify(elemMatchObj.isOwned());
 
                     // TODO: Is there a faster way of validating the elemMatchObj?
-                    StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj);
+                    StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj,
+                                                                                  whereCallback);
                     if (!swme.isOK()) {
                         return swme.getStatus();
                     }

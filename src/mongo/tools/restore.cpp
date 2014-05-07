@@ -266,7 +266,8 @@ public:
                         toolInfoLog() << "Only applying oplog entries matching this criteria: "
                                       << query.jsonString() << std::endl;
                     }
-                    _opmatcher.reset(new Matcher(query));
+                    _opmatcher.reset(new Matcher(query,
+                                                 MatchExpressionParser::WhereCallback()));
                 }
             }
         }

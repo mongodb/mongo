@@ -99,13 +99,13 @@ namespace mongo {
             *outRunner = new EOFRunner(NULL, ns);
             return Status::OK();
         }
+
         if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
             !collection->getIndexCatalog()->findIdIndex()) {
 
+            const WhereCallbackReal whereCallback(collection->ns().db());
             Status status = CanonicalQuery::canonicalize(
-                    collection->ns(),
-                    unparsedQuery,
-                    outCanonicalQuery);
+                        collection->ns(), unparsedQuery, outCanonicalQuery, whereCallback);
             if (!status.isOK())
                 return status;
             return getRunner(collection, *outCanonicalQuery, outRunner, plannerOptions);
@@ -620,6 +620,8 @@ namespace mongo {
                           Runner** out) {
         verify(collection);
 
+        const WhereCallbackReal whereCallback(collection->ns().db());
+
         CanonicalQuery* cq;
         uassertStatusOK(CanonicalQuery::canonicalize(collection->ns().ns(),
                                                      query,
@@ -628,7 +630,8 @@ namespace mongo {
                                                      0,
                                                      0,
                                                      hintObj,
-                                                     &cq)); 
+                                                     &cq,
+                                                     whereCallback));
 
         return getRunner(collection, cq, out, QueryPlannerParams::PRIVATE_IS_COUNT);
     }
@@ -729,15 +732,14 @@ namespace mongo {
             }
         }
 
+        const WhereCallbackReal whereCallback(collection->ns().db());
+
         // If there are no suitable indices for the distinct hack bail out now into regular planning
         // with no projection.
         if (plannerParams.indices.empty()) {
             CanonicalQuery* cq;
-            Status status = CanonicalQuery::canonicalize(collection->ns().ns(),
-                                                         query,
-                                                         BSONObj(),
-                                                         BSONObj(),
-                                                         &cq);
+            Status status = CanonicalQuery::canonicalize(
+                                collection->ns().ns(), query, &cq, whereCallback);
             if (!status.isOK()) {
                 return status;
             }
@@ -761,7 +763,8 @@ namespace mongo {
                                                      query,
                                                      BSONObj(),
                                                      projection,
-                                                     &cq);
+                                                     &cq,
+                                                     whereCallback);
         if (!status.isOK()) {
             return status;
         }
@@ -832,11 +835,7 @@ namespace mongo {
 
         // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
         delete cq;
-        status = CanonicalQuery::canonicalize(collection->ns().ns(),
-                                              query,
-                                              BSONObj(),
-                                              BSONObj(),
-                                              &cq);
+        status = CanonicalQuery::canonicalize(collection->ns().ns(), query, &cq, whereCallback);
         if (!status.isOK()) {
             return status;
         }

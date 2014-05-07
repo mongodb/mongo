@@ -275,7 +275,8 @@ namespace mongo {
     int BSONTool::run() {
 
         if (bsonToolGlobalParams.hasFilter) {
-            _matcher.reset(new Matcher(fromjson(bsonToolGlobalParams.filter)));
+            _matcher.reset(new Matcher(fromjson(bsonToolGlobalParams.filter),
+                                       MatchExpressionParser::WhereCallback()));
         }
 
         return doRun();

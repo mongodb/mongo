@@ -102,7 +102,12 @@ namespace mongo {
 
     // -----------------
 
-    StatusWithMatchExpression expressionParserWhereCallbackNoOp(const BSONElement& where) {
+    WhereCallbackNoop::WhereCallbackNoop() {
+
+    }
+
+    StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where) const {
+
         auto_ptr<WhereNoOpMatchExpression> exp( new WhereNoOpMatchExpression() );
         if ( where.type() == String || where.type() == Code ) {
             Status s = exp->init( where.valuestr() );
@@ -120,11 +125,4 @@ namespace mongo {
 
         return StatusWithMatchExpression( ErrorCodes::BadValue, "$where got bad type" );
     }
-
-    // Override callback
-    MONGO_INITIALIZER_WITH_PREREQUISITES( MatchExpressionWhereNoOp, ("MatchExpressionWhere") )( ::mongo::InitializerContext* context ) {
-        expressionParserWhereCallback = expressionParserWhereCallbackNoOp;
-        return Status::OK();
-    }
-
 }

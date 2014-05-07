@@ -157,6 +157,7 @@ env.Library('expressions',
              'db/matcher/expression_tree.cpp',
              'db/matcher/expression_parser.cpp',
              'db/matcher/expression_parser_tree.cpp',
+             'db/matcher/expression_where_noop.cpp',
              'db/matcher/matchable.cpp',
              'db/matcher/match_details.cpp'],
             LIBDEPS=['bson',
@@ -174,10 +175,6 @@ env.Library('expressions_text',
             ['db/matcher/expression_text.cpp',
              'db/matcher/expression_parser_text.cpp'],
             LIBDEPS=['expressions','db/fts/base'] )
-
-env.Library('expressions_where',
-            ['db/matcher/expression_where.cpp'],
-            LIBDEPS=['expressions'] )
 
 env.CppUnitTest('expression_test',
                 ['db/matcher/expression_test.cpp',
@@ -473,7 +470,6 @@ env.Library("coredb", [
                            'geoquery',
                            'expressions',
                            'expressions_geo',
-                           'expressions_where',
                            'expressions_text',
                            'index_names',
                            'db/exec/working_set',
@@ -643,6 +639,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/startup_warnings.cpp",
                     "db/storage_options.cpp",
                     "db/ops/update_lifecycle_impl.cpp",
+                    "db/matcher/expression_where.cpp",
 
                     # most commands are only for mongod
                     "db/stats/top.cpp",
@@ -740,7 +737,6 @@ mongosLibraryFiles = [
     "s/version_manager.cpp",
     "s/version_mongos.cpp",
     "s/mongos_persistence_stubs.cpp",
-    "s/expression_where_noop.cpp",
     ]
 
 env.Library( "mongoscore",

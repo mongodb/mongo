@@ -19,12 +19,13 @@
 
 #include "mongo/db/projection.h"
 
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    void Projection::init( const BSONObj& o ) {
+    void Projection::init(const BSONObj& o,
+                          const MatchExpressionParser::WhereCallback& whereCallback) {
         massert( 10371 , "can only add to Projection once", _source.isEmpty());
         _source = o;
 
@@ -78,7 +79,7 @@ namespace mongo {
                     // initialize new Matcher object(s)
 
                     _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()]
-                            = boost::make_shared<Matcher>(e.wrap(), true);
+                        = boost::make_shared<Matcher>(e.wrap(), whereCallback);
                     add( e.fieldName(), true );
                 }
                 else {

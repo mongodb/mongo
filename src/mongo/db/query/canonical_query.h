@@ -45,7 +45,10 @@ namespace mongo {
         /**
          * Caller owns the pointer in 'out' if any call to canonicalize returns Status::OK().
          */
-        static Status canonicalize(const QueryMessage& qm, CanonicalQuery** out);
+        static Status canonicalize(const QueryMessage& qm,
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
         /**
          * For testing or for internal clients to use.
@@ -60,35 +63,67 @@ namespace mongo {
          */
         static Status canonicalize(const CanonicalQuery& baseQuery,
                                    MatchExpression* root,
-                                   CanonicalQuery** out);
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
-        static Status canonicalize(const string& ns, const BSONObj& query, CanonicalQuery** out);
+        static Status canonicalize(const string& ns,
+                                   const BSONObj& query,
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
-        static Status canonicalize(const string& ns, const BSONObj& query, long long skip,
-                                   long long limit, CanonicalQuery** out);
+        static Status canonicalize(const string& ns, 
+                                   const BSONObj& query,
+                                   long long skip,
+                                   long long limit, 
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
-        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
-                                   const BSONObj& proj, CanonicalQuery** out);
+        static Status canonicalize(const string& ns,
+                                   const BSONObj& query,
+                                   const BSONObj& sort,
+                                   const BSONObj& proj, 
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
-        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+        static Status canonicalize(const string& ns, 
+                                   const BSONObj& query,
+                                   const BSONObj& sort,
                                    const BSONObj& proj,
-                                   long long skip, long long limit,
-                                   CanonicalQuery** out);
+                                   long long skip,
+                                   long long limit,
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
-        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+        static Status canonicalize(const string& ns,
+                                   const BSONObj& query,
+                                   const BSONObj& sort,
                                    const BSONObj& proj,
-                                   long long skip, long long limit,
+                                   long long skip,
+                                   long long limit,
                                    const BSONObj& hint,
-                                   CanonicalQuery** out);
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
-        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+        static Status canonicalize(const string& ns,
+                                   const BSONObj& query,
+                                   const BSONObj& sort,
                                    const BSONObj& proj,
-                                   long long skip, long long limit,
+                                   long long skip,
+                                   long long limit,
                                    const BSONObj& hint,
-                                   const BSONObj& minObj, const BSONObj& maxObj,
+                                   const BSONObj& minObj,
+                                   const BSONObj& maxObj,
                                    bool snapshot,
                                    bool explain,
-                                   CanonicalQuery** out);
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
 
         /**
          * Returns true if "query" describes an exact-match query on _id, possibly with
@@ -168,7 +203,9 @@ namespace mongo {
         /**
          * Takes ownership of 'root' and 'lpq'.
          */
-        Status init(LiteParsedQuery* lpq, MatchExpression* root);
+        Status init(LiteParsedQuery* lpq,
+                    const MatchExpressionParser::WhereCallback& whereCallback,
+                    MatchExpression* root);
 
         scoped_ptr<LiteParsedQuery> _pq;
 

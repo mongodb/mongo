@@ -32,7 +32,6 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
@@ -60,7 +59,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":\"b\"}" );
-            M m( query );
+            M m(query, MatchExpressionParser::WhereCallback());
             ASSERT( m.matches( fromjson( "{\"a\":\"b\"}" ) ) );
         }
     };
@@ -70,7 +69,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":5}" );
-            M m( query );
+            M m(query, MatchExpressionParser::WhereCallback());
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
         }
     };
@@ -81,7 +80,7 @@ namespace MatcherTests {
         void run() {
             BSONObjBuilder query;
             query.append( "a", 5 );
-            M m( query.done() );
+            M m(query.done(), MatchExpressionParser::WhereCallback());
             ASSERT( m.matches( fromjson( "{\"a\":5}" ) ) );
         }
     };
@@ -91,7 +90,7 @@ namespace MatcherTests {
     public:
         void run() {
             BSONObj query = fromjson( "{\"a\":{\"$gt\":4}}" );
-            M m( query );
+            M m(query, MatchExpressionParser::WhereCallback());
             BSONObjBuilder b;
             b.append( "a", 5 );
             ASSERT( m.matches( b.done() ) );
@@ -106,7 +105,7 @@ namespace MatcherTests {
             ASSERT_EQUALS( 4 , query["a"].embeddedObject()["$in"].embeddedObject()["0"].number() );
             ASSERT_EQUALS( NumberInt , query["a"].embeddedObject()["$in"].embeddedObject()["0"].type() );
 
-            M m( query );
+            M m(query, MatchExpressionParser::WhereCallback());
 
             {
                 BSONObjBuilder b;
@@ -134,7 +133,7 @@ namespace MatcherTests {
     class MixedNumericEmbedded {
     public:
         void run() {
-            M m( BSON( "a" << BSON( "x" << 1 ) ) );
+            M m(BSON("a" << BSON("x" << 1)), MatchExpressionParser::WhereCallback());
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1 ) ) ) );
             ASSERT( m.matches( BSON( "a" << BSON( "x" << 1.0 ) ) ) );
         }
@@ -144,7 +143,7 @@ namespace MatcherTests {
     class Size {
     public:
         void run() {
-            M m( fromjson( "{a:{$size:4}}" ) );
+            M m(fromjson("{a:{$size:4}}"), MatchExpressionParser::WhereCallback());
             ASSERT( m.matches( fromjson( "{a:[1,2,3,4]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3]}" ) ) );
             ASSERT( !m.matches( fromjson( "{a:[1,2,3,'a','b']}" ) ) );
@@ -156,7 +155,8 @@ namespace MatcherTests {
     class WithinBox {
     public:
         void run() {
-            M m(fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}"));
+            M m(fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}"),
+                MatchExpressionParser::WhereCallback());
             ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
             ASSERT(m.matches(fromjson("{loc: [4,4]}")));
             ASSERT(m.matches(fromjson("{loc: [5,5]}")));
@@ -169,7 +169,8 @@ namespace MatcherTests {
     class WithinPolygon {
     public:
         void run() {
-            M m(fromjson("{loc:{$within:{$polygon:[{x:0,y:0},[0,5],[5,5],[5,0]]}}}"));
+            M m(fromjson("{loc:{$within:{$polygon:[{x:0,y:0},[0,5],[5,5],[5,0]]}}}"),
+                MatchExpressionParser::WhereCallback());
             ASSERT(m.matches(fromjson("{loc: [3,4]}")));
             ASSERT(m.matches(fromjson("{loc: [4,4]}")));
             ASSERT(m.matches(fromjson("{loc: {x:5,y:5}}")));
@@ -182,7 +183,8 @@ namespace MatcherTests {
     class WithinCenter {
     public:
         void run() {
-            M m(fromjson("{loc:{$within:{$center:[{x:30,y:30},10]}}}"));
+            M m(fromjson("{loc:{$within:{$center:[{x:30,y:30},10]}}}"),
+                MatchExpressionParser::WhereCallback());
             ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
             ASSERT(m.matches(fromjson("{loc: {x:30,y:30}}")));
             ASSERT(m.matches(fromjson("{loc: [20,30]}")));
@@ -198,7 +200,8 @@ namespace MatcherTests {
     class ElemMatchKey {
     public:
         void run() {
-            M matcher( BSON( "a.b" << 1 ) );
+            M matcher(BSON("a.b" << 1),
+                      MatchExpressionParser::WhereCallback());
             MatchDetails details;
             details.requestElemMatchKey();
             ASSERT( !details.hasElemMatchKey() );
@@ -214,7 +217,8 @@ namespace MatcherTests {
     public:
         void run() {
             Client::ReadContext ctx( "unittests.matchertests" );
-            M m( BSON( "$where" << "function(){ return this.a == 1; }" ) );
+            M m(BSON("$where" << "function(){ return this.a == 1; }"),
+                WhereCallbackReal(StringData("unittests")));
             ASSERT( m.matches( BSON( "a" << 1 ) ) );
             ASSERT( !m.matches( BSON( "a" << 2 ) ) );
         }
@@ -224,7 +228,7 @@ namespace MatcherTests {
     class TimingBase {
     public:
         long dotime( const BSONObj& patt , const BSONObj& obj ) {
-            M m( patt );
+            M m(patt, MatchExpressionParser::WhereCallback());
             Timer t;
             for ( int i=0; i<900000; i++ ) {
                 if ( !m.matches( obj ) ) {
@@ -257,7 +261,7 @@ namespace MatcherTests {
         }
 
 #define ADD_BOTH(TEST) \
-        add< TEST<Matcher2> >();
+        add< TEST<Matcher> >();
 
         void setupTests() {
             ADD_BOTH(Basic);

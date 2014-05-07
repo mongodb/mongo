@@ -20,7 +20,7 @@
 #include "mongo/pch.h"
 #include "mongo/util/string_map.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 
 namespace mongo {
 
@@ -76,7 +76,7 @@ namespace mongo {
          * called once per lifetime
          * e.g. { "x" : 1 , "a.y" : 1 }
          */
-        void init( const BSONObj& spec );
+        void init(const BSONObj& spec, const MatchExpressionParser::WhereCallback& whereCallback);
 
         /**
          * @return the spec init was called with

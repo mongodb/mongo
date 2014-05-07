@@ -47,7 +47,9 @@ namespace mongo {
           _projImpl(params.projImpl) {
 
         if (ProjectionStageParams::NO_FAST_PATH == _projImpl) {
-            _exec.reset(new ProjectionExec(params.projObj, params.fullExpression));
+            _exec.reset(new ProjectionExec(params.projObj, 
+                                           params.fullExpression,
+                                           *params.whereCallback));
         }
         else {
             // We shouldn't need the full expression if we're fast-pathing.

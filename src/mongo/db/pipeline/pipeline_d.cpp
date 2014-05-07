@@ -154,6 +154,9 @@ namespace {
                                    ;
         boost::shared_ptr<Runner> runner;
         bool sortInRunner = false;
+
+        const WhereCallbackReal whereCallback(pExpCtx->ns.db());
+
         if (sortStage) {
             CanonicalQuery* cq;
             Status status =
@@ -161,7 +164,8 @@ namespace {
                                              queryObj,
                                              sortObj,
                                              projectionForQuery,
-                                             &cq);
+                                             &cq,
+                                             whereCallback);
             Runner* rawRunner;
             if (status.isOK() && getRunner(collection, cq, &rawRunner, runnerOptions).isOK()) {
                 // success: The Runner will handle sorting for us using an index.
@@ -184,7 +188,8 @@ namespace {
                                              queryObj,
                                              noSort,
                                              projectionForQuery,
-                                             &cq));
+                                             &cq,
+                                             whereCallback));
 
             Runner* rawRunner;
             uassertStatusOK(getRunner(collection, cq, &rawRunner, runnerOptions));

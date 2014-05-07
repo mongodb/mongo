@@ -346,7 +346,8 @@ namespace {
             const BSONObj& query,
             std::vector<BSONObjCollection::iterator>* result) {
 
-        StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query);
+        StatusWithMatchExpression parseResult = 
+                MatchExpressionParser::parse(query, MatchExpressionParser::WhereCallback());
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }

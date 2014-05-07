@@ -62,7 +62,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/count.h"
@@ -147,9 +147,11 @@ namespace mongo {
                     filter = b.obj();
                 }
 
+                const NamespaceString nss(d.getns());
+
                 Client& me = cc();
                 scoped_lock bl(Client::clientsMutex);
-                Matcher m(filter);
+                Matcher m(filter, WhereCallbackReal(nss.db()));
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
                     Client *c = *i;
                     verify( c );

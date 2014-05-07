@@ -188,7 +188,12 @@ namespace mongo {
 
         // Create canonical query
         CanonicalQuery* cqRaw;
-        Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cqRaw);
+
+        const NamespaceString nss(ns);
+        const WhereCallbackReal whereCallback(nss.db());
+
+        Status result = CanonicalQuery::canonicalize(
+                            ns, queryObj, sortObj, projObj, &cqRaw, whereCallback);
         if (!result.isOK()) {
             return result;
         }

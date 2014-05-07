@@ -36,17 +36,17 @@
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/value.h"
-#include "mongo/db/projection.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/strategy.h"
 #include "mongo/util/intrusive_counter.h"
+
 
 namespace mongo {
     class Accumulator;
@@ -714,8 +714,7 @@ namespace mongo {
     };
 
     
-    class DocumentSourceProject :
-        public DocumentSource {
+    class DocumentSourceProject : public DocumentSource {
     public:
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
@@ -752,11 +751,6 @@ namespace mongo {
         boost::scoped_ptr<Variables> _variables;
         intrusive_ptr<ExpressionObject> pEO;
         BSONObj _raw;
-
-#if defined(_DEBUG)
-        // this is used in DEBUG builds to ensure we are compatible
-        Projection _simpleProjection;
-#endif
     };
 
     class DocumentSourceRedact :

@@ -39,7 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 
@@ -94,7 +94,9 @@ namespace mongo {
 
                     BSONObj realres = db.findOne( f["ns"].String() , f["q"].Obj() );
 
-                    Matcher m( f["res"].Obj() );
+                    // Apply-ops would never have a $where matcher, so use the default callback,
+                    // which will throw an error if $where is found.
+                    Matcher m(f["res"].Obj());
                     if ( ! m.matches( realres ) ) {
                         result.append( "got" , realres );
                         result.append( "whatFailed" , f );

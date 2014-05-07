@@ -37,7 +37,7 @@
 #endif
 
 #include "mongo/db/instance.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/tools/tool_logger.h"
 #include "mongo/tools/tool_options.h"
 #include "mongo/util/options_parser/environment.h"

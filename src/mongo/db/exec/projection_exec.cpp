@@ -49,7 +49,9 @@ namespace mongo {
           _hasReturnKey(false) { }
 
 
-    ProjectionExec::ProjectionExec(const BSONObj& spec, const MatchExpression* queryExpression)
+    ProjectionExec::ProjectionExec(const BSONObj& spec, 
+                                   const MatchExpression* queryExpression,
+                                   const MatchExpressionParser::WhereCallback& whereCallback)
         : _include(true),
           _special(false),
           _source(spec),
@@ -112,7 +114,8 @@ namespace mongo {
                     BSONObj elemMatchObj = e.wrap();
                     verify(elemMatchObj.isOwned());
                     _elemMatchObjs.push_back(elemMatchObj);
-                    StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj);
+                    StatusWithMatchExpression swme = MatchExpressionParser::parse(elemMatchObj, 
+                                                                                  whereCallback);
                     verify(swme.isOK());
                     // And store it in _matchers.
                     _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()]

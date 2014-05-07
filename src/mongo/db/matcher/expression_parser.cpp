@@ -41,6 +41,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
+
 namespace {
 
     using namespace mongo;
@@ -333,12 +334,7 @@ namespace mongo {
                         root->add( new AtomicMatchExpression() );
                 }
                 else if ( mongoutils::str::equals( "where", rest ) ) {
-                    /*
-                    if ( !topLevel )
-                        return StatusWithMatchExpression( ErrorCodes::BadValue,
-                                                          "$where has to be at the top level" );
-                    */
-                    StatusWithMatchExpression s = expressionParserWhereCallback( e );
+                    StatusWithMatchExpression s = _whereCallback->parseWhere(e);
                     if ( !s.isOK() )
                         return s;
                     root->add( s.getValue() );
@@ -796,6 +792,12 @@ namespace mongo {
         return StatusWithMatchExpression( myAnd.release() );
     }
 
+    StatusWithMatchExpression MatchExpressionParser::WhereCallback::parseWhere(
+                                                        const BSONElement& where) const {
+        return StatusWithMatchExpression(ErrorCodes::NoWhereParseContext,
+                                         "no context for parsing $where");
+    }
+
     // Geo
     StatusWithMatchExpression expressionParserGeoCallbackDefault( const char* name,
                                                                   int type,
@@ -805,14 +807,6 @@ namespace mongo {
 
     MatchExpressionParserGeoCallback expressionParserGeoCallback =
         expressionParserGeoCallbackDefault;
-
-    // Where
-    StatusWithMatchExpression expressionParserWhereCallbackDefault(const BSONElement& where) {
-        return StatusWithMatchExpression( ErrorCodes::BadValue, "$where not linked in" );
-    }
-
-    MatchExpressionParserWhereCallback expressionParserWhereCallback =
-        expressionParserWhereCallbackDefault;
 
     // Text
     StatusWithMatchExpression expressionParserTextCallbackDefault( const BSONObj& queryObj ) {

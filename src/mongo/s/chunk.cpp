@@ -1160,9 +1160,14 @@ namespace mongo {
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
         CanonicalQuery* canonicalQuery = NULL;
-        Status status = CanonicalQuery::canonicalize(_ns, query, &canonicalQuery);
+        Status status = CanonicalQuery::canonicalize(
+                            _ns,
+                            query,
+                            &canonicalQuery,
+                            WhereCallbackNoop());
+                            
         boost::scoped_ptr<CanonicalQuery> canonicalQueryPtr(canonicalQuery);
-
+        
         uassert(status.code(), status.reason(), status.isOK());
 
         // Query validation

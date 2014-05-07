@@ -29,6 +29,7 @@
 #include <string>
 #include <sstream>
 
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/catalog/collection.h"
+
 
 namespace {
 
@@ -269,6 +271,9 @@ namespace mongo {
         // OK to proceed with clearing entire cache.
         querySettings->clearAllowedIndices();
 
+        const NamespaceString nss(ns);
+        const WhereCallbackReal whereCallback(nss.db());
+
         // Remove corresponding entries from plan cache.
         // Admin hints affect the planning process directly. If there were
         // plans generated as a result of applying index filter, these need to be
@@ -286,8 +291,8 @@ namespace mongo {
 
             // Create canonical query.
             CanonicalQuery* cqRaw;
-            Status result = CanonicalQuery::canonicalize(ns, entry->query, entry->sort,
-                                                         entry->projection, &cqRaw);
+            Status result = CanonicalQuery::canonicalize(
+                    ns, entry->query, entry->sort, entry->projection, &cqRaw, whereCallback);
             invariant(result.isOK());
             scoped_ptr<CanonicalQuery> cq(cqRaw);
 

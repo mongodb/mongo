@@ -47,12 +47,13 @@ namespace {
     CanonicalQuery* canonicalize(const char* queryStr) {
         BSONObj queryObj = fromjson(queryStr);
         CanonicalQuery* cq;
-        Status result = CanonicalQuery::canonicalize("test.foo", queryObj, &cq);
+        Status result = CanonicalQuery::canonicalize(
+                            "test.foo", queryObj, &cq, WhereCallbackNoop());
         ASSERT_OK(result);
         return cq;
     }
 
-    void CheckIndexBoundsWithKey(const char* keyStr,
+    void checkIndexBoundsWithKey(const char* keyStr,
                                  const char* queryStr,
                                  const IndexBounds& expectedBounds) {
 
@@ -77,7 +78,7 @@ namespace {
     }
 
     // Assume shard key is { a: 1 }
-    void CheckIndexBounds(const char* queryStr, const OrderedIntervalList& expectedOil) {
+    void checkIndexBounds(const char* queryStr, const OrderedIntervalList& expectedOil) {
         auto_ptr<CanonicalQuery> query(canonicalize(queryStr));
         ASSERT(query.get() != NULL);
 
@@ -105,7 +106,7 @@ namespace {
     TEST(CMCollapseTreeTest, Basic) {
         OrderedIntervalList expected;
         expected.intervals.push_back(Interval(BSON("" << 2 << "" << 2), true, true));
-        CheckIndexBounds("{a: 2}", expected);
+        checkIndexBounds("{a: 2}", expected);
     }
 
     // { b: 2 } -> a: [MinKey, MaxKey]
@@ -115,7 +116,7 @@ namespace {
         builder.appendMinKey("");
         builder.appendMaxKey("");
         expected.intervals.push_back(Interval(builder.obj(), true, true));
-        CheckIndexBounds("{b: 2}", expected);
+        checkIndexBounds("{b: 2}", expected);
     }
 
     // { 'a' : { '$not' : { '$gt' : 1 } } } -> a: [MinKey, 1.0], (inf.0, MaxKey]
@@ -133,7 +134,7 @@ namespace {
             builder.appendMaxKey("");
             expected.intervals.push_back(Interval(builder.obj(), false, true));
         }
-        CheckIndexBounds("{ 'a' : { '$not' : { '$gt' : 1 } } }", expected);
+        checkIndexBounds("{ 'a' : { '$not' : { '$gt' : 1 } } }", expected);
     }
 
     // {$or: [{a: 20}, {$and: [{a:1}, {b:7}]}]} -> a: [1.0, 1.0], [20.0, 20.0]
@@ -141,7 +142,7 @@ namespace {
         OrderedIntervalList expected;
         expected.intervals.push_back(Interval(BSON("" << 1.0 << "" << 1.0), true, true));
         expected.intervals.push_back(Interval(BSON("" << 20.0 << "" << 20.0), true, true));
-        CheckIndexBounds("{$or: [{a: 20}, {$and: [{a:1}, {b:7}]}]}", expected);
+        checkIndexBounds("{$or: [{a: 20}, {$and: [{a:1}, {b:7}]}]}", expected);
     }
 
     // {a:20, $or: [{b:1}, {c:7}]} -> a: [20.0, 20.0]
@@ -149,14 +150,14 @@ namespace {
         // Logic rewrite could give a tree with root OR.
         OrderedIntervalList expected;
         expected.intervals.push_back(Interval(BSON("" << 20.0 << "" << 20.0), true, true));
-        CheckIndexBounds("{a:20, $or: [{b:1}, {c:7}]}", expected);
+        checkIndexBounds("{a:20, $or: [{b:1}, {c:7}]}", expected);
     }
 
     // {$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:5}}]} -> a: (0.0, 10.0)
     TEST(CMCollapseTreeTest, OrOfAnd) {
         OrderedIntervalList expected;
         expected.intervals.push_back(Interval(BSON("" << 0.0 << "" << 10.0), false, false));
-        CheckIndexBounds("{$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:5}}]}", expected);
+        checkIndexBounds("{$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:5}}]}", expected);
     }
 
     // {$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:15}}, {a:{$gt:20}}]}
@@ -165,14 +166,14 @@ namespace {
         OrderedIntervalList expected;
         expected.intervals.push_back(Interval(BSON("" << 0.0 << "" << 15.0), false, false));
         expected.intervals.push_back(Interval(BSON("" << 20.0 << "" << INF), false, true));
-        CheckIndexBounds("{$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:15}}, {a:{$gt:20}}]}", expected);
+        checkIndexBounds("{$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:15}}, {a:{$gt:20}}]}", expected);
     }
 
     // "{$or: [{a:{$gt:1,$lt:5},b:6}, {a:3,b:{$gt:0,$lt:10}}]}" -> a: (1.0, 5.0)
     TEST(CMCollapseTreeTest, OrOfAnd3) {
         OrderedIntervalList expected;
         expected.intervals.push_back(Interval(BSON("" << 1.0 << "" << 5.0), false, false));
-        CheckIndexBounds("{$or: [{a:{$gt:1,$lt:5},b:6}, {a:3,b:{$gt:0,$lt:10}}]}", expected);
+        checkIndexBounds("{$or: [{a:{$gt:1,$lt:5},b:6}, {a:3,b:{$gt:0,$lt:10}}]}", expected);
     }
 
     //
@@ -192,7 +193,7 @@ namespace {
         expectedBounds.fields[1].intervals.push_back(
             Interval(BSON("" << 0.0 << "" << 3.0), false, false));
 
-        CheckIndexBoundsWithKey(
+        checkIndexBoundsWithKey(
             "{a: 1, b: 1}", // shard key
             "{$or: [{a:{$gt:1,$lt:5}, b:{$gt:0,$lt:3}, c:6}, "
                    "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}",
@@ -215,7 +216,7 @@ namespace {
         expectedBounds.fields[1].intervals.push_back(
             Interval(builder.obj(), true, true));
 
-        CheckIndexBoundsWithKey(
+        checkIndexBoundsWithKey(
             "{a: 1, b: 1}", // shard key
             "{$or: [{a:{$gt:1,$lt:5}, c:6}, "
                    "{a:3, b:{$gt:1,$lt:2}, c:{$gt:0,$lt:10}}]}",
@@ -241,7 +242,7 @@ namespace {
         expectedBounds.fields[1].intervals.push_back(
             Interval(BSON("" << 5.0 << "" << 5.0), true, true));
 
-        CheckIndexBoundsWithKey(
+        checkIndexBoundsWithKey(
             "{a: 1, b: 1}", // shard key
             "{$or: [{a:{$in:[1]},b:{$in:[1]}}, {a:{$in:[1,5]},b:{$in:[1,5]}}]}",
             expectedBounds);
@@ -258,7 +259,7 @@ namespace {
         expectedBounds.fields.push_back(OrderedIntervalList());
         OrderedIntervalList& oil = expectedBounds.fields.front();
         oil.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
-        CheckIndexBoundsWithKey("{'a.b': 1}", "{a : {$elemMatch: {b:1}}}", expectedBounds);
+        checkIndexBoundsWithKey("{'a.b': 1}", "{a : {$elemMatch: {b:1}}}", expectedBounds);
     }
 
     // {foo: {$all: [ {$elemMatch: {a:1, b:1}}, {$elemMatch: {a:2, b:2}}]}}
@@ -294,7 +295,7 @@ namespace {
 
         Interval interval(BSON("" << array << "" << array),  true, true);
         expected.intervals.push_back(interval);
-        CheckIndexBounds("{a : [1, 2, 3]}", expected);
+        checkIndexBounds("{a : [1, 2, 3]}", expected);
     }
 
 
@@ -311,7 +312,7 @@ namespace {
         builder.appendRegex("", "abc");
         builder.appendRegex("", "abc");
         expected.intervals.push_back(Interval(builder.obj(), true, true));
-        CheckIndexBounds("{ a: /abc/ }", expected);
+        checkIndexBounds("{ a: /abc/ }", expected);
     }
 
     // {$where: 'this.credits == this.debits' }
@@ -321,7 +322,7 @@ namespace {
         builder.appendMinKey("");
         builder.appendMaxKey("");
         expected.intervals.push_back(Interval(builder.obj(), true, true));
-        CheckIndexBounds("{$where: 'this.credits == this.debits' }", expected);
+        checkIndexBounds("{$where: 'this.credits == this.debits' }", expected);
     }
 
     // { $text: { $search: "coffee -cake" } }
@@ -331,7 +332,7 @@ namespace {
         builder.appendMinKey("");
         builder.appendMaxKey("");
         expected.intervals.push_back(Interval(builder.obj(), true, true));
-        CheckIndexBounds("{ $text: { $search: 'coffee -cake' } }", expected);
+        checkIndexBounds("{ $text: { $search: 'coffee -cake' } }", expected);
     }
 
     // { a: 2, $text: { $search: "leche", $language: "es" } }
@@ -341,7 +342,7 @@ namespace {
         builder.appendMinKey("");
         builder.appendMaxKey("");
         expected.intervals.push_back(Interval(builder.obj(), true, true));
-        CheckIndexBounds("{ a: 2, $text: { $search: 'leche', $language: 'es' } }", expected);
+        checkIndexBounds("{ a: 2, $text: { $search: 'leche', $language: 'es' } }", expected);
     }
 
     //  { a: 0 } -> hashed a: [hash(0), hash(0)]
@@ -369,7 +370,7 @@ namespace {
         builder.appendMinKey("");
         builder.appendMaxKey("");
         expectedOil.intervals.push_back(Interval(builder.obj(), true, true));
-        CheckIndexBoundsWithKey("{a: 'hashed'}", "{ a: { $lt: 2, $gt: 1} }", expectedBounds);
+        checkIndexBoundsWithKey("{a: 'hashed'}", "{ a: { $lt: 2, $gt: 1} }", expectedBounds);
     }
 
     // { a: /abc/ } -> hashed a: [Minkey, Maxkey]
@@ -382,7 +383,7 @@ namespace {
         builder.appendMaxKey("");
         expectedOil.intervals.push_back(Interval(builder.obj(), true, true));
 
-        CheckIndexBoundsWithKey("{a: 'hashed'}", "{ a: /abc/ }", expectedBounds);
+        checkIndexBoundsWithKey("{a: 'hashed'}", "{ a: /abc/ }", expectedBounds);
     }
 
     /**

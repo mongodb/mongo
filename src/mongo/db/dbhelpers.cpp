@@ -100,8 +100,10 @@ namespace mongo {
             return DiskLoc();
 
         CanonicalQuery* cq;
+        const WhereCallbackReal whereCallback(collection->ns().db());
+
         massert(17244, "Could not canonicalize " + query.toString(),
-                CanonicalQuery::canonicalize(collection->ns(), query, &cq).isOK());
+            CanonicalQuery::canonicalize(collection->ns(), query, &cq, whereCallback).isOK());
 
         Runner* rawRunner;
         size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
@@ -166,8 +168,11 @@ namespace mongo {
         Client::Context ctx(ns);
 
         CanonicalQuery* cq;
+        const NamespaceString nss(ns);
+        const WhereCallbackReal whereCallback(nss.db());
+
         uassert(17236, "Could not canonicalize " + query.toString(),
-                CanonicalQuery::canonicalize(ns, query, &cq).isOK());
+            CanonicalQuery::canonicalize(ns, query, &cq, whereCallback).isOK());
 
         Runner* rawRunner;
         uassert(17237, "Could not get runner for query " + query.toString(),

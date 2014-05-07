@@ -113,7 +113,8 @@ namespace mongo {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
             PlanStage* childStage = buildStages(collection, qsol, pn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            ProjectionStageParams params;
+
+            ProjectionStageParams params(WhereCallbackReal(collection->ns().db()));
             params.projObj = pn->projection;
 
             // Stuff the right data into the params depending on what proj impl we use.

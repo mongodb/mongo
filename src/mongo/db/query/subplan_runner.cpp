@@ -199,13 +199,16 @@ namespace mongo {
             QLOG() << "Subplanner: index " << i << " is " << ie.toString() << endl;
         }
 
+        const WhereCallbackReal whereCallback(_collection->ns().db());
+
         for (size_t i = 0; i < theOr->numChildren(); ++i) {
             // Turn the i-th child into its own query.
             MatchExpression* orChild = theOr->getChild(i);
             CanonicalQuery* orChildCQ;
             Status childCQStatus = CanonicalQuery::canonicalize(*_query,
                                                                 orChild,
-                                                                &orChildCQ);
+                                                                &orChildCQ,
+                                                                whereCallback);
             if (!childCQStatus.isOK()) {
                 mongoutils::str::stream ss;
                 ss << "Subplanner: Can't canonicalize subchild " << orChild->toString()

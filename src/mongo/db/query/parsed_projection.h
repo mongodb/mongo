@@ -49,8 +49,11 @@ namespace mongo {
          * Returns Status::OK() if it's a valid spec.
          * Returns a Status indicating how it's invalid otherwise.
          */
-        static Status make(const BSONObj& spec, const MatchExpression* const query,
-                           ParsedProjection** out);
+        static Status make(const BSONObj& spec,
+                           const MatchExpression* const query,
+                           ParsedProjection** out,
+                           const MatchExpressionParser::WhereCallback& whereCallback =
+                                        MatchExpressionParser::WhereCallback());
 
         /**
          * Is the full document required to compute this projection?

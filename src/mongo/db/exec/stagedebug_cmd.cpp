@@ -175,7 +175,8 @@ namespace mongo {
                 if (!e.isABSONObj()) { return NULL; }
                 BSONObj argObj = e.Obj();
                 if (filterTag == e.fieldName()) {
-                    StatusWithMatchExpression swme = MatchExpressionParser::parse(argObj);
+                    StatusWithMatchExpression swme = MatchExpressionParser::parse(
+                                        argObj, WhereCallbackReal(collection->ns().db()));
                     if (!swme.isOK()) { return NULL; }
                     // exprs is what will wind up deleting this.
                     matcher = swme.getValue();

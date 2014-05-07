@@ -102,7 +102,11 @@ namespace mongo {
                                       result , errmsg );
         }
 
-        void _appendHelper( BSONObjBuilder& result , const BSONObj& doc , bool found , const BSONObj& fields ) {
+        static void _appendHelper(BSONObjBuilder& result,
+                                  const BSONObj& doc,
+                                  bool found,
+                                  const BSONObj& fields,
+                                  const MatchExpressionParser::WhereCallback& whereCallback) {
             if ( ! found ) {
                 result.appendNull( "value" );
                 return;
@@ -114,28 +118,33 @@ namespace mongo {
             }
 
             Projection p;
-            p.init( fields );
+            p.init(fields, whereCallback);
             result.append( "value" , p.transform( doc ) );
-                
         }
 
-        bool runNoDirectClient( const string& ns , 
-                                const BSONObj& queryOriginal , const BSONObj& fields , const BSONObj& update , 
-                                bool upsert , bool returnNew , bool remove ,
-                                BSONObjBuilder& result , string& errmsg ) {
-            
-            
+        static bool runNoDirectClient(const string& ns, 
+                                      const BSONObj& queryOriginal,
+                                      const BSONObj& fields,
+                                      const BSONObj& update,
+                                      bool upsert,
+                                      bool returnNew,
+                                      bool remove ,
+                                      BSONObjBuilder& result,
+                                      string& errmsg) {
+
             Lock::DBWrite lk( ns );
             Client::Context cx( ns );
             DurTransaction txn;
             Collection* collection = cx.db()->getCollection( &txn, ns );
+
+            const WhereCallbackReal whereCallback = WhereCallbackReal(StringData(ns));
 
             BSONObj doc;
             bool found = false;
             {
                 CanonicalQuery* cq;
                 massert(17383, "Could not canonicalize " + queryOriginal.toString(),
-                        CanonicalQuery::canonicalize(ns, queryOriginal, &cq).isOK());
+                    CanonicalQuery::canonicalize(ns, queryOriginal, &cq, whereCallback).isOK());
 
                 Runner* rawRunner;
                 massert(17384, "Could not get runner for query " + queryOriginal.toString(),
@@ -212,7 +221,7 @@ namespace mongo {
             }
 
             if ( remove ) {
-                _appendHelper( result , doc , found , fields );
+                _appendHelper(result, doc, found, fields, whereCallback);
                 if ( found ) {
                     deleteObjects(&txn, cx.db(), ns, queryModified, true, true);
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
@@ -224,13 +233,13 @@ namespace mongo {
                 // update
                 if ( ! found && ! upsert ) {
                     // didn't have it, and am not upserting
-                    _appendHelper( result , doc , found , fields );
+                    _appendHelper(result, doc, found, fields, whereCallback);
                 }
                 else {
                     // we found it or we're updating
                     
                     if ( ! returnNew ) {
-                        _appendHelper( result , doc , found , fields );
+                        _appendHelper(result, doc, found, fields, whereCallback);
                     }
                     
                     const NamespaceString requestNs(ns);
@@ -273,7 +282,7 @@ namespace mongo {
                             log() << errmsg << endl;
                             return false;
                         }
-                        _appendHelper( result , doc , true , fields );
+                        _appendHelper(result, doc, true, fields, whereCallback);
                     }
                     
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
@@ -312,9 +321,10 @@ namespace mongo {
 
             Projection projection;
             if (fields) {
-                projection.init(fieldsHolder);
-                if (!projection.includeID())
+                projection.init(fieldsHolder, WhereCallbackReal(StringData(dbname)));
+                if (!projection.includeID()) {
                     fields = NULL; // do projection in post-processing
+                }
             }
 
             Lock::DBWrite dbXLock(dbname);

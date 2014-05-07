@@ -30,8 +30,8 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/query_planner_common.h"
+
 
 namespace {
 
@@ -310,48 +310,74 @@ namespace mongo {
     //
 
     // static
-    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
-                                        CanonicalQuery** out) {
-        BSONObj emptyObj;
-        return CanonicalQuery::canonicalize(ns, query, emptyObj, emptyObj, 0, 0, out);
+    Status CanonicalQuery::canonicalize(const string& ns,
+                                        const BSONObj& query,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        const BSONObj emptyObj;
+        return CanonicalQuery::canonicalize(
+                                    ns, query, emptyObj, emptyObj, 0, 0, out, whereCallback);
     }
 
     // static
-    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
-                                        long long skip, long long limit,
-                                        CanonicalQuery** out) {
-        BSONObj emptyObj;
-        return CanonicalQuery::canonicalize(ns, query, emptyObj, emptyObj, skip, limit, out);
+    Status CanonicalQuery::canonicalize(const string& ns,
+                                        const BSONObj& query,
+                                        long long skip,
+                                        long long limit,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        const BSONObj emptyObj;
+        return CanonicalQuery::canonicalize(ns, 
+                                            query, 
+                                            emptyObj, 
+                                            emptyObj, 
+                                            skip, 
+                                            limit, 
+                                            out,
+                                            whereCallback);
     }
 
     // static
-    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
-                                        const BSONObj& sort, const BSONObj& proj,
-                                        CanonicalQuery** out) {
-        return CanonicalQuery::canonicalize(ns, query, sort, proj, 0, 0, out);
+    Status CanonicalQuery::canonicalize(const string& ns,
+                                        const BSONObj& query,
+                                        const BSONObj& sort,
+                                        const BSONObj& proj,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        return CanonicalQuery::canonicalize(ns, query, sort, proj, 0, 0, out, whereCallback);
     }
 
     // static
-    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
-                                        const BSONObj& sort, const BSONObj& proj,
-                                        long long skip, long long limit,
-                                        CanonicalQuery** out) {
-        BSONObj emptyObj;
-        return CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, emptyObj, out);
+    Status CanonicalQuery::canonicalize(const string& ns,
+                                        const BSONObj& query,
+                                        const BSONObj& sort,
+                                        const BSONObj& proj,
+                                        long long skip,
+                                        long long limit,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        const BSONObj emptyObj;
+        return CanonicalQuery::canonicalize(
+                            ns, query, sort, proj, skip, limit, emptyObj, out, whereCallback);
     }
 
     // static
-    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
-                                        const BSONObj& sort, const BSONObj& proj,
-                                        long long skip, long long limit,
+    Status CanonicalQuery::canonicalize(const string& ns,
+                                        const BSONObj& query,
+                                        const BSONObj& sort,
+                                        const BSONObj& proj,
+                                        long long skip,
+                                        long long limit,
                                         const BSONObj& hint,
-                                        CanonicalQuery** out) {
-        BSONObj emptyObj;
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        const BSONObj emptyObj;
         return CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
                                             emptyObj, emptyObj,
                                             false, // snapshot
                                             false, // explain
-                                            out);
+                                            out,
+                                            whereCallback);
     }
 
     //
@@ -359,14 +385,16 @@ namespace mongo {
     //
 
     // static
-    Status CanonicalQuery::canonicalize(const QueryMessage& qm, CanonicalQuery** out) {
+    Status CanonicalQuery::canonicalize(const QueryMessage& qm,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
         // Make LiteParsedQuery.
         LiteParsedQuery* lpq;
         Status parseStatus = LiteParsedQuery::make(qm, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
         // Make MatchExpression.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter());
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter(), whereCallback);
         if (!swme.isOK()) {
             delete lpq;
             return swme.getStatus();
@@ -375,7 +403,7 @@ namespace mongo {
         // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
         // Takes ownership of lpq and the MatchExpression* in swme.
-        Status initStatus = cq->init(lpq, swme.getValue());
+        Status initStatus = cq->init(lpq, whereCallback, swme.getValue());
 
         if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
@@ -385,7 +413,8 @@ namespace mongo {
     // static
     Status CanonicalQuery::canonicalize(const CanonicalQuery& baseQuery,
                                         MatchExpression* root,
-                                        CanonicalQuery** out) {
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
 
         LiteParsedQuery* lpq;
 
@@ -406,7 +435,7 @@ namespace mongo {
 
         // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq, root->shallowClone());
+        Status initStatus = cq->init(lpq, whereCallback, root->shallowClone());
 
         if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
@@ -414,14 +443,19 @@ namespace mongo {
     }
 
     // static
-    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
-                                        const BSONObj& sort, const BSONObj& proj,
-                                        long long skip, long long limit,
+    Status CanonicalQuery::canonicalize(const string& ns,
+                                        const BSONObj& query,
+                                        const BSONObj& sort,
+                                        const BSONObj& proj,
+                                        long long skip,
+                                        long long limit,
                                         const BSONObj& hint,
-                                        const BSONObj& minObj, const BSONObj& maxObj,
+                                        const BSONObj& minObj,
+                                        const BSONObj& maxObj,
                                         bool snapshot,
                                         bool explain,
-                                        CanonicalQuery** out) {
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
         LiteParsedQuery* lpq;
         // Pass empty sort and projection.
         BSONObj emptyObj;
@@ -432,7 +466,8 @@ namespace mongo {
         }
 
         // Build a parse tree from the BSONObj in the parsed query.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter());
+        StatusWithMatchExpression swme = 
+                            MatchExpressionParser::parse(lpq->getFilter(), whereCallback);
         if (!swme.isOK()) {
             delete lpq;
             return swme.getStatus();
@@ -441,14 +476,16 @@ namespace mongo {
         // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
         // Takes ownership of lpq and the MatchExpression* in swme.
-        Status initStatus = cq->init(lpq, swme.getValue());
+        Status initStatus = cq->init(lpq, whereCallback, swme.getValue());
 
         if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
         return Status::OK();
     }
 
-    Status CanonicalQuery::init(LiteParsedQuery* lpq, MatchExpression* root) {
+    Status CanonicalQuery::init(LiteParsedQuery* lpq,
+                                const MatchExpressionParser::WhereCallback& whereCallback,
+                                MatchExpression* root) {
         _pq.reset(lpq);
 
         // Normalize, sort and validate tree.
@@ -466,7 +503,8 @@ namespace mongo {
         // Validate the projection if there is one.
         if (!_pq->getProj().isEmpty()) {
             ParsedProjection* pp;
-            Status projStatus = ParsedProjection::make(_pq->getProj(), _root.get(), &pp);
+            Status projStatus = 
+                ParsedProjection::make(_pq->getProj(), _root.get(), &pp, whereCallback);
             if (!projStatus.isOK()) {
                 return projStatus;
             }

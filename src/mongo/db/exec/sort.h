@@ -34,11 +34,11 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/platform/unordered_map.h"
+
 
 namespace mongo {
 
@@ -156,7 +156,6 @@ namespace mongo {
         PlanStageStats* getStats();
 
     private:
-        void getBoundsForSort(const BSONObj& queryObj, const BSONObj& sortObj);
 
         //
         // Query Stage

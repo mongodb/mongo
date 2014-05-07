@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/scripting/engine.h"
 
+
 namespace mongo {
 
     class WhereMatchExpression : public MatchExpression {
@@ -45,7 +46,7 @@ namespace mongo {
         WhereMatchExpression() : MatchExpression( WHERE ){ _func = 0; }
         virtual ~WhereMatchExpression(){}
 
-        Status init( const StringData& ns, const StringData& theCode, const BSONObj& scope );
+        Status init(const StringData& dbName, const StringData& theCode, const BSONObj& scope);
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
@@ -55,7 +56,7 @@ namespace mongo {
 
         virtual MatchExpression* shallowClone() const {
             WhereMatchExpression* e = new WhereMatchExpression();
-            e->init(_ns, _code, _userScope);
+            e->init(_dbName, _code, _userScope);
             if ( getTag() ) {
                 e->setTag(getTag()->clone());
             }
@@ -69,7 +70,7 @@ namespace mongo {
         virtual void resetTag() { setTag(NULL); }
 
     private:
-        string _ns;
+        string _dbName;
         string _code;
         BSONObj _userScope;
 
@@ -77,25 +78,25 @@ namespace mongo {
         ScriptingFunction _func;
     };
 
-    Status WhereMatchExpression::init( const StringData& ns,
+    Status WhereMatchExpression::init( const StringData& dbName,
                                        const StringData& theCode,
                                        const BSONObj& scope ) {
 
-        if ( ns.size() == 0 )
-            return Status( ErrorCodes::BadValue, "ns for $where cannot be empty" );
+        if (dbName.size() == 0) {
+            return Status(ErrorCodes::BadValue, "ns for $where cannot be empty");
+        }
 
-        if ( theCode.size() == 0 )
-            return Status( ErrorCodes::BadValue, "code for $where cannot be empty" );
+        if (theCode.size() == 0) {
+            return Status(ErrorCodes::BadValue, "code for $where cannot be empty");
+        }
 
-        _ns = ns.toString();
+        _dbName = dbName.toString();
         _code = theCode.toString();
         _userScope = scope.getOwned();
 
-        NamespaceString nswrapper( _ns );
         const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
                                                           ->getAuthenticatedUserNamesToken();
-        _scope = globalScriptEngine->getPooledScope( nswrapper.db().toString(),
-                                                     "where" + userToken );
+        _scope = globalScriptEngine->getPooledScope(_dbName, "where" + userToken);
         _func = _scope->createFunction( _code.c_str() );
 
         if ( !_func )
@@ -133,7 +134,7 @@ namespace mongo {
         debug << "$where\n";
 
         _debugAddSpace( debug, level + 1 );
-        debug << "ns: " << _ns << "\n";
+        debug << "dbName: " << _dbName << "\n";
 
         _debugAddSpace( debug, level + 1 );
         debug << "code: " << _code << "\n";
@@ -147,57 +148,38 @@ namespace mongo {
             return false;
         const WhereMatchExpression* realOther = static_cast<const WhereMatchExpression*>(other);
         return
-            _ns == realOther->_ns &&
+            _dbName == realOther->_dbName &&
             _code == realOther->_code &&
             _userScope == realOther->_userScope;
     }
 
+    WhereCallbackReal::WhereCallbackReal(const StringData& dbName)
+        : _dbName(dbName) {
 
-    // -----------------
-
-    StatusWithMatchExpression expressionParserWhereCallbackReal(const BSONElement& where) {
-        if ( !haveClient() )
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "no current client needed for $where" );
-
-        Client::Context* context = cc().getContext();
-        if ( !context )
-            return StatusWithMatchExpression( ErrorCodes::NoClientContext,
-                                              "no context in $where parsing" );
-
-        const char* ns = context->ns();
-        if ( !ns )
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "no ns in $where parsing" );
-
-        if ( !globalScriptEngine )
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "no globalScriptEngine in $where parsing" );
-
-        auto_ptr<WhereMatchExpression> exp( new WhereMatchExpression() );
-        if ( where.type() == String || where.type() == Code ) {
-            Status s = exp->init( ns, where.valuestr(), BSONObj() );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( exp.release() );
-        }
-
-        if ( where.type() == CodeWScope ) {
-            Status s = exp->init( ns,
-                                  where.codeWScopeCode(),
-                                  BSONObj( where.codeWScopeScopeDataUnsafe() ) );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-            return StatusWithMatchExpression( exp.release() );
-        }
-
-        return StatusWithMatchExpression( ErrorCodes::BadValue, "$where got bad type" );
     }
 
-    MONGO_INITIALIZER( MatchExpressionWhere )( ::mongo::InitializerContext* context ) {
-        // This could be overrided by MatchExpressionWhereNoOp in mongos
-        expressionParserWhereCallback = expressionParserWhereCallbackReal;
-        return Status::OK();
+    StatusWithMatchExpression WhereCallbackReal::parseWhere(const BSONElement& where) const {
+        if (!globalScriptEngine)
+            return StatusWithMatchExpression(ErrorCodes::BadValue,
+                                             "no globalScriptEngine in $where parsing");
+
+        auto_ptr<WhereMatchExpression> exp(new WhereMatchExpression());
+        if (where.type() == String || where.type() == Code) {
+            Status s = exp->init(_dbName, where.valuestr(), BSONObj());
+            if (!s.isOK())
+                return StatusWithMatchExpression(s);
+            return StatusWithMatchExpression(exp.release());
+        }
+
+        if (where.type() == CodeWScope) {
+            Status s = exp->init(_dbName,
+                                 where.codeWScopeCode(),
+                                 BSONObj(where.codeWScopeScopeDataUnsafe()));
+            if (!s.isOK())
+                return StatusWithMatchExpression(s);
+            return StatusWithMatchExpression(exp.release());
+        }
+
+        return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");
     }
-
-
-
-
 }

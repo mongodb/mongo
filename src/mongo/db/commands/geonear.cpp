@@ -170,7 +170,19 @@ namespace mongo {
                                    "$dis" << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
             CanonicalQuery* cq;
-            if (!CanonicalQuery::canonicalize(ns, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), &cq).isOK()) {
+
+            const NamespaceString nss(dbname);
+            const WhereCallbackReal whereCallback(nss.db());
+
+            if (!CanonicalQuery::canonicalize(ns,
+                                              rewritten,
+                                              BSONObj(),
+                                              projObj,
+                                              0,
+                                              numWanted,
+                                              BSONObj(),
+                                              &cq,
+                                              whereCallback).isOK()) {
                 errmsg = "Can't parse filter / create query";
                 return false;
             }

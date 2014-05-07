@@ -30,6 +30,7 @@
 
 #include <algorithm>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
@@ -227,9 +228,8 @@ namespace mongo {
         params.indices.push_back(sortOrder);
 
         CanonicalQuery* rawQueryForSort;
-        verify(CanonicalQuery::canonicalize("fake_ns",
-                                            queryObj,
-                                            &rawQueryForSort).isOK());
+        verify(CanonicalQuery::canonicalize(
+                "fake_ns", queryObj, &rawQueryForSort, WhereCallbackNoop()).isOK());
         auto_ptr<CanonicalQuery> queryForSort(rawQueryForSort);
 
         vector<QuerySolution*> solns;

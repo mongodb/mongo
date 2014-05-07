@@ -133,12 +133,14 @@ namespace mongo {
 
             Collection* collection = db->getCollection( ns );
 
+            const WhereCallbackReal whereCallback(StringData(db->name()));
+
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
             if (collection) {
                 CanonicalQuery* cq;
-                if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
+                if (!CanonicalQuery::canonicalize(ns, query, &cq, whereCallback).isOK()) {
                     uasserted(17212, "Can't canonicalize query " + query.toString());
                     return 0;
                 }

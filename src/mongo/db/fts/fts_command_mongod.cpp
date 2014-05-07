@@ -95,9 +95,16 @@ namespace mongo {
             Client::ReadContext ctx(ns);
 
             CanonicalQuery* cq;
-            Status canonicalizeStatus = CanonicalQuery::canonicalize(ns, queryObj, sortSpec,
-                                                                     projObj, 0, limit, BSONObj(),
-                                                                     &cq);
+            Status canonicalizeStatus = 
+                    CanonicalQuery::canonicalize(ns, 
+                                                 queryObj,
+                                                 sortSpec,
+                                                 projObj, 
+                                                 0,
+                                                 limit,
+                                                 BSONObj(),
+                                                 &cq,
+                                                 WhereCallbackReal(StringData(dbname)));
             if (!canonicalizeStatus.isOK()) {
                 errmsg = canonicalizeStatus.reason();
                 return false;
