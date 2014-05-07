@@ -313,6 +313,7 @@ async
 asyncopp
 autockpt
 autocommit
+basecfg
 bdb
 bigram
 bitcnt

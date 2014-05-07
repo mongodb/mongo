@@ -56,8 +56,8 @@ See @ref home for more details.
 
 When a database is created, the config string passed to `wiredtiger_open`
 is saved to a file called \c WiredTiger.basecfg.  This configuration is
-read when the database is subsequntly opened.  Users should not edit this
-file, create a @ref config_file instead: settings there wil override
+read when the database is subsequently opened.  Users should not edit this
+file, create a @ref config_file instead: settings there will override
 \c WiredTiger.basecfg.
 
 */
