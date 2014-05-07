@@ -378,10 +378,8 @@ wts_salvage(void)
 
 	/*
 	 * Some data-sources don't support salvage.
-	 *
-	 * XXX excluding LSM is temporary.
 	 */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb") || DATASOURCE("lsm"))
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;

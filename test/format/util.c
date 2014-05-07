@@ -292,14 +292,13 @@ path_setup(const char *home)
 
 	/*
 	 * Salvage command, save the interesting files so we can replay the
-	 * salvage command as necessary.  Exclude log files: they could be
-	 * removed by log archive during the copy.
+	 * salvage command as necessary.
 	 */
 #undef	CMD
 #define	CMD								\
 	"cd %s && "							\
 	"rm -rf slvg.copy && mkdir slvg.copy && "			\
-	"cp WiredTiger WiredTiger.* wt* slvg.copy/"
+	"cp WiredTiger* wt* slvg.copy/"
 	len = strlen(g.home) + strlen(CMD) + 1;
 	if ((g.home_salvage_copy = malloc(len)) == NULL)
 		syserr("malloc");
