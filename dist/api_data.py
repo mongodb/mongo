@@ -366,7 +366,8 @@ connection_runtime_config = [
 	    @ref statistics for more information''',
 	    type='list', choices=['all', 'fast', 'none', 'clear']),
 	Config('verbose', '', r'''
-	    enable messages for various events.  Options are given as a
+	    enable messages for various events. Only available if WiredTiger
+		is configured with --enable-verbose. Options are given as a
 	    list, such as <code>"verbose=[evictserver,read]"</code>''',
 	    type='list', choices=[
 	        'api',
