@@ -102,7 +102,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	WT_VERBOSE_TRET(session, block, "open: %s", filename);
+	WT_TRET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
 	*blockp = NULL;
@@ -198,8 +198,8 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	conn = S2C(session);
 
-	WT_VERBOSE_TRET(session,
-	    block, "close: %s", block->name == NULL ? "" : block->name );
+	WT_TRET(__wt_verbose(session, WT_VERB_BLOCK,
+	    "close: %s", block->name == NULL ? "" : block->name ));
 
 	__wt_spin_lock(session, &conn->block_lock);
 
@@ -262,13 +262,13 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	    session, block->fh, (off_t)0, (size_t)block->allocsize, buf->mem));
 
 	desc = buf->mem;
-	WT_VERBOSE_ERR(session, block,
+	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
 	    "%s: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32,
 	    block->name, desc->magic,
 	    desc->majorv, desc->minorv,
-	    desc->cksum);
+	    desc->cksum));
 
 	/*
 	 * We fail the open if the checksum fails, or the magic number is wrong

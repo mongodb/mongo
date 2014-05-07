@@ -350,8 +350,8 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, WT_ERROR,
 		    "Attempt to reconcile a clean page.");
 
-	WT_VERBOSE_RET(
-	    session, reconcile, "%s", __wt_page_type_string(page->type));
+	WT_RET(__wt_verbose(session,
+	    WT_VERB_RECONCILE, "%s", __wt_page_type_string(page->type)));
 	WT_STAT_FAST_CONN_INCR(session, rec_pages);
 	WT_STAT_FAST_DATA_INCR(session, rec_pages);
 	if (LF_ISSET(WT_EVICTION_LOCKED)) {
@@ -479,8 +479,8 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_VERBOSE_RET(session, split,
-	    "root page split -> %" PRIu32 " pages", mod->mod_multi_entries);
+	WT_RET(__wt_verbose(session, WT_VERB_SPLIT,
+	    "root page split -> %" PRIu32 " pages", mod->mod_multi_entries));
 
 	/*
 	 * Create a new root page, initialize the array of child references,
@@ -4481,7 +4481,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		WT_VERBOSE_RET(session, reconcile, "page %p empty", page);
+		WT_RET(__wt_verbose(
+		    session, WT_VERB_RECONCILE, "page %p empty", page));
 		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
 		/* If this is the root page, we need to create a sync point. */
@@ -4528,9 +4529,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		F_SET(mod, WT_PM_REC_REPLACE);
 		break;
 	default:					/* Page split */
-		WT_VERBOSE_RET(session, reconcile,
+		WT_RET(__wt_verbose(session, WT_VERB_RECONCILE,
 		    "page %p reconciled into %" PRIu32 " pages",
-		    page, r->bnd_next);
+		    page, r->bnd_next));
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
@@ -4546,12 +4547,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-#if 0
 		/*
 		 * Display the actual split keys: not turned on because it's a
 		 * lot of output and not generally useful.
 		 */
-		if (WT_VERBOSE_ISSET(session, split)) {
+		if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;
 			uint32_t i;
@@ -4566,25 +4566,26 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					WT_ERR(__wt_buf_set_printable(
 					    session, tkey,
 					    bnd->key.data, bnd->key.size));
-					WT_VERBOSE_ERR(session, split,
+					WT_ERR(__wt_verbose(
+					    session, WT_VERB_SPLIT,
 					    "split: starting key "
 					    "%.*s",
 					    (int)tkey->size,
-					    (const char *)tkey->data);
+					    (const char *)tkey->data));
 					break;
 				case WT_PAGE_COL_FIX:
 				case WT_PAGE_COL_INT:
 				case WT_PAGE_COL_VAR:
-					WT_VERBOSE_ERR(session, split,
+					WT_ERR(__wt_verbose(
+					    session, WT_VERB_SPLIT,
 					    "split: starting recno %" PRIu64,
-					    bnd->recno);
+					    bnd->recno));
 					break;
 				WT_ILLEGAL_VALUE_ERR(session);
 				}
 err:			__wt_scr_free(&tkey);
 			WT_RET(ret);
 		}
-#endif
 		if (r->bnd_next > r->bnd_next_max) {
 			r->bnd_next_max = r->bnd_next;
 			WT_STAT_FAST_DATA_SET(

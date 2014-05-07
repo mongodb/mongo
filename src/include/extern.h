@@ -1362,6 +1362,13 @@ extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_cksum_init(void);
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session,
     WT_EVENT_HANDLER *handler);
+extern int __wt_eventv(WT_SESSION_IMPL *session,
+    int msg_event,
+    int error,
+    const char *file_name,
+    int line_number,
+    const char *fmt,
+    va_list ap);
 extern void __wt_err(WT_SESSION_IMPL *session,
     int error,
     const char *fmt,
@@ -1391,11 +1398,6 @@ extern int __wt_ext_msg_printf( WT_EXTENSION_API *wt_api,
     3,
     4)));
 extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v);
-extern int __wt_verbose(WT_SESSION_IMPL *session,
-    const char *fmt,
-    ...) WT_GCC_ATTRIBUTE((format (printf,
-    2,
-    3)));
 extern void __wt_assert(WT_SESSION_IMPL *session,
     int error,
     const char *file_name,

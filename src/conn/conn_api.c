@@ -1002,27 +1002,27 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
-		{ "api",		WT_VERB_api },
-		{ "block",		WT_VERB_block },
-		{ "checkpoint",		WT_VERB_checkpoint },
-		{ "compact",		WT_VERB_compact },
-		{ "evict",		WT_VERB_evict },
-		{ "evictserver",	WT_VERB_evictserver },
-		{ "fileops",		WT_VERB_fileops },
-		{ "log",		WT_VERB_log },
-		{ "lsm",		WT_VERB_lsm },
-		{ "metadata",		WT_VERB_metadata },
-		{ "mutex",		WT_VERB_mutex },
-		{ "overflow",		WT_VERB_overflow },
-		{ "read",		WT_VERB_read },
-		{ "reconcile",		WT_VERB_reconcile },
-		{ "recovery",		WT_VERB_recovery },
-		{ "salvage",		WT_VERB_salvage },
-		{ "shared_cache",	WT_VERB_shared_cache },
-		{ "split",		WT_VERB_split },
-		{ "verify",		WT_VERB_verify },
-		{ "version",		WT_VERB_version },
-		{ "write",		WT_VERB_write },
+		{ "api",		WT_VERB_API },
+		{ "block",		WT_VERB_BLOCK },
+		{ "checkpoint",		WT_VERB_CHECKPOINT },
+		{ "compact",		WT_VERB_COMPACT },
+		{ "evict",		WT_VERB_EVICT },
+		{ "evictserver",	WT_VERB_EVICTSERVER },
+		{ "fileops",		WT_VERB_FILEOPS },
+		{ "log",		WT_VERB_LOG },
+		{ "lsm",		WT_VERB_LSM },
+		{ "metadata",		WT_VERB_METADATA },
+		{ "mutex",		WT_VERB_MUTEX },
+		{ "overflow",		WT_VERB_OVERFLOW },
+		{ "read",		WT_VERB_READ },
+		{ "reconcile",		WT_VERB_RECONCILE },
+		{ "recovery",		WT_VERB_RECOVERY },
+		{ "salvage",		WT_VERB_SALVAGE },
+		{ "shared_cache",	WT_VERB_SHARED_CACHE },
+		{ "split",		WT_VERB_SPLIT },
+		{ "verify",		WT_VERB_VERIFY },
+		{ "version",		WT_VERB_VERSION },
+		{ "write",		WT_VERB_WRITE },
 		{ NULL, 0 }
 	};
 
@@ -1215,7 +1215,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_statistics_config(session, cfg));
 
 	/* Now that we know if verbose is configured, output the version. */
-	WT_VERBOSE_ERR(session, version, "%s", WIREDTIGER_VERSION_STRING);
+	WT_ERR(__wt_verbose(
+	    session, WT_VERB_VERSION, "%s", WIREDTIGER_VERSION_STRING));
 
 	/*
 	 * Open the connection, then reset the local session as the real one

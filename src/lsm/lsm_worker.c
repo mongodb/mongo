@@ -168,11 +168,11 @@ __wt_lsm_merge_worker(void *vargs)
 			aggressive = chunk_wait / lsm_tree->merge_min;
 
 			if (aggressive > old_aggressive)
-				WT_VERBOSE_ERR(session, lsm,
+				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 				     "LSM merge got aggressive (%u), "
 				     "%u / %" PRIu64,
 				     aggressive, stallms,
-				     lsm_tree->chunk_fill_ms);
+				     lsm_tree->chunk_fill_ms));
 		}
 	}
 
@@ -303,8 +303,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
 
-			WT_VERBOSE_ERR(session, lsm,
-			     "LSM worker flushing %u", i);
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			     "LSM worker flushing %u", i));
 
 			/*
 			 * Flush the file before checkpointing: this is the
@@ -353,8 +353,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 				break;
 
-			WT_VERBOSE_ERR(session, lsm,
-			     "LSM worker checkpointing %u", i);
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			     "LSM worker checkpointing %u", i));
 
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session, chunk->uri,
@@ -397,8 +397,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 			}
 
-			WT_VERBOSE_ERR(session, lsm,
-			     "LSM worker checkpointed %u", i);
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			     "LSM worker checkpointed %u", i));
 		}
 keep_going:
 		__lsm_unpin_chunks(session, &cookie);
@@ -496,10 +496,10 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_CLEAR(key);
 	WT_ERR_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
 
-	WT_VERBOSE_ERR(session, lsm,
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 	    "LSM worker created bloom filter %s. "
 	    "Expected %" PRIu64 " items, got %" PRIu64,
-	    chunk->bloom_uri, chunk->count, insert_count);
+	    chunk->bloom_uri, chunk->count, insert_count));
 
 	/* Ensure the bloom filter is in the metadata. */
 	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
@@ -635,9 +635,9 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			if ((ret = __lsm_drop_file(
 			    session, chunk->bloom_uri)) == EBUSY) {
 				ret = 0;
-				WT_VERBOSE_ERR(session, lsm,
+				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 				    "LSM worker bloom drop busy: %s.",
-				    chunk->bloom_uri);
+				    chunk->bloom_uri));
 				++skipped;
 				continue;
 			} else
@@ -653,9 +653,9 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			if ((ret = __lsm_drop_file(
 			    session, chunk->uri)) == EBUSY) {
 				ret = 0;
-				WT_VERBOSE_ERR(session, lsm,
+				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 				    "LSM worker drop busy: %s.",
-				    chunk->uri);
+				    chunk->uri));
 				++skipped;
 				continue;
 			} else

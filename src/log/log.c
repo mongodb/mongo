@@ -154,8 +154,8 @@ __wt_log_remove(WT_SESSION_IMPL *session, uint32_t lognum)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &path));
 	WT_ERR(__wt_log_filename(session, lognum, path));
-	WT_VERBOSE_ERR(session, log, "log_remove: remove log %s",
-	    (char *)path->data);
+	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+	    "log_remove: remove log %s", (char *)path->data));
 	WT_ERR(__wt_remove(session, path->data));
 err:	__wt_scr_free(&path);
 	return (ret);
@@ -173,8 +173,8 @@ __log_openfile(WT_SESSION_IMPL *session, int ok_create, WT_FH **fh, uint32_t id)
 
 	WT_RET(__wt_scr_alloc(session, 0, &path));
 	WT_ERR(__wt_log_filename(session, id, path));
-	WT_VERBOSE_ERR(session, log, "opening log %s",
-	    (const char *)path->data);
+	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+	    "opening log %s", (const char *)path->data));
 	WT_ERR(__wt_open(
 	    session, path->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
 err:	__wt_scr_free(&path);
@@ -210,8 +210,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		firstlog = WT_MIN(firstlog, lognum);
 	}
 	log->fileid = lastlog;
-	WT_VERBOSE_ERR(session, log, "log_open: first log %d last log %d",
-	    firstlog, lastlog);
+	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+	    "log_open: first log %d last log %d", firstlog, lastlog));
 	log->first_lsn.file = firstlog;
 	log->first_lsn.offset = 0;
 
@@ -248,13 +248,13 @@ __wt_log_close(WT_SESSION_IMPL *session)
 	log = conn->log;
 
 	if (log->log_close_fh != NULL && log->log_close_fh != log->log_fh) {
-		WT_VERBOSE_RET(session, log,
-		    "closing old log %s", log->log_close_fh->name);
+		WT_RET(__wt_verbose(session, WT_VERB_LOG,
+		    "closing old log %s", log->log_close_fh->name));
 		WT_RET(__wt_close(session, log->log_close_fh));
 	}
 	if (log->log_fh != NULL) {
-		WT_VERBOSE_RET(session, log,
-		    "closing log %s", log->log_fh->name);
+		WT_RET(__wt_verbose(session, WT_VERB_LOG,
+		    "closing log %s", log->log_fh->name));
 		WT_RET(__wt_close(session, log->log_fh));
 		log->log_fh = NULL;
 	}
@@ -742,9 +742,9 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		return (0);
 
 	if (LF_ISSET(WT_LOGSCAN_RECOVER))
-		WT_VERBOSE_RET(session, log,
+		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "__wt_log_scan truncating to %u/%" PRIuMAX,
-		    log->trunc_lsn.file, (uintmax_t)log->trunc_lsn.offset);
+		    log->trunc_lsn.file, (uintmax_t)log->trunc_lsn.offset));
 
 	if (log != NULL) {
 		allocsize = log->allocsize;
@@ -1137,8 +1137,8 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	(void)vsnprintf((char *)logrec->data + logrec->size, len, fmt, ap);
 
-	WT_VERBOSE_ERR(session, log,
-	    "log_printf: %s", (char *)logrec->data + logrec->size);
+	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+	    "log_printf: %s", (char *)logrec->data + logrec->size));
 
 	logrec->size += len;
 	WT_ERR(__wt_log_write(session, logrec, NULL, 0));

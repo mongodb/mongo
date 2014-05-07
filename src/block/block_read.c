@@ -168,9 +168,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	size_t bufsize;
 	uint32_t page_cksum;
 
-	WT_VERBOSE_RET(session, read,
+	WT_RET(__wt_verbose(session, WT_VERB_READ,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
-	    (uintmax_t)offset, size, cksum);
+	    (uintmax_t)offset, size, cksum));
 
 	/*
 	 * Grow the buffer as necessary and read the block.  Buffers should be
