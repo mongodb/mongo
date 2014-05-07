@@ -1835,7 +1835,8 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
  *	Handle the raw compression page reconciliation bookkeeping.
  */
 static int
-__rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
+__rec_split_raw_worker(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, int no_more_rows)
 {
 	WT_BM *bm;
 	WT_BOUNDARY *last, *next;
@@ -1850,7 +1851,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	size_t corrected_page_size, len, result_len;
 	uint64_t recno;
 	uint32_t entry, i, result_slots, slots;
-	int single;
+	int last_block;
 	uint8_t *dsk_start;
 
 	wt_session = (WT_SESSION *)session;
@@ -1956,10 +1957,10 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 * If we haven't managed to find at least one split point, we're done,
 	 * don't bother calling the underlying compression function.
 	 */
-	if (slots == 0 && final)
-		goto too_small;
-	if (slots == 0)
-		goto more_rows;
+	if (slots == 0) {
+		result_slots = 0;
+		goto no_slots;
+	}
 
 	/* The slot at array's end is the total length of the data. */
 	r->raw_offsets[++slots] =
@@ -2005,22 +2006,29 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
-	    result_len, final, &result_len, &result_slots);
+	    result_len, no_more_rows, &result_len, &result_slots);
 	if (ret == EAGAIN) {
 		ret = 0;
-		if (!final)
-			goto more_rows;
 		result_slots = 0;
 	}
 	WT_ERR(ret);
 
-	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
-	if (result_slots != 0) {
-		WT_STAT_FAST_DATA_INCR(session, compress_raw_ok);
+no_slots:
+	/*
+	 * Check for the last block we're going to write: if no more rows and
+	 * we failed to compress anything, or we compressed everything, it's
+	 * the last block.
+	 */
+	last_block = no_more_rows &&
+	    (result_slots == 0 || result_slots == slots);
 
+	if (result_slots != 0) {
 		/*
 		 * Compression succeeded: finalize the header information.
 		 */
+		WT_STAT_FAST_DATA_INCR(session, compress_raw_ok);
+
+		dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 		dsk_dst = dst->mem;
 		dsk_dst->recno = last->recno;
 		dsk_dst->mem_size =
@@ -2059,19 +2067,19 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
 			next->recno = 0;
-			if (!final)
+			if (!last_block)
 				WT_ERR(__rec_split_row_promote_cell(
 				    session, dsk, &next->key));
 			break;
 		}
 		last->already_compressed = 1;
-	} else if (final) {
-		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
-
-too_small:	/*
+	} else if (no_more_rows) {
+		/*
 		 * Compression wasn't even attempted, or failed and there are no
 		 * more rows to accumulate, write the original buffer instead.
 		 */
+		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
+
 		dsk->recno = last->recno;
 		dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
 		dsk->u.entries = r->entries;
@@ -2082,12 +2090,13 @@ too_small:	/*
 
 		last->already_compressed = 0;
 	} else {
+		/*
+		 * Compression wasn't even attempted, or failed and there are
+		 * more rows to accumulate; increase the size of the "page" and
+		 * try again after we accumulate some more rows.
+		 */
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail_temporary);
 
-more_rows:	/*
-		 * Compression failed, increase the size of the "page" and try
-		 * again after we accumulate some more rows.
-		 */
 		len = WT_PTRDIFF(r->first_free, r->dsk.mem);
 		corrected_page_size = r->page_size * 2;
 		WT_ERR(bm->write_size(bm, session, &corrected_page_size));
@@ -2103,35 +2112,32 @@ more_rows:	/*
 	++r->bnd_next;
 
 	/*
-	 * Check for writing the whole page in our first/only attempt.
-	 */
-	single = final && r->entries == 0 && r->bnd_next == 1;
-
-	/*
 	 * If we're doing an eviction, and we skipped an update, it only pays
 	 * off to continue if we're writing multiple blocks, that is, we'll be
 	 * able to evict something.  This should be unlikely (why did eviction
 	 * choose a recently written, small block), but it's possible.
 	 */
-	if (single && F_ISSET(r, WT_SKIP_UPDATE_RESTORE) && r->leave_dirty) {
+	if (r->bnd_next == 1 && last_block &&
+	    F_ISSET(r, WT_SKIP_UPDATE_RESTORE) && r->leave_dirty) {
 		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
 		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
 		WT_ERR(EBUSY);
 	}
 
 	/*
-	 * If it's a checkpoint, copy any compressed version of the page into
-	 * the original buffer, the wrapup functions will perform the actual
-	 * write from that buffer.  If not a checkpoint, write the newly created
-	 * compressed page.
+	 * If we are writing the whole page in our first/only attempt, it might
+	 * be a checkpoint.  In the case of a checkpoint, copy any compressed
+	 * version of the page into the original buffer, the wrapup functions
+	 * will perform the actual write from that buffer.  If not a checkpoint,
+	 * write the newly created compressed page.
 	 */
-	if (single && __rec_is_checkpoint(r, last)) {
+	if (r->bnd_next == 1 && last_block && __rec_is_checkpoint(r, last)) {
 		if (last->already_compressed)
 			WT_ERR(__wt_buf_set(
 			    session, &r->dsk, dst->mem, dst->size));
 	} else
-		WT_ERR(__rec_split_write(session,
-		    r, last, last->already_compressed ? dst : &r->dsk, final));
+		WT_ERR(__rec_split_write(session, r, last,
+		    last->already_compressed ? dst : &r->dsk, last_block));
 
 done:
 err:	__wt_scr_free(&dst);
@@ -2374,7 +2380,7 @@ err:	__wt_scr_free(&tmp);
  */
 static int
 __rec_split_write(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int final)
+    WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int last_block)
 {
 	WT_BTREE *btree;
 	WT_DECL_ITEM(key);
@@ -2430,12 +2436,12 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	 * any to the per-block structure.  Quit as soon as we find a skipped
 	 * update that doesn't belong to the block, they're in sorted order.
 	 *
-	 * This code requires a key be filled in for the next block (or final
-	 * be set, if there's no next block).
+	 * This code requires a key be filled in for the next block (or the
+	 * last block flag be set, if there's no next block).
 	 */
 	for (i = 0, skip = r->skip; i < r->skip_next; ++i, ++skip) {
-		/* The final block gets all remaining skipped updates. */
-		if (final) {
+		/* The last block gets all remaining skipped updates. */
+		if (last_block) {
 			WT_ERR(__rec_skip_update_move(session, bnd, skip));
 			continue;
 		}
