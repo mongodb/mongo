@@ -1030,7 +1030,15 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if ((ret = __wt_config_gets(session, cfg, "verbose", &cval)) != 0)
 		return (ret == WT_NOTFOUND ? 0 : ret);
-#ifdef HAVE_VERBOSE
+
+#ifndef HAVE_VERBOSE
+	WT_RET(__wt_msg(session,
+	    "Verbose option specified when WiredTiger built without verbose "
+	    "support. Add --enable-verbose to configure command and rebuild "
+	    "to include support for verbose messages"));
+	return (0);
+#endif
+
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
@@ -1040,12 +1048,6 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_RET_NOTFOUND_OK(ret);
 	}
-#else
-	WT_RET(__wt_msg(session,
-	    "Verbose option specified when WiredTiger built without verbose "
-	    "support. Add --enable-verbose to configure command and rebuild "
-	    "to include support for verbose messages"));
-#endif
 	return (0);
 }
 
