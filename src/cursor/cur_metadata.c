@@ -402,8 +402,8 @@ err:	API_END(session, ret);
  * Metadata cursors are a similar to a file cursor on the special metadata
  * table, except that the metadata for the metadata table (which is stored
  * in the turtle file) can also be queried.
+ *
  * Metadata cursors are read-only default.
- * updateable.
  */
 int
 __wt_curmetadata_open(WT_SESSION_IMPL *session,
