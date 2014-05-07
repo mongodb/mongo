@@ -2022,6 +2022,20 @@ no_slots:
 	last_block = no_more_rows &&
 	    (result_slots == 0 || result_slots == slots);
 
+	/*
+	 * If not the last block and the compression function ate it all, there
+	 * are problems: First, with row-store objects where we're potentially
+	 * skipping updates, we have to have a key for the next block so we can
+	 * figure out with what block a skipped update is associated.  Second,
+	 * if the compression function compressed all of the data, we're not
+	 * pushing it hard enough (unless we got lucky and gave it exactly the
+	 * right amount to work with).  We deal with both of these problems by
+	 * accumulating more data any time we're not writing the last block and
+	 * the compression function took all of the data.
+	 */
+	if (!last_block && result_slots == slots)
+		result_slots = 0;
+
 	if (result_slots != 0) {
 		/*
 		 * Compression succeeded: finalize the header information.
@@ -2036,9 +2050,9 @@ no_slots:
 		dsk_dst->u.entries = r->raw_entries[result_slots - 1];
 
 		/*
-		 * There may be a remnant in the working buffer that didn't get
-		 * compressed; copy it down to the start of the working buffer
-		 * and update the starting record number, free space and so on.
+		 * There is likely a remnant in the working buffer that didn't
+		 * get compressed; copy it down to the start of the buffer and
+		 * update the starting record number, free space and so on.
 		 * !!!
 		 * Note use of memmove, the source and destination buffers can
 		 * overlap.
@@ -2054,7 +2068,7 @@ no_slots:
 		    r->page_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
 
 		/*
-		 * Set the key for the next chunk (before writing the block, a
+		 * Set the key for the next block (before writing the block, a
 		 * key range is needed in that code).
 		 */
 		switch (dsk->type) {
@@ -2067,9 +2081,16 @@ no_slots:
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
 			next->recno = 0;
-			if (!last_block)
+			if (!last_block) {
+				/*
+				 * Confirm there was uncompressed data remaining
+				 * in the buffer, we're about to read it for the
+				 * next chunk's initial key.
+				 */
+				WT_ASSERT(session, len > 0);
 				WT_ERR(__rec_split_row_promote_cell(
 				    session, dsk, &next->key));
+			}
 			break;
 		}
 		last->already_compressed = 1;
@@ -2108,7 +2129,7 @@ no_slots:
 		goto done;
 	}
 
-	/* We have a chunk, update the boundary counter. */
+	/* We have a block, update the boundary counter. */
 	++r->bnd_next;
 
 	/*
