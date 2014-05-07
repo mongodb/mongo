@@ -314,7 +314,6 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	    __curdump_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_DUMP *cdump;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	const char *cfg[2];
 
