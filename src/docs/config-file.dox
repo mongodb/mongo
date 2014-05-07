@@ -51,4 +51,13 @@ If the process is running with special privileges and \c WIREDTIGER_CONFIG
 is set, the ::wiredtiger_open function must be configured with the
 \c use_environment_priv flag, or the call to ::wiredtiger_open will fail.
 See @ref home for more details.
+
+@section config_base WiredTiger.basecfg file
+
+When a database is created, the config string passed to `wiredtiger_open`
+is saved to a file called \c WiredTiger.basecfg.  This configuration is
+read when the database is subsequntly opened.  Users should not edit this
+file, create a @ref config_file instead: settings there wil override
+\c WiredTiger.basecfg.
+
 */
