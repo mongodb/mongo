@@ -1034,14 +1034,15 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0) {
-#ifndef HAVE_VERBOSE
+#ifdef HAVE_VERBOSE
+			FLD_SET(conn->verbose, ft->flag);
+#else
 			WT_RET_MSG(session, EINVAL,
 			    "Verbose option specified when WiredTiger built "
 			    "without verbose support. Add --enable-verbose to "
 			    "configure command and rebuild to include support "
 			    "for verbose messages");
 #endif
-			FLD_SET(conn->verbose, ft->flag);
 		} else
 			FLD_CLR(conn->verbose, ft->flag);
 
