@@ -118,9 +118,6 @@ namespace mongo {
 
         // Network Options
 
-        general_options.addOptionChaining("net.ipv6", "ipv6", moe::Switch,
-                "enable IPv6 support (disabled by default)");
-
         general_options.addOptionChaining("net.http.JSONPEnabled", "jsonp", moe::Switch,
                 "allow JSONP access via http (has security implications)");
 
@@ -458,17 +455,20 @@ namespace mongo {
 
     bool handlePreValidationMongodOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args) {
-        if (params.count("help")) {
+        if (params.count("help") &&
+            params["help"].as<bool>() == true) {
             printMongodHelp(moe::startupOptions);
             return false;
         }
-        if (params.count("version")) {
+        if (params.count("version") &&
+            params["version"].as<bool>() == true) {
             cout << mongodVersion() << endl;
             printGitVersion();
             printOpenSSLVersion();
             return false;
         }
-        if (params.count("sysinfo")) {
+        if (params.count("sysinfo") &&
+            params["sysinfo"].as<bool>() == true) {
             sysRuntimeInfo();
             return false;
         }
@@ -491,7 +491,8 @@ namespace mongo {
 
         // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in all cases in the
         // future
-        if (params.count("net.http.RESTInterfaceEnabled")) {
+        if (params.count("net.http.RESTInterfaceEnabled") &&
+            params["net.http.RESTInterfaceEnabled"].as<bool>() == true) {
 
             // If we are explicitly setting httpinterface to false in the config file (the source of
             // "net.http.enabled") and not overriding it on the command line (the source of
@@ -505,7 +506,8 @@ namespace mongo {
             }
         }
 
-        if (params.count("net.http.JSONPEnabled")) {
+        if (params.count("net.http.JSONPEnabled") &&
+            params["net.http.JSONPEnabled"].as<bool>() == true) {
 
             // If we are explicitly setting httpinterface to false in the config file (the source of
             // "net.http.enabled") and not overriding it on the command line (the source of
@@ -527,7 +529,8 @@ namespace mongo {
         // Need to handle this before canonicalizing the general "server options", since
         // httpinterface and nohttpinterface are shared between mongos and mongod, but mongod has
         // extra validation required.
-        if (params->count("net.http.RESTInterfaceEnabled")) {
+        if (params->count("net.http.RESTInterfaceEnabled") &&
+            (*params)["net.http.RESTInterfaceEnabled"].as<bool>() == true) {
             bool httpEnabled = false;
             if (params->count("net.http.enabled")) {
                 Status ret = params->get("net.http.enabled", &httpEnabled);
@@ -551,7 +554,8 @@ namespace mongo {
             }
         }
 
-        if (params->count("net.http.JSONPEnabled")) {
+        if (params->count("net.http.JSONPEnabled") &&
+            (*params)["net.http.JSONPEnabled"].as<bool>() == true) {
             if (params->count("nohttpinterface")) {
                 log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface" <<
                     startupWarningsLog;
@@ -581,12 +585,20 @@ namespace mongo {
 
         // "storage.journal.enabled" comes from the config file, so override it if any of "journal",
         // "nojournal", "dur", and "nodur" are set, since those come from the command line.
-        if (params->count("nodur") || params->count("nojournal")) {
-            Status ret = params->set("storage.journal.enabled", moe::Value(false));
+        if (params->count("journal")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value((*params)["journal"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
-            ret = params->remove("nodur");
+            ret = params->remove("journal");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+        if (params->count("nojournal")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value(!(*params)["nojournal"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -595,9 +607,9 @@ namespace mongo {
                 return ret;
             }
         }
-
-        if (params->count("dur") || params->count("journal")) {
-            Status ret = params->set("storage.journal.enabled", moe::Value(true));
+        if (params->count("dur")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value((*params)["dur"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -605,7 +617,14 @@ namespace mongo {
             if (!ret.isOK()) {
                 return ret;
             }
-            ret = params->remove("journal");
+        }
+        if (params->count("nodur")) {
+            Status ret = params->set("storage.journal.enabled",
+                                     moe::Value(!(*params)["nodur"].as<bool>()));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("nodur");
             if (!ret.isOK()) {
                 return ret;
             }
@@ -633,7 +652,9 @@ namespace mongo {
         // "auth" are set since those come from the command line.
         if (params->count("noauth")) {
             Status ret = params->set("security.authorization",
-                                     moe::Value(std::string("disabled")));
+                                     (*params)["noauth"].as<bool>() ?
+                                        moe::Value(std::string("disabled")) :
+                                        moe::Value(std::string("enabled")));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -644,7 +665,9 @@ namespace mongo {
         }
         if (params->count("auth")) {
             Status ret = params->set("security.authorization",
-                                     moe::Value(std::string("enabled")));
+                                     (*params)["auth"].as<bool>() ?
+                                        moe::Value(std::string("enabled")) :
+                                        moe::Value(std::string("disabled")));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -657,7 +680,8 @@ namespace mongo {
         // "storage.preallocDataFiles" comes from the config file, so override it if "noprealloc" is
         // set since that comes from the command line.
         if (params->count("noprealloc")) {
-            Status ret = params->set("storage.preallocDataFiles", moe::Value(false));
+            Status ret = params->set("storage.preallocDataFiles",
+                                     moe::Value(!(*params)["noprealloc"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -670,7 +694,8 @@ namespace mongo {
         // "sharding.archiveMovedChunks" comes from the config file, so override it if
         // "noMoveParanoia" or "moveParanoia" are set since those come from the command line.
         if (params->count("noMoveParanoia")) {
-            Status ret = params->set("sharding.archiveMovedChunks", moe::Value(false));
+            Status ret = params->set("sharding.archiveMovedChunks",
+                                     moe::Value(!(*params)["noMoveParanoia"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -680,7 +705,8 @@ namespace mongo {
             }
         }
         if (params->count("moveParanoia")) {
-            Status ret = params->set("sharding.archiveMovedChunks", moe::Value(true));
+            Status ret = params->set("sharding.archiveMovedChunks",
+                                     moe::Value((*params)["moveParanoia"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -693,6 +719,12 @@ namespace mongo {
         // "sharding.clusterRole" comes from the config file, so override it if "configsvr" or
         // "shardsvr" are set since those come from the command line.
         if (params->count("configsvr")) {
+            if ((*params)["configsvr"].as<bool>() == false) {
+                // Handle the case where "configsvr" comes from the legacy config file and is set to
+                // false.  This option is not allowed in the YAML config.
+                return Status(ErrorCodes::BadValue,
+                              "configsvr option cannot be set to false in config file");
+            }
             Status ret = params->set("sharding.clusterRole", moe::Value(std::string("configsvr")));
             if (!ret.isOK()) {
                 return ret;
@@ -703,6 +735,12 @@ namespace mongo {
             }
         }
         if (params->count("shardsvr")) {
+            if ((*params)["shardsvr"].as<bool>() == false) {
+                // Handle the case where "shardsvr" comes from the legacy config file and is set to
+                // false.  This option is not allowed in the YAML config.
+                return Status(ErrorCodes::BadValue,
+                              "shardsvr option cannot be set to false in config file");
+            }
             Status ret = params->set("sharding.clusterRole", moe::Value(std::string("shardsvr")));
             if (!ret.isOK()) {
                 return ret;
@@ -748,7 +786,8 @@ namespace mongo {
         // "storage.indexBuildRetry" comes from the config file, so override it if
         // "noIndexBuildRetry" is set since that comes from the command line.
         if (params->count("noIndexBuildRetry")) {
-            Status ret = params->set("storage.indexBuildRetry", moe::Value(false));
+            Status ret = params->set("storage.indexBuildRetry",
+                                     moe::Value(!(*params)["noIndexBuildRetry"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -840,10 +879,10 @@ namespace mongo {
         }
 
         if (params.count("storage.directoryPerDB")) {
-            storageGlobalParams.directoryperdb = true;
+            storageGlobalParams.directoryperdb = params["storage.directoryPerDB"].as<bool>();
         }
         if (params.count("cpu")) {
-            serverGlobalParams.cpu = true;
+            serverGlobalParams.cpu = params["cpu"].as<bool>();
         }
         if (params.count("security.authorization") &&
             params["security.authorization"].as<std::string>() == "disabled") {
@@ -854,7 +893,7 @@ namespace mongo {
             getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
         if (params.count("storage.quota.enforced")) {
-            storageGlobalParams.quota = true;
+            storageGlobalParams.quota = params["storage.quota.enforced"].as<bool>();
         }
         if (params.count("storage.quota.maxFilesPerDB")) {
             storageGlobalParams.quota = true;
@@ -881,27 +920,27 @@ namespace mongo {
             storageGlobalParams.durOptions = params["storage.journal.debugFlags"].as<int>();
         }
         if (params.count("nohints")) {
-            storageGlobalParams.useHints = false;
+            storageGlobalParams.useHints = !params["nohints"].as<bool>();
         }
         if (params.count("nopreallocj")) {
-            storageGlobalParams.preallocj = false;
+            storageGlobalParams.preallocj = params["nopreallocj"].as<bool>();
         }
 
         if (params.count("net.http.RESTInterfaceEnabled")) {
-            serverGlobalParams.rest = true;
+            serverGlobalParams.rest = params["net.http.RESTInterfaceEnabled"].as<bool>();
         }
         if (params.count("net.http.JSONPEnabled")) {
-            serverGlobalParams.jsonp = true;
+            serverGlobalParams.jsonp = params["net.http.JSONPEnabled"].as<bool>();
         }
         if (params.count("noscripting")) {
-            mongodGlobalParams.scriptingEnabled = false;
+            mongodGlobalParams.scriptingEnabled = !params["noscripting"].as<bool>();
         }
         if (params.count("storage.preallocDataFiles")) {
             storageGlobalParams.prealloc = params["storage.preallocDataFiles"].as<bool>();
             cout << "note: noprealloc may hurt performance in many applications" << endl;
         }
         if (params.count("storage.smallFiles")) {
-            storageGlobalParams.smallfiles = true;
+            storageGlobalParams.smallfiles = params["storage.smallFiles"].as<bool>();
         }
         if (params.count("diaglog")) {
             warning() << "--diaglog is deprecated and will be removed in a future release";
@@ -918,31 +957,31 @@ namespace mongo {
                           "Can't have journaling enabled when using --repair option.");
         }
 
-        if (params.count("repair")) {
+        if (params.count("repair") && params["repair"].as<bool>() == true) {
             mongodGlobalParams.upgrade = 1; // --repair implies --upgrade
             mongodGlobalParams.repair = 1;
             storageGlobalParams.dur = false;
         }
-        if (params.count("upgrade")) {
+        if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
             mongodGlobalParams.upgrade = 1;
         }
         if (params.count("notablescan")) {
-            storageGlobalParams.noTableScan = true;
+            storageGlobalParams.noTableScan = params["notablescan"].as<bool>();
         }
         if (params.count("master")) {
-            replSettings.master = true;
+            replSettings.master = params["master"].as<bool>();
         }
-        if (params.count("slave")) {
+        if (params.count("slave") && params["slave"].as<bool>() == true) {
             replSettings.slave = SimpleSlave;
         }
         if (params.count("slavedelay")) {
             replSettings.slavedelay = params["slavedelay"].as<int>();
         }
         if (params.count("fastsync")) {
-            replSettings.fastsync = true;
+            replSettings.fastsync = params["fastsync"].as<bool>();
         }
         if (params.count("autoresync")) {
-            replSettings.autoresync = true;
+            replSettings.autoresync = params["autoresync"].as<bool>();
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
@@ -1042,9 +1081,6 @@ namespace mongo {
             replSettings.master = true;
             if (!params.count("replication.oplogSizeMB"))
                 replSettings.oplogSize = 5 * 1024 * 1024;
-        }
-        if (params.count("net.ipv6")) {
-            enableIPv6();
         }
 
         if (params.count("sharding.archiveMovedChunks")) {

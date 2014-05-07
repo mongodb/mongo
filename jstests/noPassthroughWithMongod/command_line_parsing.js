@@ -20,7 +20,10 @@ var m2expected = {
         },
         "net" : {
             "port" : 31002
-        }
+        },
+        "help" : false,
+        "version" : false,
+        "sysinfo" : false
     }
 };
 var m2result = m2.getDB("admin").runCommand( "getCmdLineOpts" );
@@ -42,7 +45,10 @@ var m3expected = {
         },
         "net" : {
             "port" : 31004
-        }
+        },
+        "help" : false,
+        "version" : false,
+        "sysinfo" : false
     }
 };
 var m3result = m3.getDB("admin").runCommand( "getCmdLineOpts" );

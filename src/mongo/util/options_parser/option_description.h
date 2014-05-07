@@ -27,6 +27,9 @@ namespace optionenvironment {
 
     /**
      * An OptionType is an enum of all the types we support in the OptionsParser
+     *
+     * NOTE(sverch): The semantics of "Switch" options are completely identical to "Bool" options,
+     * except that on the command line they do not take a value.
      */
     enum OptionType {
         StringVector,     // po::value< std::vector<std::string> >

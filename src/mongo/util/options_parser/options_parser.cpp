@@ -221,10 +221,7 @@ namespace optionenvironment {
                         return Status::OK();
                     }
                     else if (stringVal == "false") {
-                        // XXX: Don't set switches that are false, to maintain backwards
-                        // compatibility with the old behavior since some code depends on this
-                        // behavior
-                        *value = Value();
+                        *value = Value(false);
                         return Status::OK();
                     }
                     else {
@@ -343,19 +340,6 @@ namespace optionenvironment {
                     Status ret = boostAnyToValue(vm[long_name].value(), &optionValue);
                     if (!ret.isOK()) {
                         return ret;
-                    }
-
-                    // XXX: Don't set switches that are false, to maintain backwards compatibility
-                    // with the old behavior during the transition to the new parser
-                    if (iterator->_type == Switch) {
-                        bool value;
-                        ret = optionValue.get(&value);
-                        if (!ret.isOK()) {
-                            return ret;
-                        }
-                        if (!value) {
-                            continue;
-                        }
                     }
 
                     // If this is really a StringMap, try to split on "key=value" for each element
@@ -595,6 +579,45 @@ namespace optionenvironment {
             return Status::OK();
         }
 
+        /**
+         *  Remove any options of type "Switch" that are set to false.  This is needed because boost
+         *  defaults switches to false, and we need to be able to tell the difference between
+         *  whether an option is set explicitly to false in config files or not present at all.
+         */
+        Status removeFalseSwitches(const OptionSection& options, Environment* environment) {
+            std::vector<OptionDescription> options_vector;
+            Status ret = options.getAllOptions(&options_vector);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
+                 iterator != options_vector.end(); iterator++) {
+
+                if (iterator->_type == Switch) {
+                    bool switchValue;
+                    Status ret = environment->get(iterator->_dottedName, &switchValue);
+                    if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
+                        StringBuilder sb;
+                        sb << "Error getting switch value for option: " << iterator->_dottedName
+                           << " from source: " << ret.toString();
+                        return Status(ErrorCodes::InternalError, sb.str());
+                    }
+                    else if (ret.isOK() && switchValue == false) {
+                        Status ret = environment->remove(iterator->_dottedName);
+                        if (!ret.isOK()) {
+                            StringBuilder sb;
+                            sb << "Error removing false flag: " << iterator->_dottedName << ": "
+                               << ret.toString();
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+                    }
+                }
+            }
+
+            return Status::OK();
+        }
+
     } // namespace
 
     /**
@@ -673,6 +696,14 @@ namespace optionenvironment {
             sb << "Error parsing command line: " << e.what();
             return Status(ErrorCodes::BadValue, sb.str());
         }
+
+        // This is needed because "switches" default to false in boost, and we don't want to
+        // erroneously think that they were present but set to false in a config file.
+        ret = removeFalseSwitches(options, environment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
         return Status::OK();
     }
 

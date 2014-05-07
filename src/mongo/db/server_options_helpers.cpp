@@ -159,6 +159,9 @@ namespace {
         options->addOptionChaining("net.bindIp", "bind_ip", moe::String,
                 "comma separated list of ip addresses to listen on - all local ips by default");
 
+        options->addOptionChaining("net.ipv6", "ipv6", moe::Switch,
+                "enable IPv6 support (disabled by default)");
+
         options->addOptionChaining("net.maxIncomingConnections", "maxConns", moe::Int,
                 maxConnInfoBuilder.str().c_str());
 
@@ -181,7 +184,7 @@ namespace {
 #ifndef _WIN32
         options->addOptionChaining("syslog", "syslog", moe::Switch,
                 "log to system's syslog facility instead of file or stdout")
-                                  .incompatibleWith("systemLog.logpath")
+                                  .incompatibleWith("logpath")
                                   .setSources(moe::SourceAllLegacy);
 
         options->addOptionChaining("systemLog.syslogFacility", "syslogFacility", moe::String,
@@ -405,7 +408,8 @@ namespace {
         // "net.wireObjectCheck" comes from the config file, so override it if either "objcheck" or
         // "noobjcheck" are set, since those come from the command line.
         if (params->count("objcheck")) {
-            Status ret = params->set("net.wireObjectCheck", moe::Value(true));
+            Status ret = params->set("net.wireObjectCheck",
+                                     moe::Value((*params)["objcheck"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -416,7 +420,8 @@ namespace {
         }
 
         if (params->count("noobjcheck")) {
-            Status ret = params->set("net.wireObjectCheck", moe::Value(false));
+            Status ret = params->set("net.wireObjectCheck",
+                                     moe::Value(!(*params)["noobjcheck"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -429,7 +434,8 @@ namespace {
         // "net.http.enabled" comes from the config file, so override it if "nohttpinterface" or
         // "httpinterface" are set since those come from the command line.
         if (params->count("nohttpinterface")) {
-            Status ret = params->set("net.http.enabled", moe::Value(false));
+            Status ret = params->set("net.http.enabled",
+                                     moe::Value(!(*params)["nohttpinterface"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -439,7 +445,8 @@ namespace {
             }
         }
         if (params->count("httpinterface")) {
-            Status ret = params->set("net.http.enabled", moe::Value(true));
+            Status ret = params->set("net.http.enabled",
+                                     moe::Value((*params)["httpinterface"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -452,7 +459,8 @@ namespace {
         // "net.unixDomainSocket.enabled" comes from the config file, so override it if
         // "nounixsocket" is set since that comes from the command line.
         if (params->count("nounixsocket")) {
-            Status ret = params->set("net.unixDomainSocket.enabled", moe::Value(false));
+            Status ret = params->set("net.unixDomainSocket.enabled",
+                                     moe::Value(!(*params)["nounixsocket"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -466,7 +474,7 @@ namespace {
         // that we ensure that we set the log level to the maximum of the options provided
         int logLevel = -1;
         for (std::string s = ""; s.length() <= 14; s.append("v")) {
-            if (!s.empty() && params->count(s)) {
+            if (!s.empty() && params->count(s) && (*params)[s].as<bool>() == true) {
                 logLevel = s.length();
             }
 
@@ -523,7 +531,7 @@ namespace {
 
         // "systemLog.destination" comes from the config file, so override it if "syslog" is set
         // since that comes from the command line.
-        if (params->count("syslog")) {
+        if (params->count("syslog") && (*params)["syslog"].as<bool>() == true) {
             Status ret = params->set("systemLog.destination", moe::Value(std::string("syslog")));
             if (!ret.isOK()) {
                 return ret;
@@ -578,10 +586,12 @@ namespace {
         }
 
         if (params.count("enableExperimentalIndexStatsCmd")) {
-            serverGlobalParams.experimental.indexStatsCmdEnabled = true;
+            serverGlobalParams.experimental.indexStatsCmdEnabled =
+                params["enableExperimentalIndexStatsCmd"].as<bool>();
         }
         if (params.count("enableExperimentalStorageDetailsCmd")) {
-            serverGlobalParams.experimental.storageDetailsCmdEnabled = true;
+            serverGlobalParams.experimental.storageDetailsCmdEnabled =
+                params["enableExperimentalStorageDetailsCmd"].as<bool>();
         }
 
         if (params.count("net.port")) {
@@ -590,6 +600,10 @@ namespace {
 
         if (params.count("net.bindIp")) {
             serverGlobalParams.bind_ip = params["net.bindIp"].as<std::string>();
+        }
+
+        if (params.count("net.ipv6") && params["net.ipv6"].as<bool>() == true) {
+            enableIPv6();
         }
 
         if (params.count("net.http.enabled")) {
@@ -624,11 +638,11 @@ namespace {
         }
 
         if (params.count("systemLog.quiet")) {
-            serverGlobalParams.quiet = true;
+            serverGlobalParams.quiet = params["systemLog.quiet"].as<bool>();
         }
 
         if (params.count("systemLog.traceAllExceptions")) {
-            DBException::traceExceptions = true;
+            DBException::traceExceptions = params["systemLog.traceAllExceptions"].as<bool>();
         }
 
         if (params.count("net.maxIncomingConnections")) {
@@ -661,7 +675,9 @@ namespace {
             serverGlobalParams.noUnixSocket = !params["net.unixDomainSocket.enabled"].as<bool>();
         }
 
-        if (params.count("processManagement.fork") && !params.count("shutdown")) {
+        if ((params.count("processManagement.fork") &&
+             params["processManagement.fork"].as<bool>() == true) &&
+            (!params.count("shutdown") || params["shutdown"].as<bool>() == false)) {
             serverGlobalParams.doFork = true;
         }
 #endif  // _WIN32
@@ -745,7 +761,11 @@ namespace {
         }
 #endif // _WIN32
 
-        serverGlobalParams.logAppend = params.count("systemLog.logAppend");
+        if (params.count("systemLog.logAppend") &&
+            params["systemLog.logAppend"].as<bool>() == true) {
+            serverGlobalParams.logAppend = true;
+        }
+
         if (!serverGlobalParams.logpath.empty() && serverGlobalParams.logWithSyslog) {
             return Status(ErrorCodes::BadValue, "Cant use both a logpath and syslog ");
         }

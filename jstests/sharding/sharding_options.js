@@ -97,4 +97,42 @@ expectedResult = {
 testGetCmdLineOptsMongos({ config : "jstests/libs/config_files/enable_autosplit.json" },
                          expectedResult);
 
+// Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
+jsTest.log("Testing explicitly disabled \"moveParanoia\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/disable_moveparanoia.ini",
+        "sharding" : {
+            "archiveMovedChunks" : false
+        }
+    }
+};
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/disable_moveparanoia.ini" },
+                         expectedResult);
+
+jsTest.log("Testing explicitly disabled \"noMoveParanoia\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/disable_nomoveparanoia.ini",
+        "sharding" : {
+            "archiveMovedChunks" : true
+        }
+    }
+};
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/disable_nomoveparanoia.ini" },
+                         expectedResult);
+
+jsTest.log("Testing explicitly disabled \"noAutoSplit\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/disable_noautosplit.ini",
+        "sharding" : {
+            "autoSplit" : true
+        }
+    }
+};
+testGetCmdLineOptsMongos({ config : "jstests/libs/config_files/disable_noautosplit.ini" },
+                         expectedResult);
+
+
 print(baseName + " succeeded.");

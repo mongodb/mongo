@@ -39,4 +39,27 @@ expectedResult = {
 };
 testGetCmdLineOptsMongod({}, expectedResult);
 
+// Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
+jsTest.log("Testing explicitly disabled \"auth\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/disable_auth.ini",
+        "security" : {
+            "authorization" : "disabled"
+        }
+    }
+};
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/disable_auth.ini" }, expectedResult);
+
+jsTest.log("Testing explicitly disabled \"noauth\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/disable_noauth.ini",
+        "security" : {
+            "authorization" : "enabled"
+        }
+    }
+};
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/disable_noauth.ini" }, expectedResult);
+
 print(baseName + " succeeded.");

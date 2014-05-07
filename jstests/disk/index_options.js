@@ -32,4 +32,16 @@ expectedResult = {
 };
 testGetCmdLineOptsMongod({}, expectedResult);
 
+jsTest.log("Testing explicitly disabled \"noIndexBuildRetry\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/disable_noindexbuildretry.ini",
+        "storage" : {
+            "indexBuildRetry" : true
+        }
+    }
+};
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/disable_noindexbuildretry.ini" },
+                   expectedResult);
+
 print(baseName + " succeeded.");

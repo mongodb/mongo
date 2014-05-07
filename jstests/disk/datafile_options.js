@@ -32,4 +32,17 @@ expectedResult = {
 };
 testGetCmdLineOptsMongod({}, expectedResult);
 
+// Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
+jsTest.log("Testing explicitly disabled \"noprealloc\" config file option");
+expectedResult = {
+    "parsed" : {
+        "config" : "jstests/libs/config_files/disable_noprealloc.ini",
+        "storage" : {
+            "preallocDataFiles" : true
+        }
+    }
+};
+testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/disable_noprealloc.ini" },
+                         expectedResult);
+
 print(baseName + " succeeded.");

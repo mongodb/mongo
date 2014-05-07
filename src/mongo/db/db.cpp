@@ -867,7 +867,8 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 #endif  // _WIN32
 
 #ifdef __linux__
-    if (moe::startupOptionsParsed.count("shutdown")){
+    if (moe::startupOptionsParsed.count("shutdown") &&
+        moe::startupOptionsParsed["shutdown"].as<bool>() == true) {
         bool failed = false;
 
         string name = (boost::filesystem::path(storageGlobalParams.dbpath) / "mongod.lock").string();
