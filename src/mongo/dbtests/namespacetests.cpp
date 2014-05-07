@@ -246,7 +246,7 @@ namespace NamespaceTests {
                 }
                 ASSERT( !deleted.isNull() );
 
-                const RecordStore* rs = collection()->getRecordStore();
+                const RecordStoreV1Base* rs = cheatRecordStore();
 
                 // Shrink the DeletedRecord's size to newDeletedRecordSize.
                 ASSERT_GREATER_THAN_OR_EQUALS( rs->deletedRecordFor( deleted )->lengthWithHeaders(),
@@ -575,7 +575,7 @@ namespace NamespaceTests {
                 create();
                 cookDeletedList( 344 );
 
-                const RecordStore* rs = collection()->getRecordStore();
+                const RecordStoreV1Base* rs = cheatRecordStore();
 
                 // The returned record is quantized from 300 to 320.
                 StatusWith<DiskLoc> actualLocation = collection()->insertDocument( &txn,

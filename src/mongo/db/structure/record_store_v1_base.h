@@ -144,8 +144,7 @@ namespace mongo {
 
         virtual Status touch( TransactionExperiment* txn, BSONObjBuilder* output ) const;
 
-        // TODO: another sad one
-        virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
+        const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
         const RecordStoreV1MetaData* details() const { return _details.get(); }
 

@@ -172,9 +172,6 @@ namespace mongo {
         // do not use this anymore
         virtual void increaseStorageSize( TransactionExperiment* txn,  int size, int quotaMax ) = 0;
 
-        // TODO: another sad one
-        virtual const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const = 0;
-
     protected:
         std::string _ns;
     };
