@@ -29,7 +29,7 @@
 	    WT_CURSTD_VALUE_EXT);					\
 } while (0)
 
-#define WT_MD_SET_KEY_VALUE(c, mc, fc) do {				\
+#define	WT_MD_SET_KEY_VALUE(c, mc, fc) do {				\
 	(c)->key.data = (fc)->key.data;					\
 	(c)->key.size = (fc)->key.size;					\
 	(c)->value.data = (fc)->value.data;				\
@@ -402,8 +402,8 @@ err:	API_END(session, ret);
  * Metadata cursors are a similar to a file cursor on the special metadata
  * table, except that the metadata for the metadata table (which is stored
  * in the turtle file) can also be queried.
+ *
  * Metadata cursors are read-only default.
- * updateable.
  */
 int
 __wt_curmetadata_open(WT_SESSION_IMPL *session,
