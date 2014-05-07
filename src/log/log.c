@@ -811,7 +811,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	rd_lsn = start_lsn;
 	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
 	do {
-		if (rd_lsn.offset >= log_size) {
+		if (rd_lsn.offset + allocsize > log_size) {
 advance:
 			/*
 			 * If we read the last record, go to the next file.
@@ -840,11 +840,6 @@ advance:
 		 * Read the minimum allocation size a record could be.
 		 */
 		WT_ASSERT(session, buf.memsize >= allocsize);
-		/*
-		 * The log file end could be the middle of a log record.
-		 */
-		if (rd_lsn.offset + allocsize > log_size)
-			goto advance;
 		WT_ERR(__wt_read(session,
 		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
 		/*
