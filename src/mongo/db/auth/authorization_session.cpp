@@ -451,7 +451,8 @@ namespace {
                         &updatedUser);
                 if (status.isOK()) {
                     if (user != updatedUser) {
-                        LOG(1) << "Updated session cache for V1 user " << name;
+                        LOG(1) << "Updated session cache with privileges on the " <<
+                                target.databaseToMatch() << " database for V1 user " << name;
                         fassert(17226, _authenticatedUsers.replaceAt(it, updatedUser) == user);
                     }
                     getAuthorizationManager().releaseUser(user);

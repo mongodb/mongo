@@ -781,7 +781,9 @@ namespace mongo {
                 _initializeUserPrivilegesFromRolesV1(user.get());
                 user->markProbedV1(dbname);
             }
-            else if (status != ErrorCodes::UserNotFound) {
+            else if (status == ErrorCodes::UserNotFound) {
+                user->markProbedV1(dbname);
+            } else {
                 return status;
             }
         }
