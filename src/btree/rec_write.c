@@ -53,6 +53,7 @@ typedef struct {
 	uint32_t *raw_entries;		/* Raw compression slot entries */
 	uint32_t *raw_offsets;		/* Raw compression slot offsets */
 	uint64_t *raw_recnos;		/* Raw compression recno count */
+	WT_ITEM	  raw_destination;	/* Raw compression destination buffer */
 
 	/*
 	 * Track if reconciliation has seen any overflow items.  If a leaf page
@@ -575,6 +576,7 @@ __rec_write_init(
 	    page->type != WT_PAGE_COL_FIX &&
 	    btree->dictionary == 0 &&
 	    btree->prefix_compression == 0;
+	r->raw_destination.flags = WT_ITEM_ALIGNED;
 
 	/* Track overflow items. */
 	r->ovfl_items = 0;
@@ -657,6 +659,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 	__wt_free(session, r->raw_entries);
 	__wt_free(session, r->raw_offsets);
 	__wt_free(session, r->raw_recnos);
+	__wt_free(session, r->raw_destination.mem);
 
 	__rec_bnd_cleanup(session, r, 1);
 
@@ -1844,8 +1847,8 @@ __rec_split_raw_worker(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COMPRESSOR *compressor;
-	WT_DECL_ITEM(dst);
 	WT_DECL_RET;
+	WT_ITEM *dst;
 	WT_PAGE_HEADER *dsk, *dsk_dst;
 	WT_SESSION *wt_session;
 	size_t corrected_page_size, len, result_len;
@@ -1857,8 +1860,10 @@ __rec_split_raw_worker(
 	wt_session = (WT_SESSION *)session;
 	btree = S2BT(session);
 	bm = btree->bm;
-	compressor = btree->compressor;
+
 	unpack = &_unpack;
+	compressor = btree->compressor;
+	dst = &r->raw_destination;
 	dsk = r->dsk.mem;
 
 	WT_RET(__rec_split_bnd_grow(session, r));
@@ -1994,7 +1999,7 @@ __rec_split_raw_worker(
 		    (size_t)r->raw_offsets[slots], &result_len));
 	corrected_page_size = result_len + WT_BLOCK_COMPRESS_SKIP;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
-	WT_RET(__wt_scr_alloc(session, corrected_page_size, &dst));
+	WT_RET(__wt_buf_init(session, dst, corrected_page_size));
 
 	/*
 	 * Copy the header bytes into the destination buffer, then call the
@@ -2011,7 +2016,7 @@ __rec_split_raw_worker(
 		ret = 0;
 		result_slots = 0;
 	}
-	WT_ERR(ret);
+	WT_RET(ret);
 
 no_slots:
 	/*
@@ -2088,7 +2093,7 @@ no_slots:
 				 * next chunk's initial key.
 				 */
 				WT_ASSERT(session, len > 0);
-				WT_ERR(__rec_split_row_promote_cell(
+				WT_RET(__rec_split_row_promote_cell(
 				    session, dsk, &next->key));
 			}
 			break;
@@ -2120,13 +2125,13 @@ no_slots:
 
 		len = WT_PTRDIFF(r->first_free, r->dsk.mem);
 		corrected_page_size = r->page_size * 2;
-		WT_ERR(bm->write_size(bm, session, &corrected_page_size));
-		WT_ERR(__wt_buf_grow(session, &r->dsk, corrected_page_size));
+		WT_RET(bm->write_size(bm, session, &corrected_page_size));
+		WT_RET(__wt_buf_grow(session, &r->dsk, corrected_page_size));
 		r->page_size *= 2;
 		r->first_free = (uint8_t *)r->dsk.mem + len;
 		r->space_avail =
 		    r->page_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
-		goto done;
+		return (0);
 	}
 
 	/* We have a block, update the boundary counter. */
@@ -2142,7 +2147,7 @@ no_slots:
 	    F_ISSET(r, WT_SKIP_UPDATE_RESTORE) && r->leave_dirty) {
 		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
 		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
-		WT_ERR(EBUSY);
+		return (EBUSY);
 	}
 
 	/*
@@ -2154,15 +2159,12 @@ no_slots:
 	 */
 	if (r->bnd_next == 1 && last_block && __rec_is_checkpoint(r, last)) {
 		if (last->already_compressed)
-			WT_ERR(__wt_buf_set(
+			WT_RET(__wt_buf_set(
 			    session, &r->dsk, dst->mem, dst->size));
 	} else
-		WT_ERR(__rec_split_write(session, r, last,
+		WT_RET(__rec_split_write(session, r, last,
 		    last->already_compressed ? dst : &r->dsk, last_block));
-
-done:
-err:	__wt_scr_free(&dst);
-	return (ret);
+	return (0);
 }
 
 /*
