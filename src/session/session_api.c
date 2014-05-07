@@ -220,7 +220,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_clsm_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "metadata:"))
-		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
+		ret = __wt_curmetadata_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
@@ -265,6 +265,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    !WT_PREFIX_MATCH(uri, "index:") &&
 		    !WT_PREFIX_MATCH(uri, "file:") &&
 		    !WT_PREFIX_MATCH(uri, "lsm:") &&
+		    !WT_PREFIX_MATCH(uri, "metadata:") &&
 		    !WT_PREFIX_MATCH(uri, "table:") &&
 		    __wt_schema_get_source(session, uri) == NULL)
 			WT_ERR(__wt_bad_object_type(session, uri));

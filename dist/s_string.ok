@@ -399,6 +399,7 @@ curconfig
 curdump
 curfile
 curindex
+curmetadata
 cursoring
 cursorp
 curstat

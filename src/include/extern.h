@@ -675,6 +675,11 @@ extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_curmetadata_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    WT_CURSOR *owner,
+    const char *cfg[],
+    WT_CURSOR **cursorp);
 extern void __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst);
 extern int __wt_curstat_init(WT_SESSION_IMPL *session,
     const char *uri,
@@ -687,6 +692,9 @@ extern int __wt_curstat_open(WT_SESSION_IMPL *session,
 extern int __wt_cursor_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_noop(WT_CURSOR *cursor);
 extern void __wt_cursor_set_notsup(WT_CURSOR *cursor);
+extern int __wt_cursor_config_readonly(WT_CURSOR *cursor,
+    const char *cfg[],
+    int def);
 extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);

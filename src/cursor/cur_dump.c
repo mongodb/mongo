@@ -314,6 +314,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	    __curdump_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_DUMP *cdump;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	const char *cfg[2];
 
@@ -337,7 +338,10 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	cfg[1] = NULL;
-	WT_RET(__wt_cursor_init(cursor, NULL, owner, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, NULL, owner, cfg, cursorp));
 
+	if (0) {
+err:		__wt_free(session, cursor);
+	}
 	return (0);
 }
