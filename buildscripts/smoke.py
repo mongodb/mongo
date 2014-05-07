@@ -38,20 +38,19 @@ from itertools import izip
 import glob
 from optparse import OptionParser
 import os
-import parser
 import pprint
 import re
-import shutil
 import shlex
 import socket
 import stat
-from subprocess import (call, PIPE, Popen, STDOUT)
+from subprocess import (PIPE, Popen, STDOUT)
 import sys
 import time
 
 from pymongo import Connection
 from pymongo.errors import OperationFailure
 
+import cleanbb
 import utils
 
 try:
@@ -85,6 +84,7 @@ file_of_commands_mode = False
 start_mongod = True
 temp_path = None
 clean_every_n_tests = 1
+clean_whole_dbroot = False
 
 tests = []
 winners = []
@@ -123,6 +123,16 @@ def buildlogger(cmd, is_global=False):
         else:
             return [utils.find_python(), 'buildscripts/buildlogger.py'] + cmd
     return cmd
+
+
+def clean_dbroot(dbroot="", nokill=False):
+    # Clean entire /data/db dir if --with-cleanbb, else clean specific database path.
+    if clean_whole_dbroot and not small_oplog:
+        dbroot = os.path.normpath(smoke_db_prefix + "/data/db")
+    if os.path.exists(dbroot):
+        print("clean_dbroot: %s" % dbroot)
+        cleanbb.cleanup(dbroot, nokill)
+
 
 class mongod(object):
     def __init__(self, **kwargs):
@@ -189,13 +199,10 @@ class mongod(object):
             srcport = mongod_port
             self.port += 1
             self.slave = True
-        if os.path.exists(dir_name):
-            if 'slave' in self.kwargs:
-                argv = [utils.find_python(), "buildscripts/cleanbb.py", '--nokill', dir_name]
-            else:
-                argv = [utils.find_python(), "buildscripts/cleanbb.py", dir_name]
-            call(argv)
+
+        clean_dbroot(dbroot=dir_name, nokill=self.slave)
         utils.ensureDir(dir_name)
+
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
         # These parameters are alwas set for tests
         # SERVER-9137 Added httpinterface parameter to keep previous behavior
@@ -707,8 +714,9 @@ def run_tests(tests):
                             check_and_report_replication_dbhashes()
 
                     elif use_db: # reach inside test and see if "usedb" is true
-                        if (tests_run % clean_every_n_tests) == 0:
-                            # restart mongo every 'clean_every_n_tests' times
+                        if clean_every_n_tests and (tests_run % clean_every_n_tests) == 0:
+                            # Restart mongod periodically to clean accumulated test data
+                            # clean_dbroot() is invoked by mongod.start()
                             master.__exit__(None, None, None)
                             master = mongod(small_oplog_rs=small_oplog_rs,
                                             small_oplog=small_oplog,
@@ -983,6 +991,7 @@ def set_globals(options, tests):
     global report_file, shell_write_mode, use_write_commands
     global temp_path
     global clean_every_n_tests
+    global clean_whole_dbroot
 
     start_mongod = options.start_mongod
     if hasattr(options, 'use_ssl'):
@@ -1015,7 +1024,9 @@ def set_globals(options, tests):
     auth = options.auth
     authMechanism = options.authMechanism
     keyFile = options.keyFile
+
     clean_every_n_tests = options.clean_every_n_tests
+    clean_whole_dbroot = options.with_cleanbb
 
     if auth and not keyFile:
         # if only --auth was given to smoke.py, load the
@@ -1273,8 +1284,7 @@ def main():
         return
 
     if options.with_cleanbb:
-        dbroot = os.path.join(options.smoke_db_prefix, 'data', 'db')
-        call([utils.find_python(), "buildscripts/cleanbb.py", "--nokill", dbroot])
+        clean_dbroot(nokill=True)
 
     test_report["start"] = time.time()
     test_report["mongod_running_at_start"] = mongod().is_mongod_up(mongod_port)
