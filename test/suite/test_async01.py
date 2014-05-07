@@ -197,7 +197,7 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Compact after insert.
         # Wait for all outstanding async ops to finish.
-        op = self.conn.async_new_op(tablearg, None, callback)
+        op = self.conn.async_new_op(tablearg, 'timeout=0', callback)
         op.compact()
         ncompact += 1
         self.conn.async_flush()
