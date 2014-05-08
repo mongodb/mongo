@@ -287,6 +287,7 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_ASYNC *async;
 	WT_ASYNC_FORMAT *af, *afnext;
+	WT_ASYNC_OP *op;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
@@ -312,6 +313,15 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 			WT_TRET(wt_session->close(wt_session, NULL));
 			async->worker_sessions[i] = NULL;
 		}
+	/* Free any op key/value buffers. */
+	for (i = 0; i < conn->async_size; i++) {
+		op = (WT_ASYNC_OP *)&async->async_ops[i];
+		if (op->c.key.data != NULL)
+			__wt_buf_free(session, &op->c.key);
+		if (op->c.value.data != NULL)
+			__wt_buf_free(session, &op->c.value);
+	}
+
 	/* Free format resources */
 	af = STAILQ_FIRST(&async->formatqh);
 	while (af != NULL) {
@@ -323,6 +333,7 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_free(session, af);
 		af = afnext;
 	}
+	__wt_free(session, async->async_queue);
 	__wt_free(session, async->async_ops);
 	__wt_spin_destroy(session, &async->ops_lock);
 	__wt_free(session, conn->async);
