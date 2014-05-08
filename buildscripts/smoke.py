@@ -679,7 +679,8 @@ def run_tests(tests):
             if small_oplog or small_oplog_rs:
                 master.wait_for_repl()
 
-            for tests_run, test in enumerate(tests, 1):
+            for tests_run, test in enumerate(tests):
+                tests_run += 1    # enumerate from 1, python 2.5 compatible
                 test_result = { "start": time.time() }
 
                 (test_path, use_db) = test
