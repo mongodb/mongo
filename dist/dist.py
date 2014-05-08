@@ -1,8 +1,11 @@
-import filecmp, os, re, shutil
+import filecmp, glob, os, re, shutil
 
 # source_files --
 #	Return a list of the source file names in filelist.
-def source_files():
+def source_files(skip_includes=False):
+	if not skip_includes:
+		for line in glob.iglob('../src/include/*.[hi]'):
+			yield line
 	file_re = re.compile(r'^\w')
 	for line in open('filelist', 'r'):
 		if file_re.match(line):

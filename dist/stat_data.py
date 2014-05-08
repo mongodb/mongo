@@ -41,6 +41,23 @@ connection_stats = [
 	Stat('write_io', 'total write I/Os'),
 
 	##########################################
+	# Async API statistics
+	##########################################
+	Stat('async_alloc_race', 'async: number of allocation state races'),
+	Stat('async_alloc_view', 'async: number of op slots viewed for alloc'),
+	Stat('async_flush', 'async: number of async flush calls'),
+	Stat('async_full', 'async: number of times op allocation failed'),
+	Stat('async_cur_queue', 'async: current work queue length'),
+	Stat('async_max_queue', 'async: maximum work queue length',
+	    'max_aggregate,no_scale'),
+	Stat('async_op_alloc', 'async op allocation'),
+	Stat('async_op_compact', 'async op compact calls'),
+	Stat('async_op_insert', 'async op insert calls'),
+	Stat('async_op_remove', 'async op remove calls'),
+	Stat('async_op_search', 'async op search calls'),
+	Stat('async_op_update', 'async op update calls'),
+
+	##########################################
 	# Block manager statistics
 	##########################################
 	Stat('block_byte_map_read', 'block manager: mapped bytes read'),

@@ -142,9 +142,9 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		    session, block, tmp, offset, size, cksum) == 0)
 			break;
 
-skip:		WT_VERBOSE_ERR(session, salvage,
+skip:		WT_ERR(__wt_verbose(session, WT_VERB_SALVAGE,
 		    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
-		    allocsize, (uintmax_t)offset);
+		    allocsize, (uintmax_t)offset));
 
 		/* Free the allocation-size block. */
 		WT_ERR(__wt_block_off_free(

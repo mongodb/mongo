@@ -4,7 +4,6 @@
 from dist import source_files
 import re, sys
 
-
 # Complain if a function comment is missing.
 def missing_comment():
     for f in source_files():

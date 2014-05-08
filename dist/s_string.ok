@@ -11,10 +11,12 @@ API
 APIs
 ARG
 ARGS
+ASYNC
 Addr
 Ailamaki
 Alakuijala
 Alloc
+Async
 Athanassoulis
 Athlon
 BBBBB
@@ -178,6 +180,7 @@ NoAddr
 Noll
 Nul
 ONPAGE
+OPTYPE
 OUTBUFF
 OVFL
 PADDR
@@ -209,6 +212,7 @@ Radu
 Recno
 Recurse
 Redistributions
+Relock
 Resize
 SCHED
 SIMD
@@ -306,8 +310,10 @@ argc
 args
 argv
 async
+asyncopp
 autockpt
 autocommit
+basecfg
 bdb
 bigram
 bitcnt
@@ -342,6 +348,7 @@ bzDecompressInit
 bzip
 calloc
 catfmt
+cb
 cd
 centric
 cfg
@@ -393,6 +400,7 @@ curconfig
 curdump
 curfile
 curindex
+curmetadata
 cursoring
 cursorp
 curstat
@@ -451,6 +459,7 @@ encodings
 endian
 english
 enqueue
+enqueued
 enum's
 env
 eof
@@ -464,6 +473,7 @@ eventv
 evictable
 evictserver
 exactp
+execop
 extern
 extlist
 extlists
@@ -599,6 +609,7 @@ logmgr
 lognum
 logput
 logread
+logrec
 lookup
 lookups
 lr
@@ -697,6 +708,8 @@ onpage
 oo
 opendir
 openfile
+opsq
+optype
 os
 ovfl
 packv
@@ -747,6 +760,8 @@ readserver
 realloc
 recno
 recnos
+reconfig
+reconfiguring
 recsize
 recurse
 refp
@@ -876,6 +891,7 @@ trk
 trk's
 troot
 trunc
+trylock
 trywrlock
 tsalvage
 tsplit
@@ -932,6 +948,7 @@ util
 uu
 va
 valuep
+valuev
 vanishingly
 variable's
 vcell

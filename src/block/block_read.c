@@ -73,30 +73,13 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/*
-	 * Clear buffers previously used for mapped memory, we may be forced
-	 * to read into this buffer.
-	 */
-	if (F_ISSET(buf, WT_ITEM_MAPPED))
-		__wt_buf_free(session, buf);
-
-	/*
 	 * Map the block if it's possible.
 	 */
 	mapped = bm->map != NULL && offset + size <= (off_t)bm->maplen;
 	if (mapped) {
-		/*
-		 * If we're going to be able to return mapped memory and the
-		 * buffer has allocated memory, discard it.
-		 */
-		if (buf->mem != NULL)
-			__wt_buf_free(session, buf);
-
-		buf->mem = (uint8_t *)bm->map + offset;
-		buf->memsize = size;
-		buf->data = buf->mem;
+		buf->data = (uint8_t *)bm->map + offset;
 		buf->size = size;
-		F_SET(buf, WT_ITEM_MAPPED);
-		WT_RET(__wt_mmap_preload(session, buf->mem, buf->size));
+		WT_RET(__wt_mmap_preload(session, buf->data, buf->size));
 
 		WT_STAT_FAST_CONN_INCR(session, block_map_read);
 		WT_STAT_FAST_CONN_INCRV(session, block_byte_map_read, size);
@@ -185,9 +168,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	size_t bufsize;
 	uint32_t page_cksum;
 
-	WT_VERBOSE_RET(session, read,
+	WT_RET(__wt_verbose(session, WT_VERB_READ,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
-	    (uintmax_t)offset, size, cksum);
+	    (uintmax_t)offset, size, cksum));
 
 	/*
 	 * Grow the buffer as necessary and read the block.  Buffers should be

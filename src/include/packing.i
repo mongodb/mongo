@@ -45,6 +45,10 @@ typedef struct {
 	int genname;
 } WT_PACK_NAME;
 
+/*
+ * __pack_initn --
+ *      Initialize a pack iterator with the specified string and length.
+ */
 static inline int
 __pack_initn(
     WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt, size_t len)
@@ -61,12 +65,20 @@ __pack_initn(
 	return (0);
 }
 
+/*
+ * __pack_init --
+ *      Initialize a pack iterator with the specified string.
+ */
 static inline int
 __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
 {
 	return (__pack_initn(session, pack, fmt, strlen(fmt)));
 }
 
+/*
+ * __pack_next --
+ *      Get the next field type from a pack iterator.
+ */
 static inline int
 __pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names,
     int iskey, WT_PACK_NAME *pn)
@@ -88,7 +100,7 @@ __pack_name_next(WT_PACK_NAME *pn, WT_CONFIG_ITEM *name)
 	WT_CONFIG_ITEM ignore;
 
 	if (pn->genname) {
-		snprintf(pn->buf, sizeof(pn->buf),
+		(void)snprintf(pn->buf, sizeof(pn->buf),
 		    (pn->iskey ? "key%d" : "value%d"), pn->count);
 		WT_CLEAR(*name);
 		name->str = pn->buf;
@@ -216,6 +228,10 @@ next:	if (pack->cur == pack->end)
 	}								\
 } while (0)
 
+/*
+ * __pack_size --
+ *      Get the size of a packed value.
+ */
 static inline size_t
 __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 {
@@ -338,7 +354,7 @@ __unpack_put_json(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv,
 	const char *p, *end;
 	size_t s, n;
 
-	s = snprintf(buf, bufsz, "\"%.*s\" : ", (int)name->len, name->str);
+	s = (size_t)snprintf(buf, bufsz, "\"%.*s\" : ", (int)name->len, name->str);
 	if (s <= bufsz) {
 		bufsz -= s;
 		buf += s;
@@ -415,7 +431,7 @@ __unpack_put_json(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv,
 	case 'i':
 	case 'l':
 	case 'q':
-		return (s + snprintf(buf, bufsz, "%" PRId64, pv->u.i));
+		return (s + (size_t)snprintf(buf, bufsz, "%" PRId64, pv->u.i));
 	case 'B':
 	case 't':
 	case 'H':
@@ -424,12 +440,16 @@ __unpack_put_json(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv,
 	case 'Q':
 	case 'r':
 	case 'R':
-		return (s + snprintf(buf, bufsz, "%" PRId64, pv->u.u));
+		return (s + (size_t)snprintf(buf, bufsz, "%" PRId64, pv->u.u));
 	}
 	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
 	return ((size_t)-1);
 }
 
+/*
+ * __pack_write --
+ *      Pack a value into a buffer.
+ */
 static inline int
 __pack_write(
     WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **pp, size_t maxlen)
@@ -526,6 +546,10 @@ __pack_write(
 	return (0);
 }
 
+/*
+ * __unpack_read --
+ *      Read a packed value from a buffer.
+ */
 static inline int
 __unpack_read(WT_SESSION_IMPL *session,
     WT_PACK_VALUE *pv, const uint8_t **pp, size_t maxlen)

@@ -83,7 +83,10 @@
  * resulting bug is a mother to find -- make sure we get it right, don't make
  * the caller remember to put the & operator on the pointer.
  */
-#define	__wt_free(session, p)		__wt_free_int(session, (void *)&(p))
+#define	__wt_free(session, p) do {					\
+	if ((p) != NULL)						\
+		__wt_free_int(session, (void *)&(p));			\
+} while (0)
 #ifdef HAVE_DIAGNOSTIC
 #define	__wt_overwrite_and_free(session, p) do {			\
 	memset(p, WT_DEBUG_BYTE, sizeof(*(p)));				\
@@ -122,20 +125,12 @@
 #define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
 
 /* Verbose messages. */
+#ifdef HAVE_VERBOSE
 #define	WT_VERBOSE_ISSET(session, f)					\
-	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
-#define	WT_VERBOSE_ERR(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_ERR(__wt_verbose(session, #f ": " __VA_ARGS__));	\
-} while (0)
-#define	WT_VERBOSE_RET(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
-} while (0)
-#define	WT_VERBOSE_TRET(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_TRET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
-} while (0)
+	(FLD_ISSET(S2C(session)->verbose, f))
+#else
+#define	WT_VERBOSE_ISSET(session, f)	0
+#endif
 
 /*
  * Clear a structure, two flavors: inline when we want to guarantee there's

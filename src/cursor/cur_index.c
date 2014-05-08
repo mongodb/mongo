@@ -39,7 +39,7 @@ static int __curindex_json_init(WT_CURSOR *cursor, const char *keyformat,
 		p++;
 	}
 	json->value_names.str = p;
-	json->value_names.len = end - p;
+	json->value_names.len = WT_PTRDIFF(end, p);
 
 	return (0);
 }
@@ -398,9 +398,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	    __curindex_close);		/* close */
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR *cursor;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_INDEX *idx;
-	WT_ITEM fmt, plan;
 	WT_TABLE *table;
 	const char *columns, *idxname, *tablename;
 	size_t namesize;
@@ -459,15 +459,17 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	/* Handle projections. */
 	if (columns != NULL) {
-		WT_CLEAR(fmt);
+		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), NULL, 0, &fmt));
-		cursor->value_format = __wt_buf_steal(session, &fmt);
+		    columns, strlen(columns), NULL, 0, tmp));
+		WT_ERR(__wt_strndup(
+		    session, tmp->data, tmp->size, &cursor->value_format));
 
-		WT_CLEAR(plan);
+		WT_ERR(__wt_buf_init(session, tmp, 0));
 		WT_ERR(__wt_struct_plan(session, table,
-		    columns, strlen(columns), 0, &plan));
-		cindex->value_plan = __wt_buf_steal(session, &plan);
+		    columns, strlen(columns), 0, tmp));
+		WT_ERR(__wt_strndup(
+		    session, tmp->data, tmp->size, &cindex->value_plan));
 	}
 
 	/* Open the column groups needed for this index cursor. */
@@ -484,5 +486,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 err:		WT_TRET(__curindex_close(cursor));
 	}
 
+	__wt_scr_free(&tmp);
 	return (ret);
 }

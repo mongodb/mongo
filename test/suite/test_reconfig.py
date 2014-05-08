@@ -39,17 +39,11 @@ class test_reconfig(wttest.WiredTigerTestCase):
         self.conn.reconfigure("statistics=(fast)")
         self.conn.reconfigure("statistics=(none)")
 
-    def test_reconfig_verbose(self):
-        # we know the verbose output format may change in the future,
-        # so we just match on a string that's likely to endure.
-        with self.expectedStdoutPattern('mutex: '):
-            self.conn.reconfigure("verbose=[mutex]")
-            # Reopening the connection allows the initial connection
-            # to completely close and all its threads to finish.
-            # If we don't do this, some trailing threads give additional
-            # output after we make our 'expectedStdoutPattern' check,
-            # and cause the test to fail.
-            self.reopen_conn()
+    def test_reconfig_checkpoints(self):
+        self.conn.reconfigure("checkpoint=(wait=0)")
+        self.conn.reconfigure("checkpoint=(wait=5)")
+        self.conn.reconfigure("checkpoint=(wait=0,name=hi)")
+        self.conn.reconfigure("checkpoint=(wait=5,name=hi)")
 
 if __name__ == '__main__':
     wttest.run()

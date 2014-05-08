@@ -86,8 +86,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		WT_VERBOSE_ERR(session, verify,
-		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name);
+		WT_ERR(__wt_verbose(session, WT_VERB_VERIFY,
+		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name));
 
 		/* Fake checkpoints require no work. */
 		if (F_ISSET(ckpt, WT_CKPT_FAKE))
@@ -260,9 +260,9 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	unpack = &_unpack;
 	WT_CLEAR(*unpack);	/* -Wuninitialized */
 
-	WT_VERBOSE_RET(session, verify, "%s %s",
+	WT_RET(__wt_verbose(session, WT_VERB_VERIFY, "%s %s",
 	    __wt_page_addr_string(session, ref, vs->tmp1),
-	    __wt_page_type_string(page->type));
+	    __wt_page_type_string(page->type)));
 #ifdef HAVE_DIAGNOSTIC
 	if (vs->dump_address)
 		WT_RET(__wt_msg(session, "%s %s",
@@ -594,7 +594,7 @@ __verify_overflow_cell(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_RET;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 	uint32_t cell_num, i;
 
 	btree = S2BT(session);
@@ -642,7 +642,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size, WT_VSTUFF *vs)
 {
 	WT_BM *bm;
-	WT_PAGE_HEADER *dsk;
+	const WT_PAGE_HEADER *dsk;
 
 	bm = S2BT(session)->bm;
 
@@ -654,7 +654,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	 * it was an overflow page, only that it was a valid page.  Confirm it's
 	 * the type of page we expected.
 	 */
-	dsk = vs->tmp1->mem;
+	dsk = vs->tmp1->data;
 	if (dsk->type != WT_PAGE_OVFL)
 		WT_RET_MSG(session, WT_ERROR,
 		    "overflow referenced page at %s is not an overflow page",

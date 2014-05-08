@@ -163,18 +163,30 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
 }
 
+/*
+ * __wt_cache_read_gen --
+ *      Get the current read generation number.
+ */
 static inline uint64_t
 __wt_cache_read_gen(WT_SESSION_IMPL *session)
 {
 	return (S2C(session)->cache->read_gen);
 }
 
+/*
+ * __wt_cache_read_gen_incr --
+ *      Increment the current read generation number.
+ */
 static inline void
 __wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
 {
 	++S2C(session)->cache->read_gen;
 }
 
+/*
+ * __wt_cache_read_gen_set --
+ *      Get the read generation to store in a page.
+ */
 static inline uint64_t
 __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 {
@@ -328,16 +340,17 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * The page can never end up with changes older than the oldest
 		 * running transaction.
 		 */
-		if (F_ISSET(&session->txn, TXN_RUNNING))
+		if (F_ISSET(&session->txn, TXN_HAS_SNAPSHOT))
 			page->modify->disk_snap_min = session->txn.snap_min;
+
+		txn_global = &S2C(session)->txn_global;
+		page->modify->rec_skipped_txn = txn_global->last_running;
 
 		/*
 		 * Set the checkpoint generation: if a checkpoint is already
 		 * running, these changes cannot be included, by definition.
 		 */
-		txn_global = &S2C(session)->txn_global;
-		page->modify->checkpoint_gen = txn_global->checkpoint_gen;
-		page->modify->rec_min_skipped_txn = txn_global->last_running;
+		page->modify->checkpoint_gen = S2BT(session)->checkpoint_gen;
 	}
 
 	/* Check if this is the largest transaction ID to update the page. */
@@ -514,7 +527,7 @@ __wt_row_leaf_key(WT_SESSION_IMPL *session,
 	 * exists to inline fast-path checks for already instantiated keys and
 	 * on-page uncompressed keys.
 	 */
-retry:	ikey = WT_ROW_KEY_COPY(rip);
+	ikey = WT_ROW_KEY_COPY(rip);
 
 	/*
 	 * Key copied.
@@ -539,23 +552,8 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 	/*
 	 * We have to build the key (it's never been instantiated, and it's some
 	 * kind of compressed or overflow key).
-	 *
-	 * Magic: the row-store leaf page search loop calls us to instantiate
-	 * keys, and it's not prepared to handle memory being allocated in the
-	 * key's WT_ITEM.  Call __wt_row_leaf_key_work to instantiate the key
-	 * with no buffer reference, then retry to pick up a simple reference
-	 * to the instantiated key.
 	 */
-	if (instantiate) {
-		WT_RET(__wt_row_leaf_key_work(session, page, rip, NULL, 1));
-		goto retry;
-	}
-
-	/*
-	 * If instantiate wasn't set, our caller is prepared to handle memory
-	 * allocations in the key's WT_ITEM, pass the key.
-	 */
-	return (__wt_row_leaf_key_work(session, page, rip, key, 0));
+	return (__wt_row_leaf_key_work(session, page, rip, key, instantiate));
 }
 
 /*
@@ -577,7 +575,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
 		rip = &page->u.row.d[cbt->slot];
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
 		key->size = WT_INSERT_KEY_SIZE(cbt->ins);

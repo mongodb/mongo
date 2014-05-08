@@ -51,6 +51,16 @@ typedef enum __wt_page_state WT_PAGE_STATE;
 typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
+struct __wt_async;
+    typedef struct __wt_async WT_ASYNC;
+struct __wt_async_cursor;
+    typedef struct __wt_async_cursor WT_ASYNC_CURSOR;
+struct __wt_async_format;
+    typedef struct __wt_async_format WT_ASYNC_FORMAT;
+struct __wt_async_op_impl;
+    typedef struct __wt_async_op_impl WT_ASYNC_OP_IMPL;
+struct __wt_async_worker_state;
+    typedef struct __wt_async_worker_state WT_ASYNC_WORKER_STATE;
 struct __wt_block;
     typedef struct __wt_block WT_BLOCK;
 struct __wt_block_ckpt;
@@ -121,6 +131,8 @@ struct __wt_cursor_json;
     typedef struct __wt_cursor_json WT_CURSOR_JSON;
 struct __wt_cursor_lsm;
     typedef struct __wt_cursor_lsm WT_CURSOR_LSM;
+struct __wt_cursor_metadata;
+    typedef struct __wt_cursor_metadata WT_CURSOR_METADATA;
 struct __wt_cursor_stat;
     typedef struct __wt_cursor_stat WT_CURSOR_STAT;
 struct __wt_cursor_table;
@@ -245,6 +257,7 @@ struct __wt_update;
 #include "dhandle.h"			/* required by btree.h */
 
 #include "api.h"
+#include "async.h"
 #include "block.h"
 #include "bloom.h"
 #include "btmem.h"
@@ -269,6 +282,8 @@ struct __wt_update;
 #include "extern.h"
 #include "verify_build.h"
 
+#include "buf.i"
+#include "misc.i"
 #include "intpack.i"			/* required by cell.i, packing.i */
 #include "packing.i"
 #include "cell.i"			/* required by btree.i */

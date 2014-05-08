@@ -18,19 +18,20 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_REF *walk_page;
+	WT_PAGE_MODIFY *mod;
+	WT_REF *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
 	uint32_t checkpoint_gen, flags;
 
 	btree = S2BT(session);
-	walk_page = NULL;
+	walk = NULL;
 	txn = &session->txn;
 
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
-	if (WT_VERBOSE_ISSET(session, checkpoint))
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
 		WT_ERR(__wt_epoch(session, &start));
 
 	switch (syncop) {
@@ -40,21 +41,20 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		flags = WT_READ_CACHE |
 		    WT_READ_NO_GEN | WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
-		for (walk_page = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk_page, flags));
-			if (walk_page == NULL)
+		for (walk = NULL;;) {
+			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			if (walk == NULL)
 				break;
 
 			/* Write dirty pages if nobody beat us to it. */
-			page = walk_page->page;
+			page = walk->page;
 			if (__wt_page_is_modified(page)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
 					__wt_txn_refresh(
 					    session, WT_TXN_NONE, 1);
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
-				WT_ERR(__wt_rec_write(
-				    session, walk_page, NULL, 0));
+				WT_ERR(__wt_rec_write(session, walk, NULL, 0));
 			}
 		}
 		break;
@@ -70,37 +70,48 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * eviction to complete.
 		 */
 		btree->checkpointing = 1;
-		checkpoint_gen = S2C(session)->txn_global.checkpoint_gen;
+		checkpoint_gen = ++btree->checkpoint_gen;
 
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 			WT_ERR(__wt_evict_file_exclusive_on(session));
 			__wt_evict_file_exclusive_off(session);
 		}
 
-		/*
-		 * Write all dirty in-cache pages.
-		 */
+		/* Write all dirty in-cache pages. */
 		flags = WT_READ_CACHE | WT_READ_NO_GEN;
-		for (walk_page = NULL;;) {
-			WT_ERR(__wt_tree_walk(session, &walk_page, flags));
-			if (walk_page == NULL)
+		for (walk = NULL;;) {
+			WT_ERR(__wt_tree_walk(session, &walk, flags));
+			if (walk == NULL)
 				break;
 
 			/*
 			 * Write dirty pages, unless we can be sure they only
 			 * became dirty after the checkpoint started.
+			 *
+			 * We can skip pages if:
+			 * (1) they are leaf pages;
+			 * (2) the global checkpoint generation has been
+			 *     incremented (otherwise we skip writing the
+			 *     metadata when first creating tables);
+			 * (3) the page's checkpoint generation is equal to
+			 *     the current checkpoint generation, so it has
+			 *     already been written since this checkpoint
+			 *     started; and
+			 * (4) there is a snapshot transaction active (which
+			 *     is the case in ordinary application checkpoints
+			 *     but not all internal cases); and
+			 * (5) any updates skipped by reconciliation were
+			 *     sufficiently recent that the checkpoint
+			 *     transaction would skip them.
 			 */
-			page = walk_page->page;
-#ifdef FAST_CHECKPOINTS
+			page = walk->page;
+			mod = page->modify;
 			if (__wt_page_is_modified(page) &&
 			    (WT_PAGE_IS_INTERNAL(page) ||
-			    page->modify->checkpoint_gen == 0 ||
-			    page->modify->checkpoint_gen < checkpoint_gen ||
-			    TXNID_LE(page->modify->rec_min_skipped_txn,
-			    session->txn.snap_max))) {
-#else
-			if (__wt_page_is_modified(page)) {
-#endif
+			    checkpoint_gen == 0 ||
+			    mod->checkpoint_gen < checkpoint_gen ||
+			    !F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
+			    TXNID_LE(mod->rec_skipped_txn, txn->snap_max))) {
 				if (WT_PAGE_IS_INTERNAL(page)) {
 					internal_bytes +=
 					    page->memory_footprint;
@@ -109,8 +120,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 					leaf_bytes += page->memory_footprint;
 					++leaf_pages;
 				}
-				WT_ERR(__wt_rec_write(
-				    session, walk_page, NULL, 0));
+				WT_ERR(__wt_rec_write(session, walk, NULL, 0));
 			}
 
 			/*
@@ -122,13 +132,14 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (page->modify != NULL)
 				page->modify->checkpoint_gen = checkpoint_gen;
 		}
+		WT_ASSERT(session, checkpoint_gen == btree->checkpoint_gen);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	if (WT_VERBOSE_ISSET(session, checkpoint)) {
+	if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT)) {
 		WT_ERR(__wt_epoch(session, &end));
-		WT_VERBOSE_ERR(session, checkpoint,
+		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "__sync_file WT_SYNC_%s wrote:\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of leaves\n\t %" PRIu64
 		    " bytes, %" PRIu64 " pages of internal\n\t"
@@ -136,12 +147,12 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
 		    leaf_bytes, leaf_pages, internal_bytes, internal_pages,
-		    WT_TIMEDIFF(end, start) / WT_MILLION);
+		    WT_TIMEDIFF(end, start) / WT_MILLION));
 	}
 
 err:	/* On error, clear any left-over tree walk. */
-	if (walk_page != NULL)
-		WT_TRET(__wt_page_release(session, walk_page));
+	if (walk != NULL)
+		WT_TRET(__wt_page_release(session, walk));
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED && session->ncursors == 0)
 		__wt_txn_release_snapshot(session);

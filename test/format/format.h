@@ -168,6 +168,7 @@ typedef struct {
 	uint32_t c_key_max;
 	uint32_t c_key_min;
 	uint32_t c_leaf_page_max;
+	uint32_t c_logging;
 	uint32_t c_merge_max;
 	uint32_t c_merge_threads;
 	uint32_t c_mmap;
@@ -263,6 +264,7 @@ void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(void);
 void	 wts_read_scan(void);
+void	 wts_salvage_copy(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);

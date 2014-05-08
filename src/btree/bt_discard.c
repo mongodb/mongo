@@ -40,6 +40,8 @@ void
 __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
+	WT_PAGE_HEADER *dsk;
+	WT_PAGE_MODIFY *mod;
 
 	/*
 	 * Kill our caller's reference, do our best to catch races.
@@ -65,8 +67,29 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	WT_ASSERT(session, hp == NULL);
 	}
 #endif
+
+	/*
+	 * If a root page split, there may be one or more pages linked from the
+	 * page; walk the list, discarding pages.
+	 */
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		mod = page->modify;
+		if (mod != NULL && mod->mod_root_split != NULL)
+			__wt_page_out(session, &mod->mod_root_split);
+		break;
+	}
+
 	/* Update the cache's information. */
 	__wt_cache_page_evict(session, page);
+
+	/*
+	 * If discarding the page as part of process exit, the application may
+	 * configure to leak the memory rather than do the work.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_LEAK_MEMORY))
+		return;
 
 	/* Free the page modification information. */
 	if (page->modify != NULL)
@@ -88,12 +111,11 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	}
 
 	/* Discard any disk image. */
+	dsk = (WT_PAGE_HEADER *)page->dsk;
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
-		__wt_overwrite_and_free_len(
-		    session, page->dsk, page->dsk->mem_size);
+		__wt_overwrite_and_free_len(session, dsk, page->dsk->mem_size);
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
-		(void)__wt_mmap_discard(
-		    session, page->dsk, page->dsk->mem_size);
+		(void)__wt_mmap_discard(session, dsk, dsk->mem_size);
 
 	__wt_overwrite_and_free(session, page);
 }
@@ -139,15 +161,6 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	switch (page->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		/*
-		 * If a root page split, there may be one or more pages linked
-		 * from the page; walk the list, discarding pages.
-		 */
-		if (mod->mod_root_split != NULL)
-			__wt_page_out(session, &mod->mod_root_split);
-		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
 		/* Free the append array. */

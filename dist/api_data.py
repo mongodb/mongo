@@ -235,9 +235,10 @@ file_config = format_meta + [
 	Config('memory_page_max', '5MB', r'''
 	    the maximum size a page can grow to in memory before being
 	    reconciled to disk.  The specified size will be adjusted to a lower
-	    bound of <code>50 * leaf_page_max</code>.  This limit is soft - it
-	    is possible for pages to be temporarily larger than this value.
-	    This setting is ignored for LSM trees, see \c chunk_size''',
+	    bound of <code>50 * leaf_page_max</code>, and an upper bound of
+	    <code>cache_size / 2</code>.  This limit is soft - it is possible
+	    for pages to be temporarily larger than this value.  This setting
+	    is ignored for LSM trees, see \c chunk_size''',
 	    min='512B', max='10TB'),
 	Config('os_cache_max', '0', r'''
 	    maximum system buffer cache usage, in bytes.  If non-zero, evict
@@ -250,7 +251,7 @@ file_config = format_meta + [
 	    system buffer cache after that many bytes from this object are
 	    written into the buffer cache''',
 	    min=0),
-	Config('prefix_compression', 'true', r'''
+	Config('prefix_compression', 'false', r'''
 	    configure prefix compression on row-store leaf pages''',
 	    type='boolean'),
 	Config('prefix_compression_min', '4', r'''
@@ -296,6 +297,30 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
+	Config('async', '', r'''
+	    asynchronous operations configuration options.''',
+	    type='category', subconfig=[
+	    Config('enabled', 'false', r'''
+	        enable asynchronous operation''',
+	        type='boolean'),
+	    Config('ops_max', '1024', r'''
+	        maximum number of expected simultaneous asynchronous
+                operations.''', min='10', max='4096'),
+	    Config('threads', '2', r'''
+	        the number of worker threads to service asynchronous
+                requests''',
+                min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
+            ]),
+	Config('checkpoint', '', r'''
+	    periodically checkpoint the database''',
+	    type='category', subconfig=[
+	    Config('name', '"WiredTigerCheckpoint"', r'''
+	        the checkpoint name'''),
+	    Config('wait', '0', r'''
+	        seconds to wait between each checkpoint; setting this value
+	        above 0 configures periodic checkpoints''',
+	        min='0', max='100000'),
+	    ]),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',
@@ -333,6 +358,9 @@ connection_runtime_config = [
 	    trigger eviction when the cache becomes this full (as a
 	    percentage)''',
 	    min=10, max=99),
+	Config('eviction_workers', '0', r'''
+	    additional threads to help evict pages from cache''',
+	    min=0, max=20),
 	Config('statistics', 'none', r'''
 	    Maintain database statistics, which may impact performance.
 	    Choosing "all" maintains all statistics regardless of cost,
@@ -348,9 +376,11 @@ connection_runtime_config = [
 	    @ref statistics for more information''',
 	    type='list', choices=['all', 'fast', 'none', 'clear']),
 	Config('verbose', '', r'''
-	    enable messages for various events.  Options are given as a
+	    enable messages for various events. Only available if WiredTiger
+		is configured with --enable-verbose. Options are given as a
 	    list, such as <code>"verbose=[evictserver,read]"</code>''',
 	    type='list', choices=[
+	        'api',
 	        'block',
 	        'checkpoint',
 	        'compact',
@@ -359,6 +389,7 @@ connection_runtime_config = [
 	        'fileops',
 	        'log',
 	        'lsm',
+	        'metadata',
 	        'mutex',
 	        'overflow',
 	        'read',
@@ -473,6 +504,12 @@ methods = {
 	    ignore the encodings for the key and value, manage data as if
 	    the formats were \c "u".  See @ref cursor_raw for details''',
 	    type='boolean'),
+	Config('readonly', 'false', r'''
+	    only query operations are supported by this cursor. An error is
+	    returned if a modification is attempted using the cursor.  The
+	    default is false for all cursor types except for metadata
+	    cursors.''',
+	    type='boolean'),
 	Config('statistics', '', r'''
 	    Specify the statistics to be gathered.  Choosing "all" gathers
 	    statistics regardless of cost and may include traversing
@@ -567,7 +604,33 @@ methods = {
 'connection.add_compressor' : Method([]),
 'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
-'connection.close' : Method([]),
+'connection.async_new_op' : Method([
+	Config('append', 'false', r'''
+	    append the value as a new record, creating a new record
+	    number key; valid only for operations with record number keys''',
+	    type='boolean'),
+	Config('overwrite', 'true', r'''
+	    configures whether the cursor's insert, update and remove
+	    methods check the existing state of the record.  If \c overwrite
+	    is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
+	    if the record exists, WT_CURSOR::update and WT_CURSOR::remove
+	    fail with ::WT_NOTFOUND if the record does not exist''',
+	    type='boolean'),
+	Config('raw', 'false', r'''
+	    ignore the encodings for the key and value, manage data as if
+	    the formats were \c "u".  See @ref cursor_raw for details''',
+	    type='boolean'),
+	Config('timeout', '1200', r'''
+	    maximum amount of time to allow for compact in seconds. The
+	    actual amount of time spent in compact may exceed the configured
+	    value. A value of zero disables the timeout''',
+	    type='int'),
+]),
+'connection.close' : Method([
+	Config('leak_memory', 'false', r'''
+	    don't free memory during close''',
+	    type='boolean'),
+]),
 'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([
@@ -595,16 +658,6 @@ methods = {
 	    default value of -1 indicates a platform-specific alignment
 	    value should be used (4KB on Linux systems, zero elsewhere)''',
 	    min='-1', max='1MB'),
-	Config('checkpoint', '', r'''
-	    periodically checkpoint the database''',
-	    type='category', subconfig=[
-	    Config('name', '"WiredTigerCheckpoint"', r'''
-	        the checkpoint name'''),
-	    Config('wait', '0', r'''
-	        seconds to wait between each checkpoint; setting this value
-	        configures periodic checkpoints''',
-	        min='1', max='100000'),
-	    ]),
 	Config('checkpoint_sync', 'true', r'''
 	    flush files to stable storage when closing or writing
 	    checkpoints''',

@@ -16,6 +16,7 @@ __ovfl_read(WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size, WT_ITEM *store)
 {
 	WT_BTREE *btree;
+	const WT_PAGE_HEADER *dsk;
 
 	btree = S2BT(session);
 
@@ -27,8 +28,9 @@ __ovfl_read(WT_SESSION_IMPL *session,
 	 * WiredTiger supports large page sizes, overflow items should be rare.
 	 */
 	WT_RET(__wt_bt_read(session, store, addr, addr_size));
-	store->data = WT_PAGE_HEADER_BYTE(btree, store->mem);
-	store->size = ((WT_PAGE_HEADER *)store->mem)->u.datalen;
+	dsk = store->data;
+	store->data = WT_PAGE_HEADER_BYTE(btree, dsk);
+	store->size = dsk->u.datalen;
 
 	WT_STAT_FAST_DATA_INCR(session, cache_read_overflow);
 

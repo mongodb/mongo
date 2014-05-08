@@ -241,9 +241,9 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_STAT_FAST_CONN_INCR(session, block_write);
 	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
 
-	WT_VERBOSE_RET(session, write,
+	WT_RET(__wt_verbose(session, WT_VERB_WRITE,
 	    "off %" PRIuMAX ", size %" PRIuMAX ", cksum %" PRIu32,
-	    (uintmax_t)offset, (uintmax_t)align_size, blk->cksum);
+	    (uintmax_t)offset, (uintmax_t)align_size, blk->cksum));
 
 	*offsetp = offset;
 	*sizep = WT_STORE_SIZE(align_size);

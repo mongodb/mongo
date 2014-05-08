@@ -4,6 +4,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/src/include
 noinst_PROGRAMS = \
 	ex_access \
 	ex_all \
+	ex_async \
 	ex_call_center \
 	ex_config \
 	ex_config_parse \

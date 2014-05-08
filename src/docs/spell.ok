@@ -67,6 +67,7 @@ archiver
 arg
 autoconf
 automake
+basecfg
 bdb
 bdbmap
 bigram

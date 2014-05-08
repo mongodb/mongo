@@ -30,8 +30,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	page = ref->page;
 	istree = 0;
 
-	WT_VERBOSE_RET(session, evict,
-	    "page %p (%s)", page, __wt_page_type_string(page->type));
+	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
+	    "page %p (%s)", page, __wt_page_type_string(page->type)));
 
 	/*
 	 * Pin the oldest transaction ID: eviction looks at page structures
@@ -312,9 +312,9 @@ __rec_review(
 	 * is blocked by the exclusive lock.
 	 */
 	mod = page->modify;
-#ifdef FAST_CHECKPOINTS
+#ifdef EVICTION_DURING_CHECKPOINT
 	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
-	    mod->checkpoint_gen >= S2C(session)->txn_global.checkpoint_gen;
+	    mod->checkpoint_gen >= btree->checkpoint_gen;
 #else
 	behind_checkpoint = btree->checkpointing && (mod != NULL);
 #endif
@@ -326,8 +326,8 @@ __rec_review(
 	}
 
 	/*
-	 * If we are checkpointing, we can't merge multiblock pages into their
-	 * parent.
+	 * If we behind a checkpoint, we can't merge multiblock pages into
+	 * their parent.
 	 */
 	if (behind_checkpoint && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
 		return (EBUSY);
@@ -357,41 +357,35 @@ __rec_review(
 	 * Otherwise, if the top-level page we're evicting is a leaf page, set
 	 * the update-restore flag, so reconciliation will write blocks it can
 	 * write and create a list of skipped updates for blocks it cannot
-	 * write.   This is how forced eviction of huge pages works: we take a
+	 * write.  This is how forced eviction of huge pages works: we take a
 	 * big page and reconcile it into blocks, some of which we write and
 	 * discard, the rest of which we re-create as smaller in-memory pages,
 	 * (restoring the updates that stopped us from writing the block), and
 	 * inserting the whole mess into the page's parent.
-	 *	Don't set the update-restore flag for internal pages, they don't
+	 *
+	 * Don't set the update-restore flag for internal pages, they don't
 	 * have updates that can be saved and restored.
-	 *	Don't set the update-restore flag for small pages.  (If a small
+	 *
+	 * Don't set the update-restore flag for small pages.  (If a small
 	 * page were selected by eviction and then modified, and we configure it
 	 * for update-restore, we'll end up splitting one or two pages into the
 	 * parent, which is a waste of effort.  If we don't set update-restore,
 	 * eviction will return EBUSY, which makes more sense, the page was just
 	 * modified.)
-	 *	Don't set the update-restore flag for any page other than the
+	 *
+	 * Don't set the update-restore flag for any page other than the
 	 * top one; only the reconciled top page goes through the split path
 	 * (and child pages are pages we expect to merge into the top page, they
 	 * they are not expected to split).
 	 */
 	if (__wt_page_is_modified(page)) {
 		flags = WT_EVICTION_LOCKED;
-		if (btree->checkpointing)
-			LF_SET(WT_SKIP_UPDATE_OK);
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
 		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
 		    page->memory_footprint > 10 * btree->maxleafpage)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_rec_write(session, ref, NULL, flags));
-		/*
-		 * If we wrote the page and skipped some updates because we
-		 * were helping out a checkpoint, that's okay, but we can't
-		 * evict the page.
-		 */
-		if (LF_ISSET(WT_SKIP_UPDATE_OK) && __wt_page_is_modified(page))
-			return (EBUSY);
 		WT_ASSERT(session,
 		    !__wt_page_is_modified(page) ||
 		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));
@@ -401,7 +395,7 @@ __rec_review(
 		 * on the page are old enough they can be discarded from cache.
 		 */
 		if (!exclusive && mod != NULL &&
-		    !__wt_txn_visible_apps(session, mod->rec_max_txn))
+		    !__wt_txn_visible_all(session, mod->rec_max_txn))
 			return (EBUSY);
 	}
 
@@ -466,7 +460,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_hazard);
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_hazard);
 
-	WT_VERBOSE_RET(
-	    session, evict, "page %p hazard request failed", ref->page);
+	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
+	    "page %p hazard request failed", ref->page));
 	return (EBUSY);
 }

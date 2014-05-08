@@ -12,8 +12,9 @@
  * any real understanding of what might be useful to surface to applications.
  */
 static u_int __split_deepen_max_internal_image = 100;
-static u_int __split_deepen_min_child = 100;
+static u_int __split_deepen_min_child = 10;
 static u_int __split_deepen_per_child = 100;
+static u_int __split_deepen_split_child = 100;
 
 /*
  * __split_should_deepen --
@@ -34,22 +35,28 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	pindex = WT_INTL_INDEX_COPY(page);
 
 	/*
-	 * Don't deepen the tree if the page's memory footprint is less than N
-	 * times the maximum internal page size chunk in the backing file.
+	 * Deepen the tree if the page's memory footprint is larger than the
+	 * maximum size for a page in memory.  We need an absolute minimum
+	 * number of entries in order to split the page: if there is a single
+	 * huge key, splitting won't help.
 	 */
-	if (page->memory_footprint <
-	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage)
-		return (0);
+	if (page->memory_footprint > S2BT(session)->maxmempage &&
+	    pindex->entries >= __split_deepen_min_child)
+		return (1);
 
 	/*
-	 * Don't deepen the tree unless the split will result in at least N
-	 * children in the newly created intermediate layer.
+	 * Deepen the tree if the page's memory footprint is at least N
+	 * times the maximum internal page size chunk in the backing file and
+	 * the split will result in at least N children in the newly created
+	 * intermediate layer.
 	 */
-	if (pindex->entries <
-	    (__split_deepen_per_child * __split_deepen_min_child))
-		return (0);
+	if (page->memory_footprint >
+	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage &&
+	    pindex->entries >=
+	    (__split_deepen_per_child * __split_deepen_split_child))
+		return (1);
 
-	return (1);
+	return (0);
 }
 
 /*
@@ -195,12 +202,18 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	panic = 0;
 
 	pindex = WT_INTL_INDEX_COPY(parent);
-	children = pindex->entries / __split_deepen_per_child;
+
+	/*
+	 * Create N children, unless we are dealing with a large page without
+	 * many entries, in which case split into the minimum number of pages.
+	 */
+	children = WT_MAX(pindex->entries / __split_deepen_per_child,
+	    __split_deepen_min_child);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
-	WT_VERBOSE_ERR(session, split,
+	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
-	    parent, pindex->entries, children);
+	    parent, pindex->entries, children));
 
 	/*
 	 * If the workload is prepending/appending to the tree, we could deepen
@@ -418,7 +431,8 @@ __split_inmem_build(
     WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref, WT_MULTI *multi)
 {
 	WT_CURSOR_BTREE cbt;
-	WT_ITEM key;
+	WT_DECL_ITEM(key);
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *skip;
@@ -426,8 +440,8 @@ __split_inmem_build(
 	uint32_t i, slot;
 
 	WT_CLEAR(cbt);
+	cbt.iface.session = &session->iface;
 	cbt.btree = S2BT(session);
-	WT_CLEAR(key);
 
 	/*
 	 * We can find unresolved updates when attempting to evict a page, which
@@ -450,6 +464,9 @@ __split_inmem_build(
 	 */
 	multi->skip_dsk = NULL;
 
+	if (orig->type == WT_PAGE_ROW_LEAF)
+		WT_RET(__wt_scr_alloc(session, 0, &key));
+
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip)
 		switch (orig->type) {
@@ -461,10 +478,10 @@ __split_inmem_build(
 			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
-			WT_RET(__wt_col_search(session, recno, ref, &cbt));
+			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_col_modify(
+			WT_ERR(__wt_col_modify(
 			    session, &cbt, recno, NULL, upd, 0));
 			break;
 		case WT_PAGE_ROW_LEAF:
@@ -474,24 +491,24 @@ __split_inmem_build(
 				upd = orig->pg_row_upd[slot];
 				orig->pg_row_upd[slot] = NULL;
 
-				WT_RET(__wt_row_leaf_key(
-				    session, orig, skip->rip, &key, 0));
+				WT_ERR(__wt_row_leaf_key(
+				    session, orig, skip->rip, key, 0));
 			} else {
 				upd = skip->ins->upd;
 				skip->ins->upd = NULL;
 
-				key.data = WT_INSERT_KEY(skip->ins);
-				key.size = WT_INSERT_KEY_SIZE(skip->ins);
+				key->data = WT_INSERT_KEY(skip->ins);
+				key->size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
 
 			/* Search the page. */
-			WT_RET(__wt_row_search(session, &key, ref, &cbt));
+			WT_ERR(__wt_row_search(session, key, ref, &cbt));
 
 			/* Apply the modification. */
-			WT_RET(__wt_row_modify(
-			    session, &cbt, &key, NULL, upd, 0));
+			WT_ERR(
+			    __wt_row_modify(session, &cbt, key, NULL, upd, 0));
 			break;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
 	/*
@@ -500,7 +517,11 @@ __split_inmem_build(
 	 * must write this page, so reset the checkpoint generation to zero.
 	 */
 	page->modify->checkpoint_gen = 0;
-	return (0);
+
+err:	__wt_scr_free(&key);
+	/* Free any resources that may have been cached in the cursor. */
+	WT_TRET(__wt_btcur_close(&cbt));
+	return (ret);
 }
 
 /*
@@ -509,7 +530,7 @@ __split_inmem_build(
  */
 int
 __wt_multi_to_ref(WT_SESSION_IMPL *session,
-    WT_PAGE *orig, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
+    WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp)
 {
 	WT_ADDR *addr;
 	WT_REF *ref;
@@ -549,9 +570,9 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		    multi->addr.addr, addr->size, &addr->addr));
 		incr += sizeof(WT_ADDR) + addr->size;
 	} else
-		WT_RET(__split_inmem_build(session, orig, ref, multi));
+		WT_RET(__split_inmem_build(session, page, ref, multi));
 
-	switch (orig->type) {
+	switch (page->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__wt_strndup(session,
@@ -776,11 +797,11 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
-	WT_VERBOSE_ERR(session, split,
+	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %s split into parent %p %" PRIu32 " -> %" PRIu32
 	    " (%" PRIu32 ")",
 	    child, __wt_page_type_string(child->type), parent, parent_entries,
-	    result_entries, result_entries - parent_entries);
+	    result_entries, result_entries - parent_entries));
 
 	/*
 	 * Simple page splits trickle up the tree, that is, as leaf pages grow

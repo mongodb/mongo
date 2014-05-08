@@ -529,7 +529,7 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
 	 *
 	 * !!!
 	 * This line of code is really a call to __wt_off_page, but we know the
-	 * cell we're given with either be on the page or past the end of page,
+	 * cell we're given will either be on the page or past the end of page,
 	 * so it's a simpler check.  (I wouldn't bother, but the real problem is
 	 * we can't call __wt_off_page directly, it's in btree.i which requires
 	 * this file be included first.)
@@ -797,8 +797,9 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_dsk_cell_data_ref, __wt_page_cell_data_ref --
- *	Set a buffer to reference the data from an unpacked cell, two flavors.
+ * __wt_dsk_cell_data_ref --
+ *	Set a buffer to reference the data from an unpacked cell.
+ *
  * There are two versions because of WT_CELL_VALUE_OVFL_RM type cells.  When an
  * overflow item is deleted, its backing blocks are removed; if there are still
  * running transactions that might need to see the overflow item, we cache a
@@ -816,6 +817,11 @@ __wt_dsk_cell_data_ref(WT_SESSION_IMPL *session,
 	    __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
 	return (__cell_data_ref(session, NULL, page_type, unpack, store));
 }
+
+/*
+ * __wt_page_cell_data_ref --
+ *	Set a buffer to reference the data from an unpacked cell.
+ */
 static inline int
 __wt_page_cell_data_ref(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store)

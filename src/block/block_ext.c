@@ -468,9 +468,9 @@ __block_extend(
 	fh->size += size;
 
 	WT_STAT_FAST_DATA_INCR(session, block_extension);
-	WT_VERBOSE_RET(session, block,
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
-	    (intmax_t)size, (intmax_t)*offp);
+	    (intmax_t)size, (intmax_t)*offp));
 
 	return (0);
 }
@@ -533,21 +533,21 @@ append:			WT_RET(__block_extend(session, block, offp, size));
 
 	/* If doing a partial allocation, adjust the record and put it back. */
 	if (ext->size > size) {
-		WT_VERBOSE_RET(session, block,
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 		    "allocate %" PRIdMAX " from range %" PRIdMAX "-%"
 		    PRIdMAX ", range shrinks to %" PRIdMAX "-%" PRIdMAX,
 		    (intmax_t)size,
 		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size),
 		    (intmax_t)(ext->off + size),
-		    (intmax_t)(ext->off + size + ext->size - size));
+		    (intmax_t)(ext->off + size + ext->size - size)));
 
 		ext->off += size;
 		ext->size -= size;
 		WT_RET(__block_ext_insert(session, &block->live.avail, ext));
 	} else {
-		WT_VERBOSE_RET(session, block,
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 		    "allocate range %" PRIdMAX "-%" PRIdMAX,
-		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
+		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size)));
 
 		__wt_block_ext_free(session, ext);
 	}
@@ -575,8 +575,8 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
-	WT_VERBOSE_RET(session, block,
-	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)offset, (intmax_t)size);
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)offset, (intmax_t)size));
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_RET(__wt_block_misplaced(session, block, "free", offset, size, 1));
@@ -891,7 +891,8 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 	WT_EXTLIST tmp;
 	u_int i;
 
-	WT_VERBOSE_RET(session, block, "merging %s into %s", a->name, b->name);
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_BLOCK, "merging %s into %s", a->name, b->name));
 
 	/*
 	 * Sometimes the list we are merging is much bigger than the other: if
@@ -1027,9 +1028,9 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 			after = NULL;
 	}
 	if (before == NULL && after == NULL) {
-		WT_VERBOSE_RET(session, block,
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 		    "%s: insert range %" PRIdMAX "-%" PRIdMAX,
-		    el->name, (intmax_t)off, (intmax_t)(off + size));
+		    el->name, (intmax_t)off, (intmax_t)(off + size)));
 
 		return (__block_off_insert(session, el, off, size));
 	}
@@ -1044,12 +1045,12 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 	if (before == NULL) {
 		WT_RET(__block_off_remove(session, el, after->off, &ext));
 
-		WT_VERBOSE_RET(session, block,
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 		    "%s: range grows from %" PRIdMAX "-%" PRIdMAX ", to %"
 		    PRIdMAX "-%" PRIdMAX,
 		    el->name,
 		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size),
-		    (intmax_t)off, (intmax_t)(off + ext->size + size));
+		    (intmax_t)off, (intmax_t)(off + ext->size + size)));
 
 		ext->off = off;
 		ext->size += size;
@@ -1061,13 +1062,13 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 		}
 		WT_RET(__block_off_remove(session, el, before->off, &ext));
 
-		WT_VERBOSE_RET(session, block,
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 		    "%s: range grows from %" PRIdMAX "-%" PRIdMAX ", to %"
 		    PRIdMAX "-%" PRIdMAX,
 		    el->name,
 		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size),
 		    (intmax_t)ext->off,
-		    (intmax_t)(ext->off + ext->size + size));
+		    (intmax_t)(ext->off + ext->size + size)));
 
 		ext->size += size;
 	}
@@ -1169,7 +1170,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 		WT_ERR(func(session, el, off, size));
 	}
 
-	if (WT_VERBOSE_ISSET(session, block))
+	if (WT_VERBOSE_ISSET(session, WT_VERB_BLOCK))
 		WT_ERR(__block_extlist_dump(session, "read extlist", el, 0));
 
 err:	__wt_scr_free(&tmp);
@@ -1192,7 +1193,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	uint32_t entries;
 	uint8_t *p;
 
-	if (WT_VERBOSE_ISSET(session, block))
+	if (WT_VERBOSE_ISSET(session, WT_VERB_BLOCK))
 		WT_RET(__block_extlist_dump(session, "write extlist", el, 0));
 
 	/*
@@ -1264,9 +1265,9 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_TRET(__wt_block_off_remove_overlap(
 	    session, &block->live.alloc, el->offset, el->size));
 
-	WT_VERBOSE_ERR(session, block,
+	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,
 	    "%s written %" PRIdMAX "/%" PRIu32,
-	    el->name, (intmax_t)el->offset, el->size);
+	    el->name, (intmax_t)el->offset, el->size));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -1295,9 +1296,9 @@ __wt_block_extlist_truncate(
 	if (ext->off + ext->size != fh->size)
 		return (0);
 
-	WT_VERBOSE_RET(session, block,
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
-	    (intmax_t)fh->size, (intmax_t)ext->off);
+	    (intmax_t)fh->size, (intmax_t)ext->off));
 
 	/*
 	 * We're about to remove the extent list entry, save the value, we need
@@ -1371,30 +1372,31 @@ __block_extlist_dump(
 	WT_EXT *ext;
 	WT_SIZE *szp;
 
-	WT_RET(__wt_verbose(
-	    session, "%s: %s: %" PRIu64 " bytes, by offset:%s",
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+	    "%s: %s: %" PRIu64 " bytes, by offset:%s",
 	    tag, el->name, el->bytes, el->entries == 0 ? " [Empty]" : ""));
 	if (el->entries == 0)
 		return (0);
 
 	WT_EXT_FOREACH(ext, el->off)
-		WT_RET(__wt_verbose(session,
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 		    "\t{%" PRIuMAX "/%" PRIuMAX "}",
 		    (uintmax_t)ext->off, (uintmax_t)ext->size));
 
 	if (!show_size)
 		return (0);
 
-	WT_RET(__wt_verbose(session, "%s: %s: by size:%s",
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+	    "%s: %s: by size:%s",
 	    tag, el->name, el->entries == 0 ? " [Empty]" : ""));
 	if (el->entries == 0)
 		return (0);
 
 	WT_EXT_FOREACH(szp, el->sz) {
-		WT_RET(__wt_verbose(session,
+		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 		    "\t{%" PRIuMAX "}", (uintmax_t)szp->size));
 		WT_EXT_FOREACH_OFF(ext, szp->off)
-			WT_RET(__wt_verbose(session,
+			WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
 			    "\t\t{%" PRIuMAX "/%" PRIuMAX "}",
 			    (uintmax_t)ext->off, (uintmax_t)ext->size));
 	}

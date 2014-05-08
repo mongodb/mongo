@@ -36,6 +36,7 @@ WiredTiger applications:
 - @subpage tune_transparent_huge_pages
 - @subpage tune_zone_reclaim
 - @subpage tune_statistics
+- @subpage tune_close
 
 @section programming_deployment Deployment considerations
 - @subpage checkpoints

@@ -99,9 +99,9 @@ __log_archive_server(void *arg)
 
 		lsn = log->ckpt_lsn;
 		lsn.offset = 0;
-		WT_VERBOSE_ERR(session, log,
+		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 		    "log_archive: ckpt LSN %" PRIu32 ",%" PRIu64,
-		    lsn.file, lsn.offset);
+		    lsn.file, lsn.offset));
 		/*
 		 * Main archive code.  Get the list of all log files and
 		 * remove any earlier than the checkpoint LSN.
@@ -259,6 +259,7 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 	}
 
 	WT_TRET(__wt_log_slot_destroy(session));
+	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);

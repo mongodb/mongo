@@ -60,8 +60,8 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	else if (id > r->max_fileid)
 		r->max_fileid = id;
 	else if (id >= r->nfiles || r->files[id].uri == NULL)
-		WT_VERBOSE_RET(session, recovery,
-		    "No file found with ID %u (max %u)", id, r->nfiles);
+		WT_RET(__wt_verbose(session, WT_VERB_RECOVERY,
+		    "No file found with ID %u (max %u)", id, r->nfiles));
 	else if ((c = r->files[id].c) == NULL) {
 		WT_RET(__wt_open_cursor(
 		    session, r->files[id].uri, NULL, cfg, &c));
@@ -82,10 +82,10 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 #define	GET_RECOVERY_CURSOR(session, r, lsnp, fileid, cp)		\
 	WT_ERR(__recovery_cursor(					\
 	    (session), (r), (lsnp), (fileid), 0, (cp)));		\
-	WT_VERBOSE_ERR((session), recovery,				\
+	WT_ERR(__wt_verbose((session), WT_VERB_RECOVERY,		\
 	    "%s op %d to file %d at LSN %u/%" PRIuMAX,			\
 	    (cursor == NULL) ? "Skipping" : "Applying",			\
-	    optype, fileid, lsnp->file, (uintmax_t)lsnp->offset);	\
+	    optype, fileid, lsnp->file, (uintmax_t)lsnp->offset));	\
 	if (cursor == NULL)						\
 		break
 
@@ -314,9 +314,9 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 		    (int)cval.len, cval.str);
 	r->files[fileid].ckpt_lsn = lsn;
 
-	WT_VERBOSE_RET(r->session, recovery,
+	WT_RET(__wt_verbose(r->session, WT_VERB_RECOVERY,
 	    "Recovering %s with id %u @ (%" PRIu32 ", %" PRIu64 ")",
-	    uri, fileid, lsn.file, lsn.offset);
+	    uri, fileid, lsn.file, lsn.offset));
 
 	return (0);
 
@@ -426,9 +426,9 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 */
 	r.metadata_only = 0;
-	WT_VERBOSE_ERR(session, recovery,
+	WT_ERR(__wt_verbose(session, WT_VERB_RECOVERY,
 	    "Main recovery loop: starting at %u/%" PRIuMAX,
-	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset);
+	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset));
 	if (IS_INIT_LSN(&r.ckpt_lsn))
 		WT_ERR(__wt_log_scan(session, NULL,
 		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,

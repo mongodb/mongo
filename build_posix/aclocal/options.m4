@@ -30,16 +30,6 @@ if test "$wt_cv_enable_bzip2" = "yes"; then
 fi
 AM_CONDITIONAL([BZIP2], [test "$wt_cv_enable_bzip2" = "yes"])
 
-AC_MSG_CHECKING(if --enable-debug option specified)
-AC_ARG_ENABLE(debug,
-	[AS_HELP_STRING([--enable-debug],
-	    [Configure for debug symbols.])], r=$enableval, r=no)
-case "$r" in
-no)	wt_cv_enable_debug=no;;
-*)	wt_cv_enable_debug=yes;;
-esac
-AC_MSG_RESULT($wt_cv_enable_debug)
-
 AH_TEMPLATE(HAVE_DIAGNOSTIC, [Define to 1 for diagnostic tests.])
 AC_MSG_CHECKING(if --enable-diagnostic option specified)
 AC_ARG_ENABLE(diagnostic,
@@ -105,8 +95,8 @@ if test "$wt_cv_enable_snappy" = "yes"; then
 fi
 AM_CONDITIONAL([SNAPPY], [test "$wt_cv_enable_snappy" = "yes"])
 
-AC_MSG_CHECKING(if --with-spinlock option specified)
 AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
+AC_MSG_CHECKING(if --with-spinlock option specified)
 AC_ARG_WITH(spinlock,
 	[AS_HELP_STRING([--with-spinlock],
 	    [Spinlock type (pthread, pthread_logging or gcc).])],
@@ -121,6 +111,18 @@ pthread_logging|pthreads_logging)
 *)	AC_MSG_ERROR([Unknown spinlock type "$with_spinlock"]);;
 esac
 AC_MSG_RESULT($with_spinlock)
+
+AH_TEMPLATE(HAVE_VERBOSE, [Enable verbose message configuration.])
+AC_MSG_CHECKING(if --enable-verbose option specified)
+AC_ARG_ENABLE(verbose,
+	[AS_HELP_STRING([--enable-verbose],
+	    [Enable verbose message configuration.])], r=$enableval, r=no)
+case "$r" in
+no)	wt_cv_enable_verbose=no;;
+*)	AC_DEFINE(HAVE_VERBOSE)
+	wt_cv_enable_verbose=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_verbose)
 
 AC_MSG_CHECKING(if --enable-zlib option specified)
 AC_ARG_ENABLE(zlib,

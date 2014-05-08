@@ -58,6 +58,28 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_config_readonly --
+ *	Parse read only configuration and setup cursor appropriately.
+ */
+int
+__wt_cursor_config_readonly(WT_CURSOR *cursor, const char *cfg[], int def)
+{
+	WT_CONFIG_ITEM cval;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_RET(__wt_config_gets_def(session, cfg, "readonly", def, &cval));
+	if (cval.val != 0) {
+		/* Reset all cursor methods that could modify data. */
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
+	}
+	return (0);
+}
+
+/*
  * __wt_cursor_kv_not_set --
  *	Standard error message for key/values not set.
  */
@@ -84,7 +106,7 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(cursor, cursor, ap);
+	ret = __wt_cursor_get_keyv(cursor, cursor, cursor->flags, ap);
 	va_end(ap);
 	return (ret);
 }
@@ -205,7 +227,7 @@ err:	return (ret);
  *	WT_CURSOR->get_key worker function.
  */
 int
-__wt_cursor_get_keyv(WT_CURSOR *cursor, WT_CURSOR *container, va_list ap)
+__wt_cursor_get_keyv(WT_CURSOR *cursor, WT_CURSOR *container, uint32_t flags, va_list ap)
 {
 	WT_CURSOR_JSON *json;
 	WT_DECL_RET;
@@ -213,9 +235,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, WT_CURSOR *container, va_list ap)
 	WT_SESSION_IMPL *session;
 	size_t size;
 	const char *fmt;
-	uint32_t flags;
 
-	flags = container->flags;
 	json = (WT_CURSOR_JSON *)container->json_private;
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
@@ -340,11 +360,26 @@ int
 __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_DECL_RET;
+	va_list ap;
+
+	va_start(ap, cursor);
+	ret = __wt_cursor_get_valuev(cursor, ap);
+	va_end(ap);
+	return (ret);
+}
+
+/*
+ * __wt_cursor_get_valuev --
+ *	WT_CURSOR->get_value worker implementation.
+ */
+int
+__wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
+{
+	WT_CURSOR_JSON *json;
+	WT_DECL_RET;
 	WT_ITEM *value;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
-	va_list ap;
-	WT_CURSOR_JSON *json;
 
 	json = (WT_CURSOR_JSON *)cursor->json_private;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
@@ -352,7 +387,6 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
 
-	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
 	/* Fast path some common cases: single strings, byte arrays and bits. */
@@ -373,8 +407,6 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 		ret = __wt_struct_unpackv(session,
 		    cursor->value.data, cursor->value.size, fmt, ap);
 
-	va_end(ap);
-
 err:	API_END(session, ret);
 	return (ret);
 }
@@ -386,14 +418,26 @@ err:	API_END(session, ret);
 void
 __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 {
+	va_list ap;
+
+	va_start(ap, cursor);
+	__wt_cursor_set_valuev(cursor, ap);
+	va_end(ap);
+}
+
+/*
+ * __wt_cursor_set_valuev --
+ *	WT_CURSOR->set_value worker implementation.
+ */
+void
+__wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
+{
 	WT_DECL_RET;
 	WT_ITEM *buf, *item;
 	WT_SESSION_IMPL *session;
 	const char *fmt, *str;
 	size_t sz;
-	va_list ap;
 
-	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
@@ -422,8 +466,6 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	} else {
 		WT_ERR(
 		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
-		va_end(ap);
-		va_start(ap, cursor);
 		buf = &cursor->value;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
 		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
@@ -435,7 +477,6 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	if (0) {
 err:		cursor->saved_err = ret;
 	}
-	va_end(ap);
 	API_END(session, ret);
 }
 
@@ -660,6 +701,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_RET(__wt_config_gets_def(session, cfg, "raw", 0, &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
+
+	/* readonly */
+	WT_RET(__wt_cursor_config_readonly(cursor, cfg, 0));
 
 	/*
 	 * Cursors that are internal to some other cursor (such as file cursors

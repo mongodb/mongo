@@ -103,6 +103,14 @@ struct __wt_cursor_btree {
 	int	compare;
 
 	/*
+	 * The key value from a binary search of a row-store files; we keep a
+	 * copy of the last key we retrieved in the search, it avoids having
+	 * doing the additional work of getting the key again for return to
+	 * the application.
+	 */
+	WT_ITEM search_key;
+
+	/*
 	 * It's relatively expensive to calculate the last record on a variable-
 	 * length column-store page because of the repeat values.  Calculate it
 	 * once per page and cache it.  This value doesn't include the skiplist
@@ -233,6 +241,17 @@ struct __wt_cursor_json {
 	char	*value_buf;		/* JSON formatted string */
 	WT_CONFIG_ITEM key_names;	/* Names of key columns */
 	WT_CONFIG_ITEM value_names;	/* Names of value colums */
+};
+
+struct __wt_cursor_metadata {
+	WT_CURSOR iface;
+
+	WT_CURSOR *file_cursor;		/* Queries of regular metadata */
+	WT_ITEM tmp_val;		/* Result of metadata metadata query */
+#define	WT_MDC_POSITIONED	0x01
+#define	WT_MDC_ONMETADATA	0x02
+#define	WT_MDC_TMP_USED		0x04
+	uint32_t flags;
 };
 
 struct __wt_cursor_stat {

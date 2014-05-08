@@ -21,9 +21,9 @@ __wt_read(
 
 	WT_STAT_FAST_CONN_INCR(session, read_io);
 
-	WT_VERBOSE_RET(session, fileops,
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: read %zu bytes at offset %" PRIuMAX,
-	    fh->name, len, (uintmax_t)offset);
+	    fh->name, len, (uintmax_t)offset));
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
 	WT_ASSERT(session,
@@ -60,9 +60,9 @@ __wt_write(WT_SESSION_IMPL *session,
 
 	WT_STAT_FAST_CONN_INCR(session, write_io);
 
-	WT_VERBOSE_RET(session, fileops,
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: write %zu bytes at offset %" PRIuMAX,
-	    fh->name, len, (uintmax_t)offset);
+	    fh->name, len, (uintmax_t)offset));
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
 	WT_ASSERT(session,

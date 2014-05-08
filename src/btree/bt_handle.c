@@ -189,13 +189,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	cfg = btree->dhandle->cfg;
 
 	/* Dump out format information. */
-	if (WT_VERBOSE_ISSET(session, version)) {
+	if (WT_VERBOSE_ISSET(session, WT_VERB_VERSION)) {
 		WT_RET(__wt_config_gets(session, cfg, "version.major", &cval));
 		maj_version = cval.val;
 		WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
 		min_version = cval.val;
-		WT_VERBOSE_RET(session, version,
-		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
+		WT_RET(__wt_verbose(session, WT_VERB_VERSION,
+		    "%" PRIu64 ".%" PRIu64, maj_version, min_version));
 	}
 
 	/* Get the file ID. */
@@ -364,9 +364,9 @@ __wt_btree_tree_open(
 
 	/* Read the page, then build the in-memory version of the page. */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, dsk.mem,
-	    F_ISSET(&dsk, WT_ITEM_MAPPED) ?
-	    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, dsk.data,
+	    WT_DATA_IN_ITEM(&dsk) ?
+	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED , &page));
 
 	/* Finish initializing the root, root reference links. */
 	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);
@@ -599,6 +599,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
+	uint64_t cache_size;
 	uint32_t intl_split_size, leaf_split_size;
 	const char **cfg;
 
@@ -625,6 +626,16 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
 	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
+
+	/*
+	 * Don't let pages grow to more than half the cache size.  Otherwise,
+	 * with very small caches, we can end up in a situation where nothing
+	 * can be evicted.  Take care getting the cache size: with a shared
+	 * cache, it may not have been set.
+	 */
+	cache_size = S2C(session)->cache_size;
+	if (cache_size > 0)
+		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 2);
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))

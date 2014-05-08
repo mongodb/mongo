@@ -135,11 +135,11 @@ __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
 }
 
 /*
- * __eventv --
+ * __wt_eventv --
  * 	Report a message to an event handler.
  */
-static int
-__eventv(WT_SESSION_IMPL *session, int msg_event, int error,
+int
+__wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
@@ -303,7 +303,7 @@ __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	(void)__eventv(session, 0, error, NULL, 0, fmt, ap);
+	(void)__wt_eventv(session, 0, error, NULL, 0, fmt, ap);
 	va_end(ap);
 }
 
@@ -322,7 +322,7 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	(void)__eventv(session, 0, 0, NULL, 0, fmt, ap);
+	(void)__wt_eventv(session, 0, 0, NULL, 0, fmt, ap);
 	va_end(ap);
 }
 
@@ -343,7 +343,7 @@ __wt_ext_err_printf(
 		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
 	va_start(ap, fmt);
-	ret = __eventv(session, 0, 0, NULL, 0, fmt, ap);
+	ret = __wt_eventv(session, 0, 0, NULL, 0, fmt, ap);
 	va_end(ap);
 	return (ret);
 }
@@ -434,23 +434,6 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 }
 
 /*
- * __wt_verbose --
- * 	Verbose message.
- */
-int
-__wt_verbose(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
-{
-	WT_DECL_RET;
-	va_list ap;
-
-	va_start(ap, fmt);
-	ret = __eventv(session, 1, 0, NULL, 0, fmt, ap);
-	va_end(ap);
-	return (ret);
-}
-
-/*
  * __wt_assert --
  *	Assert and other unexpected failures, includes file/line information
  * for debugging.
@@ -463,7 +446,7 @@ __wt_assert(WT_SESSION_IMPL *session,
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)__eventv(session, 0, error, file_name, line_number, fmt, ap);
+	(void)__wt_eventv(session, 0, error, file_name, line_number, fmt, ap);
 	va_end(ap);
 
 #ifdef HAVE_DIAGNOSTIC

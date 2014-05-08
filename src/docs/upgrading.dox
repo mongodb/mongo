@@ -1,5 +1,21 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_213 Upgrading to Version 2.1.3
+<dl>
+
+<dt>WT_SESSION::create prefix_compression disabled by default</dt>
+<dd>
+In the 2.1.3 release, prefix compression default to \c false.  Applications
+that benefit from prefix compression will need to explicitly set
+\c prefix_compression=true when creating tables.
+</dd>
+
+<dt>wiredtiger_open verbose message changes</dt>
+<dd>
+In the 2.1.3 release it is now necessary to include \c --enable-verbose
+in the configure command to be able to use verbose messages.
+</dd>
+
 @section version_212 Upgrading to Version 2.1.2
 <dl>
 

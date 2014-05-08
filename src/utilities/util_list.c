@@ -64,31 +64,8 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_EXTENSION_API *wtext;
 	int found;
 	const char *key, *value, *uri;
-
-	/*
-	 * XXX
-	 * Normally, we don't say anything about the WiredTiger metadata file,
-	 * it's not an "object" in the database.  I'm making an exception for
-	 * -c and -v, the checkpoint and verbose options.
-	 */
-	if (cflag || vflag) {
-		uri = WT_METADATA_URI;
-		printf("%s\n", uri);
-		if (cflag && (ret = list_print_checkpoint(session, uri)) != 0)
-			return (ret);
-		if (vflag) {
-			wtext = session->
-			    connection->get_extension_api(session->connection);
-			if ((ret = wtext->
-			    metadata_search(wtext, session, uri, &value)) != 0)
-				return (
-				    util_err(ret, "metadata search: %s", uri));
-			printf("%s\n", value);
-		}
-	}
 
 	/* Open the metadata file. */
 	uri = "metadata:";
@@ -120,7 +97,16 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 				continue;
 			found = 1;
 		}
-		printf("%s\n", key);
+
+		/*
+		 * XXX
+		 * We don't normally say anything about the WiredTiger
+		 * metadata file, it's not an "object" in the database.  I'm
+		 * making an exception for the checkpoint and verbose options.
+		 */
+		if (!WT_PREFIX_MATCH(key, WT_METADATA_URI) || cflag || vflag)
+			printf("%s\n", key);
+
 		if (!cflag && !vflag)
 			continue;
 

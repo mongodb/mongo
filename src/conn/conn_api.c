@@ -7,6 +7,9 @@
 
 #include "wt_internal.h"
 
+#define	WT_BASECONFIG	"WiredTiger.basecfg"
+#define	WT_USERCONFIG	"WiredTiger.config"
+
 static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
@@ -438,6 +441,46 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __conn_async_flush --
+ *	WT_CONNECTION.async_flush method.
+ */
+static int
+__conn_async_flush(WT_CONNECTION *wt_conn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL_NOCONF(conn, session, async_flush);
+	WT_ERR(__wt_async_flush(conn));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_async_new_op --
+ *	WT_CONNECTION.async_new_op method.
+ */
+static int
+__conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
+    WT_ASYNC_CALLBACK *callback, WT_ASYNC_OP **asyncopp)
+{
+	WT_ASYNC_OP_IMPL *op;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL(conn, session, async_new_op, config, cfg);
+	WT_ERR(__wt_async_new_op(conn, uri, config, cfg, callback, &op));
+
+	*asyncopp = &op->iface;
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __conn_get_home --
  *	WT_CONNECTION.get_home method.
  */
@@ -484,6 +527,7 @@ __conn_is_new(WT_CONNECTION *wt_conn)
 static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -493,7 +537,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
-	WT_UNUSED(cfg);
+
+	WT_ERR(__wt_config_gets(session, cfg, "leak_memory", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_CONN_LEAK_MEMORY);
 
 	/*
 	 * Rollback all running transactions.
@@ -559,6 +606,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 
 	WT_ERR(__conn_statistics_config(session, raw_cfg));
 	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
+	WT_ERR(__wt_checkpoint_server_create(conn, raw_cfg));
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
@@ -602,12 +650,13 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  *	Read in any WiredTiger_config file in the home directory.
  */
 static int
-__conn_config_file(
-    WT_SESSION_IMPL *session, WT_ITEM **cbufp, const char **cfgend)
+__conn_config_file(WT_SESSION_IMPL *session,
+    const char *filename, const char **cfg, WT_ITEM **cbufp)
 {
 	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_FH *fh;
+	const char **cfgend;
 	off_t size;
 	size_t len;
 	int exist, quoted;
@@ -618,13 +667,12 @@ __conn_config_file(
 	fh = NULL;
 
 	/* Check for an optional configuration file. */
-#define	WT_CONFIGFILE	"WiredTiger.config"
-	WT_RET(__wt_exist(session, WT_CONFIGFILE, &exist));
+	WT_RET(__wt_exist(session, filename, &exist));
 	if (!exist)
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, 0, 0, &fh));
+	WT_RET(__wt_open(session, filename, 0, 0, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;
@@ -637,7 +685,8 @@ __conn_config_file(
 	 * and a waste of time.)
 	 */
 	if (size > 100 * 1024)
-		WT_ERR_MSG(session, EFBIG, WT_CONFIGFILE);
+		WT_ERR_MSG(
+		    session, EFBIG, "Configuration file too big: %s", filename);
 	len = (size_t)size;
 
 	/*
@@ -727,6 +776,10 @@ __conn_config_file(
 	WT_ERR(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), cbuf->data, 0));
 
+	/* Move to the end of the list, insert before the last entry. */
+	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
+		;
+	cfgend[1] = *cfgend;
 	*cfgend = cbuf->data;
 	*cbufp = cbuf;
 
@@ -744,11 +797,10 @@ err:		if (cbuf != NULL)
  *	Read configuration from an environment variable, if set.
  */
 static int
-__conn_config_env(
-    WT_SESSION_IMPL *session, const char *cfg[], const char **cfgend)
+__conn_config_env(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	const char *env_config;
+	const char **cfgend, *env_config;
 
 	if ((env_config = getenv("WIREDTIGER_CONFIG")) == NULL ||
 	    strlen(env_config) == 0)
@@ -770,6 +822,10 @@ __conn_config_env(
 	WT_RET(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
 
+	/* Move to the end of the list, insert before the last entry. */
+	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
+		;
+	cfgend[1] = *cfgend;
 	*cfgend = env_config;
 	return (0);
 }
@@ -841,7 +897,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the end-of-file.
 	 */
 	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0)
-		WT_ERR_MSG(session, EBUSY, "%s",
+		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
 
@@ -855,7 +911,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 	if (ret != 0)
-		WT_ERR_MSG(session, EBUSY, "%s",
+		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "thread in this process");
 
@@ -958,25 +1014,27 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
-		{ "block",		WT_VERB_block },
-		{ "checkpoint",		WT_VERB_checkpoint },
-		{ "compact",		WT_VERB_compact },
-		{ "evict",		WT_VERB_evict },
-		{ "evictserver",	WT_VERB_evictserver },
-		{ "fileops",		WT_VERB_fileops },
-		{ "log",		WT_VERB_log },
-		{ "lsm",		WT_VERB_lsm },
-		{ "mutex",		WT_VERB_mutex },
-		{ "overflow",		WT_VERB_overflow },
-		{ "read",		WT_VERB_read },
-		{ "reconcile",		WT_VERB_reconcile },
-		{ "recovery",		WT_VERB_recovery },
-		{ "salvage",		WT_VERB_salvage },
-		{ "shared_cache",	WT_VERB_shared_cache },
-		{ "split",		WT_VERB_split },
-		{ "verify",		WT_VERB_verify },
-		{ "version",		WT_VERB_version },
-		{ "write",		WT_VERB_write },
+		{ "api",		WT_VERB_API },
+		{ "block",		WT_VERB_BLOCK },
+		{ "checkpoint",		WT_VERB_CHECKPOINT },
+		{ "compact",		WT_VERB_COMPACT },
+		{ "evict",		WT_VERB_EVICT },
+		{ "evictserver",	WT_VERB_EVICTSERVER },
+		{ "fileops",		WT_VERB_FILEOPS },
+		{ "log",		WT_VERB_LOG },
+		{ "lsm",		WT_VERB_LSM },
+		{ "metadata",		WT_VERB_METADATA },
+		{ "mutex",		WT_VERB_MUTEX },
+		{ "overflow",		WT_VERB_OVERFLOW },
+		{ "read",		WT_VERB_READ },
+		{ "reconcile",		WT_VERB_RECONCILE },
+		{ "recovery",		WT_VERB_RECOVERY },
+		{ "salvage",		WT_VERB_SALVAGE },
+		{ "shared_cache",	WT_VERB_SHARED_CACHE },
+		{ "split",		WT_VERB_SPLIT },
+		{ "verify",		WT_VERB_VERIFY },
+		{ "version",		WT_VERB_VERSION },
+		{ "write",		WT_VERB_WRITE },
 		{ NULL, 0 }
 	};
 
@@ -984,16 +1042,74 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if ((ret = __wt_config_gets(session, cfg, "verbose", &cval)) != 0)
 		return (ret == WT_NOTFOUND ? 0 : ret);
+
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
-		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0) {
+#ifdef HAVE_VERBOSE
 			FLD_SET(conn->verbose, ft->flag);
-		else
+#else
+			WT_RET_MSG(session, EINVAL,
+			    "Verbose option specified when WiredTiger built "
+			    "without verbose support. Add --enable-verbose to "
+			    "configure command and rebuild to include support "
+			    "for verbose messages");
+#endif
+		} else
 			FLD_CLR(conn->verbose, ft->flag);
 
 		WT_RET_NOTFOUND_OK(ret);
 	}
 	return (0);
+}
+
+/*
+ * __conn_write_config --
+ *	Save the configuration used to create a database.
+ */
+static int
+__conn_write_config(
+    WT_SESSION_IMPL *session, const char *filename, const char *config)
+{
+	FILE *fp;
+	WT_CONFIG parser;
+	WT_CONFIG_ITEM ckey, cval;
+	WT_DECL_RET;
+	char *path;
+
+	/* If there is no configuration, don't bother creating an empty file. */
+	if (config == NULL)
+		return (0);
+
+	WT_RET(__wt_filename(session, filename, &path));
+	if ((fp = fopen(path, "w")) == NULL)
+		ret = __wt_errno();
+	__wt_free(session, path);
+	if (fp == NULL)
+		return (ret);
+
+	fprintf(fp, "# This file is created by WiredTiger.  Do not edit\n");
+	fprintf(fp, "# Instead, create and edit a WiredTiger.config file to\n");
+	fprintf(fp, "# persistently override database settings\n");
+
+	WT_ERR(__wt_config_init(session, &parser, config));
+	while ((ret = __wt_config_next(&parser, &ckey, &cval)) == 0) {
+		/* Skip "create". */
+		if (WT_STRING_MATCH("create", ckey.str, ckey.len))
+			continue;
+
+		/* Fix quoting for non-trivial settings. */
+		if (cval.type == WT_CONFIG_ITEM_STRING) {
+			--cval.str;
+			cval.len += 2;
+		}
+		fprintf(fp, "%.*s=%.*s\n",
+		    (int)ckey.len, ckey.str, (int)cval.len, cval.str);
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	WT_TRET(fclose(fp));
+	return (ret);
 }
 
 /*
@@ -1006,6 +1122,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
 	static const WT_CONNECTION stdc = {
+		__conn_async_flush,
+		__conn_async_new_op,
 		__conn_close,
 		__conn_reconfigure,
 		__conn_get_home,
@@ -1033,7 +1151,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	const char *cfg[5], **cfgend;
+	/* Leave space for optional additional configuration. */
+	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
 
 	*wt_connp = NULL;
 
@@ -1067,8 +1186,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    WT_CONFIG_REF(session, wiredtiger_open), config, 0));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
-	/* Leave space for optional additional configuration. */
-	cfg[2] = cfg[3] = cfg[4] = NULL;
 
 	/* Finish configuring error messages so we get them right early. */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
@@ -1083,25 +1200,25 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_single(session, cfg));
 
 	/*
-	 * Build the configuration stack.
+	 * Build the configuration stack, in the following order (where later
+	 * entries override earlier entries):
 	 *
-	 * The configuration file falls between the default configuration and
-	 * the wiredtiger_open() configuration, overriding the defaults but not
-	 * overriding the value passed by the application.  The environment
-	 * setting overrides the configuration file (if any), but not the
-	 * config passed by the application.
+	 * 1. default wiredtiger_open configuration
+	 * 2. base configuration file, created with the database (optional)
+	 * 3. user configuration file (optional)
+	 * 4. environment variable settings (optional)
+	 * 5. the config passed in by the application.
 	 *
 	 * Track the end of the stack, which always points to the config passed
 	 * by the application.
 	 */
-	cfgend = &cfg[1];
-	WT_ERR(__conn_config_file(session, &cbuf, cfgend));
-	if (*cfgend != config)
-		*++cfgend = config;
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbuf));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cbuf));
+	WT_ERR(__conn_config_env(session, cfg));
 
-	WT_ERR(__conn_config_env(session, cfg, cfgend));
-	if (*cfgend != config)
-		*++cfgend = config;
+	/* Write the base configuration file, if we're creating the database. */
+	if (conn->is_new)
+		WT_ERR(__conn_write_config(session, WT_BASECONFIG, config));
 
 	/*
 	 * Configuration ...
@@ -1167,7 +1284,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_statistics_config(session, cfg));
 
 	/* Now that we know if verbose is configured, output the version. */
-	WT_VERBOSE_ERR(session, version, "%s", WIREDTIGER_VERSION_STRING);
+	WT_ERR(__wt_verbose(
+	    session, WT_VERB_VERSION, "%s", WIREDTIGER_VERSION_STRING));
 
 	/*
 	 * Open the connection, then reset the local session as the real one

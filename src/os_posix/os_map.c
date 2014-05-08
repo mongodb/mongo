@@ -16,8 +16,8 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 {
 	void *map;
 
-	WT_VERBOSE_RET(session, fileops,
-	    "%s: map %" PRIuMAX " bytes", fh->name, (uintmax_t)fh->size);
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: map %" PRIuMAX " bytes", fh->name, (uintmax_t)fh->size));
 
 	if ((map = mmap(NULL, (size_t)fh->size,
 	    PROT_READ,
@@ -43,7 +43,7 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
  *	Cause a section of a memory map to be faulted in.
  */
 int
-__wt_mmap_preload(WT_SESSION_IMPL *session, void *p, size_t size)
+__wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size)
 {
 #ifdef HAVE_POSIX_MADVISE
 	/* Linux requires the address be aligned to a 4KB boundary. */
@@ -110,8 +110,8 @@ __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size)
 int
 __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len)
 {
-	WT_VERBOSE_RET(session, fileops,
-	    "%s: unmap %" PRIuMAX " bytes", fh->name, (uintmax_t)len);
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: unmap %" PRIuMAX " bytes", fh->name, (uintmax_t)len));
 
 	if (munmap(map, len) == 0)
 		return (0);

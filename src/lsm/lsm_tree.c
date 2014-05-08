@@ -165,12 +165,19 @@ __lsm_tree_set_name(WT_SESSION_IMPL *session,
  *	Get the URI of the Bloom filter for a given chunk.
  */
 int
-__wt_lsm_tree_bloom_name(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, uint32_t id, WT_ITEM *buf)
+__wt_lsm_tree_bloom_name(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, uint32_t id, const char **retp)
 {
-	WT_RET(__wt_buf_fmt(session, buf, "file:%s-%06" PRIu32 ".bf",
-	    lsm_tree->filename, id));
-	return (0);
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_buf_fmt(
+	    session, tmp, "file:%s-%06" PRIu32 ".bf", lsm_tree->filename, id));
+	WT_ERR(__wt_strndup(session, tmp->data, tmp->size, retp));
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
 }
 
 /*
@@ -178,12 +185,19 @@ __wt_lsm_tree_bloom_name(
  *	Get the URI of the file for a given chunk.
  */
 int
-__wt_lsm_tree_chunk_name(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, uint32_t id, WT_ITEM *buf)
+__wt_lsm_tree_chunk_name(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, uint32_t id, const char **retp)
 {
-	WT_RET(__wt_buf_fmt(session, buf, "file:%s-%06" PRIu32 ".lsm",
-	    lsm_tree->filename, id));
-	return (0);
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_buf_fmt(
+	    session, tmp, "file:%s-%06" PRIu32 ".lsm", lsm_tree->filename, id));
+	WT_ERR(__wt_strndup(session, tmp->data, tmp->size, retp));
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
 }
 
 /*
@@ -217,17 +231,14 @@ int
 __wt_lsm_tree_setup_chunk(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-	WT_ITEM buf;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
 	int exists;
 
-	WT_CLEAR(buf);
-
 	WT_RET(__wt_epoch(session, &chunk->create_ts));
 
-	WT_RET(__wt_lsm_tree_chunk_name(session, lsm_tree, chunk->id, &buf));
-	chunk->uri = __wt_buf_steal(session, &buf);
+	WT_RET(__wt_lsm_tree_chunk_name(
+	    session, lsm_tree, chunk->id, &chunk->uri));
 
 	/*
 	 * If the underlying file exists, drop the chunk first - there may be
@@ -421,7 +432,8 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s%s,key_format=u,value_format=u,memory_page_max=%" PRIu64,
 	    tmpconfig, config, 2 * lsm_tree->chunk_max));
-	lsm_tree->file_config = __wt_buf_steal(session, buf);
+	WT_ERR(__wt_strndup(
+	    session, buf->data, buf->size, &lsm_tree->file_config));
 
 	/* Create the first chunk and flush the metadata. */
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
@@ -752,10 +764,10 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    nchunks + 1, &lsm_tree->chunk));
 
-	WT_VERBOSE_ERR(session, lsm,
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 	    "Tree switch to: %" PRIu32 ", checkpoint throttle %ld, "
 	    "merge throttle %ld",
-	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle);
+	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle));
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;
@@ -838,7 +850,6 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
     const char *olduri, const char *newuri, const char *cfg[])
 {
 	WT_DECL_RET;
-	WT_ITEM buf;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	const char *old;
@@ -846,7 +857,6 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	int locked;
 
 	old = NULL;
-	WT_CLEAR(buf);
 	locked = 0;
 
 	/* Get the LSM tree. */
@@ -869,8 +879,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		chunk->uri = NULL;
 
 		WT_ERR(__wt_lsm_tree_chunk_name(
-		    session, lsm_tree, chunk->id, &buf));
-		chunk->uri = __wt_buf_steal(session, &buf);
+		    session, lsm_tree, chunk->id, &chunk->uri));
 		WT_ERR(__wt_schema_rename(session, old, chunk->uri, cfg));
 		__wt_free(session, old);
 
@@ -878,8 +887,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 			old = chunk->bloom_uri;
 			chunk->bloom_uri = NULL;
 			WT_ERR(__wt_lsm_tree_bloom_name(
-			    session, lsm_tree, chunk->id, &buf));
-			chunk->bloom_uri = __wt_buf_steal(session, &buf);
+			    session, lsm_tree, chunk->id, &chunk->bloom_uri));
 			F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 			WT_ERR(__wt_schema_rename(
 			    session, old, chunk->uri, cfg));
@@ -1080,16 +1088,17 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
+	int exclusive;
 
-	WT_RET(__wt_lsm_tree_get(session, uri,
-	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
+	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
+	WT_RET(__wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
 
 	/*
 	 * We mark that we're busy using the tree to coordinate
 	 * with merges so that merging doesn't change the chunk
 	 * array out from underneath us.
 	 */
-	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
+	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, exclusive));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (file_func == __wt_checkpoint &&

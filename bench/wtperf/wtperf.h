@@ -93,6 +93,8 @@ struct __config {			/* Configuration struction */
 
 	FILE *logf;			/* Logging handle */
 
+	char *async_config;		/* Config string for async */
+
 	const char *compress_ext;	/* Compression extension for conn */
 	const char *compress_table;	/* Compression arg to table create */
 
@@ -105,6 +107,7 @@ struct __config {			/* Configuration struction */
 	WORKLOAD	*workload;		/* Workloads */
 	u_int		 workload_cnt;
 
+	uint32_t	 use_asyncops;		/* Use async operations */
 	/* State tracking variables. */
 
 	uint64_t ckpt_ops;		/* checkpoint operations */
