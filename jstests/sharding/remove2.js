@@ -78,7 +78,8 @@ var st = new ShardingTest( testName = "remove2",
                            { chunkSize : 1,
                              rs : true,
                              rs0 : { nodes : 2 },
-                             rs1 : { nodes : 2 }
+                             rs1 : { nodes : 2 },
+                             enableBalancer: true
                            });
 
 // Pending resolution of SERVER-8598, we need to wait for deletion after chunk migrations to avoid

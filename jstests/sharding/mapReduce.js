@@ -8,7 +8,7 @@ verifyOutput = function(out) {
 }
 
 
-s = new ShardingTest( "mrShard" , 2 , 1 , 1 , { chunksize : 1 } );
+s = new ShardingTest( "mrShard" , 2 , 1 , 1 , { chunksize : 1, enableBalancer : 1 } );
 
 s.adminCommand( { enablesharding : "mrShard" } )
 s.adminCommand( { shardcollection : "mrShard.srcSharded", key : { "_id" : 1 } } )

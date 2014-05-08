@@ -1,6 +1,6 @@
 // tests sharding with replica sets
 
-s = new ShardingTest( "rs1" , 3 /* numShards */, 1 /* verboseLevel */, 2 /* numMongos */, { rs : true , chunksize : 1 } )
+s = new ShardingTest( "rs1" , 3 /* numShards */, 1 /* verboseLevel */, 2 /* numMongos */, { rs : true , chunksize : 1, enableBalancer : true } )
 
 s.adminCommand( { enablesharding : "test" } );
 s.config.settings.update( { _id: "balancer" }, { $set : { _waitForDelete : true } } , true );

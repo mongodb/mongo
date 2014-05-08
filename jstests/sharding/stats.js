@@ -1,4 +1,4 @@
-s = new ShardingTest( "stats" , 2 , 1 , 1 );
+s = new ShardingTest( "stats" , 2 , 1 , 1, { enableBalancer : 1 } );
 s.adminCommand( { enablesharding : "test" } );
 
 a = s._connections[0].getDB( "test" );
