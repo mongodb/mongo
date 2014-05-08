@@ -69,8 +69,8 @@ struct __wt_btree {
 	const char *value_format;	/* Value format */
 	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
-					/* Row-store comparison function */
-	WT_COLLATOR *collator;		/* Comparison function */
+	WT_COLLATOR *collator;		/* Row-store comparator */
+	int appending;			/* Row-store workload has appends */
 
 	uint32_t id;			/* File ID, for logging */
 

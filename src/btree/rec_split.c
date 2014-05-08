@@ -539,7 +539,7 @@ __split_inmem_build(
 			}
 
 			/* Search the page. */
-			WT_ERR(__wt_row_search(session, key, ref, &cbt));
+			WT_ERR(__wt_row_search(session, key, ref, &cbt, 1));
 
 			/* Apply the modification. */
 			WT_ERR(
