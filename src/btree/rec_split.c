@@ -640,7 +640,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 int
 __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
-	WT_CELL_UNPACK *kpack, _kpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_PAGE *parent, *child;
@@ -651,7 +650,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, hazard, locked;
 
-	kpack = &_kpack;
 	alloc_index = NULL;
 	parent_ref = NULL;
 	ref_tmp = NULL;
