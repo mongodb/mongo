@@ -295,8 +295,7 @@ __wt_update_serial(
 	 */
 	 WT_RET(__page_write_gen_wrapped_check(page));
 
-	ret = __update_serial_func(
-	    session, page, srch_upd, upd);
+	ret = __update_serial_func(session, page, srch_upd, upd);
 
 	/* Free unused memory on error. */
 	if (ret != 0) {
