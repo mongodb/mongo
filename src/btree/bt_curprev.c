@@ -51,7 +51,7 @@ restart:
 			key.data = WT_INSERT_KEY(current);
 			key.size = WT_INSERT_KEY_SIZE(current);
 			WT_RET(__wt_search_insert(
-			    session, cbt, cbt->ins_head, &key));
+			    session, cbt, cbt->ins_head, &key, 0));
 		} else
 			cbt->ins = __col_insert_search(cbt->ins_head,
 			    cbt->ins_stack, cbt->next_stack,

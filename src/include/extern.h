@@ -506,11 +506,13 @@ extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,
 extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     WT_INSERT_HEAD *inshead,
-    WT_ITEM *srch_key);
+    WT_ITEM *srch_key,
+    int insert);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key,
     WT_REF *leaf,
-    WT_CURSOR_BTREE *cbt);
+    WT_CURSOR_BTREE *cbt,
+    int insert);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,
     WT_CONFIG *conf,
