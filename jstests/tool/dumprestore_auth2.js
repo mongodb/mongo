@@ -1,57 +1,96 @@
 // dumprestore_auth2.js
 // Tests that mongodump and mongorestore properly handle access control information
+// Tests that the default auth roles of backup and restore work properly.
 
-t = new ToolTest( "dumprestore_auth2" );
+t = new ToolTest("dumprestore_auth2", {auth: ""});
 
-t.startDB( "foo" );
+coll = t.startDB("foo");
+admindb = coll.getDB().getSiblingDB("admin")
 
-db = t.db.getSiblingDB("admin")
+// Create the relevant users and roles.
+admindb.createUser({user: "root", pwd: "pass", roles: ["root"]});
+admindb.auth("root", "pass");
 
-db.createUser({user: 'user',pwd: 'password', roles: jsTest.basicUserRoles});
-db.createRole({role: 'role', roles: [], privileges:[]});
+admindb.createUser({user: "backup", pwd: "pass", roles: ["backup"]});
+admindb.createUser({user: "restore", pwd: "pass", roles: ["restore"]});
 
-assert.eq(1, db.system.users.count(), "setup")
-assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}),
-          "setup2: " + tojson( db.system.users.getIndexes() ) );
-assert.eq(1, db.system.roles.count(), "setup3")
-assert.eq(2, db.system.indexes.count({ns: "admin.system.roles"}), "setup4")
-assert.eq(1, db.system.version.count());
-var versionDoc = db.system.version.findOne();
+admindb.createRole({role: "customRole",
+                    privileges:[{resource: {db: "jstests_tool_dumprestore_auth2",
+                                            collection: "foo"},
+                                 actions: ["find"]}],
+                    roles:[]});
+admindb.createUser({user: "test", pwd: "pass", roles: ["customRole"]});
 
-t.runTool( "dump" , "--out" , t.ext );
+coll.insert({word: "tomato"});
+assert.eq(1, coll.count());
 
-db.dropDatabase()
+assert.eq(4, admindb.system.users.count(), "setup users")
+assert.eq(2, admindb.system.indexes.count({ns: "admin.system.users"}),
+          "setup2: " + tojson( admindb.system.users.getIndexes() ) );
+assert.eq(1, admindb.system.roles.count(), "setup3")
+assert.eq(2, admindb.system.indexes.count({ns: "admin.system.roles"}), "setup4")
+assert.eq(1, admindb.system.version.count());
+var versionDoc = admindb.system.version.findOne();
 
-assert.eq(0, db.system.users.count(), "didn't drop users")
-assert.eq(0, db.system.roles.count(), "didn't drop roles")
-assert.eq(0, db.system.version.count(), "didn't drop version");
-assert.eq(0, db.system.indexes.count(), "didn't drop indexes")
+// Logout root user.
+admindb.logout();
 
-t.runTool("restore", "--dir", t.ext)
+// Verify that the custom role works as expected.
+admindb.auth("test", "pass");
+assert.eq("tomato", coll.findOne().word);
+admindb.logout();
 
-assert.soon("db.system.users.findOne()", "no data after restore");
-assert.eq(1, db.system.users.find({user:'user'}).count(), "didn't restore users")
-assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}), "didn't restore user indexes")
-assert.eq(1, db.system.roles.find({role:'role'}).count(), "didn't restore roles")
-assert.eq(2, db.system.indexes.count({ns: "admin.system.roles"}), "didn't restore role indexes")
-assert.eq(1, db.system.version.count(), "didn't restore version");
-assert.docEq(versionDoc, db.system.version.findOne(), "version doc wasn't restored properly");
+// Dump the database.
+t.runTool("dump", "--out", t.ext, "--username", "backup", "--password", "pass");
 
-db.dropUser('user')
-db.createUser({user: 'user2', pwd: 'password2', roles: jsTest.basicUserRoles});
-db.dropRole('role')
-db.createRole({role: 'role2', roles: [], privileges:[]});
+// Drop the relevant data in the database.
+admindb.auth("root", "pass");
+coll.getDB().dropDatabase();
+admindb.dropUser("backup");
+admindb.dropUser("test");
+admindb.dropRole("customRole");
 
-t.runTool("restore", "--dir", t.ext, "--drop")
+assert.eq(2, admindb.system.users.count(), "didn't drop backup and test users");
+assert.eq(0, admindb.system.roles.count(), "didn't drop roles");
+assert.eq(0, coll.count(), "didn't drop foo coll");
 
-assert.soon("1 == db.system.users.find({user:'user'}).count()", "didn't restore users 2")
-assert.eq(0, db.system.users.find({user:'user2'}).count(), "didn't drop users")
-assert.eq(0, db.system.roles.find({role:'role2'}).count(), "didn't drop roles")
-assert.eq(1, db.system.roles.find({role:'role'}).count(), "didn't restore roles")
-assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}), "didn't maintain user indexes")
-assert.eq(2, db.system.indexes.count({ns: "admin.system.roles"}), "didn't maintain role indexes")
-assert.eq(1, db.system.version.count(), "didn't restore version");
-assert.docEq(versionDoc, db.system.version.findOne(), "version doc wasn't restored properly");
+t.runTool("restore", "--dir", t.ext, "--username", "restore", "--password", "pass");
+
+assert.soon("admindb.system.users.findOne()", "no data after restore");
+assert.eq(4, admindb.system.users.count(), "didn't restore users");
+assert.eq(2, admindb.system.indexes.count({ns: "admin.system.users"}),
+          "didn't restore user indexes");
+assert.eq(1, admindb.system.roles.find({role:'customRole'}).count(), "didn't restore roles");
+assert.eq(2, admindb.system.indexes.count({ns: "admin.system.roles"}),
+          "didn't restore role indexes");
+
+admindb.logout();
+
+// Login as user with customRole to verify privileges are restored.
+admindb.auth("test", "pass");
+assert.eq("tomato", coll.findOne().word);
+admindb.logout();
+
+admindb.auth("root", "pass");
+admindb.createUser({user: "root2", pwd: "pass", roles: ["root"]});
+admindb.dropRole("customRole");
+admindb.createRole({role: "customRole2", roles: [], privileges:[]});
+admindb.dropUser("root");
+admindb.logout();
+
+t.runTool("restore", "--dir", t.ext, "--username", "restore", "--password", "pass", "--drop");
+
+admindb.auth("root", "pass");
+assert.soon("1 == admindb.system.users.find({user:'root'}).count()", "didn't restore users 2");
+assert.eq(0, admindb.system.users.find({user:'root2'}).count(), "didn't drop users");
+assert.eq(0, admindb.system.roles.find({role:'customRole2'}).count(), "didn't drop roles");
+assert.eq(1, admindb.system.roles.find({role:'customRole'}).count(), "didn't restore roles");
+assert.eq(2, admindb.system.indexes.count({ns: "admin.system.users"}),
+          "didn't maintain user indexes");
+assert.eq(2, admindb.system.indexes.count({ns: "admin.system.roles"}),
+          "didn't maintain role indexes");
+assert.eq(1, admindb.system.version.count(), "didn't restore version");
+assert.docEq(versionDoc, admindb.system.version.findOne(), "version doc wasn't restored properly");
+admindb.logout();
 
 t.stop();
-
