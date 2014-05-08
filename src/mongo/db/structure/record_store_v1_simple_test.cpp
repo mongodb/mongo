@@ -38,6 +38,8 @@ using namespace mongo;
 
 namespace {
 
+    char zeros[20*1024*1024] = {};
+
     TEST( SimpleRecordStoreV1, quantizeAllocationSpaceSimple ) {
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(33),       36);
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(1000),     1024);
@@ -403,4 +405,54 @@ namespace {
         Record* record = rs.recordFor( result.getValue() );
         ASSERT_EQUALS( string("abc"), string(record->data()) );
     }
+
+    // ----------------
+
+    /**
+     * Inserts take the first deleted record with the correct size.
+     */
+    TEST( SimpleRecordStoreV1, InsertTakesFirstDeletedWithExactSize ) {
+        DummyTransactionExperiment txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 100},
+                {DiskLoc(0, 1100), 100},
+                {DiskLoc(0, 1300), 100},
+                {DiskLoc(2, 1100), 100},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1200), 100},
+                {DiskLoc(2, 1100), 100},
+                {DiskLoc(1, 1000), 1000},
+                {}
+            };
+
+            initializeV1RS(&txn, recs, drecs, &em, md);
+        }
+
+        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, 0);
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 100},
+                {DiskLoc(0, 1100), 100},
+                {DiskLoc(0, 1300), 100},
+                {DiskLoc(0, 1200), 100},
+                {DiskLoc(2, 1100), 100},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(2, 1100), 100},
+                {DiskLoc(1, 1000), 1000},
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
+    }
+
 }

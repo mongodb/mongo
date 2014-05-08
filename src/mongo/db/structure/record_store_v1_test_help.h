@@ -176,5 +176,43 @@ namespace mongo {
 
         std::vector<ExtentInfo> _extents;
     };
+    
+    struct LocAndSize {
+        DiskLoc loc;
+        int size; // with headers
+    };
 
+    /**
+     * Creates a V1 structure with the passed in records and DeletedRecords (drecs).
+     *
+     * List of LocAndSize are terminated by a Null DiskLoc. Passing a NULL pointer is shorthand for
+     * an empty list. Each extent gets it's own DiskLoc file number. DiskLoc Offsets must be > 1000.
+     *
+     * records must be sorted by extent/file. offsets within an extent can be in any order.
+     *
+     * drecs must be grouped into size-buckets, but the ordering within the size buckets is up to
+     * you.
+     *
+     * You are responsible for ensuring the records and drecs don't overlap (unless you are testing
+     * a corrupt initial state).
+     *
+     * ExtentManager and MetaData must both be empty.
+     */
+    void initializeV1RS(TransactionExperiment* txn,
+                        const LocAndSize* records,
+                        const LocAndSize* drecs,
+                        DummyExtentManager* em,
+                        DummyRecordStoreV1MetaData* md);
+
+    /**
+     * Asserts that the V1RecordStore defined by md has the passed in records and drecs in the
+     * correct order.
+     *
+     * List of LocAndSize are terminated by a Null DiskLoc. Passing a NULL pointer means don't check
+     * that list.
+     */
+    void assertStateV1RS(const LocAndSize* records,
+                         const LocAndSize* drecs,
+                         const ExtentManager* em,
+                         const DummyRecordStoreV1MetaData* md);
 }

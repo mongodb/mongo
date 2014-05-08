@@ -30,7 +30,14 @@
 
 #include "mongo/db/structure/record_store_v1_test_help.h"
 
+#include <algorithm>
+#include <map>
+#include <set>
+#include <vector>
+
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/record.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
     bool DummyTransactionExperiment::commitIfNeeded( bool force ) {
@@ -235,7 +242,7 @@ namespace mongo {
         DiskLoc loc( _extents.size(), 0 );
         _extents.push_back( info );
 
-        Extent* e = getExtent( loc );
+        Extent* e = getExtent( loc, false );
         e->magic = Extent::extentSignature;
         e->myLoc = loc;
         e->xnext.Null();
@@ -262,7 +269,7 @@ namespace mongo {
 
     Record* DummyExtentManager::recordForV1( const DiskLoc& loc ) const {
         invariant( static_cast<size_t>( loc.a() ) < _extents.size() );
-        //log() << "DummyExtentManager::recordForV1: " << loc;
+        invariant( static_cast<size_t>( loc.getOfs() ) < _extents[loc.a()].length );
         char* root = _extents[loc.a()].data;
         return reinterpret_cast<Record*>( root + loc.getOfs() );
     }
@@ -279,7 +286,10 @@ namespace mongo {
         invariant( !loc.isNull() );
         invariant( static_cast<size_t>( loc.a() ) < _extents.size() );
         invariant( loc.getOfs() == 0 );
-        return reinterpret_cast<Extent*>( _extents[loc.a()].data );
+        Extent* ext = reinterpret_cast<Extent*>( _extents[loc.a()].data );
+        if (doSanityCheck)
+            ext->assertOk();
+        return ext;
     }
 
     int DummyExtentManager::maxSize() const {
@@ -290,5 +300,256 @@ namespace mongo {
         return new CacheHint();
     }
 
+namespace {
+    void accumulateExtentSizeRequirements(const LocAndSize* las, std::map<int, size_t>* sizes) {
+        if (!las)
+            return;
 
+        while (!las->loc.isNull()) {
+            // We require passed in offsets to be > 1000 to leave room for Extent headers.
+            invariant(Extent::HeaderSize() < 1000);
+            invariant(las->loc.getOfs() >= 1000);
+
+            const size_t end = las->loc.getOfs() + las->size;
+            size_t& sizeNeeded = (*sizes)[las->loc.a()];
+            sizeNeeded = std::max(sizeNeeded, end);
+            las++;
+        }
+    }
+
+    void printRecList(const ExtentManager* em, const RecordStoreV1MetaData* md) {
+        log() << " *** BEGIN ACTUAL RECORD LIST *** ";
+        DiskLoc extLoc = md->firstExtent();
+        std::set<DiskLoc> seenLocs;
+        while (!extLoc.isNull()) {
+            Extent* ext = em->getExtent(extLoc, true);
+            DiskLoc actualLoc = ext->firstRecord;
+            while (!actualLoc.isNull()) {
+                const Record* actualRec = em->recordForV1(actualLoc);
+                const int actualSize = actualRec->lengthWithHeaders();
+
+                log() << "loc: " << actualLoc // <--hex
+                      << " (" << actualLoc.getOfs() << ") size: " << actualSize;
+
+                const bool foundCycle = !seenLocs.insert(actualLoc).second;
+                invariant(!foundCycle);
+
+                const int nextOfs = actualRec->nextOfs();
+                actualLoc = (nextOfs == DiskLoc::NullOfs ? DiskLoc()
+                                                         : DiskLoc(actualLoc.a(), nextOfs));
+            }
+            extLoc = ext->xnext;
+        }
+        log() << " *** END ACTUAL RECORD LIST *** ";
+    }
+
+    void printDRecList(const ExtentManager* em, const RecordStoreV1MetaData* md) {
+        log() << " *** BEGIN ACTUAL DELETED RECORD LIST *** ";
+        std::set<DiskLoc> seenLocs;
+        for (int bucketIdx = 0; bucketIdx < RecordStoreV1Base::Buckets; bucketIdx++) {
+            DiskLoc actualLoc = md->deletedListEntry(bucketIdx);
+            while (!actualLoc.isNull()) {
+                const DeletedRecord* actualDrec = &em->recordForV1(actualLoc)->asDeleted();
+                const int actualSize = actualDrec->lengthWithHeaders();
+
+
+                log() << "loc: " << actualLoc // <--hex
+                      << " (" << actualLoc.getOfs() << ") size: " << actualSize;
+
+                const bool foundCycle = !seenLocs.insert(actualLoc).second;
+                invariant(!foundCycle);
+
+                actualLoc = actualDrec->nextDeleted();
+            }
+        }
+        log() << " *** END ACTUAL DELETED RECORD LIST *** ";
+    }
+}
+
+    void initializeV1RS(TransactionExperiment* txn,
+                        const LocAndSize* records,
+                        const LocAndSize* drecs,
+                        DummyExtentManager* em,
+                        DummyRecordStoreV1MetaData* md) {
+        invariant(records || drecs); // if both are NULL nothing is being created...
+        invariant(em->numFiles() == 0);
+        invariant(md->firstExtent().isNull());
+
+        // pre-allocate extents (even extents that aren't part of this RS)
+        {
+            typedef std::map<int, size_t> ExtentSizes;
+            ExtentSizes extentSizes;
+            accumulateExtentSizeRequirements(records, &extentSizes);
+            accumulateExtentSizeRequirements(drecs, &extentSizes);
+            invariant(!extentSizes.empty());
+
+            const int maxExtent = extentSizes.rbegin()->first;
+            for (int i = 0; i <= maxExtent; i++) {
+                const size_t size = extentSizes.count(i) ? extentSizes[i] : 0;
+                const DiskLoc loc = em->allocateExtent(txn, md->isCapped(), size, 0);
+
+                // This function and assertState depend on these details of DummyExtentManager
+                invariant(loc.a() == i);
+                invariant(loc.getOfs() == 0);
+            }
+
+            // link together extents that should be part of this RS
+            md->setFirstExtent(txn, DiskLoc(extentSizes.begin()->first, 0));
+            for (ExtentSizes::iterator it = extentSizes.begin();
+                    boost::next(it) != extentSizes.end(); /* ++it */ ) {
+                const int a = it->first;
+                ++it;
+                const int b = it->first;
+                em->getExtent(DiskLoc(a, 0))->xnext = DiskLoc(b, 0);
+                em->getExtent(DiskLoc(b, 0))->xprev = DiskLoc(a, 0);
+            }
+        }
+
+        if (records && !records[0].loc.isNull()) {
+            // TODO figure out how to handle capExtent specially in cappedCollections
+            int recIdx = 0;
+            DiskLoc extLoc = md->firstExtent();
+            while (!extLoc.isNull()) {
+                Extent* ext = em->getExtent(extLoc);
+                while (extLoc.a() == records[recIdx].loc.a()) { // for all records in this extent
+                    const DiskLoc loc = records[recIdx].loc;
+                    const int size = records[recIdx].size;;
+                    invariant(size >= Record::HeaderSize);
+
+                    md->incrementStats(txn, size - Record::HeaderSize, 1);
+
+                    if (ext->firstRecord.isNull())
+                        ext->firstRecord = loc;
+
+                    Record* rec = em->recordForV1(loc);
+                    rec->lengthWithHeaders() = size;
+                    rec->extentOfs() = 0;
+
+                    const DiskLoc nextLoc = records[++recIdx].loc;
+                    if (nextLoc.a() == loc.a()) {
+                        Record* nextRec = em->recordForV1(loc);
+                        rec->nextOfs() = nextLoc.getOfs();
+                        nextRec->prevOfs() = loc.getOfs();
+                    }
+                    else {
+                        rec->nextOfs() = DiskLoc::NullOfs;
+                        ext->lastRecord = loc;
+                    }
+                }
+                extLoc = ext->xnext;
+            }
+            invariant(records[recIdx].loc.isNull());
+        }
+
+        if (drecs && !drecs[0].loc.isNull()) {
+            int drecIdx = 0;
+            DiskLoc* prevNextPtr = NULL;
+            int lastBucket = -1;
+            while (!drecs[drecIdx].loc.isNull()) {
+                const DiskLoc loc = drecs[drecIdx].loc;
+                const int size = drecs[drecIdx].size;
+                invariant(size >= Record::HeaderSize);
+                const int bucket = RecordStoreV1Base::bucket(size);
+
+                if (bucket != lastBucket) {
+                    invariant(bucket > lastBucket); // if this fails, drecs weren't sorted by bucket
+                    md->setDeletedListEntry(txn, bucket, loc);
+                    lastBucket = bucket;
+                }
+                else {
+                    *prevNextPtr = loc;
+                }
+
+                DeletedRecord* drec = &em->recordForV1(loc)->asDeleted();
+                drec->lengthWithHeaders() = size;
+                drec->extentOfs() = 0;
+                drec->nextDeleted() = DiskLoc();
+                prevNextPtr = &drec->nextDeleted();
+
+                drecIdx++;
+            }
+        }
+
+        // Make sure we set everything up as requested.
+        assertStateV1RS(records, drecs, em, md);
+    }
+
+    void assertStateV1RS(const LocAndSize* records,
+                         const LocAndSize* drecs,
+                         const ExtentManager* em,
+                         const DummyRecordStoreV1MetaData* md) {
+        invariant(records || drecs); // if both are NULL nothing is being asserted...
+
+        if (records) {
+            try {
+                long long dataSize = 0;
+                long long numRecs = 0;
+
+                int recIdx = 0;
+
+                DiskLoc extLoc = md->firstExtent();
+                while (!extLoc.isNull()) {
+                    Extent* ext = em->getExtent(extLoc, true);
+                    DiskLoc actualLoc = ext->firstRecord;
+                    while (!actualLoc.isNull()) {
+                        const Record* actualRec = em->recordForV1(actualLoc);
+                        const int actualSize = actualRec->lengthWithHeaders();
+
+                        dataSize += actualSize - Record::HeaderSize;
+                        numRecs += 1;
+
+                        ASSERT_EQUALS(actualLoc, records[recIdx].loc);
+                        ASSERT_EQUALS(actualSize, records[recIdx].size);
+
+                        ASSERT_EQUALS(actualRec->extentOfs(), extLoc.getOfs());
+
+                        recIdx++;
+                        const int nextOfs = actualRec->nextOfs();
+                        actualLoc = (nextOfs == DiskLoc::NullOfs ? DiskLoc()
+                                                                 : DiskLoc(actualLoc.a(), nextOfs));
+                    }
+                    extLoc = ext->xnext;
+                }
+
+                // both the expected and actual record lists must be done at this point
+                ASSERT_EQUALS(records[recIdx].loc, DiskLoc());
+
+                ASSERT_EQUALS(dataSize, md->dataSize());
+                ASSERT_EQUALS(numRecs, md->numRecords());
+            }
+            catch (...) {
+                printRecList(em, md);
+                throw;
+            }
+        }
+
+        if (drecs) {
+            try {
+                int drecIdx = 0;
+                for (int bucketIdx = 0; bucketIdx < RecordStoreV1Base::Buckets; bucketIdx++) {
+                    DiskLoc actualLoc = md->deletedListEntry(bucketIdx);
+                    while (!actualLoc.isNull()) {
+                        const DeletedRecord* actualDrec = &em->recordForV1(actualLoc)->asDeleted();
+                        const int actualSize = actualDrec->lengthWithHeaders();
+
+                        ASSERT_EQUALS(actualLoc, drecs[drecIdx].loc);
+                        ASSERT_EQUALS(actualSize, drecs[drecIdx].size);
+
+                        // Make sure the drec is correct
+                        ASSERT_EQUALS(actualDrec->extentOfs(), 0);
+                        ASSERT_EQUALS(bucketIdx, RecordStoreV1Base::bucket(actualSize));
+
+                        drecIdx++;
+                        actualLoc = actualDrec->nextDeleted();
+                    }
+                }
+                // both the expected and actual deleted lists must be done at this point
+                ASSERT_EQUALS(drecs[drecIdx].loc, DiskLoc());
+            }
+            catch (...) {
+                printDRecList(em, md);
+                throw;
+            }
+        }
+    }
 }
