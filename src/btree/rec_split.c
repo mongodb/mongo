@@ -60,6 +60,40 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __split_ovfl_key_cleanup --
+ *	Handle cleanup for on-page row-store overflow keys.
+ */
+static int
+__split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
+{
+	WT_CELL *cell;
+	WT_CELL_UNPACK kpack;
+	WT_IKEY *ikey;
+	uint32_t cell_offset;
+
+	/*
+	 * A key being discarded (page split) or moved to a different page (page
+	 * deepening) may be an on-page overflow key.  Clear any reference to an
+	 * underlying disk image, and, if the key hasn't been deleted, delete it
+	 * along with any backing blocks.
+	 */
+	if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
+		return (0);
+	if ((cell_offset = ikey->cell_offset) == 0)
+		return (0);
+
+	/* Leak blocks rather than try this twice. */
+	ikey->cell_offset = 0;
+
+	cell = WT_PAGE_REF_OFFSET(page, cell_offset);
+	__wt_cell_unpack(cell, &kpack);
+	if (kpack.ovfl && kpack.raw != WT_CELL_KEY_OVFL_RM)
+		WT_RET(__wt_ovfl_discard(session, cell));
+
+	return (0);
+}
+
+/*
  * __split_ref_instantiate --
  *	Instantiate key/address pairs in memory in service of a split.
  */
@@ -98,11 +132,7 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 			WT_RET(__wt_row_ikey(session, 0, key, size, &ikey));
 			ref->key.ikey = ikey;
 		} else {
-			/*
-			 * The instantiated key no longer references an on-page
-			 * disk block.
-			 */
-			ikey->cell_offset = 0;
+			WT_RET(__split_ovfl_key_cleanup(session, page, ref));
 
 			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
 		}
@@ -610,7 +640,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 int
 __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
-	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -757,14 +786,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
-			break;
-		if (ikey->cell_offset != 0) {
-			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
-			__wt_cell_unpack(cell, kpack);
-			if (kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
-				WT_TRET(__wt_ovfl_discard(session, cell));
-		}
+		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
 		break;
 	}
 
