@@ -2201,9 +2201,9 @@ __rec_raw_decompress(
 	if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
 		WT_ERR(__wt_illegal_value(session, btree->dhandle->name));
 
-	WT_ERR(__wt_strndup(session, tmp->data, result_len, retp));
+	WT_ERR(__wt_strndup(session, tmp->data, dsk->mem_size, retp));
 	WT_ASSERT(session, __wt_verify_dsk_image(
-	    session, "[raw evict split]", tmp->data, result_len) == 0);
+	    session, "[raw evict split]", tmp->data, dsk->mem_size) == 0);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
