@@ -4,8 +4,9 @@ s = new ShardingTest( { shards : 2,
                         other: { rs: true, 
                                  numReplicas: 2, 
                                  chunksize : 1,
-                                 rsOptions: { oplogSize : 50 } } } 
-                       );
+                                 rsOptions: { oplogSize : 50 },
+                                 enableBalancer : 1
+                             } } );
 
 // reduce chunk size to split
 var config = s.getDB("config");

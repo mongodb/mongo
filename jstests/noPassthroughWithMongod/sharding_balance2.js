@@ -1,6 +1,6 @@
 // sharding_balance2.js
 
-s = new ShardingTest( "slow_sharding_balance2" , 2 , 1 , 1 , { chunksize : 1 , manualAddShard : true } )
+s = new ShardingTest( "slow_sharding_balance2" , 2 , 1 , 1 , { chunksize : 1 , manualAddShard : true, enableBalancer : 1 } )
 
 names = s.getConnNames();
 for ( var i=0; i<names.length; i++ ){

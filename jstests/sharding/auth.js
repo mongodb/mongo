@@ -40,7 +40,13 @@ function getShardName(rsTest) {
     return config._id+"/"+members.join(",");
 }
 
-var s = new ShardingTest( "auth1", 0 , 0 , 1 , {rs: true, extraOptions : {"keyFile" : "jstests/libs/key1"}, noChunkSize : true});
+var s = new ShardingTest( "auth1", 0 , 0 , 1 ,
+  {
+    rs: true,
+    extraOptions : {"keyFile" : "jstests/libs/key1"},
+    noChunkSize : true,
+    enableBalancer:true
+  } );
 
 print("logging in first, if there was an unclean shutdown the user might already exist");
 login(adminUser);

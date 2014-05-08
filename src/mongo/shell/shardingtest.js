@@ -60,6 +60,7 @@
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.
  *          Can be used to specify options that are common all mongos.
+ *       enableBalancer  {boolean} : if true, enable the balancer
  * 
  *       // replica Set only:
  *       rsOptions {Object}: same as the rs property above. Can be used to
@@ -377,6 +378,11 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     var admin = this.admin = this.s.getDB( "admin" );
     this.config = this.s.getDB( "config" );
+
+    // Disable the balancer unless it is explicitly turned on
+    if ( !otherParams.enableBalancer ) {
+        this.stopBalancer();
+    }
 
     if ( ! otherParams.manualAddShard ){
         this._shardNames = []
