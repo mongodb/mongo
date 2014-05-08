@@ -61,7 +61,7 @@ static const CONFIG default_cfg = {
 #undef OPT_DEFINE_DEFAULT
 };
 
-static const char * const debug_cconfig = "verbose=[lsm]";
+static const char * const debug_cconfig = "";
 static const char * const debug_tconfig = "";
 
 /*
