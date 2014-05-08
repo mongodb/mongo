@@ -37,6 +37,10 @@ typedef struct {
 #define	WT_PACK_INIT    { NULL, NULL, NULL, NULL, 0, WT_PACK_VALUE_INIT }
 #define	WT_DECL_PACK(pack)  WT_PACK pack = WT_PACK_INIT
 
+/*
+ * __pack_initn --
+ *      Initialize a pack iterator with the specified string and length.
+ */
 static inline int
 __pack_initn(
     WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt, size_t len)
@@ -53,12 +57,20 @@ __pack_initn(
 	return (0);
 }
 
+/*
+ * __pack_init --
+ *      Initialize a pack iterator with the specified string.
+ */
 static inline int
 __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
 {
 	return (__pack_initn(session, pack, fmt, strlen(fmt)));
 }
 
+/*
+ * __pack_next --
+ *      Get the next field type from a pack iterator.
+ */
 static inline int
 __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
 {
@@ -173,6 +185,10 @@ next:	if (pack->cur == pack->end)
 	}								\
 } while (0)
 
+/*
+ * __pack_size --
+ *      Get the size of a packed value.
+ */
 static inline size_t
 __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 {
@@ -234,6 +250,10 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 	return ((size_t)-1);
 }
 
+/*
+ * __pack_write --
+ *      Pack a value into a buffer.
+ */
 static inline int
 __pack_write(
     WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, uint8_t **pp, size_t maxlen)
@@ -330,6 +350,10 @@ __pack_write(
 	return (0);
 }
 
+/*
+ * __unpack_read --
+ *      Read a packed value from a buffer.
+ */
 static inline int
 __unpack_read(WT_SESSION_IMPL *session,
     WT_PACK_VALUE *pv, const uint8_t **pp, size_t maxlen)

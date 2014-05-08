@@ -166,7 +166,7 @@ __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 }
 
 /*
- * __wt_vpack_uint
+ * __wt_vpack_uint --
  *	Variable-sized packing for unsigned integers
  */
 static inline int
@@ -194,7 +194,7 @@ __wt_vpack_uint(uint8_t **pp, size_t maxlen, uint64_t x)
 }
 
 /*
- * __wt_vpack_int
+ * __wt_vpack_int --
  *	Variable-sized packing for signed integers
  */
 static inline int
@@ -224,7 +224,7 @@ __wt_vpack_int(uint8_t **pp, size_t maxlen, int64_t x)
 }
 
 /*
- * __wt_vunpack_uint
+ * __wt_vunpack_uint --
  *	Variable-sized unpacking for unsigned integers
  */
 static inline int
@@ -262,7 +262,7 @@ __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 }
 
 /*
- * __wt_vunpack_int
+ * __wt_vunpack_int --
  *	Variable-sized packing for signed integers
  */
 static inline int
@@ -327,7 +327,7 @@ __wt_vsize_negint(uint64_t x)
 }
 
 /*
- * __wt_vsize_uint
+ * __wt_vsize_uint --
  *	Return the packed size of an unsigned integer.
  */
 static inline size_t
@@ -344,7 +344,7 @@ __wt_vsize_uint(uint64_t x)
 }
 
 /*
- * __wt_vsize_int
+ * __wt_vsize_int --
  *	Return the packed size of a signed integer.
  */
 static inline size_t

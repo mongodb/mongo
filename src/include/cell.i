@@ -797,8 +797,9 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_dsk_cell_data_ref, __wt_page_cell_data_ref --
- *	Set a buffer to reference the data from an unpacked cell, two flavors.
+ * __wt_dsk_cell_data_ref --
+ *	Set a buffer to reference the data from an unpacked cell.
+ *
  * There are two versions because of WT_CELL_VALUE_OVFL_RM type cells.  When an
  * overflow item is deleted, its backing blocks are removed; if there are still
  * running transactions that might need to see the overflow item, we cache a
@@ -816,6 +817,11 @@ __wt_dsk_cell_data_ref(WT_SESSION_IMPL *session,
 	    __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
 	return (__cell_data_ref(session, NULL, page_type, unpack, store));
 }
+
+/*
+ * __wt_page_cell_data_ref --
+ *	Set a buffer to reference the data from an unpacked cell.
+ */
 static inline int
 __wt_page_cell_data_ref(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store)

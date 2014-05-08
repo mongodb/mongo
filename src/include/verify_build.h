@@ -40,6 +40,11 @@
 #define	ALIGN_CHECK(type, a)						\
 	STATIC_ASSERT(WT_ALIGN(sizeof(type), (a)) == sizeof(type))
 
+/*
+ * __wt_verify_build --
+ *      This function is never called: it exists so there is a place for code
+ *      that checks build-time conditions.
+ */
 static inline void
 __wt_verify_build(void)
 {

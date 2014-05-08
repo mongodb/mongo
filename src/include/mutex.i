@@ -24,6 +24,10 @@
 #define	WT_SPIN_COUNT 1000
 #endif
 
+/*
+ * __wt_spin_init --
+ *      Initialize a spinlock.
+ */
 static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
@@ -34,6 +38,10 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 	return (0);
 }
 
+/*
+ * __wt_spin_destroy --
+ *      Destroy a spinlock.
+ */
 static inline void
 __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -42,6 +50,10 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	*(t) = 0;
 }
 
+/*
+ * __wt_spin_trylock_func --
+ *      Try to lock a spinlock or fail immediately if it is busy.
+ */
 static inline int
 __wt_spin_trylock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -50,6 +62,10 @@ __wt_spin_trylock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	return (__sync_lock_test_and_set(t, 1) == 0 ? 0 : EBUSY);
 }
 
+/*
+ * __wt_spin_lock --
+ *      Spin until the lock is acquired.
+ */
 static inline void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -65,6 +81,10 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	}
 }
 
+/*
+ * __wt_spin_unlock --
+ *      Release the spinlock.
+ */
 static inline void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -76,6 +96,10 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
+/*
+ * __wt_spin_init --
+ *      Initialize a spinlock.
+ */
 static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
@@ -100,6 +124,10 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 	return (0);
 }
 
+/*
+ * __wt_spin_destroy --
+ *      Destroy a spinlock.
+ */
 static inline void
 __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -120,6 +148,10 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 #define	__wt_spin_trylock(session, lock, idp)				\
 	__wt_spin_trylock_func(session, lock)
 
+/*
+ * __wt_spin_trylock_func --
+ *      Try to lock a spinlock or fail immediately if it is busy.
+ */
 static inline int
 __wt_spin_trylock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -128,6 +160,10 @@ __wt_spin_trylock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	return (pthread_mutex_trylock(&t->lock));
 }
 
+/*
+ * __wt_spin_lock --
+ *      Spin until the lock is acquired.
+ */
 static inline void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -154,6 +190,10 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	__wt_spin_lock_func(session, lock, &__id, __FILE__, __LINE__);	\
 } while (0)
 
+/*
+ * __wt_spin_trylock_func --
+ *      Try to lock a spinlock or fail immediately if it is busy.
+ */
 static inline int
 __wt_spin_trylock_func(WT_SESSION_IMPL *session,
     WT_SPINLOCK *t, int *idp, const char *file, int line)
@@ -203,6 +243,10 @@ __wt_spin_trylock_func(WT_SESSION_IMPL *session,
 	return (ret);
 }
 
+/*
+ * __wt_spin_lock_func --
+ *      Spin until the lock is acquired.
+ */
 static inline void
 __wt_spin_lock_func(WT_SESSION_IMPL *session,
     WT_SPINLOCK *t, int *idp, const char *file, int line)
@@ -228,6 +272,10 @@ __wt_spin_lock_func(WT_SESSION_IMPL *session,
 
 #endif
 
+/*
+ * __wt_spin_unlock --
+ *      Release the spinlock.
+ */
 static inline void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
