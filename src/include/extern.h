@@ -603,8 +603,9 @@ extern int __wt_conn_cache_pool_config(WT_SESSION_IMPL *session,
 extern int __wt_conn_cache_pool_open(WT_SESSION_IMPL *session);
 extern int __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn);
 extern void *__wt_cache_pool_server(void *arg);
-extern int __wt_checkpoint_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern int __wt_checkpoint_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_checkpoint_server_create(WT_CONNECTION_IMPL *conn,
+    const char *cfg[]);
+extern int __wt_checkpoint_server_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,

@@ -311,6 +311,16 @@ connection_runtime_config = [
                 requests''',
                 min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
             ]),
+	Config('checkpoint', '', r'''
+	    periodically checkpoint the database''',
+	    type='category', subconfig=[
+	    Config('name', '"WiredTigerCheckpoint"', r'''
+	        the checkpoint name'''),
+	    Config('wait', '0', r'''
+	        seconds to wait between each checkpoint; setting this value
+	        above 0 configures periodic checkpoints''',
+	        min='0', max='100000'),
+	    ]),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',
@@ -646,16 +656,6 @@ methods = {
 	    default value of -1 indicates a platform-specific alignment
 	    value should be used (4KB on Linux systems, zero elsewhere)''',
 	    min='-1', max='1MB'),
-	Config('checkpoint', '', r'''
-	    periodically checkpoint the database''',
-	    type='category', subconfig=[
-	    Config('name', '"WiredTigerCheckpoint"', r'''
-	        the checkpoint name'''),
-	    Config('wait', '0', r'''
-	        seconds to wait between each checkpoint; setting this value
-	        configures periodic checkpoints''',
-	        min='1', max='100000'),
-	    ]),
 	Config('checkpoint_sync', 'true', r'''
 	    flush files to stable storage when closing or writing
 	    checkpoints''',

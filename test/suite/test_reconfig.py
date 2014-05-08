@@ -39,5 +39,11 @@ class test_reconfig(wttest.WiredTigerTestCase):
         self.conn.reconfigure("statistics=(fast)")
         self.conn.reconfigure("statistics=(none)")
 
+    def test_reconfig_checkpoints(self):
+        self.conn.reconfigure("checkpoint=(wait=0)")
+        self.conn.reconfigure("checkpoint=(wait=5)")
+        self.conn.reconfigure("checkpoint=(wait=0,name=hi)")
+        self.conn.reconfigure("checkpoint=(wait=5,name=hi)")
+
 if __name__ == '__main__':
     wttest.run()
