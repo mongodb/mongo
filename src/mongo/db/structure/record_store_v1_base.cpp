@@ -48,11 +48,11 @@ namespace mongo {
        contains records up to that size.  All records >= 4mb are placed into the 16mb bucket.
     */
     const int RecordStoreV1Base::bucketSizes[] = {
-        0x20,     0x40,     0x80,     0x100,
-        0x200,    0x400,    0x800,    0x1000,
-        0x2000,   0x4000,   0x8000,   0x10000,
-        0x20000,  0x40000,  0x80000,  0x100000,
-        0x200000, 0x400000, 0x1000000,
+        0x20,     0x40,     0x80,     0x100,      // 32,   64,   128,  256
+        0x200,    0x400,    0x800,    0x1000,     // 512,  1K,   2K,   4K
+        0x2000,   0x4000,   0x8000,   0x10000,    // 8K,   16K,  32K,  64K
+        0x20000,  0x40000,  0x80000,  0x100000,   // 128K, 256K, 512K, 1M
+        0x200000, 0x400000, 0x1000000,            // 2M,   4M,   16M (see above)
      };
 
 
