@@ -759,6 +759,7 @@ readserver
 realloc
 recno
 recnos
+reconfig
 recsize
 recurse
 refp
