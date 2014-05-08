@@ -36,6 +36,9 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	WT_RET(
 	    WT_LEX_CMP(session, btree->collator, srch_key, &insert_key, cmp));
 	if (cmp >= 0) {
+		if (btree->appending == 0)
+			btree->appending = 1;
+
 		/*
 		 * !!!
 		 * We may race with another appending thread.
@@ -173,18 +176,22 @@ restart:	page = parent->page;
 			goto descend;
 
 		/* Fast-path appends. */
-		__wt_ref_key(page, child, &item->data, &item->size);
-		WT_ERR(
-		    WT_LEX_CMP(session, btree->collator, srch_key, item, cmp));
-		if (cmp >= 0)
-			goto descend;
+		if (btree->appending) {
+			__wt_ref_key(page, child, &item->data, &item->size);
+			WT_ERR(WT_LEX_CMP(
+			    session, btree->collator, srch_key, item, cmp));
+			if (cmp >= 0)
+				goto descend;
+
+			btree->appending = 0;
+		}
 
 		/*
 		 * Two versions of the binary search of internal pages: with and
 		 * without application-specified collation.
 		 */
 		base = 0;
-		limit = pindex->entries - 1;
+		limit = pindex->entries;
 		if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);

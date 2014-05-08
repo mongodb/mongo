@@ -71,6 +71,7 @@ struct __wt_btree {
 
 					/* Row-store comparison function */
 	WT_COLLATOR *collator;		/* Comparison function */
+	int appending;			/* If appending data */
 
 	uint32_t id;			/* File ID, for logging */
 
