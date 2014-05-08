@@ -139,7 +139,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_ITEM *next, _next, *last, _last, *tmp;
-	WT_REF *child;
+	WT_REF *ref;
 	uint64_t recno;
 	int cmp, first;
 
@@ -148,9 +148,9 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		recno = 0;
-		WT_INTL_FOREACH_BEGIN(page, child) {
-			WT_ASSERT(session, child->key.recno > recno);
-			recno = child->key.recno;
+		WT_INTL_FOREACH_BEGIN(page, ref) {
+			WT_ASSERT(session, ref->key.recno > recno);
+			recno = ref->key.recno;
 		} WT_INTL_FOREACH_END;
 		break;
 	case WT_PAGE_ROW_INT:
@@ -160,8 +160,8 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_CLEAR(_last);
 
 		first = 1;
-		WT_INTL_FOREACH_BEGIN(page, child) {
-			__wt_ref_key(page, child, &next->data, &next->size);
+		WT_INTL_FOREACH_BEGIN(page, ref) {
+			__wt_ref_key(page, ref, &next->data, &next->size);
 			if (last->size == 0) {
 				if (first)
 					first = 0;
