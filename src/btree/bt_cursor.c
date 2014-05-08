@@ -276,8 +276,13 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 
 	WT_RET(__cursor_func_init(cbt, 1));
 
+	/*
+	 * Set the "insert" flag for the btree row-store search; we may intend
+	 * to position our cursor at the end of the tree, rather than match an
+	 * existing record.
+	 */
 	WT_ERR(btree->type == BTREE_ROW ?
-	    __cursor_row_search(session, cbt, 0) :
+	    __cursor_row_search(session, cbt, 1) :
 	    __cursor_col_search(session, cbt));
 
 	/*
@@ -306,11 +311,6 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	} else if ((ret = __wt_btcur_next(cbt, 0)) != WT_NOTFOUND)
 		exact = 1;
 	else {
-		/*
-		 * Set the "insert" flag for the btree row-store search; we are
-		 * intending to position our cursor at the end of the tree, not
-		 * match an existing record.
-		 */
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, 1) :
 		    __cursor_col_search(session, cbt));
