@@ -86,8 +86,8 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 	 *
 	 * No locking is required to update the WT_REF structure because we're
 	 * the only thread splitting the parent page, and there's no way for
-	 * readers to race with our updates of single pointers.  We change does
-	 * have to be written before the page goes away, though, our caller
+	 * readers to race with our updates of single pointers.  The changes
+	 * have to be written before the page goes away, of course, our caller
 	 * owns that problem.
 	 *
 	 * Row-store keys, first.
@@ -97,8 +97,15 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 			__wt_ref_key(page, ref, &key, &size);
 			WT_RET(__wt_row_ikey(session, 0, key, size, &ikey));
 			ref->key.ikey = ikey;
-		} else
+		} else {
+			/*
+			 * The instantiated key no longer references an on-page
+			 * disk block.
+			 */
+			ikey->cell_offset = 0;
+
 			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
+		}
 		*child_incrp += sizeof(WT_IKEY) + ikey->size;
 	}
 
