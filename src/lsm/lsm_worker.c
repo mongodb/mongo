@@ -627,6 +627,16 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			continue;
 		}
 
+		/*
+		 * Don't remove files if a hot backup is in progress.
+		 *
+		 * The schema lock protects the set of live files, this check
+		 * prevents us from removing a file that hot backup already
+		 * knows about.
+		 */
+		if (S2C(session)->hot_backup != 0)
+			break;
+
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			/*
 			 * An EBUSY return is acceptable - a cursor may still

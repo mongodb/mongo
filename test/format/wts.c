@@ -370,6 +370,25 @@ wts_dump(const char *tag, int dump_bdb)
 }
 
 void
+wts_salvage_copy(void)
+{
+	int ret;
+
+	/*
+	 * Some data-sources don't support salvage.
+	 */
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
+		return;
+
+	/*
+	 * Save a copy of the interesting files so we can replay the salvage
+	 * step as necessary.
+	 */
+	if ((ret = system(g.home_salvage_copy)) != 0)
+		die(ret, "salvage copy step failed");
+}
+
+void
 wts_salvage(void)
 {
 	WT_CONNECTION *conn;
@@ -378,21 +397,12 @@ wts_salvage(void)
 
 	/*
 	 * Some data-sources don't support salvage.
-	 *
-	 * XXX excluding LSM is temporary.
 	 */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb") || DATASOURCE("lsm"))
+	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
 	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
-
-	/*
-	 * Save a copy of the interesting files so we can replay the salvage
-	 * step as necessary.
-	 */
-	if ((ret = system(g.home_salvage_copy)) != 0)
-		die(ret, "salvage copy step failed");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");

@@ -1088,16 +1088,17 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
+	int exclusive;
 
-	WT_RET(__wt_lsm_tree_get(session, uri,
-	    FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
+	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
+	WT_RET(__wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
 
 	/*
 	 * We mark that we're busy using the tree to coordinate
 	 * with merges so that merging doesn't change the chunk
 	 * array out from underneath us.
 	 */
-	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
+	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, exclusive));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (file_func == __wt_checkpoint &&

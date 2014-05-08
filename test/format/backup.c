@@ -44,9 +44,8 @@ check_copy(void)
 	    conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session: %s", g.home_backup);
 
-	/* Session operations for LSM can return EBUSY. */
 	ret = session->verify(session, g.uri, NULL);
-	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
+	if (ret != 0)
 		die(ret, "session.verify: %s: %s", g.home_backup, g.uri);
 
 	if ((ret = conn->close(conn, NULL)) != 0)

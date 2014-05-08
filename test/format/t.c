@@ -222,6 +222,7 @@ main(int argc, char *argv[])
 		 * against the Berkeley DB data set again, if possible).
 		 */
 		if (g.c_delete_pct == 0) {
+			wts_salvage_copy();
 			wts_open(g.home, 1, &g.wts_conn);
 			wts_salvage();
 			wts_verify("post-salvage verify");
