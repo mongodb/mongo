@@ -20,6 +20,7 @@
 #include <ctime>
 
 #include "mongo/bson/inline_decls.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
