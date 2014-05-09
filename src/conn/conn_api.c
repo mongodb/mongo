@@ -1324,7 +1324,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 err:	if (cbbuf != NULL)
 		__wt_buf_free(session, cbbuf);
-	if (cbbuf != NULL)
+	if (cubuf != NULL)
 		__wt_buf_free(session, cubuf);
 
 	if (ret != 0 && conn != NULL)
