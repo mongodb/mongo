@@ -3118,6 +3118,18 @@ namespace {
                                          "c: [[1,10,false,false]]}}}}}");
     }
 
+    // Test that planner properly unionizes the index bounds for two negation
+    // predicates (SERVER-13890).
+    TEST_F(QueryPlannerTest, IndexBoundsOrOfNegations) {
+        addIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{a: {$ne: 3}}, {a: {$ne: 4}}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+                                "bounds: {a: [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
     //
     // Tests related to building index bounds for multikey
     // indices, combined with compound and $elemMatch

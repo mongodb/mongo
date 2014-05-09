@@ -1104,4 +1104,19 @@ namespace {
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
+    TEST(IndexBoundsBuilderTest, UnionizeWithNE) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        vector<BSONObj> toUnionize;
+        toUnionize.push_back(fromjson("{a: {$ne: 3}}"));
+        toUnionize.push_back(fromjson("{a: {$ne: 4}}}"));
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        testTranslateAndUnion(toUnionize, &oil, &tightness);
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            IndexBoundsBuilder::allValues()));
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    }
+
 }  // namespace
