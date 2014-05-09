@@ -58,14 +58,6 @@ namespace mongo {
 
     class OpDebug;
 
-    class DocWriter {
-    public:
-        virtual ~DocWriter() {}
-        virtual void writeDocument( char* buf ) const = 0;
-        virtual size_t documentSize() const = 0;
-        virtual bool addPadding() const { return true; }
-    };
-
     struct CompactOptions {
 
         CompactOptions() {
