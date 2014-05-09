@@ -47,3 +47,12 @@ env.CppUnitTest(
         'record_store_v1_test_help'
         ]
     )
+
+env.CppUnitTest(
+    target='record_store_v1_capped_test',
+    source=['record_store_v1_capped_test.cpp',
+            ],
+    LIBDEPS=[
+        'record_store_v1_test_help'
+        ]
+    )

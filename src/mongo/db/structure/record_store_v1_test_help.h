@@ -125,6 +125,7 @@ namespace mongo {
 
         bool _capped;
         int _userFlags;
+        long long _maxCappedDocs;
 
         int _lastExtentSize;
         double _paddingFactor;

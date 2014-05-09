@@ -75,6 +75,7 @@ namespace mongo {
         _userFlags = userFlags;
         _lastExtentSize = 0;
         _paddingFactor = 1;
+        _maxCappedDocs = numeric_limits<long long>::max();
     }
 
     const DiskLoc& DummyRecordStoreV1MetaData::capExtent() const {
@@ -181,7 +182,7 @@ namespace mongo {
     }
 
     long long DummyRecordStoreV1MetaData::maxCappedDocs() const {
-        invariant( false );
+        return _maxCappedDocs;
     }
 
     double DummyRecordStoreV1MetaData::paddingFactor() const {
@@ -272,6 +273,7 @@ namespace mongo {
     }
 
     Extent* DummyExtentManager::getExtent( const DiskLoc& loc, bool doSanityCheck ) const {
+        invariant( !loc.isNull() );
         invariant( static_cast<size_t>( loc.a() ) < _extents.size() );
         invariant( loc.getOfs() == 0 );
         return reinterpret_cast<Extent*>( _extents[loc.a()].data );
