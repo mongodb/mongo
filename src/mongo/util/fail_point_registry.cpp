@@ -53,7 +53,7 @@ namespace mongo {
     }
 
     FailPoint* FailPointRegistry::getFailPoint(const string& name) const {
-        return mapFindWithDefault(_fpMap, name, reinterpret_cast<FailPoint *>(NULL));
+        return mapFindWithDefault(_fpMap, name, static_cast<FailPoint*>(NULL));
     }
 
     void FailPointRegistry::freeze() {
