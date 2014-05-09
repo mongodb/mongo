@@ -532,5 +532,24 @@ namespace mongo {
         log() << "end freelist" << endl;
     }
 
+    namespace {
+        class CacheHintMadvise : public ExtentManager::CacheHint {
+        public:
+            CacheHintMadvise(void *p, unsigned len, MAdvise::Advice a)
+                : _advice( p, len, a ) {
+            }
+        private:
+            MAdvise _advice;
+        };
+    }
+
+    ExtentManager::CacheHint* MmapV1ExtentManager::cacheHint( const DiskLoc& extentLoc,
+                                                              const ExtentManager::HintType& hint ) {
+        invariant ( hint == Sequential );
+        Extent* e = getExtent( extentLoc );
+        return new CacheHintMadvise( reinterpret_cast<void*>( e ),
+                                     e->length,
+                                     MAdvise::Sequential );
+    }
 
 }

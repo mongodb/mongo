@@ -281,5 +281,9 @@ namespace mongo {
         return 1024 * 1024 * 64;
     }
 
+    DummyExtentManager::CacheHint* DummyExtentManager::cacheHint( const DiskLoc& extentLoc, const HintType& hint ) {
+        return new CacheHint();
+    }
+
 
 }

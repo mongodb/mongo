@@ -145,6 +145,9 @@ namespace mongo {
 
         virtual int maxSize() const;
 
+
+        virtual CacheHint* cacheHint( const DiskLoc& extentLoc, const HintType& hint );
+
     private:
 
         /**

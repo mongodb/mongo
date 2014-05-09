@@ -32,12 +32,11 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/structure/capped_callback.h"
 #include "mongo/db/structure/record_store_v1_base.h"
 
 namespace mongo {
-
-    class MAdvise;
 
     class CappedRecordStoreV1 : public RecordStoreV1Base {
     public:
@@ -125,7 +124,7 @@ namespace mongo {
 
         CappedDocumentDeleteCallback* _deleteCallback;
 
-        OwnedPointerVector<MAdvise> _extentAdvice;
+        OwnedPointerVector<ExtentManager::CacheHint> _extentAdvice;
 
         friend class CappedRecordStoreV1Iterator;
     };

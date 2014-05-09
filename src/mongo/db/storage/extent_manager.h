@@ -146,6 +146,13 @@ namespace mongo {
          * quantizes extent size to >= min + page boundary
          */
         virtual int quantizeExtentSize( int size ) const;
+
+        enum HintType { Sequential, Random };
+        class CacheHint {
+        public:
+            virtual ~CacheHint(){}
+        };
+        virtual CacheHint* cacheHint( const DiskLoc& extentLoc, const HintType& hint ) = 0;
     };
 
 }
