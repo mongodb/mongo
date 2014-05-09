@@ -139,7 +139,7 @@ namespace mongo {
 
                 num++;
 
-                logOpForDbHash( "u", ns.c_str(), BSONObj(), NULL, NULL, false );
+                logOpForDbHash(ns.c_str());
             }
 
             result.append( "applied" , num );

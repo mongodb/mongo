@@ -423,7 +423,7 @@ namespace mongo {
         }
 
         logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
-        logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
+        logOpForDbHash(ns);
         getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
 
         if ( strstr( ns, ".system.js" ) ) {

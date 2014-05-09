@@ -42,12 +42,7 @@ namespace mongo {
     DBHashCmd dbhashCmd;
 
 
-    void logOpForDbHash( const char* opstr,
-                         const char* ns,
-                         const BSONObj& obj,
-                         BSONObj* patt,
-                         const BSONObj* fullObj,
-                         bool forMigrateCleanup ) {
+    void logOpForDbHash(const char* ns) {
         dbhashCmd.wipeCacheForCollection( ns );
     }
 
