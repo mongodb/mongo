@@ -702,9 +702,7 @@ namespace mongo {
                           const char * ns,
                           const BSONObj& obj,
                           BSONObj * patt,
-                          const BSONObj* fullObj,
                           bool notInActiveChunk) {
-        // TODO: include fullObj?
         migrateFromStatus.logOp(opstr, ns, obj, patt, notInActiveChunk);
     }
 

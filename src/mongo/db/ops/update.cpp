@@ -769,7 +769,7 @@ namespace mongo {
             if (request.shouldCallLogOp() && !logObj.isEmpty()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
                 logOp(txn, "u", nsString.ns().c_str(), logObj , &idQuery,
-                      NULL, request.isFromMigration(), &newObj);
+                      NULL, request.isFromMigration());
             }
 
             // Only record doc modifications if they wrote (exclude no-ops)
@@ -883,7 +883,7 @@ namespace mongo {
         uassertStatusOK(newLoc.getStatus());
         if (request.shouldCallLogOp()) {
             logOp(txn, "i", nsString.ns().c_str(), newObj,
-                   NULL, NULL, request.isFromMigration(), &newObj);
+                   NULL, NULL, request.isFromMigration());
         }
 
         opDebug->nMatched = 1;

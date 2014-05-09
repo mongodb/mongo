@@ -374,7 +374,6 @@ namespace mongo {
                            const char * ns,
                            const BSONObj& obj,
                            BSONObj * patt,
-                           const BSONObj* fullObj,
                            bool forMigrateCleanup );
 
 }

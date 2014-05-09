@@ -416,13 +416,12 @@ namespace mongo {
                const BSONObj& obj,
                BSONObj* patt,
                bool* b,
-               bool fromMigrate,
-               const BSONObj* fullObj) {
+               bool fromMigrate) {
         if ( replSettings.master ) {
             _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
-        logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
+        logOpForSharding(opstr, ns, obj, patt, fromMigrate);
         logOpForDbHash(ns);
         getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
 

@@ -74,8 +74,7 @@ namespace mongo {
                 const BSONObj& obj,
                 BSONObj *patt = NULL,
                 bool *b = NULL,
-                bool fromMigrate = false,
-                const BSONObj* fullObj = NULL );
+                bool fromMigrate = false);
 
     // Log an empty no-op operation to the local oplog
     void logKeepalive();
