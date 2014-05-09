@@ -39,6 +39,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/structure/capped_callback.h"
 #include "mongo/db/structure/record_store.h"
 #include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/platform/cstdint.h"
@@ -99,7 +100,7 @@ namespace mongo {
      * this is NOT safe through a yield right now
      * not sure if it will be, or what yet
      */
-    class Collection {
+    class Collection : CappedDocumentDeleteCallback {
     public:
         Collection( TransactionExperiment* txn,
                     const StringData& fullNS,
@@ -195,9 +196,6 @@ namespace mongo {
                                           const char* damangeSource,
                                           const mutablebson::DamageVector& damages );
 
-
-        int64_t storageSize( int* numExtents = NULL, BSONArrayBuilder* extentInfo = NULL ) const;
-
         // -----------
 
         StatusWith<CompactStats> compact(TransactionExperiment* txn, const CompactOptions* options);
@@ -277,6 +275,9 @@ namespace mongo {
         // --- end suspect things
 
     private:
+
+        Status aboutToDeleteCapped( TransactionExperiment* txn, const DiskLoc& loc );
+
         /**
          * same semantics as insertDocument, but doesn't do:
          *  - some user error checks

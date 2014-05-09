@@ -30,13 +30,13 @@
 
 #include "mongo/db/structure/record_store_v1_capped.h"
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/record_store_v1_capped_iterator.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/mongoutils/str.h"
 
 /*
  capped collection layout
@@ -59,13 +59,13 @@
 namespace mongo {
 
     CappedRecordStoreV1::CappedRecordStoreV1( TransactionExperiment* txn,
-                                              Collection* collection,
+                                              CappedDocumentDeleteCallback* collection,
                                               const StringData& ns,
                                               RecordStoreV1MetaData* details,
                                               ExtentManager* em,
                                               bool isSystemIndexes )
         : RecordStoreV1Base( ns, details, em, isSystemIndexes ),
-          _collection( collection ) {
+          _deleteCallback( collection ) {
 
         DiskLoc extentLoc = details->firstExtent();
         while ( !extentLoc.isNull() ) {
@@ -96,10 +96,11 @@ namespace mongo {
             // the extent check is a way to try and improve performance
             // since we have to iterate all the extents (for now) to get
             // storage size
-            if ( lenToAlloc > _collection->storageSize() ) {
+            if ( lenToAlloc > storageSize() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::BadValue,
-                                            str::stream() << "document is larger than capped size "
-                                            << lenToAlloc << " > " << _collection->storageSize(),
+                                            mongoutils::str::stream()
+                                            << "document is larger than capped size "
+                                            << lenToAlloc << " > " << storageSize(),
                                             16328 );
             }
 
@@ -164,7 +165,11 @@ namespace mongo {
                 }
 
                 DiskLoc fr = theCapExtent()->firstRecord;
-                _collection->deleteDocument( txn, fr, true );
+                Status status = _deleteCallback->aboutToDeleteCapped( txn, fr );
+                if ( !status.isOK() )
+                    return StatusWith<DiskLoc>( status );
+                deleteRecord( txn, fr );
+
                 compact(txn);
                 if( ++passes > maxPasses ) {
                     StringBuilder sb;
@@ -473,7 +478,9 @@ namespace mongo {
 
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
-            _collection->deleteDocument( txn, curr, true );
+            Status status = _deleteCallback->aboutToDeleteCapped( txn, curr );
+            uassertStatusOK( status );
+            deleteRecord( txn, curr );
             compact(txn);
 
             // This is the case where we have not yet had to remove any

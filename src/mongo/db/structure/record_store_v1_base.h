@@ -119,6 +119,8 @@ namespace mongo {
 
         virtual ~RecordStoreV1Base();
 
+        virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int level = 0 ) const;
+
         Record* recordFor( const DiskLoc& loc ) const;
 
         void deleteRecord( TransactionExperiment* txn,

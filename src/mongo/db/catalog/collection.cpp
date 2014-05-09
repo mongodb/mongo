@@ -271,6 +271,18 @@ namespace mongo {
         return loc;
     }
 
+    Status Collection::aboutToDeleteCapped( TransactionExperiment* txn, const DiskLoc& loc ) {
+
+        BSONObj doc = docFor( loc );
+
+        /* check if any cursors point to us.  if so, advance them. */
+        _cursorCache.invalidateDocument(loc, INVALIDATION_DELETION);
+
+        _indexCatalog.unindexRecord(txn, doc, loc, false);
+
+        return Status::OK();
+    }
+
     void Collection::deleteDocument( TransactionExperiment* txn,
                                      const DiskLoc& loc,
                                      bool cappedOK,
@@ -442,38 +454,6 @@ namespace mongo {
         }
 
         return Status::OK();
-    }
-
-    int64_t Collection::storageSize( int* numExtents, BSONArrayBuilder* extentInfo ) const {
-        if ( _details->firstExtent().isNull() ) {
-            if ( numExtents )
-                *numExtents = 0;
-            return 0;
-        }
-
-        Extent* e = getExtentManager()->getExtent( _details->firstExtent() );
-
-        long long total = 0;
-        int n = 0;
-        while ( e ) {
-            total += e->length;
-            n++;
-
-            if ( extentInfo ) {
-                extentInfo->append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
-            }
-
-            if ( e->xnext.isNull() )
-                e = NULL;
-            else
-                e = getExtentManager()->getExtent( e->xnext );
-
-        }
-
-        if ( numExtents )
-            *numExtents = n;
-
-        return total;
     }
 
     ExtentManager* Collection::getExtentManager() {

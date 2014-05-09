@@ -109,6 +109,12 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const = 0;
 
+        /**
+         * @param extraInfo - optional more debug info
+         * @param level - optional, level of debug info to put in (higher is more)
+         */
+        virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int infoLevel = 0 ) const = 0;
+
         // CRUD related
 
         virtual Record* recordFor( const DiskLoc& loc ) const = 0;

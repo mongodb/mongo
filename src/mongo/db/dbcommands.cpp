@@ -1135,11 +1135,9 @@ namespace mongo {
             if( numRecords )
                 result.append( "avgObjSize" , collection->averageObjectSize() );
 
-            int numExtents;
-            BSONArrayBuilder extents;
             result.appendNumber( "storageSize",
-                                 static_cast<long long>( collection->storageSize( &numExtents , verbose ? &extents : 0  ) / scale ) );
-            result.append( "numExtents" , numExtents );
+                                 static_cast<long long>(collection->getRecordStore()->storageSize( &result,
+                                                                                                   verbose ? 1 : 0 ) ) );
             result.append( "nindexes" , collection->getIndexCatalog()->numIndexesReady() );
 
             collection->appendCustomStats( &result, scale );
@@ -1147,9 +1145,6 @@ namespace mongo {
             BSONObjBuilder indexSizes;
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
             result.append("indexSizes", indexSizes.obj());
-
-            if ( verbose )
-                result.appendArray( "extents" , extents.arr() );
 
             return true;
         }
@@ -1350,9 +1345,9 @@ namespace mongo {
                 objects += collection->numRecords();
                 size += collection->dataSize();
 
-                int temp;
-                storageSize += collection->storageSize( &temp, NULL );
-                numExtents += temp;
+                BSONObjBuilder temp;
+                storageSize += collection->getRecordStore()->storageSize( &temp );
+                numExtents += temp.obj()["numExtents"].numberInt(); // XXX
 
                 indexes += collection->getIndexCatalog()->numIndexesTotal();
                 indexSize += getIndexSizeForCollection(dbname, ns);

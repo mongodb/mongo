@@ -32,17 +32,17 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/structure/capped_callback.h"
 #include "mongo/db/structure/record_store_v1_base.h"
 
 namespace mongo {
 
-    class Collection;
     class MAdvise;
 
     class CappedRecordStoreV1 : public RecordStoreV1Base {
     public:
         CappedRecordStoreV1( TransactionExperiment* txn,
-                             Collection* collection,
+                             CappedDocumentDeleteCallback* collection,
                              const StringData& ns,
                              RecordStoreV1MetaData* details,
                              ExtentManager* em,
@@ -123,7 +123,7 @@ namespace mongo {
 
         // -- end copy from cap.cpp --
 
-        Collection* _collection;
+        CappedDocumentDeleteCallback* _deleteCallback;
 
         OwnedPointerVector<MAdvise> _extentAdvice;
 

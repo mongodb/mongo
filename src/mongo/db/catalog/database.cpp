@@ -746,9 +746,9 @@ namespace mongo {
             }
             else if ( options.capped ) {
                 // normal
-                while ( collection->storageSize() < options.cappedSize ) {
+                while ( collection->getRecordStore()->storageSize() < options.cappedSize ) {
                     int sz = _massageExtentSize( _extentManager.get(),
-                                                 options.cappedSize - collection->storageSize() );
+                                                 options.cappedSize - collection->getRecordStore()->storageSize() );
                     sz &= 0xffffff00;
                     collection->increaseStorageSize( txn, sz, true );
                 }

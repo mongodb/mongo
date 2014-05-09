@@ -176,7 +176,7 @@ namespace mongo {
                     indexesInProg = stopIndexBuilds( srcCtx.db(), cmdObj );
                     capped = sourceColl->isCapped();
                     if ( capped ) {
-                        size = sourceColl->storageSize();
+                        size = sourceColl->getRecordStore()->storageSize();
                     }
                 }
             }

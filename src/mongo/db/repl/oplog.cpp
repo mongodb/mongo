@@ -448,7 +448,7 @@ namespace mongo {
         if ( collection ) {
 
             if (replSettings.oplogSize != 0) {
-                int o = (int)(collection->storageSize() / ( 1024 * 1024 ) );
+                int o = (int)(collection->getRecordStore()->storageSize() / ( 1024 * 1024 ) );
                 int n = (int)(replSettings.oplogSize / (1024 * 1024));
                 if ( n != o ) {
                     stringstream ss;

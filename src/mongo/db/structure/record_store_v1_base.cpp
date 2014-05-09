@@ -69,6 +69,36 @@ namespace mongo {
     RecordStoreV1Base::~RecordStoreV1Base() {
     }
 
+
+    int64_t RecordStoreV1Base::storageSize( BSONObjBuilder* extraInfo, int level ) const {
+        BSONArrayBuilder extentInfo;
+
+        int64_t total = 0;
+        int n = 0;
+
+        DiskLoc cur = _details->firstExtent();
+        while ( !cur.isNull() ) {
+            Extent* e = _extentManager->getExtent( cur );
+
+            total += e->length;
+            n++;
+
+            if ( extraInfo && level > 0 ) {
+                extentInfo.append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
+            }
+
+            cur = e->xnext;
+        }
+
+        if ( extraInfo ) {
+            extraInfo->append( "numExtents", n );
+            if ( level > 0 )
+                extraInfo->append( "extents", extentInfo.arr() );
+        }
+
+        return total;
+    }
+
     Record* RecordStoreV1Base::recordFor( const DiskLoc& loc ) const {
         return _extentManager->recordForV1( loc );
     }
