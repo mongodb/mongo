@@ -606,7 +606,8 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 
 	WT_ERR(__conn_statistics_config(session, raw_cfg));
 	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
-	WT_ERR(__wt_checkpoint_server_create(conn, raw_cfg));
+	WT_ERR(__wt_checkpoint_server_create(conn, cfg));
+	WT_ERR(__wt_statlog_create(conn, cfg));
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
