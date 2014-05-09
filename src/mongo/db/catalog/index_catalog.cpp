@@ -452,13 +452,13 @@ namespace mongo {
             return Status( ErrorCodes::InternalError, e.toString() );
         }
 
-        int before = _collection->details()->_indexBuildsInProgress;
+        int before = _collection->detailsDeprecated()->_indexBuildsInProgress;
         try {
             _txn->writingInt( _collection->detailsWritable()->_indexBuildsInProgress ) += 1;
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
-            fassert( 17344, before == _collection->details()->_indexBuildsInProgress );
+            fassert( 17344, before == _collection->detailsDeprecated()->_indexBuildsInProgress );
             _catalog->_removeFromSystemIndexes(_txn, descriptor->indexName());
             return Status( ErrorCodes::InternalError, e.toString() );
         }
@@ -512,7 +512,7 @@ namespace mongo {
         _inProgress = false; // defensive
         fassert( 17204, _catalog->_collection->ok() ); // defensive
 
-        int idxNo = _collection->details()->_catalogFindIndexByName(_collection, _indexName, true);
+        int idxNo = _collection->detailsDeprecated()->_catalogFindIndexByName(_collection, _indexName, true);
         fassert( 17205, idxNo >= 0 );
 
         IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );

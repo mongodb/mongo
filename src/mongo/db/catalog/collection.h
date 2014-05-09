@@ -112,7 +112,7 @@ namespace mongo {
         bool ok() const { return _magic == 1357924; }
 
         NamespaceDetails* detailsWritable() { return _details; } // TODO: remove
-        const NamespaceDetails* details() const { return _details; }
+        const NamespaceDetails* detailsDeprecated() const { return _details; }
 
         CollectionInfoCache* infoCache() { return &_infoCache; }
         const CollectionInfoCache* infoCache() const { return &_infoCache; }

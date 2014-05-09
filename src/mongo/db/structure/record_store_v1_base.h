@@ -119,6 +119,9 @@ namespace mongo {
 
         virtual ~RecordStoreV1Base();
 
+        virtual long long dataSize() const { return _details->dataSize(); }
+        virtual long long numRecords() const { return _details->numRecords(); }
+
         virtual int64_t storageSize( BSONObjBuilder* extraInfo = NULL, int level = 0 ) const;
 
         Record* recordFor( const DiskLoc& loc ) const;

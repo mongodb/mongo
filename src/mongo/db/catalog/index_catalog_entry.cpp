@@ -137,20 +137,20 @@ namespace mongo {
     }
 
     DiskLoc IndexCatalogEntry::_catalogHead() const {
-        const NamespaceDetails* nsd = _collection->details();
+        const NamespaceDetails* nsd = _collection->detailsDeprecated();
         int idxNo = _indexNo();
         return nsd->idx( idxNo ).head;
     }
 
     bool IndexCatalogEntry::_catalogIsMultikey() const {
-        const NamespaceDetails* nsd = _collection->details();
+        const NamespaceDetails* nsd = _collection->detailsDeprecated();
         int idxNo = _indexNo();
         return nsd->isMultikey( idxNo );
     }
 
     int IndexCatalogEntry::_indexNo() const {
-        int idxNo = _collection->details()->_catalogFindIndexByName(
-                                                _collection, _descriptor->indexName(), true);
+        int idxNo = _collection->detailsDeprecated()->_catalogFindIndexByName(_collection,
+                                                                              _descriptor->indexName(), true);
         fassert( 17341, idxNo >= 0 );
         return idxNo;
     }

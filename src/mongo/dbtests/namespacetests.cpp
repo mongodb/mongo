@@ -174,11 +174,11 @@ namespace NamespaceTests {
             const char *ns() const {
                 return ns_;
             }
-            NamespaceDetails *nsd() const {
+            const NamespaceDetails *nsd() const {
                 Collection* c = collection();
                 if ( !c )
                     return NULL;
-                return c->detailsWritable()->writingWithExtra();
+                return c->detailsDeprecated();
             }
             const RecordStore* recordStore() const {
                 Collection* c = collection();

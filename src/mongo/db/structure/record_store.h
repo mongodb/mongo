@@ -109,6 +109,10 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const = 0;
 
+        virtual long long dataSize() const = 0;
+
+        virtual long long numRecords() const = 0;
+
         /**
          * @param extraInfo - optional more debug info
          * @param level - optional, level of debug info to put in (higher is more)

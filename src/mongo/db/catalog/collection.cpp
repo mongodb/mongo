@@ -196,7 +196,7 @@ namespace mongo {
             }
         }
 
-        if ( _details->isCapped() ) {
+        if ( isCapped() ) {
             // TOOD: old god not done
             Status ret = _indexCatalog.checkNoIndexConflicts( docToInsert );
             if ( !ret.isOK() )
@@ -255,7 +255,7 @@ namespace mongo {
             _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
         }
         catch ( AssertionException& e ) {
-            if ( _details->isCapped() ) {
+            if ( isCapped() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                             str::stream() << "unexpected index insertion failure on"
                                             << " capped collection" << e.toString()
@@ -288,7 +288,7 @@ namespace mongo {
                                      bool cappedOK,
                                      bool noWarn,
                                      BSONObj* deletedId ) {
-        if ( _details->isCapped() && !cappedOK ) {
+        if ( isCapped() && !cappedOK ) {
             log() << "failing remove on a capped ns " << _ns << endl;
             uasserted( 10089,  "cannot remove from a capped collection" );
             return;
@@ -367,7 +367,7 @@ namespace mongo {
         if ( oldRecord->netLength() < objNew.objsize() ) {
             // doesn't fit, have to move to new location
 
-            if ( _details->isCapped() )
+            if ( isCapped() )
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                             "failing update: objects in a capped ns cannot grow",
                                             10003 );
@@ -499,11 +499,11 @@ namespace mongo {
     }
 
     uint64_t Collection::numRecords() const {
-        return _details->numRecords();
+        return _recordStore->numRecords();
     }
 
     uint64_t Collection::dataSize() const {
-        return _details->dataSize();
+        return _recordStore->dataSize();
     }
 
     /**
