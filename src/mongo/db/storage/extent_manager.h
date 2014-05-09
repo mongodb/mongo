@@ -147,11 +147,16 @@ namespace mongo {
          */
         virtual int quantizeExtentSize( int size ) const;
 
+        // see cacheHint methods
         enum HintType { Sequential, Random };
         class CacheHint {
         public:
             virtual ~CacheHint(){}
         };
+        /**
+         * Tell the system that for this extent, it will have this kind of disk access.
+         * Owner takes owernship of CacheHint
+         */
         virtual CacheHint* cacheHint( const DiskLoc& extentLoc, const HintType& hint ) = 0;
     };
 
