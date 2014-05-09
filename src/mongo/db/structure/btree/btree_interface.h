@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    class BucketDeletionNotification;
+
     /**
      * A version-hiding wrapper around the bulk builder for the Btree.
      */
@@ -87,7 +89,8 @@ namespace mongo {
                                             RecordStore* recordStore,
                                             const Ordering& ordering,
                                             const string& indexName,
-                                            int version);
+                                            int version,
+                                            BucketDeletionNotification* bucketDeletion);
 
         //
         // Data changes

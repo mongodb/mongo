@@ -44,12 +44,9 @@ namespace mongo {
     class Collection;
     class NamespaceDetails;
 
-    class BtreeInMemoryState;
     class IndexDescriptor;
     struct IndexDetails;
     class IndexAccessMethod;
-    class BtreeAccessMethod;
-    class BtreeBasedAccessMethod;
 
     /**
      * how many: 1 per Collection

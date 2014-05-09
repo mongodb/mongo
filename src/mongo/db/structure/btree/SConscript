@@ -1,0 +1,15 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target= 'btree',
+    source= [
+        'btree_logic.cpp',
+        'btree_interface.cpp',
+        'key.cpp'
+        ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/bson'
+        ]
+    )

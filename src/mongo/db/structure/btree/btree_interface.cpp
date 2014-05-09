@@ -27,9 +27,10 @@
  */
 
 #include "mongo/db/structure/btree/btree_interface.h"
-#include "mongo/db/storage/transaction.h"
 
+#include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/btree/btree_logic.h"
+
 
 namespace mongo {
 
@@ -63,12 +64,14 @@ namespace mongo {
         BtreeInterfaceImpl(HeadManager* headManager,
                            RecordStore* recordStore,
                            const Ordering& ordering,
-                           const string& indexName) {
+                           const string& indexName,
+                           BucketDeletionNotification* bucketDeletionNotification) {
 
             _btree.reset(new BtreeLogic<OnDiskFormat>(headManager,
                                                       recordStore,
                                                       ordering,
-                                                      indexName));
+                                                      indexName,
+                                                      bucketDeletionNotification));
         }
 
         virtual ~BtreeInterfaceImpl() { }
@@ -195,20 +198,23 @@ namespace mongo {
                                                  RecordStore* recordStore,
                                                  const Ordering& ordering,
                                                  const string& indexName,
-                                                 int version) {
+                                                 int version,
+                                                 BucketDeletionNotification* bucketDeletion) {
 
         if (0 == version) {
             return new BtreeInterfaceImpl<BtreeLayoutV0>(headManager,
                                                          recordStore,
                                                          ordering,
-                                                         indexName);
+                                                         indexName,
+                                                         bucketDeletion);
         }
         else {
             invariant(1 == version);
             return new BtreeInterfaceImpl<BtreeLayoutV1>(headManager,
                                                          recordStore,
                                                          ordering,
-                                                         indexName);
+                                                         indexName,
+                                                         bucketDeletion);
         }
     }
 

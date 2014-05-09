@@ -35,9 +35,13 @@
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/btree/btree_ondisk.h"
 #include "mongo/db/structure/btree/key.h"
+#include "mongo/db/structure/btree/bucket_deletion_notification.h"
 #include "mongo/db/structure/head_manager.h"
 
+
 namespace mongo {
+
+    class BucketDeletionNotification;
 
     /**
      * This is the logic for manipulating the Btree.  It is (mostly) independent of the on-disk
@@ -70,11 +74,15 @@ namespace mongo {
         BtreeLogic(HeadManager* head,
                    RecordStore* store,
                    const Ordering& ordering,
-                   const string& indexName)
+                   const string& indexName,
+                   BucketDeletionNotification* bucketDeletion)
             : _headManager(head),
               _recordStore(store),
               _ordering(ordering),
-              _indexName(indexName) { }
+              _indexName(indexName),
+              _bucketDeletion(bucketDeletion) { 
+        
+        }
 
         //
         // Public-facing
@@ -132,6 +140,14 @@ namespace mongo {
                       const DiskLoc& value,
                       bool dupsAllowed);
 
+        /**
+         * Navigates down the tree and locates the bucket and position containing a record with
+         * the specified <key, recordLoc> combination.
+         *
+         * @return true if the exact <key, recordLoc> was found. Otherwise, false and the
+         *      bucketLocOut would contain the bucket containing key which is before or after the
+         *      searched one (dependent on the direction).
+         */
         bool locate(const BSONObj& key,
                     const DiskLoc& recordLoc,
                     const int direction,
@@ -147,13 +163,6 @@ namespace mongo {
                      const DiskLoc& recordLoc);
 
         bool isEmpty() const;
-
-        Status find(BucketType* bucket,
-                    const KeyDataType& key,
-                    const DiskLoc& recordLoc,
-                    bool errorIfDup,
-                    int* keyPositionOut,
-                    bool* foundOut) const;
 
         long long fullValidate(long long *unusedCount,
                                bool strict,
@@ -324,6 +333,13 @@ namespace mongo {
                           int direction,
                           pair<DiskLoc, int>& bestParent) const;
 
+        Status _find(BucketType* bucket,
+                    const KeyDataType& key,
+                    const DiskLoc& recordLoc,
+                    bool errorIfDup,
+                    int* keyPositionOut,
+                    bool* foundOut) const;
+
         bool customFind(int low,
                         int high,
                         const BSONObj& keyBegin,
@@ -354,7 +370,7 @@ namespace mongo {
 
         DiskLoc advance(const DiskLoc& bucketLoc, int* posInOut, int direction) const;
 
-        DiskLoc locate(const DiskLoc& bucketLoc,
+        DiskLoc _locate(const DiskLoc& bucketLoc,
                        const KeyDataType& key,
                        int* posOut,
                        bool* foundOut,
@@ -533,6 +549,9 @@ namespace mongo {
         Ordering _ordering;
 
         string _indexName;
+
+        // Not owned here
+        BucketDeletionNotification* _bucketDeletion;
     };
 
 }  // namespace mongo

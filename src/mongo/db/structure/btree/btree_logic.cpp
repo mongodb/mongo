@@ -27,14 +27,13 @@
  */
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/index/btree_index_cursor.h"  // for aboutToDeleteBucket
 #include "mongo/db/jsobj.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/btree/btree_logic.h"
 #include "mongo/db/structure/btree/key.h"
 #include "mongo/db/structure/record_store.h"
+
 
 namespace mongo {
 
@@ -141,7 +140,7 @@ namespace mongo {
                 }
 
                 if (mayInterrupt) {
-                    killCurrentOp.checkForInterrupt();
+                    _trans->checkForInterrupt();
                 }
 
                 BucketType* x = _getModifiableBucket(xloc);
@@ -1082,7 +1081,7 @@ namespace mongo {
 
         // Find the DiskLoc 
         bool found;
-        DiskLoc bucket = locate(getRootLoc(), key, &position, &found, minDiskLoc, 1);
+        DiskLoc bucket = _locate(getRootLoc(), key, &position, &found, minDiskLoc, 1);
 
         while (!bucket.isNull()) {
             FullKey fullKey = getFullKey(getBucket(bucket), position);
@@ -1110,7 +1109,7 @@ namespace mongo {
                                                  const DiskLoc self) const {
         int position;
         bool found;
-        DiskLoc posLoc = locate(getRootLoc(), key, &position, &found, minDiskLoc, 1);
+        DiskLoc posLoc = _locate(getRootLoc(), key, &position, &found, minDiskLoc, 1);
 
         while (!posLoc.isNull()) {
             FullKey fullKey = getFullKey(getBucket(posLoc), position);
@@ -1152,7 +1151,7 @@ namespace mongo {
      * note result might be an Unused location!
      */
     template <class BtreeLayout>
-    Status BtreeLogic<BtreeLayout>::find(BucketType* bucket,
+    Status BtreeLogic<BtreeLayout>::_find(BucketType* bucket,
                                           const KeyDataType& key,
                                           const DiskLoc& recordLoc,
                                           bool errorIfDup,
@@ -1164,7 +1163,6 @@ namespace mongo {
         genericRecordLoc = recordLoc;
 
         bool dupsChecked = false;
-        // globalIndexCounters->btree(reinterpret_cast<const char*>(bucket));
 
         int low = 0;
         int high = bucket->n - 1;
@@ -1263,7 +1261,7 @@ namespace mongo {
                                             const DiskLoc bucketLoc) {
         invariant(bucketLoc != getRootLoc());
 
-        BtreeIndexCursor::aboutToDeleteBucket(bucketLoc);
+        _bucketDeletion->aboutToDeleteBucket(bucketLoc);
 
         BucketType* p = getBucket(bucket->parent);
         int parentIdx = indexInParent(bucket, bucketLoc);
@@ -1448,7 +1446,7 @@ namespace mongo {
         }
 
         *trans->writing(&getBucket(bucket->nextChild)->parent) = bucket->parent;
-        BtreeIndexCursor::aboutToDeleteBucket(bucketLoc);
+        _bucketDeletion->aboutToDeleteBucket(bucketLoc);
         deallocBucket(trans, bucket, bucketLoc);
     }
 
@@ -1791,7 +1789,7 @@ namespace mongo {
         int pos;
         bool found = false;
         KeyDataOwnedType ownedKey(key);
-        DiskLoc loc = locate(getRootLoc(), ownedKey, &pos, &found, recordLoc, 1);
+        DiskLoc loc = _locate(getRootLoc(), ownedKey, &pos, &found, recordLoc, 1);
         if (found) {
             BucketType* bucket = btreemod(trans, getBucket(loc));
             delKeyAtPos(trans, bucket, loc, pos);
@@ -2241,7 +2239,7 @@ namespace mongo {
 
         int pos;
         bool found;
-        Status findStatus = find(bucket, key, recordLoc, !dupsAllowed, &pos, &found);
+        Status findStatus = _find(bucket, key, recordLoc, !dupsAllowed, &pos, &found);
         if (!findStatus.isOK()) {
             return findStatus;
         }
@@ -2366,7 +2364,7 @@ namespace mongo {
         bool found = false;
         KeyDataOwnedType owned(key);
 
-        *bucketLocOut = locate(getRootLoc(), owned, posOut, &found, recordLoc, direction);
+        *bucketLocOut = _locate(getRootLoc(), owned, posOut, &found, recordLoc, direction);
 
         if (!found) {
             return false;
@@ -2378,7 +2376,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    DiskLoc BtreeLogic<BtreeLayout>::locate(const DiskLoc& bucketLoc,
+    DiskLoc BtreeLogic<BtreeLayout>::_locate(const DiskLoc& bucketLoc,
                                             const KeyDataType& key,
                                             int* posOut,
                                             bool* foundOut,
@@ -2387,7 +2385,7 @@ namespace mongo {
         int position;
         BucketType* bucket = getBucket(bucketLoc);
         // XXX: owned to not owned conversion(?)
-        find(bucket, key, recordLoc, false, &position, foundOut);
+        _find(bucket, key, recordLoc, false, &position, foundOut);
 
         // Look in our current bucket.
         if (*foundOut) {
@@ -2399,7 +2397,7 @@ namespace mongo {
         DiskLoc childLoc = childLocForPos(bucket, position);
 
         if (!childLoc.isNull()) {
-            DiskLoc inChild = locate(childLoc, key, posOut, foundOut, recordLoc, direction);
+            DiskLoc inChild = _locate(childLoc, key, posOut, foundOut, recordLoc, direction);
             if (!inChild.isNull()) {
                 return inChild;
             }

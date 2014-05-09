@@ -46,11 +46,25 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/transaction.h"
 #include "mongo/db/structure/btree/btree_interface.h"
+#include "mongo/db/structure/btree/bucket_deletion_notification.h"
 #include "mongo/util/progress_meter.h"
+
 
 namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
+
+    /**
+     * Invalidates all active cursors, which point at the bucket being deleted.
+     */
+    class InvalidateCursorsNotification : public BucketDeletionNotification {
+    public:
+        virtual void aboutToDeleteBucket(const DiskLoc& bucket) {
+            BtreeIndexCursor::aboutToDeleteBucket(bucket);
+        }
+    };
+
+    static InvalidateCursorsNotification invalidateCursors;
 
     BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState)
         : _btreeState(btreeState), _descriptor(btreeState->descriptor()) {
@@ -60,7 +74,8 @@ namespace mongo {
                                                          btreeState->recordStore(),
                                                          btreeState->ordering(),
                                                          _descriptor->indexNamespace(),
-                                                         _descriptor->version()));
+                                                         _descriptor->version(),
+                                                         &invalidateCursors));
     }
 
     // Find the keys for obj, put them in the tree pointing to loc
