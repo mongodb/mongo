@@ -651,9 +651,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  */
 static int
 __conn_config_file(WT_SESSION_IMPL *session,
-    const char *filename, const char **cfg, WT_ITEM **cbufp)
+    const char *filename, const char **cfg, WT_ITEM *cbuf)
 {
-	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_FH *fh;
 	const char **cfgend;
@@ -661,8 +660,6 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	size_t len;
 	int exist, quoted;
 	uint8_t *p, *t;
-
-	*cbufp = NULL;				/* Returned buffer */
 
 	fh = NULL;
 
@@ -697,7 +694,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 * newline character, simplify the parsing loop by pretending that's
 	 * what we're doing.
 	 */
-	WT_ERR(__wt_scr_alloc(session, len + 10,  &cbuf));
+	WT_ERR(__wt_buf_init(session, cbuf, len + 10));
 	WT_ERR(
 	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
 	((uint8_t *)cbuf->mem)[0] = '\n';
@@ -781,13 +778,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 		;
 	cfgend[1] = *cfgend;
 	*cfgend = cbuf->data;
-	*cbufp = cbuf;
 
-	if (0) {
-err:		if (cbuf != NULL)
-			__wt_buf_free(session, cbuf);
-	}
-	if (fh != NULL)
+err:	if (fh != NULL)
 		WT_TRET(__wt_close(session, fh));
 	return (ret);
 }
@@ -1148,8 +1140,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	};
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(cbbuf);
-	WT_DECL_ITEM(cubuf);
+	WT_ITEM cbbuf, cubuf;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	/* Leave space for optional additional configuration. */
@@ -1159,6 +1150,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
+	WT_CLEAR(cbbuf);
+	WT_CLEAR(cubuf);
 
 	WT_RET(__wt_library_init());
 
@@ -1322,10 +1315,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Destroying the connection on error will destroy our session handle,
 	 * cleanup using the session handle first, then discard the connection.
 	 */
-err:	if (cbbuf != NULL)
-		__wt_buf_free(session, cbbuf);
-	if (cubuf != NULL)
-		__wt_buf_free(session, cubuf);
+err:	__wt_buf_free(session, &cbbuf);
+	__wt_buf_free(session, &cubuf);
 
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_close(conn));
