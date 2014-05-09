@@ -1148,7 +1148,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	};
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(cbuf);
+	WT_DECL_ITEM(cbbuf);
+	WT_DECL_ITEM(cubuf);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	/* Leave space for optional additional configuration. */
@@ -1212,8 +1213,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Track the end of the stack, which always points to the config passed
 	 * by the application.
 	 */
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbuf));
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cbuf));
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbbuf));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf));
 	WT_ERR(__conn_config_env(session, cfg));
 
 	/* Write the base configuration file, if we're creating the database. */
@@ -1321,8 +1322,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Destroying the connection on error will destroy our session handle,
 	 * cleanup using the session handle first, then discard the connection.
 	 */
-err:	if (cbuf != NULL)
-		__wt_buf_free(session, cbuf);
+err:	if (cbbuf != NULL)
+		__wt_buf_free(session, cbbuf);
+	if (cbbuf != NULL)
+		__wt_buf_free(session, cubuf);
 
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_close(conn));
