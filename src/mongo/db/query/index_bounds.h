@@ -71,7 +71,7 @@ namespace mongo {
      * interpret.  Previously known as FieldRangeVector.
      */
     struct IndexBounds {
-        IndexBounds() : isSimpleRange(false) { }
+        IndexBounds() : isSimpleRange(false), endKeyInclusive(false) { }
 
         // For each indexed field, the values that the field is allowed to take on.
         vector<OrderedIntervalList> fields;
