@@ -34,9 +34,10 @@ __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	key.size = WT_INSERT_KEY_SIZE(ret_ins);
 
 	/* Fast-path appends. */
-	if (!insert)
-		goto skip_append;
-	WT_RET(WT_LEX_CMP(session, btree->collator, srch_key, &key, cmp));
+	cmp = -1;
+	if (insert)
+		WT_RET(WT_LEX_CMP(
+		    session, btree->collator, srch_key, &key, cmp));
 	if (cmp >= 0) {
 		if (btree->appending == 0)
 			btree->appending = 1;
@@ -62,7 +63,6 @@ __wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		return (0);
 	}
 
-skip_append:
 	/*
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
