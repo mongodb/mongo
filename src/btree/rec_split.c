@@ -549,11 +549,13 @@ __split_inmem_build(
 		}
 
 	/*
-	 * We modified the page above, which will have copied the current
-	 * checkpoint generation.  If there is a checkpoint in progress, it
-	 * must write this page, so reset the checkpoint generation to zero.
+	 * We modified the page above, which will have set the first dirty
+	 * transaction to the last transaction current running.  However, the
+	 * updates we installed may be older than that.  Take the oldest active
+	 * transaction ID to make sure these updates are not skipped by a
+	 * checkpoint.
 	 */
-	page->modify->checkpoint_gen = 0;
+	page->modify->first_dirty_txn = S2C(session)->txn_global.oldest_id;
 
 err:	__wt_scr_free(&key);
 	/* Free any resources that may have been cached in the cursor. */

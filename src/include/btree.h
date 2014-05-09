@@ -117,12 +117,6 @@ struct __wt_btree {
 	u_int    evict_walk_skips;	/* Number of walks skipped */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 
-	/*
-	 * The current checkpoint generation.  Use a 32-bit count for now: if
-	 * we can do 4 billion checkpoints without a restart, we'll be in good
-	 * shape.
-	 */
-	uint32_t checkpoint_gen;
 	int checkpointing;		/* Checkpoint in progress */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */

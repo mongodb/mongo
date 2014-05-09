@@ -815,6 +815,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
 	uint64_t pages_walked;
 	uint32_t walk_flags;
 	int internal_pages, modified, restarts;
@@ -883,12 +884,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * with the checkpointing thread.
 		 */
 		modified = __wt_page_is_modified(page);
-#ifdef EVICTION_DURING_CHECKPOINT
-		if (modified && btree->checkpointing &&
-		    page->modify->checkpoint_gen >= btree->checkpoint_gen)
-#else
 		if (modified && btree->checkpointing)
-#endif
 			continue;
 
 		/* Optionally ignore clean pages. */
@@ -899,9 +895,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * If the page is clean but has modifications that appear too
 		 * new to evict, skip it.
 		 */
-		if (!modified && page->modify != NULL &&
+		mod = page->modify;
+		if (!modified && mod != NULL &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
-		    !__wt_txn_visible_all(session, page->modify->rec_max_txn))
+		    !__wt_txn_visible_all(session, mod->rec_max_txn))
 			continue;
 
 		/*
@@ -920,10 +917,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 */
 		if (modified && !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE) &&
 		    !btree->checkpointing &&
-		    (page->modify->disk_snap_min ==
-		    S2C(session)->txn_global.oldest_id ||
-		    !__wt_txn_visible_all(session,
-		    page->modify->update_txn)))
+		    (mod->disk_snap_min == S2C(session)->txn_global.oldest_id ||
+		    !__wt_txn_visible_all(session, mod->update_txn)))
 			continue;
 
 		WT_ASSERT(session, evict->ref == NULL);

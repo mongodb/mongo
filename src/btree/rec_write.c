@@ -4655,7 +4655,7 @@ err:			__wt_scr_free(&tkey);
 			WT_PANIC_RETX(session,
 			    "reconciliation illegally skipped an update");
 
-		mod->rec_skipped_txn = r->skipped_txn;
+		mod->first_dirty_txn = r->skipped_txn;
 
 		btree->modified = 1;
 		WT_FULL_BARRIER();
@@ -4675,12 +4675,6 @@ err:			__wt_scr_free(&tkey);
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
-
-	/*
-	 * Set the checkpoint generation, used to determine whether we can skip
-	 * writing this page again.
-	 */
-	mod->checkpoint_gen = btree->checkpoint_gen;
 
 	return (0);
 }

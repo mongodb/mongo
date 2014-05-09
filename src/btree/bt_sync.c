@@ -23,7 +23,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_TXN *txn;
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
-	uint32_t checkpoint_gen, flags;
+	uint32_t flags;
 
 	btree = S2BT(session);
 	walk = NULL;
@@ -70,7 +70,6 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * eviction to complete.
 		 */
 		btree->checkpointing = 1;
-		checkpoint_gen = ++btree->checkpoint_gen;
 
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 			WT_ERR(__wt_evict_file_exclusive_on(session));
@@ -88,19 +87,12 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 * Write dirty pages, unless we can be sure they only
 			 * became dirty after the checkpoint started.
 			 *
-			 * We can skip pages if:
+			 * We can skip dirty pages if:
 			 * (1) they are leaf pages;
-			 * (2) the global checkpoint generation has been
-			 *     incremented (otherwise we skip writing the
-			 *     metadata when first creating tables);
-			 * (3) the page's checkpoint generation is equal to
-			 *     the current checkpoint generation, so it has
-			 *     already been written since this checkpoint
-			 *     started; and
-			 * (4) there is a snapshot transaction active (which
+			 * (2) there is a snapshot transaction active (which
 			 *     is the case in ordinary application checkpoints
 			 *     but not all internal cases); and
-			 * (5) any updates skipped by reconciliation were
+			 * (3) the first dirty update on the page is
 			 *     sufficiently recent that the checkpoint
 			 *     transaction would skip them.
 			 */
@@ -108,10 +100,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			mod = page->modify;
 			if (__wt_page_is_modified(page) &&
 			    (WT_PAGE_IS_INTERNAL(page) ||
-			    checkpoint_gen == 0 ||
-			    mod->checkpoint_gen < checkpoint_gen ||
 			    !F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
-			    TXNID_LE(mod->rec_skipped_txn, txn->snap_max))) {
+			    TXNID_LE(mod->first_dirty_txn, txn->snap_max))) {
 				if (WT_PAGE_IS_INTERNAL(page)) {
 					internal_bytes +=
 					    page->memory_footprint;
@@ -122,17 +112,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 				}
 				WT_ERR(__wt_rec_write(session, walk, NULL, 0));
 			}
-
-			/*
-			 * Set the checkpoint generation, even if we didn't
-			 * write the page.  If it becomes dirty and is selected
-			 * for eviction, it can't be written until this
-			 * checkpoint completes.
-			 */
-			if (page->modify != NULL)
-				page->modify->checkpoint_gen = checkpoint_gen;
 		}
-		WT_ASSERT(session, checkpoint_gen == btree->checkpoint_gen);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
