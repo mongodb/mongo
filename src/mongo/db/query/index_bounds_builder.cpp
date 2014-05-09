@@ -197,7 +197,14 @@ namespace mongo {
                                                const IndexEntry& index,
                                                OrderedIntervalList* oilOut,
                                                BoundsTightness* tightnessOut) {
-        translate(expr, elt, index, oilOut, tightnessOut);
+        OrderedIntervalList arg;
+        translate(expr, elt, index, &arg, tightnessOut);
+
+        // Append the new intervals to oilOut.
+        oilOut->intervals.insert(oilOut->intervals.end(), arg.intervals.begin(),
+                                 arg.intervals.end());
+
+        // Union the appended intervals with the existing ones.
         unionize(oilOut);
     }
 
@@ -216,6 +223,9 @@ namespace mongo {
                                        const IndexEntry& index,
                                        OrderedIntervalList* oilOut,
                                        BoundsTightness* tightnessOut) {
+        // We expect that the OIL we are constructing starts out empty.
+        invariant(oilOut->intervals.empty());
+
         oilOut->name = elt.fieldName();
 
         bool isHashed = false;
