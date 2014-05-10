@@ -125,8 +125,7 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.opaque = &opaque;
 
 	if ((ret = deflateInit(&zs, zlib_compressor->zlib_level)) != Z_OK)
-		return (zlib_error(
-		    compressor, session, "deflateInit", ret));
+		return (zlib_error(compressor, session, "deflateInit", ret));
 
 	zs.next_in = src;
 	zs.avail_in = (uint32_t)src_len;
@@ -205,8 +204,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	if ((ret = deflateInit(&zs,
 	    zlib_compressor->zlib_level)) != Z_OK)
-		return (zlib_error(
-		    compressor, session, "deflateInit", ret));
+		return (zlib_error(compressor, session, "deflateInit", ret));
 
 	zs.next_in = src;
 	zs.next_out = dst;
@@ -262,8 +260,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		    zlib_error(compressor, session, "deflate end block", ret));
 
 	if ((ret = deflateEnd(&zs)) != Z_OK && ret != Z_DATA_ERROR)
-		return (
-		    zlib_error(compressor, session, "deflateEnd", ret));
+		return (zlib_error(compressor, session, "deflateEnd", ret));
 
 	if (last_slot > 0) {
 		*result_slotsp = last_slot;
@@ -306,8 +303,7 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.opaque = &opaque;
 
 	if ((ret = inflateInit(&zs)) != Z_OK)
-		return (zlib_error(
-		    compressor, session, "inflateInit", ret));
+		return (zlib_error(compressor, session, "inflateInit", ret));
 
 	zs.next_in = src;
 	zs.avail_in = (uint32_t)src_len;
