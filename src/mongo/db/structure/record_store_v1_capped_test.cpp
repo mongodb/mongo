@@ -47,10 +47,11 @@ namespace {
         vector<DiskLoc> deleted;
     };
 
-    TEST(CappedRecordStoreV1, Simple1) {
+    void simpleSize( int size ) {
+
         DummyTransactionExperiment txn;
         DummyExtentManager em;
-        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
 
         string myns = "test.simple1";
@@ -58,7 +59,7 @@ namespace {
 
         rs.increaseStorageSize( &txn, 1024, -1 );
 
-        rs.insertRecord( &txn, "abc", 4, 10000 );
+        rs.insertRecord( &txn, "abc", size, 10000 );
 
         {
             BSONObjBuilder b;
@@ -67,19 +68,25 @@ namespace {
             ASSERT_EQUALS( 1, obj["numExtents"].numberInt() );
             ASSERT_EQUALS( storageSize, em.quantizeExtentSize( 1024 ) );
         }
-        /*
+
         for ( int i = 0; i < 1000; i++ ) {
-            rs.insertRecord( &txn, "abc", 4, 10000 );
+            ASSERT_TRUE( rs.insertRecord( &txn, "abcdefg", size, 10000 ).isOK() );
         }
 
         long long start = md->numRecords();
         for ( int i = 0; i < 1000; i++ ) {
-            rs.insertRecord( &txn, "abc", 4, 10000 );
+            ASSERT_TRUE( rs.insertRecord( &txn, "abcdefg", size, 10000 ).isOK() );
         }
         ASSERT_EQUALS( start, md->numRecords() );
         ASSERT_GREATER_THAN( start, 100 );
         ASSERT_LESS_THAN( start, 1000 );
-        */
+    }
+
+    TEST(CappedRecordStoreV1, Simple4) {
+        simpleSize(4);
+    }
+    TEST(CappedRecordStoreV1, Simple8) {
+        simpleSize(8);
     }
 
 }

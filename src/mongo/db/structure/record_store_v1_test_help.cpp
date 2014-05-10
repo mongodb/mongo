@@ -76,6 +76,9 @@ namespace mongo {
         _lastExtentSize = 0;
         _paddingFactor = 1;
         _maxCappedDocs = numeric_limits<long long>::max();
+        _capFirstNewRecord.setInvalid();
+        if ( _capped )
+            setDeletedListEntry( NULL, 1, DiskLoc().setInvalid() );
     }
 
     const DiskLoc& DummyRecordStoreV1MetaData::capExtent() const {

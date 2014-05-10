@@ -258,6 +258,7 @@ namespace mongo {
     void RecordStoreV1Base::deleteRecord( TransactionExperiment* txn, const DiskLoc& dl ) {
 
         Record* todelete = recordFor( dl );
+        invariant( todelete->netLength() >= 4 ); // this is required for defensive code
 
         /* remove ourself from the record next/prev chain */
         {
@@ -306,7 +307,7 @@ namespace mongo {
             }
             else {
                 DEV {
-                    unsigned long long *p = reinterpret_cast<unsigned long long *>( todelete->data() );
+                    unsigned* p = reinterpret_cast<unsigned*>( todelete->data() );
                     *txn->writing(p) = 0;
                 }
                 addDeletedRec(txn, dl);
@@ -359,15 +360,15 @@ namespace mongo {
         DiskLoc emptyLoc = _findFirstSpot( txn, eloc, e );
 
         if ( _details->lastExtent().isNull() ) {
-            verify( _details->firstExtent().isNull() );
+            invariant( _details->firstExtent().isNull() );
             _details->setFirstExtent( txn, eloc );
             _details->setLastExtent( txn, eloc );
             _details->setCapExtent( txn, eloc );
-            verify( e->xprev.isNull() );
-            verify( e->xnext.isNull() );
+            invariant( e->xprev.isNull() );
+            invariant( e->xnext.isNull() );
         }
         else {
-            verify( !_details->firstExtent().isNull() );
+            invariant( !_details->firstExtent().isNull() );
             *txn->writing(&e->xprev) = _details->lastExtent();
             *txn->writing(&_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
             _details->setLastExtent( txn, eloc );
