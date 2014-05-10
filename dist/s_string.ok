@@ -345,6 +345,8 @@ bzCompressInit
 bzDecompress
 bzDecompressEnd
 bzDecompressInit
+bzalloc
+bzfree
 bzip
 calloc
 catfmt
@@ -978,5 +980,7 @@ xff
 xxxx
 xxxxx
 xxxxxx
+zalloc
+zfree
 zlib
 zu

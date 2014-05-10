@@ -401,6 +401,10 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 }
 
 #if 0
+/*
+ * helium_dump_kv --
+ *	Dump a Helium record.
+ */
 static void
 helium_dump_kv(const char *pfx, uint8_t *p, size_t len, FILE *fp)
 {
@@ -416,7 +420,7 @@ helium_dump_kv(const char *pfx, uint8_t *p, size_t len, FILE *fp)
 }
 
 /*
- * he_dump --
+ * helium_dump --
  *	Dump the records in a Helium store.
  */
 static int

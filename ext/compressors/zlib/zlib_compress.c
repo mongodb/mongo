@@ -69,6 +69,10 @@ zlib_error(
 	return (WT_ERROR);
 }
 
+/*
+ * zalloc --
+ *	Allocate a scratch buffer.
+ */
 static void *
 zalloc(void *cookie, u_int number, u_int size)
 {
@@ -81,6 +85,10 @@ zalloc(void *cookie, u_int number, u_int size)
 	    wt_api, opaque->session, (size_t)(number * size)));
 }
 
+/*
+ * zfree --
+ *	Free a scratch buffer.
+ */
 static void
 zfree(void *cookie, void *p)
 {
@@ -92,6 +100,10 @@ zfree(void *cookie, void *p)
 	wt_api->scr_free(wt_api, opaque->session, p);
 }
 
+/*
+ * zlib_compress --
+ *	WiredTiger zlib compression.
+ */
 static int
 zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -129,8 +141,7 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		*compression_failed = 1;
 
 	if ((ret = deflateEnd(&zs)) != Z_OK)
-		return (
-		    zlib_error(compressor, session, "deflateEnd", ret));
+		return (zlib_error(compressor, session, "deflateEnd", ret));
 
 	return (0);
 }
@@ -273,6 +284,10 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	return (0);
 }
 
+/*
+ * zlib_decompress --
+ *	WiredTiger zlib decompression.
+ */
 static int
 zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -312,6 +327,10 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    0 : zlib_error(compressor, session, "inflate", ret));
 }
 
+/*
+ * zlib_terminate --
+ *	WiredTiger zlib compression termination.
+ */
 static int
 zlib_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
@@ -321,6 +340,10 @@ zlib_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	return (0);
 }
 
+/*
+ * zlib_add_compressor --
+ *	Add a zlib compressor.
+ */
 static int
 zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 {
@@ -352,6 +375,10 @@ zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 	    connection, name, &zlib_compressor->compressor, NULL));
 }
 
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger zlib compression extension.
+ */
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {

@@ -1759,7 +1759,9 @@ struct __wt_connection {
 	 * The application must first implement the WT_COMPRESSOR interface
 	 * and then register the implementation with WiredTiger:
 	 *
-	 * @snippet nop_compress.c WT_COMPRESSOR initialization
+	 * @snippet nop_compress.c WT_COMPRESSOR initialization structure
+	 *
+	 * @snippet nop_compress.c WT_COMPRESSOR initialization function
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the compression function to be used in calls
@@ -2572,7 +2574,8 @@ struct __wt_collator {
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_compressor.
  *
- * @snippet nop_compress.c WT_COMPRESSOR initialization
+ * @snippet nop_compress.c WT_COMPRESSOR initialization structure
+ * @snippet nop_compress.c WT_COMPRESSOR initialization function
  */
 struct __wt_compressor {
 	/*!
