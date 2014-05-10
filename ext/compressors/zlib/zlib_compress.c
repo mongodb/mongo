@@ -131,17 +131,12 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.avail_in = (uint32_t)src_len;
 	zs.next_out = dst;
 	zs.avail_out = (uint32_t)dst_len - 1;
-	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
-		;
-	if (ret == Z_STREAM_END) {
+	if (deflate(&zs, Z_FINISH) == Z_STREAM_END) {
 		*compression_failed = 0;
 		*result_lenp = zs.total_out;
 	} else
 		*compression_failed = 1;
-
-	if ((ret = deflateEnd(&zs)) != Z_OK)
-		return (zlib_error(compressor, session, "deflateEnd", ret));
-
+	(void)deflateEnd(&zs);
 	return (0);
 }
 
