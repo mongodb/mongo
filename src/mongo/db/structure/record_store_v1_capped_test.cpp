@@ -67,7 +67,7 @@ namespace {
             ASSERT_EQUALS( 1, obj["numExtents"].numberInt() );
             ASSERT_EQUALS( storageSize, em.quantizeExtentSize( 1024 ) );
         }
-
+        /*
         for ( int i = 0; i < 1000; i++ ) {
             rs.insertRecord( &txn, "abc", 4, 10000 );
         }
@@ -79,7 +79,7 @@ namespace {
         ASSERT_EQUALS( start, md->numRecords() );
         ASSERT_GREATER_THAN( start, 100 );
         ASSERT_LESS_THAN( start, 1000 );
-
+        */
     }
 
 }
