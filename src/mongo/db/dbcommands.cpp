@@ -1137,7 +1137,8 @@ namespace mongo {
 
             result.appendNumber( "storageSize",
                                  static_cast<long long>(collection->getRecordStore()->storageSize( &result,
-                                                                                                   verbose ? 1 : 0 ) ) );
+                                                                                                   verbose ? 1 : 0 ) ) / 
+                                 scale );
             result.append( "nindexes" , collection->getIndexCatalog()->numIndexesReady() );
 
             collection->appendCustomStats( &result, scale );
