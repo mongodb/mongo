@@ -117,12 +117,12 @@ namespace mongo {
         _head = newHead;
     }
 
-    void IndexCatalogEntry::setMultikey() {
+    void IndexCatalogEntry::setMultikey( TransactionExperiment* txn ) {
         if ( isMultikey() )
             return;
         NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
-        if ( nsd->setIndexIsMultikey( idxNo, true ) ) {
+        if ( nsd->setIndexIsMultikey( txn, idxNo, true ) ) {
             LOG(1) << _collection->ns().ns() << ": clearing plan cache - index "
                    << _descriptor->keyPattern() << " set to multi key.";
             _collection->infoCache()->clearQueryCache();

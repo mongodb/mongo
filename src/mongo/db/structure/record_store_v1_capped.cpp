@@ -568,14 +568,8 @@ namespace mongo {
     }
 
     void CappedRecordStoreV1::addDeletedRec( TransactionExperiment* txn, const DiskLoc& dloc ) {
-        DeletedRecord* d = drec( dloc );
+        DeletedRecord* d = txn->writing( drec( dloc ) );
 
-        {
-            Record *r = (Record *) txn->writingPtr(d, sizeof(Record));
-            d = &r->asDeleted();
-            // defensive code: try to make us notice if we reference a deleted record
-            reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
-        }
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
         if ( !cappedLastDelRecLastExtent().isValid() ) {
             // Initial extent allocation.  Insert at end.

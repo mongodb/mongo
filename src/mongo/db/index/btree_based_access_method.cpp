@@ -132,8 +132,7 @@ namespace mongo {
         }
 
         if (*numInserted > 1) {
-            // XXX: this should use a txn?
-            _btreeState->setMultikey();
+            _btreeState->setMultikey( txn );
         }
 
         return ret;
@@ -308,7 +307,7 @@ namespace mongo {
             static_cast<BtreeBasedPrivateUpdateData*>(ticket._indexSpecificUpdateData.get());
 
         if (data->oldKeys.size() + data->added.size() - data->removed.size() > 1) {
-            _btreeState->setMultikey();
+            _btreeState->setMultikey( txn );
         }
 
         for (size_t i = 0; i < data->added.size(); ++i) {

@@ -208,7 +208,12 @@ namespace mongo {
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( TransactionExperiment* txn,
                                                          const DocWriter* doc,
                                                          int quotaMax ) {
-        int lenWHdr = doc->documentSize() + Record::HeaderSize;
+        int docSize = doc->documentSize();
+        if ( docSize < 4 ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
+                                        "record has to be >= 4 bytes" );
+        }
+        int lenWHdr = docSize + Record::HeaderSize;
         if ( doc->addPadding() )
             lenWHdr = getRecordAllocationSize( lenWHdr );
 
@@ -234,6 +239,11 @@ namespace mongo {
                                                          const char* data,
                                                          int len,
                                                          int quotaMax ) {
+        if ( len < 4 ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
+                                        "record has to be >= 4 bytes" );
+        }
+
         int lenWHdr = getRecordAllocationSize( len + Record::HeaderSize );
         fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
 
@@ -306,10 +316,9 @@ namespace mongo {
                         0, todelete->lengthWithHeaders() );
             }
             else {
-                DEV {
-                    unsigned* p = reinterpret_cast<unsigned*>( todelete->data() );
-                    *txn->writing(p) = 0;
-                }
+                // this is defensive so we can detect if we are still using a location
+                // that was deleted
+                memset(txn->writingPtr(todelete->data(), 4), 0xee, 4);
                 addDeletedRec(txn, dl);
             }
         }

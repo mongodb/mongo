@@ -73,7 +73,7 @@ namespace mongo {
         virtual Status commitBulk(IndexAccessMethod* bulk,
                                   bool mayInterrupt,
                                   std::set<DiskLoc>* dups) {
-            verify(this == bulk);
+            invariant(this == bulk);
             return Status::OK();
         }
 

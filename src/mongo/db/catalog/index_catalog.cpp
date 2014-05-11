@@ -418,7 +418,7 @@ namespace mongo {
 
         // need this first for names, etc...
         BSONObj keyPattern = _spec.getObjectField("key");
-        IndexDescriptor* descriptor = new IndexDescriptor( _collection, 
+        IndexDescriptor* descriptor = new IndexDescriptor( _collection,
                                                            IndexNames::findPluginName(keyPattern),
                                                            _spec );
         auto_ptr<IndexDescriptor> descriptorCleaner( descriptor );
@@ -440,7 +440,8 @@ namespace mongo {
             return systemIndexesEntry.getStatus();
 
         // 2) collection's NamespaceDetails
-        IndexDetails& indexDetails = _collection->detailsWritable()->getNextIndexDetails( _collection );
+        IndexDetails& indexDetails =
+            _collection->detailsWritable()->getNextIndexDetails( _txn, _collection );
 
         try {
             *_txn->writing( &indexDetails.info ) = systemIndexesEntry.getValue();
@@ -470,7 +471,7 @@ namespace mongo {
         // 3) indexes entry in .ns file
         NamespaceIndex& nsi = db->namespaceIndex();
         invariant( nsi.details( descriptor->indexNamespace() ) == NULL );
-        nsi.add_ns( descriptor->indexNamespace(), DiskLoc(), false );
+        nsi.add_ns( _txn, descriptor->indexNamespace(), DiskLoc(), false );
 
         // 4) system.namespaces entry index ns
         db->_addNamespaceToCatalog(_txn, descriptor->indexNamespace(), NULL);
@@ -553,7 +554,7 @@ namespace mongo {
 
             int toIdxNo = nsd->getCompletedIndexCount();
 
-            nsd->swapIndex( idxNo, toIdxNo );
+            nsd->swapIndex( _txn, idxNo, toIdxNo );
 
             idxNo = nsd->getCompletedIndexCount();
         }
@@ -917,7 +918,7 @@ namespace mongo {
         }
 
         // all info in the .ns file
-        _details->_removeIndexFromMe( idxNo );
+        _details->_removeIndexFromMe( txn, idxNo );
 
         // remove from system.indexes
         // n is how many things were removed from this

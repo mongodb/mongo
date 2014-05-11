@@ -40,6 +40,7 @@
 namespace mongo {
 
     class NamespaceDetails;
+    class TransactionExperiment;
 
     /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"
        if you will: at least the core parts.  (Additional info in system.* collections.)
@@ -52,19 +53,23 @@ namespace mongo {
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
 
-        void init() {
+        void init( TransactionExperiment* txn ) {
             if ( !_ht.get() )
-                _init();
+                _init( txn );
         }
 
-        void add_ns( const StringData& ns, const DiskLoc& loc, bool capped);
-        void add_ns( const StringData& ns, const NamespaceDetails* details );
-        void add_ns( const Namespace& ns, const NamespaceDetails* details );
+        void add_ns( TransactionExperiment* txn,
+                     const StringData& ns, const DiskLoc& loc, bool capped);
+        void add_ns( TransactionExperiment* txn,
+                     const StringData& ns, const NamespaceDetails* details );
+        void add_ns( TransactionExperiment* txn,
+                     const Namespace& ns, const NamespaceDetails* details );
 
         NamespaceDetails* details(const StringData& ns);
         NamespaceDetails* details(const Namespace& ns);
 
-        void kill_ns(const StringData& ns);
+        void kill_ns( TransactionExperiment* txn,
+                      const StringData& ns);
 
         bool allocated() const { return _ht.get() != 0; }
 
@@ -75,7 +80,7 @@ namespace mongo {
         unsigned long long fileLength() const { return _f.length(); }
 
     private:
-        void _init();
+        void _init( TransactionExperiment* txn );
         void maybeMkdir() const;
 
         DurableMappedFile _f;

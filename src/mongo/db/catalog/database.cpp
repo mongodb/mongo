@@ -219,7 +219,7 @@ namespace mongo {
             // If already exists, open.  Otherwise behave as if empty until
             // there's a write, then open.
             if (!newDb) {
-                _namespaceIndex.init();
+                _namespaceIndex.init( txn );
                 openAllFiles(txn);
 
                 // upgrade freelist
@@ -231,7 +231,7 @@ namespace mongo {
                                                     details->firstExtent(),
                                                     details->lastExtent());
                     }
-                    _namespaceIndex.kill_ns( oldFreeList );
+                    _namespaceIndex.kill_ns( txn, oldFreeList );
                 }
             }
             _magic = 781231;
@@ -605,24 +605,25 @@ namespace mongo {
         // ----
 
         // this could throw, but if it does we're ok
-        _namespaceIndex.add_ns( toNS, fromDetails );
+        _namespaceIndex.add_ns( txn, toNS, fromDetails );
         NamespaceDetails* toDetails = _namespaceIndex.details( toNS );
 
         try {
-            toDetails->copyingFrom(toNSString.c_str(),
+            toDetails->copyingFrom(txn,
+                                   toNSString.c_str(),
                                    _namespaceIndex,
                                    fromDetails); // fixes extraOffset
         }
         catch( DBException& ) {
             // could end up here if .ns is full - if so try to clean up / roll back a little
-            _namespaceIndex.kill_ns( toNSString );
+            _namespaceIndex.kill_ns( txn, toNSString );
             _clearCollectionCache(toNSString);
             throw;
         }
 
         // at this point, code .ns stuff moved
 
-        _namespaceIndex.kill_ns( fromNSString );
+        _namespaceIndex.kill_ns( txn, fromNSString );
         _clearCollectionCache(fromNSString);
         fromDetails = NULL;
 
@@ -687,7 +688,7 @@ namespace mongo {
                                             bool createIdIndex ) {
         massert( 17399, "collection already exists", _namespaceIndex.details( ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
-        _namespaceIndex.init();
+        _namespaceIndex.init( txn );
 
         if ( serverGlobalParams.configsvr &&
              !( ns.startsWith( "config." ) ||
@@ -708,7 +709,7 @@ namespace mongo {
 
         audit::logCreateCollection( currentClient.get(), ns );
 
-        _namespaceIndex.add_ns( ns, DiskLoc(), options.capped );
+        _namespaceIndex.add_ns( txn, ns, DiskLoc(), options.capped );
         BSONObj optionsAsBSON = options.toBSON();
         _addNamespaceToCatalog( txn, ns, &optionsAsBSON );
 
@@ -726,7 +727,7 @@ namespace mongo {
         }
 
         if ( options.cappedMaxDocs > 0 )
-            collection->setMaxCappedDocs( options.cappedMaxDocs );
+            collection->setMaxCappedDocs( txn, options.cappedMaxDocs );
 
         if ( allocateDefaultSpace ) {
             if ( options.initialNumExtents > 0 ) {
@@ -816,12 +817,12 @@ namespace mongo {
         // free extents
         if( !d->firstExtent().isNull() ) {
             _extentManager->freeExtents(txn, d->firstExtent(), d->lastExtent());
-            d->setFirstExtentInvalid();
-            d->setLastExtentInvalid();
+            d->setFirstExtentInvalid(txn);
+            d->setLastExtentInvalid(txn);
         }
 
         // remove from the catalog hashtable
-        _namespaceIndex.kill_ns( ns );
+        _namespaceIndex.kill_ns( txn, ns );
 
         return Status::OK();
     }

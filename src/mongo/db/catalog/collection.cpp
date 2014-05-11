@@ -205,7 +205,7 @@ namespace mongo {
 
         StatusWith<DiskLoc> status = _insertDocument( txn, docToInsert, enforceQuota );
         if ( status.isOK() ) {
-            _details->paddingFits();
+            _details->paddingFits( txn );
         }
 
         return status;
@@ -373,7 +373,7 @@ namespace mongo {
                                             10003 );
 
             moveCounter.increment();
-            _details->paddingTooSmall();
+            _details->paddingTooSmall( txn );
 
             // unindex old record, don't delete
             // this way, if inserting new doc fails, we can re-index this one
@@ -403,7 +403,7 @@ namespace mongo {
         }
 
         _infoCache.notifyOfWriteOp();
-        _details->paddingFits();
+        _details->paddingFits( txn );
 
         if ( debug )
             debug->keyUpdates = 0;
@@ -439,7 +439,7 @@ namespace mongo {
         // Broadcast the mutation so that query results stay correct.
         _cursorCache.invalidateDocument(loc, INVALIDATION_MUTATION);
 
-        _details->paddingFits();
+        _details->paddingFits( txn );
 
         Record* rec = _recordStore->recordFor( loc );
         char* root = rec->data();
@@ -648,14 +648,14 @@ namespace mongo {
     }
 
     bool Collection::setUserFlag( TransactionExperiment* txn, int flag ) {
-        if ( !_details->setUserFlag( flag ) )
+        if ( !_details->setUserFlag( txn, flag ) )
             return false;
         _syncUserFlags(txn);
         return true;
     }
 
     bool Collection::clearUserFlag( TransactionExperiment* txn, int flag ) {
-        if ( !_details->clearUserFlag( flag ) )
+        if ( !_details->clearUserFlag( txn, flag ) )
             return false;
         _syncUserFlags(txn);
         return true;
@@ -687,8 +687,8 @@ namespace mongo {
 
     }
 
-    void Collection::setMaxCappedDocs( long long max ) {
-        _details->setMaxCappedDocs( max );
+    void Collection::setMaxCappedDocs( TransactionExperiment* txn, long long max ) {
+        _details->setMaxCappedDocs( txn, max );
     }
 
 }

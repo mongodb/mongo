@@ -37,6 +37,7 @@
 namespace mongo {
 
     class Collection;
+    class TransactionExperiment;
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.
@@ -129,7 +130,7 @@ namespace mongo {
                 if( _next == 0 ) return 0;
                 return (Extra*) (((char *) d) + _next);
             }
-            void setNext(long ofs) { *getDur().writing(&_next) = ofs;  }
+            void setNext(TransactionExperiment* txn, long ofs);
             void copy(NamespaceDetails *d, const Extra& e) {
                 memcpy(this, &e, sizeof(Extra));
                 _next = 0;
@@ -140,56 +141,60 @@ namespace mongo {
             return (Extra *) (((char *) this) + _extraOffset);
         }
         /* add extra space for indexes when more than 10 */
-        Extra* allocExtra( const StringData& ns,
+        Extra* allocExtra( TransactionExperiment* txn,
+                           const StringData& ns,
                            NamespaceIndex& ni,
                            int nindexessofar );
 
-        void copyingFrom( const char* thisns,
+        void copyingFrom( TransactionExperiment* txn,
+                          const char* thisns,
                           NamespaceIndex& ni,
                           NamespaceDetails *src); // must be called when renaming a NS to fix up extra
 
     public:
         const DiskLoc& capExtent() const { return _capExtent; }
-        void setCapExtent( const DiskLoc& loc );
+        void setCapExtent( TransactionExperiment* txn, const DiskLoc& loc );
 
         const DiskLoc& capFirstNewRecord() const { return _capFirstNewRecord; }
-        void setCapFirstNewRecord( const DiskLoc& loc );
+        void setCapFirstNewRecord( TransactionExperiment* txn, const DiskLoc& loc );
 
         bool capLooped() const { return _capFirstNewRecord.isValid(); }
 
     public:
 
         const DiskLoc& firstExtent() const { return _firstExtent; }
-        void setFirstExtent( const DiskLoc& loc );
+        void setFirstExtent( TransactionExperiment* txn, const DiskLoc& loc );
 
         const DiskLoc& lastExtent() const { return _lastExtent; }
-        void setLastExtent( const DiskLoc& loc );
+        void setLastExtent( TransactionExperiment* txn, const DiskLoc& loc );
 
-        void setFirstExtentInvalid();
-        void setLastExtentInvalid();
+        void setFirstExtentInvalid( TransactionExperiment* txn );
+        void setLastExtentInvalid( TransactionExperiment* txn );
 
 
         long long dataSize() const { return _stats.datasize; }
         long long numRecords() const { return _stats.nrecords; }
 
-        void incrementStats( long long dataSizeIncrement,
+        void incrementStats( TransactionExperiment* txn,
+                             long long dataSizeIncrement,
                              long long numRecordsIncrement );
 
-        void setStats( long long dataSizeIncrement,
+        void setStats( TransactionExperiment* txn,
+                       long long dataSizeIncrement,
                        long long numRecordsIncrement );
 
 
         bool isCapped() const { return _isCapped; }
         long long maxCappedDocs() const;
-        void setMaxCappedDocs( long long max );
+        void setMaxCappedDocs( TransactionExperiment* txn, long long max );
 
         int lastExtentSize() const { return _lastExtentSize; }
-        void setLastExtentSize( int newMax );
+        void setLastExtentSize( TransactionExperiment* txn, int newMax );
 
         const DiskLoc& deletedListEntry( int bucket ) const { return _deletedList[bucket]; }
-        void setDeletedListEntry( int bucket, const DiskLoc& loc );
+        void setDeletedListEntry( TransactionExperiment* txn, int bucket, const DiskLoc& loc );
 
-        void orphanDeletedList();
+        void orphanDeletedList( TransactionExperiment* txn );
 
         /**
          * @param max in and out, will be adjusted
@@ -238,17 +243,17 @@ namespace mongo {
         /**
          * @return - if any state was changed
          */
-        bool setIndexIsMultikey(int i, bool multikey = true);
+        bool setIndexIsMultikey(TransactionExperiment* txn, int i, bool multikey = true);
 
         /**
          * This fetches the IndexDetails for the next empty index slot. The caller must populate
          * returned object.  This handles allocating extra index space, if necessary.
          */
-        IndexDetails& getNextIndexDetails(Collection* collection);
+        IndexDetails& getNextIndexDetails(TransactionExperiment* txn, Collection* collection);
 
         double paddingFactor() const { return _paddingFactor; }
 
-        void setPaddingFactor( double paddingFactor );
+        void setPaddingFactor( TransactionExperiment* txn, double paddingFactor );
 
         /* called to indicate that an update fit in place.  
            fits also called on an insert -- idea there is that if you had some mix and then went to
@@ -259,13 +264,13 @@ namespace mongo {
                  size of documents might be considered -- in some cases smaller ones are more likely 
                  to grow than larger ones in the same collection? (not always)
         */
-        void paddingFits() {
+        void paddingFits( TransactionExperiment* txn ) {
             MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
                 double x = max(1.0, _paddingFactor - 0.001 );
-                setPaddingFactor( x );
+                setPaddingFactor( txn, x );
             }
         }
-        void paddingTooSmall() {            
+        void paddingTooSmall( TransactionExperiment* txn ) {
             MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less       
                 /* the more indexes we have, the higher the cost of a move.  so we take that into 
                    account herein.  note on a move that insert() calls paddingFits(), thus
@@ -276,7 +281,7 @@ namespace mongo {
                 */
                 double N = min(_nIndexes,7) + 3;
                 double x = min(2.0,_paddingFactor + (0.001 * N));
-                setPaddingFactor( x );
+                setPaddingFactor( txn, x );
             }
         }
 
@@ -292,15 +297,14 @@ namespace mongo {
          }
          * these methods all return true iff only something was modified
          */
-        bool setUserFlag( int flag );
-        bool clearUserFlag( int flag );
-        bool replaceUserFlags( int flags );
+        bool setUserFlag( TransactionExperiment* txn, int flag );
+        bool clearUserFlag( TransactionExperiment* txn, int flag );
+        bool replaceUserFlags( TransactionExperiment* txn, int flags );
 
-        NamespaceDetails *writingWithoutExtra() {
-            return ( NamespaceDetails* ) getDur().writingPtr( this, sizeof( NamespaceDetails ) );
-        }
+        NamespaceDetails *writingWithoutExtra( TransactionExperiment* txn );
+
         /** Make all linked Extra objects writeable as well */
-        NamespaceDetails *writingWithExtra();
+        NamespaceDetails *writingWithExtra( TransactionExperiment* txn );
 
         /**
          * Returns the offset of the specified index name within the array of indexes. Must be
@@ -314,14 +318,14 @@ namespace mongo {
 
     private:
 
-        void _removeIndexFromMe( int idx );
+        void _removeIndexFromMe( TransactionExperiment* txn, int idx );
 
         /**
          * swaps all meta data for 2 indexes
          * a and b are 2 index ids, whose contents will be swapped
          * must have a lock on the entire collection to do this
          */
-        void swapIndex( int a, int b );
+        void swapIndex( TransactionExperiment* txn, int a, int b );
 
         friend class IndexCatalog;
         friend class IndexCatalogEntry;

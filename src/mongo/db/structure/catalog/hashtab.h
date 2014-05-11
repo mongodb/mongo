@@ -25,6 +25,7 @@
 #include "mongo/pch.h"
 #include <map>
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/transaction.h"
 
 namespace mongo {
 
@@ -121,24 +122,24 @@ namespace mongo {
             return 0;
         }
 
-        void kill(const Key& k) {
+        void kill(TransactionExperiment* txn, const Key& k) {
             bool found;
             int i = _find(k, found);
             if ( i >= 0 && found ) {
                 Node* n = &nodes(i);
-                n = getDur().writing(n);
+                n = txn->writing(n);
                 n->k.kill();
                 n->setUnused();
             }
         }
 
         /** returns false if too full */
-        bool put(const Key& k, const Type& value) {
+        bool put(TransactionExperiment* txn, const Key& k, const Type& value) {
             bool found;
             int i = _find(k, found);
             if ( i < 0 )
                 return false;
-            Node* n = getDur().writing( &nodes(i) );
+            Node* n = txn->writing( &nodes(i) );
             if ( !found ) {
                 n->k = k;
                 n->hash = k.hash();

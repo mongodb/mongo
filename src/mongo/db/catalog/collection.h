@@ -271,7 +271,7 @@ namespace mongo {
         bool setUserFlag( TransactionExperiment* txn, int flag );
         bool clearUserFlag( TransactionExperiment* txn, int flag );
 
-        void setMaxCappedDocs( long long max );
+        void setMaxCappedDocs( TransactionExperiment* txn, long long max );
         // --- end suspect things
 
     private:

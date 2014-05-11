@@ -83,7 +83,7 @@ namespace mongo {
 
         bool isMultikey() const;
 
-        void setMultikey();
+        void setMultikey( TransactionExperiment* txn );
 
         // if this ready is ready for queries
         bool isReady() const;

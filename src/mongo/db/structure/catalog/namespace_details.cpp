@@ -43,6 +43,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/structure/catalog/hashtab.h"
+#include "mongo/db/storage/transaction.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/startup_test.h"
 
@@ -83,7 +84,8 @@ namespace mongo {
         memset(_reserved, 0, sizeof(_reserved));
     }
 
-    NamespaceDetails::Extra* NamespaceDetails::allocExtra( const StringData& ns,
+    NamespaceDetails::Extra* NamespaceDetails::allocExtra( TransactionExperiment* txn,
+                                                           const StringData& ns,
                                                            NamespaceIndex& ni,
                                                            int nindexessofar) {
         Lock::assertWriteLocked(ns);
@@ -100,24 +102,24 @@ namespace mongo {
         Extra temp;
         temp.init();
 
-        ni.add_ns( extrans, reinterpret_cast<NamespaceDetails*>( &temp ) );
+        ni.add_ns( txn, extrans, reinterpret_cast<NamespaceDetails*>( &temp ) );
         Extra* e = reinterpret_cast<NamespaceDetails::Extra*>( ni.details( extrans ) );
 
         long ofs = e->ofsFrom(this);
         if( i == 0 ) {
             verify( _extraOffset == 0 );
-            *getDur().writing(&_extraOffset) = ofs;
+            *txn->writing(&_extraOffset) = ofs;
             verify( extra() == e );
         }
         else {
             Extra *hd = extra();
             verify( hd->next(this) == 0 );
-            hd->setNext(ofs);
+            hd->setNext(txn, ofs);
         }
         return e;
     }
 
-    bool NamespaceDetails::setIndexIsMultikey(int i, bool multikey) {
+    bool NamespaceDetails::setIndexIsMultikey(TransactionExperiment* txn, int i, bool multikey) {
         massert(16577, "index number greater than NIndexesMax", i < NIndexesMax );
 
         unsigned long long mask = 1ULL << i;
@@ -128,7 +130,7 @@ namespace mongo {
                 return false;
             }
 
-            *getDur().writing(&_multiKeyIndexBits) |= mask;
+            *txn->writing(&_multiKeyIndexBits) |= mask;
         }
         else {
             // Shortcut if the bit is already set correctly
@@ -138,19 +140,21 @@ namespace mongo {
 
             // Invert mask: all 1's except a 0 at the ith bit
             mask = ~mask;
-            *getDur().writing(&_multiKeyIndexBits) &= mask;
+            *txn->writing(&_multiKeyIndexBits) &= mask;
         }
 
         return true;
     }
 
-    IndexDetails& NamespaceDetails::getNextIndexDetails(Collection* collection) {
+    IndexDetails& NamespaceDetails::getNextIndexDetails(TransactionExperiment* txn,
+                                                        Collection* collection) {
         IndexDetails *id;
         try {
             id = &idx(getTotalIndexCount(), true);
         }
         catch(DBException&) {
-            allocExtra(collection->ns().ns(),
+            allocExtra(txn,
+                       collection->ns().ns(),
                        collection->_database->namespaceIndex(),
                        getTotalIndexCount());
             id = &idx(getTotalIndexCount(), false);
@@ -216,37 +220,42 @@ namespace mongo {
     }
 
     // must be called when renaming a NS to fix up extra
-    void NamespaceDetails::copyingFrom( const char* thisns,
+    void NamespaceDetails::copyingFrom( TransactionExperiment* txn,
+                                        const char* thisns,
                                         NamespaceIndex& ni,
                                         NamespaceDetails* src) {
         _extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
         Extra *se = src->extra();
         int n = NIndexesBase;
         if( se ) {
-            Extra *e = allocExtra(thisns, ni, n);
+            Extra *e = allocExtra(txn, thisns, ni, n);
             while( 1 ) {
                 n += NIndexesExtra;
                 e->copy(this, *se);
                 se = se->next(src);
                 if( se == 0 ) break;
-                Extra *nxt = allocExtra(thisns, ni, n);
-                e->setNext( nxt->ofsFrom(this) );
+                Extra *nxt = allocExtra(txn, thisns, ni, n);
+                e->setNext( txn, nxt->ofsFrom(this) );
                 e = nxt;
             }
             verify( _extraOffset );
         }
     }
 
-    NamespaceDetails *NamespaceDetails::writingWithExtra() {
-        vector< pair< long long, unsigned > > writeRanges;
-        writeRanges.push_back( make_pair( 0, sizeof( NamespaceDetails ) ) );
-        for( Extra *e = extra(); e; e = e->next( this ) ) {
-            writeRanges.push_back( make_pair( (char*)e - (char*)this, sizeof( Extra ) ) );
-        }
-        return reinterpret_cast< NamespaceDetails* >( getDur().writingRangesAtOffsets( this, writeRanges ) );
+    NamespaceDetails* NamespaceDetails::writingWithoutExtra( TransactionExperiment* txn ) {
+        return txn->writing( this );
     }
 
-    void NamespaceDetails::setMaxCappedDocs( long long max ) {
+
+    // XXX - this method should go away
+    NamespaceDetails *NamespaceDetails::writingWithExtra( TransactionExperiment* txn ) {
+        for( Extra *e = extra(); e; e = e->next( this ) ) {
+            txn->writing( e );
+        }
+        return writingWithoutExtra( txn );
+    }
+
+    void NamespaceDetails::setMaxCappedDocs( TransactionExperiment* txn, long long max ) {
         massert( 16499,
                  "max in a capped collection has to be < 2^31 or -1",
                  validMaxCappedDocs( &max ) );
@@ -276,88 +285,95 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    void NamespaceDetails::setLastExtentSize( int newMax ) {
+    void NamespaceDetails::setLastExtentSize( TransactionExperiment* txn, int newMax ) {
         if ( _lastExtentSize == newMax )
             return;
-        getDur().writingInt(_lastExtentSize) = newMax;
+        txn->writingInt(_lastExtentSize) = newMax;
     }
 
-    void NamespaceDetails::incrementStats( long long dataSizeIncrement,
+    void NamespaceDetails::incrementStats( TransactionExperiment* txn,
+                                           long long dataSizeIncrement,
                                            long long numRecordsIncrement ) {
 
         // durability todo : this could be a bit annoying / slow to record constantly
-        Stats* s = getDur().writing( &_stats );
+        Stats* s = txn->writing( &_stats );
         s->datasize += dataSizeIncrement;
         s->nrecords += numRecordsIncrement;
     }
 
-    void NamespaceDetails::setStats( long long dataSize,
+    void NamespaceDetails::setStats( TransactionExperiment* txn,
+                                     long long dataSize,
                                      long long numRecords ) {
-        Stats* s = getDur().writing( &_stats );
+        Stats* s = txn->writing( &_stats );
         s->datasize = dataSize;
         s->nrecords = numRecords;
     }
 
-    void NamespaceDetails::setFirstExtent( const DiskLoc& loc ) {
-        *getDur().writing( &_firstExtent ) = loc;
+    void NamespaceDetails::setFirstExtent( TransactionExperiment* txn,
+                                           const DiskLoc& loc ) {
+        *txn->writing( &_firstExtent ) = loc;
     }
 
-    void NamespaceDetails::setLastExtent( const DiskLoc& loc ) {
-        *getDur().writing( &_lastExtent ) = loc;
+    void NamespaceDetails::setLastExtent( TransactionExperiment* txn,
+                                          const DiskLoc& loc ) {
+        *txn->writing( &_lastExtent ) = loc;
     }
 
-    void NamespaceDetails::setCapExtent( const DiskLoc& loc ) {
-        *getDur().writing( &_capExtent ) = loc;
+    void NamespaceDetails::setCapExtent( TransactionExperiment* txn,
+                                         const DiskLoc& loc ) {
+        *txn->writing( &_capExtent ) = loc;
     }
 
-    void NamespaceDetails::setCapFirstNewRecord( const DiskLoc& loc ) {
-        *getDur().writing( &_capFirstNewRecord ) = loc;
+    void NamespaceDetails::setCapFirstNewRecord( TransactionExperiment* txn,
+                                                 const DiskLoc& loc ) {
+        *txn->writing( &_capFirstNewRecord ) = loc;
     }
 
-    void NamespaceDetails::setFirstExtentInvalid() {
-        *getDur().writing( &_firstExtent ) = DiskLoc().setInvalid();
+    void NamespaceDetails::setFirstExtentInvalid( TransactionExperiment* txn ) {
+        *txn->writing( &_firstExtent ) = DiskLoc().setInvalid();
     }
 
-    void NamespaceDetails::setLastExtentInvalid() {
-        *getDur().writing( &_lastExtent ) = DiskLoc().setInvalid();
+    void NamespaceDetails::setLastExtentInvalid( TransactionExperiment* txn ) {
+        *txn->writing( &_lastExtent ) = DiskLoc().setInvalid();
     }
 
-    void NamespaceDetails::setDeletedListEntry( int bucket, const DiskLoc& loc ) {
-        *getDur().writing( &_deletedList[bucket] ) = loc;
+    void NamespaceDetails::setDeletedListEntry( TransactionExperiment* txn,
+                                                int bucket, const DiskLoc& loc ) {
+        *txn->writing( &_deletedList[bucket] ) = loc;
     }
 
-    bool NamespaceDetails::setUserFlag( int flags ) {
+    bool NamespaceDetails::setUserFlag( TransactionExperiment* txn, int flags ) {
         if ( ( _userFlags & flags ) == flags )
             return false;
         
-        getDur().writingInt(_userFlags) |= flags;
+        txn->writingInt(_userFlags) |= flags;
         return true;
     }
 
-    bool NamespaceDetails::clearUserFlag( int flags ) {
+    bool NamespaceDetails::clearUserFlag( TransactionExperiment* txn, int flags ) {
         if ( ( _userFlags & flags ) == 0 )
             return false;
 
-        getDur().writingInt(_userFlags) &= ~flags;
+        txn->writingInt(_userFlags) &= ~flags;
         return true;
     }
 
-    bool NamespaceDetails::replaceUserFlags( int flags ) {
+    bool NamespaceDetails::replaceUserFlags( TransactionExperiment* txn, int flags ) {
         if ( flags == _userFlags )
             return false;
 
-        getDur().writingInt(_userFlags) = flags;
+        txn->writingInt(_userFlags) = flags;
         return true;
     }
 
-    void NamespaceDetails::setPaddingFactor( double paddingFactor ) {
+    void NamespaceDetails::setPaddingFactor( TransactionExperiment* txn, double paddingFactor ) {
         if ( paddingFactor == _paddingFactor )
             return;
 
         if ( isCapped() )
             return;
 
-        *getDur().writing(&_paddingFactor) = paddingFactor;
+        *txn->writing(&_paddingFactor) = paddingFactor;
     }
 
     /* remove bit from a bit array - actually remove its slot, not a clear
@@ -372,10 +388,10 @@ namespace mongo {
             ((tmp >> (x+1)) << x);
     }
 
-    void NamespaceDetails::_removeIndexFromMe( int idxNumber ) {
+    void NamespaceDetails::_removeIndexFromMe( TransactionExperiment* txn, int idxNumber ) {
 
         // TODO: don't do this whole thing, do it piece meal for readability
-        NamespaceDetails* d = writingWithExtra();
+        NamespaceDetails* d = writingWithExtra( txn );
 
         // fix the _multiKeyIndexBits, by moving all bits above me down one
         d->_multiKeyIndexBits = removeAndSlideBit(d->_multiKeyIndexBits, idxNumber);
@@ -391,22 +407,22 @@ namespace mongo {
         d->idx( getTotalIndexCount() ) = IndexDetails();
     }
 
-    void NamespaceDetails::swapIndex( int a, int b ) {
+    void NamespaceDetails::swapIndex( TransactionExperiment* txn, int a, int b ) {
 
         // flip main meta data
         IndexDetails temp = idx(a);
-        *getDur().writing(&idx(a)) = idx(b);
-        *getDur().writing(&idx(b)) = temp;
+        *txn->writing(&idx(a)) = idx(b);
+        *txn->writing(&idx(b)) = temp;
 
         // flip multi key bits
         bool tempMultikey = isMultikey(a);
-        setIndexIsMultikey( a, isMultikey(b) );
-        setIndexIsMultikey( b, tempMultikey );
+        setIndexIsMultikey( txn, a, isMultikey(b) );
+        setIndexIsMultikey( txn, b, tempMultikey );
     }
 
-    void NamespaceDetails::orphanDeletedList() {
+    void NamespaceDetails::orphanDeletedList( TransactionExperiment* txn ) {
         for( int i = 0; i < Buckets; i++ ) {
-            *getDur().writing(&_deletedList[i]) = DiskLoc();
+            *txn->writing(&_deletedList[i]) = DiskLoc();
         }
     }
 
@@ -420,6 +436,11 @@ namespace mongo {
                 return i.pos()-1;
         }
         return -1;
+    }
+
+    void NamespaceDetails::Extra::setNext( TransactionExperiment* txn,
+                                           long ofs ) {
+        *txn->writing(&_next) = ofs;
     }
 
     /* ------------------------------------------------------------------------- */

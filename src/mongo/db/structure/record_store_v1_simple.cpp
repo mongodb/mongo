@@ -267,16 +267,10 @@ namespace mongo {
     void SimpleRecordStoreV1::addDeletedRec( TransactionExperiment* txn, const DiskLoc& dloc ) {
         DeletedRecord* d = drec( dloc );
 
-        {
-            Record *r = (Record *) txn->writingPtr(d, sizeof(Record));
-            d = &r->asDeleted();
-            // defensive code: try to make us notice if we reference a deleted record
-            reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
-        }
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
 
         int b = bucket(d->lengthWithHeaders());
-        d->nextDeleted() = _details->deletedListEntry(b);
+        *txn->writing(&d->nextDeleted()) = _details->deletedListEntry(b);
         _details->setDeletedListEntry(txn, b, dloc);
     }
 

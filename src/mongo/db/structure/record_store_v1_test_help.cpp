@@ -84,8 +84,10 @@ namespace mongo {
         _paddingFactor = 1;
         _maxCappedDocs = numeric_limits<long long>::max();
         _capFirstNewRecord.setInvalid();
-        if ( _capped )
+        if ( _capped ) {
+            // copied from NamespaceDetails::NamespaceDetails()
             setDeletedListEntry( NULL, 1, DiskLoc().setInvalid() );
+        }
     }
 
     const DiskLoc& DummyRecordStoreV1MetaData::capExtent() const {

@@ -47,7 +47,7 @@ namespace {
         vector<DiskLoc> deleted;
     };
 
-    void simpleSize( int size ) {
+    void simpleInsertTest( const char* buf, int size ) {
 
         DummyTransactionExperiment txn;
         DummyExtentManager em;
@@ -59,7 +59,9 @@ namespace {
 
         rs.increaseStorageSize( &txn, 1024, -1 );
 
-        rs.insertRecord( &txn, "abc", size, 10000 );
+        ASSERT_NOT_OK( rs.insertRecord( &txn, buf, 3, 1000 ).getStatus() );
+
+        rs.insertRecord( &txn, buf, size, 10000 );
 
         {
             BSONObjBuilder b;
@@ -70,23 +72,23 @@ namespace {
         }
 
         for ( int i = 0; i < 1000; i++ ) {
-            ASSERT_TRUE( rs.insertRecord( &txn, "abcdefg", size, 10000 ).isOK() );
+            ASSERT_OK( rs.insertRecord( &txn, buf, size, 10000 ).getStatus() );
         }
 
         long long start = md->numRecords();
         for ( int i = 0; i < 1000; i++ ) {
-            ASSERT_TRUE( rs.insertRecord( &txn, "abcdefg", size, 10000 ).isOK() );
+            ASSERT_OK( rs.insertRecord( &txn, buf, size, 10000 ).getStatus() );
         }
         ASSERT_EQUALS( start, md->numRecords() );
         ASSERT_GREATER_THAN( start, 100 );
         ASSERT_LESS_THAN( start, 1000 );
     }
 
-    TEST(CappedRecordStoreV1, Simple4) {
-        simpleSize(4);
+    TEST(CappedRecordStoreV1, SimpleInsertSize4) {
+        simpleInsertTest("abcd", 4);
     }
-    TEST(CappedRecordStoreV1, Simple8) {
-        simpleSize(8);
+    TEST(CappedRecordStoreV1, Simpleinserttes8) {
+        simpleInsertTest("abcdefgh", 8);
     }
 
 }

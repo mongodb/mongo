@@ -164,7 +164,7 @@ namespace QueryStageCollectionScan {
         Collection* collection() { return db()->getCollection( ns() ); }
         NamespaceDetails *nsd() { return collection()->detailsWritable(); }
 
-    private:
+    protected:
         const RecordStore* recordStore() {
             Collection* c = collection();
             if ( !c )
@@ -185,7 +185,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanEmptyLooped : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapFirstNewRecord( DiskLoc() );
+            nsd()->setCapFirstNewRecord( &_txn, DiskLoc() );
         }
         virtual int expectedCount() const { return 0; }
         virtual int nExtents() const { return 0; }
@@ -193,7 +193,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanEmptyMultiExtentLooped : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapFirstNewRecord( DiskLoc() );
+            nsd()->setCapFirstNewRecord( &_txn, DiskLoc() );
         }
         virtual int expectedCount() const { return 0; }
         virtual int nExtents() const { return 3; }
@@ -201,7 +201,7 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanSingle : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 0 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 0 ) );
         }
         virtual int expectedCount() const { return 1; }
         virtual int nExtents() const { return 0; }
@@ -210,7 +210,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanNewCapFirst : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             DiskLoc x = insert( nsd()->capExtent(), 0 );
-            nsd()->setCapFirstNewRecord( x );
+            nsd()->setCapFirstNewRecord( &_txn, x );
             insert( nsd()->capExtent(), 1 );
         }
         virtual int expectedCount() const { return 2; }
@@ -220,7 +220,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanNewCapLast : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             insert( nsd()->capExtent(), 0 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 1 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 1 ) );
         }
         virtual int expectedCount() const { return 2; }
         virtual int nExtents() const { return 0; }
@@ -229,7 +229,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanNewCapMiddle : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             insert( nsd()->capExtent(), 0 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 1 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 1 ) );
             insert( nsd()->capExtent(), 2 );
         }
         virtual int expectedCount() const { return 3; }
@@ -240,7 +240,7 @@ namespace QueryStageCollectionScan {
         virtual void insertTestData() {
             insert( nsd()->capExtent(), 0 );
             insert( nsd()->lastExtent(), 1 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 2 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 2 ) );
             insert( nsd()->capExtent(), 3 );
         }
         virtual int expectedCount() const { return 4; }
@@ -249,10 +249,10 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanLastExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapExtent( nsd()->lastExtent() );
+            nsd()->setCapExtent( &_txn, nsd()->lastExtent() );
             insert( nsd()->capExtent(), 0 );
             insert( nsd()->firstExtent(), 1 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 2 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 2 ) );
             insert( nsd()->capExtent(), 3 );
         }
         virtual int expectedCount() const { return 4; }
@@ -261,11 +261,11 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanMidExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapExtent( extentManager()->getExtent(nsd()->firstExtent())->xnext );
+            nsd()->setCapExtent( &_txn, extentManager()->getExtent(nsd()->firstExtent())->xnext );
             insert( nsd()->capExtent(), 0 );
             insert( nsd()->lastExtent(), 1 );
             insert( nsd()->firstExtent(), 2 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 3 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 3 ) );
             insert( nsd()->capExtent(), 4 );
         }
         virtual int expectedCount() const { return 5; }
@@ -274,10 +274,10 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanAloneInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapExtent( extentManager()->getExtent(nsd()->firstExtent())->xnext );
+            nsd()->setCapExtent( &_txn, extentManager()->getExtent(nsd()->firstExtent())->xnext );
             insert( nsd()->lastExtent(), 0 );
             insert( nsd()->firstExtent(), 1 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 2 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 2 ) );
         }
         virtual int expectedCount() const { return 3; }
         virtual int nExtents() const { return 3; }
@@ -285,10 +285,10 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanFirstInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapExtent( extentManager()->getExtent(nsd()->firstExtent())->xnext );
+            nsd()->setCapExtent( &_txn, extentManager()->getExtent(nsd()->firstExtent())->xnext );
             insert( nsd()->lastExtent(), 0 );
             insert( nsd()->firstExtent(), 1 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 2 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 2 ) );
             insert( nsd()->capExtent(), 3 );
         }
         virtual int expectedCount() const { return 4; }
@@ -297,11 +297,11 @@ namespace QueryStageCollectionScan {
 
     class QueryStageCollscanLastInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
-            nsd()->setCapExtent( extentManager()->getExtent(nsd()->firstExtent())->xnext );
+            nsd()->setCapExtent( &_txn, extentManager()->getExtent(nsd()->firstExtent())->xnext );
             insert( nsd()->capExtent(), 0 );
             insert( nsd()->lastExtent(), 1 );
             insert( nsd()->firstExtent(), 2 );
-            nsd()->setCapFirstNewRecord( insert( nsd()->capExtent(), 3 ) );
+            nsd()->setCapFirstNewRecord( &_txn, insert( nsd()->capExtent(), 3 ) );
         }
         virtual int expectedCount() const { return 4; }
         virtual int nExtents() const { return 3; }

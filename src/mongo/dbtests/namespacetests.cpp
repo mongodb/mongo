@@ -469,27 +469,28 @@ namespace NamespaceTests {
                 create();
                 NamespaceDetails *nsd = collection()->detailsWritable();
 
+                DurTransaction txn;
                 // Set 2 & 54 as multikey
-                nsd->setIndexIsMultikey(2, true);
-                nsd->setIndexIsMultikey(54, true);
+                nsd->setIndexIsMultikey(&txn, 2, true);
+                nsd->setIndexIsMultikey(&txn, 54, true);
                 ASSERT(nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(54));
 
                 // Flip 2 & 47
-                nsd->setIndexIsMultikey(2, false);
-                nsd->setIndexIsMultikey(47, true);
+                nsd->setIndexIsMultikey(&txn, 2, false);
+                nsd->setIndexIsMultikey(&txn, 47, true);
                 ASSERT(!nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(47));
 
                 // Reset entries that are already true
-                nsd->setIndexIsMultikey(54, true);
-                nsd->setIndexIsMultikey(47, true);
+                nsd->setIndexIsMultikey(&txn, 54, true);
+                nsd->setIndexIsMultikey(&txn, 47, true);
                 ASSERT(nsd->isMultikey(54));
                 ASSERT(nsd->isMultikey(47));
 
                 // Two non-multi-key
-                nsd->setIndexIsMultikey(2, false);
-                nsd->setIndexIsMultikey(43, false);
+                nsd->setIndexIsMultikey(&txn, 2, false);
+                nsd->setIndexIsMultikey(&txn, 43, false);
                 ASSERT(!nsd->isMultikey(2));
                 ASSERT(nsd->isMultikey(54));
                 ASSERT(nsd->isMultikey(47));
