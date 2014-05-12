@@ -130,7 +130,7 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.next_in = src;
 	zs.avail_in = (uint32_t)src_len;
 	zs.next_out = dst;
-	zs.avail_out = (uint32_t)dst_len - 1;
+	zs.avail_out = (uint32_t)dst_len;
 	if (deflate(&zs, Z_FINISH) == Z_STREAM_END) {
 		*compression_failed = 0;
 		*result_lenp = zs.total_out;
