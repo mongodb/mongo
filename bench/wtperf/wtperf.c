@@ -862,8 +862,7 @@ populate_async(void *arg)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	uint64_t op, usecs;
-	uint32_t opcount;
-	int intxn, measure_latency, ret;
+	int measure_latency, ret;
 	char *value_buf, *key_buf;
 
 	thread = (CONFIG_THREAD *)arg;
@@ -896,7 +895,7 @@ populate_async(void *arg)
 		goto err;
 	}
 	/* Populate the databases. */
-	for (intxn = 0, opcount = 0;;) {
+	for (;;) {
 		op = get_next_incr(cfg);
 		if (op > cfg->icount)
 			break;
@@ -923,17 +922,6 @@ retry:		if ((ret = conn->async_new_op(
 			lprintf(cfg, ret, 0, "Failed inserting");
 			goto err;
 		}
-		if (cfg->populate_ops_per_txn != 0) {
-			if (++opcount < cfg->populate_ops_per_txn)
-				continue;
-			opcount = 0;
-
-			if ((ret = session->commit_transaction(
-			    session, NULL)) != 0)
-				lprintf(cfg, ret, 0,
-				    "Fail committing, transaction was aborted");
-			intxn = 0;
-		}
 	}
 	/*
 	 * Gather statistics.
@@ -955,11 +943,6 @@ retry:		if ((ret = conn->async_new_op(
 		usecs = ns_to_us(WT_TIMEDIFF(stop, start));
 		track_operation(trk, usecs);
 	}
-	if (intxn &&
-	    (ret = session->commit_transaction(session, NULL)) != 0)
-		lprintf(cfg, ret, 0,
-		    "Fail committing, transaction was aborted");
-
 	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session in populate");
 		goto err;
