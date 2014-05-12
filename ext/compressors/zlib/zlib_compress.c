@@ -136,7 +136,10 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		*result_lenp = zs.total_out;
 	} else
 		*compression_failed = 1;
-	(void)deflateEnd(&zs);
+
+	if ((ret = deflateEnd(&zs)) != Z_OK && ret != Z_DATA_ERROR)
+		return (zlib_error(compressor, session, "deflateEnd", ret));
+
 	return (0);
 }
 
