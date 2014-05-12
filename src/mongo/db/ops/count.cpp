@@ -96,7 +96,6 @@ namespace mongo {
 
         try {
             const ScopedRunnerRegistration safety(runner.get());
-            runner->setYieldPolicy(Runner::YIELD_AUTO);
 
             long long count = 0;
             Runner::RunnerState state;

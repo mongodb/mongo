@@ -188,11 +188,6 @@ namespace mongo {
 
     bool IDHackRunner::restoreState() { return true; }
 
-    void IDHackRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        if (_done || _killed) { return; }
-        _policy = policy;
-    }
-
     // Nothing to do here, holding no state.
     void IDHackRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
         if (_done || _killed) { return; }

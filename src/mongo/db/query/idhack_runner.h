@@ -65,8 +65,6 @@ namespace mongo {
 
         virtual bool restoreState();
 
-        virtual void setYieldPolicy(Runner::YieldPolicy policy);
-
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual const std::string& ns();
@@ -106,9 +104,6 @@ namespace mongo {
         // TODO: When we combine the canonicalize and getRunner steps into one we can get rid of
         // this.
         boost::scoped_ptr<CanonicalQuery> _query;
-
-        // Are we allowed to release the lock?
-        Runner::YieldPolicy _policy;
 
         // Did someone call kill() on us?
         bool _killed;

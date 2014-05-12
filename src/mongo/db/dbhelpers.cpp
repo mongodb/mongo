@@ -379,7 +379,6 @@ namespace mongo {
                                                                    InternalPlanner::FORWARD,
                                                                    InternalPlanner::IXSCAN_FETCH));
 
-                runner->setYieldPolicy(Runner::YIELD_AUTO);
                 DiskLoc rloc;
                 BSONObj obj;
                 Runner::RunnerState state;
@@ -530,7 +529,6 @@ namespace mongo {
         auto_ptr<Runner> runner(InternalPlanner::indexScan(collection, idx, min, max, false));
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage
-        runner->setYieldPolicy(Runner::YIELD_AUTO);
 
         DiskLoc loc;
         Runner::RunnerState state;

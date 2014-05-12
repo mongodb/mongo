@@ -1,3 +1,5 @@
+// SERVER-13922
+if (0) {
 // Test background index creation w/ constraints
 
 load( "jstests/libs/slow_weekly_util.js" )
@@ -88,3 +90,4 @@ doTest( "false" );
 doTest( "true" );
 
 testServer.stop();
+}  // if (0)

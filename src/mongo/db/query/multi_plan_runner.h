@@ -36,7 +36,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/plan_ranker.h" // for CandidatePlan
 #include "mongo/db/query/runner.h"
-#include "mongo/db/query/runner_yield_policy.h"
 
 namespace mongo {
 
@@ -103,8 +102,6 @@ namespace mongo {
         virtual bool restoreState();
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
-        virtual void setYieldPolicy(Runner::YieldPolicy policy);
-
         virtual const std::string& ns();
 
         virtual void kill();
@@ -146,10 +143,6 @@ namespace mongo {
         // If everything fails during the plan competition, we can't pick one.
         size_t _failureCount;
 
-        // We need to cache this so that when we switch from running our candidates to using a
-        // PlanExecutor, we can set the right yielding policy on it.
-        Runner::YieldPolicy _policy;
-
         // The winner of the plan competition...
         boost::scoped_ptr<PlanExecutor> _bestPlan;
 
@@ -164,9 +157,6 @@ namespace mongo {
 
         // Candidate plans' stats. Owned here.
         std::vector<PlanStageStats*> _candidateStats;
-
-        // Yielding policy we use when we're running candidates.
-        boost::scoped_ptr<RunnerYieldPolicy> _yieldPolicy;
 
         // The query that we're trying to figure out the best solution to.
         boost::scoped_ptr<CanonicalQuery> _query;

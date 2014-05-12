@@ -63,27 +63,10 @@ namespace mongo {
         if (!_killed) { _root->invalidate(dl, type); }
     }
 
-    void PlanExecutor::setYieldPolicy(Runner::YieldPolicy policy) {
-        if (Runner::YIELD_MANUAL == policy) {
-            _yieldPolicy.reset();
-        }
-        else {
-            _yieldPolicy.reset(new RunnerYieldPolicy());
-        }
-    }
-
     Runner::RunnerState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         if (_killed) { return Runner::RUNNER_DEAD; }
 
         for (;;) {
-            // Yield, if we can yield ourselves.
-            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
-                saveState();
-                _yieldPolicy->yield();
-                if (_killed) { return Runner::RUNNER_DEAD; }
-                restoreState();
-            }
-
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState code = _root->work(&id);
 

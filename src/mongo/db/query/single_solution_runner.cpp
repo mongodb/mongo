@@ -72,10 +72,6 @@ namespace mongo {
         return _exec->restoreState();
     }
 
-    void SingleSolutionRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        _exec->setYieldPolicy(policy);
-    }
-
     void SingleSolutionRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
         _exec->invalidate(dl, type);
     }

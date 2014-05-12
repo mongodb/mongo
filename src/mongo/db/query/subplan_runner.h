@@ -70,8 +70,6 @@ namespace mongo {
 
         virtual bool restoreState();
 
-        virtual void setYieldPolicy(Runner::YieldPolicy policy);
-
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual const std::string& ns();
@@ -116,8 +114,6 @@ namespace mongo {
         std::auto_ptr<CanonicalQuery> _query;
 
         bool _killed;
-
-        Runner::YieldPolicy _policy;
 
         boost::scoped_ptr<Runner> _underlyingRunner;
 

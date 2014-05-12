@@ -47,7 +47,6 @@
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/mmap_v1/dur_transaction.h"
@@ -386,70 +385,6 @@ namespace mongo {
             return Status::OK();
         }
 
-        Status recoverFromYield(const UpdateRequest& request,
-                                UpdateDriver* driver,
-                                Collection* collection) {
-
-            const NamespaceString& nsString(request.getNamespaceString());
-            // We yielded and recovered OK, and our cursor is still good. Details about
-            // our namespace may have changed while we were yielded, so we re-acquire
-            // them here. If we can't do so, escape the update loop. Otherwise, refresh
-            // the driver so that it knows about what is currently indexed.
-
-            if (request.shouldCallLogOp() && !isMasterNs(nsString.ns().c_str())) {
-                return Status(ErrorCodes::NotMaster, mongoutils::str::stream() <<
-                              "Demoted from primary while performing update on " << nsString.ns());
-            }
-
-            Database* db = dbHolder().get(nsString.db().toString(), storageGlobalParams.dbpath);
-
-            Collection* oldCollection = collection;
-            collection = db->getCollection(nsString.ns());
-
-            // We should not get a new pointer to the same collection...
-            if (oldCollection && (oldCollection != collection))
-                return Status(ErrorCodes::IllegalOperation,
-                              str::stream() << "Collection changed during the Update: ok?"
-                                            << " old: " << oldCollection->ok()
-                                            << " new:" << collection->ok());
-
-            if (!collection)
-                return Status(ErrorCodes::IllegalOperation,
-                              "Update aborted due to invalid state transitions after yield -- "
-                              "collection pointer NULL.");
-
-            if (!collection->ok())
-                return Status(ErrorCodes::IllegalOperation,
-                              "Update aborted due to invalid state transitions after yield -- "
-                              "collection not ok().");
-
-            IndexCatalog* idxCatalog = collection->getIndexCatalog();
-            if (!idxCatalog)
-                return Status(ErrorCodes::IllegalOperation,
-                              "Update aborted due to invalid state transitions after yield -- "
-                              "IndexCatalog pointer NULL.");
-
-            if (!idxCatalog->ok())
-                return Status(ErrorCodes::IllegalOperation,
-                              "Update aborted due to invalid state transitions after yield -- "
-                              "IndexCatalog not ok().");
-
-            if (request.getLifecycle()) {
-                UpdateLifecycle* lifecycle = request.getLifecycle();
-                lifecycle->setCollection(collection);
-
-                if (!lifecycle->canContinue()) {
-                    return Status(ErrorCodes::IllegalOperation,
-                                  "Update aborted due to invalid state transitions after yield.",
-                                  17270);
-                }
-
-                driver->refreshIndexKeys(lifecycle->getIndexKeys());
-            }
-
-            return Status::OK();
-        }
-
         Status ensureIdAndFirst(mb::Document& doc) {
             mb::Element idElem = mb::findFirstChildNamed(doc.root(), idFieldName);
 
@@ -503,7 +438,6 @@ namespace mongo {
         std::auto_ptr<CanonicalQuery> cqHolder(cq);
         const NamespaceString& nsString = request.getNamespaceString();
         UpdateLifecycle* lifecycle = request.getLifecycle();
-        const CurOp* curOp = cc().curop();
 
         Collection* collection = db->getCollection(nsString.ns());
 
@@ -531,15 +465,6 @@ namespace mongo {
 
         // Register Runner with ClientCursor
         const ScopedRunnerRegistration safety(runner.get());
-
-        // Use automatic yield policy
-        runner->setYieldPolicy(Runner::YIELD_AUTO);
-
-        // If the update was marked with '$isolated' (a.k.a '$atomic'), we are not allowed to
-        // yield while evaluating the update loop below.
-        const bool isolated =
-            (cq && QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC)) ||
-            LiteParsedQuery::isQueryIsolated(request.getQuery());
 
         //
         // We'll start assuming we have one or more documents for this update. (Otherwise,
@@ -581,41 +506,20 @@ namespace mongo {
         // Used during iteration of docs
         BSONObj oldObj;
 
-        // Keep track if we have done a write in isolation mode, which will indicate we can't yield
-        bool isolationModeWriteOccured = false;
-
         // Get first doc, and location
         Runner::RunnerState state = Runner::RUNNER_ADVANCED;
-
-        // Keep track of yield count so we can see if one happens on the getNext() calls below
-        int oldYieldCount = curOp->numYields();
 
         uassert(ErrorCodes::NotMaster,
                 mongoutils::str::stream() << "Not primary while updating " << nsString.ns(),
                 !request.shouldCallLogOp() || isMasterNs(nsString.ns().c_str()));
 
         while (true) {
-            // See if we have a write in isolation mode
-            isolationModeWriteOccured = isolated && (opDebug->nModified > 0);
-
-            // Change to manual yielding (no yielding) if we have written in isolation mode
-            if (isolationModeWriteOccured) {
-                runner->setYieldPolicy(Runner::YIELD_MANUAL);
-            }
-
-            // keep track of the yield count before calling getNext (which might yield).
-            oldYieldCount = curOp->numYields();
-
             // Get next doc, and location
             DiskLoc loc;
             state = runner->getNext(&oldObj, &loc);
-            const bool didYield = (oldYieldCount != curOp->numYields());
 
             if (state != Runner::RUNNER_ADVANCED) {
                 if (state == Runner::RUNNER_EOF) {
-                    if (didYield)
-                        uassertStatusOK(recoverFromYield(request, driver, collection));
-
                     // We have reached the logical end of the loop, so do yielding recovery
                     break;
                 }
@@ -625,10 +529,6 @@ namespace mongo {
                                                          << Runner::statestr(state)));
                 }
             }
-
-            // Refresh things after a yield.
-            if (didYield)
-                uassertStatusOK(recoverFromYield(request, driver, collection));
 
             // We fill this with the new locs of moved doc so we don't double-update.
             if (updatedLocs && updatedLocs->count(loc) > 0) {

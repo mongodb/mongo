@@ -29,6 +29,7 @@
 #include "mongo/db/query/subplan_runner.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
@@ -113,7 +114,6 @@ namespace mongo {
           _plannerParams(params),
           _query(cq),
           _killed(false),
-          _policy(Runner::YIELD_MANUAL),
           _ns(cq->getParsed().ns()) { }
 
     SubplanRunner::~SubplanRunner() {
@@ -167,7 +167,6 @@ namespace mongo {
                 }
                 else {
                     _underlyingRunner.reset(runner);
-                    _underlyingRunner->setYieldPolicy(_policy);
                 }
             }
 
@@ -318,9 +317,6 @@ namespace mongo {
                     mpr->addPlan(solutions[i], root, ws);
                 }
 
-                // If we're allowed to yield, let the MPR know.
-                mpr->setYieldPolicy(_policy);
-
                 // Calling pickBestPlan can yield so we must propagate events down to the MPR.
                 _underlyingRunner.reset(mpr);
 
@@ -404,7 +400,6 @@ namespace mongo {
         // Takes ownership of all arguments.
         mpr->addPlan(soln, root, ws);
 
-        mpr->setYieldPolicy(_policy);
         _underlyingRunner.reset(mpr);
 
         return true;
@@ -449,18 +444,6 @@ namespace mongo {
         }
 
         return true;
-    }
-
-    void SubplanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        if (_killed) { return; }
-
-        // If somebody sets this before calling work() we need to know how to set it in our subquery
-        // runners.
-        _policy = policy;
-
-        if (NULL != _underlyingRunner.get()) {
-            _underlyingRunner->setYieldPolicy(policy);
-        }
     }
 
     void SubplanRunner::invalidate(const DiskLoc& dl, InvalidationType type) {

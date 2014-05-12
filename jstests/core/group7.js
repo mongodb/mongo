@@ -1,4 +1,7 @@
 // Test yielding group command SERVER-1395
+// Currently disabled, see SERVER-13922.
+
+if (0) {
 
 t = db.jstests_group7;
 t.drop();
@@ -45,3 +48,4 @@ for( var j = 1; j <= 6; ++j ) {
     updates *= 2;
 }
 assert( yielded );
+}

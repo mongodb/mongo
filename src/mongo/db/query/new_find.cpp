@@ -367,7 +367,6 @@ namespace mongo {
 
         // Takes ownership of ws and stage.
         auto_ptr<InternalRunner> runner(new InternalRunner(collection, stage, oplogws));
-        runner->setYieldPolicy(Runner::YIELD_AUTO);
 
         // The stage returns a DiskLoc of where to start.
         DiskLoc startLoc;
@@ -548,7 +547,6 @@ namespace mongo {
         // We turn on auto-yielding for the runner here.  The runner registers itself with the
         // active runners list in ClientCursor.
         auto_ptr<ScopedRunnerRegistration> safety(new ScopedRunnerRegistration(runner.get()));
-        runner->setYieldPolicy(Runner::YIELD_AUTO);
 
         BSONObj obj;
         Runner::RunnerState state;

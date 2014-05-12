@@ -172,7 +172,6 @@ namespace DocumentSourceTests {
                 uassertStatusOK(getRunner(ctx.ctx().db()->getCollection(ns), cq, &runnerBare));
 
                 _runner.reset(runnerBare);
-                _runner->setYieldPolicy(Runner::YIELD_AUTO);
                 _runner->saveState();
                 _registration.reset(new ScopedRunnerRegistration(_runner.get()));
 
@@ -315,27 +314,6 @@ namespace DocumentSourceTests {
             }
             PendingValue _state;
             boost::thread _dummyWriter;
-        };
-
-        /** DocumentSourceCursor yields deterministically when enough documents are scanned. */
-        class Yield : public Base {
-        public:
-            void run() {
-                // Insert enough documents that counting them will exceed the iteration threshold
-                // to trigger a yield.
-                for( int i = 0; i < 1000; ++i ) {
-                    client.insert( ns, BSON( "a" << 1 ) );
-                }
-                createSource();
-                ASSERT_EQUALS( 0, cc().curop()->numYields() );
-                // Iterate through all results.
-                while( source()->getNext() );
-                // The lock was yielded during iteration.
-                ASSERT_GREATER_THAN(cc().curop()->numYields(), 0);
-            }
-        private:
-            // An active writer is required to trigger yielding.
-            WriterClientScope _writerScope;
         };
 
         /** Test coalescing a limit into a cursor */
@@ -1931,7 +1909,6 @@ namespace DocumentSourceTests {
             add<DocumentSourceCursor::Iterate>();
             add<DocumentSourceCursor::Dispose>();
             add<DocumentSourceCursor::IterateDispose>();
-            add<DocumentSourceCursor::Yield>();
             add<DocumentSourceCursor::LimitCoalesce>();
 
             add<DocumentSourceLimit::DisposeSource>();

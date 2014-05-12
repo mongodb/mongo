@@ -41,7 +41,6 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
@@ -81,7 +80,7 @@ namespace mongo {
                                            Collection* collection,
                                            const IndexDescriptor* descriptor,
                                            IndexAccessMethod* accessMethod,
-                                           bool shouldYield) {
+                                           bool canBeKilled ) {
 
         string ns = collection->ns().ns(); // our copy for sanity
 
@@ -92,7 +91,7 @@ namespace mongo {
         {
             stringstream ss;
             ss << "Index Build";
-            if ( shouldYield )
+            if ( canBeKilled )
                 ss << "(background)";
             curopMessage = ss.str();
         }
@@ -106,10 +105,6 @@ namespace mongo {
         unsigned long long numDropped = 0;
 
         auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,collection));
-
-        // We're not delegating yielding to the runner because we need to know when a yield
-        // happens.
-        RunnerYieldPolicy yieldPolicy;
 
         std::string idxName = descriptor->indexName();
 
@@ -131,7 +126,7 @@ namespace mongo {
             }
             catch( AssertionException& e ) {
                 if (ErrorCodes::isInterruption(DBException::convertExceptionCode(e.getCode()))) {
-                    killCurrentOp.checkForInterrupt();
+                    txn->checkForInterrupt();
                 }
 
                 // TODO: Does exception really imply dropDups exception?
@@ -168,26 +163,17 @@ namespace mongo {
             progress.hit();
 
             getDur().commitIfNeeded();
-            if (shouldYield && yieldPolicy.shouldYield()) {
-                // Note: yieldAndCheckIfOK checks for interrupt and thus can throw
-                if (!yieldPolicy.yieldAndCheckIfOK(runner.get())) {
-                    uasserted(ErrorCodes::CursorNotFound, "cursor gone during bg index");
-                    break;
-                }
 
+            if (canBeKilled) {
                 // Checking for interrupt here is necessary because the bg index 
                 // interruptors can only interrupt this index build while they hold 
                 // a write lock, and yieldAndCheckIfOK only checks for
                 // interrupt prior to yielding our write lock. We need to check the kill flag
                 // here before another iteration of the loop.
-                killCurrentOp.checkForInterrupt();
-
-                progress.setTotalWhileRunning( collection->numRecords() );
-                // Recalculate idxNo if we yielded
-                IndexDescriptor* idx = collection->getIndexCatalog()->findIndexByName( idxName,
-                                                                                       true );
-                verify( idx && idx == descriptor );
+                txn->checkForInterrupt();
             }
+
+            progress.setTotalWhileRunning( collection->numRecords() );
         }
 
         progress.finished();
@@ -295,7 +281,7 @@ namespace mongo {
                 getDur().commitIfNeeded();
 
                 RARELY if ( mayInterrupt ) {
-                    killCurrentOp.checkForInterrupt();
+                    txn->checkForInterrupt();
                 }
             }
         }

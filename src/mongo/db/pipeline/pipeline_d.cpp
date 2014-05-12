@@ -198,7 +198,6 @@ namespace {
 
 
         // DocumentSourceCursor expects a yielding Runner that has had its state saved.
-        runner->setYieldPolicy(Runner::YIELD_AUTO);
         runner->saveState();
 
         // Put the Runner into a DocumentSourceCursor and add it to the front of the pipeline.

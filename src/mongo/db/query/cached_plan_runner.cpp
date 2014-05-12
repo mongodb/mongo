@@ -116,13 +116,6 @@ namespace mongo {
         }
     }
 
-    void CachedPlanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        _exec->setYieldPolicy(policy);
-        if (NULL != _backupPlan.get()) {
-            _backupPlan->setYieldPolicy(policy);
-        }
-    }
-
     const std::string& CachedPlanRunner::ns() {
         return _canonicalQuery->getParsed().ns();
     }

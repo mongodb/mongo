@@ -10,6 +10,9 @@
 
 // Index drop race
 
+// SERVER-13922 background indices are foregrounded with yielding gone
+if (0) {
+
 var dbname = 'dropbgindex';
 var collection = 'jstests_feh';
 var size = 500000;
@@ -100,3 +103,4 @@ assert.soon( function() {
 );
 
 replTest.stopSet();
+}  // if (0)

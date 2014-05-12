@@ -81,53 +81,6 @@ namespace mongo {
         }
 
         /**
-         * The yielding policy of the runner.  By default, a runner does not yield itself
-         * (YIELD_MANUAL).
-         */
-        enum YieldPolicy {
-            // Any call to getNext() may yield.  In particular, the runner may be killed during any
-            // call to getNext().  If this occurs, getNext() will return RUNNER_DEAD.
-            //
-            // If you are enabling autoyield, you must register the Runner with ClientCursor via
-            // ClientCursor::registerRunner and deregister via ClientCursor::deregisterRunnerwhen
-            // done.  Registered runners are informed about DiskLoc deletions and Namespace
-            // invalidations and other important events.
-            //
-            // Exception: This is not required if the Runner is cached inside of a ClientCursor.
-            // This is only done if the Runner is cached and can be referred to by a cursor id.
-            // This is not a popular thing to do.
-            YIELD_AUTO,
-
-            // Owner must yield manually if yields are requested.  How to yield yourself:
-            //
-            // 0. Let's say you have Runner* runner.
-            //
-            // 1. Register your runner with ClientCursor.  Registered runners are informed about
-            // DiskLoc deletions and Namespace invalidation and other important events.  Do this by
-            // calling ClientCursor::registerRunner(runner).  This could be done once when you get
-            // your runner, or per-yield.
-            //
-            // 2. Call runner->saveState() before you yield.
-            //
-            // 3. Call RunnerYieldPolicy::staticYield(runner->ns(), NULL) to yield.  Any state that
-            // may change between yields must be checked by you.  (For example, DiskLocs may not be
-            // valid across yielding, indices may be dropped, etc.)
-            //
-            // 4. Call runner->restoreState() before using the runner again.
-            //
-            // 5. Your runner's next call to getNext may return RUNNER_DEAD.
-            //
-            // 6. When you're done with your runner, deregister it from ClientCursor via
-            // ClientCursor::deregister(runner).
-            YIELD_MANUAL,
-        };
-
-        /**
-         * Set the yielding policy of the underlying runner.  See the RunnerYieldPolicy enum above.
-         */
-        virtual void setYieldPolicy(YieldPolicy policy) = 0;
-
-        /**
          * Get the next result from the query.
          *
          * If objOut is not NULL, only results that have a BSONObj are returned.  The BSONObj may

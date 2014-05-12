@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
@@ -189,10 +190,7 @@ namespace QuerySingleSolutionRunner {
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
             scoped_ptr<SingleSolutionRunner> ssr(makeCollScanRunner(ctx.ctx(),filterObj));
-
-            // Set up autoyielding.
             registerRunner(ssr.get());
-            ssr->setYieldPolicy(Runner::YIELD_AUTO);
 
             BSONObj objOut;
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));
@@ -222,10 +220,7 @@ namespace QuerySingleSolutionRunner {
             addIndex(indexSpec);
 
             scoped_ptr<SingleSolutionRunner> ssr(makeIndexScanRunner(ctx.ctx(), indexSpec, 7, 10));
-
-            // Set up autoyielding.
             registerRunner(ssr.get());
-            ssr->setYieldPolicy(Runner::YIELD_AUTO);
 
             BSONObj objOut;
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, ssr->getNext(&objOut, NULL));

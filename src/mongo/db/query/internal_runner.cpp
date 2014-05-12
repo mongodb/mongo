@@ -42,13 +42,14 @@ namespace mongo {
 
     InternalRunner::InternalRunner(const Collection* collection, PlanStage* root, WorkingSet* ws)
         : _collection(collection),
-          _exec(new PlanExecutor(ws, root, collection)),
-          _policy(Runner::YIELD_MANUAL) {
+          _exec(new PlanExecutor(ws, root, collection)) {
+
+        _collection->cursorCache()->registerRunner(this);
         invariant( collection );
     }
 
     InternalRunner::~InternalRunner() {
-        if (Runner::YIELD_AUTO == _policy && _collection) {
+        if (_collection) {
             _collection->cursorCache()->deregisterRunner(this);
         }
     }
@@ -75,25 +76,6 @@ namespace mongo {
 
     void InternalRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
         _exec->invalidate(dl, type);
-    }
-
-    void InternalRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        // No-op.
-        if (_policy == policy) { return; }
-
-        invariant( _collection );
-
-        if (Runner::YIELD_AUTO == policy) {
-            // Going from manual to auto.
-            _collection->cursorCache()->registerRunner(this);
-        }
-        else {
-            // Going from auto to manual.
-            _collection->cursorCache()->deregisterRunner(this);
-        }
-
-        _policy = policy;
-        _exec->setYieldPolicy(policy);
     }
 
     void InternalRunner::kill() {

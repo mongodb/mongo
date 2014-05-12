@@ -808,14 +808,6 @@ namespace mongo {
             if (elapsedTracker.intervalHasElapsed()) {
                 // Consider yielding between inserts.
 
-                if (state.hasLock()) {
-                    int micros = ClientCursor::suggestYieldMicros();
-                    if (micros > 0) {
-                        state.unlock();
-                        killCurrentOp.checkForInterrupt();
-                        sleepmicros(micros);
-                    }
-                }
                 killCurrentOp.checkForInterrupt();
                 elapsedTracker.resetLastTime();
             }

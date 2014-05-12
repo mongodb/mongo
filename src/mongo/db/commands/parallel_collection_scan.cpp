@@ -85,9 +85,6 @@ namespace mongo {
                 _collection = NULL;
                 _iterators.clear();
             }
-            virtual void setYieldPolicy(YieldPolicy policy) {
-                invariant( false );
-            }
             virtual void saveState() {
                 for (size_t i = 0; i < _iterators.size(); i++) {
                     _iterators[i]->prepareToYield();

@@ -154,7 +154,6 @@ namespace mongo {
 
                 // Set up automatic yielding
                 const ScopedRunnerRegistration safety(runner.get());
-                runner->setYieldPolicy(Runner::YIELD_AUTO);
 
                 Runner::RunnerState state;
                 if (Runner::RUNNER_ADVANCED == (state = runner->getNext(&doc, NULL))) {

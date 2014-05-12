@@ -32,7 +32,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/query/runner_yield_policy.h"
 
 namespace mongo {
 
@@ -83,9 +82,6 @@ namespace mongo {
         //
 
         /** TODO document me */
-        void setYieldPolicy(Runner::YieldPolicy policy);
-
-        /** TODO document me */
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
         /** TOOD document me */
@@ -105,7 +101,6 @@ namespace mongo {
 
         boost::scoped_ptr<WorkingSet> _workingSet;
         boost::scoped_ptr<PlanStage> _root;
-        boost::scoped_ptr<RunnerYieldPolicy> _yieldPolicy;
 
         // Did somebody drop an index we care about or the namespace we're looking at?  If so,
         // we'll be killed.

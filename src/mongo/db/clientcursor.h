@@ -82,13 +82,6 @@ namespace mongo {
         void kill();
 
         //
-        // Yielding.
-        //
-
-        static void staticYield(int micros, const StringData& ns);
-        static int suggestYieldMicros();
-
-        //
         // Timing and timeouts
         //
 

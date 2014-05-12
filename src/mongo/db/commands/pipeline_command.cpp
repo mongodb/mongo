@@ -117,7 +117,6 @@ namespace {
         }
 
         // These are all no-ops for PipelineRunners
-        virtual void setYieldPolicy(YieldPolicy policy) {}
         virtual void saveState() {}
         virtual bool restoreState() { return true; }
         virtual const Collection* collection() { return NULL; }

@@ -863,33 +863,8 @@ namespace mongo {
                 int len;
                 const char * data = owned["data"].binDataClean( len );
 
-                // Save state, yield, run the MD5, and reacquire lock.
-                runner->saveState();
-
-                try {
-                    dbtempreleasecond yield;
-
-                    md5_append( &st , (const md5_byte_t*)(data) , len );
-                    n++;
-                }
-                catch (SendStaleConfigException&) {
-                    log() << "metadata changed during filemd5" << endl;
-                    break;
-                }
-
-                // Have the lock again.  See if we were killed.
-                if (!runner->restoreState()) {
-                    if (!partialOk) {
-                        uasserted(13281, "File deleted during filemd5 command");
-                    }
-                }
-
-                if (!shardingState.getVersion(ns).isWriteCompatibleWith(shardVersionAtStart)) {
-                    // return partial results.  Mongos will get the error at the start of the next
-                    // call if it doesn't update first.
-                    log() << "Config changed during filemd5 - command will resume " << endl;
-                    break;
-                }
+                md5_append( &st , (const md5_byte_t*)(data) , len );
+                n++;
             }
 
             if (partialOk)

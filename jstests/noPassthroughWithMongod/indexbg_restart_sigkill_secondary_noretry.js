@@ -1,3 +1,6 @@
+// SERVER-13922
+if (0) {
+
 // TODO: SERVER-13215 move test back to replSets suite.
 
 /**
@@ -110,3 +113,4 @@
     replTest.stopSet();
 }());
 
+}  // if(0)

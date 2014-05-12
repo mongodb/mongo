@@ -57,9 +57,6 @@ namespace mongo {
         return false;
     }
 
-    void EOFRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-    }
-
     void EOFRunner::invalidate(const DiskLoc& dl, InvalidationType type) {
     }
 

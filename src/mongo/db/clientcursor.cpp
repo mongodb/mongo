@@ -148,66 +148,6 @@ namespace mongo {
         _collection = NULL;
     }
 
-    void yieldOrSleepFor1Microsecond() {
-#ifdef _WIN32
-        SwitchToThread();
-#elif defined(__linux__)
-        pthread_yield();
-#else
-        sleepmicros(1);
-#endif
-    }
-
-    void ClientCursor::staticYield(int micros, const StringData& ns) {
-        bool haveReadLock = Lock::isReadLocked();
-
-        killCurrentOp.checkForInterrupt();
-        {
-            dbtempreleasecond unlock;
-            if ( unlock.unlocked() ) {
-                if ( haveReadLock ) {
-                    // This sleep helps reader threads yield to writer threads.
-                    // Without this, the underlying reader/writer lock implementations
-                    // are not sufficiently writer-greedy.
-#ifdef _WIN32
-                    SwitchToThread();
-#else
-                    if ( micros == 0 ) {
-                        yieldOrSleepFor1Microsecond();
-                    }
-                    else {
-                        sleepmicros(1);
-                    }
-#endif
-                }
-                else {
-                    if ( micros == -1 ) {
-                        sleepmicros(Client::recommendedYieldMicros());
-                    }
-                    else if ( micros == 0 ) {
-                        yieldOrSleepFor1Microsecond();
-                    }
-                    else if ( micros > 0 ) {
-                        sleepmicros( micros );
-                    }
-                }
-
-            }
-            else if ( Listener::getTimeTracker() == 0 ) {
-                // we aren't running a server, so likely a repair, so don't complain
-            }
-            else {
-                CurOp * c = cc().curop();
-                while ( c->parent() )
-                    c = c->parent();
-                warning() << "ClientCursor::staticYield can't unlock b/c of recursive lock"
-                          << " ns: " << ns 
-                          << " top: " << c->info()
-                          << endl;
-            }
-        }
-    }
-
     //
     // Timing and timeouts
     //
@@ -225,22 +165,6 @@ namespace mongo {
         if ( _slaveReadTill.isNull() )
             return;
         mongo::updateSlaveLocation( curop , _ns.c_str() , _slaveReadTill );
-    }
-
-    int ClientCursor::suggestYieldMicros() {
-        int writers = 0;
-        int readers = 0;
-
-        int micros = Client::recommendedYieldMicros( &writers , &readers );
-
-        if ( micros > 0 && writers == 0 && Lock::isR() ) {
-            // we have a read lock, and only reads are coming on, so why bother unlocking
-            return 0;
-        }
-
-        wassert( micros < 10000000 );
-        dassert( micros <  1000001 );
-        return micros;
     }
 
     //

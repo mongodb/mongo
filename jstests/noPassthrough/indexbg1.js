@@ -1,3 +1,5 @@
+// SERVER-13922
+if (0) {
 // Test background index creation
 
 load( "jstests/libs/slow_weekly_util.js" )
@@ -120,3 +122,4 @@ printjson( db.getLastError() );
 assert( !db.getLastError() );
 
 testServer.stop();
+}  // if(0)

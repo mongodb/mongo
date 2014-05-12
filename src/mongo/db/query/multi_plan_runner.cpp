@@ -56,7 +56,6 @@ namespace mongo {
           _killed(false),
           _failure(false),
           _failureCount(0),
-          _policy(Runner::YIELD_MANUAL),
           _query(query),
           _bestChild(numeric_limits<size_t>::max()),
           _backupSolution(NULL),
@@ -87,27 +86,6 @@ namespace mongo {
 
     void MultiPlanRunner::addPlan(QuerySolution* solution, PlanStage* root, WorkingSet* ws) {
         _candidates.push_back(CandidatePlan(solution, root, ws));
-    }
-
-    void MultiPlanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        if (_failure || _killed) { return; }
-
-        _policy = policy;
-
-        if (NULL != _bestPlan) {
-            _bestPlan->setYieldPolicy(policy);
-            if (NULL != _backupPlan) {
-                _backupPlan->setYieldPolicy(policy);
-            }
-        } else {
-            // Still running our candidates and doing our own yielding.
-            if (Runner::YIELD_MANUAL == policy) {
-                _yieldPolicy.reset();
-            }
-            else {
-                _yieldPolicy.reset(new RunnerYieldPolicy());
-            }
-        }
     }
 
     void MultiPlanRunner::saveState() {
@@ -363,7 +341,6 @@ namespace mongo {
         _bestPlan.reset(new PlanExecutor(_candidates[_bestChild].ws,
                                          _candidates[_bestChild].root,
                                          _collection));
-        _bestPlan->setYieldPolicy(_policy);
         _alreadyProduced = _candidates[_bestChild].results;
         _bestSolution.reset(_candidates[_bestChild].solution);
 
@@ -382,7 +359,6 @@ namespace mongo {
                     _backupPlan = new PlanExecutor(_candidates[i].ws, 
                                                    _candidates[i].root,
                                                    _collection);
-                    _backupPlan->setYieldPolicy(_policy);
                     break;
                 }
             }
@@ -466,14 +442,6 @@ namespace mongo {
         for (size_t i = 0; i < _candidates.size(); ++i) {
             CandidatePlan& candidate = _candidates[i];
             if (candidate.failed) { continue; }
-
-            // Yield, if we can yield ourselves.
-            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
-                saveState();
-                _yieldPolicy->yield();
-                if (_failure || _killed) { return false; }
-                restoreState();
-            }
 
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = candidate.root->work(&id);

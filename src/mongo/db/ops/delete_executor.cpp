@@ -114,11 +114,6 @@ namespace mongo {
 
         long long nDeleted = 0;
 
-        const bool canYield = !_request->isGod() && (
-                _canonicalQuery.get() ?
-                !QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC) :
-                LiteParsedQuery::isQueryIsolated(_request->getQuery()));
-
         Runner* rawRunner;
         if (_canonicalQuery.get()) {
             uassertStatusOK(getRunner(collection, _canonicalQuery.release(), &rawRunner));
@@ -133,12 +128,7 @@ namespace mongo {
         }
 
         auto_ptr<Runner> runner(rawRunner);
-        auto_ptr<ScopedRunnerRegistration> safety;
-
-        if (canYield) {
-            safety.reset(new ScopedRunnerRegistration(runner.get()));
-            runner->setYieldPolicy(Runner::YIELD_AUTO);
-        }
+        ScopedRunnerRegistration safety(runner.get());
 
         DiskLoc rloc;
         Runner::RunnerState state;

@@ -74,8 +74,6 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
-        virtual void setYieldPolicy(Runner::YieldPolicy policy);
-
         virtual void kill();
 
         virtual const Collection* collection() { return _collection; }
@@ -97,7 +95,6 @@ namespace mongo {
         const Collection* _collection;
 
         boost::scoped_ptr<PlanExecutor> _exec;
-        Runner::YieldPolicy _policy;
     };
 
 }  // namespace mongo
