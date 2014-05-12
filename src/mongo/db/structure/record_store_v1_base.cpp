@@ -568,12 +568,9 @@ namespace mongo {
                     }
 
                     if ( r->lengthWithHeaders() ==
-                         quantizePowerOf2AllocationSpace( r->lengthWithHeaders() - 1 ) ) {
+                         quantizePowerOf2AllocationSpace( r->lengthWithHeaders() ) ) {
                         // Count the number of records having a size consistent with the
                         // quantizePowerOf2AllocationSpace quantization implementation.
-                        // Because of SERVER-8311, power of 2 quantization is not idempotent and
-                        // r->lengthWithHeaders() - 1 must be checked instead of the record
-                        // length itself.
                         ++nPowerOf2QuantizedSize;
                     }
 
@@ -792,13 +789,18 @@ namespace mongo {
     }
 
     int RecordStoreV1Base::quantizePowerOf2AllocationSpace(int allocSize) {
-        int allocationSize = bucketSizes[ bucket( allocSize ) ];
-        if ( allocationSize == bucketSizes[MaxBucket] ) {
-            // if we get here, it means we're allocating more than 4mb, so round
-            // to the nearest megabyte
-            allocationSize = 1 + ( allocSize | ( ( 1 << 20 ) - 1 ) );
+        for ( int i = 0; i < MaxBucket; i++ ) { // skips the largest (16MB) bucket
+            if ( bucketSizes[i] >= allocSize ) {
+                // Return the size of the first bucket sized >= the requested size.
+                return bucketSizes[i];
+            }
         }
-        return allocationSize;
+
+        // if we get here, it means we're allocating more than 4mb, so round up
+        // to the nearest megabyte >= allocSize
+        const int MB = 1024*1024;
+        invariant(allocSize > 4*MB);
+        return (allocSize + (MB - 1)) & ~(MB - 1); // round up to MB alignment
     }
 
     int RecordStoreV1Base::bucket(int size) {

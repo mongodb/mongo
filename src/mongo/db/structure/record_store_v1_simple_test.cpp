@@ -88,6 +88,32 @@ namespace {
     }
 
     /**
+     * For buckets up to 4MB powerOf2 allocation should round up to next power of 2. It should be
+     * return the input unmodified if it is already a power of 2.
+     */
+    TEST( SimpleRecordStoreV1, quantizePowerOf2Small ) {
+        // only tests buckets <= 4MB. Higher buckets quatize to 1MB even with powerOf2
+        for (int bucket = 0; bucket < RecordStoreV1Base::MaxBucket; bucket++) {
+            const int size = RecordStoreV1Base::bucketSizes[bucket];
+            const int nextSize = RecordStoreV1Base::bucketSizes[bucket + 1];
+
+            // size - 1 is quantized to size.
+            ASSERT_EQUALS( size,
+                           RecordStoreV1Base::quantizePowerOf2AllocationSpace( size - 1 ) );
+
+            // size is quantized to size.
+            ASSERT_EQUALS( size,
+                           RecordStoreV1Base::quantizePowerOf2AllocationSpace( size ) );
+
+            // size + 1 is quantized to nextSize (unless > 4MB which is covered by next test)
+            if (size < 4*1024*1024) {
+                ASSERT_EQUALS( nextSize,
+                               RecordStoreV1Base::quantizePowerOf2AllocationSpace( size + 1 ) );
+            }
+        }
+    }
+
+    /**
      * Within the largest bucket, quantizePowerOf2AllocationSpace quantizes to the nearest
      * megabyte boundary.
      */
@@ -102,10 +128,8 @@ namespace {
             ASSERT_EQUALS( iSize,
                            RecordStoreV1Base::quantizePowerOf2AllocationSpace( iSize - 1 ) );
 
-            // iSize is quantized to iSize + 1mb.
-            // Descriptive rather than normative test.
-            // SERVER-8311 A pre quantized size is rounded to the next quantum level.
-            ASSERT_EQUALS( iSize + 0x100000,
+            // iSize is quantized to iSize.
+            ASSERT_EQUALS( iSize,
                            RecordStoreV1Base::quantizePowerOf2AllocationSpace( iSize ) );
 
             // iSize + 1 is quantized to iSize + 1mb.
