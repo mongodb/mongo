@@ -19,6 +19,9 @@ typedef enum {
 	WT_ASYNC_FLUSHING		/* Notify workers */
 } WT_ASYNC_FLUSH_STATE;
 
+#define	MAX_ASYNC_SLEEP_USECS	100000	/* Maximum sleep waiting for work */
+#define	MAX_ASYNC_YIELD		200	/* Maximum number of yields for work */
+
 #define	O2C(op)	((WT_CONNECTION_IMPL *)(op)->iface.connection)
 #define	O2S(op)								\
     (((WT_CONNECTION_IMPL *)(op)->iface.connection)->default_session)
