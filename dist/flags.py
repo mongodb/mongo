@@ -90,6 +90,7 @@ flags = {
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',
 		'CONN_SERVER_CHECKPOINT',
+		'CONN_SERVER_STATISTICS',
 	],
 	'session' : [
 		'SESSION_INTERNAL',

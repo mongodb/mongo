@@ -56,8 +56,8 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	*runp = 1;
 	conn->stat_usecs = (long)cval.val * 1000000;
 
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
-	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
+	ret = (__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
+	ret = (__wt_config_subinit(session, &objectconf, &cval));
 	for (cnt = 0; (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt)
 		;
 	WT_RET_NOTFOUND_OK(ret);
@@ -267,7 +267,8 @@ __statlog_server(void *arg)
 	WT_ERR(__wt_buf_init(session, &path, strlen(conn->stat_path) + 128));
 	WT_ERR(__wt_buf_init(session, &tmp, strlen(conn->stat_path) + 128));
 
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
+	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    F_ISSET(conn, WT_CONN_SERVER_STATISTICS)) {
 		/*
 		 * If statistics are turned off, wait until it's time to output
 		 * statistics and check again.
@@ -357,27 +358,24 @@ err:		__wt_err(session, ret, "statistics log server error");
 }
 
 /*
- * __wt_statlog_create --
+ * __statlog_start --
  *	Start the statistics server thread.
  */
-int
-__wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+static int
+__statlog_start(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
-	int run;
 
-	session = conn->default_session;
-
-	/* Handle configuration. */
-	WT_RET(__statlog_config(session, cfg, &run));
-
-	/* If not configured, we're done. */
-	if (!run)
+	/* Nothing to do if the server is already running. */
+	if (conn->stat_session != NULL)
 		return (0);
 
+	F_SET(conn, WT_CONN_SERVER_STATISTICS);
 	/* The statistics log server gets its own session. */
 	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &conn->stat_session));
 	conn->stat_session->name = "statlog-server";
+
+	session = conn->stat_session;
 
 	WT_RET(__wt_cond_alloc(
 	    session, "statistics log server", 0, &conn->stat_cond));
@@ -400,6 +398,33 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 }
 
 /*
+ * __wt_statlog_create --
+ *	Start the statistics server thread.
+ */
+int
+__wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+{
+	WT_SESSION_IMPL *session;
+	int start;
+
+	session = conn->default_session;
+
+	/*
+	 * Stop any server that is already running. This means that each time
+	 * reconfigure is called we'll bounce the server even if there are no
+	 * configuration changes - but that makes our lives easier.
+	 */
+	if (conn->stat_session != NULL)
+		WT_RET(__wt_statlog_destroy(conn));
+
+	WT_RET_NOTFOUND_OK(__statlog_config(session, cfg, &start));
+	if (start)
+		WT_RET(__statlog_start(conn));
+
+	return (0);
+}
+
+/*
  * __wt_statlog_destroy --
  *	Destroy the statistics server thread.
  */
@@ -413,6 +438,7 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 
 	session = conn->default_session;
 
+	F_CLR(conn, WT_CONN_SERVER_STATISTICS);
 	if (conn->stat_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->stat_cond));
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
@@ -433,6 +459,16 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 		wt_session = &conn->stat_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 	}
+
+	/* Clear connection settings so reconfigure is reliable. */
+	conn->stat_session = NULL;
+	conn->stat_tid_set = 0;
+	conn->stat_format = NULL;
+	conn->stat_fp = NULL;
+	conn->stat_path = NULL;
+	conn->stat_sources = NULL;
+	conn->stat_stamp = NULL;
+	conn->stat_usecs = 0;
 
 	return (ret);
 }

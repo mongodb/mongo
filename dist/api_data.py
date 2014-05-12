@@ -311,6 +311,10 @@ connection_runtime_config = [
                 requests''',
                 min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
             ]),
+	Config('cache_size', '100MB', r'''
+	    maximum heap memory to allocate for the cache. A database should
+	    configure either a cache_size or a shared_cache not both''',
+	    min='1MB', max='10TB'),
 	Config('checkpoint', '', r'''
 	    periodically checkpoint the database''',
 	    type='category', subconfig=[
@@ -321,28 +325,6 @@ connection_runtime_config = [
 	        above 0 configures periodic checkpoints''',
 	        min='0', max='100000'),
 	    ]),
-	Config('shared_cache', '', r'''
-	    shared cache configuration options. A database should configure
-	    either a cache_size or a shared_cache not both''',
-	    type='category', subconfig=[
-	    Config('chunk', '10MB', r'''
-	        the granularity that a shared cache is redistributed''',
-	        min='1MB', max='10TB'),
-	    Config('reserve', '0', r'''
-	        amount of cache this database is guaranteed to have
-	        available from the shared cache. This setting is per
-	        database. Defaults to the chunk size''', type='int'),
-	    Config('name', '', r'''
-	        name of a cache that is shared between databases'''),
-	    Config('size', '500MB', r'''
-	        maximum memory to allocate for the shared cache. Setting
-	        this will update the value if one is already set''',
-	        min='1MB', max='10TB')
-	    ]),
-	Config('cache_size', '100MB', r'''
-	    maximum heap memory to allocate for the cache. A database should
-	    configure either a cache_size or a shared_cache not both''',
-	    min='1MB', max='10TB'),
 	Config('error_prefix', '', r'''
 	    prefix string for error messages'''),
 	Config('eviction_dirty_target', '80', r'''
@@ -361,6 +343,24 @@ connection_runtime_config = [
 	Config('eviction_workers', '0', r'''
 	    additional threads to help evict pages from cache''',
 	    min=0, max=20),
+	Config('shared_cache', '', r'''
+	    shared cache configuration options. A database should configure
+	    either a cache_size or a shared_cache not both''',
+	    type='category', subconfig=[
+	    Config('chunk', '10MB', r'''
+	        the granularity that a shared cache is redistributed''',
+	        min='1MB', max='10TB'),
+	    Config('reserve', '0', r'''
+	        amount of cache this database is guaranteed to have
+	        available from the shared cache. This setting is per
+	        database. Defaults to the chunk size''', type='int'),
+	    Config('name', '', r'''
+	        name of a cache that is shared between databases'''),
+	    Config('size', '500MB', r'''
+	        maximum memory to allocate for the shared cache. Setting
+	        this will update the value if one is already set''',
+	        min='1MB', max='10TB')
+	    ]),
 	Config('statistics', 'none', r'''
 	    Maintain database statistics, which may impact performance.
 	    Choosing "all" maintains all statistics regardless of cost,
@@ -375,6 +375,29 @@ connection_runtime_config = [
 	    are logged using the \c statistics_log configuration.  See
 	    @ref statistics for more information''',
 	    type='list', choices=['all', 'fast', 'none', 'clear']),
+	Config('statistics_log', '', r'''
+	    log any statistics the database is configured to maintain,
+	    to a file.  See @ref statistics for more information''',
+	    type='category', subconfig=[
+	    Config('path', '"WiredTigerStat.%d.%H"', r'''
+	        the pathname to a file into which the log records are written,
+	        may contain ISO C standard strftime conversion specifications.
+	        If the value is not an absolute path name, the file is created
+	        relative to the database home'''),
+	    Config('sources', '', r'''
+	        if non-empty, include statistics for the list of data source
+	        URIs, if they are open at the time of the statistics logging.
+	        The list may include URIs matching a single data source
+	        ("table:mytable"), or a URI matching all data sources of a
+	        particular type ("table:")''',
+	        type='list'),
+	    Config('timestamp', '"%b %d %H:%M:%S"', r'''
+	        a timestamp prepended to each log record, may contain strftime
+	        conversion specifications'''),
+	    Config('wait', '0', r'''
+	        seconds to wait between each write of the log records''',
+	        min='0', max='100000'),
+	    ]),
 	Config('verbose', '', r'''
 	    enable messages for various events. Only available if WiredTiger
 		is configured with --enable-verbose. Options are given as a
@@ -723,29 +746,6 @@ methods = {
 	    maximum expected number of sessions (including server
 	    threads)''',
 	    min='1'),
-	Config('statistics_log', '', r'''
-	    log any statistics the database is configured to maintain,
-	    to a file.  See @ref statistics for more information''',
-	    type='category', subconfig=[
-	    Config('path', '"WiredTigerStat.%d.%H"', r'''
-	        the pathname to a file into which the log records are written,
-	        may contain ISO C standard strftime conversion specifications.
-	        If the value is not an absolute path name, the file is created
-	        relative to the database home'''),
-	    Config('sources', '', r'''
-	        if non-empty, include statistics for the list of data source
-	        URIs, if they are open at the time of the statistics logging.
-	        The list may include URIs matching a single data source
-	        ("table:mytable"), or a URI matching all data sources of a
-	        particular type ("table:")''',
-	        type='list'),
-	    Config('timestamp', '"%b %d %H:%M:%S"', r'''
-	        a timestamp prepended to each log record, may contain strftime
-	        conversion specifications'''),
-	    Config('wait', '0', r'''
-	        seconds to wait between each write of the log records''',
-	        min='1', max='100000'),
-	    ]),
 	Config('transaction_sync', 'fsync', r'''
 	    how to sync log records when the transaction commits''',
 	    choices=['dsync', 'fsync', 'none']),
