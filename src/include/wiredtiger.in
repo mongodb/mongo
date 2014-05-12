@@ -2615,6 +2615,12 @@ struct __wt_compressor {
 	 * return \c 0 and set \c result_lenp to the number of bytes required
 	 * for the compressed representation.
 	 *
+	 * On entry, \c dst points to the destination buffer with a length
+	 * of \c dst_len.  If the WT_COMPRESSOR::pre_size method is specified,
+	 * the destination buffer will be at least the size returned by that
+	 * method; otherwise, the destination buffer will be at least as large
+	 * as \c src_len.
+	 *
 	 * If compression would not shrink the data or the \c dst buffer is not
 	 * large enough to hold the compressed data, the callback should set
 	 * \c compression_failed to a non-zero value and return 0.
