@@ -90,6 +90,10 @@ function CollectionDataValidator() {
         // XXX: in 2.4 avgObjSize was a double, but in 2.6 it is an int
         collectionStats['avgObjSize'] = Math.floor(collectionStats['avgObjSize']);
 
+        // Delete keys that appear just because we shard
+        delete collectionStats["primary"];
+        delete collectionStats["sharded"];
+
         initialized = true;
 
         return collection;
@@ -110,6 +114,10 @@ function CollectionDataValidator() {
         // as of 2.7.1, we no longer use systemFlags
         delete collectionStats.systemFlags;
         delete newCollectionStats.systemFlags;
+
+        // Delete keys that appear just because we shard
+        delete newCollectionStats["primary"];
+        delete newCollectionStats["sharded"];
 
         assert.docEq(collectionStats, newCollectionStats, "collection metadata not equal");
 
