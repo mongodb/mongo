@@ -251,21 +251,30 @@ namespace optionenvironment {
                 case Double:
                     ret = parseNumberFromString(stringVal, &doubleVal);
                     if (!ret.isOK()) {
-                        return ret;
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as double in config file: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
                     }
                     *value = Value(doubleVal);
                     return Status::OK();
                 case Int:
                     ret = parseNumberFromString(stringVal, &intVal);
                     if (!ret.isOK()) {
-                        return ret;
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as int in config file: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
                     }
                     *value = Value(intVal);
                     return Status::OK();
                 case Long:
                     ret = parseNumberFromString(stringVal, &longVal);
                     if (!ret.isOK()) {
-                        return ret;
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as long in config file: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
                     }
                     *value = Value(longVal);
                     return Status::OK();
@@ -275,14 +284,20 @@ namespace optionenvironment {
                 case UnsignedLongLong:
                     ret = parseNumberFromString(stringVal, &unsignedLongLongVal);
                     if (!ret.isOK()) {
-                        return ret;
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as unsigned long long in config file: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
                     }
                     *value = Value(unsignedLongLongVal);
                     return Status::OK();
                 case Unsigned:
                     ret = parseNumberFromString(stringVal, &unsignedVal);
                     if (!ret.isOK()) {
-                        return ret;
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as unsigned int in config file: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
                     }
                     *value = Value(unsignedVal);
                     return Status::OK();
