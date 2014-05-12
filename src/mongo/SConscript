@@ -713,7 +713,7 @@ env.Library('coreshard', ['s/distlock.cpp',
                           's/shard.cpp',
                           's/shardkey.cpp'],
             LIBDEPS=['s/base',
-                     's/cluster_ops_impl']);
+                     's/cluster_op_impl']);
     
 mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",
@@ -742,7 +742,7 @@ env.Library( "mongoscore",
              LIBDEPS=['db/auth/authmongos',
                       'db/fts/ftsmongos',
                       'db/query/lite_parsed_query',
-                      's/cluster_ops',
+                      's/cluster_write_ops',
                       's/cluster_write_op_conversion',
                       's/upgrade',
                      ] )
@@ -1057,8 +1057,8 @@ test = testEnv.Install(
                        "testframework",
                        "gridfs",
                        "s/upgrade",
-                       "s/cluster_ops",
-                       "s/cluster_ops_impl",
+                       "s/cluster_write_ops",
+                       "s/cluster_op_impl",
                        "mocklib",
                        "db/exec/mock_stage",
                        "$BUILD_DIR/mongo/db/auth/authmocks",
