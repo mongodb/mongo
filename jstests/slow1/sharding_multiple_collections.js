@@ -1,6 +1,6 @@
 // multcollections.js
 
-s = new ShardingTest( "multcollections" , 2 , 1 , 1 , { chunksize : 1 }  );
+s = new ShardingTest( "multcollections" , 2 , 1 , 1 , { chunksize : 1, enableBalancer : true }  );
 
 s.adminCommand( { enablesharding : "test" } );
 

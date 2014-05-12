@@ -1,6 +1,6 @@
 // test to make sure that tag ranges get split
 
-s = new ShardingTest( "tag_auto_split", 2, 0, 1, { nopreallocj : true } );
+s = new ShardingTest( "tag_auto_split", 2, 0, 1, { nopreallocj : true, enableBalancer : true } );
 
 db = s.getDB( "test" );
 
@@ -24,7 +24,7 @@ printjson( sh.status() );
 s.stop();
 
 //test without full shard key on tags
-s = new ShardingTest( "tag_auto_split2", 2, 0, 1, { nopreallocj : true } );
+s = new ShardingTest( "tag_auto_split2", 2, 0, 1, { nopreallocj : true, enableBalancer : true } );
 
 db = s.getDB( "test" );
 

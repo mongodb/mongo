@@ -10,7 +10,8 @@ var options = {
     configOptions : {  },
     shardOptions : { binVersion : [ "latest", "last-stable" ] },
     separateConfig : true,
-    sync : false
+    sync : false,
+    enableBalancer : true
 }
 
 var st = new ShardingTest({ shards : 3, mongos : 1, other : options });

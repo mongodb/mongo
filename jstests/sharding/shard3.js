@@ -1,6 +1,6 @@
 // shard3.js
 
-s = new ShardingTest( "shard3" , 2 , 1 , 2 );
+s = new ShardingTest( "shard3" , 2 , 1 , 2 , { enableBalancer : 1 } );
 
 s2 = s._mongos[1];
 
