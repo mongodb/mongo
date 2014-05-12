@@ -235,7 +235,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 				return (zlib_error(
 				    compressor, session, "deflate", ret));
 
-		/* Roll back the if the last deflate didn't complete. */
+		/* Roll back if the last deflate didn't complete. */
 		if (zs.avail_in > 0) {
 			zs = last_zs;
 			break;
