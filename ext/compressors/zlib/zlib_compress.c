@@ -244,14 +244,14 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	}
 
 	zs.avail_out += WT_ZLIB_RESERVED;
-	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
-		;
+	ret = deflate(&zs, Z_FINISH);
+
 	/*
 	 * If the end marker didn't fit, report that we got no work done.  WT
 	 * will compress the (possibly large) page image using ordinary
 	 * compression instead.
 	 */
-	if (ret == Z_BUF_ERROR)
+	if (ret == Z_OK || ret == Z_BUF_ERROR)
 		last_slot = 0;
 	else if (ret != Z_STREAM_END)
 		return (
