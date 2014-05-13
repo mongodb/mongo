@@ -33,15 +33,17 @@ st.s0.getDB('admin').createRole({role: 'myRole',
                                  roles: [],
                                  privileges: [{resource: {cluster: true},
                                                actions: ['invalidateUserCache']}]});
-
+st.s0.getDB('test').createUser({user: 'spencer',
+                                pwd: 'pwd',
+                                roles: ['read',
+                                        {role: 'myRole', db: 'admin'},
+                                        {role: 'userAdminAnyDatabase', db: 'admin'}]});
+st.s0.getDB('admin').logout();
 
 var db1 = st.s0.getDB('test');
-db1.createUser({user: 'spencer', pwd: 'pwd', roles: ['read', {role: 'myRole', db: 'admin'}]});
 db1.auth('spencer', 'pwd');
-
 var db2 = st.s1.getDB('test');
 db2.auth('spencer', 'pwd');
-
 var db3 = st.s2.getDB('test');
 db3.auth('spencer', 'pwd');
 
@@ -137,6 +139,32 @@ db3.auth('spencer', 'pwd');
      // We manually invalidate the cache on s1/db3.
      db3.adminCommand("invalidateUserCache");
      assert.writeOK(db3.foo.update({}, { $inc: { a: 1 }}));
+ })();
+
+(function testConcurrentUserModification() {
+     jsTestLog("Testing having 2 mongoses modify the same user at the same time"); // SERVER-13850
+
+     assert.writeOK(db1.foo.update({}, { $inc: { a: 1 }}));
+     assert.writeOK(db3.foo.update({}, { $inc: { a: 1}}));
+
+     db1.getSiblingDB('test').revokeRolesFromUser("spencer", ['readWrite']);
+
+     // At this point db3 still thinks "spencer" has readWrite.  Use it to add a different role
+     // and make sure it doesn't add back readWrite
+     hasAuthzError(db1.foo.update({}, { $inc: { a: 1 }}));
+     assert.writeOK(db3.foo.update({}, { $inc: { a: 1}}));
+
+     db3.getSiblingDB('test').grantRolesToUser("spencer", ['dbAdmin']);
+
+     hasAuthzError(db1.foo.update({}, { $inc: { a: 1 }}));
+     // modifying "spencer" should force db3 to update its cache entry for "spencer"
+     hasAuthzError(db3.foo.update({}, { $inc: { a: 1 }}));
+
+     // Make sure nothing changes from invalidating the cache
+     db1.adminCommand('invalidateUserCache');
+     db3.adminCommand('invalidateUserCache');
+     hasAuthzError(db1.foo.update({}, { $inc: { a: 1 }}));
+     hasAuthzError(db3.foo.update({}, { $inc: { a: 1 }}));
  })();
 
 (function testDroppingUser() {

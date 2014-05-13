@@ -53,10 +53,6 @@ namespace {
 } // namespace
 
     void UserCacheInvalidator::run() {
-        if (!_authzManager->isAuthEnabled()) {
-            return; // Nothing to do
-        }
-
         Client::initThread("UserCacheInvalidatorThread");
         while (true) {
             sleepsecs(userCacheInvalidationIntervalSecs);
