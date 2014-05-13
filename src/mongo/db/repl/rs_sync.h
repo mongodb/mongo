@@ -41,12 +41,10 @@
 
 namespace mongo {
 namespace replset {
-
-    class BackgroundSyncInterface;
-
-
     // TODO: move hbmsg into an error-keeping class (SERVER-4444)
     void sethbmsg(const std::string& s, const int logLevel=0);
+
+    extern int maxSyncSourceLagSecs;
 
 } // namespace replset
 } // namespace mongo

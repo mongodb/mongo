@@ -67,7 +67,6 @@ namespace replset {
 
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
-    extern int maxSyncSourceLagSecs;
 
     class ReplSetCmdline;
 
