@@ -948,7 +948,7 @@ namespace mongo {
                 verify( foundIndex );
             }
 
-            Client::ReadContext ctx( _config.incLong );
+            scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(_config.incLong));
 
             BSONObj prev;
             BSONList all;
@@ -969,7 +969,7 @@ namespace mongo {
                                                 whereCallback).isOK());
 
             Runner* rawRunner;
-            verify(getRunner(ctx.ctx().db()->getCollection(_config.incLong),
+            verify(getRunner(ctx->ctx().db()->getCollection(_config.incLong),
                              cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
@@ -992,18 +992,12 @@ namespace mongo {
 
                 runner->saveState();
 
-                // can't be a smart pointer since it needs throw annotation on destructor
-                dbtempreleasecond* yield = new dbtempreleasecond();
+                ctx.reset();
 
-                try {
-                    // reduce a finalize array
-                    finalReduce( all );
-                }
-                catch (...) {
-                    delete yield; // if throws, replaces current exception rather than terminating.
-                    throw;
-                }
-                delete yield;
+                // reduce a finalize array
+                finalReduce( all );
+
+                ctx.reset(new Client::ReadContext(_config.incLong));
 
                 all.clear();
                 prev = o;
@@ -1016,13 +1010,10 @@ namespace mongo {
                 _txn->checkForInterrupt();
             }
 
-            {
-                dbtempreleasecond tl;
-                if ( ! tl.unlocked() )
-                    warning() << "map/reduce can't temp release" << endl;
-                // reduce and finalize last array
-                finalReduce( all );
-            }
+            ctx.reset();
+            // reduce and finalize last array
+            finalReduce( all );
+            ctx.reset(new Client::ReadContext(_config.incLong));
 
             pm.finished();
         }
@@ -1296,11 +1287,11 @@ namespace mongo {
                         // We've got a cursor preventing migrations off, now re-establish our useful cursor
 
                         // Need lock and context to use it
-                        Lock::DBRead lock( config.ns );
+                        scoped_ptr<Lock::DBRead> lock(new Lock::DBRead(config.ns));
 
                         // This context does no version check, safe b/c we checked earlier and have an
                         // open cursor
-                        Client::Context ctx(config.ns, storageGlobalParams.dbpath, false);
+                        scoped_ptr<Client::Context> ctx(new Client::Context(config.ns, storageGlobalParams.dbpath, false));
 
                         const NamespaceString nss(config.ns);
                         const WhereCallbackReal whereCallback(nss.db());
@@ -1317,7 +1308,7 @@ namespace mongo {
                         }
 
                         Runner* rawRunner;
-                        if (!getRunner(ctx.db()->getCollection( config.ns), cq, &rawRunner).isOK()) {
+                        if (!getRunner(ctx->db()->getCollection( config.ns), cq, &rawRunner).isOK()) {
                             uasserted(17239, "Can't get runner for query " + config.filter.toString());
                             return 0;
                         }
@@ -1352,16 +1343,14 @@ namespace mongo {
                             if (numInputs % 100 == 0) {
                                 Timer t;
 
-                                // TODO: As an optimization, we might want to do the save/restore 
-                                // state and yield inside the reduceAndSpillInMemoryState method,
-                                // so it only happens if necessary.
-                                //
-                                runner->saveState();
-                                {
-                                    dbtemprelease unlock;
-                                    state.reduceAndSpillInMemoryStateIfNeeded();
-                                }
-                                runner->restoreState();
+                                // TODO: As an optimization, we might want to do the save/restore
+                                // state and yield inside the reduceAndSpillInMemoryState method, so
+                                // it only happens if necessary.
+                                ctx.reset();
+                                lock.reset();
+                                state.reduceAndSpillInMemoryStateIfNeeded();
+                                lock.reset(new Lock::DBRead(config.ns));
+                                ctx.reset(new Client::Context(config.ns, storageGlobalParams.dbpath, false));
 
                                 reduceTime += t.micros();
 

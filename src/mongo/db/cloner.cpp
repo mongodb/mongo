@@ -59,26 +59,6 @@ namespace mongo {
 
     BSONElement getErrField(const BSONObj& o);
 
-    /** Selectively release the mutex based on a parameter. */
-    class dbtempreleaseif {
-        MONGO_DISALLOW_COPYING(dbtempreleaseif);
-    public:
-        dbtempreleaseif( bool release ) : _impl( release ? new dbtemprelease() : 0 ) {}
-        ~dbtempreleaseif() throw(DBException) {
-            if (_impl)
-                delete _impl;
-        }
-    private:
-        // can't use a smart pointer because we need throw annotation on destructor
-        dbtemprelease* _impl;
-    };
-
-    void mayInterrupt( bool mayBeInterrupted ) {
-        if ( mayBeInterrupted ) {
-            killCurrentOp.checkForInterrupt( false );
-        }
-    }
-
     /* for index info object:
          { "name" : "name_1" , "ns" : "foo.index3" , "key" :  { "name" : 1.0 } }
        we need to fix up the value in the "ns" parameter so that the name prefix is correct on a
@@ -107,14 +87,8 @@ namespace mongo {
             else
                 b.append(e);
         }
-        BSONObj res= b.obj();
 
-        /*    if( mod ) {
-            out() << "before: " << o.toString() << endl;
-            o.dump();
-            out() << "after:  " << res.toString() << endl;
-            res.dump();
-            }*/
+        BSONObj res= b.obj();
 
         return res;
     }
@@ -129,37 +103,35 @@ namespace mongo {
         {}
 
         void operator()( DBClientCursorBatchIterator &i ) {
+            // XXX: can probably take dblock instead
             Lock::GlobalWrite lk;
             context.relocked();
 
             bool createdCollection = false;
             Collection* collection = NULL;
 
+            if ( isindex == false ) {
+                collection = context.db()->getCollection( to_collection );
+                if ( !collection ) {
+                    massert( 17321,
+                             str::stream()
+                             << "collection dropped during clone ["
+                             << to_collection << "]",
+                             !createdCollection );
+                    createdCollection = true;
+                    collection = context.db()->createCollection( txn, to_collection );
+                    verify( collection );
+                }
+            }
+
             while( i.moreInCurrentBatch() ) {
-                if ( numSeen % 128 == 127 /*yield some*/ ) {
-                    collection = NULL;
+                if ( numSeen % 128 == 127 ) {
                     time_t now = time(0);
                     if( now - lastLog >= 60 ) {
                         // report progress
                         if( lastLog )
                             log() << "clone " << to_collection << ' ' << numSeen << endl;
                         lastLog = now;
-                    }
-                    mayInterrupt( _mayBeInterrupted );
-                    dbtempreleaseif t( _mayYield );
-                }
-
-                if ( isindex == false && collection == NULL ) {
-                    collection = context.db()->getCollection( to_collection );
-                    if ( !collection ) {
-                        massert( 17321,
-                                 str::stream()
-                                 << "collection dropped during clone ["
-                                 << to_collection << "]",
-                                 !createdCollection );
-                        createdCollection = true;
-                        collection = context.db()->createCollection( txn, to_collection );
-                        verify( collection );
                     }
                 }
 
@@ -249,8 +221,7 @@ namespace mongo {
 
         int options = QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 );
         {
-            mayInterrupt( mayBeInterrupted );
-            dbtempreleaseif r( mayYield );
+            dbtemprelease r;
             _conn->query(boost::function<void(DBClientCursorBatchIterator &)>(f), from_collection,
                          query, 0, options);
         }
@@ -417,8 +388,7 @@ namespace mongo {
             /* todo: we can put these releases inside dbclient or a dbclient specialization.
                or just wait until we get rid of global lock anyway.
                */
-            mayInterrupt( opts.mayBeInterrupted );
-            dbtempreleaseif r( opts.mayYield );
+            dbtemprelease r;
 
             // just using exhaust for collection copying right now
 
@@ -477,10 +447,6 @@ namespace mongo {
         }
 
         for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
-            {
-                mayInterrupt( opts.mayBeInterrupted );
-                dbtempreleaseif r( opts.mayYield );
-            }
             BSONObj collection = *i;
             LOG(2) << "  really will clone: " << collection << endl;
             const char * from_name = collection["name"].valuestr();

@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cloner.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"

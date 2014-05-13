@@ -71,33 +71,6 @@ namespace mongo {
         }
     };
 
-    /**
-     * only does a temp release if we're not nested and have a lock
-     *
-     * WARNING: do not put in a smart pointer or any other class. If you absolutely must, you need
-     * to add the throw(DBException) annotation to it's destructor.
-     */
-    class dbtempreleasecond : boost::noncopyable {
-        dbtemprelease * real;
-    public:
-        dbtempreleasecond() {
-            real = 0;
-            if( Lock::isLocked() ) {
-                // if nested don't temprelease, and we don't complain either for this class
-                if( !Lock::nested() ) {
-                    real = new dbtemprelease();
-                }
-            }
-        }
-        ~dbtempreleasecond() throw(DBException) {
-            if ( real ) {
-                delete real;
-                real = 0;
-            }
-        }
-        bool unlocked() const { return real != 0; }
-    };
-
     extern void (*snmpInit)();
 
 } // namespace mongo
