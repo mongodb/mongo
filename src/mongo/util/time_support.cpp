@@ -61,6 +61,15 @@ timegm(struct tm *const tmp);
 
 namespace mongo {
 
+    bool Date_t::isFormatable() const {
+        if (sizeof(time_t) == sizeof(int32_t)) {
+            return millis < 2147483647000ULL; // "2038-01-19T03:14:07Z"
+        }
+        else {
+            return millis < 32535215999000ULL; // "3000-12-31T23:59:59Z"
+        }
+    }
+
     // jsTime_virtual_skew is just for testing. a test command manipulates it.
     long long jsTime_virtual_skew = 0;
     boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
@@ -137,6 +146,7 @@ namespace {
     };
 
     void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
+        invariant(date.isFormatable());
         static const int bufSize = DateStringBuffer::dataCapacity;
         char* const buf = result->data;
         struct tm t;

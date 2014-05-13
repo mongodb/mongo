@@ -223,11 +223,17 @@ namespace mongo {
             if (format == Strict) {
                 Date_t d = date();
                 s << "{ \"$date\" : ";
-                if (static_cast<long long>(d.millis) < 0) {
-                    s << "{ \"$numberLong\" : \"" << static_cast<long long>(d.millis) << "\" }";
+                // The two cases in which we cannot convert Date_t::millis to an ISO Date string are
+                // when the date is too large to format (SERVER-13760), and when the date is before
+                // the epoch (SERVER-11273).  Since Date_t internally stores millis as an unsigned
+                // long long, despite the fact that it is logically signed (SERVER-8573), this check
+                // handles both the case where Date_t::millis is too large, and the case where
+                // Date_t::millis is negative (before the epoch).
+                if (d.isFormatable()) {
+                    s << "\"" << dateToISOStringLocal(date()) << "\"";
                 }
                 else {
-                    s << "\"" << dateToISOStringLocal(date()) << "\"";
+                    s << "{ \"$numberLong\" : \"" << static_cast<long long>(d.millis) << "\" }";
                 }
                 s << " }";
             }
@@ -235,13 +241,19 @@ namespace mongo {
                 s << "Date( ";
                 if (pretty) {
                     Date_t d = date();
-                    if (static_cast<long long>(d.millis) < 0) {
+                    // The two cases in which we cannot convert Date_t::millis to an ISO Date string
+                    // are when the date is too large to format (SERVER-13760), and when the date is
+                    // before the epoch (SERVER-11273).  Since Date_t internally stores millis as an
+                    // unsigned long long, despite the fact that it is logically signed
+                    // (SERVER-8573), this check handles both the case where Date_t::millis is too
+                    // large, and the case where Date_t::millis is negative (before the epoch).
+                    if (d.isFormatable()) {
+                        s << "\"" << dateToISOStringLocal(date()) << "\"";
+                    }
+                    else {
                         // FIXME: This is not parseable by the shell, since it may not fit in a
                         // float
                         s << d.millis;
-                    }
-                    else {
-                        s << "\"" << dateToISOStringLocal(date()) << "\"";
                     }
                 }
                 else {

@@ -418,6 +418,14 @@ namespace JsonTests {
                                built.jsonString( Strict ) );
                 ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", built.jsonString( TenGen ) );
                 ASSERT_EQUALS( "{ \"a\" : Date( 0 ) }", built.jsonString( JS ) );
+
+                // Test dates above our maximum formattable date.  See SERVER-13760.
+                BSONObjBuilder b2;
+                b2.appendDate("a", 32535262800000ULL);
+                BSONObj built2 = b2.done();
+                ASSERT_EQUALS(
+                            "{ \"a\" : { \"$date\" : { \"$numberLong\" : \"32535262800000\" } } }",
+                            built2.jsonString( Strict ) );
             }
 
         private:
