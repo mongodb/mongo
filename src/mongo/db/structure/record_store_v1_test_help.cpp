@@ -335,7 +335,10 @@ namespace {
                 const int actualSize = actualRec->lengthWithHeaders();
 
                 log() << "loc: " << actualLoc // <--hex
-                      << " (" << actualLoc.getOfs() << ") size: " << actualSize;
+                      << " (" << actualLoc.getOfs() << ")"
+                      << " size: " << actualSize
+                      << " next: " << actualRec->nextOfs()
+                      << " prev: " << actualRec->prevOfs();
 
                 const bool foundCycle = !seenLocs.insert(actualLoc).second;
                 invariant(!foundCycle);
@@ -358,9 +361,11 @@ namespace {
                 const DeletedRecord* actualDrec = &em->recordForV1(actualLoc)->asDeleted();
                 const int actualSize = actualDrec->lengthWithHeaders();
 
-
                 log() << "loc: " << actualLoc // <--hex
-                      << " (" << actualLoc.getOfs() << ") size: " << actualSize;
+                      << " (" << actualLoc.getOfs() << ")"
+                      << " size: " << actualSize
+                      << " bucket: " << bucketIdx
+                      << " next: " << actualDrec->nextDeleted();
 
                 const bool foundCycle = !seenLocs.insert(actualLoc).second;
                 invariant(!foundCycle);
@@ -401,6 +406,7 @@ namespace {
 
             // link together extents that should be part of this RS
             md->setFirstExtent(txn, DiskLoc(extentSizes.begin()->first, 0));
+            md->setLastExtent(txn, DiskLoc(extentSizes.rbegin()->first, 0));
             for (ExtentSizes::iterator it = extentSizes.begin();
                     boost::next(it) != extentSizes.end(); /* ++it */ ) {
                 const int a = it->first;
@@ -417,6 +423,7 @@ namespace {
             DiskLoc extLoc = md->firstExtent();
             while (!extLoc.isNull()) {
                 Extent* ext = em->getExtent(extLoc);
+                int prevOfs = DiskLoc::NullOfs;
                 while (extLoc.a() == records[recIdx].loc.a()) { // for all records in this extent
                     const DiskLoc loc = records[recIdx].loc;
                     const int size = records[recIdx].size;;
@@ -431,11 +438,12 @@ namespace {
                     rec->lengthWithHeaders() = size;
                     rec->extentOfs() = 0;
 
+                    rec->prevOfs() = prevOfs;
+                    prevOfs = loc.getOfs();
+
                     const DiskLoc nextLoc = records[++recIdx].loc;
-                    if (nextLoc.a() == loc.a()) {
-                        Record* nextRec = em->recordForV1(loc);
+                    if (nextLoc.a() == loc.a()) { // if next is in same extent
                         rec->nextOfs() = nextLoc.getOfs();
-                        nextRec->prevOfs() = loc.getOfs();
                     }
                     else {
                         rec->nextOfs() = DiskLoc::NullOfs;
@@ -486,8 +494,8 @@ namespace {
                          const DummyRecordStoreV1MetaData* md) {
         invariant(records || drecs); // if both are NULL nothing is being asserted...
 
-        if (records) {
-            try {
+        try {
+            if (records) {
                 long long dataSize = 0;
                 long long numRecs = 0;
 
@@ -496,6 +504,7 @@ namespace {
                 DiskLoc extLoc = md->firstExtent();
                 while (!extLoc.isNull()) {
                     Extent* ext = em->getExtent(extLoc, true);
+                    int actualPrevOfs = DiskLoc::NullOfs;
                     DiskLoc actualLoc = ext->firstRecord;
                     while (!actualLoc.isNull()) {
                         const Record* actualRec = em->recordForV1(actualLoc);
@@ -508,12 +517,19 @@ namespace {
                         ASSERT_EQUALS(actualSize, records[recIdx].size);
 
                         ASSERT_EQUALS(actualRec->extentOfs(), extLoc.getOfs());
+                        ASSERT_EQUALS(actualRec->prevOfs(), actualPrevOfs);
+                        actualPrevOfs = actualLoc.getOfs();
 
                         recIdx++;
                         const int nextOfs = actualRec->nextOfs();
                         actualLoc = (nextOfs == DiskLoc::NullOfs ? DiskLoc()
                                                                  : DiskLoc(actualLoc.a(), nextOfs));
                     }
+
+                    if (ext->xnext.isNull()) {
+                        ASSERT_EQUALS(md->lastExtent(), extLoc);
+                    }
+
                     extLoc = ext->xnext;
                 }
 
@@ -523,14 +539,8 @@ namespace {
                 ASSERT_EQUALS(dataSize, md->dataSize());
                 ASSERT_EQUALS(numRecs, md->numRecords());
             }
-            catch (...) {
-                printRecList(em, md);
-                throw;
-            }
-        }
 
-        if (drecs) {
-            try {
+            if (drecs) {
                 int drecIdx = 0;
                 for (int bucketIdx = 0; bucketIdx < RecordStoreV1Base::Buckets; bucketIdx++) {
                     DiskLoc actualLoc = md->deletedListEntry(bucketIdx);
@@ -552,10 +562,12 @@ namespace {
                 // both the expected and actual deleted lists must be done at this point
                 ASSERT_EQUALS(drecs[drecIdx].loc, DiskLoc());
             }
-            catch (...) {
-                printDRecList(em, md);
-                throw;
-            }
+        }
+        catch (...) {
+            // If a test fails, provide extra info to make debugging easier
+            printRecList(em, md);
+            printDRecList(em, md);
+            throw;
         }
     }
 }

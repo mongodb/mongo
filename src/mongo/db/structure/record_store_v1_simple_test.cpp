@@ -469,8 +469,8 @@ namespace {
                 {}
             };
             LocAndSize drecs[] = {
-                {DiskLoc(0, 1200), 100},
-                {DiskLoc(2, 1100), 100},
+                {DiskLoc(0, 1200), 100}, // this one will be used
+                {DiskLoc(2, 1000), 100},
                 {DiskLoc(1, 1000), 1000},
                 {}
             };
@@ -485,12 +485,12 @@ namespace {
                 {DiskLoc(0, 1000), 100},
                 {DiskLoc(0, 1100), 100},
                 {DiskLoc(0, 1300), 100},
-                {DiskLoc(0, 1200), 100},
+                {DiskLoc(0, 1200), 100}, // this is the new record
                 {DiskLoc(2, 1100), 100},
                 {}
             };
             LocAndSize drecs[] = {
-                {DiskLoc(2, 1100), 100},
+                {DiskLoc(2, 1000), 100},
                 {DiskLoc(1, 1000), 1000},
                 {}
             };
