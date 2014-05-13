@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,7 +32,8 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/query/cached_plan_runner.h"
+#include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/explain_plan.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/query/idhack_runner.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_access.h"
@@ -188,81 +188,8 @@ namespace mongo {
         plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
     }
 
-    Status getRunnerFromCache(CanonicalQuery* canonicalQuery,
-                              Collection* collection,
-                              const QueryPlannerParams& plannerParams,
-                              Runner** out) {
-        // Skip cache look up for non-cacheable queries.
-        if (!PlanCache::shouldCacheQuery(*canonicalQuery)) {
-            return Status(ErrorCodes::BadValue, "query is not cacheable");
-        }
-
-        CachedSolution* rawCS;
-        Status cacheLookupStatus = collection->infoCache()->getPlanCache()->get(*canonicalQuery,
-                                                                                &rawCS);
-        if (!cacheLookupStatus.isOK()) {
-            return cacheLookupStatus;
-        }
-
-        // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-        boost::scoped_ptr<CachedSolution> cs(rawCS);
-        QuerySolution *qs, *backupQs;
-        Status status = QueryPlanner::planFromCache(*canonicalQuery,
-                                                    plannerParams,
-                                                    *cs,
-                                                    &qs,
-                                                    &backupQs);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // If our cached solution is a hit for a count query, try to turn it into a fast count
-        // thing.
-        if (plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT) {
-            if (turnIxscanIntoCount(qs)) {
-                LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
-                       << ", planSummary: " << getPlanSummary(*qs);
-
-                WorkingSet* ws;
-                PlanStage* root;
-                verify(StageBuilder::build(collection, *qs, &root, &ws));
-                *out = new SingleSolutionRunner(collection,
-                                                canonicalQuery, qs, root, ws);
-                if (NULL != backupQs) {
-                    delete backupQs;
-                }
-                return Status::OK();
-            }
-        }
-
-        // If we're here, we're going to used the cached plan and things are normal.
-        LOG(2) << "Using cached query plan: " << canonicalQuery->toStringShort()
-               << ", planSummary: " << getPlanSummary(*qs);
-
-        WorkingSet* ws;
-        PlanStage* root;
-        verify(StageBuilder::build(collection, *qs, &root, &ws));
-        CachedPlanRunner* cpr = new CachedPlanRunner(collection,
-                                                     canonicalQuery,
-                                                     qs,
-                                                     root,
-                                                     ws);
-
-        // If there's a backup solution, let the CachedPlanRunner know about it.
-        if (NULL != backupQs) {
-            WorkingSet* backupWs;
-            PlanStage* backupRoot;
-            verify(StageBuilder::build(collection, *backupQs, &backupRoot, &backupWs));
-            cpr->setBackupPlan(backupQs, backupRoot, backupWs);
-        }
-
-        *out = cpr;
-        return Status::OK();
-    }
-
     /**
-     * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
-     * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
+     * For a given query, get a runner.
      */
     Status getRunner(Collection* collection,
                      CanonicalQuery* rawCanonicalQuery,
@@ -313,17 +240,52 @@ namespace mongo {
         plannerParams.options = plannerOptions;
         fillOutPlannerParams(collection, rawCanonicalQuery, &plannerParams);
 
-        // See if the cache has what we're looking for.
-        Status cacheStatus = getRunnerFromCache(canonicalQuery.get(),
-                                                collection,
-                                                plannerParams,
-                                                out);
+        // Try to look up a cached solution for the query.
 
-        // This can be not-OK and we can carry on.  It just means the query wasn't cached.
-        if (cacheStatus.isOK()) {
-            // We got a cached runner.
-            canonicalQuery.release();
-            return cacheStatus;
+        CachedSolution* rawCS;
+        if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
+            collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
+            // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+            boost::scoped_ptr<CachedSolution> cs(rawCS);
+            QuerySolution *qs, *backupQs;
+            QuerySolution*& chosenSolution=qs; // either qs or backupQs
+            Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
+                                                        &qs, &backupQs);
+
+            if (status.isOK()) {
+                // the working set will be shared by the root and backupRoot plans
+                // and owned by the containing single-solution-runner
+                //
+                WorkingSet* sharedWs = new WorkingSet();
+
+                PlanStage* root, *backupRoot=NULL;
+                verify(StageBuilder::build(collection, *qs, sharedWs, &root));
+                if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
+                    && turnIxscanIntoCount(qs)) {
+                    // If our cached solution is a hit for a count query,
+                    // try to turn it into a fast count thing.
+                    LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
+                           << ", planSummary: " << getPlanSummary(*qs);
+
+                    if (NULL != backupQs) {
+                        // should all queries that can be answered by an index scan
+                        // go through this path?  e.g. if there's a compound index on A,B
+                        // and we're looking for B where A=some-constant?
+                        //
+                        // if not, what's special about count?
+                        delete backupQs;
+                    }
+                    verify(StageBuilder::build(collection, *backupQs, sharedWs, &backupRoot));
+                }
+
+                // add a CachedPlanStage on top of the previous root
+                root = new CachedPlanStage(collection, rawCanonicalQuery, root, backupRoot);
+                
+                *out = new SingleSolutionRunner(collection,
+                                                canonicalQuery.release(),
+                                                chosenSolution, root, sharedWs);
+                return Status::OK();
+            }
         }
 
         if (internalQueryPlanOrChildrenIndependently
@@ -388,9 +350,9 @@ namespace mongo {
                            << ", planSummary: " << getPlanSummary(*solutions[i]);
 
                     // We're not going to cache anything that's fast count.
-                    WorkingSet* ws;
+                    WorkingSet* ws = new WorkingSet();
                     PlanStage* root;
-                    verify(StageBuilder::build(collection, *solutions[i], &root, &ws));
+                    verify(StageBuilder::build(collection, *solutions[i], ws, &root));
                     *out = new SingleSolutionRunner(collection,
                                                     canonicalQuery.release(),
                                                     solutions[i],
@@ -407,9 +369,9 @@ namespace mongo {
                    << ", planSummary: " << getPlanSummary(*solutions[0]);
 
             // Only one possible plan.  Run it.  Build the stages from the solution.
-            WorkingSet* ws;
+            WorkingSet* ws = new WorkingSet();
             PlanStage* root;
-            verify(StageBuilder::build(collection, *solutions[0], &root, &ws));
+            verify(StageBuilder::build(collection, *solutions[0], ws, &root));
 
             // And, run the plan.
             *out = new SingleSolutionRunner(collection,
@@ -420,20 +382,33 @@ namespace mongo {
             return Status::OK();
         }
         else {
-            // Many solutions.  Let the MultiPlanRunner pick the best, update the cache, and so on.
-            auto_ptr<MultiPlanRunner> mpr(new MultiPlanRunner(collection,canonicalQuery.release()));
+            // Many solutions.  Create a MultiPlanStage to pick the best, update the cache, and so on.
 
-            for (size_t i = 0; i < solutions.size(); ++i) {
-                WorkingSet* ws;
-                PlanStage* root;
-                if (solutions[i]->cacheData.get()) {
-                    solutions[i]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
+            // The working set will be shared by all candidate plans and owned by the containing runner
+            WorkingSet* sharedWorkingSet = new WorkingSet();
+
+            MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, rawCanonicalQuery);
+
+            for (size_t ix = 0; ix < solutions.size(); ++ix) {
+                if (solutions[ix]->cacheData.get()) {
+                    solutions[ix]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
                 }
-                verify(StageBuilder::build(collection, *solutions[i], &root, &ws));
-                // Takes ownership of all arguments.
-                mpr->addPlan(solutions[i], root, ws);
+
+                // version of StageBuild::build when WorkingSet is shared
+                PlanStage* nextPlanRoot;
+                verify(StageBuilder::build(collection, *solutions[ix],
+                                           sharedWorkingSet, &nextPlanRoot));
+
+                // Owns none of the arguments
+                multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
             }
-            *out = mpr.release();
+            multiPlanStage->pickBestPlan();
+            *out = new SingleSolutionRunner(collection,
+                                            canonicalQuery.release(),
+                                            multiPlanStage->bestSolution(),
+                                            multiPlanStage,
+                                            sharedWorkingSet);
+
             return Status::OK();
         }
     }
@@ -790,9 +765,9 @@ namespace mongo {
             LOG(2) << "Using fast distinct: " << cq->toStringShort()
                    << ", planSummary: " << getPlanSummary(*soln);
 
-            WorkingSet* ws;
+            WorkingSet* ws = new WorkingSet();
             PlanStage* root;
-            verify(StageBuilder::build(collection, *soln, &root, &ws));
+            verify(StageBuilder::build(collection, *soln, ws, &root));
             *out = new SingleSolutionRunner(collection, cq, soln, root, ws);
             return Status::OK();
         }
@@ -818,9 +793,9 @@ namespace mongo {
                        << ", planSummary: " << getPlanSummary(*solutions[i]);
 
                 // Build and return the SSR over solutions[i].
-                WorkingSet* ws;
+                WorkingSet* ws = new WorkingSet();
                 PlanStage* root;
-                verify(StageBuilder::build(collection, *solutions[i], &root, &ws));
+                verify(StageBuilder::build(collection, *solutions[i], ws, &root));
                 *out = new SingleSolutionRunner(collection, cq, solutions[i], root, ws);
                 return Status::OK();
             }

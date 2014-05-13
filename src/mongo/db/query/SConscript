@@ -31,13 +31,11 @@ env.Library(
 env.Library(
     target='query',
     source=[
-        "cached_plan_runner.cpp",
         "eof_runner.cpp",
         "explain_plan.cpp",
         "get_runner.cpp",
         "idhack_runner.cpp",
         "internal_runner.cpp",
-        "multi_plan_runner.cpp",
         "new_find.cpp",
         "plan_executor.cpp",
         "plan_ranker.cpp",

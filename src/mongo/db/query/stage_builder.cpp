@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -49,6 +49,7 @@
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/text.h"
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 
@@ -315,25 +316,15 @@ namespace mongo {
         }
     }
 
-    // static
+    // static (this one is used for Cached and MultiPlanStage)
     bool StageBuilder::build(Collection* collection,
                              const QuerySolution& solution,
-                             PlanStage** rootOut,
-                             WorkingSet** wsOut) {
-        QuerySolutionNode* root = solution.root.get();
-        if (NULL == root) { return false; }
-
-        auto_ptr<WorkingSet> ws(new WorkingSet());
-        PlanStage* stageRoot = buildStages(collection, solution, root, ws.get());
-
-        if (NULL != stageRoot) {
-            *rootOut = stageRoot;
-            *wsOut = ws.release();
-            return true;
-        }
-        else {
-            return false;
-        }
+                             WorkingSet* wsIn,
+                             PlanStage** rootOut) {
+        if (NULL == wsIn || NULL == rootOut) { return false; }
+        QuerySolutionNode* solutionNode = solution.root.get();
+        if (NULL == solutionNode) { return false; }
+        return NULL != (*rootOut = buildStages(collection, solution, solutionNode, wsIn));
     }
 
 }  // namespace mongo

@@ -33,10 +33,10 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
@@ -101,33 +101,32 @@ namespace PlanRankingTests {
             ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
             // Fill out the MPR.
-            _mpr.reset(new MultiPlanRunner(collection, cq));
-
+            _mps.reset(new MultiPlanStage(collection, cq));
+            WorkingSet* ws = new WorkingSet();
             // Put each solution from the planner into the MPR.
             for (size_t i = 0; i < solutions.size(); ++i) {
-                WorkingSet* ws;
                 PlanStage* root;
-                ASSERT(StageBuilder::build(collection, *solutions[i], &root, &ws));
+                ASSERT(StageBuilder::build(collection, *solutions[i], ws, &root));
                 // Takes ownership of all arguments.
-                _mpr->addPlan(solutions[i], root, ws);
+                _mps->addPlan(solutions[i], root, ws);
             }
 
-            // And return a pointer to the best solution.  The MPR owns the pointer.
-            size_t bestPlan = numeric_limits<size_t>::max();
-            BSONObj unused;
-            ASSERT(_mpr->pickBestPlan(&bestPlan, &unused));
-            ASSERT_LESS_THAN(bestPlan, solutions.size());
-            // This is what sets a backup plan, should we test for it.
-            _mpr->cacheBestPlan();
-            return solutions[bestPlan];
+            _mps->pickBestPlan(); // This is what sets a backup plan, should we test for it.
+            ASSERT(_mps->bestPlanChosen());
+
+            size_t bestPlanIdx = _mps->bestPlanIdx();
+            ASSERT_LESS_THAN(bestPlanIdx, solutions.size());
+
+            // And return a pointer to the best solution.
+            return _mps->bestSolution();
         }
 
         /**
          * Was a backup plan picked during the ranking process?
          */
         bool hasBackupPlan() const {
-            ASSERT(NULL != _mpr.get());
-            return _mpr->hasBackupPlan();
+            ASSERT(NULL != _mps.get());
+            return _mps->hasBackupPlan();
         }
 
     protected:
@@ -138,7 +137,7 @@ namespace PlanRankingTests {
 
     private:
         static DBDirectClient _client;
-        scoped_ptr<MultiPlanRunner> _mpr;
+        scoped_ptr<MultiPlanStage> _mps;
         // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
         // Restored at end of test invocation regardless of test result.
         bool _internalQueryForceIntersectionPlans;
@@ -707,6 +706,7 @@ namespace PlanRankingTests {
 
             // Use index on 'b'.
             QuerySolution* soln = pickBestPlan(cq);
+            std::cerr << "PlanRankingWorkPlansLongEnough: soln=" << soln->toString() << std::endl;
             ASSERT(QueryPlannerTestLib::solutionMatches(
                         "{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
                         soln->root.get()));

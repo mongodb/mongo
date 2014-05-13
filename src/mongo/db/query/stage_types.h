@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -36,6 +36,7 @@ namespace mongo {
     enum StageType {
         STAGE_AND_HASH,
         STAGE_AND_SORTED,
+	STAGE_CACHED_PLAN,
         STAGE_COLLSCAN,
 
         // If we're running a .count(), the query is fully covered by one ixscan, and the ixscan is
@@ -63,6 +64,7 @@ namespace mongo {
 
         STAGE_IXSCAN,
         STAGE_LIMIT,
+	STAGE_MULTI_PLAN,
         STAGE_OR,
         STAGE_PROJECTION,
         STAGE_SHARDING_FILTER,

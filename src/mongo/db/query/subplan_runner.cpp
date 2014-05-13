@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,14 +32,15 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_runner.h"
-#include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/type_explain.h"
 
 namespace mongo {
@@ -267,13 +268,13 @@ namespace mongo {
             // 'solutions' is owned by the SubplanRunner instance until
             // it is popped from the queue.
             vector<QuerySolution*> solutions = _solutions.front();
+            _solutions.pop();
 
             // We already checked for zero solutions in planSubqueries(...).
             invariant(!solutions.empty());
 
             if (1 == solutions.size()) {
                 // There is only one solution. Transfer ownership to an auto_ptr.
-                _solutions.pop();
                 auto_ptr<QuerySolution> autoSoln(solutions[0]);
 
                 // We want a well-formed *indexed* solution.
@@ -303,41 +304,48 @@ namespace mongo {
                 cacheData->children.push_back(autoSoln->cacheData->tree->clone());
             }
             else {
-                // N solutions, rank them.  Takes ownership of safeOrChildCQ.
-                MultiPlanRunner* mpr = new MultiPlanRunner(_collection, orChildCQ.release());
+                // N solutions, rank them.  Takes ownership of orChildCQ.
 
-                // Dump all the solutions into the MPR. The MPR takes ownership of
-                // each solution.
-                _solutions.pop();
-                for (size_t i = 0; i < solutions.size(); ++i) {
-                    WorkingSet* ws;
-                    PlanStage* root;
-                    verify(StageBuilder::build(_collection, *solutions[i], &root, &ws));
-                    // Takes ownership of all arguments.
-                    mpr->addPlan(solutions[i], root, ws);
+                // the working set will be shared by the candidate plans and owned by the runner
+                WorkingSet* sharedWorkingSet = new WorkingSet();
+
+                MultiPlanStage* multiPlanStage = new MultiPlanStage(_collection,
+                                                                    orChildCQ.get());
+
+                // Dump all the solutions into the MPR.
+                for (size_t ix = 0; ix < solutions.size(); ++ix) {
+                    PlanStage* nextPlanRoot;
+                    verify(StageBuilder::build(_collection,
+                                               *solutions[ix],
+                                               sharedWorkingSet,
+                                               &nextPlanRoot));
+
+                    // Owns first two arguments
+                    multiPlanStage->addPlan(solutions[ix], nextPlanRoot, sharedWorkingSet);
                 }
 
-                // Calling pickBestPlan can yield so we must propagate events down to the MPR.
-                _underlyingRunner.reset(mpr);
-
-                // Pull out the best plan.
-                size_t bestPlan;
-                BSONObj errorObj;
-                if (!mpr->pickBestPlan(&bestPlan, &errorObj)) {
+                multiPlanStage->pickBestPlan();
+                if (! multiPlanStage->bestPlanChosen()) {
                     QLOG() << "Subplanner: Failed to pick best plan for subchild "
-                           << orChild->toString()
-                           << " error obj is " << errorObj.toString();
+                           << orChildCQ->toString();
                     return false;
                 }
 
-                // pickBestPlan can yield.  Make sure we're not dead any which way.
+                Runner* mpr = new SingleSolutionRunner(_collection,
+                                                       orChildCQ.release(),
+                                                       multiPlanStage->bestSolution(),
+                                                       multiPlanStage,
+                                                       sharedWorkingSet);
+
+                _underlyingRunner.reset(mpr);
+
                 if (_killed) {
                     QLOG() << "Subplanner: Killed while picking best plan for subchild "
                            << orChild->toString();
                     return false;
                 }
 
-                QuerySolution* bestSoln = solutions[bestPlan];
+                QuerySolution* bestSoln = multiPlanStage->bestSolution();
 
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
                     QLOG() << "Subplanner: No indexed cache data for subchild "
@@ -355,7 +363,7 @@ namespace mongo {
                     return false;
                 }
 
-                cacheData->children.push_back(solutions[bestPlan]->cacheData->tree->clone());
+                cacheData->children.push_back(bestSoln->cacheData->tree->clone());
             }
         }
 
@@ -393,13 +401,24 @@ namespace mongo {
         // We use one of these even if there is one plan.  We do this so that the entry is cached
         // with stats obtained in the same fashion as a competitive ranking would have obtained
         // them.
-        MultiPlanRunner* mpr = new MultiPlanRunner(_collection, _query.release());
-        WorkingSet* ws;
+        MultiPlanStage* multiPlanStage = new MultiPlanStage(_collection, _query.get());
+        WorkingSet* ws = new WorkingSet();
         PlanStage* root;
-        verify(StageBuilder::build(_collection, *soln, &root, &ws));
-        // Takes ownership of all arguments.
-        mpr->addPlan(soln, root, ws);
+        verify(StageBuilder::build(_collection, *soln, ws, &root));
+        multiPlanStage->addPlan(soln, root, ws); // Takes ownership first two arguments.
 
+        multiPlanStage->pickBestPlan();
+        if (! multiPlanStage->bestPlanChosen()) {
+            QLOG() << "Subplanner: Failed to pick best plan for subchild "
+                   << _query->toString();
+            return false;
+        }
+
+        Runner* mpr = new SingleSolutionRunner(_collection,
+                                               _query.release(),
+                                               multiPlanStage->bestSolution(),
+                                               multiPlanStage,
+                                               ws);
         _underlyingRunner.reset(mpr);
 
         return true;

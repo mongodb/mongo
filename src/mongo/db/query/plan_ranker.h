@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -83,7 +83,7 @@ namespace mongo {
 
     /**
      * Information about why a plan was picked to be the best.  Data here is placed into the cache
-     * and used by the CachedPlanRunner to compare expected performance with actual.
+     * and used to compare expected performance with actual.
      */
     struct PlanRankingDecision {
         /**

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -412,6 +412,8 @@ namespace mongo {
             return "AND_HASH";
         case STAGE_AND_SORTED:
             return "AND_SORTED";
+        case STAGE_CACHED_PLAN:
+            return "CACHED_PLAN";
         case STAGE_COLLSCAN:
             return "COLLSCAN";
         case STAGE_COUNT:
@@ -432,6 +434,8 @@ namespace mongo {
             return "KEEP_MUTATIONS";
         case STAGE_LIMIT:
             return "LIMIT";
+        case STAGE_MULTI_PLAN:
+            return "MULTI_PLAN";
         case STAGE_OR:
             return "OR";
         case STAGE_PROJECTION:

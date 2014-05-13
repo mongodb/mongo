@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -183,6 +183,14 @@ namespace mongo {
         size_t matchTested;
     };
 
+    struct CachedPlanStats : public SpecificStats {
+        CachedPlanStats() { }
+
+        virtual SpecificStats* clone() const {
+            return new CachedPlanStats(*this);
+        }
+    };
+
     struct CollectionScanStats : public SpecificStats {
         CollectionScanStats() : docsTested(0) { }
 
@@ -286,6 +294,14 @@ namespace mongo {
         // Number of entries retrieved from the index during the scan.
         size_t keysExamined;
 
+    };
+
+    struct MultiPlanStats : public SpecificStats {
+        MultiPlanStats() { }
+
+        virtual SpecificStats* clone() const {
+            return new MultiPlanStats(*this);
+        }
     };
 
     struct OrStats : public SpecificStats {
