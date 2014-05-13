@@ -143,18 +143,18 @@ namespace mongo {
             return v8AssertionException(errmsg);
         }
 
-        DBClientWithCommands* conn;
+        DBClientBase* conn;
         conn = cs.connect(errmsg);
         if (!conn) {
             return v8AssertionException(errmsg);
         }
 
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
-        scope->dbClientWithCommandsTracker.track(self, conn);
+        v8::Local<v8::External> connHandle = scope->dbClientBaseTracker.track(self, conn);
 
         ScriptEngine::runConnectCallback(*conn);
 
-        args.This()->SetInternalField(0, v8::External::New(conn));
+        args.This()->SetInternalField(0, connHandle);
         args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
         args.This()->ForceSet(scope->v8StringData("host"), scope->v8StringData(host));
 
@@ -171,22 +171,23 @@ namespace mongo {
 
         DBClientBase* conn = createDirectClient();
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
-        scope->dbClientBaseTracker.track(self, conn);
+        v8::Local<v8::External> connHandle = scope->dbClientBaseTracker.track(self, conn);
 
-        args.This()->SetInternalField(0, v8::External::New(conn));
+        args.This()->SetInternalField(0, connHandle);
         args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
         args.This()->ForceSet(scope->v8StringData("host"), scope->v8StringData("EMBEDDED"));
 
         return v8::Undefined();
     }
 
-    DBClientBase* getConnection(V8Scope* scope, const v8::Arguments& args) {
+    boost::shared_ptr<DBClientBase> getConnection(V8Scope* scope, const v8::Arguments& args) {
         verify(scope->MongoFT()->HasInstance(args.This()));
         verify(args.This()->InternalFieldCount() == 1);
         v8::Local<v8::External> c = v8::External::Cast(*(args.This()->GetInternalField(0)));
-        DBClientBase* conn = (DBClientBase*)(c->Value());
-        massert(16667, "Unable to get db client connection", conn);
-        return conn;
+        boost::shared_ptr<DBClientBase>* conn =
+            static_cast<boost::shared_ptr<DBClientBase>*>(c->Value());
+        massert(16667, "Unable to get db client connection", conn && conn->get());
+        return *conn;
     }
 
     /**
@@ -195,7 +196,7 @@ namespace mongo {
     v8::Handle<v8::Value> mongoFind(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 7, "find needs 7 args")
         argumentCheck(args[1]->IsObject(), "needs to be an object")
-        DBClientBase * conn = getConnection(scope, args);
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
         const string ns = toSTLString(args[0]);
         BSONObj fields;
         BSONObj q = scope->v8ToMongo(args[1]->ToObject());
@@ -204,7 +205,7 @@ namespace mongo {
         if (haveFields)
             fields = scope->v8ToMongo(args[2]->ToObject());
 
-        auto_ptr<mongo::DBClientCursor> cursor;
+        boost::shared_ptr<mongo::DBClientCursor> cursor;
         int nToReturn = args[3]->Int32Value();
         int nToSkip = args[4]->Int32Value();
         int batchSize = args[5]->Int32Value();
@@ -216,9 +217,11 @@ namespace mongo {
         }
 
         v8::Handle<v8::Function> cons = scope->InternalCursorFT()->GetFunction();
-        v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
+        v8::Handle<v8::Object> c = cons->NewInstance();
         c->SetInternalField(0, v8::External::New(cursor.get()));
-        scope->dbClientCursorTracker.track(c, cursor.release());
+        scope->dbConnectionAndCursor.track(
+            v8::Persistent<v8::Value>::New(c),
+            new V8Scope::DBConnectionAndCursor(conn, cursor));
         return c;
     }
 
@@ -227,19 +230,22 @@ namespace mongo {
         argumentCheck(scope->NumberLongFT()->HasInstance(args[1]), "2nd arg must be a NumberLong")
         argumentCheck(args[2]->IsUndefined() || args[2]->IsNumber(), "3rd arg must be a js Number")
 
-        DBClientBase* conn = getConnection(scope, args);
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
         const string ns = toSTLString(args[0]);
         long long cursorId = numberLongVal(scope, args[1]->ToObject());
 
-        auto_ptr<mongo::DBClientCursor> cursor(new DBClientCursor(conn, ns, cursorId, 0, 0));
+        boost::shared_ptr<mongo::DBClientCursor> cursor(
+            new DBClientCursor(conn.get(), ns, cursorId, 0, 0));
 
         if (!args[2]->IsUndefined())
             cursor->setBatchSize(args[2]->Int32Value());
 
         v8::Handle<v8::Function> cons = scope->InternalCursorFT()->GetFunction();
-        v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
+        v8::Handle<v8::Object> c = cons->NewInstance();
         c->SetInternalField(0, v8::External::New(cursor.get()));
-        scope->dbClientCursorTracker.track(c, cursor.release());
+        scope->dbConnectionAndCursor.track(
+            v8::Persistent<v8::Value>::New(c),
+            new V8Scope::DBConnectionAndCursor(conn, cursor));
         return c;
     }
 
@@ -253,7 +259,7 @@ namespace mongo {
             return v8AssertionException("js db in read only mode");
         }
 
-        DBClientBase * conn = getConnection(scope, args);
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
         const string ns = toSTLString(args[0]);
 
         v8::Handle<v8::Integer> flags = args[2]->ToInteger();
@@ -301,7 +307,7 @@ namespace mongo {
             return v8AssertionException("js db in read only mode");
         }
 
-        DBClientBase * conn = getConnection(scope, args);
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
         const string ns = toSTLString(args[0]);
 
         v8::Handle<v8::Object> in = args[1]->ToObject();
@@ -327,7 +333,7 @@ namespace mongo {
             return v8AssertionException("js db in read only mode");
         }
 
-        DBClientBase * conn = getConnection(scope, args);
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
         const string ns = toSTLString(args[0]);
 
         v8::Handle<v8::Object> q = args[1]->ToObject();
@@ -343,7 +349,7 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> mongoAuth(V8Scope* scope, const v8::Arguments& args) {
-        DBClientWithCommands* conn = getConnection(scope, args);
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
         if (NULL == conn)
             return v8AssertionException("no connection");
 
@@ -372,7 +378,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> mongoLogout(V8Scope* scope, const v8::Arguments& args) {
         argumentCheck(args.Length() == 1, "logout needs 1 arg")
-        DBClientBase* conn = getConnection(scope, args);
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
         const string db = toSTLString(args[0]);
         BSONObj ret;
         conn->logout(db, ret);
