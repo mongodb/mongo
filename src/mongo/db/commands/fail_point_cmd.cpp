@@ -81,7 +81,7 @@ namespace mongo {
             h << "modifies the settings of a fail point";
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                 BSONObj& cmdObj,
                 int,
                 string& errmsg,

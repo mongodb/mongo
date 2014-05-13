@@ -341,7 +341,7 @@ namespace mongo {
             return checkAuthorizedToGrantRoles(authzSession, args.roles);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -527,7 +527,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -651,7 +651,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -737,7 +737,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -819,7 +819,7 @@ namespace mongo {
             return checkAuthorizedToGrantRoles(authzSession, roles);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -917,7 +917,7 @@ namespace mongo {
             return checkAuthorizedToRevokeRoles(authzSession, roles);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1033,7 +1033,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1175,7 +1175,7 @@ namespace mongo {
             return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1321,7 +1321,7 @@ namespace mongo {
             return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1442,7 +1442,7 @@ namespace mongo {
             return checkAuthorizedToGrantPrivileges(authzSession, privileges);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1578,7 +1578,7 @@ namespace mongo {
             return checkAuthorizedToRevokePrivileges(authzSession, privileges);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1715,7 +1715,7 @@ namespace mongo {
             return checkAuthorizedToGrantRoles(authzSession, roles);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1834,7 +1834,7 @@ namespace mongo {
             return checkAuthorizedToRevokeRoles(authzSession, roles);
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -1953,7 +1953,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -2121,7 +2121,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -2276,7 +2276,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -2356,7 +2356,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -2400,7 +2400,8 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn,
+                 const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
@@ -2808,7 +2809,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,

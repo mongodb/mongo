@@ -49,7 +49,7 @@ namespace mongo {
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const;
         CmdShutdown() : Command("shutdown") {}
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,

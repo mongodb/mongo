@@ -323,7 +323,7 @@ namespace {
         /**
          * Entry point, parses command parameters and invokes runInternal.
          */
-        bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg,
+        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool fromRepl);
 
     };
@@ -756,7 +756,7 @@ namespace {
 
     static const char* USE_ANALYZE_STR = "use {analyze: 'diskStorage' | 'pagesInRAM'}";
 
-    bool StorageDetailsCmd::run(const string& dbname, BSONObj& cmdObj, int, string& errmsg,
+    bool StorageDetailsCmd::run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg,
                                 BSONObjBuilder& result, bool fromRepl) {
 
         // { analyze: subcommand }

@@ -71,16 +71,14 @@ namespace mutablebson {
                       normally do not want to log the command to the local oplog.
 
            return value is true if succeeded.  if false, set errmsg text.
-
-           Default impl forwards to private run(). It will go away soon.
         */
-        virtual bool newRun(TransactionExperiment* txn,
+        virtual bool run(TransactionExperiment* txn,
                          const string& db,
                          BSONObj& cmdObj,
                          int options,
                          string& errmsg,
                          BSONObjBuilder& result,
-                         bool fromRepl = false );
+                         bool fromRepl = false ) = 0;
 
         /**
          * This designation for the command is only used by the 'help' call and has nothing to do 
@@ -160,7 +158,6 @@ namespace mutablebson {
         virtual ~Command() {}
 
     protected:
-
         /**
          * Appends to "*out" the privileges required to run this command on database "dbname" with
          * the invocation described by "cmdObj".  New commands shouldn't implement this, they should
@@ -234,10 +231,6 @@ namespace mutablebson {
         static int testCommandsEnabled;
 
     private:
-        // This method is deprecated. It should only be used by commands that don't transactions
-        virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ) {
-            invariant(false);
-        }
 
         /**
          * Checks to see if the client is authorized to run the given command with the given

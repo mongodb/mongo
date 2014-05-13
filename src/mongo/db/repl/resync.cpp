@@ -57,7 +57,7 @@ namespace mongo {
         }
 
         CmdResync() : Command("resync") { }
-        virtual bool newRun(TransactionExperiment* txn,
+        virtual bool run(TransactionExperiment* txn,
                          const string& dbname,
                          BSONObj& cmdObj,
                          int,

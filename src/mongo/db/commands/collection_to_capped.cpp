@@ -142,7 +142,7 @@ namespace mongo {
                                              NamespaceString(dbname, collection)),
                                      targetActions));
         }
-        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string from = jsobj.getStringField( "cloneCollectionAsCapped" );
             string to = jsobj.getStringField( "toCollection" );
             double size = jsobj.getField( "size" ).number();
@@ -196,7 +196,7 @@ namespace mongo {
             return std::vector<BSONObj>();
         }
 
-        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             // calls renamecollection which does a global lock, so we must too:
             //
             Lock::GlobalWrite globalWriteLock;

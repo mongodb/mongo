@@ -70,7 +70,7 @@ namespace mongo {
             return b.obj();
         }
 
-        virtual bool newRun(TransactionExperiment* txn,  const string& dbname, BSONObj& cmdObj, int options,
+        virtual bool run(TransactionExperiment* txn,  const string& dbname, BSONObj& cmdObj, int options,
                           string& errmsg, BSONObjBuilder& result,
                           bool fromRepl = false ) {
 

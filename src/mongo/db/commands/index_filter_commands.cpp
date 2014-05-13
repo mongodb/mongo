@@ -120,7 +120,7 @@ namespace mongo {
         : Command(name),
           helpText(helpText) { }
 
-    bool IndexFilterCommand::run(const string& dbname, BSONObj& cmdObj, int options,
+    bool IndexFilterCommand::run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int options,
                            string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string ns = parseNs(dbname, cmdObj);
 

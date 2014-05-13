@@ -72,7 +72,7 @@ namespace mongo {
         virtual bool shouldAffectCommandCounter() const;
 
         // Write command entry point.
-        virtual bool newRun(
+        virtual bool run(
                  TransactionExperiment* txn,
                  const string& dbname,
                  BSONObj& cmdObj,

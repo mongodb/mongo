@@ -79,7 +79,7 @@ namespace mongo {
         }
 
         // Cluster plan cache command entry point.
-        bool run( const std::string& dbname,
+        bool run(TransactionExperiment* txn, const std::string& dbname,
                   BSONObj& cmdObj,
                   int options,
                   std::string& errmsg,
@@ -105,7 +105,7 @@ namespace mongo {
     // Cluster index filter command implementation(s) below
     //
 
-    bool ClusterIndexFilterCmd::run( const std::string& dbName,
+    bool ClusterIndexFilterCmd::run(TransactionExperiment* txn, const std::string& dbName,
                                BSONObj& cmdObj,
                                int options,
                                std::string& errMsg,

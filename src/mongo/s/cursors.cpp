@@ -442,7 +442,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        bool run(const string&, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string&, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             cursorCache.appendInfo( result );
             if ( jsobj["setTimeout"].isNumber() )
                 CursorCache::TIMEOUT = jsobj["setTimeout"].numberLong();

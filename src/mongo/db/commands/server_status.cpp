@@ -71,7 +71,7 @@ namespace mongo {
             actions.addAction(ActionType::serverStatus);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             
             _runCalled = true;
 

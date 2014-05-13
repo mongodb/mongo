@@ -51,7 +51,7 @@ namespace mongo {
         virtual void redactForLogging(mutablebson::Document* cmdObj);
 
         CmdAuthenticate() : Command("authenticate") {}
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,

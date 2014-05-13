@@ -58,7 +58,7 @@ namespace mongo {
          * implement plan cache command functionality.
          */
 
-        bool run(const std::string& dbname, BSONObj& cmdObj, int options,
+        bool run(TransactionExperiment* txn, const std::string& dbname, BSONObj& cmdObj, int options,
                  std::string& errmsg, BSONObjBuilder& result, bool fromRepl);
 
         virtual bool isWriteCommandForConfigServer() const;

@@ -558,7 +558,7 @@ namespace mongo {
             return Status::OK();
         }
         CmdClone() : Command("clone") { }
-        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )
                 return false;
@@ -629,7 +629,7 @@ namespace mongo {
                  "is placed at the same db.collection (namespace) as the source.\n"
                  ;
         }
-        virtual bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() ) {
                 errmsg = "missing 'from' parameter";
@@ -696,7 +696,7 @@ namespace mongo {
             help << "get a nonce for subsequent copy db request from secure server\n";
             help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
         }
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
                 /* copy from self */
@@ -780,7 +780,7 @@ namespace mongo {
             help << "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
                  << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
         }
-        virtual bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             bool fromSelf = fromhost.empty();
             if ( fromSelf ) {

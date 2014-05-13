@@ -322,7 +322,7 @@ namespace mongo {
             actions.addAction(ActionType::getShardMap);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(TransactionExperiment* txn, const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
             return staticShardInfo.getShardMap( result , errmsg );
         }
     } cmdGetShardMap;

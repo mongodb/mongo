@@ -91,7 +91,7 @@ namespace mongo {
             IndexBuilder::restoreIndexes( indexesInProg );
         }
 
-        virtual bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Lock::GlobalWrite globalWriteLock;
             bool ok = wrappedRun(txn, dbname, cmdObj, errmsg, result, fromRepl);
             if (ok && !fromRepl)

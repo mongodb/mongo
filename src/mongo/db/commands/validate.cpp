@@ -59,7 +59,7 @@ namespace mongo {
         }
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
 
-        bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
 
             NamespaceString ns_string(ns);

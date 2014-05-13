@@ -83,7 +83,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        virtual bool newRun(TransactionExperiment* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
             if( coll.empty() || db.empty() ) {
                 errmsg = "no collection name specified";

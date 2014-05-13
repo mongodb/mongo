@@ -71,7 +71,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             errmsg = "medianKey command no longer supported. Calling this indicates mismatch between mongo versions.";
             return false;
         }
@@ -97,7 +97,7 @@ namespace mongo {
             return parseNsFullyQualified(dbname, cmdObj);
         }
 
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             std::string ns = parseNs(dbname, jsobj);
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
@@ -236,7 +236,7 @@ namespace mongo {
         virtual std::string parseNs(const string& dbname, const BSONObj& cmdObj) const {
             return parseNsFullyQualified(dbname, cmdObj);
         }
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             //
             // 1.a We'll parse the parameters in two steps. First, make sure the we can use the split index to get
@@ -528,7 +528,7 @@ namespace mongo {
         virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
             return parseNsFullyQualified(dbname, cmdObj);
         }
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             //
             // 1. check whether parameters passed to splitChunk are sound

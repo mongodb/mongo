@@ -179,7 +179,7 @@ namespace mongo {
         // Output
         static BSONField<BSONObj> stoppedAtKeyField;
 
-        bool newRun( TransactionExperiment* txn,
+        bool run( TransactionExperiment* txn,
                   string const &db,
                   BSONObj &cmdObj,
                   int,

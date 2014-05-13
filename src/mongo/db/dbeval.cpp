@@ -139,7 +139,7 @@ namespace mongo {
             RoleGraph::generateUniversalPrivileges(out);
         }
         CmdEval() : Command("eval", false, "$eval") { }
-        bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj["nolock"].trueValue() ) {
                 return dbEval(dbname, cmdObj, result, errmsg);
             }

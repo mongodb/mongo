@@ -81,7 +81,7 @@ namespace mongo {
         }
 
         // Cluster write command entry point.
-        bool run( const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int options,
                   string& errmsg,
@@ -144,7 +144,7 @@ namespace mongo {
     // Cluster write command implementation(s) below
     //
 
-    bool ClusterWriteCmd::run( const string& dbName,
+    bool ClusterWriteCmd::run(TransactionExperiment* txn, const string& dbName,
                                BSONObj& cmdObj,
                                int options,
                                string& errMsg,

@@ -90,16 +90,6 @@ namespace mongo {
         return ResourcePattern::forExactNamespace(NamespaceString(ns));
     }
 
-    bool Command::newRun(TransactionExperiment* txn,
-                      const string& db,
-                      BSONObj& cmdObj,
-                      int options,
-                      string& errmsg,
-                      BSONObjBuilder& result,
-                      bool fromRepl) {
-        return run(db, cmdObj, options, errmsg, result, fromRepl);
-    }
-
     void Command::htmlHelp(stringstream& ss) const {
         string helpStr;
         {
@@ -346,7 +336,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(TransactionExperiment* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             shardConnectionPool.flush();
             pool.flush();
             return true;
@@ -369,7 +359,7 @@ namespace mongo {
             actions.addAction(ActionType::connPoolStats);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
+        virtual bool run(TransactionExperiment* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.appendInfo( result );
             result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
             result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );

@@ -159,7 +159,7 @@ namespace mongo {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        virtual bool run( const string& dbname, BSONObj& cmdObj, int options,
+        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int options,
                           string& errmsg, BSONObjBuilder& result,
                           bool fromRepl = false ) {
 

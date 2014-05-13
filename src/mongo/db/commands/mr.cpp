@@ -1208,7 +1208,7 @@ namespace mongo {
                 addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
             }
 
-            bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client& client = cc();
                 CurOp * op = client.curop();
@@ -1446,7 +1446,7 @@ namespace mongo {
                 actions.addAction(ActionType::internal);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 ShardedConnectionInfo::addHook();
                 // legacy name
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();

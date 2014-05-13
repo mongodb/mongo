@@ -101,7 +101,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "internal command facilitating running in certain cloud computing environments";
         }
-        bool run(const string& dbname, BSONObj& obj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& obj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             if( !obj.hasElement("servers") ) { 
                 vector<string> ips;
                 obj["servers"].Obj().Vals(ips);
@@ -133,7 +133,7 @@ namespace mongo {
             help << "{ buildinfo:1 }";
         }
 
-        bool run(const std::string& dbname,
+        bool run(TransactionExperiment* txn, const std::string& dbname,
                  BSONObj& jsobj,
                  int, // options
                  std::string& errmsg,
@@ -156,7 +156,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(const string& badns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(TransactionExperiment* txn, const string& badns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
             return true;
         }
@@ -171,7 +171,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( globalScriptEngine ) {
                 BSONObjBuilder bb( result.subobjStart( "js" ) );
                 result.append( "utf8" , globalScriptEngine->utf8Ok() );
@@ -206,7 +206,7 @@ namespace mongo {
             actions.addAction(ActionType::hostInfo);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             ProcessInfo p;
             BSONObjBuilder bSys, bOs;
 
@@ -243,7 +243,7 @@ namespace mongo {
             actions.addAction(ActionType::logRotate);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             bool didRotate = rotateLogs();
             if (didRotate)
                 logProcessDetailsForLogRotate();
@@ -262,7 +262,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
             for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
                 Command * c = i->second;
@@ -339,7 +339,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         CmdForceError() : Command("forceerror") {}
-        bool run(const string& dbnamne, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(TransactionExperiment* txn, const string& dbnamne, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             uassert( 10038 , "forced error", false);
             return true;
         }
@@ -353,7 +353,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             result << "options" << QueryOption_AllSupported;
             return true;
         }
@@ -377,7 +377,7 @@ namespace mongo {
             help << "{ getLog : '*' }  OR { getLog : 'global' }";
         }
 
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string p = cmdObj.firstElement().String();
             if ( p == "*" ) {
                 vector<string> names;
@@ -424,7 +424,7 @@ namespace mongo {
             actions.addAction(ActionType::getCmdLineOpts);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             result.append("argv", serverGlobalParams.argvArray);
             result.append("parsed", serverGlobalParams.parsedOpts);
             return true;

@@ -121,6 +121,7 @@ namespace {
 
     class CmdAuthSchemaUpgradeS : public CmdAuthSchemaUpgrade {
         virtual bool run(
+                TransactionExperiment* txn,
                 const string& dbname,
                 BSONObj& cmdObj,
                 int options,

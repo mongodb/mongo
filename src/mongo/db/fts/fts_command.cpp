@@ -57,7 +57,7 @@ namespace mongo {
         }
 
 
-        bool FTSCommand::run(const string& dbname,
+        bool FTSCommand::run(TransactionExperiment* txn, const string& dbname,
                              BSONObj& cmdObj,
                              int options,
                              string& errmsg,

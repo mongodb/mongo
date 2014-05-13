@@ -56,7 +56,7 @@ namespace mongo {
             }
             return Status::OK();
         }
-        virtual bool run(const string& dbname,
+        virtual bool run(TransactionExperiment* txn, const string& dbname,
                          BSONObj& cmdObj,
                          int,
                          string& errmsg,

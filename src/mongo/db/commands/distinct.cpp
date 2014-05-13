@@ -68,7 +68,7 @@ namespace mongo {
             help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
         }
 
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result,
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result,
                  bool fromRepl ) {
 
             Timer t;

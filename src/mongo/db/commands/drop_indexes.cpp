@@ -92,7 +92,7 @@ namespace mongo {
         }
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
-        bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
+        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
             Lock::DBWrite dbXLock(dbname);
             bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
             if (ok && !fromRepl)
@@ -212,7 +212,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        bool newRun(TransactionExperiment* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             static DBDirectClient db;
 
             BSONElement e = jsobj.firstElement();

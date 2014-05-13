@@ -109,7 +109,7 @@ namespace mongo {
         }
 
 
-        bool run( const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,

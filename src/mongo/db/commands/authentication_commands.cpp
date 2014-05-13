@@ -99,7 +99,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(TransactionExperiment* txn, const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             nonce64 n = getNextNonce();
             stringstream ss;
             ss << hex << n;
@@ -133,7 +133,7 @@ namespace mongo {
         }
     }
 
-    bool CmdAuthenticate::run(const string& dbname,
+    bool CmdAuthenticate::run(TransactionExperiment* txn, const string& dbname,
                               BSONObj& cmdObj,
                               int,
                               string& errmsg,
@@ -351,7 +351,7 @@ namespace mongo {
         void help(stringstream& h) const { h << "de-authenticate"; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
         CmdLogout() : Command("logout") {}
-        bool run(const string& dbname,
+        bool run(TransactionExperiment* txn, const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,

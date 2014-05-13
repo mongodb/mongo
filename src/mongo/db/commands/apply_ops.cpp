@@ -59,7 +59,7 @@ namespace mongo {
             // applyOps can do pretty much anything, so require all privileges.
             RoleGraph::generateUniversalPrivileges(out);
         }
-        virtual bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             if ( cmdObj.firstElement().type() != Array ) {
                 errmsg = "ops has to be an array";

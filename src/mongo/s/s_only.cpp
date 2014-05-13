@@ -131,7 +131,7 @@ namespace mongo {
         std::string errmsg;
         bool ok;
         try {
-            ok = c->newRun( txn, dbname , cmdObj, queryOptions, errmsg, result, false );
+            ok = c->run( txn, dbname , cmdObj, queryOptions, errmsg, result, false );
         }
         catch (DBException& e) {
             ok = false;

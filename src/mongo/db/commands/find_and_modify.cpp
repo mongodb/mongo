@@ -297,7 +297,7 @@ namespace mongo {
             return true;
         }
         
-        virtual bool newRun(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
+        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
             DBDirectClient db(txn);
 
             if (cmdObj["sort"].eoo()) {
