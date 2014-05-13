@@ -399,6 +399,8 @@ namespace mongo {
                 else if (str::equals("showDiskLoc", name)) {
                     // Won't throw.
                     if (e.trueValue()) {
+                        _showDiskLoc = true;
+
                         BSONObjBuilder projBob;
                         projBob.appendElements(_proj);
                         BSONObj metaDiskLoc = BSON("$diskLoc" <<
