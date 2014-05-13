@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
 #include <v8.h>
 #include <vector>
 
@@ -60,13 +61,16 @@ namespace mongo {
     class ObjTracker {
     public:
         /** Track an object to be freed when it is no longer referenced in JavaScript.
+         * Return handle to object instance shared pointer.
          * @param  instanceHandle  persistent handle to the weakly referenced object
          * @param  rawData         pointer to the object instance
          */
-        void track(v8::Persistent<v8::Value> instanceHandle, _ObjType* instance) {
+        v8::Local<v8::External> track(v8::Persistent<v8::Value> instanceHandle,
+                                      _ObjType* instance) {
             TrackedPtr* collectionHandle = new TrackedPtr(instance, this);
             _container.insert(collectionHandle);
             instanceHandle.MakeWeak(collectionHandle, deleteOnCollect);
+            return v8::External::New(&(collectionHandle->_objPtr));
         }
         /**
          * Free any remaining objects and their TrackedPtrs.  Invoked when the
@@ -94,7 +98,7 @@ namespace mongo {
             TrackedPtr(_ObjType* instance, ObjTracker<_ObjType>* tracker) :
                 _objPtr(instance),
                 _tracker(tracker) { }
-            scoped_ptr<_ObjType> _objPtr;
+            boost::shared_ptr<_ObjType> _objPtr;
             ObjTracker<_ObjType>* _tracker;
         };
 
@@ -294,9 +298,17 @@ namespace mongo {
         v8::Persistent<v8::Object> getGlobal() { return _global; }
 
         ObjTracker<BSONHolder> bsonHolderTracker;
-        ObjTracker<DBClientWithCommands> dbClientWithCommandsTracker;
         ObjTracker<DBClientBase> dbClientBaseTracker;
-        ObjTracker<DBClientCursor> dbClientCursorTracker;
+        // Track both cursor and connection.
+        // This ensures the connection outlives the cursor.
+        struct DBConnectionAndCursor {
+            boost::shared_ptr<DBClientBase> conn;
+            boost::shared_ptr<DBClientCursor> cursor;
+            DBConnectionAndCursor(boost::shared_ptr<DBClientBase> conn,
+                                  boost::shared_ptr<DBClientCursor> cursor)
+                : conn(conn), cursor(cursor) { }
+        };
+        ObjTracker<DBConnectionAndCursor> dbConnectionAndCursor;
 
         // These are all named after the JS constructor name + FT
         v8::Handle<v8::FunctionTemplate> ObjectIdFT()       const { return _ObjectIdFT; }
