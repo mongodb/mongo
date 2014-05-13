@@ -201,50 +201,6 @@ namespace {
         ASSERT_EQUALS( 300, rs.recordFor( result.getValue() )->lengthWithHeaders() );
     }
 
-    /**
-     * 'cook' the deletedList by shrinking the smallest deleted record to size
-     * 'newDeletedRecordSize'.
-     */
-    void cookDeletedList(OperationContext* txn,
-                         RecordStoreV1Base* rs,
-                         RecordStoreV1MetaData* md,
-                         int newDeletedRecordSize) {
-
-        if (md->firstExtent().isNull())
-            rs->increaseStorageSize(txn, newDeletedRecordSize * 2, 0);
-
-        // Extract the first DeletedRecord from the deletedList.
-        DiskLoc deleted;
-        for( int i = 0; i < RecordStoreV1Base::Buckets; ++i ) {
-            if ( !md->deletedListEntry( i ).isNull() ) {
-                deleted = md->deletedListEntry( i );
-                md->setDeletedListEntry(txn, i, DiskLoc());
-                break;
-            }
-        }
-        ASSERT( !deleted.isNull() );
-
-        // Shrink the DeletedRecord's size to newDeletedRecordSize.
-        ASSERT_GREATER_THAN_OR_EQUALS( rs->deletedRecordFor( deleted )->lengthWithHeaders(),
-                                       newDeletedRecordSize );
-        DeletedRecord* dr = const_cast<DeletedRecord*>( rs->deletedRecordFor( deleted ) );
-        txn->recoveryUnit()->writingInt( dr->lengthWithHeaders() ) = newDeletedRecordSize;
-
-        // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
-        // new size.
-        md->setDeletedListEntry(txn, RecordStoreV1Base::bucket(newDeletedRecordSize), deleted);
-    }
-
-    /** Return the smallest DeletedRecord in deletedList, or DiskLoc() if none. */
-    DiskLoc smallestDeletedRecord(const RecordStoreV1MetaData* md) {
-        for( int i = 0; i < RecordStoreV1Base::Buckets; ++i ) {
-            if ( !md->deletedListEntry( i ).isNull() ) {
-                return md->deletedListEntry( i );
-            }
-        }
-        return DiskLoc();
-    }
-
     /** alloc() returns a non quantized record larger than the requested size. */
     TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecord) {
         DummyOperationContext txn;
@@ -252,16 +208,28 @@ namespace {
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
 
-        cookDeletedList( &txn, &rs, md, 310 );
+        {
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 310},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, &em, md);
+        }
+
         BSONObj obj = docForRecordSize( 300 );
         StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        ASSERT_OK( actualLocation.getStatus() );
 
-        ASSERT( actualLocation.isOK() );
-        Record* rec = rs.recordFor( actualLocation.getValue() );
-        ASSERT_EQUALS( 310, rec->lengthWithHeaders() );
-
-        // No deleted records remain after alloc returns the non quantized record.
-        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 310},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
     }
 
     /** alloc() returns a non quantized record equal to the requested size. */
@@ -271,16 +239,28 @@ namespace {
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
 
-        cookDeletedList( &txn, &rs, md, 300 );
+        {
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 300},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, &em, md);
+        }
+
         BSONObj obj = docForRecordSize( 300 );
         StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        ASSERT_OK( actualLocation.getStatus() );
 
-        ASSERT( actualLocation.isOK() );
-        Record* rec = rs.recordFor( actualLocation.getValue() );
-        ASSERT_EQUALS( 300, rec->lengthWithHeaders() );
-
-        // No deleted records remain after alloc returns the non quantized record.
-        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 300},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
     }
 
     /**
@@ -293,16 +273,28 @@ namespace {
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
 
-        cookDeletedList( &txn, &rs, md, 343 );
+        {
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 343},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, &em, md);
+        }
+
         BSONObj obj = docForRecordSize( 300 );
         StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        ASSERT_OK( actualLocation.getStatus() );
 
-        ASSERT( actualLocation.isOK() );
-        Record* rec = rs.recordFor( actualLocation.getValue() );
-        ASSERT_EQUALS( 343, rec->lengthWithHeaders() );
-
-        // No deleted records remain after alloc returns the non quantized record.
-        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 343},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
     }
 
     /**
@@ -315,19 +307,32 @@ namespace {
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
 
-        cookDeletedList( &txn, &rs, md, 344 );
+        {
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 344},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, &em, md);
+        }
+
+
         BSONObj obj = docForRecordSize( 300 );
-
-        // The returned record is quantized from 300 to 320.
         StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
+        ASSERT_OK( actualLocation.getStatus() );
 
-        ASSERT( actualLocation.isOK() );
-        Record* rec = rs.recordFor( actualLocation.getValue() );
-        ASSERT_EQUALS( 320, rec->lengthWithHeaders() );
-
-        // A new 24 byte deleted record is split off.
-        ASSERT_EQUALS( 24,
-                       rs.deletedRecordFor(smallestDeletedRecord(md))->lengthWithHeaders() );
+        {
+            LocAndSize recs[] = {
+                // The returned record is quantized from 300 to 320.
+                {DiskLoc(0, 1000), 320},
+                {}
+            };
+            LocAndSize drecs[] = {
+                // A new 24 byte deleted record is split off.
+                {DiskLoc(0, 1320), 24},
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
     }
 
     /**
@@ -340,18 +345,32 @@ namespace {
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
 
-        cookDeletedList( &txn, &rs, md, 344 );
+        {
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 344},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, &em, md);
+        }
+
         BSONObj obj = docForRecordSize( 319 );
         StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, obj.objdata(), obj.objsize(), 0);
-
-        ASSERT( actualLocation.isOK() );
-        Record* rec = rs.recordFor( actualLocation.getValue() );
+        ASSERT_OK( actualLocation.getStatus() );
 
         // Even though 319 would be quantized to 320 and 344 - 320 == 24 could become a new
         // deleted record, the entire deleted record is returned because
-        // ( 344 - 320 ) < ( 320 >> 3 ).
-        ASSERT_EQUALS( 344, rec->lengthWithHeaders() );
-        ASSERT_EQUALS( DiskLoc(), smallestDeletedRecord(md) );
+        // ( 344 - 320 ) < ( 320 / 8 ).
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 344},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
     }
 
     /** getRecordAllocationSize() returns its argument when the padding factor is 1.0. */
