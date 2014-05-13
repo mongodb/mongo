@@ -34,7 +34,7 @@
 namespace mongo {
 
     // default value of 1 so that during startup initialization if referenced no division by zero
-    unsigned long long Timer::_countsPerSecond = 1;
+    long long Timer::_countsPerSecond = 1;
 
     namespace {
 
@@ -59,11 +59,11 @@ namespace mongo {
 
             // Make sure that the current time relative to the (unspecified) epoch isn't already too
             // big to represent as a 64-bit count of nanoseconds.
-            unsigned long long maxSecs = std::numeric_limits<unsigned long long>::max() /
+            long long maxSecs = std::numeric_limits<long long>::max() /
                 Timer::nanosPerSecond;
             timespec the_time;
             fassert(16162, !clock_gettime(CLOCK_MONOTONIC, &the_time));
-            fassert(16163, static_cast<unsigned long long>(the_time.tv_sec) < maxSecs);
+            fassert(16163, static_cast<long long>(the_time.tv_sec) < maxSecs);
         }
 
 #elif defined(MONGO_TIMER_IMPL_GENERIC)

@@ -44,6 +44,6 @@
 
 namespace mongo {
 
-    unsigned long long Timer::now() const { return curTimeMicros64(); }
+    long long Timer::now() const { return curTimeMicros64(); }
 
 }  // namespace mongo

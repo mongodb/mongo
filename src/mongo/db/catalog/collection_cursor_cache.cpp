@@ -102,7 +102,7 @@ namespace mongo {
 
         void appendStats( BSONObjBuilder& builder );
 
-        std::size_t timeoutCursors( unsigned millisSinceLastCall );
+        std::size_t timeoutCursors( int millisSinceLastCall );
 
         int64_t nextSeed();
 
@@ -204,7 +204,7 @@ namespace mongo {
         return collection->cursorCache()->eraseCursor( id, checkAuth );
     }
 
-    std::size_t GlobalCursorIdCache::timeoutCursors( unsigned millisSinceLastCall ) {
+    std::size_t GlobalCursorIdCache::timeoutCursors( int millisSinceLastCall ) {
         vector<string> todo;
         {
             SimpleMutex::scoped_lock lk( _mutex );
@@ -235,7 +235,7 @@ namespace mongo {
 
     // ---
 
-    std::size_t CollectionCursorCache::timeoutCursorsGlobal( unsigned millisSinceLastCall ) {
+    std::size_t CollectionCursorCache::timeoutCursorsGlobal( int millisSinceLastCall ) {
         return _globalCursorIdCache.timeoutCursors( millisSinceLastCall );
     }
 
@@ -365,7 +365,7 @@ namespace mongo {
         }
     }
 
-    std::size_t CollectionCursorCache::timeoutCursors( unsigned millisSinceLastCall ) {
+    std::size_t CollectionCursorCache::timeoutCursors( int millisSinceLastCall ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         vector<ClientCursor*> toDelete;

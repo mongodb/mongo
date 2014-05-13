@@ -255,7 +255,7 @@ namespace mongo {
 
         void ensureStarted();
         bool isStarted() const { return _start > 0; }
-        unsigned long long startTime() { // micros
+        long long startTime() { // micros
             ensureStarted();
             return _start;
         }
@@ -264,12 +264,12 @@ namespace mongo {
             _end = curTimeMicros64();
         }
 
-        unsigned long long totalTimeMicros() {
+        long long totalTimeMicros() {
             massert( 12601 , "CurOp not marked done yet" , ! _active );
             return _end - startTime();
         }
         int totalTimeMillis() { return (int) (totalTimeMicros() / 1000); }
-        unsigned long long elapsedMicros() {
+        long long elapsedMicros() {
             return curTimeMicros64() - startTime();
         }
         int elapsedMillis() {
@@ -326,8 +326,8 @@ namespace mongo {
         Client * _client;
         CurOp * _wrapped;
         Command * _command;
-        unsigned long long _start;
-        unsigned long long _end;
+        long long _start;
+        long long _end;
         bool _active;
         bool _suppressFromCurop; // unless $all is set
         int _op;

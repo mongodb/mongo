@@ -151,7 +151,7 @@ namespace mongo {
         /**
          * Count one instance of the event, which took "timeMicros" microseconds.
          */
-        void countOne(unsigned long long timeMicros) {
+        void countOne(long long timeMicros) {
             ++_numEvents;
             _totalTimeMicros += timeMicros;
         }
@@ -168,7 +168,7 @@ namespace mongo {
 
     private:
         unsigned long long _numEvents;
-        unsigned long long _totalTimeMicros;
+        long long _totalTimeMicros;
     };
 
     /**

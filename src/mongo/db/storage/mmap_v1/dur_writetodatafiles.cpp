@@ -104,7 +104,7 @@ namespace mongo {
 #endif
             Timer t;
             WRITETODATAFILES_Impl1(h, uncompressed);
-            unsigned long long m = t.micros();
+            long long m = t.micros();
             stats.curr->_writeToDataFilesMicros += m;
             LOG(2) << "journal WRITETODATAFILES " << m / 1000.0 << "ms" << endl;
         }

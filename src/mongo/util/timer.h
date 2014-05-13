@@ -46,9 +46,9 @@ namespace mongo {
      */
     class MONGO_CLIENT_API Timer /*copyable*/ {
     public:
-        static const unsigned long long millisPerSecond = 1000;
-        static const unsigned long long microsPerSecond = 1000 * millisPerSecond;
-        static const unsigned long long nanosPerSecond = 1000 * microsPerSecond;
+        static const long long millisPerSecond = 1000;
+        static const long long microsPerSecond = 1000 * millisPerSecond;
+        static const long long nanosPerSecond = 1000 * microsPerSecond;
 
         Timer() { reset(); }
         int seconds() const { return (int)(micros() / 1000000); }
@@ -60,15 +60,15 @@ namespace mongo {
          *  @return time in milliseconds.
          */
         inline int millisReset() {
-            unsigned long long nextNow = now();
-            unsigned long long deltaMicros =
+            const long long nextNow = now();
+            const long long deltaMicros =
                 ((nextNow - _old) * microsPerSecond) / _countsPerSecond;
 
             _old = nextNow;
             return static_cast<int>(deltaMicros / 1000);
         }
 
-        inline unsigned long long micros() const {
+        inline long long micros() const {
             return ((now() - _old) * microsPerSecond) / _countsPerSecond;
         }
 
@@ -82,12 +82,12 @@ namespace mongo {
          * This value is initialized at program startup, and never changed after.
          * It should be treated as private.
          */
-        static unsigned long long _countsPerSecond;
+        static long long _countsPerSecond;
 
     private:
-        inline unsigned long long now() const;
+        inline long long now() const;
 
-        unsigned long long _old;
+        long long _old;
     };
 }  // namespace mongo
 

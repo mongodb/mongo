@@ -1242,7 +1242,8 @@ namespace QueryTests {
 
             ASSERT( ! Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 200 ) , res ) );
 
-            unsigned long long slow , fast;
+            long long slow;
+            long long fast;
 
             int n = 10000;
             DEV n = 1000;

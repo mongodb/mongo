@@ -89,9 +89,9 @@ namespace mongo {
          * @param millis amount of idle passed time since last call
          * note called outside of locks (other than ccmutex) so care must be exercised
          */
-        bool shouldTimeout( unsigned millis );
-        void setIdleTime( unsigned millis );
-        unsigned idleTime() const { return _idleAgeMillis; }
+        bool shouldTimeout( int millis );
+        void setIdleTime( int millis );
+        int idleTime() const { return _idleAgeMillis; }
 
         uint64_t getLeftoverMaxTimeMicros() const { return _leftoverMaxTimeMicros; }
         void setLeftoverMaxTimeMicros( uint64_t leftoverMaxTimeMicros ) {
@@ -184,7 +184,7 @@ namespace mongo {
         OpTime _slaveReadTill;
 
         // How long has the cursor been idle?
-        unsigned _idleAgeMillis;
+        int _idleAgeMillis;
 
         // TODO: Document.
         uint64_t _leftoverMaxTimeMicros;

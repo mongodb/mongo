@@ -152,12 +152,12 @@ namespace mongo {
     // Timing and timeouts
     //
 
-    bool ClientCursor::shouldTimeout(unsigned millis) {
+    bool ClientCursor::shouldTimeout(int millis) {
         _idleAgeMillis += millis;
         return _idleAgeMillis > 600000 && _pinValue == 0;
     }
 
-    void ClientCursor::setIdleTime( unsigned millis ) {
+    void ClientCursor::setIdleTime( int millis ) {
         _idleAgeMillis = millis;
     }
 

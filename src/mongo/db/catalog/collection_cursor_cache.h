@@ -72,7 +72,7 @@ namespace mongo {
          * note: must have a readlock on the collection
          * @return number timed out
          */
-        std::size_t timeoutCursors( unsigned millisSinceLastCall );
+        std::size_t timeoutCursors( int millisSinceLastCall );
 
         // -----------------
 
@@ -117,7 +117,7 @@ namespace mongo {
         /**
          * @return number timed out
          */
-        static std::size_t timeoutCursorsGlobal( unsigned millisSinceLastCall );
+        static std::size_t timeoutCursorsGlobal( int millisSinceLastCall );
 
     private:
         CursorId _allocateCursorId_inlock();

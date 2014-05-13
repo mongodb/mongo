@@ -196,7 +196,7 @@ namespace PerfTests {
     public:
         virtual unsigned batchSize() { return 50; }
 
-        void say(unsigned long long n, int us, string s) {
+        void say(unsigned long long n, long long us, string s) {
             unsigned long long rps = (n*1000*1000)/(us > 0 ? us : 1);
             cout << "stats " << setw(42) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << us/1000 << "ms ";
             if( showDurStats() )
@@ -316,7 +316,7 @@ namespace PerfTests {
                     for( i = 0; i < Batch; i++ )
                         timed();
                     n += i;
-                } while( t.micros() < (unsigned) hlm * 1000 );
+                } while( t.micros() < (hlm * 1000) );
             }
 
             client().getLastError(); // block until all ops are finished
