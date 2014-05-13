@@ -211,7 +211,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * up a buffer.  If this isn't sufficient, we don't fail but we will be
 	 * inefficient.
 	 */
-#define	WT_ZLIB_RESERVED	12
+#define	WT_ZLIB_RESERVED	24
 	zs.avail_out = (uint32_t)(page_max - extra - WT_ZLIB_RESERVED);
 	last_zs = zs;
 
