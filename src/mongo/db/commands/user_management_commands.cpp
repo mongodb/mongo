@@ -2333,6 +2333,10 @@ namespace mongo {
             return true;
         }
 
+        virtual bool adminOnly() const {
+            return true;
+        }
+
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
         CmdInvalidateUserCache() : Command("invalidateUserCache") {}
@@ -2365,6 +2369,50 @@ namespace mongo {
         }
 
     } cmdInvalidateUserCache;
+
+    class CmdGetCacheGeneration: public Command {
+    public:
+
+        virtual bool slaveOk() const {
+            return true;
+        }
+
+        virtual bool adminOnly() const {
+            return true;
+        }
+
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+
+        CmdGetCacheGeneration() : Command("_getUserCacheGeneration") {}
+
+        virtual void help(stringstream& ss) const {
+            ss << "internal" << endl;
+        }
+
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::internal)) {
+                return Status(ErrorCodes::Unauthorized, "Not authorized to get cache generation");
+            }
+            return Status::OK();
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            result.append("cacheGeneration", authzManager->getCacheGeneration());
+            return true;
+        }
+
+    } CmdGetCacheGeneration;
 
     /**
      * This command is used only by mongorestore to handle restoring users/roles.  We do this so

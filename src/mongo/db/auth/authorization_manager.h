@@ -38,6 +38,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_graph.h"
@@ -164,6 +165,11 @@ namespace mongo {
          * schemaVersionInvalid (0).
          */
         Status getAuthorizationVersion(int* version);
+
+        /**
+         * Returns the user cache generation identifier.
+         */
+        OID getCacheGeneration();
 
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
@@ -444,6 +450,11 @@ namespace mongo {
                                           const BSONObj* o2);
 
         /**
+         * Updates _cacheGeneration to a new OID
+         */
+        void _updateCacheGeneration_inlock();
+
+        /**
          * Fetches user information from a v2-schema user document for the named user,
          * and stores a pointer to a new user object into *acquiredUser on success.
          */
@@ -485,10 +496,10 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
-         * Current generation of cached data.  Bumped every time part of the cache gets
-         * invalidated.
+         * Current generation of cached data.  Updated every time part of the cache gets
+         * invalidated.  Protected by CacheGuard.
          */
-        uint64_t _cacheGeneration;
+        OID _cacheGeneration;
 
         /**
          * True if there is an update to the _userCache in progress, and that update is currently in

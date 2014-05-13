@@ -13,6 +13,7 @@
  *    limitations under the License.
  */
 
+#include "mongo/bson/oid.h"
 #include "mongo/util/background.h"
 
 #include <string>
@@ -21,11 +22,15 @@ namespace mongo {
 
     class AuthorizationManager;
 
-    // Background job that periodically causes the AuthorizationManager to throw out its in-memory
-    // cache of User objects (which contains the users' credentials, roles, privileges, etc).
+    /**
+     * Background job that runs only in mongos and periodically checks in with the config servers
+     * to determine whether any authorization information has changed, and if so causes the
+     * AuthorizationManager to throw out its in-memory cache of User objects (which contains the
+     * users' credentials, roles, privileges, etc).
+     */
     class UserCacheInvalidator : public BackgroundJob {
     public:
-        UserCacheInvalidator(AuthorizationManager* authzManager) : _authzManager(authzManager) {}
+        explicit UserCacheInvalidator(AuthorizationManager* authzManager);
 
     protected:
         virtual std::string name() const;
@@ -33,6 +38,7 @@ namespace mongo {
 
     private:
         AuthorizationManager* _authzManager;
+        OID _previousCacheGeneration;
     };
 
 } // namespace mongo
