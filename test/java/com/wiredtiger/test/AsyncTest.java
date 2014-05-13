@@ -287,14 +287,14 @@ public class AsyncTest {
         Session s = sessionSetup(name, keyFormat, valueFormat,
                                  opsMax, asyncThreads);
 
-        for (int i=0; i<entries; i++) {
+        for (int i = 0; i < entries; i++) {
             // adapter call does equivalent of:
             //   current.put(genkey(s, i), genvalue(s, i));
             adapter.putref(s, current, i);
         }
 
-        for (int i=0; i<entries; i++) {
-            AsyncOp op = conn.asyncNewOp("table:" + name, null, callback);
+        for (int i = 0; i < entries; i++) {
+            AsyncOp op = conn.async_new_op("table:" + name, null, callback);
 
             // adapter call does equivalent of:
             //   op.putKeyString(genkey(s, i));
@@ -308,17 +308,17 @@ public class AsyncTest {
             // to run before we fill them up.
             // In a real application, we might catch
             // 'Cannot allocate memory' exceptions from
-            // the asyncNewOp call, and use that as
+            // the async_new_op call, and use that as
             // an indicator to throttle back.
-            if ((i+1) % opsBatch == 0)
+            if ((i + 1) % opsBatch == 0)
                 sleepMillis(milliSleep);
         }
 
         // Wait for all outstanding async ops to finish.
-        conn.asyncFlush();
+        conn.async_flush();
 
-        for (int i=0; i<entries; i++) {
-            AsyncOp op = conn.asyncNewOp("table:" + name, null, callback);
+        for (int i = 0; i < entries; i++) {
+            AsyncOp op = conn.async_new_op("table:" + name, null, callback);
 
             // adapter call does equivalent of:
             //   op.putKeyString(genkey(s, i));
@@ -326,12 +326,12 @@ public class AsyncTest {
             adapter.putkv(s, op, i);
 
             op.search();
-            if ((i+1) % opsBatch == 0)
+            if ((i + 1) % opsBatch == 0)
                 sleepMillis(milliSleep);
         }
 
         // Wait for all outstanding async ops to finish.
-        conn.asyncFlush();
+        conn.async_flush();
 
         s.close("");
 

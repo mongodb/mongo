@@ -262,7 +262,6 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op, )
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %rename (compare_wrap) __wt_cursor::compare;
 %rename (AsyncOpType) WT_ASYNC_OPTYPE;
-%rename (asyncFlush) __wt_connection::async_flush;
 %rename (getKeyFormat) __wt_async_op::getKey_format;
 %rename (getValueFormat) __wt_async_op::getValue_format;
 %rename (getType) __wt_async_op::get_type;
@@ -396,7 +395,7 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	/*
 	 * We rely on the fact that the async machinery uses a pool of
 	 * threads.  Here we attach the current native (POSIX)
-	 * thread.to a Java thread and never detach it.  If the native
+	 * thread to a Java thread and never detach it.  If the native
 	 * thread was previously seen by this callback, it will be
 	 * attached to the same Java thread as before without
 	 * incurring the cost of the thread initialization.
@@ -1618,6 +1617,13 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 
 %rename(open) wiredtiger_open_wrap;
 %ignore __wt_connection::async_new_op;
+%javamethodmodifiers __wt_connection::async_new_op_wrap "
+  /**
+   * @copydoc WT_CONNECTION::async_new_op
+   */
+  public ";
+%rename(async_new_op) __wt_connection::async_new_op_wrap;
+
 %ignore __wt_connection::open_session;
 %rename(open_session) __wt_connection::open_session_wrap;
 %ignore __wt_session::open_cursor;
@@ -1696,7 +1702,7 @@ err:	if (ret != 0)
 }
 
 %extend __wt_connection {
-	WT_ASYNC_OP *asyncNewOp(JNIEnv *jenv, const char *uri,
+	WT_ASYNC_OP *async_new_op_wrap(JNIEnv *jenv, const char *uri,
 	    const char *config, jobject callbackObject) {
 		extern WT_ASYNC_CALLBACK javaApiAsyncHandler;
 		WT_ASYNC_OP *asyncop = NULL;
