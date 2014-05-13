@@ -604,6 +604,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
 
+	WT_ERR(__wt_async_reconfig(conn, raw_cfg));
 	WT_ERR(__conn_statistics_config(session, raw_cfg));
 	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
 	WT_ERR(__wt_checkpoint_server_create(conn, cfg));

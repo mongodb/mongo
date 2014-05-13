@@ -175,30 +175,33 @@ err:
  *	Parse and setup the async API options.
  */
 static int
-__async_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
+__async_config(WT_SESSION_IMPL *session,
+    WT_CONNECTION_IMPL *conn, const char **cfg, int *runp)
 {
 	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-
-	conn = S2C(session);
 
 	/*
 	 * The async configuration is off by default.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "async.enabled", &cval));
-	*runp = cval.val != 0;
-	if (*runp == 0)
-		return (0);
+	if ((ret = __wt_config_gets(
+	    session, cfg, "async.enabled", &cval)) == 0) {
+		*runp = cval.val != 0;
+		if (*runp == 0)
+			return (0);
+	}
 
-	WT_RET(__wt_config_gets(session, cfg, "async.ops_max", &cval));
-	conn->async_size = (uint32_t)cval.val;
+	if ((ret = __wt_config_gets(
+	    session, cfg, "async.ops_max", &cval)) == 0)
+		conn->async_size = (uint32_t)cval.val;
 
-	WT_RET(__wt_config_gets(session, cfg, "async.threads", &cval));
-	conn->async_workers = (uint32_t)cval.val;
-
-	/* Sanity check that api_data.py is in sync with async.h */
-	WT_ASSERT(session, conn->async_workers <= WT_ASYNC_MAX_WORKERS);
+	if ((ret = __wt_config_gets(
+	    session, cfg, "async.threads", &cval)) == 0) {
+		conn->async_workers = (uint32_t)cval.val;
+		/* Sanity check that api_data.py is in sync with async.h */
+		WT_ASSERT(session, conn->async_workers <= WT_ASYNC_MAX_WORKERS);
+	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	ret = 0;
 	return (ret);
@@ -222,6 +225,7 @@ __wt_async_stats_update(WT_SESSION_IMPL *session)
 	stats = &conn->stats;
 	WT_STAT_SET(stats, async_cur_queue, async->cur_queue);
 	WT_STAT_SET(stats, async_max_queue, async->max_queue);
+	F_SET(conn, WT_CONN_SERVER_ASYNC);
 }
 
 /*
@@ -239,7 +243,7 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 
 	/* Handle configuration. */
-	WT_RET(__async_config(session, cfg, &run));
+	WT_RET(__async_config(session, conn, cfg, &run));
 
 	/* If async is not configured, we're done. */
 	if (!run)
@@ -259,13 +263,19 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	/*
 	 * Start up the worker threads.
 	 */
+	F_SET(conn, WT_CONN_SERVER_ASYNC);
 	for (i = 0; i < conn->async_workers; i++) {
 		/*
-		 * Each worker has its own session.
+		 * Each worker has its own session.  We set both a general
+		 * server flag in the connection and an individual flag
+		 * in the session.  The user may reconfigure the number of
+		 * workers and we may want to selectively stop some workers
+		 * while leaving the rest running.
 		 */
 		WT_RET(__wt_open_session(
 		    conn, 1, NULL, NULL, &async->worker_sessions[i]));
 		async->worker_sessions[i]->name = "async-worker";
+		F_SET(async->worker_sessions[i], WT_SESSION_SERVER_ASYNC);
 	}
 	for (i = 0; i < conn->async_workers; i++) {
 		/*
@@ -275,6 +285,126 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		    __wt_async_worker, async->worker_sessions[i]));
 	}
 	__wt_async_stats_update(session);
+	return (0);
+}
+
+/*
+ * __wt_async_reconfig --
+ *	Start the async subsystem and worker threads.
+ */
+int
+__wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[])
+{
+	WT_ASYNC *async;
+	WT_CONNECTION_IMPL tmp_conn;
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *session;
+	int run;
+	uint32_t i;
+
+	session = conn->default_session;
+	async = conn->async;
+
+	/* Handle configuration. */
+	WT_RET(__async_config(session, &tmp_conn, cfg, &run));
+
+	/*
+	 * There are some restrictions on the live reconfiguration of async.
+	 * Unlike other subsystems where we simply destroy anything existing
+	 * and restart with the new configuration, async is not so easy.
+	 * If the user is just changing the number of workers, we want to
+	 * allow the existing op handles and other information to remain in
+	 * existence.  So we must handle various combinations of changes
+	 * individually.
+	 *
+	 * One restriction is that if async is currently on, the user cannot
+	 * change the number of async op handles available.  The user can try
+	 * but we do nothing with it.  However we must allow the ops_max config
+	 * string so that a user can completely start async via reconfigure.
+	 */
+
+	/*
+	 * Easy cases:
+	 * 1. If async is on and the user wants it off, shut it down.
+	 * 2. If async is off, and the user wants it on, start it.
+	 * 3. If not a toggle and async is off, we're done.
+	 */
+	if (conn->async_cfg > 0 && !run) {
+		/* Case 1 */
+		WT_TRET(__wt_async_flush(conn));
+		ret = __wt_async_destroy(conn);
+		conn->async_cfg = 0;
+		return (ret);
+	} else if (conn->async_cfg == 0 && run)
+		/* Case 2 */
+		return (__wt_async_create(conn, cfg));
+	else if (conn->async_cfg == 0)
+		/* Case 3 */
+		return (0);
+
+	/*
+	 * Running async worker modification cases:
+	 * 4. If number of workers didn't change, we're done.
+	 * 5. If more workers, start new ones.
+	 * 6. If fewer workers, kill some.
+	 */
+	if (conn->async_workers == tmp_conn.async_workers)
+		/* No change in the number of workers. */
+		return (0);
+	if (conn->async_workers < tmp_conn.async_workers) {
+		/* Case 5 */
+		/*
+		 * The worker_sessions array is allocated for the maximum
+		 * allowed number of workers, so starting more is easy.
+		 */
+		for (i = conn->async_workers; i < tmp_conn.async_workers; i++) {
+			/*
+			 * Each worker has its own session.
+			 */
+			WT_RET(__wt_open_session(
+			    conn, 1, NULL, NULL, &async->worker_sessions[i]));
+			async->worker_sessions[i]->name = "async-worker";
+			F_SET(async->worker_sessions[i],
+			    WT_SESSION_SERVER_ASYNC);
+		}
+		for (i = conn->async_workers; i < tmp_conn.async_workers; i++) {
+			/*
+			 * Start the threads.
+			 */
+			WT_RET(__wt_thread_create(session,
+			    &async->worker_tids[i], __wt_async_worker,
+			    async->worker_sessions[i]));
+		}
+		conn->async_workers = tmp_conn.async_workers;
+	}
+	if (conn->async_workers > tmp_conn.async_workers) {
+		/* Case 6 */
+		/*
+		 * Stopping an individual async worker is the most complex case.
+		 * We clear the session async flag on the targeted worker thread
+		 * so that only that thread stops, and the others keep running.
+		 */
+		for (i = conn->async_workers - 1;
+		    i >= tmp_conn.async_workers; i--) {
+			/*
+			 * Join any worker we're stopping.
+			 * After the thread is stopped, close its session.
+			 */
+			WT_ASSERT(session, async->worker_tids[i] != 0);
+			WT_ASSERT(session, async->worker_sessions[i] != NULL);
+			F_CLR(async->worker_sessions[i],
+			    WT_SESSION_SERVER_ASYNC);
+			WT_TRET(__wt_thread_join(
+			    session, async->worker_tids[i]));
+			async->worker_tids[i] = 0;
+			wt_session = &async->worker_sessions[i]->iface;
+			WT_TRET(wt_session->close(wt_session, NULL));
+			async->worker_sessions[i] = NULL;
+		}
+		conn->async_workers = tmp_conn.async_workers;
+	}
+
 	return (0);
 }
 
@@ -298,6 +428,8 @@ __wt_async_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (!conn->async_cfg)
 		return (0);
+
+	F_CLR(conn, WT_CONN_SERVER_ASYNC);
 	for (i = 0; i < conn->async_workers; i++)
 		if (async->worker_tids[i] != 0) {
 			WT_TRET(__wt_thread_join(
@@ -447,10 +579,10 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 	WT_ASYNC_OP_IMPL *op;
 	WT_DECL_RET;
 
+	*opp = NULL;
 	if (!conn->async_cfg)
 		return (0);
 
-	*opp = NULL;
 	op = NULL;
 	WT_ERR(__async_new_op_alloc(conn, uri, config, &op));
 	WT_ERR(__async_runtime_config(op, cfg));

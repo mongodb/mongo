@@ -1323,6 +1323,19 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 		lprintf(cfg, ret, 0, "Re-opening the connection failed");
 		return (ret);
 	}
+	/*
+	 * If we started async threads only for the purposes of compact,
+	 * then turn it off before starting the workload so that those extra
+	 * threads looking for work that will never arrive don't affect
+	 * performance.
+	 */
+	if (cfg->compact && cfg->use_asyncops == 0) {
+		if ((ret = cfg->conn->reconfigure(
+		    cfg->conn, "async=(enabled=false)")) != 0) {
+			lprintf(cfg, ret, 0, "Reconfigure async off failed");
+			return (ret);
+		}
+	}
 
 	return (0);
 }

@@ -52,7 +52,9 @@ retry:
 			sleep_usec = WT_MIN(sleep_usec * 2,
 			    MAX_ASYNC_SLEEP_USECS);
 		}
-		if (!F_ISSET(conn, WT_CONN_SERVER_RUN))
+		if (!F_ISSET(session, WT_SESSION_SERVER_ASYNC))
+			return (0);
+		if (!F_ISSET(conn, WT_CONN_SERVER_ASYNC))
 			return (0);
 		if (F_ISSET(conn, WT_CONN_PANIC))
 			return (__wt_panic(session));
@@ -299,7 +301,8 @@ __wt_async_worker(void *arg)
 
 	worker.num_cursors = 0;
 	STAILQ_INIT(&worker.cursorqh);
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
+	while (F_ISSET(conn, WT_CONN_SERVER_ASYNC) &&
+	    F_ISSET(session, WT_SESSION_SERVER_ASYNC)) {
 		WT_ERR(__async_op_dequeue(conn, session, &op));
 		if (op != NULL && op != &async->flush_op) {
 			/*
