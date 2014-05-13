@@ -45,6 +45,8 @@ namespace mongo {
         int64_t asInt64() const {
             return static_cast<int64_t>(millis);
         }
+
+        static const Date_t maxFormatableDate;
     };
 
     // uses ISO 8601 dates without trailing Z
