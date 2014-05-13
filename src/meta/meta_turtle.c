@@ -95,6 +95,8 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_metadata_update(session, key->data, value->data));
 	}
 
+	F_SET(S2C(session), WT_CONN_WAS_BACKUP);
+
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_scr_free(&key);

@@ -91,6 +91,7 @@ flags = {
 		'CONN_SERVER_RUN',
 		'CONN_SERVER_CHECKPOINT',
 		'CONN_SERVER_STATISTICS',
+		'CONN_WAS_BACKUP',
 	],
 	'session' : [
 		'SESSION_INTERNAL',

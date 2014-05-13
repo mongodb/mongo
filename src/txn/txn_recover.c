@@ -394,11 +394,12 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
 	const char *config;
-	int modified;
+	int modified, was_backup;
 
 	conn = S2C(default_session);
 	WT_CLEAR(r);
 	INIT_LSN(&r.ckpt_lsn);
+	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;
 
 	/* We need a real session for recovery. */
 	WT_RET(__wt_open_session(conn, 0, NULL, NULL, &session));
@@ -410,15 +411,24 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
 
 	/*
-	 * First, do a full pass through the log to recover the metadata,
-	 * and establish the last checkpoint LSN.
+	 * First, do a pass through the log to recover the metadata, and
+	 * establish the last checkpoint LSN.  Skip this when opening a hot
+	 * backup: we already have the correct metadata in that case.
 	 */
-	r.metadata_only = 1;
-	WT_ERR(__wt_log_scan(
-	    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
+	if (!was_backup) {
+		r.metadata_only = 1;
+		if (IS_INIT_LSN(&r.files[0].ckpt_lsn))
+			WT_ERR(__wt_log_scan(session,
+			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
+		else
+			WT_ERR(__wt_log_scan(session,
+			    &r.files[0].ckpt_lsn, 0, __txn_log_recover, &r));
 
-	WT_ASSERT(session, LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
+		WT_ASSERT(session,
+		    LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
+	}
 
+	/* Scan the metadata to find the live files and their IDs. */
 	WT_ERR(__recovery_file_scan(&r));
 
 	/*
@@ -446,10 +456,10 @@ err:	modified = r.modified;
 	WT_TRET(session->iface.close(&session->iface, NULL));
 
 	/*
-	 * If recovery ran successfully and modified something, log a
-	 * checkpoint.
+	 * If recovery ran successfully and modified something, or we were
+	 * opening a hot backup, log a checkpoint so the next open is fast.
 	 */
-	if (ret == 0 && modified)
+	if (ret == 0 && (modified || was_backup))
 		ret = __wt_txn_checkpoint_log(
 		    default_session, 1, WT_TXN_LOG_CKPT_STOP, NULL);
 
