@@ -888,7 +888,8 @@ namespace {
                 "{ixscan: {filter: null, pattern: {b: 1, c: 1}}}]}}}}");
     }
 
-    // SERVER-10801
+    // Disabled: SERVER-10801.
+    /*
     TEST_F(CachePlanSelectionTest, SortOnGeoQuery) {
         addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
         BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", "
@@ -900,6 +901,7 @@ namespace {
         assertPlanCacheRecoversSolution(query, sort, BSONObj(),
             "{fetch: {node: {ixscan: {pattern: {timestamp: -1, position: '2dsphere'}}}}}");
     }
+    */
 
     // SERVER-9257
     TEST_F(CachePlanSelectionTest, CompoundGeoNoGeoPredicate) {

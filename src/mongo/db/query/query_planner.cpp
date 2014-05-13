@@ -821,9 +821,27 @@ namespace mongo {
             if (!usingIndexToSort) {
                 for (size_t i = 0; i < params.indices.size(); ++i) {
                     const IndexEntry& index = params.indices[i];
+                    // Only regular (non-plugin) indexes can be used to provide a sort.
+                    if (index.type != INDEX_BTREE) {
+                        continue;
+                    }
+                    // Only non-sparse indexes can be used to provide a sort.
                     if (index.sparse) {
                         continue;
                     }
+
+                    // TODO: Sparse indexes can't normally provide a sort, because non-indexed
+                    // documents could potentially be missing from the result set.  However, if the
+                    // query predicate can be used to guarantee that all documents to be returned
+                    // are indexed, then the index should be able to provide the sort.
+                    //
+                    // For example:
+                    // - Sparse index {a: 1, b: 1} should be able to provide a sort for
+                    //   find({b: 1}).sort({a: 1}).  SERVER-13908.
+                    // - Index {a: 1, b: "2dsphere"} (which is "geo-sparse", if
+                    //   2dsphereIndexVersion=2) should be able to provide a sort for
+                    //   find({b: GEO}).sort({a:1}).  SERVER-10801.
+
                     const BSONObj kp = LiteParsedQuery::normalizeSortOrder(index.keyPattern);
                     if (providesSort(query, kp)) {
                         QLOG() << "Planner: outputting soln that uses index to provide sort."

@@ -1045,6 +1045,53 @@ namespace {
     //
 
     TEST_F(QueryPlannerTest, BasicSort) {
+        addIndex(BSON("x" << 1));
+        runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{fetch: {filter: null, node: {ixscan: "
+                                "{filter: null, pattern: {x: 1}}}}}");
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSort) {
+        addIndex(BSON("x" << "hashed"));
+        runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CantUseTextIndexToProvideSort) {
+        addIndex(BSON("x" << 1 << "_fts" << "text" << "_ftsx" << 1));
+        runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CantUseNonCompoundGeoIndexToProvideSort) {
+        addIndex(BSON("x" << "2dsphere"));
+        runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CantUseCompoundGeoIndexToProvideSort) {
+        addIndex(BSON("x" << 1 << "y" << "2dsphere"));
+        runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, "
+                                "node: {cscan: {dir: 1, filter: {}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, BasicSortWithIndexablePred) {
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
         runQuerySortProj(fromjson("{ a : 5 }"), BSON("b" << 1), BSONObj());
@@ -2297,7 +2344,10 @@ namespace {
                                 "{ixscan: {filter: null, pattern: {b: 1, c: 1}}}]}}}}");
     }
 
-    // SERVER-10801
+    // Test that a 2dsphere index can satisfy a whole index scan solution if the query has a GEO
+    // predicate on at least one of the indexed geo fields.
+    // Currently fails.  Tracked by SERVER-10801.
+    /*
     TEST_F(QueryPlannerTest, SortOnGeoQuery) {
         addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
         BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", coordinates: [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}");
@@ -2310,7 +2360,6 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {timestamp: -1, position: '2dsphere'}}}}}");
     }
 
-    // SERVER-10801
     TEST_F(QueryPlannerTest, SortOnGeoQueryMultikey) {
         // true means multikey
         addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"), true);
@@ -2325,6 +2374,7 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: "
                                 "{timestamp: -1, position: '2dsphere'}}}}}");
     }
+    */
 
     // SERVER-9257
     TEST_F(QueryPlannerTest, CompoundGeoNoGeoPredicate) {
