@@ -123,6 +123,7 @@ namespace mongo {
                                       const UserName& userName,
                                       unordered_set<RoleName>* roles) {
         User* user;
+        authzManager->invalidateUserByName(userName); // Need to make sure cache entry is up to date
         Status status = authzManager->acquireUser(userName, &user);
         if (!status.isOK()) {
             return status;
