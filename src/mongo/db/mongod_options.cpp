@@ -28,6 +28,7 @@
 
 #include "mongo/db/mongod_options.h"
 
+#include <boost/filesystem.hpp>
 #include <string>
 #include <vector>
 
@@ -155,9 +156,13 @@ namespace mongo {
         // Storage Options
 
 #ifdef _WIN32
+        boost::filesystem::path currentPath = boost::filesystem::current_path();
+
+        std::string defaultPath = currentPath.root_name().string() + "\\data\\db\\";
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
-                "directory for datafiles - defaults to \\data\\db\\")
-                                         .setDefault(moe::Value(std::string("\\data\\db\\")));
+                "directory for datafiles - defaults to \\data\\db\\ which is " + defaultPath + 
+                " based on the current working drive")
+                                         .setDefault(moe::Value(defaultPath));
 
 #else
         general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
@@ -524,6 +529,16 @@ namespace mongo {
                         "httpinterface must be enabled to use jsonp");
             }
         }
+
+#ifdef _WIN32
+        if (params.count("install") || params.count("reinstall")) {
+            if (params.count("storage.dbPath") &&
+                !boost::filesystem::path(params["storage.dbPath"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "dbPath requires an absolute file path with Windows services");
+            }
+        }
+#endif
 
         return Status::OK();
     }

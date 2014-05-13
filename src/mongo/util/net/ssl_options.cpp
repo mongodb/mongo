@@ -108,6 +108,40 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status validateSSLServerOptions(const moe::Environment& params) {
+#ifdef _WIN32
+        if (params.count("install") || params.count("reinstall")) {
+            if (params.count("net.ssl.PEMKeyFile") &&
+                !boost::filesystem::path(params["net.ssl.PEMKeyFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "PEMKeyFile requires an absolute file path with Windows services");
+            }
+
+            if (params.count("net.ssl.clusterFile") &&
+                !boost::filesystem::path(
+                    params["net.ssl.clusterFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "clusterFile requires an absolute file path with Windows services");
+            }
+
+            if (params.count("net.ssl.CAFile") &&
+                !boost::filesystem::path(params["net.ssl.CAFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "CAFile requires an absolute file path with Windows services");
+            }
+
+            if (params.count("net.ssl.CRLFile") &&
+                !boost::filesystem::path(params["net.ssl.CRLFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "CRLFile requires an absolute file path with Windows services");
+            }
+
+        }
+#endif
+
+        return Status::OK();
+    }
+
     Status canonicalizeSSLServerOptions(moe::Environment* params) {
 
         if (params->count("net.ssl.sslOnNormalPorts") &&

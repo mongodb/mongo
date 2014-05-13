@@ -94,5 +94,7 @@ namespace mongo {
      */
     Status canonicalizeSSLServerOptions(moe::Environment* params);
 
+    Status validateSSLServerOptions(const moe::Environment& params);
+
     Status storeSSLClientOptions(const moe::Environment& params);
 }

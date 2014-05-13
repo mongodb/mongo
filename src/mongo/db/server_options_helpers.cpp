@@ -35,6 +35,7 @@
 #include <syslog.h>
 #endif
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -399,6 +400,43 @@ namespace {
                 }
             }
         }
+
+#ifdef _WIN32
+        if (params.count("install") || params.count("reinstall")) {
+            if (params.count("logpath") &&
+                !boost::filesystem::path(params["logpath"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "logpath requires an absolute file path with Windows services");
+            }
+
+            if (params.count("config") &&
+                !boost::filesystem::path(params["config"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "config requires an absolute file path with Windows services");
+            }
+
+            if (params.count("processManagement.pidFilePath") &&
+                !boost::filesystem::path(
+                    params["processManagement.pidFilePath"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "pidFilePath requires an absolute file path with Windows services");
+            }
+
+            if (params.count("security.keyFile") &&
+                !boost::filesystem::path(params["security.keyFile"].as<string>()).is_absolute()) {
+                return Status(ErrorCodes::BadValue,
+                    "keyFile requires an absolute file path with Windows services");
+            }
+
+        }
+#endif
+
+#ifdef MONGO_SSL
+        Status ret = validateSSLServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
+        }
+#endif
 
         return Status::OK();
     }
