@@ -184,7 +184,6 @@ __async_config(WT_SESSION_IMPL *session,
 	/*
 	 * The async configuration is off by default.
 	 */
-	*runp = 0;
 	if ((ret = __wt_config_gets(
 	    session, cfg, "async.enabled", &cval)) == 0)
 		*runp = cval.val != 0;
@@ -244,6 +243,7 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 
 	/* Handle configuration. */
+	run = 0;
 	WT_RET(__async_config(session, conn, cfg, &run));
 
 	/* If async is not configured, we're done. */
@@ -307,10 +307,12 @@ __wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	async = conn->async;
 	memset(&tmp_conn, 0, sizeof(tmp_conn));
+	tmp_conn.async_cfg = conn->async_cfg;
 	tmp_conn.async_workers = conn->async_workers;
 	tmp_conn.async_size = conn->async_size;
 
 	/* Handle configuration. */
+	run = conn->async_cfg;
 	WT_RET(__async_config(session, &tmp_conn, cfg, &run));
 
 	/*

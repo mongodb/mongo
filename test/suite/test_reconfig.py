@@ -57,6 +57,9 @@ class test_reconfig(wttest.WiredTigerTestCase):
         self.conn.reconfigure("async=(ops_max=1024)")
         # Turn async off.
         self.conn.reconfigure("async=(enabled=false)")
+        # Async is off, turn it on.  Should end up with the
+        # same ops_max of 512 and thread of 8.
+        self.conn.reconfigure("async=(enabled=true)")
 
     def test_reconfig_statistics(self):
         self.conn.reconfigure("statistics=(all)")
