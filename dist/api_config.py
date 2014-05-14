@@ -71,7 +71,7 @@ def parseconfig(c, name_indent=''):
     tdesc = tdesc.replace(',', '\\,')
     output = '@config{' + ', '.join((name, desc, tdesc)) + '}\n'
     if ctype == 'category':
-        for subc in c.subconfig:
+        for subc in sorted(c.subconfig):
             output += parseconfig(subc, name_indent + ('&nbsp;' * 4))
         output += '@config{ ),,}\n'
     return output

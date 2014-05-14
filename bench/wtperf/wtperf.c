@@ -61,7 +61,7 @@ static const CONFIG default_cfg = {
 #undef OPT_DEFINE_DEFAULT
 };
 
-static const char * const debug_cconfig = "verbose=[lsm]";
+static const char * const debug_cconfig = "";
 static const char * const debug_tconfig = "";
 
 /*
@@ -862,8 +862,7 @@ populate_async(void *arg)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	uint64_t op, usecs;
-	uint32_t opcount;
-	int intxn, measure_latency, ret;
+	int measure_latency, ret;
 	char *value_buf, *key_buf;
 
 	thread = (CONFIG_THREAD *)arg;
@@ -896,7 +895,7 @@ populate_async(void *arg)
 		goto err;
 	}
 	/* Populate the databases. */
-	for (intxn = 0, opcount = 0;;) {
+	for (;;) {
 		op = get_next_incr(cfg);
 		if (op > cfg->icount)
 			break;
@@ -923,17 +922,6 @@ retry:		if ((ret = conn->async_new_op(
 			lprintf(cfg, ret, 0, "Failed inserting");
 			goto err;
 		}
-		if (cfg->populate_ops_per_txn != 0) {
-			if (++opcount < cfg->populate_ops_per_txn)
-				continue;
-			opcount = 0;
-
-			if ((ret = session->commit_transaction(
-			    session, NULL)) != 0)
-				lprintf(cfg, ret, 0,
-				    "Fail committing, transaction was aborted");
-			intxn = 0;
-		}
 	}
 	/*
 	 * Gather statistics.
@@ -955,11 +943,6 @@ retry:		if ((ret = conn->async_new_op(
 		usecs = ns_to_us(WT_TIMEDIFF(stop, start));
 		track_operation(trk, usecs);
 	}
-	if (intxn &&
-	    (ret = session->commit_transaction(session, NULL)) != 0)
-		lprintf(cfg, ret, 0,
-		    "Fail committing, transaction was aborted");
-
 	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session in populate");
 		goto err;
@@ -1339,6 +1322,19 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 	    cfg->home, NULL, cfg->conn_config, &cfg->conn)) != 0) {
 		lprintf(cfg, ret, 0, "Re-opening the connection failed");
 		return (ret);
+	}
+	/*
+	 * If we started async threads only for the purposes of compact,
+	 * then turn it off before starting the workload so that those extra
+	 * threads looking for work that will never arrive don't affect
+	 * performance.
+	 */
+	if (cfg->compact && cfg->use_asyncops == 0) {
+		if ((ret = cfg->conn->reconfigure(
+		    cfg->conn, "async=(enabled=false)")) != 0) {
+			lprintf(cfg, ret, 0, "Reconfigure async off failed");
+			return (ret);
+		}
 	}
 
 	return (0);

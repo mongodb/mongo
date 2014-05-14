@@ -214,21 +214,26 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		dst = (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP;
 		dst_len = len;
 
-		/*
-		 * If compression fails, fallback to the original version.  This
-		 * isn't unexpected: if compression doesn't work for some chunk
-		 * of bytes for some reason (noting there's likely additional
-		 * format/header information which compressed output requires),
-		 * it just means the uncompressed version is as good as it gets,
-		 * and that's what we use.
-		 */
 		compression_failed = 0;
 		WT_ERR(btree->compressor->compress(btree->compressor,
 		    &session->iface,
 		    src, src_len,
 		    dst, dst_len,
 		    &result_len, &compression_failed));
-		if (compression_failed) {
+		result_len += WT_BLOCK_COMPRESS_SKIP;
+
+		/*
+		 * If compression fails, or doesn't gain us at least one unit of
+		 * allocation, fallback to the original version.  This isn't
+		 * unexpected: if compression doesn't work for some chunk of
+		 * data for some reason (noting likely additional format/header
+		 * information which compressed output requires), it just means
+		 * the uncompressed version is as good as it gets, and that's
+		 * what we use.
+		 */
+		if (compression_failed ||
+		    buf->size / btree->allocsize ==
+		    result_len / btree->allocsize) {
 			ip = buf;
 			WT_STAT_FAST_DATA_INCR(session, compress_write_fail);
 		} else {
@@ -240,8 +245,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			 * size.
 			 */
 			memcpy(tmp->mem, buf->mem, WT_BLOCK_COMPRESS_SKIP);
-			tmp->size =
-			    (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
+			tmp->size = result_len;
 			ip = tmp;
 		}
 	}

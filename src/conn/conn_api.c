@@ -604,9 +604,11 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
 
+	WT_ERR(__wt_async_reconfig(conn, raw_cfg));
 	WT_ERR(__conn_statistics_config(session, raw_cfg));
 	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
-	WT_ERR(__wt_checkpoint_server_create(conn, raw_cfg));
+	WT_ERR(__wt_checkpoint_server_create(conn, cfg));
+	WT_ERR(__wt_statlog_create(conn, cfg));
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
@@ -651,9 +653,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  */
 static int
 __conn_config_file(WT_SESSION_IMPL *session,
-    const char *filename, const char **cfg, WT_ITEM **cbufp)
+    const char *filename, const char **cfg, WT_ITEM *cbuf)
 {
-	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_FH *fh;
 	const char **cfgend;
@@ -661,8 +662,6 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	size_t len;
 	int exist, quoted;
 	uint8_t *p, *t;
-
-	*cbufp = NULL;				/* Returned buffer */
 
 	fh = NULL;
 
@@ -697,7 +696,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 * newline character, simplify the parsing loop by pretending that's
 	 * what we're doing.
 	 */
-	WT_ERR(__wt_scr_alloc(session, len + 10,  &cbuf));
+	WT_ERR(__wt_buf_init(session, cbuf, len + 10));
 	WT_ERR(
 	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
 	((uint8_t *)cbuf->mem)[0] = '\n';
@@ -781,13 +780,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 		;
 	cfgend[1] = *cfgend;
 	*cfgend = cbuf->data;
-	*cbufp = cbuf;
 
-	if (0) {
-err:		if (cbuf != NULL)
-			__wt_buf_free(session, cbuf);
-	}
-	if (fh != NULL)
+err:	if (fh != NULL)
 		WT_TRET(__wt_close(session, fh));
 	return (ret);
 }
@@ -1088,10 +1082,13 @@ __conn_write_config(
 	if (fp == NULL)
 		return (ret);
 
-	fprintf(fp, "# This file is created by WiredTiger.  Do not edit\n");
-	fprintf(fp, "# Instead, create and edit a WiredTiger.config file to\n");
-	fprintf(fp, "# persistently override database settings\n");
-
+	fprintf(fp, "%s\n\n",
+	    "# Do not modify this file.\n"
+	    "#\n"
+	    "# WiredTiger created this file when the database was created,\n"
+	    "# to store persistent database settings.  Instead of changing\n"
+	    "# these settings, set a WIREDTIGER_CONFIG environment variable\n"
+	    "# or create a WiredTiger.config file to override them.");
 	WT_ERR(__wt_config_init(session, &parser, config));
 	while ((ret = __wt_config_next(&parser, &ckey, &cval)) == 0) {
 		/* Skip "create". */
@@ -1148,7 +1145,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	};
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_ITEM(cbuf);
+	WT_ITEM cbbuf, cubuf;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	/* Leave space for optional additional configuration. */
@@ -1158,6 +1155,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
+	WT_CLEAR(cbbuf);
+	WT_CLEAR(cubuf);
 
 	WT_RET(__wt_library_init());
 
@@ -1212,8 +1211,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Track the end of the stack, which always points to the config passed
 	 * by the application.
 	 */
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbuf));
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cbuf));
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbbuf));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf));
 	WT_ERR(__conn_config_env(session, cfg));
 
 	/* Write the base configuration file, if we're creating the database. */
@@ -1321,8 +1320,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Destroying the connection on error will destroy our session handle,
 	 * cleanup using the session handle first, then discard the connection.
 	 */
-err:	if (cbuf != NULL)
-		__wt_buf_free(session, cbuf);
+err:	__wt_buf_free(session, &cbbuf);
+	__wt_buf_free(session, &cubuf);
 
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_close(conn));

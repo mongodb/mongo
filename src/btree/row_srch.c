@@ -12,12 +12,12 @@
  *	Search a row-store insert list, creating a skiplist stack as we go.
  */
 int
-__wt_search_insert(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *srch_key)
+__wt_search_insert(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
+    WT_INSERT_HEAD *inshead, WT_ITEM *srch_key, int insert)
 {
 	WT_BTREE *btree;
 	WT_INSERT **insp, *last_ins, *ret_ins;
-	WT_ITEM insert_key;
+	WT_ITEM key;
 	size_t match, skiphigh, skiplow;
 	int cmp, i;
 
@@ -30,12 +30,18 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
+	key.data = WT_INSERT_KEY(ret_ins);
+	key.size = WT_INSERT_KEY_SIZE(ret_ins);
+
 	/* Fast-path appends. */
-	insert_key.data = WT_INSERT_KEY(ret_ins);
-	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-	WT_RET(
-	    WT_LEX_CMP(session, btree->collator, srch_key, &insert_key, cmp));
+	cmp = -1;
+	if (insert)
+		WT_RET(WT_LEX_CMP(
+		    session, btree->collator, srch_key, &key, cmp));
 	if (cmp >= 0) {
+		if (btree->appending == 0)
+			btree->appending = 1;
+
 		/*
 		 * !!!
 		 * We may race with another appending thread.
@@ -76,12 +82,11 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 		 */
 		if (ret_ins != last_ins) {
 			last_ins = ret_ins;
-			insert_key.data = WT_INSERT_KEY(ret_ins);
-			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
+			key.data = WT_INSERT_KEY(ret_ins);
+			key.size = WT_INSERT_KEY_SIZE(ret_ins);
 			match = WT_MIN(skiplow, skiphigh);
 			WT_RET(WT_LEX_CMP_SKIP(session,
-			    btree->collator,
-			    srch_key, &insert_key, cmp, &match));
+			    btree->collator, srch_key, &key, cmp, &match));
 		}
 
 		if (cmp > 0) {		/* Keep going at this level */
@@ -114,7 +119,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
  */
 int
 __wt_row_search(WT_SESSION_IMPL *session,
-    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt, int insert)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -173,18 +178,22 @@ restart:	page = parent->page;
 			goto descend;
 
 		/* Fast-path appends. */
-		__wt_ref_key(page, child, &item->data, &item->size);
-		WT_ERR(
-		    WT_LEX_CMP(session, btree->collator, srch_key, item, cmp));
-		if (cmp >= 0)
-			goto descend;
+		if (insert && btree->appending) {
+			__wt_ref_key(page, child, &item->data, &item->size);
+			WT_ERR(WT_LEX_CMP(
+			    session, btree->collator, srch_key, item, cmp));
+			if (cmp >= 0)
+				goto descend;
+
+			btree->appending = 0;
+		}
 
 		/*
 		 * Two versions of the binary search of internal pages: with and
 		 * without application-specified collation.
 		 */
 		base = 0;
-		limit = pindex->entries - 1;
+		limit = pindex->entries;
 		if (btree->collator == NULL) {
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
@@ -390,7 +399,8 @@ leaf_only:
 	 * return insert information appropriately.
 	 */
 	cbt->ref = child;
-	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
+	WT_ERR(
+	    __wt_search_insert(session, cbt, cbt->ins_head, srch_key, insert));
 	return (0);
 
 err:	WT_TRET(__wt_page_release(session, child));

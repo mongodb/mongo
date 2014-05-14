@@ -33,45 +33,12 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-static int
-wt_snappy_compress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
-static int
-wt_snappy_decompress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *);
-static int
-wt_snappy_pre_size(WT_COMPRESSOR *, WT_SESSION *, uint8_t *, size_t, size_t *);
-static int
-wt_snappy_terminate(WT_COMPRESSOR *, WT_SESSION *);
-
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
 
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 } SNAPPY_COMPRESSOR;
-
-int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
-{
-	SNAPPY_COMPRESSOR *snappy_compressor;
-
-	(void)config;				/* Unused parameters */
-
-	if ((snappy_compressor = calloc(1, sizeof(SNAPPY_COMPRESSOR))) == NULL)
-		return (errno);
-
-	snappy_compressor->compressor.compress = wt_snappy_compress;
-	snappy_compressor->compressor.compress_raw = NULL;
-	snappy_compressor->compressor.decompress = wt_snappy_decompress;
-	snappy_compressor->compressor.pre_size = wt_snappy_pre_size;
-	snappy_compressor->compressor.terminate = wt_snappy_terminate;
-
-	snappy_compressor->wt_api = connection->get_extension_api(connection);
-
-	return (connection->add_compressor(
-	    connection, "snappy", (WT_COMPRESSOR *)snappy_compressor, NULL));
-}
 
 /*
  * wt_snappy_error --
@@ -103,6 +70,10 @@ wt_snappy_error(WT_COMPRESSOR *compressor,
 	return (WT_ERROR);
 }
 
+/*
+ * wt_snappy_compress --
+ *	WiredTiger snappy compression.
+ */
 static int
 wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -143,6 +114,10 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	return (wt_snappy_error(compressor, session, "snappy_compress", snret));
 }
 
+/*
+ * wt_snappy_decompress --
+ *	WiredTiger snappy decompression.
+ */
 static int
 wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -177,6 +152,10 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    wt_snappy_error(compressor, session, "snappy_decompress", snret));
 }
 
+/*
+ * wt_snappy_pre_size --
+ *	WiredTiger snappy destination buffer sizing.
+ */
 static int
 wt_snappy_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -196,6 +175,10 @@ wt_snappy_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	return (0);
 }
 
+/*
+ * wt_snappy_terminate --
+ *	WiredTiger snappy compression termination.
+ */
 static int
 wt_snappy_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
@@ -203,4 +186,30 @@ wt_snappy_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 
 	free(compressor);
 	return (0);
+}
+
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger snappy compression extension.
+ */
+int
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	SNAPPY_COMPRESSOR *snappy_compressor;
+
+	(void)config;				/* Unused parameters */
+
+	if ((snappy_compressor = calloc(1, sizeof(SNAPPY_COMPRESSOR))) == NULL)
+		return (errno);
+
+	snappy_compressor->compressor.compress = wt_snappy_compress;
+	snappy_compressor->compressor.compress_raw = NULL;
+	snappy_compressor->compressor.decompress = wt_snappy_decompress;
+	snappy_compressor->compressor.pre_size = wt_snappy_pre_size;
+	snappy_compressor->compressor.terminate = wt_snappy_terminate;
+
+	snappy_compressor->wt_api = connection->get_extension_api(connection);
+
+	return (connection->add_compressor(
+	    connection, "snappy", (WT_COMPRESSOR *)snappy_compressor, NULL));
 }

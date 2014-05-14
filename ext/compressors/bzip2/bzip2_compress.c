@@ -34,19 +34,6 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-static int
-bzip2_compress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
-static int
-bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, size_t, uint8_t *, size_t, size_t *);
-static int
-bzip2_terminate(WT_COMPRESSOR *, WT_SESSION *);
-static int
-bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
-    size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
-    size_t *, uint32_t *);
-
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
@@ -67,71 +54,6 @@ typedef struct {
 	WT_COMPRESSOR *compressor;
 	WT_SESSION *session;
 } BZIP_OPAQUE;
-
-/*
- * bzip2_add_compressor --
- *	Add a bzip2 compressor.
- */
-static int
-bzip2_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
-{
-	BZIP_COMPRESSOR *bzip_compressor;
-
-	/*
-	 * There are two almost identical bzip2 compressors: one supporting raw
-	 * compression (used by test/format to test raw compression), the other
-	 * without raw compression, that might be useful for real applications.
-	 */
-	if ((bzip_compressor = calloc(1, sizeof(BZIP_COMPRESSOR))) == NULL)
-		return (errno);
-
-	bzip_compressor->compressor.compress = bzip2_compress;
-	bzip_compressor->
-	    compressor.compress_raw = raw ? bzip2_compress_raw : NULL;
-	bzip_compressor->compressor.decompress = bzip2_decompress;
-	bzip_compressor->compressor.pre_size = NULL;
-	bzip_compressor->compressor.terminate = bzip2_terminate;
-
-	bzip_compressor->wt_api = connection->get_extension_api(connection);
-
-	/* between 0-4: set the amount of verbosity to stderr */
-	bzip_compressor->bz_verbosity = 0;
-
-	/*
-	 * between 1-9: set the block size to 100k x this number (compression
-	 * only)
-	 */
-	bzip_compressor->bz_blocksize100k = 1;
-
-	/*
-	 * between 0-250: workFactor: see bzip2 manual.  0 is a reasonable
-	 * default (compression only)
-	 */
-	bzip_compressor->bz_workfactor = 0;
-
-	/*
-	 * if nonzero, decompress using less memory, but slower (decompression
-	 * only)
-	 */
-	bzip_compressor->bz_small = 0;
-
-	return (connection->add_compressor(	/* Load the compressor */
-	    connection, name, (WT_COMPRESSOR *)bzip_compressor, NULL));
-}
-
-int
-wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
-{
-	int ret;
-
-	(void)config;				/* Unused parameters */
-
-	if ((ret = bzip2_add_compressor(connection, 0, "bzip2")) != 0)
-		return (ret);
-	if ((ret = bzip2_add_compressor(connection, 1, "bzip2-raw-test")) != 0)
-		return (ret);
-	return (0);
-}
 
 /*
  * bzip2_error --
@@ -184,6 +106,10 @@ bzip2_error(
 	return (WT_ERROR);
 }
 
+/*
+ * bzalloc --
+ *	Allocate scratch buffers.
+ */
 static void *
 bzalloc(void *cookie, int number, int size)
 {
@@ -196,6 +122,10 @@ bzalloc(void *cookie, int number, int size)
 	    wt_api, opaque->session, (size_t)(number * size)));
 }
 
+/*
+ * bzfree --
+ *	Free scratch buffers.
+ */
 static void
 bzfree(void *cookie, void *p)
 {
@@ -207,6 +137,10 @@ bzfree(void *cookie, void *p)
 	wt_api->scr_free(wt_api, opaque->session, p);
 }
 
+/*
+ * bzip2_compress --
+ *	WiredTiger bzip2 compression.
+ */
 static int
 bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -343,6 +277,10 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	return (take == 0 ? EAGAIN : 0);
 }
 
+/*
+ * bzip2_decompress --
+ *	WiredTiger bzip2 decompression.
+ */
 static int
 bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -386,11 +324,84 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    0 : bzip2_error(compressor, session, "BZ2_bzDecompressEnd", ret));
 }
 
+/*
+ * bzip2_terminate --
+ *	WiredTiger bzip2 compression termination.
+ */
 static int
 bzip2_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
 	(void)session;					/* Unused parameters */
 
 	free(compressor);
+	return (0);
+}
+
+/*
+ * bzip2_add_compressor --
+ *	Add a bzip2 compressor.
+ */
+static int
+bzip2_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
+{
+	BZIP_COMPRESSOR *bzip_compressor;
+
+	/*
+	 * There are two almost identical bzip2 compressors: one supporting raw
+	 * compression (used by test/format to test raw compression), the other
+	 * without raw compression, that might be useful for real applications.
+	 */
+	if ((bzip_compressor = calloc(1, sizeof(BZIP_COMPRESSOR))) == NULL)
+		return (errno);
+
+	bzip_compressor->compressor.compress = bzip2_compress;
+	bzip_compressor->
+	    compressor.compress_raw = raw ? bzip2_compress_raw : NULL;
+	bzip_compressor->compressor.decompress = bzip2_decompress;
+	bzip_compressor->compressor.pre_size = NULL;
+	bzip_compressor->compressor.terminate = bzip2_terminate;
+
+	bzip_compressor->wt_api = connection->get_extension_api(connection);
+
+	/* between 0-4: set the amount of verbosity to stderr */
+	bzip_compressor->bz_verbosity = 0;
+
+	/*
+	 * between 1-9: set the block size to 100k x this number (compression
+	 * only)
+	 */
+	bzip_compressor->bz_blocksize100k = 1;
+
+	/*
+	 * between 0-250: workFactor: see bzip2 manual.  0 is a reasonable
+	 * default (compression only)
+	 */
+	bzip_compressor->bz_workfactor = 0;
+
+	/*
+	 * if nonzero, decompress using less memory, but slower (decompression
+	 * only)
+	 */
+	bzip_compressor->bz_small = 0;
+
+	return (connection->add_compressor(	/* Load the compressor */
+	    connection, name, (WT_COMPRESSOR *)bzip_compressor, NULL));
+}
+
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger bzip2 compression extension.
+ */
+int
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+{
+	int ret;
+
+	(void)config;				/* Unused parameters */
+
+	if ((ret = bzip2_add_compressor(connection, 0, "bzip2")) != 0)
+		return (ret);
+	if ((ret = bzip2_add_compressor(connection, 1, "bzip2-raw-test")) != 0)
+		return (ret);
 	return (0);
 }

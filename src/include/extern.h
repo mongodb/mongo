@@ -2,6 +2,7 @@
 
 extern void __wt_async_stats_update(WT_SESSION_IMPL *session);
 extern int __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_async_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_async_flush(WT_CONNECTION_IMPL *conn);
 extern int __wt_async_new_op(WT_CONNECTION_IMPL *conn,
@@ -506,11 +507,13 @@ extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,
 extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     WT_INSERT_HEAD *inshead,
-    WT_ITEM *srch_key);
+    WT_ITEM *srch_key,
+    int insert);
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_ITEM *srch_key,
     WT_REF *leaf,
-    WT_CURSOR_BTREE *cbt);
+    WT_CURSOR_BTREE *cbt,
+    int insert);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,
     WT_CONFIG *conf,

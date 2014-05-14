@@ -1,7 +1,7 @@
 import filecmp, glob, os, re, shutil
 
 # source_files --
-#	Return a list of the source file names in filelist.
+#	Return a list of the WiredTiger source file names.
 def source_files(skip_includes=False):
 	if not skip_includes:
 		for line in glob.iglob('../src/include/*.[hi]'):
@@ -10,9 +10,12 @@ def source_files(skip_includes=False):
 	for line in open('filelist', 'r'):
 		if file_re.match(line):
 			yield os.path.join('..', line.rstrip())
+	for line in open('extlist', 'r'):
+		if file_re.match(line):
+			yield os.path.join('..', line.rstrip())
 
 # source_dirs --
-#	Return a list of the directories in filelist.
+#	Return a list of the WiredTiger source directory names.
 def source_dirs():
 	dirs = set()
 	for f in source_files():

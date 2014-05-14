@@ -57,6 +57,14 @@ static const WT_CONFIG_CHECK confchk_shared_cache_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
+	{ "path", "string", NULL, NULL },
+	{ "sources", "list", NULL, NULL },
+	{ "timestamp", "string", NULL, NULL },
+	{ "wait", "int", "min=0,max=100000", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs},
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL},
@@ -72,6 +80,8 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "statistics", "list",
 	    "choices=[\"all\",\"fast\",\"none\",\"clear\"]",
 	    NULL},
+	{ "statistics_log", "category", NULL,
+	     confchk_statistics_log_subconfigs},
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
@@ -263,14 +273,6 @@ static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
-static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
-	{ "path", "string", NULL, NULL },
-	{ "sources", "list", NULL, NULL },
-	{ "timestamp", "string", NULL, NULL },
-	{ "wait", "int", "min=1,max=100000", NULL },
-	{ NULL, NULL, NULL, NULL }
-};
-
 static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs},
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL},
@@ -359,7 +361,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),error_prefix=,"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
 	  "eviction_workers=0,shared_cache=(chunk=10MB,name=,reserve=0,"
-	  "size=500MB),statistics=none,verbose=",
+	  "size=500MB),statistics=none,"
+	  "statistics_log=(path=\"WiredTigerStat.%d.%H\",sources=,"
+	  "timestamp=\"%b %d %H:%M:%S\",wait=0),verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",

@@ -29,6 +29,10 @@
 
 #include <wiredtiger_ext.h>
 
+/*
+ * collate_reverse --
+ *	WiredTiger reverse collation.
+ */
 static int
 collate_reverse(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *k1, const WT_ITEM *k2, int *cmp)
@@ -46,6 +50,10 @@ collate_reverse(WT_COLLATOR *collator, WT_SESSION *session,
 
 static WT_COLLATOR reverse_collator = { collate_reverse, NULL };
 
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger reverse collation extension.
+ */
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {

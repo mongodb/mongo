@@ -60,6 +60,40 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __split_ovfl_key_cleanup --
+ *	Handle cleanup for on-page row-store overflow keys.
+ */
+static int
+__split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
+{
+	WT_CELL *cell;
+	WT_CELL_UNPACK kpack;
+	WT_IKEY *ikey;
+	uint32_t cell_offset;
+
+	/*
+	 * A key being discarded (page split) or moved to a different page (page
+	 * deepening) may be an on-page overflow key.  Clear any reference to an
+	 * underlying disk image, and, if the key hasn't been deleted, delete it
+	 * along with any backing blocks.
+	 */
+	if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
+		return (0);
+	if ((cell_offset = ikey->cell_offset) == 0)
+		return (0);
+
+	/* Leak blocks rather than try this twice. */
+	ikey->cell_offset = 0;
+
+	cell = WT_PAGE_REF_OFFSET(page, cell_offset);
+	__wt_cell_unpack(cell, &kpack);
+	if (kpack.ovfl && kpack.raw != WT_CELL_KEY_OVFL_RM)
+		WT_RET(__wt_ovfl_discard(session, cell));
+
+	return (0);
+}
+
+/*
  * __split_ref_instantiate --
  *	Instantiate key/address pairs in memory in service of a split.
  */
@@ -86,8 +120,8 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 	 *
 	 * No locking is required to update the WT_REF structure because we're
 	 * the only thread splitting the parent page, and there's no way for
-	 * readers to race with our updates of single pointers.  We change does
-	 * have to be written before the page goes away, though, our caller
+	 * readers to race with our updates of single pointers.  The changes
+	 * have to be written before the page goes away, of course, our caller
 	 * owns that problem.
 	 *
 	 * Row-store keys, first.
@@ -97,8 +131,11 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 			__wt_ref_key(page, ref, &key, &size);
 			WT_RET(__wt_row_ikey(session, 0, key, size, &ikey));
 			ref->key.ikey = ikey;
-		} else
+		} else {
+			WT_RET(__split_ovfl_key_cleanup(session, page, ref));
+
 			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
+		}
 		*child_incrp += sizeof(WT_IKEY) + ikey->size;
 	}
 
@@ -139,7 +176,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_ITEM *next, _next, *last, _last, *tmp;
-	WT_REF *child;
+	WT_REF *ref;
 	uint64_t recno;
 	int cmp, first;
 
@@ -148,9 +185,9 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		recno = 0;
-		WT_INTL_FOREACH_BEGIN(page, child) {
-			WT_ASSERT(session, child->key.recno > recno);
-			recno = child->key.recno;
+		WT_INTL_FOREACH_BEGIN(page, ref) {
+			WT_ASSERT(session, ref->key.recno > recno);
+			recno = ref->key.recno;
 		} WT_INTL_FOREACH_END;
 		break;
 	case WT_PAGE_ROW_INT:
@@ -160,8 +197,8 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_CLEAR(_last);
 
 		first = 1;
-		WT_INTL_FOREACH_BEGIN(page, child) {
-			__wt_ref_key(page, child, &next->data, &next->size);
+		WT_INTL_FOREACH_BEGIN(page, ref) {
+			__wt_ref_key(page, ref, &next->data, &next->size);
 			if (last->size == 0) {
 				if (first)
 					first = 0;
@@ -502,7 +539,7 @@ __split_inmem_build(
 			}
 
 			/* Search the page. */
-			WT_ERR(__wt_row_search(session, key, ref, &cbt));
+			WT_ERR(__wt_row_search(session, key, ref, &cbt, 1));
 
 			/* Apply the modification. */
 			WT_ERR(
@@ -512,11 +549,13 @@ __split_inmem_build(
 		}
 
 	/*
-	 * We modified the page above, which will have copied the current
-	 * checkpoint generation.  If there is a checkpoint in progress, it
-	 * must write this page, so reset the checkpoint generation to zero.
+	 * We modified the page above, which will have set the first dirty
+	 * transaction to the last transaction current running.  However, the
+	 * updates we installed may be older than that.  Take the oldest active
+	 * transaction ID to make sure these updates are not skipped by a
+	 * checkpoint.
 	 */
-	page->modify->checkpoint_gen = 0;
+	page->modify->first_dirty_txn = S2C(session)->txn_global.oldest_id;
 
 err:	__wt_scr_free(&key);
 	/* Free any resources that may have been cached in the cursor. */
@@ -603,8 +642,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 int
 __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
-	WT_CELL *cell;
-	WT_CELL_UNPACK *kpack, _kpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_PAGE *parent, *child;
@@ -615,7 +652,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, hazard, locked;
 
-	kpack = &_kpack;
 	alloc_index = NULL;
 	parent_ref = NULL;
 	ref_tmp = NULL;
@@ -750,14 +786,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	switch (parent->type) {
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL)
-			break;
-		if (ikey->cell_offset != 0) {
-			cell = WT_PAGE_REF_OFFSET(parent, ikey->cell_offset);
-			__wt_cell_unpack(cell, kpack);
-			if (kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
-				WT_TRET(__wt_ovfl_discard(session, cell));
-		}
+		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
 		break;
 	}
 

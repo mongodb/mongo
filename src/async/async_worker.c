@@ -17,28 +17,50 @@ __async_op_dequeue(WT_CONNECTION_IMPL *conn, WT_SESSION_IMPL *session,
     WT_ASYNC_OP_IMPL **op)
 {
 	WT_ASYNC *async;
+	long sleep_usec;
 	uint64_t cur_tail, last_consume, my_consume, my_slot, prev_slot;
-	uint32_t max_tries, tries;
+	uint32_t tries;
 
 	async = conn->async;
 	*op = NULL;
-	max_tries = 100;
-	tries = 0;
 	/*
 	 * Wait for work to do.  Work is available when async->head moves.
 	 * Then grab the slot containing the work.  If we lose, try again.
 	 */
 retry:
+	tries = 0;
+	sleep_usec = 100;
 	WT_ORDERED_READ(last_consume, async->alloc_tail);
-	while (last_consume == async->head && ++tries < max_tries &&
+	/*
+	 * We stay in this loop until there is work to do.
+	 */
+	while (last_consume == async->head &&
 	    async->flush_state != WT_ASYNC_FLUSHING) {
-		__wt_yield();
+		WT_STAT_FAST_CONN_INCR(session, async_nowork);
+		if (++tries < MAX_ASYNC_YIELD)
+			/*
+			 * Initially when we find no work, allow other
+			 * threads to run.
+			 */
+			__wt_yield();
+		else {
+			/*
+			 * If we haven't found work in a while, start sleeping
+			 * to wait for work to arrive instead of spinning.
+			 */
+			__wt_sleep(0, sleep_usec);
+			sleep_usec = WT_MIN(sleep_usec * 2,
+			    MAX_ASYNC_SLEEP_USECS);
+		}
+		if (!F_ISSET(session, WT_SESSION_SERVER_ASYNC))
+			return (0);
+		if (!F_ISSET(conn, WT_CONN_SERVER_ASYNC))
+			return (0);
+		if (F_ISSET(conn, WT_CONN_PANIC))
+			return (__wt_panic(session));
 		WT_ORDERED_READ(last_consume, async->alloc_tail);
 	}
-	if (F_ISSET(conn, WT_CONN_PANIC))
-		return (__wt_panic(session));
-	if (tries >= max_tries ||
-	    async->flush_state == WT_ASYNC_FLUSHING)
+	if (async->flush_state == WT_ASYNC_FLUSHING)
 		return (0);
 	/*
 	 * Try to increment the tail to claim this slot.  If we lose
@@ -279,7 +301,8 @@ __wt_async_worker(void *arg)
 
 	worker.num_cursors = 0;
 	STAILQ_INIT(&worker.cursorqh);
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
+	while (F_ISSET(conn, WT_CONN_SERVER_ASYNC) &&
+	    F_ISSET(session, WT_SESSION_SERVER_ASYNC)) {
 		WT_ERR(__async_op_dequeue(conn, session, &op));
 		if (op != NULL && op != &async->flush_op) {
 			/*

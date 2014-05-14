@@ -75,9 +75,15 @@
  * swigCPtr is 0.
  */
 typedef struct {
+	JavaVM *javavm;		/* Used in async threads to craft a jnienv */
 	JNIEnv *jnienv;		/* jni env that created the Session/Cursor */
-	jobject jobj;		/* the java Session/Cursor object */
-	jfieldID fid;		/* cached Cursor.swigCPtr field id in session */
+	jobject jobj;		/* the java Session/Cursor/AsyncOp object */
+	jobject jcallback;	/* callback object for async ops */
+	jfieldID cptr_fid;	/* cached Cursor.swigCPtr field id in session */
+	jfieldID asynccptr_fid;	/* cached AsyncOp.swigCptr fid in conn */
+	jfieldID kunp_fid;	/* cached AsyncOp.keyUnpacker fid in conn */
+	jfieldID vunp_fid;	/* cached AsyncOp.valueUnpacker fid in conn */
+	jmethodID notify_mid;	/* cached AsyncCallback.notify mid in conn */
 } JAVA_CALLBACK;
 
 static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
@@ -131,9 +137,9 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 %typemap(out) WT_ITEM %{
 	if ($1.data == NULL)
 		$result = NULL;
-	else if (($result = (*jenv)->NewByteArray(jenv, $1.size)) != NULL) {
+	else if (($result = (*jenv)->NewByteArray(jenv, (jsize)$1.size)) != NULL) {
 		(*jenv)->SetByteArrayRegion(jenv,
-		    $result, 0, $1.size, $1.data);
+		    $result, 0, (jsize)$1.size, $1.data);
 	}
 %}
 
@@ -210,7 +216,7 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 WT_CLASS(struct __wt_connection, WT_CONNECTION, connection, connCloseHandler($1))
 WT_CLASS(struct __wt_session, WT_SESSION, session, sessionCloseHandler($1))
 WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor, cursorCloseHandler($1))
-WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, asyncop, )
+WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op, )
 
 %define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
 %javamethodmodifiers SIGNATURE_CLASS::METHOD "
@@ -259,6 +265,11 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, asyncop, )
 
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %rename (compare_wrap) __wt_cursor::compare;
+%rename (AsyncOpType) WT_ASYNC_OPTYPE;
+%rename (getKeyFormat) __wt_async_op::getKey_format;
+%rename (getValueFormat) __wt_async_op::getValue_format;
+%rename (getType) __wt_async_op::get_type;
+%rename (getId) __wt_async_op::get_id;
 
 /* SWIG magic to turn Java byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
@@ -274,13 +285,10 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
  * equivalent to 'jobj.swigCPtr = 0;' in java.
  */
 static int
-javaClose(JAVA_CALLBACK *jcb, jfieldID *pfid)
+javaClose(JNIEnv *env, JAVA_CALLBACK *jcb, jfieldID *pfid)
 {
 	jclass cls;
 	jfieldID fid;
-	JNIEnv *env;
-
-	env = jcb->jnienv;
 
 	if (pfid == NULL || *pfid == NULL) {
 		cls = (*env)->GetObjectClass(env, jcb->jobj);
@@ -306,10 +314,10 @@ connCloseHandler(WT_CONNECTION *conn_arg)
 	conn = (WT_CONNECTION_IMPL *)conn_arg;
 	jcb = (JAVA_CALLBACK *)conn->lang_private;
 	conn->lang_private = NULL;
-	ret = javaClose(jcb, NULL);
+	ret = javaClose(jcb->jnienv, jcb, NULL);
 	__wt_free(conn->default_session, jcb);
 
-	return (0);
+	return (ret);
 }
 
 /* Session specific close handler. */
@@ -323,7 +331,7 @@ sessionCloseHandler(WT_SESSION *session_arg)
 	session = (WT_SESSION_IMPL *)session_arg;
 	jcb = (JAVA_CALLBACK *)session->lang_private;
 	session->lang_private = NULL;
-	ret = javaClose(jcb, NULL);
+	ret = javaClose(jcb->jnienv, jcb, NULL);
 	__wt_free(session, jcb);
 
 	return (ret);
@@ -341,7 +349,8 @@ cursorCloseHandler(WT_CURSOR *cursor)
 	sess_jcb = (JAVA_CALLBACK *)
 	    ((WT_SESSION_IMPL *)cursor->session)->lang_private;
 	cursor->lang_private = NULL;
-	ret = javaClose(jcb, sess_jcb ? &sess_jcb->fid : NULL);
+	ret = javaClose(jcb->jnienv, jcb,
+	    sess_jcb ? &sess_jcb->cptr_fid : NULL);
 	__wt_free((WT_SESSION_IMPL *)cursor->session, jcb);
 
 	return (ret);
@@ -364,6 +373,119 @@ javaCloseHandler(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 }
 
 WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
+
+static int
+javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
+    uint32_t flags)
+{
+	int ret, envret;
+	JAVA_CALLBACK *jcb, *conn_jcb;
+	JavaVM *javavm;
+	jclass cls;
+	jfieldID fid;
+	jmethodID mid;
+	JNIEnv *jenv;
+	WT_ASYNC_OP_IMPL *op;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(cb);
+	WT_UNUSED(flags);
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	session = O2S(op);
+	jcb = (JAVA_CALLBACK *)asyncop->c.lang_private;
+	conn_jcb = (JAVA_CALLBACK *)S2C(session)->lang_private;
+	asyncop->c.lang_private = NULL;
+
+	/*
+	 * We rely on the fact that the async machinery uses a pool of
+	 * threads.  Here we attach the current native (POSIX)
+	 * thread to a Java thread and never detach it.  If the native
+	 * thread was previously seen by this callback, it will be
+	 * attached to the same Java thread as before without
+	 * incurring the cost of the thread initialization.
+	 * Marking the Java thread as a daemon means its existence
+	 * won't keep an application from exiting.
+	 */
+	javavm = jcb->javavm;
+	envret = (*javavm)->GetEnv(javavm, (void **)&jenv, JNI_VERSION_1_6);
+	if (envret == JNI_EDETACHED) {
+		if ((*javavm)->AttachCurrentThreadAsDaemon(javavm,
+		    (void **)&jenv, NULL) != 0) {
+			ret = EBUSY;
+			goto err;
+		}
+	} else if (envret != JNI_OK) {
+		ret = EBUSY;
+		goto err;
+	}
+
+	/*
+	 * Look up any needed field and method ids, and cache them
+	 * in the connection's lang_private.  fid and mids are
+	 * stable.
+	 */
+	if (conn_jcb->notify_mid == NULL) {
+		/* Any JNI error until the actual callback is unexpected. */
+		ret = EINVAL;
+
+		cls = (*jenv)->GetObjectClass(jenv, jcb->jobj);
+		if (cls == NULL)
+			goto err;
+		fid = (*jenv)->GetFieldID(jenv, cls,
+		    "keyUnpacker", "Lcom/wiredtiger/db/PackInputStream;");
+		if (fid == NULL)
+			goto err;
+		conn_jcb->kunp_fid = fid;
+
+		fid = (*jenv)->GetFieldID(jenv, cls,
+		    "valueUnpacker", "Lcom/wiredtiger/db/PackInputStream;");
+		if (fid == NULL)
+			goto err;
+		conn_jcb->vunp_fid = fid;
+
+		cls = (*jenv)->GetObjectClass(jenv, jcb->jcallback);
+		if (cls == NULL)
+			goto err;
+		mid = (*jenv)->GetMethodID(jenv, cls, "notify",
+		    "(Lcom/wiredtiger/db/AsyncOp;II)I");
+		if (mid == NULL)
+			goto err;
+		conn_jcb->notify_mid = mid;
+	}
+
+	/*
+	 * Invalidate the unpackers so any calls to op.getKey()
+	 * and op.getValue get fresh results.
+	 */
+	(*jenv)->SetObjectField(jenv, jcb->jobj, conn_jcb->kunp_fid, NULL);
+	(*jenv)->SetObjectField(jenv, jcb->jobj, conn_jcb->vunp_fid, NULL);
+
+	/* Call the registered callback. */
+	ret = (*jenv)->CallIntMethod(jenv, jcb->jcallback, conn_jcb->notify_mid,
+	    jcb->jobj, opret, flags);
+
+	if ((*jenv)->ExceptionOccurred(jenv)) {
+		(*jenv)->ExceptionDescribe(jenv);
+		(*jenv)->ExceptionClear(jenv);
+	}
+	if (0) {
+err:		__wt_err(session, ret, "Java async callback error");
+	}
+
+	/* Invalidate the AsyncOp, further use throws NullPointerException. */
+	ret = javaClose(jenv, jcb, &conn_jcb->asynccptr_fid);
+
+	(*jenv)->DeleteGlobalRef(jenv, jcb->jcallback);
+
+	__wt_free(session, jcb);
+
+	if (ret == 0 && (opret == 0 || opret == WT_NOTFOUND))
+	        return (0);
+	else
+		return (1);
+}
+
+WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %}
 
 %extend __wt_async_op {
@@ -474,6 +596,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putKeyByte(byte value)
 	throws WiredTigerPackingException {
+		keyUnpacker = null;
 		keyPacker.addByte(value);
 		return this;
 	}
@@ -500,6 +623,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putKeyByteArray(byte[] value, int off, int len)
 	throws WiredTigerPackingException {
+		keyUnpacker = null;
 		keyPacker.addByteArray(value, off, len);
 		return this;
 	}
@@ -512,6 +636,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putKeyInt(int value)
 	throws WiredTigerPackingException {
+		keyUnpacker = null;
 		keyPacker.addInt(value);
 		return this;
 	}
@@ -524,6 +649,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putKeyLong(long value)
 	throws WiredTigerPackingException {
+		keyUnpacker = null;
 		keyPacker.addLong(value);
 		return this;
 	}
@@ -536,6 +662,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putKeyShort(short value)
 	throws WiredTigerPackingException {
+		keyUnpacker = null;
 		keyPacker.addShort(value);
 		return this;
 	}
@@ -548,6 +675,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putKeyString(String value)
 	throws WiredTigerPackingException {
+		keyUnpacker = null;
 		keyPacker.addString(value);
 		return this;
 	}
@@ -560,6 +688,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putValueByte(byte value)
 	throws WiredTigerPackingException {
+		valueUnpacker = null;
 		valuePacker.addByte(value);
 		return this;
 	}
@@ -586,6 +715,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putValueByteArray(byte[] value, int off, int len)
 	throws WiredTigerPackingException {
+		valueUnpacker = null;
 		valuePacker.addByteArray(value, off, len);
 		return this;
 	}
@@ -598,6 +728,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putValueInt(int value)
 	throws WiredTigerPackingException {
+		valueUnpacker = null;
 		valuePacker.addInt(value);
 		return this;
 	}
@@ -610,6 +741,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putValueLong(long value)
 	throws WiredTigerPackingException {
+		valueUnpacker = null;
 		valuePacker.addLong(value);
 		return this;
 	}
@@ -622,6 +754,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putValueShort(short value)
 	throws WiredTigerPackingException {
+		valueUnpacker = null;
 		valuePacker.addShort(value);
 		return this;
 	}
@@ -634,6 +767,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public AsyncOp putValueString(String value)
 	throws WiredTigerPackingException {
+		valueUnpacker = null;
 		valuePacker.addString(value);
 		return this;
 	}
@@ -645,7 +779,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public byte getKeyByte()
 	throws WiredTigerPackingException {
-		return keyUnpacker.getByte();
+		return getKeyUnpacker().getByte();
 	}
 
 	/**
@@ -670,7 +804,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public void getKeyByteArray(byte[] output, int off, int len)
 	throws WiredTigerPackingException {
-		keyUnpacker.getByteArray(output, off, len);
+		getKeyUnpacker().getByteArray(output, off, len);
 	}
 
 	/**
@@ -680,7 +814,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public byte[] getKeyByteArray()
 	throws WiredTigerPackingException {
-		return keyUnpacker.getByteArray();
+		return getKeyUnpacker().getByteArray();
 	}
 
 	/**
@@ -690,7 +824,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public int getKeyInt()
 	throws WiredTigerPackingException {
-		return keyUnpacker.getInt();
+		return getKeyUnpacker().getInt();
 	}
 
 	/**
@@ -700,7 +834,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public long getKeyLong()
 	throws WiredTigerPackingException {
-		return keyUnpacker.getLong();
+		return getKeyUnpacker().getLong();
 	}
 
 	/**
@@ -710,7 +844,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public short getKeyShort()
 	throws WiredTigerPackingException {
-		return keyUnpacker.getShort();
+		return getKeyUnpacker().getShort();
 	}
 
 	/**
@@ -720,7 +854,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public String getKeyString()
 	throws WiredTigerPackingException {
-		return keyUnpacker.getString();
+		return getKeyUnpacker().getString();
 	}
 
 	/**
@@ -730,7 +864,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public byte getValueByte()
 	throws WiredTigerPackingException {
-		return valueUnpacker.getByte();
+		return getValueUnpacker().getByte();
 	}
 
 	/**
@@ -755,7 +889,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public void getValueByteArray(byte[] output, int off, int len)
 	throws WiredTigerPackingException {
-		valueUnpacker.getByteArray(output, off, len);
+		getValueUnpacker().getByteArray(output, off, len);
 	}
 
 	/**
@@ -765,7 +899,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public byte[] getValueByteArray()
 	throws WiredTigerPackingException {
-		return valueUnpacker.getByteArray();
+		return getValueUnpacker().getByteArray();
 	}
 
 	/**
@@ -775,7 +909,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public int getValueInt()
 	throws WiredTigerPackingException {
-		return valueUnpacker.getInt();
+		return getValueUnpacker().getInt();
 	}
 
 	/**
@@ -785,7 +919,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public long getValueLong()
 	throws WiredTigerPackingException {
-		return valueUnpacker.getLong();
+		return getValueUnpacker().getLong();
 	}
 
 	/**
@@ -795,7 +929,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public short getValueShort()
 	throws WiredTigerPackingException {
-		return valueUnpacker.getShort();
+		return getValueUnpacker().getShort();
 	}
 
 	/**
@@ -805,7 +939,7 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 	 */
 	public String getValueString()
 	throws WiredTigerPackingException {
-		return valueUnpacker.getString();
+		return getValueUnpacker().getString();
 	}
 
 	/**
@@ -854,12 +988,35 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
 		return ret;
 	}
+
+	/**
+	 * Set up the key unpacker or return previously cached value.
+	 *
+	 * \return The key unpacker.
+	 */
+	private PackInputStream getKeyUnpacker()
+	throws WiredTigerPackingException {
+		if (keyUnpacker == null)
+			keyUnpacker =
+			    new PackInputStream(keyFormat, get_key_wrap());
+		return keyUnpacker;
+	}
+
+	/**
+	 * Set up the value unpacker or return previously cached value.
+	 *
+	 * \return The value unpacker.
+	 */
+	private PackInputStream getValueUnpacker()
+	throws WiredTigerPackingException {
+		if (valueUnpacker == null)
+			valueUnpacker =
+			    new PackInputStream(valueFormat, get_value_wrap());
+		return valueUnpacker;
+	}
+
 %}
 
 %extend __wt_cursor {
@@ -1472,7 +1629,15 @@ WT_EVENT_HANDLER javaApiEventHandler = {NULL, NULL, NULL, javaCloseHandler};
 
 %rename(open) wiredtiger_open_wrap;
 %ignore __wt_connection::async_new_op;
+%javaexception("com.wiredtiger.db.WiredTigerException")
+     __wt_connection::async_new_op_wrap { $action; }
+%javamethodmodifiers __wt_connection::async_new_op_wrap "
+  /**
+   * @copydoc WT_CONNECTION::async_new_op
+   */
+  public ";
 %rename(async_new_op) __wt_connection::async_new_op_wrap;
+
 %ignore __wt_connection::open_session;
 %rename(open_session) __wt_connection::open_session_wrap;
 %ignore __wt_session::open_cursor;
@@ -1551,22 +1716,25 @@ err:	if (ret != 0)
 }
 
 %extend __wt_connection {
-	WT_SESSION *async_new_opwrap(JNIEnv *jenv, const char *uri,
-	    const char *config) {
-		extern WT_EVENT_HANDLER javaApiEventHandler;
+	WT_ASYNC_OP *async_new_op_wrap(JNIEnv *jenv, const char *uri,
+	    const char *config, jobject callbackObject) {
+		extern WT_ASYNC_CALLBACK javaApiAsyncHandler;
 		WT_ASYNC_OP *asyncop = NULL;
-                WT_CONNECTION_IMPL *connimpl;
+		WT_CONNECTION_IMPL *connimpl;
 		JAVA_CALLBACK *jcb;
 		int ret;
 
-		if ((ret = $self->async_new_op($self, uri, config, &javaApiEventHandler, &asyncop)) != 0)
+		if ((ret = $self->async_new_op($self, uri, config, &javaApiAsyncHandler, &asyncop)) != 0)
 			goto err;
 
-                connimpl = (WT_CONNECTION_IMPL *)$self;
+		connimpl = (WT_CONNECTION_IMPL *)$self;
 		if ((ret = __wt_calloc_def(connimpl->default_session, 1, &jcb)) != 0)
 			goto err;
 
 		jcb->jnienv = jenv;
+		(*jenv)->GetJavaVM(jenv, &jcb->javavm);
+		jcb->jcallback = JCALL1(NewGlobalRef, jcb->jnienv, callbackObject);
+		JCALL1(DeleteLocalRef, jcb->jnienv, callbackObject);
 		asyncop->c.lang_private = jcb;
 		asyncop->c.flags |= WT_CURSTD_RAW;
 

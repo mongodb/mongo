@@ -241,7 +241,6 @@ __rec_review(
 	WT_PAGE_MODIFY *mod;
 	WT_REF *child;
 	uint32_t flags;
-	int behind_checkpoint;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -293,44 +292,32 @@ __rec_review(
 		} WT_INTL_FOREACH_END;
 
 	/*
-	 * If the file is being checkpointed, we can't evict dirty pages already
-	 * visited during the checkpoint: if we write a page and free the
-	 * previous version of the page, that previous version might be
-	 * referenced by an internal page already been written in the
-	 * checkpoint, leaving the checkpoint inconsistent.
-	 *     Don't rely on new updates being skipped by the transaction used
+	 * If the file is being checkpointed, we can't evict dirty pages:
+	 * if we write a page and free the previous version of the page, that
+	 * previous version might be referenced by an internal page already
+	 * been written in the checkpoint, leaving the checkpoint inconsistent.
+	 *
+	 * Don't rely on new updates being skipped by the transaction used
 	 * for transaction reads: (1) there are paths that dirty pages for
 	 * artificial reasons; (2) internal pages aren't transactional; and
 	 * (3) if an update was skipped during the checkpoint (leaving the page
 	 * dirty), then rolled back, we could still successfully overwrite a
 	 * page and corrupt the checkpoint.
-	 *	Further, we can't race with the checkpoint's reconciliation of
+	 *
+	 * Further, we can't race with the checkpoint's reconciliation of
 	 * an internal page as we evict a clean child from the page's subtree.
 	 * This works in the usual way: eviction locks the page and then checks
 	 * for existing hazard pointers, the checkpoint thread reconciling an
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
 	 */
-	mod = page->modify;
-#ifdef EVICTION_DURING_CHECKPOINT
-	behind_checkpoint = btree->checkpointing && (mod != NULL) &&
-	    mod->checkpoint_gen >= btree->checkpoint_gen;
-#else
-	behind_checkpoint = btree->checkpointing && (mod != NULL);
-#endif
-
-	if (behind_checkpoint && __wt_page_is_modified(page)) {
+	if ((mod = page->modify) != NULL && btree->checkpointing &&
+	    (__wt_page_is_modified(page) ||
+	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
 	}
-
-	/*
-	 * If we behind a checkpoint, we can't merge multiblock pages into
-	 * their parent.
-	 */
-	if (behind_checkpoint && F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
-		return (EBUSY);
 
 	/*
 	 * Fail if any page in the top-level page's subtree won't be merged into

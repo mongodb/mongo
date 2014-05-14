@@ -317,6 +317,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->async_flush.desc = "async: number of async flush calls";
 	stats->async_full.desc = "async: number of times op allocation failed";
 	stats->async_max_queue.desc = "async: maximum work queue length";
+	stats->async_nowork.desc =
+	    "async: number of times worker found no work";
 	stats->async_op_alloc.desc = "async op allocation";
 	stats->async_op_compact.desc = "async op compact calls";
 	stats->async_op_insert.desc = "async op insert calls";
@@ -441,6 +443,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->async_flush.v = 0;
 	stats->async_full.v = 0;
 	stats->async_max_queue.v = 0;
+	stats->async_nowork.v = 0;
 	stats->async_op_alloc.v = 0;
 	stats->async_op_compact.v = 0;
 	stats->async_op_insert.v = 0;

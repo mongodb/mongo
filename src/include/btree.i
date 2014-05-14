@@ -323,6 +323,13 @@ static inline void
 __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_TXN_GLOBAL *txn_global;
+	uint64_t last_running;
+
+	txn_global = &S2C(session)->txn_global;
+
+	last_running = 0;
+	if (page->modify->write_gen == 0)
+		last_running = txn_global->last_running;
 
 	/*
 	 * We depend on atomic-add being a write barrier, that is, a barrier to
@@ -343,14 +350,17 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (F_ISSET(&session->txn, TXN_HAS_SNAPSHOT))
 			page->modify->disk_snap_min = session->txn.snap_min;
 
-		txn_global = &S2C(session)->txn_global;
-		page->modify->rec_skipped_txn = txn_global->last_running;
-
 		/*
-		 * Set the checkpoint generation: if a checkpoint is already
-		 * running, these changes cannot be included, by definition.
+		 * We won the race to dirty the page, but another thread could
+		 * have committed in the meantime, and the last_running field
+		 * been updated past it.  That is all very unlikely, but not
+		 * impossible, so we take care to read the global state before
+		 * the atomic increment.  If we raced with reconciliation, just
+		 * leave the previous value here: at worst, we will write a
+		 * page in a checkpoint when not absolutely necessary.
 		 */
-		page->modify->checkpoint_gen = S2BT(session)->checkpoint_gen;
+		if (last_running != 0)
+			page->modify->first_dirty_txn = last_running;
 	}
 
 	/* Check if this is the largest transaction ID to update the page. */

@@ -69,8 +69,8 @@ struct __wt_btree {
 	const char *value_format;	/* Value format */
 	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
-					/* Row-store comparison function */
-	WT_COLLATOR *collator;		/* Comparison function */
+	WT_COLLATOR *collator;		/* Row-store comparator */
+	int appending;			/* Row-store workload has appends */
 
 	uint32_t id;			/* File ID, for logging */
 
@@ -117,12 +117,6 @@ struct __wt_btree {
 	u_int    evict_walk_skips;	/* Number of walks skipped */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 
-	/*
-	 * The current checkpoint generation.  Use a 32-bit count for now: if
-	 * we can do 4 billion checkpoints without a restart, we'll be in good
-	 * shape.
-	 */
-	uint32_t checkpoint_gen;
 	int checkpointing;		/* Checkpoint in progress */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */

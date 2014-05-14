@@ -47,18 +47,23 @@ static int
 __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_METADATA *mdc;
+	WT_DECL_RET;
 	const char *value;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
-	/* The metadata search interface allocates a new string in value */
+
+	/* The metadata search interface allocates a new string in value. */
 	WT_RET(__wt_metadata_search(session, WT_METADATA_URI, &value));
+
 	/*
-	 * Copy the value in the underlying btree cursors tmp item
-	 * which will be free'd when the cursor is closed.
+	 * Copy the value to the underlying btree cursor's tmp item which will
+	 * be freed when the cursor is closed.
 	 */
 	if (F_ISSET(mdc, WT_MDC_TMP_USED))
 		__wt_buf_free(session, &mdc->tmp_val);
-	WT_RET(__wt_buf_set(session, &mdc->tmp_val, value, strlen(value)));
+	ret = __wt_buf_set(session, &mdc->tmp_val, value, strlen(value));
+	__wt_free(session, value);
+	WT_RET(ret);
 
 	cursor->key.data = WT_METADATA_URI;
 	cursor->key.size = strlen(WT_METADATA_URI);

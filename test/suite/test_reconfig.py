@@ -34,6 +34,33 @@ class test_reconfig(wttest.WiredTigerTestCase):
     def test_reconfig_shared_cache(self):
         self.conn.reconfigure("shared_cache=(name=pool,size=300M)")
 
+    def test_reconfig_async(self):
+        # Async starts off.  Reconfigure through all the various cases, each
+        # building from the previous state.
+        # Async is off, and remains off.
+        self.conn.reconfigure("async=(enabled=false)")
+        # Async is off, turn it on.
+        self.conn.reconfigure("async=(enabled=true)")
+        # Async is on, and remains on.
+        self.conn.reconfigure("async=(enabled=true)")
+        # Async is on, turn it off.
+        self.conn.reconfigure("async=(enabled=false)")
+        # Async is off, turn it on with ops_max and threads.
+        self.conn.reconfigure("async=(enabled=true,ops_max=512,threads=10)")
+        # Reconfigure and use same thread count. (no-op)
+        self.conn.reconfigure("async=(threads=10)")
+        # Reconfigure more threads.
+        self.conn.reconfigure("async=(threads=14)")
+        # Reconfigure fewer threads.
+        self.conn.reconfigure("async=(threads=8)")
+        # Reconfigure illegal ops_max (ignored).
+        self.conn.reconfigure("async=(ops_max=1024)")
+        # Turn async off.
+        self.conn.reconfigure("async=(enabled=false)")
+        # Async is off, turn it on.  Should end up with the
+        # same ops_max of 512 and thread of 8.
+        self.conn.reconfigure("async=(enabled=true)")
+
     def test_reconfig_statistics(self):
         self.conn.reconfigure("statistics=(all)")
         self.conn.reconfigure("statistics=(fast)")
@@ -44,6 +71,20 @@ class test_reconfig(wttest.WiredTigerTestCase):
         self.conn.reconfigure("checkpoint=(wait=5)")
         self.conn.reconfigure("checkpoint=(wait=0,name=hi)")
         self.conn.reconfigure("checkpoint=(wait=5,name=hi)")
+
+    def test_reconfig_stat_log(self):
+        self.conn.reconfigure("statistics=[all],statistics_log=(wait=0)")
+        self.conn.reconfigure("statistics_log=(wait=0)")
+        self.conn.reconfigure("statistics_log=(wait=2)")
+        self.conn.reconfigure("statistics_log=(wait=0)")
+        self.conn.reconfigure("statistics_log=(wait=2,sources=[lsm:])")
+        self.conn.reconfigure("statistics_log=(wait=0)")
+        self.conn.reconfigure("statistics_log=(wait=2,timestamp=\"t%b %d\")")
+        self.conn.reconfigure("statistics_log=(wait=0)")
+        self.conn.reconfigure("statistics_log=(wait=2,path=\"wts.%d.%H\")")
+        self.conn.reconfigure("statistics_log=(wait=0)")
+        self.conn.reconfigure(
+             "statistics_log=(wait=2,sources=[lsm:],timestamp=\"%b\")")
 
 if __name__ == '__main__':
     wttest.run()

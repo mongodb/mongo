@@ -1294,9 +1294,8 @@ __clsm_insert(WT_CURSOR *cursor)
 	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
 	ret = __clsm_put(session, clsm, &cursor->key, &value, 0);
 
-err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
-
-	__wt_scr_free(&buf);
+err:	__wt_scr_free(&buf);
+	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 
@@ -1324,9 +1323,8 @@ __clsm_update(WT_CURSOR *cursor)
 		ret = __clsm_put(session, clsm, &cursor->key, &value, 1);
 	}
 
-err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
-
-	__wt_scr_free(&buf);
+err:	__wt_scr_free(&buf);
+	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
 }
 

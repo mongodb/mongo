@@ -123,6 +123,7 @@ struct __wt_connection_stats {
 	WT_STATS async_flush;
 	WT_STATS async_full;
 	WT_STATS async_max_queue;
+	WT_STATS async_nowork;
 	WT_STATS async_op_alloc;
 	WT_STATS async_op_compact;
 	WT_STATS async_op_insert;

@@ -69,6 +69,10 @@ zlib_error(
 	return (WT_ERROR);
 }
 
+/*
+ * zalloc --
+ *	Allocate a scratch buffer.
+ */
 static void *
 zalloc(void *cookie, u_int number, u_int size)
 {
@@ -81,6 +85,10 @@ zalloc(void *cookie, u_int number, u_int size)
 	    wt_api, opaque->session, (size_t)(number * size)));
 }
 
+/*
+ * zfree --
+ *	Free a scratch buffer.
+ */
 static void
 zfree(void *cookie, void *p)
 {
@@ -92,6 +100,10 @@ zfree(void *cookie, void *p)
 	wt_api->scr_free(wt_api, opaque->session, p);
 }
 
+/*
+ * zlib_compress --
+ *	WiredTiger zlib compression.
+ */
 static int
 zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -113,24 +125,20 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.opaque = &opaque;
 
 	if ((ret = deflateInit(&zs, zlib_compressor->zlib_level)) != Z_OK)
-		return (zlib_error(
-		    compressor, session, "deflateInit", ret));
+		return (zlib_error(compressor, session, "deflateInit", ret));
 
 	zs.next_in = src;
 	zs.avail_in = (uint32_t)src_len;
 	zs.next_out = dst;
-	zs.avail_out = (uint32_t)dst_len - 1;
-	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
-		;
-	if (ret == Z_STREAM_END) {
+	zs.avail_out = (uint32_t)dst_len;
+	if (deflate(&zs, Z_FINISH) == Z_STREAM_END) {
 		*compression_failed = 0;
 		*result_lenp = zs.total_out;
 	} else
 		*compression_failed = 1;
 
-	if ((ret = deflateEnd(&zs)) != Z_OK)
-		return (
-		    zlib_error(compressor, session, "deflateEnd", ret));
+	if ((ret = deflateEnd(&zs)) != Z_OK && ret != Z_DATA_ERROR)
+		return (zlib_error(compressor, session, "deflateEnd", ret));
 
 	return (0);
 }
@@ -194,8 +202,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	if ((ret = deflateInit(&zs,
 	    zlib_compressor->zlib_level)) != Z_OK)
-		return (zlib_error(
-		    compressor, session, "deflateInit", ret));
+		return (zlib_error(compressor, session, "deflateInit", ret));
 
 	zs.next_in = src;
 	zs.next_out = dst;
@@ -204,7 +211,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * up a buffer.  If this isn't sufficient, we don't fail but we will be
 	 * inefficient.
 	 */
-#define	WT_ZLIB_RESERVED	12
+#define	WT_ZLIB_RESERVED	24
 	zs.avail_out = (uint32_t)(page_max - extra - WT_ZLIB_RESERVED);
 	last_zs = zs;
 
@@ -228,7 +235,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 				return (zlib_error(
 				    compressor, session, "deflate", ret));
 
-		/* Roll back the if the last deflate didn't complete. */
+		/* Roll back if the last deflate didn't complete. */
 		if (zs.avail_in > 0) {
 			zs = last_zs;
 			break;
@@ -237,22 +244,21 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	}
 
 	zs.avail_out += WT_ZLIB_RESERVED;
-	while ((ret = deflate(&zs, Z_FINISH)) == Z_OK)
-		;
+	ret = deflate(&zs, Z_FINISH);
+
 	/*
 	 * If the end marker didn't fit, report that we got no work done.  WT
 	 * will compress the (possibly large) page image using ordinary
 	 * compression instead.
 	 */
-	if (ret == Z_BUF_ERROR)
+	if (ret == Z_OK || ret == Z_BUF_ERROR)
 		last_slot = 0;
 	else if (ret != Z_STREAM_END)
 		return (
 		    zlib_error(compressor, session, "deflate end block", ret));
 
 	if ((ret = deflateEnd(&zs)) != Z_OK && ret != Z_DATA_ERROR)
-		return (
-		    zlib_error(compressor, session, "deflateEnd", ret));
+		return (zlib_error(compressor, session, "deflateEnd", ret));
 
 	if (last_slot > 0) {
 		*result_slotsp = last_slot;
@@ -273,6 +279,10 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	return (0);
 }
 
+/*
+ * zlib_decompress --
+ *	WiredTiger zlib decompression.
+ */
 static int
 zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -291,8 +301,7 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	zs.opaque = &opaque;
 
 	if ((ret = inflateInit(&zs)) != Z_OK)
-		return (zlib_error(
-		    compressor, session, "inflateInit", ret));
+		return (zlib_error(compressor, session, "inflateInit", ret));
 
 	zs.next_in = src;
 	zs.avail_in = (uint32_t)src_len;
@@ -312,6 +321,10 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    0 : zlib_error(compressor, session, "inflate", ret));
 }
 
+/*
+ * zlib_terminate --
+ *	WiredTiger zlib compression termination.
+ */
 static int
 zlib_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
@@ -321,6 +334,10 @@ zlib_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 	return (0);
 }
 
+/*
+ * zlib_add_compressor --
+ *	Add a zlib compressor.
+ */
 static int
 zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 {
@@ -352,6 +369,10 @@ zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 	    connection, name, &zlib_compressor->compressor, NULL));
 }
 
+/*
+ * wiredtiger_extension_init --
+ *	WiredTiger zlib compression extension.
+ */
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {

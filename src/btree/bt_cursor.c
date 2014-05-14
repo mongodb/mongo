@@ -153,9 +153,9 @@ __cursor_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
  *	Row-store search from an application cursor.
  */
 static inline int
-__cursor_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+__cursor_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int insert)
 {
-	return (__wt_row_search(session, &cbt->iface.key, NULL, cbt));
+	return (__wt_row_search(session, &cbt->iface.key, NULL, cbt, insert));
 }
 
 /*
@@ -228,7 +228,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_RET(__cursor_func_init(cbt, 1));
 
 	WT_ERR(btree->type == BTREE_ROW ?
-	    __cursor_row_search(session, cbt) :
+	    __cursor_row_search(session, cbt, 0) :
 	    __cursor_col_search(session, cbt));
 	if (cbt->compare != 0 || __cursor_invalid(cbt)) {
 		/*
@@ -276,8 +276,13 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 
 	WT_RET(__cursor_func_init(cbt, 1));
 
+	/*
+	 * Set the "insert" flag for the btree row-store search; we may intend
+	 * to position our cursor at the end of the tree, rather than match an
+	 * existing record.
+	 */
 	WT_ERR(btree->type == BTREE_ROW ?
-	    __cursor_row_search(session, cbt) :
+	    __cursor_row_search(session, cbt, 1) :
 	    __cursor_col_search(session, cbt));
 
 	/*
@@ -307,7 +312,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		exact = 1;
 	else {
 		WT_ERR(btree->type == BTREE_ROW ?
-		    __cursor_row_search(session, cbt) :
+		    __cursor_row_search(session, cbt, 1) :
 		    __cursor_col_search(session, cbt));
 		if (!__cursor_invalid(cbt)) {
 			exact = cbt->compare;
@@ -390,7 +395,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 			cbt->iface.recno = cbt->recno;
 		break;
 	case BTREE_ROW:
-		WT_ERR(__cursor_row_search(session, cbt));
+		WT_ERR(__cursor_row_search(session, cbt, 1));
 		/*
 		 * If not overwriting, fail if the key exists, else insert the
 		 * key/value pair.
@@ -464,7 +469,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		break;
 	case BTREE_ROW:
 		/* Remove the record if it exists. */
-		WT_ERR(__cursor_row_search(session, cbt));
+		WT_ERR(__cursor_row_search(session, cbt, 0));
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			WT_ERR(WT_NOTFOUND);
 
@@ -540,7 +545,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		ret = __cursor_col_modify(session, cbt, 0);
 		break;
 	case BTREE_ROW:
-		WT_ERR(__cursor_row_search(session, cbt));
+		WT_ERR(__cursor_row_search(session, cbt, 1));
 		/*
 		 * If not overwriting, fail if the key does not exist.
 		 */
