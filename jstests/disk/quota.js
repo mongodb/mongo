@@ -11,10 +11,11 @@ db = m.getDB( baseName );
 big = new Array( 10000 ).toString();
 
 // Insert documents until quota is exhausted.
-while( !db.getLastError() ) {
-    db[ baseName ].save( {b:big} );
+var coll = db[ baseName ];
+var res = coll.insert({ b: big });
+while( !res.hasWriteError() ) {
+    res = coll.insert({ b: big });
 }
-printjson( db.getLastError() );
 
 dotTwoDataFile = baseName + ".2";
 files = listFiles( dbpath );
@@ -27,8 +28,7 @@ dotTwoDataFile = "local" + ".2";
 // Check that quota does not apply to local db, and a .2 file can be created.
 l = m.getDB( "local" )[ baseName ];
 for( i = 0; i < 10000; ++i ) {
-    l.save( {b:big} );
-    assert( !db.getLastError() );
+    assert.writeOK(l.insert({ b: big }));
     dotTwoFound = false;
     if ( i % 100 != 0 ) {
         continue;

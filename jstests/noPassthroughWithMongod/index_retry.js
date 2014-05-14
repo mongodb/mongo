@@ -12,13 +12,14 @@ t.drop();
 
 // Insert a large number of documents, enough to ensure that an index build on these documents can
 // be interrupted before complete.
+var bulk = t.initializeUnorderedBulkOp();
 for (i = 0; i < 5e5; ++i) {
-    t.save( { a:i } );
+    bulk.insert({ a: i });
     if (i % 10000 == 0) {
         print("i: " + i);
     }
 }
-test.getLastError();
+assert.writeOK(bulk.execute());
 
 function debug(x) {
     printjson(x);
@@ -36,14 +37,15 @@ function indexBuildInProgress() {
             // Identify the index build as an insert into the 'test.system.indexes'
             // namespace.  It is assumed that no other clients are concurrently
             // accessing the 'test' database.
-            if ( op.op == 'insert' && op.ns == 'test.system.indexes' ) {
+            if ( op.op == 'query' && 'createIndexes' in op.query ) {
                 debug(op.opid);
+                var idxSpec = op.query.indexes[0];
                 // SERVER-4295 Make sure the index details are there
                 // we can't assert these things, since there is a race in reporting
                 // but we won't count if they aren't
-                if ( "a_1" == op.insert.name &&
-                     1 == op.insert.key.a &&
-                     op.insert.background ) {
+                if ( "a_1" == idxSpec.name &&
+                     1 == idxSpec.key.a &&
+                     idxSpec.background ) {
                     indexBuildOpId = op.opid;
                 }
             }
@@ -53,10 +55,9 @@ function indexBuildInProgress() {
 }
 
 function abortDuringIndexBuild(options) {
-
-    // Create an index asynchronously by using a new connection.
-    new Mongo(test.getMongo().host).getCollection(t.toString()).createIndex( 
-        { a:1 }, { background:true } );
+    var createIdx = startParallelShell('var coll = db.jstests_slownightly_index_retry; \
+                                        coll.createIndex({ a: 1 }, { background: true });',
+                                       ports[0]);
 
     // Wait for the index build to start.
     var times = 0;
@@ -68,6 +69,7 @@ function abortDuringIndexBuild(options) {
 
     print("killing the mongod");
     stopMongod(ports[0], /* signal */ 9);
+    createIdx();
 }
 
 abortDuringIndexBuild();

@@ -62,10 +62,8 @@ function work() {
 
     d.dropDatabase();
 
-    d.foo.insert({ _id: 100 });
-
     // assure writes applied in case we kill -9 on return from this function
-    assert(d.runCommand({ getlasterror: 1, fsync: 1 }).ok, "getlasterror not ok");
+    assert.writeOK(d.foo.insert({ _id: 100 }, { writeConcern: { fsync: 1 }}));
 }
 
 function verify() {

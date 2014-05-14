@@ -16,11 +16,11 @@ assert.soon( function() { return secondary.getDB( 'test' ).test.count() == 1; } 
 
 // Start a parallel shell to insert new documents on the primary.
 inserter = startParallelShell(
-    'for( i = 1; i < ' + numDocs + '; ++i ) { \
-         db.test.save( { a:i } );             \
-         sleep( 1 );                          \
-     }                                        \
-     db.getLastError();'
+    'var bulk = db.test.initializeUnorderedBulkOp(); \
+     for( i = 1; i < ' + numDocs + '; ++i ) { \
+         bulk.insert({ a: i });  \
+     } \
+     bulk.execute();'
 );
 
 // Periodically kill replication get mores.

@@ -449,14 +449,11 @@ def skipTest(path):
 
     return False
 
-forceCommandsForDirs = ["aggregation", "auth", "core", "parallel", "replsets", "sharding"]
-# look for jstests and one of the above suites separated by either posix or windows slashes
-forceCommandsRE = re.compile(r"jstests[/\\](%s)" % ('|'.join(forceCommandsForDirs)))
+legacyWriteRE = re.compile(r"jstests[/\\]multiVersion")
 def setShellWriteModeForTest(path, argv):
     swm = shell_write_mode
-    if swm == "legacy": # change when the default changes to "commands"
-        if use_write_commands or forceCommandsRE.search(path):
-            swm = "commands"
+    if legacyWriteRE.search(path):
+        swm = "legacy"
     argv += ["--writeMode", swm]
 
 def runTest(test, result):
@@ -1223,7 +1220,7 @@ def main():
     parser.add_option('--use-write-commands', dest='use_write_commands', default=False,
                       action='store_true',
                       help='Deprecated(use --shell-write-mode): Sets the shell to use write commands by default')
-    parser.add_option('--shell-write-mode', dest='shell_write_mode', default="legacy",
+    parser.add_option('--shell-write-mode', dest='shell_write_mode', default="commands",
                       help='Sets the shell to use a specific write mode: commands/compatibility/legacy (default:legacy)')
 
     global tests

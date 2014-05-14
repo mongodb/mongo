@@ -14,16 +14,17 @@ var i = 0;
 
 while ( true ){
     var fill = function() {
+        var bulk = t.initializeUnorderedBulkOp();
         for ( ; i<N; i++ ){
-            t.insert( { _id : i , n : 1 } );
+            bulk.insert({ _id: i, n: 1 });
         }
+        assert.writeOK(bulk.execute());
     };
 
     var timeUpdate = function() {
         return Date.timeFunc(
             function(){
                 t.update( {} , { $inc : { n : 1 } } , false , true );
-                var r = db.getLastErrorObj();
             }
         );
     };
@@ -50,7 +51,7 @@ function haveInProgressUpdate() {
 
 // --- test 1
 
-var join = startParallelShell( "db.update_yield1.update( {} , { $inc : { n : 1 } } , false , true ); db.getLastError()" );
+var join = startParallelShell( "db.update_yield1.update( {}, { $inc: { n: 1 }}, false, true );" );
 assert.soon(haveInProgressUpdate, "never doing update");
 
 var num = 0;

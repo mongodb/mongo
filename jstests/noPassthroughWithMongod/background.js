@@ -7,45 +7,41 @@ t.drop();
 
 var a = new Mongo( db.getMongo().host ).getDB( db.getName() );
 
+var bulk = t.initializeUnorderedBulkOp();
 for( var i = 0; i < 100000; i++ ) {
-	t.insert({y:'aaaaaaaaaaaa',i:i});
-	if( i % 10000 == 0 ) {
-		db.getLastError();
-		print(i);
-	}
+    bulk.insert({ y: 'aaaaaaaaaaaa', i: i });
+    if( i % 10000 == 0 ) {
+        assert.writeOK(bulk.execute());
+        bulk = t.initializeUnorderedBulkOp();
+        print(i);
+    }
 }
-
-//db.getLastError();
 
 // start bg indexing
 a.system.indexes.insert({ns:"test.bg1", key:{i:1}, name:"i_1", background:true});
 
 // add more data
-
+bulk = t.initializeUnorderedBulkOp();
 for( var i = 0; i < 100000; i++ ) {
-	t.insert({i:i});
-	if( i % 10000 == 0 ) {
-		printjson( db.currentOp() );
-		db.getLastError();
-		print(i);
-	}
+    bulk.insert({ i: i });
+    if( i % 10000 == 0 ) {
+        printjson( db.currentOp() );
+        assert.writeOK(bulk.execute());
+        bulk = t.initializeUnorderedBulkOp();
+        print(i);
+    }
 }
 
-printjson( db.getLastErrorObj() );
+assert.writeOK(bulk.execute());
 
 printjson( db.currentOp() );
 
-for( var i = 0; i < 40; i++ ) { 
-	if( db.currentOp().inprog.length == 0 )
-		break;
-	print("waiting");
-	sleep(1000);
+for( var i = 0; i < 40; i++ ) {
+    if( db.currentOp().inprog.length == 0 )
+        break;
+    print("waiting");
+    sleep(1000);
 }
 
-printjson( a.getLastErrorObj() );
-
 var idx = t.getIndexes();
-// print("indexes:");
-// printjson(idx);
-
 assert( idx[1].key.i == 1 );

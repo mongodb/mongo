@@ -8,13 +8,14 @@ rt = new ReplTest( "repl21tests" );
 master = rt.start( true );
 mc = master.getDB( 'd' )[ 'c' ];
 
-for( i = 0; i < 100000; ++i ) {
-    mc.insert( { _id:i, z:i } );
+var bulk = mc.initializeUnorderedBulkOp();
+for(var i = 0; i < 100000; ++i) {
+    bulk.insert({ _id: i, z: i });
 }
 
 targetId = 1000*1000;
-mc.insert( { _id:targetId, val:[ 1 ] } );
-master.getDB( 'd' ).getLastError();
+bulk.insert({ _id: targetId, val: [ 1 ] });
+assert.writeOK(bulk.execute());
 
 slave = rt.start( false );
 sc = slave.getDB( 'd' )[ 'c' ];
