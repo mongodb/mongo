@@ -38,7 +38,7 @@
 namespace mongo {
 
     class Cloner;
-    struct HowToFixUp;
+    struct FixUpInfo;
     class ReplSetCmdline;
 
     class ReplicationStartSynchronizer {
@@ -281,7 +281,7 @@ namespace mongo {
         void _syncThread();
         void syncTail();
         unsigned _syncRollback(OplogReader& r);
-        void syncFixUp(HowToFixUp& h, OplogReader& r);
+        void syncFixUp(FixUpInfo& h, OplogReader& r);
 
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
