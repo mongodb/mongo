@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
+#include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
