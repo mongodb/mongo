@@ -258,23 +258,18 @@ namespace mongo {
                 //
                 WorkingSet* sharedWs = new WorkingSet();
 
-                PlanStage* root, *backupRoot=NULL;
+                PlanStage *root, *backupRoot=NULL;
                 verify(StageBuilder::build(collection, *qs, sharedWs, &root));
                 if ((plannerParams.options & QueryPlannerParams::PRIVATE_IS_COUNT)
                     && turnIxscanIntoCount(qs)) {
-                    // If our cached solution is a hit for a count query,
-                    // try to turn it into a fast count thing.
                     LOG(2) << "Using fast count: " << canonicalQuery->toStringShort()
                            << ", planSummary: " << getPlanSummary(*qs);
 
                     if (NULL != backupQs) {
-                        // should all queries that can be answered by an index scan
-                        // go through this path?  e.g. if there's a compound index on A,B
-                        // and we're looking for B where A=some-constant?
-                        //
-                        // if not, what's special about count?
                         delete backupQs;
                     }
+                }
+                else if (NULL != backupQs) {
                     verify(StageBuilder::build(collection, *backupQs, sharedWs, &backupRoot));
                 }
 
