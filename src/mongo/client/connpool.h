@@ -33,6 +33,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/export_macros.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/background.h"
 
@@ -268,8 +269,8 @@ namespace mongo {
 
     class MONGO_CLIENT_API AScopedConnection : boost::noncopyable {
     public:
-        AScopedConnection() { _numConnections++; }
-        virtual ~AScopedConnection() { _numConnections--; }
+        AScopedConnection() { _numConnections.fetchAndAdd(1); }
+        virtual ~AScopedConnection() { _numConnections.fetchAndAdd(-1); }
 
         virtual DBClientBase* get() = 0;
         virtual void done() = 0;
@@ -283,10 +284,10 @@ namespace mongo {
         /**
          * @return total number of current instances of AScopedConnection
          */
-        static int getNumConnections() { return _numConnections; }
+        static int getNumConnections() { return _numConnections.load(); }
 
     private:
-        static AtomicUInt _numConnections;
+        static AtomicInt32 _numConnections;
     };
 
     /** Use to get a connection from the pool.  On exceptions things
