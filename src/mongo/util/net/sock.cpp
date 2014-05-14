@@ -260,7 +260,8 @@ namespace mongo {
         }
             
         case AF_UNIX:  
-            return (addressSize > 2 ? as<sockaddr_un>().sun_path : "anonymous unix socket");
+            return (as<sockaddr_un>().sun_path[0] != '\0' ? as<sockaddr_un>().sun_path :
+                "anonymous unix socket");
         case AF_UNSPEC: 
             return "(NONE)";
         default: 
