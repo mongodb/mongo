@@ -35,7 +35,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
-#include "mongo/bson/util/atomic_int.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
@@ -79,7 +79,7 @@ namespace mongo {
         public:
 
             SSLThreadInfo() {
-                _id = ++_next;
+                _id = _next.fetchAndAdd(1);
             }
 
             ~SSLThreadInfo() {
@@ -113,7 +113,7 @@ namespace mongo {
         private:
             unsigned _id;
 
-            static AtomicUInt _next;
+            static AtomicUInt32 _next;
             // Note: see SERVER-8734 for why we are using a recursive mutex here.
             // Once the deadlock fix in OpenSSL is incorporated into most distros of
             // Linux, this can be changed back to a nonrecursive mutex.
@@ -129,7 +129,7 @@ namespace mongo {
             SSLThreadInfo::get()->lock_callback( mode , type , file , line );
         }
 
-        AtomicUInt SSLThreadInfo::_next;
+        AtomicUInt32 SSLThreadInfo::_next;
         std::vector<boost::recursive_mutex*> SSLThreadInfo::_mutex;
         boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
 
