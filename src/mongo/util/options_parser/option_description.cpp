@@ -107,6 +107,14 @@ namespace optionenvironment {
             throw DBException(sb.str(), ErrorCodes::InternalError);
         }
 
+        // It doesn't make sense to set a "default value" for switch options, so disallow it here
+        if (_type == Switch) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << _dottedName << "\": "
+                << "the default value of a Switch option is false and cannot be changed";
+            throw DBException(sb.str(), ErrorCodes::InternalError);
+        }
+
         _default = defaultValue;
         return *this;
     }
@@ -129,6 +137,15 @@ namespace optionenvironment {
             sb << "Could not register option \"" << _dottedName << "\": "
             << "mismatch between declared type and type of implicit value: "
             << ret.toString();
+            throw DBException(sb.str(), ErrorCodes::InternalError);
+        }
+
+        // It doesn't make sense to set an "implicit value" for switch options since they can never
+        // have an argument anyway, so disallow it here
+        if (_type == Switch) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << _dottedName << "\": "
+                << "the implicit value of a Switch option is true and cannot be changed";
             throw DBException(sb.str(), ErrorCodes::InternalError);
         }
 

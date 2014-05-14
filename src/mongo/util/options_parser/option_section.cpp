@@ -138,6 +138,12 @@ namespace optionenvironment {
                             *boostType = std::auto_ptr<po::value_semantic>(po::bool_switch());
                             return Status::OK();
                         }
+                        else {
+                            // Switches should be true if they are present with no explicit value.
+                            *boostType = std::auto_ptr<po::typed_value<bool> >(po::value<bool>()
+                                                                            ->implicit_value(true));
+                            return Status::OK();
+                        }
                     }
                 case Bool:
                     {

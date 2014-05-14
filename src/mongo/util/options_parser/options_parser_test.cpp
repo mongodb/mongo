@@ -964,8 +964,13 @@ namespace {
         ASSERT_EQUALS(str, "NotCommented");
     }
 
-    // Ensure switches can be set to false in INI config files and handled differently from the "not
-    // present" case.
+    // Ensure switches in INI config files have the correct semantics.
+    //
+    // Switches have the following semantics:
+    // - Present on the command line -> set to true
+    // - Present in the config file -> set to value in config file
+    // - Present in the config file with no value (INI only) -> set to true
+    // - Not present -> not set to any value
     TEST(INIConfigFile, Switches) {
         OptionsParserTester parser;
         moe::Environment environment;
@@ -976,6 +981,7 @@ namespace {
         testOpts.addOptionChaining("switch2", "switch2", moe::Switch, "switch2");
         testOpts.addOptionChaining("switch3", "switch3", moe::Switch, "switch3");
         testOpts.addOptionChaining("switch4", "switch4", moe::Switch, "switch4");
+        testOpts.addOptionChaining("switch5", "switch5", moe::Switch, "switch5");
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -984,12 +990,8 @@ namespace {
         argv.push_back("--switch1");
         std::map<std::string, std::string> env_map;
 
-        parser.setConfig("default.conf", "switch2=true\nswitch3=false");
+        parser.setConfig("default.conf", "switch2=true\nswitch3=false\nswitch5=");
 
-        // Switches have the following semantics:
-        // - Present on the command line -> set to true
-        // - Present in the config file -> set to value in config file
-        // - Not present -> not set to any value
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
         bool switch1;
         ASSERT_OK(environment.get(moe::Key("switch1"), &switch1));
@@ -1002,6 +1004,9 @@ namespace {
         ASSERT_FALSE(switch3);
         bool switch4;
         ASSERT_NOT_OK(environment.get(moe::Key("switch4"), &switch4));
+        bool switch5;
+        ASSERT_OK(environment.get(moe::Key("switch5"), &switch5));
+        ASSERT_TRUE(switch5);
     }
 
     TEST(INIConfigFile, Monkeys) {
