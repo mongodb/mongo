@@ -923,7 +923,7 @@ namespace mongo {
             storageGlobalParams.useHints = !params["nohints"].as<bool>();
         }
         if (params.count("nopreallocj")) {
-            storageGlobalParams.preallocj = params["nopreallocj"].as<bool>();
+            storageGlobalParams.preallocj = !params["nopreallocj"].as<bool>();
         }
 
         if (params.count("net.http.RESTInterfaceEnabled")) {
