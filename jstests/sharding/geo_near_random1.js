@@ -22,7 +22,7 @@ for (var i = (test.nPts/10); i < test.nPts; i+= (test.nPts/10)){
             to: ('shard000' + (i%3)), _waitForDelete: true });
     } catch (e) {
         // ignore this error
-        if (! e.match(/that chunk is already on that shard/)){
+        if (! e.message.match(/that chunk is already on that shard/)){
             throw e;
         }
     }

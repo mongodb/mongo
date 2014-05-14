@@ -261,7 +261,7 @@ function assertErrorCode(coll, pipe, code, errmsg) {
         var cursor = new DBCommandCursor(coll.getMongo(), cursorRes, followupBatchSize);
 
         var error = assert.throws(function(){cursor.itcount()}, [], "expected error: " + code);
-        if (!error.search(code)) {
+        if (!error.message.search(code)) {
             assert(false, "expected error: " + code + " got: " + error);
         }
     }

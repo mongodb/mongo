@@ -515,7 +515,7 @@ shellHelper = function( command , rest , shouldPrint ){
     var args = rest.trim().replace(/\s*;$/,"").split( "\s+" );
     
     if ( ! shellHelper[command] )
-        throw "no command [" + command + "]";
+        throw Error( "no command [" + command + "]" );
     
     var res = shellHelper[command].apply( null , args );
     if ( shouldPrint ){
@@ -726,7 +726,7 @@ shellHelper.show = function (what) {
         }
     }
 
-    throw "don't know how to show [" + what + "]";
+    throw Error( "don't know how to show [" + what + "]" );
 
 }
 

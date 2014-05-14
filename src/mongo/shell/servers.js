@@ -8,7 +8,7 @@ _parsePath = function() {
             dbpath = arguments[ i + 1 ];
 
     if ( dbpath == "" )
-        throw "No dbpath specified";
+        throw Error("No dbpath specified");
 
     return dbpath;
 }
@@ -20,7 +20,7 @@ _parsePort = function() {
             port = arguments[ i + 1 ];
 
     if ( port == "" )
-        throw "No port specified";
+        throw Error("No port specified");
     return port;
 }
 

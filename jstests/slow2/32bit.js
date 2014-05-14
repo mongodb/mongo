@@ -106,7 +106,7 @@ function f() {
             print(res.result);
             printjson(res);
             //mydb.dropDatabase();
-            throw "fail validating 32bit.js";
+            throw Error("fail validating 32bit.js");
         }
 
         mydb.dropDatabase();

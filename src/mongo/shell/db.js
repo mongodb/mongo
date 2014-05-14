@@ -40,7 +40,7 @@ DB.prototype.commandHelp = function( name ){
     c.help = true;
     var res = this.runCommand( c );
     if ( ! res.ok )
-        throw res.errmsg;
+        throw Error(res.errmsg);
     return res.help;
 }
 
@@ -125,7 +125,7 @@ DB.prototype.getProfilingLevel  = function() {
 DB.prototype.getProfilingStatus  = function() {
     var res = this._dbCommand( { profile: -1 } );
     if ( ! res.ok )
-        throw "profile command failed: " + tojson( res );
+        throw Error( "profile command failed: " + tojson( res ) );
     delete res.ok
     return res;
 }
@@ -138,7 +138,7 @@ DB.prototype.getProfilingStatus  = function() {
  */
 DB.prototype.dropDatabase = function() {
     if ( arguments.length )
-        throw "dropDatabase doesn't take arguments";
+        throw Error("dropDatabase doesn't take arguments");
     return this._dbCommand( { dropDatabase: 1 } );
 }
 
@@ -164,8 +164,8 @@ DB.prototype.shutdownServer = function(opts) {
     try {
         var res = this.runCommand(cmd);
         if( res )
-            throw "shutdownServer failed: " + res.errmsg;
-        throw "shutdownServer failed";
+            throw Error( "shutdownServer failed: " + res.errmsg );
+        throw Error( "shutdownServer failed" );
     }
     catch ( e ){
         assert( tojson( e ).indexOf( "error doing query: failed" ) >= 0 , "unexpected error: " + tojson( e ) );
@@ -399,7 +399,7 @@ DB.prototype.eval = function(jsfunction) {
     var res = this._dbCommand( cmd );
     
     if (!res.ok)
-        throw tojson( res );
+        throw Error( tojson( res ) );
     
     return res.retval;
 }
@@ -483,7 +483,7 @@ DB.prototype.groupeval = function(parmsObj) {
 DB.prototype.groupcmd = function( parmsObj ){
     var ret = this.runCommand( { "group" : this._groupFixParms( parmsObj ) } );
     if ( ! ret.ok ){
-        throw "group command failed: " + tojson( ret );
+        throw Error( "group command failed: " + tojson( ret ) );
     }
     return ret.retval;
 }
@@ -517,7 +517,7 @@ DB.prototype.forceError = function(){
 DB.prototype.getLastError = function( w , wtimeout ){
     var res = this.getLastErrorObj( w , wtimeout );
     if ( ! res.ok )
-        throw "getlasterror failed: " + tojson( res );
+        throw Error( "getlasterror failed: " + tojson( res ) );
     return res.err;
 }
 DB.prototype.getLastErrorObj = function( w , wtimeout ){
@@ -530,7 +530,7 @@ DB.prototype.getLastErrorObj = function( w , wtimeout ){
     var res = this.runCommand( cmd );
 
     if ( ! res.ok )
-        throw "getlasterror failed: " + tojson( res );
+        throw Error( "getlasterror failed: " + tojson( res ) );
     return res;
 }
 DB.prototype.getLastErrorCmd = DB.prototype.getLastErrorObj;
@@ -589,7 +589,7 @@ DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
     if( !op ) 
-        throw "no opNum to kill specified";
+        throw Error("no opNum to kill specified");
     return this.$cmd.sys.killop.findOne({'op':op});
 }
 DB.prototype.killOP = DB.prototype.killOp;
@@ -880,7 +880,7 @@ DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
             print( "Creating user seems to have succeeded but threw an exception because we no " +
                    "longer have auth." );
         } else {
-            throw "Could not insert into system.users: " + tojson(e);
+            throw Error( "Could not insert into system.users: " + tojson(e) );
         }
     }
     print("Successfully added user: " + getUserObjString(userObj));
@@ -922,15 +922,15 @@ DB.prototype._addUserWithInsert = function(userObj, replicatedTo, timeout) {
     }
 
     if (le.err == "timeout") {
-        throw "timed out while waiting for user authentication to replicate - " +
-              "database will not be fully secured until replication finishes"
+        throw Error( "timed out while waiting for user authentication to replicate - " +
+              "database will not be fully secured until replication finishes" )
     }
 
     if (le.err.startsWith("E11000 duplicate key error")) {
-        throw "User already exists with that username/userSource combination";
+        throw Error("User already exists with that username/userSource combination");
     }
 
-    throw "couldn't add user: " + le.err;
+    throw Error( "couldn't add user: " + le.err );
 }
 
 /**
@@ -1017,7 +1017,7 @@ function _hashPassword(username, password) {
 // TODO(spencer): remove this form from v2.8
 DB.prototype._addUserDeprecatedV22Version = function(username, pass, readOnly, replicatedTo, timeout) {
     if ( pass == null || pass.length == 0 )
-        throw "password can't be empty";
+        throw Error("password can't be empty");
 
     var userObjForCommand = { user: username, pwd: pass };
     if (this.getName() == "admin") {
@@ -1153,7 +1153,7 @@ DB.prototype._removeUserV1 = function(username, writeConcern) {
     var le = db.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
 
     if (le.err) {
-        throw "Couldn't remove user: " + le.err;
+        throw Error( "Couldn't remove user: " + le.err );
     }
 
     if (le.n == 1) {

@@ -78,7 +78,7 @@ function doQueryOn(p) {
     }
     catch(e) {
         if (typeof(JSON) != "undefined") {
-            err = JSON.parse(e.substring(6));
+            err = JSON.parse(e.message.substring(6));
         }
         else if (e.indexOf("13") > 0) {
             err.code = 13;

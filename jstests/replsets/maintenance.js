@@ -78,7 +78,7 @@ var ex = assert.throws(
 	[] /*no params*/,
 	"getmore didn't fail")
 
-assert(ex.match("13436"), "wrong error code -- " + ex );
+assert(ex.message.match("13436"), "wrong error code -- " + ex );
 
 result = conns[1].getDB("admin").runCommand({replSetMaintenance : 0});
 assert.eq(result.ok, 1, tojson(result));
