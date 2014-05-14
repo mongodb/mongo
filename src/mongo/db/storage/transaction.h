@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 
@@ -39,21 +40,65 @@ namespace mongo {
 
     /**
      * This name and this class are both a work in progress.
+     *
+     * TODO(hk): move up a level, rename to OperationContext (or OpCtx if you're into the whole
+     * brevity thing)
      */
     class TransactionExperiment  {
         MONGO_DISALLOW_COPYING(TransactionExperiment);
     public:
         virtual ~TransactionExperiment() { }
 
+        /**
+         * Interface for durability.  Caller DOES NOT own pointer.
+         *
+         * XXX: what's a better name for this
+         */
+        virtual RecoveryUnit* recoveryUnit() const = 0;
+
+        // XXX: migrate callers use the recoveryUnit() directly
+        template <typename T>
+        T* writing(T* x) {
+            return recoveryUnit()->writing(x);
+        }
+
+        int& writingInt(int& d) {
+            return recoveryUnit()->writingInt(d);
+        }
+
+        void syncDataAndTruncateJournal() {
+            recoveryUnit()->syncDataAndTruncateJournal();
+        }
+
+        void createdFile(const std::string& filename, unsigned long long len) {
+            recoveryUnit()->createdFile(filename, len);
+        }
+
+        void* writingPtr(void* data, size_t len) {
+            return recoveryUnit()->writingPtr(data, len);
+        }
+
+        bool isCommitNeeded() const {
+            return recoveryUnit()->isCommitNeeded();
+        }
+
+        bool commitIfNeeded(bool force = false) {
+            return recoveryUnit()->commitIfNeeded(force);
+        }
+        // XXX: migrate callers use the recoveryUnit() directly
+
+
         // --- operation level info? ---
 
         /**
+         * TODO: Get rid of this and just have one interrupt func?
          * throws an exception if the operation is interrupted
          * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
          */
         virtual void checkForInterrupt(bool heedMutex = true) const = 0;
 
         /**
+         * TODO: Where do I go
          * @return Status::OK() if not interrupted
          *         otherwise returns reasons
          */
@@ -66,64 +111,6 @@ namespace mongo {
                                           const std::string& name = "Progress",
                                           unsigned long long progressMeterTotal = 0,
                                           int secondsBetween = 3) = 0;
-
-        // --- write unit of work methods ---
-
-        /**
-         * Commit if required.  May take a long time.  Returns true if committed.
-         *
-         * WARNING: Data *must* be in a crash-recoverable state when this is called.
-         */
-        virtual bool commitIfNeeded(bool force = false) = 0;
-
-        /**
-         * Returns true if a commit is needed but does not commit.
-         */
-        virtual bool isCommitNeeded() const = 0;
-
-        /**
-         * Declare that the data at [x, x + len) is being written.
-         */
-        virtual void* writingPtr(void* data, size_t len) = 0;
-
-        /**
-         * Declare that a file has been created
-         *
-         * Normally writes are applied only after journaling, for safety.  But here the file
-         * is created first, and the journal will just replay the creation if the create didn't
-         * happen because of crashing.
-         */
-        virtual void createdFile(const std::string& filename, unsigned long long len) = 0;
-
-        /**
-         * Commits pending changes, flushes all changes to main data files, then removes the
-         * journal.
-         *
-         * WARNING: Data *must* be in a crash-recoverable state when this is called.
-         *
-         * This is useful as a "barrier" to ensure that writes before this call will never go
-         * through recovery and be applied to files that have had changes made after this call
-         * applied.
-         */
-        virtual void syncDataAndTruncateJournal() = 0;
-
-        //
-        // Sugar methods
-        //
-
-        /**
-         * Declare write intent for an int
-         */
-        inline int& writingInt(int& d) { return *writing( &d ); }
-
-        /**
-         * A templated helper for writingPtr.
-         */
-        template <typename T>
-        inline T* writing(T* x) {
-            writingPtr(x, sizeof(T));
-            return x;
-        }
 
         /**
          * Returns a TransactionExperiment. Caller takes ownership.

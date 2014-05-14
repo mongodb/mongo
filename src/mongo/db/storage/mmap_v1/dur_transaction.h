@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/db/storage/transaction.h"
@@ -35,28 +36,20 @@
 namespace mongo {
 
     /**
-     * Just pass through to getDur().
+     * TODO(hk): Move to db/ and rename to OperationContextMongoDImpl or something better?
      */
     class DurTransaction : public TransactionExperiment  {
     public:
-        DurTransaction() { }
+        DurTransaction();
 
         virtual ~DurTransaction() { }
 
-        virtual bool commitIfNeeded(bool force = false);
-
-        virtual bool isCommitNeeded() const;
+        virtual RecoveryUnit* recoveryUnit() const;
 
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name ,
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween);
-
-        virtual void* writingPtr(void* data, size_t len);
-
-        virtual void createdFile(const std::string& filename, unsigned long long len);
-
-        virtual void syncDataAndTruncateJournal();
 
         virtual void checkForInterrupt(bool heedMutex = true) const;
 
@@ -67,6 +60,8 @@ namespace mongo {
          */
         static TransactionExperiment* factory();
 
+    private:
+        boost::scoped_ptr<RecoveryUnit> _recovery;
     };
 
 }  // namespace mongo

@@ -26,44 +26,32 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include <string>
 
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/kill_current_op.h"
-#include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
+#include "mongo/db/storage/recovery_unit.h"
+
+#pragma once
 
 namespace mongo {
 
-    DurTransaction::DurTransaction() {
-        _recovery.reset(new DurRecoveryUnit());
-    }
+    /**
+     * Just pass through to getDur().
+     */
+    class DurRecoveryUnit : public RecoveryUnit {
+    public:
+        DurRecoveryUnit() { }
 
-    RecoveryUnit* DurTransaction::recoveryUnit() const {
-        return _recovery.get();
-    }
+        virtual ~DurRecoveryUnit() { }
 
-    ProgressMeter* DurTransaction::setMessage(const char* msg,
-                                              const std::string& name,
-                                              unsigned long long progressMeterTotal,
-                                              int secondsBetween) {
-        return &cc().curop()->setMessage( msg, name, progressMeterTotal, secondsBetween );
-    }
+        virtual bool commitIfNeeded(bool force = false);
 
-    void DurTransaction::checkForInterrupt(bool heedMutex) const {
-        killCurrentOp.checkForInterrupt(heedMutex);
-    }
+        virtual bool isCommitNeeded() const;
 
-    Status DurTransaction::checkForInterruptNoAssert() const {
-        const char* killed = killCurrentOp.checkForInterruptNoAssert();
-        if ( !killed || !killed[0] )
-            return Status::OK();
+        virtual void* writingPtr(void* data, size_t len);
 
-        return Status( ErrorCodes::Interrupted, killed );
-    }
+        virtual void createdFile(const std::string& filename, unsigned long long len);
 
-    TransactionExperiment* DurTransaction::factory() {
-        return new DurTransaction();
-    }
+        virtual void syncDataAndTruncateJournal();
+    };
 
 }  // namespace mongo

@@ -26,44 +26,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
-
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
+
+#include "mongo/db/storage/mmap_v1/dur.h"
 
 namespace mongo {
 
-    DurTransaction::DurTransaction() {
-        _recovery.reset(new DurRecoveryUnit());
+    bool DurRecoveryUnit::commitIfNeeded(bool force) {
+        return getDur().commitIfNeeded(force);
     }
 
-    RecoveryUnit* DurTransaction::recoveryUnit() const {
-        return _recovery.get();
+    bool DurRecoveryUnit::isCommitNeeded() const {
+        return getDur().isCommitNeeded();
     }
 
-    ProgressMeter* DurTransaction::setMessage(const char* msg,
-                                              const std::string& name,
-                                              unsigned long long progressMeterTotal,
-                                              int secondsBetween) {
-        return &cc().curop()->setMessage( msg, name, progressMeterTotal, secondsBetween );
+    void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
+        return getDur().writingPtr(data, len);
     }
 
-    void DurTransaction::checkForInterrupt(bool heedMutex) const {
-        killCurrentOp.checkForInterrupt(heedMutex);
+    void DurRecoveryUnit::createdFile(const std::string& filename, unsigned long long len) {
+        getDur().createdFile(filename, len);
     }
 
-    Status DurTransaction::checkForInterruptNoAssert() const {
-        const char* killed = killCurrentOp.checkForInterruptNoAssert();
-        if ( !killed || !killed[0] )
-            return Status::OK();
-
-        return Status( ErrorCodes::Interrupted, killed );
-    }
-
-    TransactionExperiment* DurTransaction::factory() {
-        return new DurTransaction();
+    void DurRecoveryUnit::syncDataAndTruncateJournal() {
+        return getDur().syncDataAndTruncateJournal();
     }
 
 }  // namespace mongo
