@@ -1214,11 +1214,11 @@ namespace mongo {
          */
         DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
             clientSet(cp), _failed(false), autoReconnect(_autoReconnect), autoReconnectBackoff(1000, 2000), _so_timeout(so_timeout) {
-            _numConnections++;
+            _numConnections.fetchAndAdd(1);
         }
 
         virtual ~DBClientConnection() {
-            _numConnections--;
+            _numConnections.fetchAndAdd(-1);
         }
 
         /** Connect to a Mongo database server.
@@ -1322,7 +1322,7 @@ namespace mongo {
         virtual bool lazySupported() const { return true; }
 
         static int getNumConnections() {
-            return _numConnections;
+            return _numConnections.load();
         }
 
         /**
@@ -1365,7 +1365,7 @@ namespace mongo {
         double _so_timeout;
         bool _connect( string& errmsg );
 
-        static AtomicUInt _numConnections;
+        static AtomicInt32 _numConnections;
         static bool _lazyKillCursor; // lazy means we piggy back kill cursors on next op
 
 #ifdef MONGO_SSL

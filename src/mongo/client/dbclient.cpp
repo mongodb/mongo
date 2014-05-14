@@ -1496,7 +1496,7 @@ namespace mongo {
     }
 #endif
 
-    AtomicUInt DBClientConnection::_numConnections;
+    AtomicInt32 DBClientConnection::_numConnections;
     bool DBClientConnection::_lazyKillCursor = true;
 
 
