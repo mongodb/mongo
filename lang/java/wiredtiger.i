@@ -79,7 +79,11 @@ typedef struct {
 	JNIEnv *jnienv;		/* jni env that created the Session/Cursor */
 	jobject jobj;		/* the java Session/Cursor/AsyncOp object */
 	jobject jcallback;	/* callback object for async ops */
-	jfieldID fid;		/* cached Cursor.swigCPtr field id in session */
+	jfieldID cptr_fid;	/* cached Cursor.swigCPtr field id in session */
+	jfieldID asynccptr_fid;	/* cached AsyncOp.swigCptr fid in conn */
+	jfieldID kunp_fid;	/* cached AsyncOp.keyUnpacker fid in conn */
+	jfieldID vunp_fid;	/* cached AsyncOp.valueUnpacker fid in conn */
+	jmethodID notify_mid;	/* cached AsyncCallback.notify mid in conn */
 } JAVA_CALLBACK;
 
 static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
@@ -281,13 +285,10 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
  * equivalent to 'jobj.swigCPtr = 0;' in java.
  */
 static int
-javaClose(JAVA_CALLBACK *jcb, jfieldID *pfid)
+javaClose(JNIEnv *env, JAVA_CALLBACK *jcb, jfieldID *pfid)
 {
 	jclass cls;
 	jfieldID fid;
-	JNIEnv *env;
-
-	env = jcb->jnienv;
 
 	if (pfid == NULL || *pfid == NULL) {
 		cls = (*env)->GetObjectClass(env, jcb->jobj);
@@ -313,10 +314,10 @@ connCloseHandler(WT_CONNECTION *conn_arg)
 	conn = (WT_CONNECTION_IMPL *)conn_arg;
 	jcb = (JAVA_CALLBACK *)conn->lang_private;
 	conn->lang_private = NULL;
-	ret = javaClose(jcb, NULL);
+	ret = javaClose(jcb->jnienv, jcb, NULL);
 	__wt_free(conn->default_session, jcb);
 
-	return (0);
+	return (ret);
 }
 
 /* Session specific close handler. */
@@ -330,7 +331,7 @@ sessionCloseHandler(WT_SESSION *session_arg)
 	session = (WT_SESSION_IMPL *)session_arg;
 	jcb = (JAVA_CALLBACK *)session->lang_private;
 	session->lang_private = NULL;
-	ret = javaClose(jcb, NULL);
+	ret = javaClose(jcb->jnienv, jcb, NULL);
 	__wt_free(session, jcb);
 
 	return (ret);
@@ -348,7 +349,8 @@ cursorCloseHandler(WT_CURSOR *cursor)
 	sess_jcb = (JAVA_CALLBACK *)
 	    ((WT_SESSION_IMPL *)cursor->session)->lang_private;
 	cursor->lang_private = NULL;
-	ret = javaClose(jcb, sess_jcb ? &sess_jcb->fid : NULL);
+	ret = javaClose(jcb->jnienv, jcb,
+	    sess_jcb ? &sess_jcb->cptr_fid : NULL);
 	__wt_free((WT_SESSION_IMPL *)cursor->session, jcb);
 
 	return (ret);
@@ -377,9 +379,10 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
     uint32_t flags)
 {
 	int ret, envret;
-	JAVA_CALLBACK *jcb;
+	JAVA_CALLBACK *jcb, *conn_jcb;
 	JavaVM *javavm;
 	jclass cls;
+	jfieldID fid;
 	jmethodID mid;
 	JNIEnv *jenv;
 	WT_ASYNC_OP_IMPL *op;
@@ -390,6 +393,7 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	session = O2S(op);
 	jcb = (JAVA_CALLBACK *)asyncop->c.lang_private;
+	conn_jcb = (JAVA_CALLBACK *)S2C(session)->lang_private;
 	asyncop->c.lang_private = NULL;
 
 	/*
@@ -415,30 +419,49 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 		goto err;
 	}
 
-	/* Any JNI error until the actual callback is unexpected. */
-	ret = EINVAL;
+	/*
+	 * Look up any needed field and method ids, and cache them
+	 * in the connection's lang_private.  fid and mids are
+	 * stable.
+	 */
+	if (conn_jcb->notify_mid == NULL) {
+		/* Any JNI error until the actual callback is unexpected. */
+		ret = EINVAL;
+
+		cls = (*jenv)->GetObjectClass(jenv, jcb->jobj);
+		if (cls == NULL)
+			goto err;
+		fid = (*jenv)->GetFieldID(jenv, cls,
+		    "keyUnpacker", "Lcom/wiredtiger/db/PackInputStream;");
+		if (fid == NULL)
+			goto err;
+		conn_jcb->kunp_fid = fid;
+
+		fid = (*jenv)->GetFieldID(jenv, cls,
+		    "valueUnpacker", "Lcom/wiredtiger/db/PackInputStream;");
+		if (fid == NULL)
+			goto err;
+		conn_jcb->vunp_fid = fid;
+
+		cls = (*jenv)->GetObjectClass(jenv, jcb->jcallback);
+		if (cls == NULL)
+			goto err;
+		mid = (*jenv)->GetMethodID(jenv, cls, "notify",
+		    "(Lcom/wiredtiger/db/AsyncOp;II)I");
+		if (mid == NULL)
+			goto err;
+		conn_jcb->notify_mid = mid;
+	}
 
 	/*
-	 * Set up and call resetResults so any calls to op.getKey()
+	 * Invalidate the unpackers so any calls to op.getKey()
 	 * and op.getValue get fresh results.
 	 */
-	cls = (*jenv)->GetObjectClass(jenv, jcb->jobj);
-	if (cls == NULL)
-		goto err;
-	mid = (*jenv)->GetMethodID(jenv, cls, "resetResults", "()V");
-	if (mid == NULL)
-		goto err;
-	(*jenv)->CallVoidMethod(jenv, jcb->jobj, mid);
+	(*jenv)->SetObjectField(jenv, jcb->jobj, conn_jcb->kunp_fid, NULL);
+	(*jenv)->SetObjectField(jenv, jcb->jobj, conn_jcb->vunp_fid, NULL);
 
-	/* Set up and call registered callback. */
-	cls = (*jenv)->GetObjectClass(jenv, jcb->jcallback);
-	if (cls == NULL)
-		goto err;
-	mid = (*jenv)->GetMethodID(jenv, cls, "notify",
-	    "(Lcom/wiredtiger/db/AsyncOp;II)I");
-	if (mid == NULL)
-		goto err;
-	ret = (*jenv)->CallIntMethod(jenv, jcb->jcallback, mid,
+	/* Call the registered callback. */
+	ret = (*jenv)->CallIntMethod(jenv, jcb->jcallback, conn_jcb->notify_mid,
 	    jcb->jobj, opret, flags);
 
 	if ((*jenv)->ExceptionOccurred(jenv)) {
@@ -449,8 +472,10 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 err:		__wt_err(session, ret, "Java async callback error");
 	}
 
+	/* Invalidate the AsyncOp, further use throws NullPointerException. */
+	ret = javaClose(jenv, jcb, &conn_jcb->asynccptr_fid);
+
 	(*jenv)->DeleteGlobalRef(jenv, jcb->jcallback);
-	(*jenv)->DeleteGlobalRef(jenv, jcb->jobj);
 
 	__wt_free(session, jcb);
 
@@ -991,19 +1016,6 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 			    new PackInputStream(valueFormat, get_value_wrap());
 		return valueUnpacker;
 	}
-
-	/**
-	 * Internally called when an async operation completes so that
-	 * unpacked values are recomputed.
-	 *
-	 * \return The value unpacker.
-	 */
-	private void resetResults()
-	{
-		keyUnpacker = null;
-		valueUnpacker = null;
-	}
-
 
 %}
 
@@ -1617,6 +1629,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 
 %rename(open) wiredtiger_open_wrap;
 %ignore __wt_connection::async_new_op;
+%javaexception("com.wiredtiger.db.WiredTigerException")
+     __wt_connection::async_new_op_wrap { $action; }
 %javamethodmodifiers __wt_connection::async_new_op_wrap "
   /**
    * @copydoc WT_CONNECTION::async_new_op

@@ -32,6 +32,7 @@ import com.wiredtiger.db.AsyncOp;
 import com.wiredtiger.db.Connection;
 import com.wiredtiger.db.Cursor;
 import com.wiredtiger.db.Session;
+import com.wiredtiger.db.WiredTigerException;
 import com.wiredtiger.db.WiredTigerPackingException;
 import com.wiredtiger.db.wiredtiger;
 
@@ -255,6 +256,8 @@ public class AsyncTest {
     public static final int N_OPS_MAX = N_ENTRIES / 2;
     public static final int N_ASYNC_THREADS = 10;
 
+    public static final int MAX_RETRIES = 10;
+
     private Session sessionSetup(String name,
                                  String keyFormat, String valueFormat,
                                  int opsMax, int asyncThreads) {
@@ -283,7 +286,7 @@ public class AsyncTest {
         int entries, int opsMax, int asyncThreads, int opsBatch,
         int milliSleep, AsyncCallback callback, TypeAdapter adapter,
         HashMap current)
-    throws WiredTigerPackingException {
+    throws WiredTigerException {
         Session s = sessionSetup(name, keyFormat, valueFormat,
                                  opsMax, asyncThreads);
 
@@ -294,14 +297,25 @@ public class AsyncTest {
         }
 
         for (int i = 0; i < entries; i++) {
-            AsyncOp op = conn.async_new_op("table:" + name, null, callback);
+            for (int retry = 1; retry <= MAX_RETRIES; retry++) {
+                try {
+                    AsyncOp op = conn.async_new_op("table:" + name, null,
+                                                   callback);
 
-            // adapter call does equivalent of:
-            //   op.putKeyString(genkey(s, i));
-            //   op.putValueString(genvalue(s, i));
-            adapter.putkv(s, op, i);
+                    // adapter call does equivalent of:
+                    //   op.putKeyString(genkey(s, i));
+                    //   op.putValueString(genvalue(s, i));
+                    adapter.putkv(s, op, i);
 
-            op.insert();
+                    op.insert();
+                    break;
+                }
+                catch (WiredTigerException wte) {
+                    if (retry == MAX_RETRIES)
+                        throw wte;
+                    sleepMillis(retry);
+                }
+            }
 
             // Introduce a little delay time,
             // otherwise the workers will not get a chance
@@ -318,14 +332,26 @@ public class AsyncTest {
         conn.async_flush();
 
         for (int i = 0; i < entries; i++) {
-            AsyncOp op = conn.async_new_op("table:" + name, null, callback);
+            for (int retry = 1; retry <= MAX_RETRIES; retry++) {
+                try {
+                    AsyncOp op = conn.async_new_op("table:" + name, null,
+                                                   callback);
 
-            // adapter call does equivalent of:
-            //   op.putKeyString(genkey(s, i));
-            //   op.putValueString(genvalue(s, i));
-            adapter.putkv(s, op, i);
+                    // adapter call does equivalent of:
+                    //   op.putKeyString(genkey(s, i));
+                    //   op.putValueString(genvalue(s, i));
+                    adapter.putkv(s, op, i);
 
-            op.search();
+                    op.search();
+                    break;
+                }
+                catch (WiredTigerException wte) {
+                    if (retry == MAX_RETRIES)
+                        throw wte;
+                    sleepMillis(retry);
+                }
+            }
+
             if ((i + 1) % opsBatch == 0)
                 sleepMillis(milliSleep);
         }
@@ -339,7 +365,7 @@ public class AsyncTest {
 
     @Test
     public void async01()
-    throws WiredTigerPackingException {
+    throws WiredTigerException {
         Object syncobj = new Object();
         HashMap<String, String> current = new HashMap<String, String>();
         CallbackSS callback = new CallbackSS(current, syncobj);
@@ -354,7 +380,7 @@ public class AsyncTest {
 
     @Test
     public void async02()
-    throws WiredTigerPackingException {
+    throws WiredTigerException {
         Object syncobj = new Object();
         HashMap<String, String> current = new HashMap<String, String>();
         CallbackSS callback = new CallbackSS(current, syncobj);
@@ -369,7 +395,7 @@ public class AsyncTest {
 
     @Test
     public void async03()
-    throws WiredTigerPackingException {
+    throws WiredTigerException {
         Object syncobj = new Object();
         HashMap<String, String> current = new HashMap<String, String>();
         CallbackSS callback = new CallbackSS(current, syncobj);
@@ -384,7 +410,7 @@ public class AsyncTest {
 
     @Test
     public void async04()
-    throws WiredTigerPackingException {
+    throws WiredTigerException {
         Object syncobj = new Object();
         HashMap<Long, String> current = new HashMap<Long, String>();
         CallbackRS callback = new CallbackRS(current, syncobj);
@@ -399,7 +425,7 @@ public class AsyncTest {
 
     @Test
     public void async05()
-    throws WiredTigerPackingException {
+    throws WiredTigerException {
         Object syncobj = new Object();
         HashMap<Long, Integer> current = new HashMap<Long, Integer>();
         CallbackRI callback = new CallbackRI(current, syncobj);
@@ -410,6 +436,21 @@ public class AsyncTest {
         assertEquals(0, callback.nerror);
         assertEquals(N_ENTRIES, callback.nsearch);
         assertEquals(N_ENTRIES, callback.ninsert);
+    }
+
+    @Test
+    public void async06()
+    throws WiredTigerException {
+        Object syncobj = new Object();
+        HashMap<Long, Integer> current = new HashMap<Long, Integer>();
+        CallbackRI callback = new CallbackRI(current, syncobj);
+
+        asyncTester("async06", "q", "i", 1000000, 4000,
+                    3, 1000000, 0, callback, callback, current);
+
+        assertEquals(0, callback.nerror);
+        assertEquals(1000000, callback.nsearch);
+        assertEquals(1000000, callback.ninsert);
     }
 
     @After
