@@ -47,7 +47,7 @@ function wait(f) {
         }
         if (n == 200) {
             print("rollback3.js failing waited too long");
-            throw "wait error";
+            throw Error("wait error");
         }
         sleep(1000);
     }

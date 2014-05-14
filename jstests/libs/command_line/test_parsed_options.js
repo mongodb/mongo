@@ -7,7 +7,7 @@ function mergeOptions(obj1, obj2) {
         if (typeof obj1[attrname] === "object" &&
             typeof obj2[attrname] !== "undefined") {
             if (typeof obj2[attrname] !== "object") {
-                throw "Objects being merged must have the same structure";
+                throw Error("Objects being merged must have the same structure");
             }
             obj3[attrname] = mergeOptions(obj1[attrname], obj2[attrname]);
         }
@@ -19,7 +19,7 @@ function mergeOptions(obj1, obj2) {
         if (typeof obj2[attrname] === "object" &&
             typeof obj1[attrname] !== "undefined") {
             if (typeof obj1[attrname] !== "object") {
-                throw "Objects being merged must have the same structure";
+                throw Error("Objects being merged must have the same structure");
             }
             // Already handled above
         }

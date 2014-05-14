@@ -85,9 +85,9 @@ assert.throws( function() {
         throw e;
     }
 }, null, 'Expected error from failed TEXT under OR planning');
-assert.neq(-1, errorMessage.indexOf('TEXT'),
+assert.neq(-1, errorMessage.message.indexOf('TEXT'),
            'message from failed text planning does not mention TEXT: ' + errorMessage);
-assert.neq(-1, errorMessage.indexOf('OR'),
+assert.neq(-1, errorMessage.message.indexOf('OR'),
            'message from failed text planning does not mention OR: ' + errorMessage);
 
 // Scores should exist.

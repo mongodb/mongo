@@ -96,7 +96,7 @@ for ( i=1; i<hashes.length; i++ ){
     }
 
     if ( bad )
-        throw "hashes different";
+        throw Error("hashes different");
 }
 
 s.stop();

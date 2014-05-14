@@ -152,7 +152,7 @@ var testOps = function(db, allowedActions) {
         var res = db.killOp(1);
 
         if (res.err == 'unauthorized') {
-            throw 'unauthorized killOp';
+            throw Error("unauthorized killOp");
         }
     });
 
@@ -160,7 +160,7 @@ var testOps = function(db, allowedActions) {
         var res = db.currentOp();
 
         if (res.err == 'unauthorized') {
-            throw 'unauthorized currentOp';
+            throw Error("unauthorized currentOp");
         }
     });
 
@@ -171,7 +171,7 @@ var testOps = function(db, allowedActions) {
     checkErr(allowedActions.hasOwnProperty('index_w'), function() {
         var res = db.user.ensureIndex({ x: 1 });
         if (res.code == 13) { // Unauthorized
-            throw 'unauthorized currentOp';
+            throw Error("unauthorized currentOp");
         }
     });
 
@@ -239,7 +239,7 @@ var testOps = function(db, allowedActions) {
             var res = db.fsyncUnlock();
 
             if (res.err == 'unauthorized') {
-                throw 'unauthorized fsync unlock';
+                throw Error("unauthorized unauthorized fsyncUnlock");
             }
         });
     }
@@ -529,7 +529,7 @@ var runTests = function(conn) {
     if (failures.length > 0) {
         var list = '';
         failures.forEach(function(test) { list += (test + '\n'); });
-        throw 'Tests failed:\n' + list;
+        throw Error('Tests failed:\n' + list);
     }
 };
 
