@@ -659,7 +659,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 	__wt_free(session, r->raw_entries);
 	__wt_free(session, r->raw_offsets);
 	__wt_free(session, r->raw_recnos);
-	__wt_free(session, r->raw_destination.mem);
+	__wt_buf_free(session, &r->raw_destination);
 
 	__rec_bnd_cleanup(session, r, 1);
 
@@ -1848,7 +1848,7 @@ __rec_split_raw_worker(
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COMPRESSOR *compressor;
 	WT_DECL_RET;
-	WT_ITEM *dst;
+	WT_ITEM *dst, *write_ref;
 	WT_PAGE_HEADER *dsk, *dsk_dst;
 	WT_SESSION *wt_session;
 	size_t corrected_page_size, len, result_len;
@@ -2012,11 +2012,83 @@ __rec_split_raw_worker(
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
 	    result_len, no_more_rows, &result_len, &result_slots);
-	if (ret == EAGAIN) {
-		ret = 0;
+	switch (ret) {
+	case EAGAIN:
+		/*
+		 * The compression function wants more rows; accumulate and
+		 * retry.
+		 *
+		 * Reset the resulting slots count, just in case the compression
+		 * function left it set before giving up.
+		 */
 		result_slots = 0;
+		break;
+	case 0:
+		/*
+		 * If the compression function returned zero result slots, it's
+		 * giving up and we write the original data.  (This is a pretty
+		 * bad result: we've not done compression on a block much larger
+		 * than the maximum page size, but once compression gives up,
+		 * there's not much else we can do.)
+		 *
+		 * If the compression function returned non-zero result slots,
+		 * we were successful and have a block to write.
+		 */
+		if (result_slots == 0) {
+			WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
+
+			/*
+			 * If there are no more rows, we can write the original
+			 * data from the original buffer.
+			 */
+			if (no_more_rows)
+				break;
+
+			/*
+			 * Copy the original data to the destination buffer, as
+			 * if the compression function simply copied it.  Take
+			 * all but the last row of the original data (the last
+			 * row has to be set as the key for the next block).
+			 */
+			result_slots = slots - 1;
+			result_len = r->raw_offsets[result_slots];
+			WT_RET(__wt_buf_grow(
+			    session, dst, result_len + WT_BLOCK_COMPRESS_SKIP));
+			memcpy((uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
+			    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
+			    result_len);
+
+			/*
+			 * Mark it as uncompressed so the standard compression
+			 * function is called before the buffer is written..
+			 */
+			last->already_compressed = 0;
+		} else {
+			WT_STAT_FAST_DATA_INCR(session, compress_raw_ok);
+
+			/*
+			 * If there are more rows and the compression function
+			 * consumed all of the current data, there are problems:
+			 * First, with row-store objects, we're potentially
+			 * skipping updates, we must have a key for the next
+			 * block so we know with what block a skipped update is
+			 * associated.  Second, if the compression function
+			 * compressed all of the data, we're not pushing it
+			 * hard enough (unless we got lucky and gave it exactly
+			 * the right amount to work with, which is unlikely).
+			 * Handle both problems by accumulating more data any
+			 * time we're not writing the last block and compression
+			 * ate all of the rows.
+			 */
+			if (result_slots == slots && !no_more_rows)
+				result_slots = 0;
+			else
+				last->already_compressed = 1;
+		}
+		break;
+	default:
+		return (ret);
 	}
-	WT_RET(ret);
 
 no_slots:
 	/*
@@ -2027,27 +2099,11 @@ no_slots:
 	last_block = no_more_rows &&
 	    (result_slots == 0 || result_slots == slots);
 
-	/*
-	 * If not the last block and the compression function ate it all, there
-	 * are problems: First, with row-store objects where we're potentially
-	 * skipping updates, we have to have a key for the next block so we can
-	 * figure out with what block a skipped update is associated.  Second,
-	 * if the compression function compressed all of the data, we're not
-	 * pushing it hard enough (unless we got lucky and gave it exactly the
-	 * right amount to work with).  We deal with both of these problems by
-	 * accumulating more data any time we're not writing the last block and
-	 * the compression function took all of the data.
-	 */
-	if (!last_block && result_slots == slots)
-		result_slots = 0;
-
 	if (result_slots != 0) {
 		/*
-		 * Compression succeeded: finalize the header information.
+		 * We have a block, finalize the header information.
 		 */
-		WT_STAT_FAST_DATA_INCR(session, compress_raw_ok);
-
-		dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
+		dst->size = result_len + WT_BLOCK_COMPRESS_SKIP;
 		dsk_dst = dst->mem;
 		dsk_dst->recno = last->recno;
 		dsk_dst->mem_size =
@@ -2098,11 +2154,11 @@ no_slots:
 			}
 			break;
 		}
-		last->already_compressed = 1;
+		write_ref = dst;
 	} else if (no_more_rows) {
 		/*
-		 * Compression wasn't even attempted, or failed and there are no
-		 * more rows to accumulate, write the original buffer instead.
+		 * Compression failed and there are no more rows to accumulate,
+		 * write the original buffer instead.
 		 */
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
 
@@ -2114,12 +2170,13 @@ no_slots:
 		r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
 		r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
+		write_ref = &r->dsk;
 		last->already_compressed = 0;
 	} else {
 		/*
-		 * Compression wasn't even attempted, or failed and there are
-		 * more rows to accumulate; increase the size of the "page" and
-		 * try again after we accumulate some more rows.
+		 * Compression failed, there are more rows to accumulate and the
+		 * compression function wants to try again; increase the size of
+		 * the "page" and try again after we accumulate some more rows.
 		 */
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail_temporary);
 
@@ -2152,18 +2209,20 @@ no_slots:
 
 	/*
 	 * If we are writing the whole page in our first/only attempt, it might
-	 * be a checkpoint.  In the case of a checkpoint, copy any compressed
-	 * version of the page into the original buffer, the wrapup functions
-	 * will perform the actual write from that buffer.  If not a checkpoint,
-	 * write the newly created compressed page.
+	 * be a checkpoint (checkpoints are only a single page, by definition).
+	 * Further, checkpoints aren't written here, the wrapup functions do the
+	 * write, and they do the write from the original buffer location.  If
+	 * it's a checkpoint and the block isn't in the right buffer, copy it.
+	 *
+	 * If it's not a checkpoint, write the block.
 	 */
 	if (r->bnd_next == 1 && last_block && __rec_is_checkpoint(r, last)) {
-		if (last->already_compressed)
+		if (write_ref == dst)
 			WT_RET(__wt_buf_set(
 			    session, &r->dsk, dst->mem, dst->size));
 	} else
-		WT_RET(__rec_split_write(session, r, last,
-		    last->already_compressed ? dst : &r->dsk, last_block));
+		WT_RET(
+		    __rec_split_write(session, r, last, write_ref, last_block));
 	return (0);
 }
 
