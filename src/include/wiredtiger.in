@@ -1108,18 +1108,18 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom, create bloom
 	 * filters on LSM tree chunks as they are merged., a boolean flag;
 	 * default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_config,
-	 * config string used when creating Bloom filter files\, passed to
-	 * WT_SESSION::create., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_bit_count, the number of bits
-	 * used per item for LSM bloom filters., an integer between 2 and 1000;
-	 * default \c 16.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_hash_count, the
-	 * number of hash values per item used for LSM bloom filters., an
-	 * integer between 2 and 100; default \c 8.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest, create a bloom filter
-	 * on the oldest LSM tree chunk.  Only supported if bloom filters are
-	 * enabled., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_bit_count,
+	 * the number of bits used per item for LSM bloom filters., an integer
+	 * between 2 and 1000; default \c 16.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_config, config string used when
+	 * creating Bloom filter files\, passed to WT_SESSION::create., a
+	 * string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_hash_count, the number of hash
+	 * values per item used for LSM bloom filters., an integer between 2 and
+	 * 100; default \c 8.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;bloom_oldest,
+	 * create a bloom filter on the oldest LSM tree chunk.  Only supported
+	 * if bloom filters are enabled., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk_max, the maximum size a single
 	 * chunk can be.  Chunks larger than this size are not considered for
 	 * further merges.  This is a soft limit\, and chunks larger than this
@@ -1582,15 +1582,16 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
 	 * cache is redistributed., an integer between 1MB and 10TB; default \c
 	 * 10MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is
+	 * shared between databases., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this
 	 * database is guaranteed to have available from the shared cache.  This
 	 * setting is per database.  Defaults to the chunk size., an integer;
 	 * default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache
-	 * that is shared between databases., a string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
-	 * the shared cache.  Setting this will update the value if one is
-	 * already set., an integer between 1MB and 10TB; default \c 500MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory
+	 * to allocate for the shared cache.  Setting this will update the value
+	 * if one is already set., an integer between 1MB and 10TB; default \c
+	 * 500MB.}
 	 * @config{ ),,}
 	 * @config{statistics, Maintain database statistics\, which may impact
 	 * performance.  Choosing "all" maintains all statistics regardless of
@@ -1927,15 +1928,14 @@ struct __wt_connection {
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is
  * redistributed., an integer between 1MB and 10TB; default \c 10MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared between
+ * databases., a string; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database is
  * guaranteed to have available from the shared cache.  This setting is per
  * database.  Defaults to the chunk size., an integer; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared between
- * databases., a string; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;size,
- * maximum memory to allocate for the shared cache.  Setting this will update
- * the value if one is already set., an integer between 1MB and 10TB; default \c
- * 500MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the
+ * shared cache.  Setting this will update the value if one is already set., an
+ * integer between 1MB and 10TB; default \c 500MB.}
  * @config{ ),,}
  * @config{statistics, Maintain database statistics\, which may impact
  * performance.  Choosing "all" maintains all statistics regardless of cost\,
