@@ -406,7 +406,7 @@ def skipTest(path):
     parentDir = os.path.basename(parentPath)
     if small_oplog: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js", "dropdb_race.js", 
-                        "connections_opened.js", "opcounters.js", "dbadmin.js"]:
+                        "connections_opened.js", "opcounters_write_cmd.js", "dbadmin.js"]:
             return True
     if use_ssl:
         # Skip tests using mongobridge since it does not support SSL

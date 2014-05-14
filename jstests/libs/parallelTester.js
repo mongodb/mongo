@@ -141,7 +141,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "loglong.js",// log might overflow before 
                                                         // this has a chance to see the message
                                    "connections_opened.js", // counts connections, globally
-                                   "opcounters.js",
+                                   "opcounters_write_cmd.js",
                                    "currentop.js", // SERVER-8673, plus rwlock yielding issues
                                    "set_param1.js", // changes global state
                                    "geo_update_btree2.js", // SERVER-11132 test disables table scans
