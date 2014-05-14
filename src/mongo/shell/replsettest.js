@@ -493,7 +493,15 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
     print("ReplSetTest awaitReplication: starting: timestamp for primary, " +
           name + ", is " + tojson(this.latest));
 
-    var configVersion = this.liveNodes.master.getDB("local")['system.replset'].findOne().version;
+    // get the latest config version from master. if there is a problem, grab master and try again
+    var configVersion;
+    try {
+        configVersion = this.liveNodes.master.getDB("local")['system.replset'].findOne().version;
+    }
+    catch(e) {
+        this.getMaster();
+        configVersion = this.liveNodes.master.getDB("local")['system.replset'].findOne().version;
+    }
 
     var self = this;
     assert.soon( function() {
