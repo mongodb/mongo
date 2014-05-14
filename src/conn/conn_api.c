@@ -1082,10 +1082,13 @@ __conn_write_config(
 	if (fp == NULL)
 		return (ret);
 
-	fprintf(fp, "# This file is created by WiredTiger.  Do not edit\n");
-	fprintf(fp, "# Instead, create and edit a WiredTiger.config file to\n");
-	fprintf(fp, "# persistently override database settings\n");
-
+	fprintf(fp, "%s\n\n",
+	    "# Do not modify this file.\n"
+	    "#\n"
+	    "# WiredTiger created this file when the database was created,\n"
+	    "# to store persistent database settings.  Instead of changing\n"
+	    "# these settings, set a WIREDTIGER_CONFIG environment variable\n"
+	    "# or create a WiredTiger.config file to override them.");
 	WT_ERR(__wt_config_init(session, &parser, config));
 	while ((ret = __wt_config_next(&parser, &ckey, &cval)) == 0) {
 		/* Skip "create". */
