@@ -585,7 +585,7 @@ __wt_async_new_op(WT_CONNECTION_IMPL *conn, const char *uri,
 
 	*opp = NULL;
 	if (!conn->async_cfg)
-		return (0);
+		return (ENOTSUP);
 
 	op = NULL;
 	WT_ERR(__async_new_op_alloc(conn, uri, config, &op));
