@@ -78,8 +78,8 @@ namespace mongo {
 
     DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents( OperationContext* txn,
                                                             int lenToAlloc ) {
-        // align very slightly.
-        lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+        // align size up to a multiple of 4
+        lenToAlloc = (lenToAlloc + (4-1)) & ~(4-1);
 
         freelistAllocs.increment();
         DiskLoc loc;
@@ -87,7 +87,7 @@ namespace mongo {
             DiskLoc *prev = 0;
             DiskLoc *bestprev = 0;
             DiskLoc bestmatch;
-            int bestmatchlen = 0x7fffffff;
+            int bestmatchlen = INT_MAX; // sentinel meaning we haven't found a record big enough
             int b = bucket(lenToAlloc);
             DiskLoc cur = _details->deletedListEntry(b);
             int extra = 5; // look for a better fit, a little.
@@ -109,7 +109,7 @@ namespace mongo {
                 }
                 if ( cur.isNull() ) {
                     // move to next bucket.  if we were doing "extra", just break
-                    if ( bestmatchlen < 0x7fffffff )
+                    if ( bestmatchlen < INT_MAX )
                         break;
 
                     if ( chain > 0 ) {
@@ -137,7 +137,7 @@ namespace mongo {
                         // exact match, stop searching
                         break;
                 }
-                if ( bestmatchlen < 0x7fffffff && --extra <= 0 )
+                if ( bestmatchlen < INT_MAX && --extra <= 0 )
                     break;
                 if ( ++chain > 30 && b < MaxBucket ) {
                     // too slow, force move to next bucket to grab a big chunk
@@ -183,7 +183,7 @@ namespace mongo {
         invariant( r->extentOfs() < loc.getOfs() );
 
         int left = regionlen - lenToAlloc;
-        if ( left < 24 || left < (lenToAlloc >> 3) ) {
+        if ( left < 24 || left < (lenToAlloc / 8) ) {
             // you get the whole thing.
             return loc;
         }

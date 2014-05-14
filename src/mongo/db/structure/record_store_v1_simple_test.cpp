@@ -498,4 +498,275 @@ namespace {
         }
     }
 
+    /**
+     * Test that we keep looking for better matches for 5 links once we find a non-exact match.
+     * This "extra" scanning does not proceed into bigger buckets.
+     * WARNING: this test depends on magic numbers inside RSV1Simple::_allocFromExistingExtents.
+     */
+    TEST( SimpleRecordStoreV1, InsertLooksForBetterMatchUpTo5Links ) {
+        DummyOperationContext txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize recs[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                // This intentionally leaves gaps to keep locs readable.
+                {DiskLoc(0, 1000),  75}, // too small
+                {DiskLoc(0, 1100), 100}, // 1st big enough: will be first record
+                {DiskLoc(0, 1200), 100}, // 2nd: will be third record
+                {DiskLoc(0, 1300), 100}, // 3rd
+                {DiskLoc(0, 1400), 100}, // 4th
+                {DiskLoc(0, 1500), 100}, // 5th: first and third will stop once they look here
+                {DiskLoc(0, 1600),  80}, // 6th: second will make it here and use this
+                {DiskLoc(0, 1700), 999}, // bigger bucket. Should never look here
+                {}
+            };
+            initializeV1RS(&txn, recs, drecs, &em, md);
+        }
+
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1100), 100}, // 1st insert
+                {DiskLoc(0, 1600),  80}, // 2nd insert
+                {DiskLoc(0, 1200), 100}, // 3rd insert
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000),  75},
+                {DiskLoc(0, 1300), 100},
+                {DiskLoc(0, 1400), 100},
+                {DiskLoc(0, 1500), 100},
+                {DiskLoc(0, 1700), 999},
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
+    }
+
+    /**
+     * Test that we stop looking in a bucket once we see 31 too small drecs.
+     * WARNING: this test depends on magic numbers inside RSV1Simple::_allocFromExistingExtents.
+     */
+    TEST( SimpleRecordStoreV1, InsertLooksForMatchUpTo31Links ) {
+        DummyOperationContext txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize recs[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                // This intentionally leaves gaps to keep locs readable.
+                {DiskLoc(0, 1000),  50}, // different bucket
+
+                {DiskLoc(0, 1100),  75}, // 1st too small in correct bucket
+                {DiskLoc(0, 1200),  75},
+                {DiskLoc(0, 1300),  75},
+                {DiskLoc(0, 1400),  75},
+                {DiskLoc(0, 1500),  75},
+                {DiskLoc(0, 1600),  75},
+                {DiskLoc(0, 1700),  75},
+                {DiskLoc(0, 1800),  75},
+                {DiskLoc(0, 1900),  75},
+                {DiskLoc(0, 2000),  75}, // 10th too small
+                {DiskLoc(0, 2100),  75},
+                {DiskLoc(0, 2200),  75},
+                {DiskLoc(0, 2300),  75},
+                {DiskLoc(0, 2400),  75},
+                {DiskLoc(0, 2500),  75},
+                {DiskLoc(0, 2600),  75},
+                {DiskLoc(0, 2700),  75},
+                {DiskLoc(0, 2800),  75},
+                {DiskLoc(0, 2900),  75},
+                {DiskLoc(0, 3000),  75}, // 20th too small
+                {DiskLoc(0, 3100),  75},
+                {DiskLoc(0, 3200),  75},
+                {DiskLoc(0, 3300),  75},
+                {DiskLoc(0, 3400),  75},
+                {DiskLoc(0, 3500),  75},
+                {DiskLoc(0, 3600),  75},
+                {DiskLoc(0, 3700),  75},
+                {DiskLoc(0, 3800),  75},
+                {DiskLoc(0, 3900),  75},
+                {DiskLoc(0, 4000),  75}, // 30th too small
+                {DiskLoc(0, 4100),  75}, // 31st too small
+
+                {DiskLoc(0, 8000),  80}, // big enough but wont be seen until we take an earlier one
+                {DiskLoc(0, 9000), 140}, // bigger bucket. jumps here after seeing 31 drecs
+                {}
+            };
+            initializeV1RS(&txn, recs, drecs, &em, md);
+        }
+
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0); // takes from bigger bucket
+        rs.insertRecord(&txn, zeros, 70 - Record::HeaderSize, 0); // removes a 75-sized drec
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0); // now sees big-enough drec
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 9000), 80}, // 1st insert went here
+                {DiskLoc(0, 1100), 75}, // 2nd here
+                {DiskLoc(0, 8000), 80}, // 3rd here
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 9000 + 80),  140 - 80}, // split off during first insert
+                {DiskLoc(0, 1000),  50},
+                {DiskLoc(0, 1200),  75},
+                {DiskLoc(0, 1300),  75},
+                {DiskLoc(0, 1400),  75},
+                {DiskLoc(0, 1500),  75},
+                {DiskLoc(0, 1600),  75},
+                {DiskLoc(0, 1700),  75},
+                {DiskLoc(0, 1800),  75},
+                {DiskLoc(0, 1900),  75},
+                {DiskLoc(0, 2000),  75},
+                {DiskLoc(0, 2100),  75},
+                {DiskLoc(0, 2200),  75},
+                {DiskLoc(0, 2300),  75},
+                {DiskLoc(0, 2400),  75},
+                {DiskLoc(0, 2500),  75},
+                {DiskLoc(0, 2600),  75},
+                {DiskLoc(0, 2700),  75},
+                {DiskLoc(0, 2800),  75},
+                {DiskLoc(0, 2900),  75},
+                {DiskLoc(0, 3000),  75},
+                {DiskLoc(0, 3100),  75},
+                {DiskLoc(0, 3200),  75},
+                {DiskLoc(0, 3300),  75},
+                {DiskLoc(0, 3400),  75},
+                {DiskLoc(0, 3500),  75},
+                {DiskLoc(0, 3600),  75},
+                {DiskLoc(0, 3700),  75},
+                {DiskLoc(0, 3800),  75},
+                {DiskLoc(0, 3900),  75},
+                {DiskLoc(0, 4000),  75},
+                {DiskLoc(0, 4100),  75},
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
+    }
+
+    /**
+     * Test that we stop looking in a bucket once we see 31 drecs, or look 4-past the first
+     * too-large match, whichever comes first. This is a combination of
+     * InsertLooksForBetterMatchUpTo5Links and InsertLooksForMatchUpTo31Links.
+     *
+     * WARNING: this test depends on magic numbers inside RSV1Simple::_allocFromExistingExtents.
+     */
+    TEST( SimpleRecordStoreV1, InsertLooksForMatchUpTo31LinksEvenIfFoundOversizedFit ) {
+        DummyOperationContext txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize recs[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                // This intentionally leaves gaps to keep locs readable.
+                {DiskLoc(0, 1000),  50}, // different bucket
+
+                {DiskLoc(0, 1100),  75}, // 1st too small in correct bucket
+                {DiskLoc(0, 1200),  75},
+                {DiskLoc(0, 1300),  75},
+                {DiskLoc(0, 1400),  75},
+                {DiskLoc(0, 1500),  75},
+                {DiskLoc(0, 1600),  75},
+                {DiskLoc(0, 1700),  75},
+                {DiskLoc(0, 1800),  75},
+                {DiskLoc(0, 1900),  75},
+                {DiskLoc(0, 2000),  75}, // 10th too small
+                {DiskLoc(0, 2100),  75},
+                {DiskLoc(0, 2200),  75},
+                {DiskLoc(0, 2300),  75},
+                {DiskLoc(0, 2400),  75},
+                {DiskLoc(0, 2500),  75},
+                {DiskLoc(0, 2600),  75},
+                {DiskLoc(0, 2700),  75},
+                {DiskLoc(0, 2800),  75},
+                {DiskLoc(0, 2900),  75},
+                {DiskLoc(0, 3000),  75}, // 20th too small
+                {DiskLoc(0, 3100),  75},
+                {DiskLoc(0, 3200),  75},
+                {DiskLoc(0, 3300),  75},
+                {DiskLoc(0, 3400),  75},
+                {DiskLoc(0, 3500),  75},
+                {DiskLoc(0, 3600),  75},
+                {DiskLoc(0, 3700),  75}, // 27th too small
+
+                {DiskLoc(0, 7000),  95}, // 1st insert takes this
+                {DiskLoc(0, 7100),  95}, // 3rd insert takes this
+
+                {DiskLoc(0, 3800),  75},
+                {DiskLoc(0, 3900),  75}, // 29th too small (31st overall)
+
+                {DiskLoc(0, 8000),  80}, // exact match. taken by 2nd insert
+
+                {DiskLoc(0, 9000), 140}, // bigger bucket. Should never get here
+                {}
+            };
+            initializeV1RS(&txn, recs, drecs, &em, md);
+        }
+
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+        rs.insertRecord(&txn, zeros, 80 - Record::HeaderSize, 0);
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 7000), 95}, // 1st insert went here
+                {DiskLoc(0, 8000), 80}, // 2nd here
+                {DiskLoc(0, 7100), 95}, // 3rd here
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000),  50},
+                {DiskLoc(0, 1100),  75},
+                {DiskLoc(0, 1200),  75},
+                {DiskLoc(0, 1300),  75},
+                {DiskLoc(0, 1400),  75},
+                {DiskLoc(0, 1500),  75},
+                {DiskLoc(0, 1600),  75},
+                {DiskLoc(0, 1700),  75},
+                {DiskLoc(0, 1800),  75},
+                {DiskLoc(0, 1900),  75},
+                {DiskLoc(0, 2000),  75},
+                {DiskLoc(0, 2100),  75},
+                {DiskLoc(0, 2200),  75},
+                {DiskLoc(0, 2300),  75},
+                {DiskLoc(0, 2400),  75},
+                {DiskLoc(0, 2500),  75},
+                {DiskLoc(0, 2600),  75},
+                {DiskLoc(0, 2700),  75},
+                {DiskLoc(0, 2800),  75},
+                {DiskLoc(0, 2900),  75},
+                {DiskLoc(0, 3000),  75},
+                {DiskLoc(0, 3100),  75},
+                {DiskLoc(0, 3200),  75},
+                {DiskLoc(0, 3300),  75},
+                {DiskLoc(0, 3400),  75},
+                {DiskLoc(0, 3500),  75},
+                {DiskLoc(0, 3600),  75},
+                {DiskLoc(0, 3700),  75},
+                {DiskLoc(0, 3800),  75},
+                {DiskLoc(0, 3900),  75},
+                {DiskLoc(0, 9000), 140},
+                {}
+            };
+            assertStateV1RS(recs, drecs, &em, md);
+        }
+    }
 }
