@@ -71,9 +71,24 @@ namespace mongo {
 
     Box::Box() {}
 
-    Box::Box(double x, double y, double size) : _min(x, y), _max(x + size, y + size) { }
+    Box::Box(double x, double y, double size) :
+        _min(x, y), _max(x + size, y + size) {
+    }
 
-    Box::Box(Point min, Point max) : _min(min), _max(max) { }
+    Box::Box(const Point& ptA, const Point& ptB) {
+        init(ptA, ptB);
+    }
+
+    void Box::init(const Point& ptA, const Point& ptB) {
+        _min.x = min(ptA.x, ptB.x);
+        _min.y = min(ptA.y, ptB.y);
+        _max.x = max(ptA.x, ptB.x);
+        _max.y = max(ptA.y, ptB.y);
+    }
+
+    void Box::init(const Box& other) {
+        init(other._min, other._max);
+    }
 
     BSONArray Box::toBSON() const {
         return BSON_ARRAY(BSON_ARRAY(_min.x << _min.y) << BSON_ARRAY(_max.x << _max.y));
@@ -151,7 +166,14 @@ namespace mongo {
         _max.y += error;
     }
 
-    bool Box::onBoundary(Point p, double fudge) {
+    void Box::expandToInclude(const Point& pt) {
+        _min.x = min(_min.x, pt.x);
+        _min.y = min(_min.y, pt.y);
+        _max.x = max(_max.x, pt.x);
+        _max.y = max(_max.y, pt.y);
+    }
+
+    bool Box::onBoundary(Point p, double fudge) const {
         return onBoundary(_min.x, p.x, fudge) ||
                onBoundary(_max.x, p.x, fudge) ||
                onBoundary(_min.y, p.y, fudge) ||
@@ -168,21 +190,30 @@ namespace mongo {
                between(_min.y, _max.y , y, fudge);
     }
 
-    bool Box::contains(const Box& other, double fudge) {
+    bool Box::contains(const Box& other, double fudge) const {
         return inside(other._min, fudge) && inside(other._max, fudge);
     }
 
 ////////////// Polygon
 
-    Polygon::Polygon(void) : _centroidCalculated(false), _boundsCalculated(false) {}
+    Polygon::Polygon() {
+    }
 
-    Polygon::Polygon(vector<Point> points) : _centroidCalculated(false),
-                                             _boundsCalculated(false), _points(points) { }
+    Polygon::Polygon(const vector<Point>& points) {
+        init(points);
+    }
 
-    void Polygon::add(Point p) {
-        _centroidCalculated = false;
-        _boundsCalculated = false;
-        _points.push_back(p);
+    void Polygon::init(const vector<Point>& points) {
+
+        _points.clear();
+        _bounds.reset();
+        _centroid.reset();
+
+        _points.insert(_points.begin(), points.begin(), points.end());
+    }
+
+    void Polygon::init(const Polygon& other) {
+        init(other._points);
     }
 
     int Polygon::size(void) const { return _points.size(); }
@@ -306,13 +337,14 @@ namespace mongo {
         }
     }
 
-    Point Polygon::centroid(void) {
-        /* Centroid is cached, it won't change betwen points */
-        if (_centroidCalculated) {
-            return _centroid;
+    const Point& Polygon::centroid() const {
+
+        if (_centroid) {
+            return *_centroid;
         }
 
-        Point cent;
+        _centroid.reset(new Point());
+
         double signedArea = 0.0;
         double area = 0.0;  // Partial signed area
 
@@ -321,43 +353,35 @@ namespace mongo {
         for (i = 0; i < size() - 1; ++i) {
             area = _points[i].x * _points[i+1].y - _points[i+1].x * _points[i].y ;
             signedArea += area;
-            cent.x += (_points[i].x + _points[i+1].x) * area;
-            cent.y += (_points[i].y + _points[i+1].y) * area;
+            _centroid->x += (_points[i].x + _points[i+1].x) * area;
+            _centroid->y += (_points[i].y + _points[i+1].y) * area;
         }
 
         // Do last vertex
         area = _points[i].x * _points[0].y - _points[0].x * _points[i].y;
-        cent.x += (_points[i].x + _points[0].x) * area;
-        cent.y += (_points[i].y + _points[0].y) * area;
+        _centroid->x += (_points[i].x + _points[0].x) * area;
+        _centroid->y += (_points[i].y + _points[0].y) * area;
         signedArea += area;
         signedArea *= 0.5;
-        cent.x /= (6 * signedArea);
-        cent.y /= (6 * signedArea);
+        _centroid->x /= (6 * signedArea);
+        _centroid->y /= (6 * signedArea);
 
-        _centroidCalculated = true;
-        _centroid = cent;
-
-        return cent;
+        return *_centroid;
     }
 
-    Box Polygon::bounds(void) {
-        if (_boundsCalculated) {
-            return _bounds;
+    const Box& Polygon::bounds() const {
+
+        if (_bounds) {
+            return *_bounds;
         }
 
-        _bounds._max = _points[0];
-        _bounds._min = _points[0];
+        _bounds.reset(new Box(_points[0], _points[0]));
 
         for (int i = 1; i < size(); i++) {
-            _bounds._max.x = max(_bounds._max.x, _points[i].x);
-            _bounds._max.y = max(_bounds._max.y, _points[i].y);
-            _bounds._min.x = min(_bounds._min.x, _points[i].x);
-            _bounds._min.y = min(_bounds._min.y, _points[i].y);
-
+            _bounds->expandToInclude(_points[i]);
         }
 
-        _boundsCalculated = true;
-        return _bounds;
+        return *_bounds;
     }
 
     /////// Other methods

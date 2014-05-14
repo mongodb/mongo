@@ -580,7 +580,7 @@ namespace mongo {
                 verify(0);
             }
 
-            const S2Region& region = gme->getGeoQuery().getRegion();
+            const S2Region& region = gme->getGeoQuery().getGeometry().getS2Region();
             ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }

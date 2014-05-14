@@ -268,18 +268,20 @@ namespace mongo {
 
                 const GeometryContainer& gc = gq.getGeometry();
 
-                // 2d indices answer flat queries.
-                if (gc.hasFlatRegion()) {
+                // 2d indices require an R2 covering
+                if (gc.hasR2Region()) {
                     return true;
                 }
 
+                const CapWithCRS* cap = gc.getCapGeometryHack();
+
                 // 2d indices can answer centerSphere queries.
-                if (NULL == gc._cap.get()) {
+                if (NULL == cap) {
                     return false;
                 }
 
-                verify(SPHERE == gc._cap->crs);
-                const Circle& circle = gc._cap->circle;
+                verify(SPHERE == cap->crs);
+                const Circle& circle = cap->circle;
 
                 // No wrapping around the edge of the world is allowed in 2d centerSphere.
                 return twoDWontWrap(circle, index);

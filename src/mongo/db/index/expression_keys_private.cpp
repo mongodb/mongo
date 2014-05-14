@@ -99,7 +99,7 @@ namespace {
 
         if (!geoContainer.hasS2Region()) { return false; }
 
-        S2KeysFromRegion(&coverer, geoContainer.getRegion(), out);
+        S2KeysFromRegion(&coverer, geoContainer.getS2Region(), out);
 
         return true;
     }

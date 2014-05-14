@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/geo/geoquery.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/query/index_bounds_builder.h"
 
@@ -45,6 +46,19 @@ namespace mongo {
             BSONObjBuilder bob;
             bob.append("", BSONElementHasher::hash64(value, BSONElementHasher::DEFAULT_HASH_SEED));
             return bob.obj();
+        }
+
+        static void cover2d(const R2Region& region,
+                            const BSONObj& indexInfoObj,
+                            OrderedIntervalList* oil) {
+
+            BSONObjBuilder builder;
+            builder << "" << MINKEY;
+            builder << "" << MAXKEY;
+
+            oil->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(builder.obj(),
+                                                                           true,
+                                                                           true));
         }
 
         // TODO: what should we really pass in for indexInfoObj?

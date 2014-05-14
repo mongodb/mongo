@@ -37,6 +37,7 @@ namespace mongo {
 
     class GeometryContainer {
     public:
+
         bool parseFrom(const BSONObj &obj);
 
         /**
@@ -64,14 +65,30 @@ namespace mongo {
          */
         bool supportsContains() const;
 
+        // Region which can be used to generate a covering of the query object in the S2 space.
         bool hasS2Region() const;
-        bool hasFlatRegion() const;
+        const S2Region& getS2Region() const;
 
-        // Used by s2cursor only to generate a covering of the query object.
-        // One region is not NULL and this returns it.
-        const S2Region& getRegion() const;
-    // XXX FIXME
-    // private:
+        // Region which can be used to generate a covering of the query object in euclidean space.
+        bool hasR2Region() const;
+        const R2Region& getR2Region() const;
+
+        // Reports as best we can the CRS closest to that of the contained geometry
+        CRS getNativeCRS() const;
+
+        // Returns a string related to the type of the geometry (for debugging queries)
+        std::string getDebugType() const;
+
+        // Needed for 2D wrapping check and 2d stage (for now)
+        // TODO: Remove these hacks
+        const CapWithCRS* getCapGeometryHack() const;
+        const BoxWithCRS* getBoxGeometryHack() const;
+        const PolygonWithCRS* getPolygonGeometryHack() const;
+
+    private:
+
+        class R2BoxRegion;
+
         // Does 'this' intersect with the provided type?
         bool intersects(const S2Cell& otherPoint) const;
         bool intersects(const S2Polyline& otherLine) const;
@@ -90,17 +107,21 @@ namespace mongo {
         // Only one of these shared_ptrs should be non-NULL.  S2Region is a
         // superclass but it only supports testing against S2Cells.  We need
         // the most specific class we can get.
+        // TODO: Make this non-copyable and change all these shared ptrs to scoped
         shared_ptr<PointWithCRS> _point;
         shared_ptr<LineWithCRS> _line;
+        shared_ptr<BoxWithCRS> _box;
         shared_ptr<PolygonWithCRS> _polygon;
         shared_ptr<CapWithCRS> _cap;
         shared_ptr<MultiPointWithCRS> _multiPoint;
         shared_ptr<MultiLineWithCRS> _multiLine;
         shared_ptr<MultiPolygonWithCRS> _multiPolygon;
         shared_ptr<GeometryCollection> _geometryCollection;
-        shared_ptr<BoxWithCRS> _box;
 
-        shared_ptr<S2RegionUnion> _region;
+        // Cached for use during covering calculations
+        // TODO: _s2Region is currently generated immediately - don't necessarily need to do this
+        shared_ptr<S2RegionUnion> _s2Region;
+        shared_ptr<R2Region> _r2Region;
     };
 
     // TODO: Make a struct, turn parse stuff into something like
@@ -162,12 +183,8 @@ namespace mongo {
         };
 
         bool parseFrom(const BSONObj &obj);
-        bool satisfiesPredicate(const GeometryContainer &otherContainer) const;
 
-        bool hasS2Region() const;
-        const S2Region& getRegion() const;
         std::string getField() const { return field; }
-
         Predicate getPred() const { return predicate; }
         const GeometryContainer& getGeometry() const { return geoContainer; }
 

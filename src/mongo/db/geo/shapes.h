@@ -70,9 +70,13 @@ namespace mongo {
 
     class Box {
     public:
+
         Box();
         Box(double x, double y, double size);
-        Box(Point min, Point max);
+        Box(const Point& ptA, const Point& ptB);
+
+        void init(const Point& ptA, const Point& ptB);
+        void init(const Box& other);
 
         BSONArray toBSON() const;
         std::string toString() const;
@@ -85,22 +89,30 @@ namespace mongo {
         double area() const;
         double maxDim() const;
         Point center() const;
-        void truncate(double min, double max);
-        void fudge(double error);
-        bool onBoundary(Point p, double fudge = 0);
+
+        bool onBoundary(Point p, double fudge = 0) const;
         bool inside(Point p, double fudge = 0) const;
         bool inside(double x, double y, double fudge = 0) const;
-        bool contains(const Box& other, double fudge = 0);
+        bool contains(const Box& other, double fudge = 0) const;
+
+        // Box modifications
+        void truncate(double min, double max);
+        void fudge(double error);
+        void expandToInclude(const Point& pt);
+
         Point _min;
         Point _max;
     };
 
     class Polygon {
     public:
-        Polygon();
-        Polygon(std::vector<Point> points);
 
-        void add(Point p);
+        Polygon();
+        Polygon(const std::vector<Point>& points);
+
+        void init(const std::vector<Point>& points);
+        void init(const Polygon& other);
+
         int size() const;
 
         bool contains(const Point& p) const;
@@ -114,26 +126,57 @@ namespace mongo {
         int contains(const Point &p, double fudge) const;
 
         /**
-         * Calculate the centroid, or center of mass of the polygon object.
+         * Get the centroid of the polygon object.
          */
-        Point centroid();
-        Box bounds();
+        const Point& centroid() const;
+        const Box& bounds() const;
+
     private:
-        bool _centroidCalculated;
-        Point _centroid;
-        Box _bounds;
-        bool _boundsCalculated;
+
+        // Only modified on creation and init()
         std::vector<Point> _points;
+
+        // Cached attributes of the polygon
+        mutable scoped_ptr<Box> _bounds;
+        mutable scoped_ptr<Point> _centroid;
+    };
+
+    class R2Region {
+    public:
+
+        virtual ~R2Region() {
+        }
+
+        virtual Box getR2Bounds() const = 0;
+
+        /**
+         * Fast heuristic containment check
+         *
+         * Returns true if the region definitely contains the box.
+         * Returns false if not or if too expensive to find out one way or another.
+         */
+        virtual bool fastContains(const Box& other) const = 0;
+
+        /**
+         * Fast heuristic disjoint check
+         *
+         * Returns true if the region definitely is disjoint from the box.
+         * Returns false if not or if too expensive to find out one way or another.
+         */
+        virtual bool fastDisjoint(const Box& other) const = 0;
     };
 
     // Clearly this isn't right but currently it's sufficient.
     enum CRS {
+        UNSET,
         FLAT,
         SPHERE
     };
 
     struct PointWithCRS {
-        PointWithCRS() : flatUpgradedToSphere(false) { }
+
+        PointWithCRS() : crs(UNSET), flatUpgradedToSphere(false) {}
+
         S2Point point;
         S2Cell cell;
         Point oldPoint;
@@ -144,44 +187,66 @@ namespace mongo {
     };
 
     struct LineWithCRS {
+
+        LineWithCRS() : crs(UNSET) {}
+
         S2Polyline line;
         CRS crs;
     };
 
     struct CapWithCRS {
+
+        CapWithCRS() : crs(UNSET) {}
+
         S2Cap cap;
         Circle circle;
         CRS crs;
     };
 
     struct BoxWithCRS {
+
+        BoxWithCRS() : crs(UNSET) {}
+
         Box box;
         CRS crs;
     };
 
     struct PolygonWithCRS {
+
+        PolygonWithCRS() : crs(UNSET) {}
+
         S2Polygon polygon;
         Polygon oldPolygon;
         CRS crs;
     };
 
     struct MultiPointWithCRS {
+
+        MultiPointWithCRS() : crs(UNSET) {}
+
         std::vector<S2Point> points;
         std::vector<S2Cell> cells;
         CRS crs;
     };
 
     struct MultiLineWithCRS {
+
+        MultiLineWithCRS() : crs(UNSET) {}
+
         OwnedPointerVector<S2Polyline> lines;
         CRS crs;
     };
 
     struct MultiPolygonWithCRS {
+
+        MultiPolygonWithCRS() : crs(UNSET) {}
+
         OwnedPointerVector<S2Polygon> polygons;
         CRS crs;
     };
 
     struct GeometryCollection {
+
         std::vector<PointWithCRS> points;
 
         // The amount of indirection here is painful but we can't operator= scoped_ptr or

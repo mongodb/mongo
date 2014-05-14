@@ -48,11 +48,17 @@ namespace mongo {
         if ( !e.isABSONObj())
             return false;
 
-        GeometryContainer container;
-        if ( !container.parseFrom( e.Obj() ) )
+        GeometryContainer geometry;
+        if ( !geometry.parseFrom( e.Obj() ) )
                 return false;
 
-        return _query.satisfiesPredicate( container );
+        if (GeoQuery::WITHIN == _query.getPred()) {
+            return _query.getGeometry().contains(geometry);
+        }
+        else {
+            verify(GeoQuery::INTERSECT == _query.getPred());
+            return _query.getGeometry().intersects(geometry);
+        }
     }
 
     void GeoMatchExpression::debugString( StringBuilder& debug, int level ) const {

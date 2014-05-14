@@ -162,20 +162,20 @@ namespace {
 
         // Geometry type.
         // Only one of the shared_ptrs in GeoContainer may be non-NULL.
-        const GeometryContainer& geoContainer = geoQuery.getGeometry();
-        if (NULL != geoContainer._point) { *os << "pt"; }
-        else if (NULL != geoContainer._line) { *os << "ln"; }
-        else if (NULL != geoContainer._polygon) { *os << "pl"; }
-        else if (NULL != geoContainer._cap ) { *os << "cc"; }
-        else if (NULL != geoContainer._multiPoint) { *os << "mp"; }
-        else if (NULL != geoContainer._multiLine) { *os << "ml"; }
-        else if (NULL != geoContainer._multiPolygon) { *os << "my"; }
-        else if (NULL != geoContainer._geometryCollection) { *os << "gc"; }
-        else { invariant(NULL != geoContainer._box); *os << "bx"; }
+        *os << geoQuery.getGeometry().getDebugType();
 
         // CRS (flat or spherical)
-        if (geoContainer.hasFlatRegion()) { *os << "fl"; }
-        else { invariant(geoContainer.hasS2Region()); *os << "sp"; }
+        if (FLAT == geoQuery.getGeometry().getNativeCRS()) {
+            *os << "fl";
+        }
+        else if (SPHERE == geoQuery.getGeometry().getNativeCRS()) {
+            *os << "sp";
+        }
+        else {
+            error() << "unknown CRS type " << (int)geoQuery.getGeometry().getNativeCRS()
+                    << " in geometry of type " << geoQuery.getGeometry().getDebugType();
+            invariant(false);
+        }
     }
 
     /**
@@ -195,6 +195,11 @@ namespace {
         switch (nearQuery.centroid.crs) {
         case FLAT: *os << "fl"; break;
         case SPHERE: *os << "sp"; break;
+        case UNSET:
+            error() << "unknown CRS type " << (int)nearQuery.centroid.crs
+                    << " in point geometry for near query";
+            invariant(false);
+            break;
         }
     }
 

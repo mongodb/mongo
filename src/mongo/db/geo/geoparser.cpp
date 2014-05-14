@@ -394,8 +394,10 @@ namespace mongo {
         BSONObjIterator coordIt(type.embeddedObject());
         BSONElement minE = coordIt.next();
         BSONElement maxE = coordIt.next();
-        if (!parseLegacyPoint(minE.Obj(), &out->box._min) ||
-            !parseLegacyPoint(maxE.Obj(), &out->box._max)) { return false; }
+        Point ptA, ptB;
+        if (!parseLegacyPoint(minE.Obj(), &ptA) ||
+            !parseLegacyPoint(maxE.Obj(), &ptB)) { return false; }
+        out->box.init(ptA, ptB);
         out->crs = FLAT;
         return true;
     }
@@ -415,7 +417,7 @@ namespace mongo {
                 if (!parseLegacyPoint(coordIt.next().Obj(), &p)) { return false; }
                 points.push_back(p);
             }
-            out->oldPolygon = Polygon(points);
+            out->oldPolygon.init(points);
             out->crs = FLAT;
         }
         return true;
@@ -450,6 +452,7 @@ namespace mongo {
             out->points[i] = coordToPoint(thisCoord[0].Number(), thisCoord[1].Number());
             out->cells[i] = S2Cell(out->points[i]);
         }
+        out->crs = SPHERE;
 
         return true;
     }
@@ -489,6 +492,7 @@ namespace mongo {
             out->lines.mutableVector()[i] = new S2Polyline();
             out->lines.mutableVector()[i]->Init(vertices);
         }
+        out->crs = SPHERE;
 
         return true;
     }
@@ -528,6 +532,7 @@ namespace mongo {
                 return false;
             }
         }
+        out->crs = SPHERE;
 
         return true;
     }

@@ -246,14 +246,6 @@ namespace mongo {
         return parseLegacyQuery(obj) || parseNewQuery(obj);
     }
 
-    const S2Region& GeoQuery::getRegion() const {
-        return geoContainer.getRegion();
-    }
-
-    bool GeoQuery::hasS2Region() const {
-        return geoContainer.hasS2Region();
-    }
-
     bool GeometryContainer::isSimpleContainer() const {
         return NULL != _point || NULL != _line || NULL != _polygon;
     }
@@ -278,20 +270,185 @@ namespace mongo {
                || NULL != _geometryCollection;
     }
 
-    bool GeometryContainer::hasFlatRegion() const {
-        return (NULL != _polygon && _polygon->crs == FLAT)
-               || (NULL != _cap && _cap->crs == FLAT)
-               || NULL != _box;
+    const S2Region& GeometryContainer::getS2Region() const {
+        if (NULL != _point) {
+            // _point->crs might be FLAT but we "upgrade" it for free if it was in bounds.
+            if (FLAT == _point->crs) {
+                verify(_point->flatUpgradedToSphere);
+            }
+            return _point->cell;
+        } else if (NULL != _line) {
+            return _line->line;
+        } else if (NULL != _cap && SPHERE == _cap->crs) {
+            return _cap->cap;
+        } else if (NULL != _multiPoint) {
+            return *_s2Region;
+        } else if (NULL != _multiLine) {
+            return *_s2Region;
+        } else if (NULL != _multiPolygon) {
+            return *_s2Region;
+        } else if (NULL != _geometryCollection) {
+            return *_s2Region;
+        } else {
+            verify(NULL != _polygon);
+            verify(SPHERE == _polygon->crs);
+            return _polygon->polygon;
+        }
     }
 
-    bool GeoQuery::satisfiesPredicate(const GeometryContainer &otherContainer) const {
-        verify(predicate == WITHIN || predicate == INTERSECT);
+    bool GeometryContainer::hasR2Region() const {
+        return _cap || _box || _point || (_polygon && _polygon->crs == FLAT)
+               || (_multiPoint && FLAT == _multiPoint->crs);
+    }
 
-        if (WITHIN == predicate) {
-            return geoContainer.contains(otherContainer);
-        } else {
-            return geoContainer.intersects(otherContainer);
+    class GeometryContainer::R2BoxRegion : public R2Region {
+    public:
+
+        R2BoxRegion(const GeometryContainer* geometry);
+        virtual ~R2BoxRegion();
+
+        Box getR2Bounds() const;
+
+        bool fastContains(const Box& other) const;
+
+        bool fastDisjoint(const Box& other) const;
+
+    private:
+
+        static Box buildBounds(const GeometryContainer& geometry);
+
+        // Not owned here
+        const GeometryContainer* _geometry;
+
+        // TODO: For big complex shapes, may be better to use actual shape from above
+        const Box _bounds;
+    };
+
+    GeometryContainer::R2BoxRegion::R2BoxRegion(const GeometryContainer* geometry) :
+        _geometry(geometry), _bounds(buildBounds(*geometry)) {
+    }
+
+    GeometryContainer::R2BoxRegion::~R2BoxRegion() {
+    }
+
+    Box GeometryContainer::R2BoxRegion::getR2Bounds() const {
+        return _bounds;
+    }
+
+    bool GeometryContainer::R2BoxRegion::fastContains(const Box& other) const {
+
+        // TODO: Add more cases here to make coverings better
+        if (_geometry->_box && FLAT == _geometry->_box->crs) {
+            const Box& box = _geometry->_box->box;
+            if (box.inside(other._min) && box.inside(other._max)) {
+                return true;
+            }
         }
+
+        // Not sure
+        return false;
+    }
+
+    bool GeometryContainer::R2BoxRegion::fastDisjoint(const Box& other) const {
+
+        if (!_bounds.intersects(other))
+            return true;
+
+        // Not sure
+        return false;
+    }
+
+    static Point toLngLatPoint(const S2Point& s2Point) {
+        Point point;
+        S2LatLng latLng(s2Point);
+        point.x = latLng.lng().degrees();
+        point.y = latLng.lat().degrees();
+        return point;
+    }
+
+    static void lineR2Bounds(const S2Polyline& flatLine, Box* flatBounds) {
+
+        int numVertices = flatLine.num_vertices();
+        verify(flatLine.num_vertices() > 0);
+
+        flatBounds->init(toLngLatPoint(flatLine.vertex(0)), toLngLatPoint(flatLine.vertex(0)));
+
+        for (int i = 1; i < numVertices; ++i) {
+            flatBounds->expandToInclude(toLngLatPoint(flatLine.vertex(i)));
+        }
+    }
+
+    static void circleR2Bounds(const Circle& circle, Box* flatBounds) {
+        flatBounds->init(Point(circle.center.x - circle.radius, circle.center.y - circle.radius),
+                         Point(circle.center.x + circle.radius, circle.center.y + circle.radius));
+    }
+
+    static void multiPointR2Bounds(const vector<S2Point>& points, Box* flatBounds) {
+
+        verify(!points.empty());
+
+        flatBounds->init(toLngLatPoint(points.front()), toLngLatPoint(points.front()));
+
+        vector<S2Point>::const_iterator it = points.begin();
+        for (++it; it != points.end(); ++it) {
+            const S2Point& s2Point = *it;
+            flatBounds->expandToInclude(toLngLatPoint(s2Point));
+        }
+    }
+
+    static void polygonR2Bounds(const Polygon& polygon, Box* flatBounds) {
+        *flatBounds = polygon.bounds();
+    }
+
+    static void s2RegionR2Bounds(const S2Region& region, Box* flatBounds) {
+        S2LatLngRect s2Bounds = region.GetRectBound();
+        flatBounds->init(Point(s2Bounds.lng_lo().degrees(), s2Bounds.lat_lo().degrees()),
+                         Point(s2Bounds.lng_hi().degrees(), s2Bounds.lat_hi().degrees()));
+    }
+
+    Box GeometryContainer::R2BoxRegion::buildBounds(const GeometryContainer& geometry) {
+
+        Box bounds;
+
+        if (geometry._point && FLAT == geometry._point->crs) {
+            bounds.init(geometry._point->oldPoint, geometry._point->oldPoint);
+        }
+        else if (geometry._line && FLAT == geometry._line->crs) {
+            lineR2Bounds(geometry._line->line, &bounds);
+        }
+        else if (geometry._cap && FLAT == geometry._cap->crs) {
+            circleR2Bounds(geometry._cap->circle, &bounds);
+        }
+        else if (geometry._box && FLAT == geometry._box->crs) {
+            bounds = geometry._box->box;
+        }
+        else if (geometry._polygon && FLAT == geometry._polygon->crs) {
+            polygonR2Bounds(geometry._polygon->oldPolygon, &bounds);
+        }
+        else if (geometry._multiPoint && FLAT == geometry._multiPoint->crs) {
+            multiPointR2Bounds(geometry._multiPoint->points, &bounds);
+        }
+        else if (geometry._multiLine && FLAT == geometry._multiLine->crs) {
+            verify(false);
+        }
+        else if (geometry._multiPolygon && FLAT == geometry._multiPolygon->crs) {
+            verify(false);
+        }
+        else if (geometry._geometryCollection) {
+            verify(false);
+        }
+        else if (geometry.hasS2Region()) {
+            // For now, just support spherical cap for $centerSphere and GeoJSON points
+            verify((geometry._cap && FLAT != geometry._cap->crs) ||
+                   (geometry._point && FLAT != geometry._point->crs));
+            s2RegionR2Bounds(geometry.getS2Region(), &bounds);
+        }
+
+        return bounds;
+    }
+
+    const R2Region& GeometryContainer::getR2Region() const {
+        return *_r2Region;
     }
 
     bool GeometryContainer::contains(const GeometryContainer& otherContainer) const {
@@ -857,88 +1014,114 @@ namespace mongo {
         } else if (GeoParser::isMultiPoint(obj)) {
             _multiPoint.reset(new MultiPointWithCRS());
             if (!GeoParser::parseMultiPoint(obj, _multiPoint.get())) { return false; }
-            _region.reset(new S2RegionUnion());
+            _s2Region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _multiPoint->cells.size(); ++i) {
-                _region->Add(&_multiPoint->cells[i]);
+                _s2Region->Add(&_multiPoint->cells[i]);
             }
         } else if (GeoParser::isMultiLine(obj)) {
             _multiLine.reset(new MultiLineWithCRS());
             if (!GeoParser::parseMultiLine(obj, _multiLine.get())) { return false; }
-            _region.reset(new S2RegionUnion());
+            _s2Region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _multiLine->lines.vector().size(); ++i) {
-                _region->Add(_multiLine->lines.vector()[i]);
+                _s2Region->Add(_multiLine->lines.vector()[i]);
             }
         } else if (GeoParser::isMultiPolygon(obj)) {
             _multiPolygon.reset(new MultiPolygonWithCRS());
             if (!GeoParser::parseMultiPolygon(obj, _multiPolygon.get())) { return false; }
-            _region.reset(new S2RegionUnion());
+            _s2Region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _multiPolygon->polygons.vector().size(); ++i) {
-                _region->Add(_multiPolygon->polygons.vector()[i]);
+                _s2Region->Add(_multiPolygon->polygons.vector()[i]);
             }
         } else if (GeoParser::isGeometryCollection(obj)) {
             _geometryCollection.reset(new GeometryCollection());
             if (!GeoParser::parseGeometryCollection(obj, _geometryCollection.get())) {
                 return false;
             }
-            _region.reset(new S2RegionUnion());
+            _s2Region.reset(new S2RegionUnion());
             for (size_t i = 0; i < _geometryCollection->points.size(); ++i) {
-                _region->Add(&_geometryCollection->points[i].cell);
+                _s2Region->Add(&_geometryCollection->points[i].cell);
             }
             for (size_t i = 0; i < _geometryCollection->lines.vector().size(); ++i) {
-                _region->Add(&_geometryCollection->lines.vector()[i]->line);
+                _s2Region->Add(&_geometryCollection->lines.vector()[i]->line);
             }
             for (size_t i = 0; i < _geometryCollection->polygons.vector().size(); ++i) {
-                _region->Add(&_geometryCollection->polygons.vector()[i]->polygon);
+                _s2Region->Add(&_geometryCollection->polygons.vector()[i]->polygon);
             }
             for (size_t i = 0; i < _geometryCollection->multiPoints.vector().size(); ++i) {
                 MultiPointWithCRS* multiPoint = _geometryCollection->multiPoints.vector()[i];
                 for (size_t j = 0; j < multiPoint->cells.size(); ++j) {
-                    _region->Add(&multiPoint->cells[j]);
+                    _s2Region->Add(&multiPoint->cells[j]);
                 }
             }
             for (size_t i = 0; i < _geometryCollection->multiLines.vector().size(); ++i) {
                 const MultiLineWithCRS* multiLine = _geometryCollection->multiLines.vector()[i];
                 for (size_t j = 0; j < multiLine->lines.vector().size(); ++j) {
-                    _region->Add(multiLine->lines.vector()[j]);
+                    _s2Region->Add(multiLine->lines.vector()[j]);
                 }
             }
             for (size_t i = 0; i < _geometryCollection->multiPolygons.vector().size(); ++i) {
                 const MultiPolygonWithCRS* multiPolygon =
                     _geometryCollection->multiPolygons.vector()[i];
                 for (size_t j = 0; j < multiPolygon->polygons.vector().size(); ++j) {
-                    _region->Add(multiPolygon->polygons.vector()[j]);
+                    _s2Region->Add(multiPolygon->polygons.vector()[j]);
                 }
             }
         } else {
             return false;
         }
 
+        // If we support R2 regions, build the region immediately
+        if (hasR2Region())
+            _r2Region.reset(new R2BoxRegion(this));
+
         return true;
     }
 
-    const S2Region& GeometryContainer::getRegion() const {
-        if (NULL != _point) {
-            // _point->crs might be FLAT but we "upgrade" it for free if it was in bounds.
-            if (FLAT == _point->crs) {
-                verify(_point->flatUpgradedToSphere);
-            }
-            return _point->cell;
-        } else if (NULL != _line) {
-            return _line->line;
-        } else if (NULL != _cap && SPHERE == _cap->crs) {
-            return _cap->cap;
-        } else if (NULL != _multiPoint) {
-            return *_region;
-        } else if (NULL != _multiLine) {
-            return *_region;
-        } else if (NULL != _multiPolygon) {
-            return *_region;
-        } else if (NULL != _geometryCollection) {
-            return *_region;
-        } else {
-            verify(NULL != _polygon);
-            verify(SPHERE == _polygon->crs);
-            return _polygon->polygon;
+    string GeometryContainer::getDebugType() const {
+        if (NULL != _point) { return "pt"; }
+        else if (NULL != _line) { return "ln"; }
+        else if (NULL != _box) { return "bx"; }
+        else if (NULL != _polygon) { return "pl"; }
+        else if (NULL != _cap ) { return "cc"; }
+        else if (NULL != _multiPoint) { return "mp"; }
+        else if (NULL != _multiLine) { return "ml"; }
+        else if (NULL != _multiPolygon) { return "my"; }
+        else if (NULL != _geometryCollection) { return "gc"; }
+        else {
+            invariant(false);
+            return "";
         }
     }
+
+    CRS GeometryContainer::getNativeCRS() const {
+
+        // TODO: Fix geometry collection reporting when/if we support multiple CRSes
+
+        if (NULL != _point) { return _point->crs; }
+        else if (NULL != _line) { return _line->crs; }
+        else if (NULL != _box) { return _box->crs; }
+        else if (NULL != _polygon) { return _polygon->crs; }
+        else if (NULL != _cap ) { return _cap->crs; }
+        else if (NULL != _multiPoint) { return _multiPoint->crs; }
+        else if (NULL != _multiLine) { return _multiLine->crs; }
+        else if (NULL != _multiPolygon) { return _multiPolygon->crs; }
+        else if (NULL != _geometryCollection) { return SPHERE; }
+        else {
+            invariant(false);
+            return FLAT;
+        }
+    }
+
+    const CapWithCRS* GeometryContainer::getCapGeometryHack() const {
+        return _cap.get();
+    }
+
+    const BoxWithCRS* GeometryContainer::getBoxGeometryHack() const {
+        return _box.get();
+    }
+
+    const PolygonWithCRS* GeometryContainer::getPolygonGeometryHack() const {
+        return _polygon.get();
+    }
+
 }  // namespace mongo
