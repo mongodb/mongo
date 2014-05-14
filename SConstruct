@@ -1441,17 +1441,52 @@ def doConfigure(myenv):
                 return 0;
             }
             """
-            context.Message('Checking for gcc atomic builtins... ')
+            context.Message('Checking for gcc __atomic builtins... ')
             ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
             context.Result(ret)
             return ret
+
+        def CheckGCCSyncBuiltins(context):
+            test_body = """
+            int main(int argc, char **argv) {
+                int a = 0;
+                return __sync_fetch_and_add(&a, 1);
+            }
+
+            //
+            // Figure out if we are using gcc older than 4.2 to target 32-bit x86. If so, error out
+            // even if we were able to compile the __sync statement, due to
+            // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=40693
+            //
+            #if defined(__i386__)
+            #if !defined(__clang__)
+            #if defined(__GNUC__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 2)
+            #error "Refusing to use __sync in 32-bit mode with gcc older than 4.2"
+            #endif
+            #endif
+            #endif
+            """
+
+            context.Message('Checking for useable __sync builtins... ')
+            ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
+            context.Result(ret)
+            return ret
+
         conf = Configure(myenv, help=False, custom_tests = {
             'CheckGCCAtomicBuiltins': CheckGCCAtomicBuiltins,
+            'CheckGCCSyncBuiltins': CheckGCCSyncBuiltins,
         })
-        haveGCCAtomicBuiltins = conf.CheckGCCAtomicBuiltins()
-        conf.Finish()
-        if haveGCCAtomicBuiltins:
-            conf.env.Append(CPPDEFINES=["HAVE_GCC_ATOMIC_BUILTINS"])
+
+        # Prefer the __atomic builtins. If we don't have those, try for __sync. Otherwise
+        # atomic_intrinsics.h will try to fall back to the hand-rolled assembly implementations
+        # in atomic_intrinsics_gcc_intel for x86 platforms.
+        if conf.CheckGCCAtomicBuiltins():
+            conf.env.Append(CPPDEFINES=["MONGO_HAVE_GCC_ATOMIC_BUILTINS"])
+        else:
+            if conf.CheckGCCSyncBuiltins():
+                conf.env.Append(CPPDEFINES=["MONGO_HAVE_GCC_SYNC_BUILTINS"])
+
+        myenv = conf.Finish()
 
     conf = Configure(myenv)
     libdeps.setup_conftests(conf)
