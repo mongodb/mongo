@@ -224,10 +224,24 @@ namespace {
             newMockHostResultAt(host, hangTimeMillis, Status::OK(), hangUntilNotify);
         }
 
+        void addMockTimestepAt(int timeMillis) {
+
+            // Add a mock query to a host we aren't using at the provided time
+            ConnectionString host = ConnectionString::mock(HostAndPort("$timestepHost:1000"));
+            newMockHostResultAt(host, timeMillis, Status::OK(), NULL);
+
+            // The query won't be scheduled by the multi op, so we need to do so ourselves
+            _threadPool->schedule(host,
+                                  boost::bind(&MockSystemEnv::doBlockingQuery,
+                                              this,
+                                              host,
+                                              QuerySpec()));
+        }
+
         Date_t currentTimeMillis() {
             return _mockTimeMillis;
         }
-
+        
         StatusWith<DBClientCursor*> doBlockingQuery(const ConnectionString& host,
                                                     const QuerySpec& query) {
 
@@ -268,7 +282,7 @@ namespace {
                 string errMsg;
                 ASSERT(!info.conn->connect(host.toString(), errMsg));
             }
-
+            
             return StatusWith<DBClientCursor*>(new DBClientCursor(info.conn.get(),
                                                                   query.ns(),
                                                                   query.query(),
@@ -584,11 +598,12 @@ namespace {
         Status hostError = Status(ErrorCodes::InternalError, "");
         mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
         mockSystem.addMockHostErrorAt(hostB, 3000, hostError);
+        mockSystem.addMockTimestepAt(4000);
 
         MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
         QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
+        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
         // Unhang before checking status, in case it throws
         unhangNotify.notifyOne();
 
@@ -650,11 +665,12 @@ namespace {
         mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
         mockSystem.addMockHostErrorAt(hostB, 4000, hostError);
         mockSystem.addMockHostErrorAt(hostC, 2000, hostError);
+        mockSystem.addMockTimestepAt(5000);
 
         MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
         QuerySpec query;
-        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 4000);
+        StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 5000);
         // Unhang before checking status, in case it throws
         unhangNotify.notifyOne();
 
