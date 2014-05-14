@@ -268,7 +268,6 @@ namespace mongo {
         friend class CmdReplSetElect;
         friend class Member;
         friend class Manager;
-        friend class GhostSync;
         friend class Consensus;
 
     private:
