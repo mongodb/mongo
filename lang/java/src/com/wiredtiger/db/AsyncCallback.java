@@ -24,21 +24,19 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.wiredtiger.test;
+package com.wiredtiger.db;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
-
-@RunWith(Suite.class)
-@Suite.SuiteClasses( {
-    AsyncTest.class,
-    AutoCloseTest.class,
-    CursorTest.class,
-    CursorTest02.class,
-    PackTest.class
-})
-
-public class WiredTigerSuite {
-    // the class remains empty,
-    // used only as a holder for the above annotations
+/**
+ * An interface that must be implemented to receive notifications
+ * from asynchronous operations.
+ */
+public interface AsyncCallback {
+    /**
+     * Notify when an asynchronous operation completes.
+     *
+     * \param op The operation that completed
+     * \param opReturn The return value of the operation
+     * \param flags Flags (currently 0).
+     */
+    public int notify(AsyncOp op, int opReturn, int flags);
 }
