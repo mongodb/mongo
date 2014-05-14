@@ -31,7 +31,8 @@
 
 #include <vector>
 
-#include "mongo/bson/util/atomic_int.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
@@ -47,7 +48,7 @@ namespace mongo {
     class MessagingPort;
     class PiggyBackData;
 
-    typedef AtomicUInt MSGID;
+    typedef uint32_t MSGID;
 
     enum Operations {
         opReply = 1,     /* reply. responseTo is set. */
