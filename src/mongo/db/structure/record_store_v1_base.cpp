@@ -287,14 +287,16 @@ namespace mongo {
 
         /* remove ourself from extent pointers */
         {
-            Extent *e = txn->recoveryUnit()->writing( _getExtent( _getExtentLocForRecord( dl ) ) );
+            Extent *e =  _getExtent( todelete->myExtentLoc(dl) );
             if ( e->firstRecord == dl ) {
+                txn->recoveryUnit()->writing(&e->firstRecord);
                 if ( todelete->nextOfs() == DiskLoc::NullOfs )
                     e->firstRecord.Null();
                 else
                     e->firstRecord.set(dl.a(), todelete->nextOfs() );
             }
             if ( e->lastRecord == dl ) {
+                txn->recoveryUnit()->writing(&e->lastRecord);
                 if ( todelete->prevOfs() == DiskLoc::NullOfs )
                     e->lastRecord.Null();
                 else
