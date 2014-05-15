@@ -104,13 +104,22 @@ small_oplog_rs = False
 test_report = { "results": [] }
 report_file = None
 
-# This class just implements the with statement API, for a sneaky
-# purpose below.
-class Nothing(object):
+# This class just implements the with statement API
+class NullMongod(object):
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
     def __enter__(self):
+        self.start()
         return self
+
     def __exit__(self, type, value, traceback):
+        self.stop()
         return not isinstance(value, Exception)
+
 
 def buildlogger(cmd, is_global=False):
     # if the environment variable MONGO_USE_BUILDLOGGER
@@ -134,23 +143,11 @@ def clean_dbroot(dbroot="", nokill=False):
         cleanbb.cleanup(dbroot, nokill)
 
 
-class mongod(object):
+class mongod(NullMongod):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.proc = None
         self.auth = False
-
-    def __enter__(self):
-        self.start()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        try:
-            self.stop()
-        except Exception, e:
-            print >> sys.stderr, "error shutting down mongod"
-            print >> sys.stderr, e
-        return not isinstance(value, Exception)
 
     def ensure_test_dirs(self):
         utils.ensureDir(smoke_db_prefix + "/tmp/unittest/")
@@ -296,15 +293,16 @@ class mongod(object):
             if os.sys.platform == "win32":
                 import win32job
                 win32job.TerminateJobObject(self.job_object, -1)
-                import time
                 # Windows doesn't seem to kill the process immediately, so give it some time to die
                 time.sleep(5)
-            else:
-                # This function not available in Python 2.5
+            elif hasattr(self.proc, "terminate"):
+                # This method added in Python 2.6
                 self.proc.terminate()
-        except AttributeError:
-            from os import kill
-            kill(self.proc.pid, 15)
+            else:
+                os.kill(self.proc.pid, 15)
+        except Exception, e:
+            print >> sys.stderr, "error shutting down mongod"
+            print >> sys.stderr, e
         self.proc.wait()
         sys.stderr.flush()
         sys.stdout.flush()
@@ -629,23 +627,26 @@ def run_tests(tests):
     # The reason we want to use "with" is so that we get __exit__ semantics
     # but "with" is only supported on Python 2.5+
 
-    if start_mongod:
-        master = mongod(small_oplog_rs=small_oplog_rs,
-                        small_oplog=small_oplog,
-                        no_journal=no_journal,
-                        set_parameters=set_parameters,
-                        no_preallocj=no_preallocj,
-                        auth=auth,
-                        authMechanism=authMechanism,
-                        keyFile=keyFile,
-                        use_ssl=use_ssl,
-                        use_x509=use_x509).__enter__()
-    else:
-        master = Nothing()
+    master = NullMongod()
+    slave = NullMongod()
+
     try:
+        if start_mongod:
+            master = mongod(small_oplog_rs=small_oplog_rs,
+                            small_oplog=small_oplog,
+                            no_journal=no_journal,
+                            set_parameters=set_parameters,
+                            no_preallocj=no_preallocj,
+                            auth=auth,
+                            authMechanism=authMechanism,
+                            keyFile=keyFile,
+                            use_ssl=use_ssl,
+                            use_x509=use_x509)
+            master.start()
+
         if small_oplog:
-            slave = mongod(slave=True,
-                           set_parameters=set_parameters).__enter__()
+            slave = mongod(slave=True, set_parameters=set_parameters)
+            slave.start()
         elif small_oplog_rs:
             slave = mongod(slave=True,
                            small_oplog_rs=small_oplog_rs,
@@ -657,7 +658,8 @@ def run_tests(tests):
                            authMechanism=authMechanism,
                            keyFile=keyFile,
                            use_ssl=use_ssl,
-                           use_x509=use_x509).__enter__()
+                           use_x509=use_x509)
+            slave.start()
             primary = Connection(port=master.port, slave_okay=True);
 
             primary.admin.command({'replSetInitiate' : {'_id' : 'foo', 'members' : [
@@ -669,86 +671,84 @@ def run_tests(tests):
                 result = primary.admin.command("ismaster");
                 ismaster = result["ismaster"]
                 time.sleep(1)
-        else:
-            slave = Nothing()
 
-        try:
-            if small_oplog or small_oplog_rs:
-                master.wait_for_repl()
+        if small_oplog or small_oplog_rs:
+            master.wait_for_repl()
 
-            for tests_run, test in enumerate(tests):
-                tests_run += 1    # enumerate from 1, python 2.5 compatible
-                test_result = { "start": time.time() }
+        for tests_run, test in enumerate(tests):
+            tests_run += 1    # enumerate from 1, python 2.5 compatible
+            test_result = { "start": time.time() }
 
-                (test_path, use_db) = test
+            (test_path, use_db) = test
 
-                if test_path.startswith(mongo_repo + os.path.sep):
-                    test_result["test_file"] = test_path[len(mongo_repo)+1:]
+            if test_path.startswith(mongo_repo + os.path.sep):
+                test_result["test_file"] = test_path[len(mongo_repo)+1:]
+            else:
+                # user could specify a file not in repo. leave it alone.
+                test_result["test_file"] = test_path
+
+            try:
+                if skipTest(test_path):
+                    test_result["status"] = "skip"
+
+                    print "skipping " + test_path
                 else:
-                    # user could specify a file not in repo. leave it alone.
-                    test_result["test_file"] = test_path
+                    fails.append(test)
+                    runTest(test, test_result)
+                    fails.pop()
+                    winners.append(test)
 
+                    test_result["status"] = "pass"
+
+                test_result["end"] = time.time()
+                test_result["elapsed"] = test_result["end"] - test_result["start"]
+                test_report["results"].append( test_result )
+                if small_oplog or small_oplog_rs:
+                    master.wait_for_repl()
+                    # check the db_hashes
+                    if isinstance(slave, mongod):
+                        check_db_hashes(master, slave)
+                        check_and_report_replication_dbhashes()
+
+                elif use_db: # reach inside test and see if "usedb" is true
+                    if clean_every_n_tests and (tests_run % clean_every_n_tests) == 0:
+                        # Restart mongod periodically to clean accumulated test data
+                        # clean_dbroot() is invoked by mongod.start()
+                        master.stop()
+                        master = mongod(small_oplog_rs=small_oplog_rs,
+                                        small_oplog=small_oplog,
+                                        no_journal=no_journal,
+                                        set_parameters=set_parameters,
+                                        no_preallocj=no_preallocj,
+                                        auth=auth,
+                                        authMechanism=authMechanism,
+                                        keyFile=keyFile,
+                                        use_ssl=use_ssl,
+                                        use_x509=use_x509)
+                        master.start()
+
+            except TestFailure, f:
+                test_result["end"] = time.time()
+                test_result["elapsed"] = test_result["end"] - test_result["start"]
+                test_result["error"] = str(f)
+                test_result["status"] = "fail"
+                test_report["results"].append( test_result )
                 try:
-                    if skipTest(test_path):
-                        test_result["status"] = "skip"
-
-                        print "skipping " + test_path
-                    else:
-                        fails.append(test)
-                        runTest(test, test_result)
-                        fails.pop()
-                        winners.append(test)
-
-                        test_result["status"] = "pass"
-
-                    test_result["end"] = time.time()
-                    test_result["elapsed"] = test_result["end"] - test_result["start"]
-                    test_report["results"].append( test_result )
-                    if small_oplog or small_oplog_rs:
-                        master.wait_for_repl()
-                        # check the db_hashes
-                        if isinstance(slave, mongod):
-                            check_db_hashes(master, slave)
-                            check_and_report_replication_dbhashes()
-
-                    elif use_db: # reach inside test and see if "usedb" is true
-                        if clean_every_n_tests and (tests_run % clean_every_n_tests) == 0:
-                            # Restart mongod periodically to clean accumulated test data
-                            # clean_dbroot() is invoked by mongod.start()
-                            master.__exit__(None, None, None)
-                            master = mongod(small_oplog_rs=small_oplog_rs,
-                                            small_oplog=small_oplog,
-                                            no_journal=no_journal,
-                                            set_parameters=set_parameters,
-                                            no_preallocj=no_preallocj,
-                                            auth=auth,
-                                            authMechanism=authMechanism,
-                                            keyFile=keyFile,
-                                            use_ssl=use_ssl,
-                                            use_x509=use_x509).__enter__()
-
+                    print f
+                    # Record the failing test and re-raise.
+                    losers[f.path] = f.status
+                    raise f
+                except TestServerFailure, f:
+                    return 2
                 except TestFailure, f:
-                    test_result["end"] = time.time()
-                    test_result["elapsed"] = test_result["end"] - test_result["start"]
-                    test_result["error"] = str(f)
-                    test_result["status"] = "fail"
-                    test_report["results"].append( test_result )
-                    try:
-                        print f
-                        # Record the failing test and re-raise.
-                        losers[f.path] = f.status
-                        raise f
-                    except TestServerFailure, f:
-                        return 2
-                    except TestFailure, f:
-                        if not continue_on_failure:
-                            return 1
-            if isinstance(slave, mongod):
-                check_db_hashes(master, slave)
-        finally:
-            slave.__exit__(None, None, None)
+                    if not continue_on_failure:
+                        return 1
+        if isinstance(slave, mongod):
+            check_db_hashes(master, slave)
+
     finally:
-        master.__exit__(None, None, None)
+        slave.stop()
+        master.stop()
     return 0
 
 
