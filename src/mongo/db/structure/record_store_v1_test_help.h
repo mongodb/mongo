@@ -85,8 +85,6 @@ namespace mongo {
         virtual const DiskLoc& capFirstNewRecord() const;
         virtual void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc );
 
-        virtual bool capLooped() const;
-
         virtual long long dataSize() const;
         virtual long long numRecords() const;
 
@@ -201,11 +199,14 @@ namespace mongo {
      *
      * records must be sorted by extent/file. offsets within an extent can be in any order.
      *
-     * drecs must be grouped into size-buckets, but the ordering within the size buckets is up to
-     * you.
+     * In a simple RS, drecs must be grouped into size-buckets, but the ordering within the size
+     * buckets is up to you.
      *
-     * You are responsible for ensuring the records and drecs don't overlap (unless you are testing
-     * a corrupt initial state).
+     * In a capped collection, all drecs form a single list and must be grouped by extent, with each
+     * extent having at least one drec. capFirstNewRecord() and capExtent() *must* be correctly set
+     * on md before calling.
+     *
+     * You are responsible for ensuring the records and drecs don't overlap.
      *
      * ExtentManager and MetaData must both be empty.
      */

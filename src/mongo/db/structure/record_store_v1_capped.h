@@ -101,7 +101,6 @@ namespace mongo {
         const DiskLoc& cappedLastDelRecLastExtent() const;
         void setListOfAllDeletedRecords( OperationContext* txn, const DiskLoc& loc );
         void setLastDelRecLastExtent( OperationContext* txn, const DiskLoc& loc );
-        bool capLooped() const;
         Extent *theCapExtent() const;
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
         void advanceCapExtent( OperationContext* txn, const StringData& ns );

@@ -38,6 +38,8 @@ using namespace mongo;
 
 namespace {
 
+    // Provides data to be inserted. Must be large enough for largest possible record.
+    // Should be in BSS so unused portions should be free.
     char zeros[20*1024*1024] = {};
 
     TEST( SimpleRecordStoreV1, quantizeAllocationSpaceSimple ) {

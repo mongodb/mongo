@@ -112,10 +112,6 @@ namespace mongo {
         _capFirstNewRecord = loc;
     }
 
-    bool DummyRecordStoreV1MetaData::capLooped() const {
-        invariant( false );
-    }
-
     long long DummyRecordStoreV1MetaData::dataSize() const {
         return _dataSize;
     }
@@ -337,8 +333,10 @@ namespace {
                 log() << "loc: " << actualLoc // <--hex
                       << " (" << actualLoc.getOfs() << ")"
                       << " size: " << actualSize
+                      << " prev: " << actualRec->prevOfs()
                       << " next: " << actualRec->nextOfs()
-                      << " prev: " << actualRec->prevOfs();
+                      << (actualLoc == md->capFirstNewRecord() ? " (CAP_FIRST_NEW)" : "")
+                      ;
 
                 const bool foundCycle = !seenLocs.insert(actualLoc).second;
                 invariant(!foundCycle);
@@ -372,6 +370,10 @@ namespace {
 
                 actualLoc = actualDrec->nextDeleted();
             }
+
+            // Only print bucket 0 in capped collections since it contains all deleted records
+            if (md->isCapped())
+                break;
         }
         log() << " *** END ACTUAL DELETED RECORD LIST *** ";
     }
@@ -383,6 +385,8 @@ namespace {
                         DummyExtentManager* em,
                         DummyRecordStoreV1MetaData* md) {
         invariant(records || drecs); // if both are NULL nothing is being created...
+        
+        // Need to start with a blank slate
         invariant(em->numFiles() == 0);
         invariant(md->firstExtent().isNull());
 
@@ -415,10 +419,13 @@ namespace {
                 em->getExtent(DiskLoc(a, 0))->xnext = DiskLoc(b, 0);
                 em->getExtent(DiskLoc(b, 0))->xprev = DiskLoc(a, 0);
             }
+
+            // This signals "done allocating new extents".
+            if (md->isCapped())
+                md->setDeletedListEntry(txn, 1, DiskLoc());
         }
 
         if (records && !records[0].loc.isNull()) {
-            // TODO figure out how to handle capExtent specially in cappedCollections
             int recIdx = 0;
             DiskLoc extLoc = md->firstExtent();
             while (!extLoc.isNull()) {
@@ -441,7 +448,7 @@ namespace {
                     rec->prevOfs() = prevOfs;
                     prevOfs = loc.getOfs();
 
-                    const DiskLoc nextLoc = records[++recIdx].loc;
+                    const DiskLoc nextLoc = records[recIdx + 1].loc;
                     if (nextLoc.a() == loc.a()) { // if next is in same extent
                         rec->nextOfs() = nextLoc.getOfs();
                     }
@@ -449,6 +456,8 @@ namespace {
                         rec->nextOfs() = DiskLoc::NullOfs;
                         ext->lastRecord = loc;
                     }
+
+                    recIdx++;
                 }
                 extLoc = ext->xnext;
             }
@@ -465,7 +474,22 @@ namespace {
                 invariant(size >= Record::HeaderSize);
                 const int bucket = RecordStoreV1Base::bucket(size);
 
-                if (bucket != lastBucket) {
+                if (md->isCapped()) {
+                    // All drecs form a single list in bucket 0
+                    if (prevNextPtr == NULL) {
+                        md->setDeletedListEntry(txn, 0, loc);
+                    }
+                    else {
+                        *prevNextPtr = loc;
+                    }
+
+                    if (loc.a() < md->capExtent().a()
+                            && drecs[drecIdx + 1].loc.a() == md->capExtent().a()) {
+                        // Bucket 1 is known as cappedLastDelRecLastExtent
+                        md->setDeletedListEntry(txn, 1, loc);
+                    }
+                } 
+                else if (bucket != lastBucket) {
                     invariant(bucket > lastBucket); // if this fails, drecs weren't sorted by bucket
                     md->setDeletedListEntry(txn, bucket, loc);
                     lastBucket = bucket;
@@ -502,11 +526,11 @@ namespace {
                 int recIdx = 0;
 
                 DiskLoc extLoc = md->firstExtent();
-                while (!extLoc.isNull()) {
+                while (!extLoc.isNull()) { // for each Extent
                     Extent* ext = em->getExtent(extLoc, true);
-                    int actualPrevOfs = DiskLoc::NullOfs;
+                    int expectedPrevOfs = DiskLoc::NullOfs;
                     DiskLoc actualLoc = ext->firstRecord;
-                    while (!actualLoc.isNull()) {
+                    while (!actualLoc.isNull()) { // for each Record in this Extent
                         const Record* actualRec = em->recordForV1(actualLoc);
                         const int actualSize = actualRec->lengthWithHeaders();
 
@@ -517,8 +541,8 @@ namespace {
                         ASSERT_EQUALS(actualSize, records[recIdx].size);
 
                         ASSERT_EQUALS(actualRec->extentOfs(), extLoc.getOfs());
-                        ASSERT_EQUALS(actualRec->prevOfs(), actualPrevOfs);
-                        actualPrevOfs = actualLoc.getOfs();
+                        ASSERT_EQUALS(actualRec->prevOfs(), expectedPrevOfs);
+                        expectedPrevOfs = actualLoc.getOfs();
 
                         recIdx++;
                         const int nextOfs = actualRec->nextOfs();
@@ -544,6 +568,27 @@ namespace {
                 int drecIdx = 0;
                 for (int bucketIdx = 0; bucketIdx < RecordStoreV1Base::Buckets; bucketIdx++) {
                     DiskLoc actualLoc = md->deletedListEntry(bucketIdx);
+
+                    if (md->isCapped() && bucketIdx == 1) {
+                        // In capped collections, the 2nd bucket (index 1) points to the drec before
+                        // the first drec in the capExtent. If the capExtent is the first Extent,
+                        // it should be Null.
+
+                        if (md->capExtent() == md->firstExtent()) {
+                            ASSERT_EQUALS(actualLoc, DiskLoc());
+                        }
+                        else {
+                            ASSERT_NOT_EQUALS(actualLoc.a(), md->capExtent().a());
+                            const DeletedRecord* actualDrec =
+                                &em->recordForV1(actualLoc)->asDeleted();
+                            ASSERT_EQUALS(actualDrec->nextDeleted().a(), md->capExtent().a());
+                        }
+
+                        // Don't do normal checking of bucket 1 in capped collections. Checking
+                        // other buckets to verify that they are Null.
+                        continue;
+                    }
+
                     while (!actualLoc.isNull()) {
                         const DeletedRecord* actualDrec = &em->recordForV1(actualLoc)->asDeleted();
                         const int actualSize = actualDrec->lengthWithHeaders();
@@ -553,7 +598,11 @@ namespace {
 
                         // Make sure the drec is correct
                         ASSERT_EQUALS(actualDrec->extentOfs(), 0);
-                        ASSERT_EQUALS(bucketIdx, RecordStoreV1Base::bucket(actualSize));
+
+                        // in capped collections all drecs are linked into a single list in bucket 0
+                        ASSERT_EQUALS(bucketIdx, md->isCapped()
+                                                   ? 0
+                                                   : RecordStoreV1Base::bucket(actualSize));
 
                         drecIdx++;
                         actualLoc = actualDrec->nextDeleted();

@@ -52,7 +52,7 @@ namespace mongo {
         virtual const DiskLoc& capFirstNewRecord() const = 0;
         virtual void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc ) = 0;
 
-        virtual bool capLooped() const = 0;
+        bool capLooped() const { return capFirstNewRecord().isValid(); }
 
         virtual long long dataSize() const = 0;
         virtual long long numRecords() const = 0;

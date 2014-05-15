@@ -158,8 +158,6 @@ namespace mongo {
         const DiskLoc& capFirstNewRecord() const { return _capFirstNewRecord; }
         void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc );
 
-        bool capLooped() const { return _capFirstNewRecord.isValid(); }
-
     public:
 
         const DiskLoc& firstExtent() const { return _firstExtent; }

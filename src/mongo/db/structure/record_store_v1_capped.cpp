@@ -485,7 +485,7 @@ namespace mongo {
             // documents to make room for other documents, and we are allocating
             // documents from free space in fresh extents instead of reusing
             // space from familiar extents.
-            if ( !capLooped() ) {
+            if ( !_details->capLooped() ) {
 
                 // We just removed the last record from the 'capExtent', and
                 // the 'capExtent' can't be empty, so we set 'capExtent' to
@@ -559,10 +559,6 @@ namespace mongo {
         return _details->setDeletedListEntry(txn, 1, loc);
     }
 
-    bool CappedRecordStoreV1::capLooped() const {
-        return _details->capFirstNewRecord().isValid();
-    }
-
     Extent* CappedRecordStoreV1::theCapExtent() const {
         return _extentManager->getExtent(_details->capExtent());
     }
@@ -598,7 +594,7 @@ namespace mongo {
     vector<RecordIterator*> CappedRecordStoreV1::getManyIterators() const {
         OwnedPointerVector<RecordIterator> iterators;
 
-        if (!capLooped()) {
+        if (!_details->capLooped()) {
             // if we haven't looped yet, just spit out all extents (same as non-capped impl)
             const Extent* ext;
             for (DiskLoc extLoc = details()->firstExtent(); !extLoc.isNull(); extLoc = ext->xnext) {
