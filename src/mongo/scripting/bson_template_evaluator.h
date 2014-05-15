@@ -46,10 +46,10 @@
 #include <map>
 #include <string>
 
-#include <boost/function.hpp>
 #include <boost/noncopyable.hpp>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -94,7 +94,7 @@ namespace mongo {
          *      fieldName : key
          *      in : { #RAND_INT: [10, 20] }
          */
-        typedef boost::function< Status (BsonTemplateEvaluator* btl, const char* fieldName,
+        typedef stdx::function< Status (BsonTemplateEvaluator* btl, const char* fieldName,
                                          const BSONObj& in, BSONObjBuilder& builder) > OperatorFn;
 
         BsonTemplateEvaluator();

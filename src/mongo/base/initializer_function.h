@@ -27,9 +27,8 @@
 
 #pragma once
 
-#include <boost/function.hpp>
-
 #include "mongo/base/status.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -41,6 +40,6 @@ namespace mongo {
      * On successful execution, an InitializerFunction returns Status::OK().  It may
      * inspect and mutate the supplied InitializerContext.
      */
-    typedef boost::function<Status (InitializerContext*)> InitializerFunction;
+    typedef stdx::function<Status (InitializerContext*)> InitializerFunction;
 
 }  // namespace mongo

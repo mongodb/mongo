@@ -28,8 +28,6 @@
 
 #include "mongo/s/config_upgrade.h"
 
-#include <boost/function.hpp>
-
 #include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/cluster_client_internal.h"
@@ -39,6 +37,7 @@
 #include "mongo/s/type_database.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version.h"
 
@@ -75,7 +74,7 @@ namespace mongo {
      */
     struct Upgrade {
 
-        typedef boost::function<bool(const ConnectionString&, const VersionType&, string*)> UpgradeCallback;
+        typedef stdx::function<bool(const ConnectionString&, const VersionType&, string*)> UpgradeCallback;
 
         Upgrade(int _fromVersion,
                 const VersionRange& _toVersionRange,

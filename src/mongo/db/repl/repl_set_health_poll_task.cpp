@@ -94,7 +94,7 @@ namespace mongo {
         }
         m = mem;
 
-        theReplSet->mgr->send( boost::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
+        theReplSet->mgr->send( stdx::bind(&ReplSet::msgUpdateHBInfo, theReplSet, mem) );
 
         static time_t last = 0;
         time_t now = time(0);
@@ -106,7 +106,7 @@ namespace mongo {
         }
         if( changed || now-last>4 ) {
             last = now;
-            theReplSet->mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+            theReplSet->mgr->send( stdx::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
         }
     }
 
@@ -283,8 +283,8 @@ namespace mongo {
         BSONElement cfg = info["config"];
         if( cfg.ok() ) {
             // received a new config
-            boost::function<void()> f =
-                boost::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
+            stdx::function<void()> f =
+                stdx::bind(&Manager::msgReceivedNewConfig, theReplSet->mgr, cfg.Obj().copy());
             theReplSet->mgr->send(f);
         }
         if (info.hasElement("electionTime")) {

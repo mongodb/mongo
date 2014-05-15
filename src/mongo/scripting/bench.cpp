@@ -315,7 +315,7 @@ namespace mongo {
     BenchRunWorker::~BenchRunWorker() {}
 
     void BenchRunWorker::start() {
-        boost::thread(boost::bind(&BenchRunWorker::run, this));
+        boost::thread(stdx::bind(&BenchRunWorker::run, this));
     }
 
     bool BenchRunWorker::shouldStop() const {
@@ -446,7 +446,7 @@ namespace mongo {
                         // use special query function for exhaust query option
                         if (options & QueryOption_Exhaust) {
                             BenchRunEventTrace _bret(&_stats.queryCounter);
-                            boost::function<void (const BSONObj&)> castedDoNothing(doNothing);
+                            stdx::function<void (const BSONObj&)> castedDoNothing(doNothing);
                             count =  conn->query(castedDoNothing, ns, fixedQuery, &filter, options);
                         }
                         else {

@@ -45,7 +45,7 @@ namespace mongo {
             explicit Worker(ThreadPool& owner)
                 : _owner(owner)
                 , _is_done(true)
-                , _thread(boost::bind(&Worker::loop, this))
+                , _thread(stdx::bind(&Worker::loop, this))
             {}
 
             // destructor will block until current operation is completed
@@ -56,7 +56,7 @@ namespace mongo {
             }
 
             void set_task(Task& func) {
-                verify(!func.empty());
+                verify(func);
                 verify(_is_done);
                 _is_done = false;
 
@@ -72,7 +72,7 @@ namespace mongo {
             void loop() {
                 while (true) {
                     Task task = _task.take();
-                    if (task.empty())
+                    if (!task)
                         break; // ends the thread
 
                     try {

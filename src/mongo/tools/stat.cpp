@@ -306,7 +306,7 @@ namespace mongo {
             state.reset( new ServerState() );
             state->host = host;
             /* For each new thread, pass in a thread state object and the delta between samples */
-            state->thr.reset( new boost::thread( boost::bind( serverThread,
+            state->thr.reset( new boost::thread( stdx::bind( serverThread,
                                                               state,
                                                               (int)ceil(_statUtil.getSeconds()) ) ) );
             state->authParams = BSON(saslCommandUserFieldName << toolGlobalParams.username

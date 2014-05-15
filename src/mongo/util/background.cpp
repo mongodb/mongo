@@ -31,12 +31,11 @@
 
 #include "mongo/util/background.h"
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread/once.hpp>
 #include <boost/thread/thread.hpp>
 
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -198,7 +197,7 @@ namespace mongo {
         // If the job is already 'done', for instance because it was cancelled or already
         // finished, ignore additional requests to run the job.
         if (_status->state == NotStarted) {
-            boost::thread t( boost::bind( &BackgroundJob::jobBody , this ) );
+            boost::thread t( stdx::bind( &BackgroundJob::jobBody , this ) );
             _status->state = Running;
         }
     }
@@ -327,8 +326,8 @@ namespace mongo {
         // Use a shorter cycle time in debug mode to help catch race conditions.
         const size_t waitMillis = (debug ? 5 : 60) * 1000;
 
-        const boost::function<bool()> predicate =
-            boost::bind( &PeriodicTaskRunner::_isShutdownRequested, this );
+        const stdx::function<bool()> predicate =
+            stdx::bind( &PeriodicTaskRunner::_isShutdownRequested, this );
 
         mutex::scoped_lock lock( _mutex );
         while ( !predicate() ) {

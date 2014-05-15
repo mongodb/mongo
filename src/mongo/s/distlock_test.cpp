@@ -367,7 +367,7 @@ namespace mongo {
             for (int i = 0; i < numThreads; i++) {
                 results.push_back(shared_ptr<BSONObjBuilder> (new BSONObjBuilder()));
                 threads.push_back(shared_ptr<boost::thread> (new boost::thread(
-                                      boost::bind(&TestDistLockWithSkew::runThread, this,
+                                      stdx::bind(&TestDistLockWithSkew::runThread, this,
                                                   hostConn, (unsigned) i, seed + i, boost::ref(cmdObj),
                                                   boost::ref(*(results[i].get()))))));
             }

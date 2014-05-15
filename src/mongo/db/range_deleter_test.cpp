@@ -26,7 +26,6 @@
  *    it in the license file.
  */
 
-#include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <string>
 
@@ -34,11 +33,11 @@
 #include "mongo/db/range_deleter.h"
 #include "mongo/db/range_deleter_mock_env.h"
 #include "mongo/db/range_deleter_stats.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
-    using boost::bind;
     using std::string;
 
     using mongo::BSONObj;
@@ -138,6 +137,17 @@ namespace {
         ASSERT_FALSE(env->deleteOccured());
     }
 
+    static void rangeDeleterDeleteNow(RangeDeleter* deleter,
+                                      OperationContext* txn,
+                                      const std::string& ns,
+                                      const BSONObj& min,
+                                      const BSONObj& max,
+                                      const BSONObj& shardKeyPattern,
+                                      bool secondaryThrottle,
+                                      std::string* errMsg) {
+        deleter->deleteNow(txn, ns, min, max, shardKeyPattern, secondaryThrottle, errMsg);
+    }
+
     // Should not start delete if the set of cursors that were open when the
     // deleteNow method is called is still open.
     TEST(ImmediateDelete, ShouldWaitCursor) {
@@ -149,15 +159,16 @@ namespace {
         env->addCursorId(ns, 345);
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
-                                                                &deleter,
-                                                                noTxn,
-                                                                ns,
-                                                                BSON("x" << 0),
-                                                                BSON("x" << 10),
-                                                                BSON("x" << 1),
-                                                                true,
-                                                                &errMsg));
+        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+                                                            rangeDeleterDeleteNow,
+                                                            &deleter,
+                                                            noTxn,
+                                                            ns,
+                                                            BSON("x" << 0),
+                                                            BSON("x" << 10),
+                                                            BSON("x" << 1),
+                                                            true,
+                                                            &errMsg));
 
         env->waitForNthGetCursor(1u);
 
@@ -199,15 +210,16 @@ namespace {
         env->addCursorId(ns, 345);
 
         string errMsg;
-        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
-                                                                &deleter,
-                                                                noTxn,
-                                                                ns,
-                                                                BSON("x" << 0),
-                                                                BSON("x" << 10),
-                                                                BSON("x" << 1),
-                                                                true,
-                                                                &errMsg));
+        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+                                                            rangeDeleterDeleteNow,
+                                                            &deleter,
+                                                            noTxn,
+                                                            ns,
+                                                            BSON("x" << 0),
+                                                            BSON("x" << 10),
+                                                            BSON("x" << 1),
+                                                            true,
+                                                            &errMsg));
 
         env->waitForNthGetCursor(1u);
 
@@ -441,15 +453,16 @@ namespace {
         env->pauseDeletes();
 
         string delErrMsg;
-        boost::thread deleterThread = boost::thread(boost::bind(&RangeDeleter::deleteNow,
-                                                                &deleter,
-                                                                noTxn,
-                                                                ns,
-                                                                BSON("x" << 64),
-                                                                BSON("x" << 70),
-                                                                BSON("x" << 1),
-                                                                true,
-                                                                &delErrMsg));
+        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+                                                            rangeDeleterDeleteNow,
+                                                            &deleter,
+                                                            noTxn,
+                                                            ns,
+                                                            BSON("x" << 64),
+                                                            BSON("x" << 70),
+                                                            BSON("x" << 1),
+                                                            true,
+                                                            &delErrMsg));
 
         env->waitForNthPausedDelete(1u);
 

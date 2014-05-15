@@ -31,13 +31,13 @@
 
 #include "mongo/pch.h"
 
-#include <boost/bind.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/list.h"
@@ -75,7 +75,7 @@ namespace ThreadedTests {
             if (!remaining) 
                 return;
 
-            boost::thread athread(boost::bind(&ThreadedTest::subthread, this, remaining));
+            boost::thread athread(stdx::bind(&ThreadedTest::subthread, this, remaining));
             launch_subthreads(remaining - 1);
             athread.join();
         }
@@ -430,13 +430,13 @@ namespace ThreadedTests {
             auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );            
             AtomicUInt32 x1(0);
             cout << "A : " << &x1 << endl;
-            boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
+            boost::thread t1( stdx::bind( worker1 , &lk , &x1 ) );
             while ( ! x1.load() );
             verify( x1.load() == 1 );
             sleepmillis( 500 );
             verify( x1.load() == 1 );            
             AtomicUInt32 x2(0);
-            boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
+            boost::thread t2( stdx::bind( worker2, &lk , &x2 ) );
             t2.join();
             verify( x2.load() == 1 );
             a.reset();
@@ -469,7 +469,7 @@ namespace ThreadedTests {
             
             AtomicUInt32 x2(0);
 
-            boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
+            boost::thread t2( stdx::bind( worker2, &lk , &x2 ) );
             t2.join();
             verify( x2.load() == 1 );
 
@@ -517,7 +517,7 @@ namespace ThreadedTests {
             verify( pthread_rwlock_rdlock( &lk ) == 0 );
             
             AtomicUInt32 x1(0);
-            boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
+            boost::thread t1( stdx::bind( worker1 , &lk , &x1 ) );
             while ( ! x1.load() );
             verify( x1.load() == 1 );
             sleepmillis( 500 );
@@ -525,7 +525,7 @@ namespace ThreadedTests {
             
             AtomicUInt32 x2(0);
 
-            boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
+            boost::thread t2( stdx::bind( worker2, &lk , &x2 ) );
             t2.join();
             verify( x2.load() == 1 );
 

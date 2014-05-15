@@ -219,7 +219,7 @@ static bool runMongosServer( bool doUpgrade ) {
     DBClientConnection::setLazyKillCursor( false );
 
     ReplicaSetMonitor::setConfigChangeHook(
-        boost::bind(&ConfigServer::replicaSetChange, &configServer, _1 , _2));
+        stdx::bind(&ConfigServer::replicaSetChange, &configServer, stdx::placeholders::_1 , stdx::placeholders::_2));
 
     if (!configServer.init(mongosGlobalParams.configdbs)) {
         log() << "couldn't resolve config db address" << endl;
@@ -268,7 +268,7 @@ static bool runMongosServer( bool doUpgrade ) {
 #endif
 
     if (serverGlobalParams.isHttpInterfaceEnabled)
-        boost::thread web( boost::bind(&webServerThread,
+        boost::thread web( stdx::bind(&webServerThread,
                                        new NoAdminAccess(), // takes ownership
                                        OperationContext::factoryNULL) ); // XXX SERVER-13931
 

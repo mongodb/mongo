@@ -34,13 +34,12 @@
 
 #include "mongo/pch.h"
 
-#include <boost/function.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 
@@ -86,7 +85,7 @@ namespace mongo {
             will fully read all data queried.  Faster when you are pulling a lot of data and know you want to
             pull it all down.  Note: it is not allowed to not read all the data unless you close the connection.
 
-            Use the query( boost::function<void(const BSONObj&)> f, ... ) version of the connection's query()
+            Use the query( stdx::function<void(const BSONObj&)> f, ... ) version of the connection's query()
             method, and it will take care of all the details for you.
         */
         QueryOption_Exhaust = 1 << 6,
@@ -996,7 +995,7 @@ namespace mongo {
          * Once such a function is set as the runCommand hook, every time the DBClient
          * processes a runCommand, the hook will be called just prior to sending it to the server. 
          */
-        typedef boost::function<void(BSONObjBuilder*)> RunCommandHookFunc;
+        typedef stdx::function<void(BSONObjBuilder*)> RunCommandHookFunc;
         virtual void setRunCommandHook(RunCommandHookFunc func);
         RunCommandHookFunc getRunCommandHook() const {
             return _runCommandHook;
@@ -1006,7 +1005,7 @@ namespace mongo {
          * Similar to above, but for running a function on a command response after a command
          * has been run.
          */
-        typedef boost::function<void(const BSONObj&, const std::string&)> PostRunCommandHookFunc;
+        typedef stdx::function<void(const BSONObj&, const std::string&)> PostRunCommandHookFunc;
         virtual void setPostRunCommandHook(PostRunCommandHookFunc func);
         PostRunCommandHookFunc getPostRunCommandHook() const {
             return _postRunCommandHook;
@@ -1122,13 +1121,13 @@ namespace mongo {
             Use the DBClientCursorBatchIterator version, below, if you want to do items in large
             blocks, perhaps to avoid granular locking and such.
          */
-        virtual unsigned long long query( boost::function<void(const BSONObj&)> f,
+        virtual unsigned long long query( stdx::function<void(const BSONObj&)> f,
                                           const string& ns,
                                           Query query,
                                           const BSONObj *fieldsToReturn = 0,
                                           int queryOptions = 0 );
 
-        virtual unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f,
+        virtual unsigned long long query( stdx::function<void(DBClientCursorBatchIterator&)> f,
                                           const string& ns,
                                           Query query,
                                           const BSONObj *fieldsToReturn = 0,
@@ -1279,7 +1278,7 @@ namespace mongo {
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions , batchSize );
         }
 
-        virtual unsigned long long query( boost::function<void(DBClientCursorBatchIterator &)> f,
+        virtual unsigned long long query( stdx::function<void(DBClientCursorBatchIterator &)> f,
                                           const string& ns,
                                           Query query,
                                           const BSONObj *fieldsToReturn,

@@ -51,7 +51,7 @@ namespace mongo {
             // dispatching pool has already been disposed.
             //
 
-            _threads.push_back(new boost::thread(boost::bind(&HostThreadPool::doWork, _context)));
+            _threads.push_back(new boost::thread(stdx::bind(&HostThreadPool::doWork, _context)));
         }
     }
 
@@ -204,7 +204,7 @@ namespace mongo {
             _pending.insert(make_pair(host, pendingOp));
 
             HostThreadPool::Callback callback =
-                boost::bind(&MultiHostQueryOp::PendingQueryContext::doBlockingQuery, pendingOp);
+                stdx::bind(&MultiHostQueryOp::PendingQueryContext::doBlockingQuery, pendingOp);
 
             _hostThreads->schedule(host, callback);
         }

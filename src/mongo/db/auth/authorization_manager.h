@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -48,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -258,7 +258,7 @@ namespace mongo {
         Status queryAuthzDocument(const NamespaceString& collectionName,
                                   const BSONObj& query,
                                   const BSONObj& projection,
-                                  const boost::function<void(const BSONObj&)>& resultProcessor);
+                                  const stdx::function<void(const BSONObj&)>& resultProcessor);
 
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".

@@ -166,7 +166,7 @@ namespace {
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj&,
-            const boost::function<void(const BSONObj&)>& resultProcessor) {
+            const stdx::function<void(const BSONObj&)>& resultProcessor) {
         std::vector<BSONObjCollection::iterator> iterVector;
         Status status = _queryVector(collectionName, query, &iterVector);
         if (!status.isOK()) {

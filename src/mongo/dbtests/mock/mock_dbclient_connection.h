@@ -99,11 +99,11 @@ namespace mongo {
         //
         // Unsupported methods (defined to get rid of virtual function was hidden error)
         //
-        unsigned long long query(boost::function<void(const mongo::BSONObj&)> f,
+        unsigned long long query(stdx::function<void(const mongo::BSONObj&)> f,
                 const std::string& ns, mongo::Query query,
                 const mongo::BSONObj* fieldsToReturn = 0, int queryOptions = 0);
 
-        unsigned long long query(boost::function<void(mongo::DBClientCursorBatchIterator&)> f,
+        unsigned long long query(stdx::function<void(mongo::DBClientCursorBatchIterator&)> f,
                 const std::string& ns, mongo::Query query,
                 const mongo::BSONObj* fieldsToReturn = 0,
                 int queryOptions = 0);

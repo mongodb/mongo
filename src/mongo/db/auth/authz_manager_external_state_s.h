@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <string>
@@ -38,6 +37,7 @@
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/s/distlock.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -83,7 +83,7 @@ namespace mongo {
         virtual Status query(const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& projection,
-                             const boost::function<void(const BSONObj&)>& resultProcessor);
+                             const stdx::function<void(const BSONObj&)>& resultProcessor);
 
         virtual Status insert(const NamespaceString& collectionName,
                               const BSONObj& document,

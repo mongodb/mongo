@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <v8.h>
 
 #include "mongo/scripting/engine_v8-3.25.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -171,7 +171,7 @@ namespace mongo {
     void collectionSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value,
                                            const v8::PropertyCallbackInfo<v8::Value>& info);
 
-    typedef boost::function<void (V8Scope*, const v8::Local<v8::FunctionTemplate>&)>
+    typedef stdx::function<void (V8Scope*, const v8::Local<v8::FunctionTemplate>&)>
             V8FunctionPrototypeManipulatorFn;
 
     void v8RegisterMongoPrototypeManipulator(const V8FunctionPrototypeManipulatorFn& manipulator);

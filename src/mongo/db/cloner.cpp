@@ -222,7 +222,7 @@ namespace mongo {
         int options = QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 );
         {
             dbtemprelease r;
-            _conn->query(boost::function<void(DBClientCursorBatchIterator &)>(f), from_collection,
+            _conn->query(stdx::function<void(DBClientCursorBatchIterator &)>(f), from_collection,
                          query, 0, options);
         }
 

@@ -411,7 +411,7 @@ namespace PerfTests {
                 return 0;
             }
             unsigned long long counter = 0;
-            boost::thread athread(boost::bind(&B::thread, this, &counter));
+            boost::thread athread(stdx::bind(&B::thread, this, &counter));
             unsigned long long child = launchThreads(remaining - 1);
             athread.join();
             unsigned long long accum = child + counter;

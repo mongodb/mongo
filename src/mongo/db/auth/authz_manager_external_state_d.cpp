@@ -84,7 +84,7 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& projection,
-            const boost::function<void(const BSONObj&)>& resultProcessor) {
+            const stdx::function<void(const BSONObj&)>& resultProcessor) {
         try {
             DBDirectClient client;
             client.query(resultProcessor, collectionName.ns(), query, &projection);

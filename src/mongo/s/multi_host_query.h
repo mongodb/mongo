@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -38,6 +37,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -221,7 +221,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(HostThreadPools);
     public:
 
-        typedef boost::function<void(void)> Callback;
+        typedef stdx::function<void(void)> Callback;
 
         /**
          * Construct a HostThreadPools object, which lazily constructs thread pools per-host of the
@@ -263,7 +263,7 @@ namespace mongo {
     class HostThreadPool {
     public:
 
-        typedef boost::function<void(void)> Callback;
+        typedef stdx::function<void(void)> Callback;
 
         /**
          * Constructs a thread pool of a given size.

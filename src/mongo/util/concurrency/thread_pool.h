@@ -31,10 +31,9 @@
 
 #include <list>
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/thread/condition.hpp>
 
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -42,7 +41,7 @@ namespace mongo {
     namespace threadpool {
         class Worker;
 
-        typedef boost::function<void(void)> Task; //nullary function or functor
+        typedef stdx::function<void(void)> Task; //nullary function or functor
 
         // exported to the mongo namespace
         class ThreadPool : boost::noncopyable {
@@ -61,18 +60,18 @@ namespace mongo {
             // task will be copied a few times so make sure it's relatively cheap
             void schedule(Task task);
 
-            // Helpers that wrap schedule and boost::bind.
+            // Helpers that wrap schedule and stdx::bind.
             // Functor and args will be copied a few times so make sure it's relatively cheap
             template<typename F, typename A>
-            void schedule(F f, A a) { schedule(boost::bind(f,a)); }
+            void schedule(F f, A a) { schedule(stdx::bind(f,a)); }
             template<typename F, typename A, typename B>
-            void schedule(F f, A a, B b) { schedule(boost::bind(f,a,b)); }
+            void schedule(F f, A a, B b) { schedule(stdx::bind(f,a,b)); }
             template<typename F, typename A, typename B, typename C>
-            void schedule(F f, A a, B b, C c) { schedule(boost::bind(f,a,b,c)); }
+            void schedule(F f, A a, B b, C c) { schedule(stdx::bind(f,a,b,c)); }
             template<typename F, typename A, typename B, typename C, typename D>
-            void schedule(F f, A a, B b, C c, D d) { schedule(boost::bind(f,a,b,c,d)); }
+            void schedule(F f, A a, B b, C c, D d) { schedule(stdx::bind(f,a,b,c,d)); }
             template<typename F, typename A, typename B, typename C, typename D, typename E>
-            void schedule(F f, A a, B b, C c, D d, E e) { schedule(boost::bind(f,a,b,c,d,e)); }
+            void schedule(F f, A a, B b, C c, D d, E e) { schedule(stdx::bind(f,a,b,c,d,e)); }
 
             int tasks_remaining() { return _tasksRemaining; }
 

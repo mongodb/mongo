@@ -318,7 +318,7 @@ namespace {
                 AuthorizationManager::rolesCollectionNamespace,
                 BSONObj(),
                 BSONObj(),
-                boost::bind(addRoleFromDocumentOrWarn, &newRoleGraph, _1));
+                stdx::bind(addRoleFromDocumentOrWarn, &newRoleGraph, stdx::placeholders::_1));
         if (!status.isOK())
             return status;
 

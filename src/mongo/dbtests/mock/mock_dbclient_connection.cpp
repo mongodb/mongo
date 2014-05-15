@@ -117,7 +117,7 @@ namespace mongo {
         return _remoteServer->toString();
     }
 
-    unsigned long long MockDBClientConnection::query(boost::function<void(const BSONObj&)> f,
+    unsigned long long MockDBClientConnection::query(stdx::function<void(const BSONObj&)> f,
                     const string& ns,
                     mongo::Query query,
                     const BSONObj* fieldsToReturn,
@@ -126,7 +126,7 @@ namespace mongo {
         return 0;
     }
 
-    unsigned long long MockDBClientConnection::query(boost::function<void(
+    unsigned long long MockDBClientConnection::query(stdx::function<void(
             mongo::DBClientCursorBatchIterator&)> f,
             const std::string& ns,
             mongo::Query query,

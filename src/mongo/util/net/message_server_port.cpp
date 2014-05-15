@@ -36,6 +36,7 @@
 
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/exit.h"
@@ -81,7 +82,7 @@ namespace mongo {
 #ifndef __linux__  // TODO: consider making this ifdef _WIN32
                 {
                     HandleIncomingMsgParam* himParam = new HandleIncomingMsgParam(p, _handler);
-                    boost::thread thr(boost::bind(&handleIncomingMsg, himParam));
+                    boost::thread thr(stdx::bind(&handleIncomingMsg, himParam));
                 }
 #else
                 pthread_attr_t attrs;

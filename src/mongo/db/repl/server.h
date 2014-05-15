@@ -31,8 +31,8 @@
 #include <deque>
 
 #include <boost/thread/condition.hpp>
-#include <boost/function.hpp>
 
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/task.h"
 
@@ -40,7 +40,7 @@ namespace mongo {
 
     namespace task {
 
-        typedef boost::function<void()> lam;
+        typedef stdx::function<void()> lam;
 
         /** typical usage is: task::fork( new Server("threadname") ); */
         class Server : public Task {

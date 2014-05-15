@@ -103,7 +103,7 @@ public:
         // use low-latency "exhaust" mode if going over the network
         if (!_usingMongos && typeid(connBase) == typeid(DBClientConnection&)) {
             DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
-            boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
+            stdx::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
             conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
         }
         else {

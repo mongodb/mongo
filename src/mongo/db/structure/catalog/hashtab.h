@@ -172,7 +172,7 @@ namespace mongo {
             }
         }
 
-        // TODO: should probably use boost::bind for this, but didn't want to look at it
+        // TODO: should probably use stdx::bind for this, but didn't want to look at it
         typedef void (*IteratorCallback2)( const Key& k , Type& v , void * extra );
         void iterAll( IteratorCallback2 callback , void * extra ) {
             for ( int i=0; i<n; i++ ) {

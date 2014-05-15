@@ -119,7 +119,7 @@ namespace mongo {
         void Server::call( const lam& msg ) {
             Ret r;
             r.msg = &msg;
-            lam f = boost::bind(&Ret::f, &r);
+            lam f = stdx::bind(&Ret::f, &r);
             send(f);
             {
                 scoped_lock lk(r.m);
@@ -182,7 +182,7 @@ namespace mongo {
         class TaskUnitTest : public mongo::StartupTest {
         public:
             virtual void run() {
-                lam f = boost::bind(abc, 3);
+                lam f = stdx::bind(abc, 3);
                 //f();
 
                 s = new Server("unittest");

@@ -117,7 +117,7 @@ namespace mongo {
 
     void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
         verify( onlyCollections ); // TODO: need to implement this
-        //                                  need boost::bind or something to make this less ugly
+        //                                  need stdx::bind or something to make this less ugly
 
         if ( _ht.get() )
             _ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );

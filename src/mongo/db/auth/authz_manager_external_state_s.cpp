@@ -213,7 +213,7 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& queryDoc,
             const BSONObj& projection,
-            const boost::function<void(const BSONObj&)>& resultProcessor) {
+            const stdx::function<void(const BSONObj&)>& resultProcessor) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
             Query query(queryDoc);

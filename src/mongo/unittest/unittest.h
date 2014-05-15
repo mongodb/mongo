@@ -39,13 +39,12 @@
 #include <string>
 #include <vector>
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/logger/logstream_builder.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -191,7 +190,7 @@ namespace mongo {
         /**
          * Type representing the function composing a test.
          */
-        typedef boost::function<void (void)> TestFunction;
+        typedef stdx::function<void (void)> TestFunction;
 
         /**
          * Container holding a test function and its name.  Suites
@@ -274,7 +273,7 @@ namespace mongo {
 
             template<class T , typename A >
             void add( const A& a ) {
-                add(demangleName(typeid(T)), boost::bind(&Suite::runTestObjectWithArg<T, A>, a));
+                add(demangleName(typeid(T)), stdx::bind(&Suite::runTestObjectWithArg<T, A>, a));
             }
 
             template<class T>

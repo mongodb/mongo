@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <string>
 #include <map>
 #include <vector>
@@ -39,6 +38,7 @@
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -67,7 +67,7 @@ namespace mongo {
         virtual Status query(const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& projection, // Currently unused in mock
-                             const boost::function<void(const BSONObj&)>& resultProcessor);
+                             const stdx::function<void(const BSONObj&)>& resultProcessor);
 
         // This implementation does not understand uniqueness constraints.
         virtual Status insert(const NamespaceString& collectionName,

@@ -50,6 +50,7 @@
 #endif
 
 #include "mongo/platform/posix_fadvise.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
@@ -98,7 +99,7 @@ namespace mongo {
 
 
     void FileAllocator::start() {
-        boost::thread t( boost::bind( &FileAllocator::run , this ) );
+        boost::thread t( stdx::bind( &FileAllocator::run , this ) );
     }
 
     void FileAllocator::requestAllocation( const string &name, long &size ) {

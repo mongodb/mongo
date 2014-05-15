@@ -171,7 +171,7 @@ namespace mongo {
             }
 
             // note that we got a heartbeat from this node
-            theReplSet->mgr->send(boost::bind(&ReplSet::msgUpdateHBRecv,
+            theReplSet->mgr->send(stdx::bind(&ReplSet::msgUpdateHBRecv,
                                               theReplSet, from->hbinfo().id(), time(0)));
 
 
@@ -241,7 +241,7 @@ namespace mongo {
     */
     void ReplSetImpl::startThreads() {
         task::fork(mgr);
-        mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+        mgr->send( stdx::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
         if (myConfig().arbiterOnly) {
             return;
@@ -253,7 +253,7 @@ namespace mongo {
 
         boost::thread t(startSyncThread);
 
-        boost::thread producer(boost::bind(&replset::BackgroundSync::producerThread, sync));
+        boost::thread producer(stdx::bind(&replset::BackgroundSync::producerThread, sync));
         theReplSet->syncSourceFeedback.go();
 
         // member heartbeats are started in ReplSetImpl::initFromConfig

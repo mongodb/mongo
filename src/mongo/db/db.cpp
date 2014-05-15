@@ -280,7 +280,7 @@ namespace mongo {
         logStartup();
         startReplication();
         if (serverGlobalParams.isHttpInterfaceEnabled)
-            boost::thread web( boost::bind(&webServerThread,
+            boost::thread web( stdx::bind(&webServerThread,
                                            new RestAdminAccess(), // takes ownership
                                            OperationContextImpl::factory) ); // XXX SERVER-13931
 

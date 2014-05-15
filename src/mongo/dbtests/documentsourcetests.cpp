@@ -290,7 +290,7 @@ namespace DocumentSourceTests {
         public:
             WriterClientScope() :
             _state( Initial ),
-            _dummyWriter( boost::bind( &WriterClientScope::runDummyWriter, this ) ) {
+            _dummyWriter( stdx::bind( &WriterClientScope::runDummyWriter, this ) ) {
                 _state.await( Ready );
             }
             ~WriterClientScope() {

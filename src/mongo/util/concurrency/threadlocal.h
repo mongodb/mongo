@@ -30,7 +30,6 @@
 
 #include "mongo/client/undef_macros.h"
 #include <boost/thread/tss.hpp>
-#include <boost/bind.hpp>
 #include "mongo/client/redef_macros.h"
 
 

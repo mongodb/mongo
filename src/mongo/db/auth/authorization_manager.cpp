@@ -393,7 +393,7 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& projection,
-            const boost::function<void(const BSONObj&)>& resultProcessor) {
+            const stdx::function<void(const BSONObj&)>& resultProcessor) {
         return _externalState->query(collectionName, query, projection, resultProcessor);
     }
 
@@ -1051,7 +1051,7 @@ namespace {
                 NamespaceString(db, "system.users"),
                 BSONObj(),
                 BSONObj(),
-                boost::bind(upgradeProcessUser, externalState, db, _1, writeConcern));
+                stdx::bind(upgradeProcessUser, externalState, db, stdx::placeholders::_1, writeConcern));
     }
 
     /**
@@ -1078,10 +1078,10 @@ namespace {
                 sourceCollection,
                 BSONObj(),
                 BSONObj(),
-                boost::bind(uassertInsertIntoCollection,
+                stdx::bind(uassertInsertIntoCollection,
                             externalState,
                             targetCollection,
-                            _1,
+                            stdx::placeholders::_1,
                             writeConcern));
     }
 

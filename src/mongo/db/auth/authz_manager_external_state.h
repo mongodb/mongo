@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <string>
 #include <vector>
 
@@ -38,6 +37,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -175,7 +175,7 @@ namespace mongo {
         virtual Status query(const NamespaceString& collectionName,
                              const BSONObj& query,
                              const BSONObj& projection,
-                             const boost::function<void(const BSONObj&)>& resultProcessor) = 0;
+                             const stdx::function<void(const BSONObj&)>& resultProcessor) = 0;
 
         /**
          * Inserts "document" into "collectionName".

@@ -58,11 +58,11 @@ namespace {
         }
 
         HostThreadPool::Callback getCallback() {
-            return boost::bind(&CallbackCheck::noteCallback, this);
+            return stdx::bind(&CallbackCheck::noteCallback, this);
         }
 
         HostThreadPool::Callback getHostCallback(const ConnectionString& host) {
-            return boost::bind(&CallbackCheck::noteHostCallback, this, host);
+            return stdx::bind(&CallbackCheck::noteHostCallback, this, host);
         }
 
         void noteHostCallback(const ConnectionString& host) {
@@ -232,7 +232,7 @@ namespace {
 
             // The query won't be scheduled by the multi op, so we need to do so ourselves
             _threadPool->schedule(host,
-                                  boost::bind(&MockSystemEnv::doBlockingQuery,
+                                  stdx::bind(&MockSystemEnv::doBlockingQuerySwallowResult,
                                               this,
                                               host,
                                               QuerySpec()));
@@ -241,7 +241,14 @@ namespace {
         Date_t currentTimeMillis() {
             return _mockTimeMillis;
         }
-        
+
+        void doBlockingQuerySwallowResult(const ConnectionString& host,
+                                          const QuerySpec& query) {
+            StatusWith<DBClientCursor*> result = doBlockingQuery(host, query);
+            if (result.isOK())
+                delete result.getValue();
+        }
+
         StatusWith<DBClientCursor*> doBlockingQuery(const ConnectionString& host,
                                                     const QuerySpec& query) {
 

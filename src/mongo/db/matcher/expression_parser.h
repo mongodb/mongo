@@ -30,13 +30,12 @@
 
 #pragma once
 
-#include <boost/function.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -194,10 +193,10 @@ namespace mongo {
     };
 
 
-    typedef boost::function<StatusWithMatchExpression(const char* name, int type, const BSONObj& section)> MatchExpressionParserGeoCallback;
+    typedef stdx::function<StatusWithMatchExpression(const char* name, int type, const BSONObj& section)> MatchExpressionParserGeoCallback;
     extern MatchExpressionParserGeoCallback expressionParserGeoCallback;
 
-    typedef boost::function<StatusWithMatchExpression(const BSONObj& queryObj)> MatchExpressionParserTextCallback;
+    typedef stdx::function<StatusWithMatchExpression(const BSONObj& queryObj)> MatchExpressionParserTextCallback;
     extern MatchExpressionParserTextCallback expressionParserTextCallback;
 
 }

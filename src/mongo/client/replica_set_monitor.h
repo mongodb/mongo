@@ -27,13 +27,13 @@
 
 #pragma once
 
-#include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
 #include <string>
 #include <set>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -51,7 +51,7 @@ namespace mongo {
     public:
         class Refresher;
 
-        typedef boost::function<void(const std::string& setName,
+        typedef stdx::function<void(const std::string& setName,
                                      const std::string& newConnectionString)>
                 ConfigChangeHook;
 
