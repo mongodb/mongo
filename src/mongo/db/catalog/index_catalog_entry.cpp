@@ -113,7 +113,7 @@ namespace mongo {
         NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         IndexDetails& id = nsd->idx( idxNo );
-        *txn->writing(&id.head) = newHead;
+        *txn->recoveryUnit()->writing(&id.head) = newHead;
         _head = newHead;
     }
 

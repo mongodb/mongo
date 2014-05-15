@@ -681,7 +681,7 @@ namespace mongo {
             }
 
             // Opportunity for journaling to write during the update.
-            txn->commitIfNeeded();
+            txn->recoveryUnit()->commitIfNeeded();
         }
 
         // TODO: Can this be simplified?

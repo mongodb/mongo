@@ -283,7 +283,7 @@ namespace mongo {
             warning() << "Internal error while reading system.indexes collection";
         }
 
-        txn->writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
+        txn->recoveryUnit()->writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
 
         return Status::OK();
     }
@@ -444,8 +444,8 @@ namespace mongo {
             _collection->detailsWritable()->getNextIndexDetails( _txn, _collection );
 
         try {
-            *_txn->writing( &indexDetails.info ) = systemIndexesEntry.getValue();
-            *_txn->writing( &indexDetails.head ) = DiskLoc();
+            *_txn->recoveryUnit()->writing( &indexDetails.info ) = systemIndexesEntry.getValue();
+            *_txn->recoveryUnit()->writing( &indexDetails.head ) = DiskLoc();
         }
         catch ( DBException& e ) {
             log() << "got exception trying to assign loc to IndexDetails" << e;
@@ -455,7 +455,7 @@ namespace mongo {
 
         int before = _collection->detailsDeprecated()->_indexBuildsInProgress;
         try {
-            _txn->writingInt( _collection->detailsWritable()->_indexBuildsInProgress ) += 1;
+            _txn->recoveryUnit()->writingInt( _collection->detailsWritable()->_indexBuildsInProgress ) += 1;
         }
         catch ( DBException& e ) {
             log() << "got exception trying to incrementStats _indexBuildsInProgress: " << e;
@@ -559,8 +559,8 @@ namespace mongo {
             idxNo = nsd->getCompletedIndexCount();
         }
 
-        _txn->writingInt( nsd->_indexBuildsInProgress ) -= 1;
-        _txn->writingInt( nsd->_nIndexes ) += 1;
+        _txn->recoveryUnit()->writingInt( nsd->_indexBuildsInProgress ) -= 1;
+        _txn->recoveryUnit()->writingInt( nsd->_nIndexes ) += 1;
 
         _catalog->_collection->infoCache()->addedIndex();
 
@@ -980,13 +980,13 @@ namespace mongo {
             massert( 16631, "index does not have an 'expireAfterSeconds' field", false );
             break;
         case NumberInt:
-            *txn->writing(reinterpret_cast<int*>(nonConstPtr)) = newExpireSeconds;
+            *txn->recoveryUnit()->writing(reinterpret_cast<int*>(nonConstPtr)) = newExpireSeconds;
             break;
         case NumberDouble:
-            *txn->writing(reinterpret_cast<double*>(nonConstPtr)) = newExpireSeconds;
+            *txn->recoveryUnit()->writing(reinterpret_cast<double*>(nonConstPtr)) = newExpireSeconds;
             break;
         case NumberLong:
-            *txn->writing(reinterpret_cast<long long*>(nonConstPtr)) = newExpireSeconds;
+            *txn->recoveryUnit()->writing(reinterpret_cast<long long*>(nonConstPtr)) = newExpireSeconds;
             break;
         default:
             massert( 16632, "current 'expireAfterSeconds' is not a number", false );

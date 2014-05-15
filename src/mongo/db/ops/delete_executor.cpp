@@ -167,7 +167,7 @@ namespace mongo {
             }
 
             if (!_request->isGod()) {
-                txn->commitIfNeeded();
+                txn->recoveryUnit()->commitIfNeeded();
             }
 
             if (debug && _request->isGod() && nDeleted == 100) {

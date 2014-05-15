@@ -268,9 +268,9 @@ namespace mongo {
         Extent *e = getExtent( loc, false );
         verify( e );
 
-        *txn->writing(&e->magic) = Extent::extentSignature;
-        *txn->writing(&e->myLoc) = loc;
-        *txn->writing(&e->length) = size;
+        *txn->recoveryUnit()->writing(&e->magic) = Extent::extentSignature;
+        *txn->recoveryUnit()->writing(&e->myLoc) = loc;
+        *txn->recoveryUnit()->writing(&e->length) = size;
 
         return loc;
     }
@@ -389,9 +389,9 @@ namespace mongo {
 
         // remove from the free list
         if ( !best->xprev.isNull() )
-            *txn->writing(&getExtent( best->xprev )->xnext) = best->xnext;
+            *txn->recoveryUnit()->writing(&getExtent( best->xprev )->xnext) = best->xnext;
         if ( !best->xnext.isNull() )
-            *txn->writing(&getExtent( best->xnext )->xprev) = best->xprev;
+            *txn->recoveryUnit()->writing(&getExtent( best->xnext )->xprev) = best->xprev;
         if ( _getFreeListStart() == best->myLoc )
             _setFreeListStart( txn, best->xnext );
         if ( _getFreeListEnd() == best->myLoc )
@@ -425,10 +425,10 @@ namespace mongo {
 
     void MmapV1ExtentManager::freeExtent(OperationContext* txn, DiskLoc firstExt ) {
         Extent* e = getExtent( firstExt );
-        txn->writing( &e->xnext )->Null();
-        txn->writing( &e->xprev )->Null();
-        txn->writing( &e->firstRecord )->Null();
-        txn->writing( &e->lastRecord )->Null();
+        txn->recoveryUnit()->writing( &e->xnext )->Null();
+        txn->recoveryUnit()->writing( &e->xprev )->Null();
+        txn->recoveryUnit()->writing( &e->firstRecord )->Null();
+        txn->recoveryUnit()->writing( &e->lastRecord )->Null();
 
 
         if( _getFreeListStart().isNull() ) {
@@ -438,8 +438,8 @@ namespace mongo {
         else {
             DiskLoc a = _getFreeListStart();
             invariant( getExtent( a )->xprev.isNull() );
-            *txn->writing( &getExtent( a )->xprev ) = firstExt;
-            *txn->writing( &getExtent( firstExt )->xnext ) = a;
+            *txn->recoveryUnit()->writing( &getExtent( a )->xprev ) = firstExt;
+            *txn->recoveryUnit()->writing( &getExtent( firstExt )->xnext ) = a;
             _setFreeListStart( txn, firstExt );
         }
 
@@ -467,8 +467,8 @@ namespace mongo {
         else {
             DiskLoc a = _getFreeListStart();
             invariant( getExtent( a )->xprev.isNull() );
-            *txn->writing( &getExtent( a )->xprev ) = lastExt;
-            *txn->writing( &getExtent( lastExt )->xnext ) = a;
+            *txn->recoveryUnit()->writing( &getExtent( a )->xprev ) = lastExt;
+            *txn->recoveryUnit()->writing( &getExtent( lastExt )->xnext ) = a;
             _setFreeListStart( txn, firstExt );
         }
 
@@ -491,13 +491,13 @@ namespace mongo {
     void MmapV1ExtentManager::_setFreeListStart( OperationContext* txn, DiskLoc loc ) {
         invariant( !_files.empty() );
         DataFile* file = _files[0];
-        *txn->writing( &file->header()->freeListStart ) = loc;
+        *txn->recoveryUnit()->writing( &file->header()->freeListStart ) = loc;
     }
 
     void MmapV1ExtentManager::_setFreeListEnd( OperationContext* txn, DiskLoc loc ) {
         invariant( !_files.empty() );
         DataFile* file = _files[0];
-        *txn->writing( &file->header()->freeListEnd ) = loc;
+        *txn->recoveryUnit()->writing( &file->header()->freeListEnd ) = loc;
     }
 
     void MmapV1ExtentManager::freeListStats( int* numExtents, int64_t* totalFreeSize ) const {

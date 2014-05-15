@@ -175,7 +175,7 @@ namespace mongo {
             ofs = newOfs;
         }
 
-        DeletedRecord* empty = txn->writing(drec(emptyLoc));
+        DeletedRecord* empty = txn->recoveryUnit()->writing(drec(emptyLoc));
         empty->lengthWithHeaders() = delRecLength;
         empty->extentOfs() = e->myLoc.getOfs();
         empty->nextDeleted().Null();
@@ -224,7 +224,7 @@ namespace mongo {
         Record *r = recordFor( loc.getValue() );
         fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
 
-        r = reinterpret_cast<Record*>( txn->writingPtr(r, lenWHdr) );
+        r = reinterpret_cast<Record*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
         doc->writeDocument( r->data() );
 
         _addRecordToRecListInExtent(txn, r, loc.getValue());
@@ -255,7 +255,7 @@ namespace mongo {
         fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
 
         // copy the data
-        r = reinterpret_cast<Record*>( txn->writingPtr(r, lenWHdr) );
+        r = reinterpret_cast<Record*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
         memcpy( r->data(), data, len );
 
         _addRecordToRecListInExtent(txn, r, loc.getValue());
@@ -275,19 +275,19 @@ namespace mongo {
             if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
                 DiskLoc prev = getPrevRecordInExtent( dl );
                 Record* prevRecord = recordFor( prev );
-                txn->writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
+                txn->recoveryUnit()->writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
             }
 
             if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
                 DiskLoc next = getNextRecord( dl );
                 Record* nextRecord = recordFor( next );
-                txn->writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
+                txn->recoveryUnit()->writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
             }
         }
 
         /* remove ourself from extent pointers */
         {
-            Extent *e = txn->writing( _getExtent( _getExtentLocForRecord( dl ) ) );
+            Extent *e = txn->recoveryUnit()->writing( _getExtent( _getExtentLocForRecord( dl ) ) );
             if ( e->firstRecord == dl ) {
                 if ( todelete->nextOfs() == DiskLoc::NullOfs )
                     e->firstRecord.Null();
@@ -312,13 +312,13 @@ namespace mongo {
                    to this disk location.  so an incorrectly done remove would cause
                    a lot of problems.
                 */
-                memset( txn->writingPtr(todelete, todelete->lengthWithHeaders() ),
+                memset( txn->recoveryUnit()->writingPtr(todelete, todelete->lengthWithHeaders() ),
                         0, todelete->lengthWithHeaders() );
             }
             else {
                 // this is defensive so we can detect if we are still using a location
                 // that was deleted
-                memset(txn->writingPtr(todelete->data(), 4), 0xee, 4);
+                memset(txn->recoveryUnit()->writingPtr(todelete->data(), 4), 0xee, 4);
                 addDeletedRec(txn, dl);
             }
         }
@@ -335,16 +335,16 @@ namespace mongo {
         dassert( recordFor(loc) == r );
         Extent *e = _getExtent( _getExtentLocForRecord( loc ) );
         if ( e->lastRecord.isNull() ) {
-            *txn->writing(&e->firstRecord) = loc;
-            *txn->writing(&e->lastRecord) = loc;
+            *txn->recoveryUnit()->writing(&e->firstRecord) = loc;
+            *txn->recoveryUnit()->writing(&e->lastRecord) = loc;
             r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
         }
         else {
             Record *oldlast = recordFor(e->lastRecord);
             r->prevOfs() = e->lastRecord.getOfs();
             r->nextOfs() = DiskLoc::NullOfs;
-            txn->writingInt(oldlast->nextOfs()) = loc.getOfs();
-            *txn->writing(&e->lastRecord) = loc;
+            txn->recoveryUnit()->writingInt(oldlast->nextOfs()) = loc.getOfs();
+            *txn->recoveryUnit()->writing(&e->lastRecord) = loc;
         }
     }
 
@@ -359,12 +359,12 @@ namespace mongo {
         Extent *e = _extentManager->getExtent( eloc );
         invariant( e );
 
-        *txn->writing( &e->nsDiagnostic ) = _ns;
+        *txn->recoveryUnit()->writing( &e->nsDiagnostic ) = _ns;
 
-        txn->writing( &e->xnext )->Null();
-        txn->writing( &e->xprev )->Null();
-        txn->writing( &e->firstRecord )->Null();
-        txn->writing( &e->lastRecord )->Null();
+        txn->recoveryUnit()->writing( &e->xnext )->Null();
+        txn->recoveryUnit()->writing( &e->xprev )->Null();
+        txn->recoveryUnit()->writing( &e->firstRecord )->Null();
+        txn->recoveryUnit()->writing( &e->lastRecord )->Null();
 
         DiskLoc emptyLoc = _findFirstSpot( txn, eloc, e );
 
@@ -378,8 +378,8 @@ namespace mongo {
         }
         else {
             invariant( !_details->firstExtent().isNull() );
-            *txn->writing(&e->xprev) = _details->lastExtent();
-            *txn->writing(&_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
+            *txn->recoveryUnit()->writing(&e->xprev) = _details->lastExtent();
+            *txn->recoveryUnit()->writing(&_extentManager->getExtent(_details->lastExtent())->xnext) = eloc;
             _details->setLastExtent( txn, eloc );
         }
 

@@ -174,7 +174,7 @@ namespace mongo {
         //
         //  RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
 
-        txn->syncDataAndTruncateJournal();
+        txn->recoveryUnit()->syncDataAndTruncateJournal();
 
         Database::closeDatabase( name, db->path() );
         db = 0; // d is now deleted

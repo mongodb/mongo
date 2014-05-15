@@ -553,7 +553,7 @@ namespace mongo {
                                         systemIndexCollection, indexName, false);
 
                 IndexDetails& indexDetails = details->idx(indexI);
-                *txn->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
+                *txn->recoveryUnit()->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
             }
 
             {

@@ -1031,7 +1031,7 @@ namespace mongo {
         }
         else {
             logOp( txn, "i", insertNS.c_str(), docToInsert );
-            txn->commitIfNeeded();
+            txn->recoveryUnit()->commitIfNeeded();
             result->getStats().n = 1;
         }
     }

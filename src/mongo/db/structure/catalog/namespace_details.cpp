@@ -108,7 +108,7 @@ namespace mongo {
         long ofs = e->ofsFrom(this);
         if( i == 0 ) {
             verify( _extraOffset == 0 );
-            *txn->writing(&_extraOffset) = ofs;
+            *txn->recoveryUnit()->writing(&_extraOffset) = ofs;
             verify( extra() == e );
         }
         else {
@@ -130,7 +130,7 @@ namespace mongo {
                 return false;
             }
 
-            *txn->writing(&_multiKeyIndexBits) |= mask;
+            *txn->recoveryUnit()->writing(&_multiKeyIndexBits) |= mask;
         }
         else {
             // Shortcut if the bit is already set correctly
@@ -140,7 +140,7 @@ namespace mongo {
 
             // Invert mask: all 1's except a 0 at the ith bit
             mask = ~mask;
-            *txn->writing(&_multiKeyIndexBits) &= mask;
+            *txn->recoveryUnit()->writing(&_multiKeyIndexBits) &= mask;
         }
 
         return true;
@@ -243,14 +243,14 @@ namespace mongo {
     }
 
     NamespaceDetails* NamespaceDetails::writingWithoutExtra( OperationContext* txn ) {
-        return txn->writing( this );
+        return txn->recoveryUnit()->writing( this );
     }
 
 
     // XXX - this method should go away
     NamespaceDetails *NamespaceDetails::writingWithExtra( OperationContext* txn ) {
         for( Extra *e = extra(); e; e = e->next( this ) ) {
-            txn->writing( e );
+            txn->recoveryUnit()->writing( e );
         }
         return writingWithoutExtra( txn );
     }
@@ -288,7 +288,7 @@ namespace mongo {
     void NamespaceDetails::setLastExtentSize( OperationContext* txn, int newMax ) {
         if ( _lastExtentSize == newMax )
             return;
-        txn->writingInt(_lastExtentSize) = newMax;
+        txn->recoveryUnit()->writingInt(_lastExtentSize) = newMax;
     }
 
     void NamespaceDetails::incrementStats( OperationContext* txn,
@@ -296,7 +296,7 @@ namespace mongo {
                                            long long numRecordsIncrement ) {
 
         // durability todo : this could be a bit annoying / slow to record constantly
-        Stats* s = txn->writing( &_stats );
+        Stats* s = txn->recoveryUnit()->writing( &_stats );
         s->datasize += dataSizeIncrement;
         s->nrecords += numRecordsIncrement;
     }
@@ -304,49 +304,49 @@ namespace mongo {
     void NamespaceDetails::setStats( OperationContext* txn,
                                      long long dataSize,
                                      long long numRecords ) {
-        Stats* s = txn->writing( &_stats );
+        Stats* s = txn->recoveryUnit()->writing( &_stats );
         s->datasize = dataSize;
         s->nrecords = numRecords;
     }
 
     void NamespaceDetails::setFirstExtent( OperationContext* txn,
                                            const DiskLoc& loc ) {
-        *txn->writing( &_firstExtent ) = loc;
+        *txn->recoveryUnit()->writing( &_firstExtent ) = loc;
     }
 
     void NamespaceDetails::setLastExtent( OperationContext* txn,
                                           const DiskLoc& loc ) {
-        *txn->writing( &_lastExtent ) = loc;
+        *txn->recoveryUnit()->writing( &_lastExtent ) = loc;
     }
 
     void NamespaceDetails::setCapExtent( OperationContext* txn,
                                          const DiskLoc& loc ) {
-        *txn->writing( &_capExtent ) = loc;
+        *txn->recoveryUnit()->writing( &_capExtent ) = loc;
     }
 
     void NamespaceDetails::setCapFirstNewRecord( OperationContext* txn,
                                                  const DiskLoc& loc ) {
-        *txn->writing( &_capFirstNewRecord ) = loc;
+        *txn->recoveryUnit()->writing( &_capFirstNewRecord ) = loc;
     }
 
     void NamespaceDetails::setFirstExtentInvalid( OperationContext* txn ) {
-        *txn->writing( &_firstExtent ) = DiskLoc().setInvalid();
+        *txn->recoveryUnit()->writing( &_firstExtent ) = DiskLoc().setInvalid();
     }
 
     void NamespaceDetails::setLastExtentInvalid( OperationContext* txn ) {
-        *txn->writing( &_lastExtent ) = DiskLoc().setInvalid();
+        *txn->recoveryUnit()->writing( &_lastExtent ) = DiskLoc().setInvalid();
     }
 
     void NamespaceDetails::setDeletedListEntry( OperationContext* txn,
                                                 int bucket, const DiskLoc& loc ) {
-        *txn->writing( &_deletedList[bucket] ) = loc;
+        *txn->recoveryUnit()->writing( &_deletedList[bucket] ) = loc;
     }
 
     bool NamespaceDetails::setUserFlag( OperationContext* txn, int flags ) {
         if ( ( _userFlags & flags ) == flags )
             return false;
         
-        txn->writingInt(_userFlags) |= flags;
+        txn->recoveryUnit()->writingInt(_userFlags) |= flags;
         return true;
     }
 
@@ -354,7 +354,7 @@ namespace mongo {
         if ( ( _userFlags & flags ) == 0 )
             return false;
 
-        txn->writingInt(_userFlags) &= ~flags;
+        txn->recoveryUnit()->writingInt(_userFlags) &= ~flags;
         return true;
     }
 
@@ -362,7 +362,7 @@ namespace mongo {
         if ( flags == _userFlags )
             return false;
 
-        txn->writingInt(_userFlags) = flags;
+        txn->recoveryUnit()->writingInt(_userFlags) = flags;
         return true;
     }
 
@@ -373,7 +373,7 @@ namespace mongo {
         if ( isCapped() )
             return;
 
-        *txn->writing(&_paddingFactor) = paddingFactor;
+        *txn->recoveryUnit()->writing(&_paddingFactor) = paddingFactor;
     }
 
     /* remove bit from a bit array - actually remove its slot, not a clear
@@ -411,8 +411,8 @@ namespace mongo {
 
         // flip main meta data
         IndexDetails temp = idx(a);
-        *txn->writing(&idx(a)) = idx(b);
-        *txn->writing(&idx(b)) = temp;
+        *txn->recoveryUnit()->writing(&idx(a)) = idx(b);
+        *txn->recoveryUnit()->writing(&idx(b)) = temp;
 
         // flip multi key bits
         bool tempMultikey = isMultikey(a);
@@ -422,7 +422,7 @@ namespace mongo {
 
     void NamespaceDetails::orphanDeletedList( OperationContext* txn ) {
         for( int i = 0; i < Buckets; i++ ) {
-            *txn->writing(&_deletedList[i]) = DiskLoc();
+            *txn->recoveryUnit()->writing(&_deletedList[i]) = DiskLoc();
         }
     }
 
@@ -440,7 +440,7 @@ namespace mongo {
 
     void NamespaceDetails::Extra::setNext( OperationContext* txn,
                                            long ofs ) {
-        *txn->writing(&_next) = ofs;
+        *txn->recoveryUnit()->writing(&_next) = ofs;
     }
 
     /* ------------------------------------------------------------------------- */

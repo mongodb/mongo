@@ -311,7 +311,7 @@ namespace mongo {
                 }
             }
 
-            txn.writingInt(h->versionMinor) = 5;
+            txn.recoveryUnit()->writingInt(h->versionMinor) = 5;
             return;
         }
 

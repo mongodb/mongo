@@ -55,38 +55,6 @@ namespace mongo {
          */
         virtual RecoveryUnit* recoveryUnit() const = 0;
 
-        // XXX: migrate callers use the recoveryUnit() directly
-        template <typename T>
-        T* writing(T* x) {
-            return recoveryUnit()->writing(x);
-        }
-
-        int& writingInt(int& d) {
-            return recoveryUnit()->writingInt(d);
-        }
-
-        void syncDataAndTruncateJournal() {
-            recoveryUnit()->syncDataAndTruncateJournal();
-        }
-
-        void createdFile(const std::string& filename, unsigned long long len) {
-            recoveryUnit()->createdFile(filename, len);
-        }
-
-        void* writingPtr(void* data, size_t len) {
-            return recoveryUnit()->writingPtr(data, len);
-        }
-
-        bool isCommitNeeded() const {
-            return recoveryUnit()->isCommitNeeded();
-        }
-
-        bool commitIfNeeded(bool force = false) {
-            return recoveryUnit()->commitIfNeeded(force);
-        }
-        // XXX: migrate callers use the recoveryUnit() directly
-
-
         // --- operation level info? ---
 
         /**

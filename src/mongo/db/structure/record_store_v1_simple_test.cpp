@@ -228,7 +228,7 @@ namespace {
         ASSERT_GREATER_THAN_OR_EQUALS( rs->deletedRecordFor( deleted )->lengthWithHeaders(),
                                        newDeletedRecordSize );
         DeletedRecord* dr = const_cast<DeletedRecord*>( rs->deletedRecordFor( deleted ) );
-        txn->writingInt( dr->lengthWithHeaders() ) = newDeletedRecordSize;
+        txn->recoveryUnit()->writingInt( dr->lengthWithHeaders() ) = newDeletedRecordSize;
 
         // Re-insert the DeletedRecord into the deletedList bucket appropriate for its
         // new size.

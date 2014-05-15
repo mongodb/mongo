@@ -569,7 +569,7 @@ namespace mongo {
                     Lock::DBWrite lock( _config.outputOptions.finalNamespace );
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
-                    _txn->commitIfNeeded();
+                    _txn->recoveryUnit()->commitIfNeeded();
                     pm.hit();
                 }
                 _db.dropCollection( _config.tempNamespace );
@@ -611,7 +611,7 @@ namespace mongo {
                     else {
                         Helpers::upsert( _txn, _config.outputOptions.finalNamespace , temp );
                     }
-                    _txn->commitIfNeeded();
+                    _txn->recoveryUnit()->commitIfNeeded();
                     pm.hit();
                 }
                 pm.finished();
@@ -661,7 +661,7 @@ namespace mongo {
 
             coll->insertDocument( _txn, o, true );
             logOp( _txn, "i", _config.incLong.c_str(), o );
-            _txn->commitIfNeeded();
+            _txn->recoveryUnit()->commitIfNeeded();
         }
 
         State::State(OperationContext* txn, const Config& c) :

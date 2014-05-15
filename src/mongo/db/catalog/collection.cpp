@@ -426,7 +426,7 @@ namespace mongo {
 
         //  update in place
         int sz = objNew.objsize();
-        memcpy(txn->writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
+        memcpy(txn->recoveryUnit()->writingPtr(oldRecord->data(), sz), objNew.objdata(), sz);
 
         return StatusWith<DiskLoc>( oldLocation );
     }
@@ -449,7 +449,7 @@ namespace mongo {
         const mutablebson::DamageVector::const_iterator end = damages.end();
         for( ; where != end; ++where ) {
             const char* sourcePtr = damangeSource + where->sourceOffset;
-            void* targetPtr = txn->writingPtr(root + where->targetOffset, where->size);
+            void* targetPtr = txn->recoveryUnit()->writingPtr(root + where->targetOffset, where->size);
             std::memcpy(targetPtr, sourcePtr, where->size);
         }
 

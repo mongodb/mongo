@@ -43,20 +43,20 @@ namespace mongo {
 
     template <class BtreeLayout>
     typename BtreeLogic<BtreeLayout>::Builder*
-    BtreeLogic<BtreeLayout>::newBuilder(OperationContext* trans, bool dupsAllowed) {
-        return new Builder(this, trans, dupsAllowed);
+    BtreeLogic<BtreeLayout>::newBuilder(OperationContext* txn, bool dupsAllowed) {
+        return new Builder(this, txn, dupsAllowed);
     }
 
     template <class BtreeLayout>
     BtreeLogic<BtreeLayout>::Builder::Builder(BtreeLogic* logic,
-                                              OperationContext* trans,
+                                              OperationContext* txn,
                                               bool dupsAllowed)
         : _logic(logic),
           _dupsAllowed(dupsAllowed),
           _numAdded(0),
-          _trans(trans) {
+          _txn(txn) {
 
-        _first = _cur = _logic->addBucket(trans);
+        _first = _cur = _logic->addBucket(txn);
         _b = _getModifiableBucket(_cur);
         _committed = false;
     }
@@ -113,7 +113,7 @@ namespace mongo {
 
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::Builder::newBucket() {
-        DiskLoc newBucketLoc = _logic->addBucket(_trans);
+        DiskLoc newBucketLoc = _logic->addBucket(_txn);
         _b->parent = newBucketLoc;
         _cur = newBucketLoc;
         _b = _getModifiableBucket(_cur);
@@ -124,23 +124,23 @@ namespace mongo {
         for (;;) {
             if (_getBucket(loc)->parent.isNull()) {
                 // only 1 bucket at this level. we are done.
-                _logic->_headManager->setHead(_trans, loc);
+                _logic->_headManager->setHead(_txn, loc);
                 break;
             }
 
-            DiskLoc upLoc = _logic->addBucket(_trans);
+            DiskLoc upLoc = _logic->addBucket(_txn);
             DiskLoc upStart = upLoc;
             BucketType* up = _getModifiableBucket(upLoc);
 
             DiskLoc xloc = loc;
             while (!xloc.isNull()) {
-                if (_trans->commitIfNeeded()) {
+                if (_txn->recoveryUnit()->commitIfNeeded()) {
                     _b = _getModifiableBucket(_cur);
                     up = _getModifiableBucket(upLoc);
                 }
 
                 if (mayInterrupt) {
-                    _trans->checkForInterrupt();
+                    _txn->checkForInterrupt();
                 }
 
                 BucketType* x = _getModifiableBucket(xloc);
@@ -152,7 +152,7 @@ namespace mongo {
 
                 if (!_logic->_pushBack(up, r, k, keepLoc)) {
                     // current bucket full
-                    DiskLoc n = _logic->addBucket(_trans);
+                    DiskLoc n = _logic->addBucket(_txn);
                     up->parent = n;
                     upLoc = n;
                     up = _getModifiableBucket(upLoc);
@@ -168,7 +168,7 @@ namespace mongo {
                         DiskLoc ll = x->nextChild;
                         _getModifiableBucket(ll)->parent = upLoc;
                     }
-                    _logic->deallocBucket(_trans, x, xloc);
+                    _logic->deallocBucket(_txn, x, xloc);
                 }
                 xloc = nextLoc;
             }
@@ -180,7 +180,7 @@ namespace mongo {
 
     template <class BtreeLayout>
     void BtreeLogic<BtreeLayout>::Builder::mayCommitProgressDurably() {
-        if (_trans->commitIfNeeded()) {
+        if (_txn->recoveryUnit()->commitIfNeeded()) {
             _b = _getModifiableBucket(_cur);
         }
     }
@@ -188,7 +188,7 @@ namespace mongo {
     template <class BtreeLayout>
     typename BtreeLogic<BtreeLayout>::BucketType*
     BtreeLogic<BtreeLayout>::Builder::_getModifiableBucket(DiskLoc loc) {
-        return _logic->btreemod(_trans, _logic->getBucket(loc));
+        return _logic->btreemod(_txn, _logic->getBucket(loc));
     }
 
     template <class BtreeLayout>
@@ -241,8 +241,8 @@ namespace mongo {
 
     template <class BtreeLayout>
     typename BtreeLogic<BtreeLayout>::BucketType*
-    BtreeLogic<BtreeLayout>::btreemod(OperationContext* trans, BucketType* bucket) {
-        trans->writingPtr(bucket, BtreeLayout::BucketSize);
+    BtreeLogic<BtreeLayout>::btreemod(OperationContext* txn, BucketType* bucket) {
+        txn->recoveryUnit()->writingPtr(bucket, BtreeLayout::BucketSize);
         return bucket;
     }
 
@@ -426,7 +426,7 @@ namespace mongo {
      * Returns false if a split is required.
      */
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* trans,
+    bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* txn,
                                               BucketType* bucket,
                                               const DiskLoc bucketLoc,
                                               int& keypos,
@@ -437,7 +437,7 @@ namespace mongo {
 
         int bytesNeeded = key.dataSize() + sizeof(KeyHeaderType);
         if (bytesNeeded > bucket->emptySize) {
-            _pack(trans, bucket, bucketLoc, keypos);
+            _pack(txn, bucket, bucketLoc, keypos);
             if (bytesNeeded > bucket->emptySize) {
                 return false;
             }
@@ -451,7 +451,7 @@ namespace mongo {
             char* end = reinterpret_cast<char*>(&getKeyHeader(bucket, bucket->n + 1));
 
             // Declare that we will write to [k(keypos),k(n)]
-            trans->writingPtr(start, end - start);
+            txn->recoveryUnit()->writingPtr(start, end - start);
         }
 
         // e.g. for n==3, keypos==2
@@ -461,7 +461,7 @@ namespace mongo {
         }
 
         size_t writeLen = sizeof(bucket->emptySize) + sizeof(bucket->topSize) + sizeof(bucket->n);
-        trans->writingPtr(&bucket->emptySize, writeLen);
+        txn->recoveryUnit()->writingPtr(&bucket->emptySize, writeLen);
         bucket->emptySize -= sizeof(KeyHeaderType);
         bucket->n++;
 
@@ -471,7 +471,7 @@ namespace mongo {
         kn.recordLoc = recordLoc;
         kn.setKeyDataOfs((short) _alloc(bucket, key.dataSize()));
         char *p = dataAt(bucket, kn.keyDataOfs());
-        trans->writingPtr(p, key.dataSize());
+        txn->recoveryUnit()->writingPtr(p, key.dataSize());
         memcpy(p, key.data(), key.dataSize());
         return true;
     }
@@ -510,7 +510,7 @@ namespace mongo {
      * it.
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::_pack(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::_pack(OperationContext* txn,
                                         BucketType* bucket,
                                         const DiskLoc thisLoc,
                                         int &refPos) {
@@ -521,7 +521,7 @@ namespace mongo {
             return;
         }
 
-        _packReadyForMod(btreemod(trans, bucket), refPos);
+        _packReadyForMod(btreemod(txn, bucket), refPos);
     }
 
     /**
@@ -1256,7 +1256,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::delBucket(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::delBucket(OperationContext* txn,
                                             BucketType* bucket,
                                             const DiskLoc bucketLoc) {
         invariant(bucketLoc != getRootLoc());
@@ -1265,8 +1265,8 @@ namespace mongo {
 
         BucketType* p = getBucket(bucket->parent);
         int parentIdx = indexInParent(bucket, bucketLoc);
-        *trans->writing(&childLocForPos(p, parentIdx)) = DiskLoc();
-        deallocBucket(trans, bucket, bucketLoc);
+        *txn->recoveryUnit()->writing(&childLocForPos(p, parentIdx)) = DiskLoc();
+        deallocBucket(txn, bucket, bucketLoc);
     }
 
     template <class BtreeLayout>
@@ -1336,7 +1336,7 @@ namespace mongo {
      * May delete the bucket 'bucket' rendering 'bucketLoc' invalid.
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::delKeyAtPos(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::delKeyAtPos(OperationContext* txn,
                                               BucketType* bucket,
                                               const DiskLoc bucketLoc,
                                               int p) {
@@ -1350,25 +1350,25 @@ namespace mongo {
                     // we don't delete the top bucket ever
                 }
                 else {
-                    if (!mayBalanceWithNeighbors(trans, bucket, bucketLoc)) {
-                        // An empty bucket is only allowed as a transient state.  If
+                    if (!mayBalanceWithNeighbors(txn, bucket, bucketLoc)) {
+                        // An empty bucket is only allowed as a txnient state.  If
                         // there are no neighbors to balance with, we delete ourself.
                         // This condition is only expected in legacy btrees.
-                        delBucket(trans, bucket, bucketLoc);
+                        delBucket(txn, bucket, bucketLoc);
                     }
                 }
                 return;
             }
-            deleteInternalKey(trans, bucket, bucketLoc, p);
+            deleteInternalKey(txn, bucket, bucketLoc, p);
             return;
         }
 
         if (left.isNull()) {
             _delKeyAtPos(bucket, p);
-            mayBalanceWithNeighbors(trans, bucket, bucketLoc);
+            mayBalanceWithNeighbors(txn, bucket, bucketLoc);
         }
         else {
-            deleteInternalKey(trans, bucket, bucketLoc, p);
+            deleteInternalKey(txn, bucket, bucketLoc, p);
         }
     }
 
@@ -1396,7 +1396,7 @@ namespace mongo {
      * legacy btree.
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* txn,
                                                     BucketType* bucket,
                                                     const DiskLoc bucketLoc,
                                                     int keypos) {
@@ -1422,32 +1422,32 @@ namespace mongo {
         // Because advanceLoc is a descendant of thisLoc, updating thisLoc will
         // not affect packing or keys of advanceLoc and kn will be stable
         // during the following setInternalKey()
-        setInternalKey(trans, bucket, bucketLoc, keypos, kn.recordLoc, kn.data,
+        setInternalKey(txn, bucket, bucketLoc, keypos, kn.recordLoc, kn.data,
                        childLocForPos(bucket, keypos),
                        childLocForPos(bucket, keypos + 1));
-        delKeyAtPos(trans, btreemod(trans, advanceBucket), advanceLoc, advanceKeyOfs);
+        delKeyAtPos(txn, btreemod(txn, advanceBucket), advanceLoc, advanceKeyOfs);
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::replaceWithNextChild(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::replaceWithNextChild(OperationContext* txn,
                                                        BucketType* bucket,
                                                        const DiskLoc bucketLoc) {
 
         invariant(bucket->n == 0 && !bucket->nextChild.isNull() );
         if (bucket->parent.isNull()) {
             invariant(getRootLoc() == bucketLoc);
-            _headManager->setHead(trans, bucket->nextChild);
+            _headManager->setHead(txn, bucket->nextChild);
         }
         else {
             BucketType* parentBucket = getBucket(bucket->parent);
             int bucketIndexInParent = indexInParent(bucket, bucketLoc);
-            *trans->writing(&childLocForPos(parentBucket, bucketIndexInParent)) =
+            *txn->recoveryUnit()->writing(&childLocForPos(parentBucket, bucketIndexInParent)) =
                 bucket->nextChild;
         }
 
-        *trans->writing(&getBucket(bucket->nextChild)->parent) = bucket->parent;
+        *txn->recoveryUnit()->writing(&getBucket(bucket->nextChild)->parent) = bucket->parent;
         _bucketDeletion->aboutToDeleteBucket(bucketLoc);
-        deallocBucket(trans, bucket, bucketLoc);
+        deallocBucket(txn, bucket, bucketLoc);
     }
 
     template <class BtreeLayout>
@@ -1539,15 +1539,15 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doMergeChildren(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::doMergeChildren(OperationContext* txn,
                                                   BucketType* bucket,
                                                   const DiskLoc bucketLoc,
                                                   int leftIndex) {
 
         DiskLoc leftNodeLoc = childLocForPos(bucket, leftIndex);
         DiskLoc rightNodeLoc = childLocForPos(bucket, leftIndex + 1);
-        BucketType* l = btreemod(trans, getBucket(leftNodeLoc));
-        BucketType* r = btreemod(trans, getBucket(rightNodeLoc));
+        BucketType* l = btreemod(txn, getBucket(leftNodeLoc));
+        BucketType* r = btreemod(txn, getBucket(rightNodeLoc));
 
         int pos = 0;
         _packReadyForMod(l, pos);
@@ -1565,8 +1565,8 @@ namespace mongo {
         }
 
         l->nextChild = r->nextChild;
-        fixParentPtrs(trans, l, leftNodeLoc, oldLNum);
-        delBucket(trans, r, rightNodeLoc);
+        fixParentPtrs(txn, l, leftNodeLoc, oldLNum);
+        delBucket(txn, r, rightNodeLoc);
 
         childLocForPos(bucket, leftIndex + 1) = leftNodeLoc;
         childLocForPos(bucket, leftIndex) = DiskLoc();
@@ -1577,10 +1577,10 @@ namespace mongo {
             //
             // TODO To ensure all leaves are of equal height, we should ensure this is only called
             // on the root.
-            replaceWithNextChild(trans, bucket, bucketLoc);
+            replaceWithNextChild(txn, bucket, bucketLoc);
         }
         else {
-            mayBalanceWithNeighbors(trans, bucket, bucketLoc);
+            mayBalanceWithNeighbors(txn, bucket, bucketLoc);
         }
     }
 
@@ -1609,7 +1609,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::tryBalanceChildren(OperationContext* trans,
+    bool BtreeLogic<BtreeLayout>::tryBalanceChildren(OperationContext* txn,
                                                      BucketType* bucket,
                                                      const DiskLoc bucketLoc,
                                                      int leftIndex) {
@@ -1620,12 +1620,12 @@ namespace mongo {
             return false;
         }
 
-        doBalanceChildren(trans, btreemod(trans, bucket), bucketLoc, leftIndex);
+        doBalanceChildren(txn, btreemod(txn, bucket), bucketLoc, leftIndex);
         return true;
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(OperationContext* txn,
                                                        BucketType* bucket,
                                                        const DiskLoc bucketLoc,
                                                        int leftIndex,
@@ -1650,14 +1650,14 @@ namespace mongo {
         FullKey leftIndexKN = getFullKey(bucket, leftIndex);
         setKey(r, rAdd - 1, leftIndexKN.recordLoc, leftIndexKN.data, l->nextChild);
 
-        fixParentPtrs(trans, r, rchild, 0, rAdd - 1);
+        fixParentPtrs(txn, r, rchild, 0, rAdd - 1);
 
         FullKey kn = getFullKey(l, split);
         l->nextChild = kn.prevChildBucket;
 
         // Because lchild is a descendant of thisLoc, updating thisLoc will not affect packing or
         // keys of lchild and kn will be stable during the following setInternalKey()            
-        setInternalKey(trans, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
+        setInternalKey(txn, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
 
         // lchild and rchild cannot be merged, so there must be >0 (actually more) keys to the left
         // of split.
@@ -1666,7 +1666,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(OperationContext* txn,
                                                        BucketType* bucket,
                                                        const DiskLoc bucketLoc,
                                                        int leftIndex,
@@ -1696,11 +1696,11 @@ namespace mongo {
             FullKey kn = getFullKey(r, split - lN - 1);
             l->nextChild = kn.prevChildBucket;
             // Child lN was lchild's old nextChild, and don't need to fix that one.
-            fixParentPtrs(trans, l, lchild, lN + 1, l->n);
+            fixParentPtrs(txn, l, lchild, lN + 1, l->n);
             // Because rchild is a descendant of thisLoc, updating thisLoc will
             // not affect packing or keys of rchild and kn will be stable
             // during the following setInternalKey()
-            setInternalKey(trans, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
+            setInternalKey(txn, bucket, bucketLoc, leftIndex, kn.recordLoc, kn.data, lchild, rchild);
         }
 
         // lchild and rchild cannot be merged, so there must be >0 (actually more)
@@ -1710,7 +1710,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doBalanceChildren(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::doBalanceChildren(OperationContext* txn,
                                                     BucketType* bucket,
                                                     const DiskLoc bucketLoc,
                                                     int leftIndex) {
@@ -1719,10 +1719,10 @@ namespace mongo {
         DiskLoc rchild = childLocForPos(bucket, leftIndex + 1);
 
         int zeropos = 0;
-        BucketType* l = btreemod(trans, getBucket(lchild));
+        BucketType* l = btreemod(txn, getBucket(lchild));
         _packReadyForMod(l, zeropos);
 
-        BucketType* r = btreemod(trans, getBucket(rchild));
+        BucketType* r = btreemod(txn, getBucket(rchild));
         _packReadyForMod(r, zeropos);
 
         int split = rebalancedSeparatorPos(bucket, bucketLoc, leftIndex);
@@ -1731,15 +1731,15 @@ namespace mongo {
         // then we must actively balance.
         invariant(split != l->n);
         if (split < l->n) {
-            doBalanceLeftToRight(trans, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
+            doBalanceLeftToRight(txn, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
         }
         else {
-            doBalanceRightToLeft(trans, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
+            doBalanceRightToLeft(txn, bucket, bucketLoc, leftIndex, split, l, lchild, r, rchild);
         }
     }
 
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* trans,
+    bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* txn,
                                                           BucketType* bucket,
                                                           const DiskLoc bucketLoc) {
         if (bucket->parent.isNull()) {
@@ -1761,21 +1761,21 @@ namespace mongo {
         // Balance if possible on one side - we merge only if absolutely necessary to preserve btree
         // bucket utilization constraints since that's a more heavy duty operation (especially if we
         // must re-split later).
-        if (mayBalanceRight && tryBalanceChildren(trans, p, bucket->parent, parentIdx)) {
+        if (mayBalanceRight && tryBalanceChildren(txn, p, bucket->parent, parentIdx)) {
             return true;
         }
 
-        if (mayBalanceLeft && tryBalanceChildren(trans, p, bucket->parent, parentIdx - 1)) {
+        if (mayBalanceLeft && tryBalanceChildren(txn, p, bucket->parent, parentIdx - 1)) {
             return true;
         }
 
-        BucketType* pm = btreemod(trans, getBucket(bucket->parent));
+        BucketType* pm = btreemod(txn, getBucket(bucket->parent));
         if (mayBalanceRight) {
-            doMergeChildren(trans, pm, bucket->parent, parentIdx);
+            doMergeChildren(txn, pm, bucket->parent, parentIdx);
             return true;
         }
         else if (mayBalanceLeft) {
-            doMergeChildren(trans, pm, bucket->parent, parentIdx - 1);
+            doMergeChildren(txn, pm, bucket->parent, parentIdx - 1);
             return true;
         }
 
@@ -1783,7 +1783,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::unindex(OperationContext* trans,
+    bool BtreeLogic<BtreeLayout>::unindex(OperationContext* txn,
                                           const BSONObj& key,
                                           const DiskLoc& recordLoc) {
         int pos;
@@ -1791,8 +1791,8 @@ namespace mongo {
         KeyDataOwnedType ownedKey(key);
         DiskLoc loc = _locate(getRootLoc(), ownedKey, &pos, &found, recordLoc, 1);
         if (found) {
-            BucketType* bucket = btreemod(trans, getBucket(loc));
-            delKeyAtPos(trans, bucket, loc, pos);
+            BucketType* bucket = btreemod(txn, getBucket(loc));
+            delKeyAtPos(txn, bucket, loc, pos);
             assertValid(_indexName, getRoot(), _ordering);
         }
         return found;
@@ -1804,11 +1804,11 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    inline void BtreeLogic<BtreeLayout>::fix(OperationContext* trans,
+    inline void BtreeLogic<BtreeLayout>::fix(OperationContext* txn,
                                              const DiskLoc bucketLoc,
                                              const DiskLoc child) {
         if (!child.isNull()) {
-            *trans->writing(&getBucket(child)->parent) = bucketLoc;
+            *txn->recoveryUnit()->writing(&getBucket(child)->parent) = bucketLoc;
         }
     }
 
@@ -1817,7 +1817,7 @@ namespace mongo {
      * Maybe get rid of parent ptrs?
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::fixParentPtrs(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::fixParentPtrs(OperationContext* txn,
                                                 BucketType* bucket,
                                                 const DiskLoc bucketLoc,
                                                 int firstIndex,
@@ -1830,12 +1830,12 @@ namespace mongo {
         }
 
         for (int i = firstIndex; i <= lastIndex; i++) {
-            fix(trans, bucketLoc, childLocForPos(bucket, i));
+            fix(txn, bucketLoc, childLocForPos(bucket, i));
         }
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::setInternalKey(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::setInternalKey(OperationContext* txn,
                                                  BucketType* bucket,
                                                  const DiskLoc bucketLoc,
                                                  int keypos,
@@ -1844,7 +1844,7 @@ namespace mongo {
                                                  const DiskLoc lchild,
                                                  const DiskLoc rchild) {
         childLocForPos(bucket, keypos).Null();
-        // This may leave the bucket empty (n == 0) which is ok only as a transient state.  In the
+        // This may leave the bucket empty (n == 0) which is ok only as a txnient state.  In the
         // instant case, the implementation of insertHere behaves correctly when n == 0 and as a
         // side effect increments n.
         _delKeyAtPos(bucket, keypos, true);
@@ -1855,7 +1855,7 @@ namespace mongo {
         // Just set temporarily - required to pass validation in insertHere()
         childLocForPos(bucket, keypos) = lchild;
 
-        insertHere(trans, bucketLoc, keypos, key, recordLoc, lchild, rchild);
+        insertHere(txn, bucketLoc, keypos, key, recordLoc, lchild, rchild);
     }
 
     /**
@@ -1869,7 +1869,7 @@ namespace mongo {
      * intent code in basicInsert().
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::insertHere(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::insertHere(OperationContext* txn,
                                              const DiskLoc bucketLoc,
                                              int pos,
                                              const KeyDataType& key,
@@ -1879,9 +1879,9 @@ namespace mongo {
 
         BucketType* bucket = getBucket(bucketLoc);
 
-        if (!basicInsert(trans, bucket, bucketLoc, pos, key, recordLoc)) {
+        if (!basicInsert(txn, bucket, bucketLoc, pos, key, recordLoc)) {
             // If basicInsert() fails, the bucket will be packed as required by split().
-            split(trans, btreemod(trans, bucket), bucketLoc, pos, recordLoc, key, leftChildLoc, rightChildLoc);
+            split(txn, btreemod(txn, bucket), bucketLoc, pos, recordLoc, key, leftChildLoc, rightChildLoc);
             return;
         }
 
@@ -1894,9 +1894,9 @@ namespace mongo {
             }
             kn->prevChildBucket = bucket->nextChild;
             invariant(kn->prevChildBucket == leftChildLoc);
-            *trans->writing(&bucket->nextChild) = rightChildLoc;
+            *txn->recoveryUnit()->writing(&bucket->nextChild) = rightChildLoc;
             if (!rightChildLoc.isNull()) {
-                *trans->writing(&getBucket(rightChildLoc)->parent) = bucketLoc;
+                *txn->recoveryUnit()->writing(&getBucket(rightChildLoc)->parent) = bucketLoc;
             }
         }
         else {
@@ -1909,13 +1909,13 @@ namespace mongo {
             // Intent declared in basicInsert()
             *const_cast<LocType*>(pc) = rightChildLoc;
             if (!rightChildLoc.isNull()) {
-                *trans->writing(&getBucket(rightChildLoc)->parent) = bucketLoc;
+                *txn->recoveryUnit()->writing(&getBucket(rightChildLoc)->parent) = bucketLoc;
             }
         }
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::split(OperationContext* trans,
+    void BtreeLogic<BtreeLayout>::split(OperationContext* txn,
                                         BucketType* bucket,
                                         const DiskLoc bucketLoc,
                                         int keypos,
@@ -1925,8 +1925,8 @@ namespace mongo {
                                         const DiskLoc rchild) {
 
         int split = splitPos(bucket, keypos);
-        DiskLoc rLoc = addBucket(trans);
-        BucketType* r = btreemod(trans, getBucket(rLoc));
+        DiskLoc rLoc = addBucket(txn);
+        BucketType* r = btreemod(txn, getBucket(rLoc));
 
         for (int i = split + 1; i < bucket->n; i++) {
             FullKey kn = getFullKey(bucket, i);
@@ -1936,7 +1936,7 @@ namespace mongo {
         assertValid(_indexName, r, _ordering);
 
         r = NULL;
-        fixParentPtrs(trans, getBucket(rLoc), rLoc);
+        fixParentPtrs(txn, getBucket(rLoc), rLoc);
 
         FullKey splitkey = getFullKey(bucket, split);
         // splitkey key gets promoted, its children will be thisLoc (l) and rLoc (r)
@@ -1947,20 +1947,20 @@ namespace mongo {
 
         if (bucket->parent.isNull()) {
             // promote splitkey to a parent this->node make a new parent if we were the root
-            DiskLoc L = addBucket(trans);
-            BucketType* p = btreemod(trans, getBucket(L));
+            DiskLoc L = addBucket(txn);
+            BucketType* p = btreemod(txn, getBucket(L));
             pushBack(p, splitkey.recordLoc, splitkey.data, bucketLoc);
             p->nextChild = rLoc;
             assertValid(_indexName, p, _ordering);
             bucket->parent = L;
-            _headManager->setHead(trans, L);
-            *trans->writing(&getBucket(rLoc)->parent) = bucket->parent;
+            _headManager->setHead(txn, L);
+            *txn->recoveryUnit()->writing(&getBucket(rLoc)->parent) = bucket->parent;
         }
         else {
             // set this before calling _insert - if it splits it will do fixParent() logic and
             // change the value.
-            *trans->writing(&getBucket(rLoc)->parent) = bucket->parent;
-            _insert(trans,
+            *txn->recoveryUnit()->writing(&getBucket(rLoc)->parent) = bucket->parent;
+            _insert(txn,
                     getBucket(bucket->parent),
                     bucket->parent,
                     splitkey.data,
@@ -1976,12 +1976,12 @@ namespace mongo {
 
         // add our this->new key, there is room this->now
         if (keypos <= split) {
-            insertHere(trans, bucketLoc, newpos, key, recordLoc, lchild, rchild);
+            insertHere(txn, bucketLoc, newpos, key, recordLoc, lchild, rchild);
         }
         else {
             int kp = keypos - split - 1;
             invariant(kp >= 0);
-            insertHere(trans, rLoc, kp, key, recordLoc, lchild, rchild);
+            insertHere(txn, rLoc, kp, key, recordLoc, lchild, rchild);
         }
     }
 
@@ -1995,22 +1995,22 @@ namespace mongo {
     };
 
     template <class BtreeLayout>
-    Status BtreeLogic<BtreeLayout>::initAsEmpty(OperationContext* trans) {
+    Status BtreeLogic<BtreeLayout>::initAsEmpty(OperationContext* txn) {
         if (!_headManager->getHead().isNull()) {
             return Status(ErrorCodes::InternalError, "index already initialized");
         }
 
-        _headManager->setHead(trans, addBucket(trans));
+        _headManager->setHead(txn, addBucket(txn));
         return Status::OK();
     }
 
     template <class BtreeLayout>
-    DiskLoc BtreeLogic<BtreeLayout>::addBucket(OperationContext* trans) {
+    DiskLoc BtreeLogic<BtreeLayout>::addBucket(OperationContext* txn) {
         DummyDocWriter docWriter(BtreeLayout::BucketSize);
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord(trans, &docWriter, 0);
+        StatusWith<DiskLoc> loc = _recordStore->insertRecord(txn, &docWriter, 0);
         // XXX: remove this(?) or turn into massert or sanely bubble it back up.
         uassertStatusOK(loc.getStatus());
-        BucketType* b = btreemod(trans, getBucket(loc.getValue()));
+        BucketType* b = btreemod(txn, getBucket(loc.getValue()));
         init(b);
         return loc.getValue();
     }
@@ -2200,7 +2200,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    Status BtreeLogic<BtreeLayout>::insert(OperationContext* trans,
+    Status BtreeLogic<BtreeLayout>::insert(OperationContext* txn,
                                            const BSONObj& rawKey,
                                            const DiskLoc& value,
                                            bool dupsAllowed) {
@@ -2213,7 +2213,7 @@ namespace mongo {
             return Status(ErrorCodes::KeyTooLong, msg);
         }
 
-        Status status = _insert(trans,
+        Status status = _insert(txn,
                                 getRoot(),
                                 getRootLoc(),
                                 key,
@@ -2227,7 +2227,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    Status BtreeLogic<BtreeLayout>::_insert(OperationContext* trans,
+    Status BtreeLogic<BtreeLayout>::_insert(OperationContext* txn,
                                             BucketType* bucket,
                                             const DiskLoc bucketLoc,
                                             const KeyDataType& key,
@@ -2250,7 +2250,7 @@ namespace mongo {
                 LOG(4) << "btree _insert: reusing unused key" << endl;
                 massert(17433, "_insert: reuse key but lchild is not null", leftChild.isNull());
                 massert(17434, "_insert: reuse key but rchild is not null", rightChild.isNull());
-                trans->writing(&header)->setUsed();
+                txn->recoveryUnit()->writing(&header)->setUsed();
                 return Status::OK();
             }
             return Status(ErrorCodes::UniqueIndexViolation, "FIXME");
@@ -2262,11 +2262,11 @@ namespace mongo {
         // promoting a split key.  These are the only two cases where _insert() is called
         // currently.
         if (childLoc.isNull() || !rightChild.isNull()) {
-            insertHere(trans, bucketLoc, pos, key, recordLoc, leftChild, rightChild);
+            insertHere(txn, bucketLoc, pos, key, recordLoc, leftChild, rightChild);
             return Status::OK();
         }
         else {
-            return _insert(trans,
+            return _insert(txn,
                            getBucket(childLoc),
                            childLoc,
                            key,

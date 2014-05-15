@@ -127,7 +127,7 @@ namespace mongo {
             int i = _find(k, found);
             if ( i >= 0 && found ) {
                 Node* n = &nodes(i);
-                n = txn->writing(n);
+                n = txn->recoveryUnit()->writing(n);
                 n->k.kill();
                 n->setUnused();
             }
@@ -139,7 +139,7 @@ namespace mongo {
             int i = _find(k, found);
             if ( i < 0 )
                 return false;
-            Node* n = txn->writing( &nodes(i) );
+            Node* n = txn->recoveryUnit()->writing( &nodes(i) );
             if ( !found ) {
                 n->k = k;
                 n->hash = k.hash();

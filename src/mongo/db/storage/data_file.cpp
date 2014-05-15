@@ -170,8 +170,8 @@ namespace mongo {
         int offset = header()->unused.getOfs();
 
         DataFileHeader *h = header();
-        *txn->writing(&h->unused) = DiskLoc( fileNo, offset + size );
-        txn->writingInt(h->unusedLength) = h->unusedLength - size;
+        *txn->recoveryUnit()->writing(&h->unused) = DiskLoc( fileNo, offset + size );
+        txn->recoveryUnit()->writingInt(h->unusedLength) = h->unusedLength - size;
 
         return DiskLoc( fileNo, offset );
     }
@@ -200,9 +200,9 @@ namespace mongo {
                 }
             }
 
-            txn->createdFile(filename, filelength);
+            txn->recoveryUnit()->createdFile(filename, filelength);
             verify( HeaderSize == 8192 );
-            DataFileHeader *h = txn->writing(this);
+            DataFileHeader *h = txn->recoveryUnit()->writing(this);
             h->fileLength = filelength;
             h->version = PDFILE_VERSION;
             h->versionMinor = PDFILE_VERSION_MINOR_22_AND_OLDER; // All dbs start like this
@@ -221,8 +221,8 @@ namespace mongo {
         if ( freeListStart == minDiskLoc ) {
             // we are upgrading from 2.4 to 2.6
             invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real
-            *txn->writing( &freeListStart ) = DiskLoc();
-            *txn->writing( &freeListEnd ) = DiskLoc();
+            *txn->recoveryUnit()->writing( &freeListStart ) = DiskLoc();
+            *txn->recoveryUnit()->writing( &freeListEnd ) = DiskLoc();
         }
     }
 

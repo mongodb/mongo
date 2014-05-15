@@ -155,7 +155,7 @@ namespace mongo {
             // unlink ourself from the deleted list
             DeletedRecord *bmr = drec(bestmatch);
             if ( bestprev ) {
-                *txn->writing(bestprev) = bmr->nextDeleted();
+                *txn->recoveryUnit()->writing(bestprev) = bmr->nextDeleted();
             }
             else {
                 // should be the front of a free-list
@@ -163,7 +163,7 @@ namespace mongo {
                 invariant( _details->deletedListEntry(myBucket) == bestmatch );
                 _details->setDeletedListEntry(txn, myBucket, bmr->nextDeleted());
             }
-            *txn->writing(&bmr->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
+            *txn->recoveryUnit()->writing(&bmr->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
             invariant(bmr->extentOfs() < bestmatch.getOfs());
 
             freelistIterations.increment( 1 + chain );
@@ -204,11 +204,11 @@ namespace mongo {
         }
 
         /* split off some for further use. */
-        txn->writingInt(r->lengthWithHeaders()) = lenToAlloc;
+        txn->recoveryUnit()->writingInt(r->lengthWithHeaders()) = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord* newDel = drec(newDelLoc);
-        DeletedRecord* newDelW = txn->writing(newDel);
+        DeletedRecord* newDelW = txn->recoveryUnit()->writing(newDel);
         newDelW->extentOfs() = r->extentOfs();
         newDelW->lengthWithHeaders() = left;
         newDelW->nextDeleted().Null();
@@ -270,7 +270,7 @@ namespace mongo {
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
 
         int b = bucket(d->lengthWithHeaders());
-        *txn->writing(&d->nextDeleted()) = _details->deletedListEntry(b);
+        *txn->recoveryUnit()->writing(&d->nextDeleted()) = _details->deletedListEntry(b);
         _details->setDeletedListEntry(txn, b, dloc);
     }
 
@@ -415,11 +415,11 @@ namespace mongo {
                     // remove the old records (orphan them) periodically so our commit block doesn't get too large
                     bool stopping = false;
                     RARELY stopping = !txn->checkForInterruptNoAssert().isOK();
-                    if( stopping || txn->isCommitNeeded() ) {
-                        *txn->writing(&e->firstRecord) = L;
+                    if( stopping || txn->recoveryUnit()->isCommitNeeded() ) {
+                        *txn->recoveryUnit()->writing(&e->firstRecord) = L;
                         Record *r = recordFor(L);
-                        txn->writingInt(r->prevOfs()) = DiskLoc::NullOfs;
-                        txn->commitIfNeeded();
+                        txn->recoveryUnit()->writingInt(r->prevOfs()) = DiskLoc::NullOfs;
+                        txn->recoveryUnit()->commitIfNeeded();
                         txn->checkForInterrupt();
                     }
                 }
@@ -429,10 +429,10 @@ namespace mongo {
             invariant( _details->lastExtent() != diskloc );
             DiskLoc newFirst = e->xnext;
             _details->setFirstExtent( txn, newFirst );
-            *txn->writing(&_extentManager->getExtent( newFirst )->xprev) = DiskLoc();
+            *txn->recoveryUnit()->writing(&_extentManager->getExtent( newFirst )->xprev) = DiskLoc();
             _extentManager->freeExtent( txn, diskloc );
 
-            txn->commitIfNeeded();
+            txn->recoveryUnit()->commitIfNeeded();
 
             {
                 double op = 1.0;
@@ -452,7 +452,7 @@ namespace mongo {
                                          CompactStats* stats ) {
 
         // this is a big job, so might as well make things tidy before we start just to be nice.
-        txn->commitIfNeeded();
+        txn->recoveryUnit()->commitIfNeeded();
 
         list<DiskLoc> extents;
         for( DiskLoc extLocation = _details->firstExtent();

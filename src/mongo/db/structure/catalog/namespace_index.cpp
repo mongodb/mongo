@@ -169,7 +169,7 @@ namespace mongo {
             maybeMkdir();
             unsigned long long l = storageGlobalParams.lenForNewNsFiles;
             if ( _f.create(pathString, l, true) ) {
-                txn->createdFile(pathString, l); // always a new file
+                txn->recoveryUnit()->createdFile(pathString, l); // always a new file
                 len = l;
                 verify(len == storageGlobalParams.lenForNewNsFiles);
                 p = _f.getView();
@@ -178,7 +178,7 @@ namespace mongo {
                     // we do this so the durability system isn't mad at us for
                     // only initiating file and not doing a write
                     // grep for 17388
-                    txn->writingPtr( p, 5 ); // throw away
+                    txn->recoveryUnit()->writingPtr( p, 5 ); // throw away
                 }
             }
         }

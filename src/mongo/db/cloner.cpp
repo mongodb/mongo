@@ -166,7 +166,7 @@ namespace mongo {
                 if ( logForRepl )
                     logOp(txn, "i", to_collection, js);
 
-                txn->commitIfNeeded();
+                txn->recoveryUnit()->commitIfNeeded();
 
                 RARELY if ( time( 0 ) - saveLast > 60 ) {
                     log() << numSeen << " objects cloned so far from collection " << from_collection;
@@ -252,7 +252,7 @@ namespace mongo {
                 if ( logForRepl )
                     logOp(txn, "i", to_collection, spec);
 
-                txn->commitIfNeeded();
+                txn->recoveryUnit()->commitIfNeeded();
 
             }
         }
@@ -328,7 +328,7 @@ namespace mongo {
         copy(txn, ctx.ctx(), temp.c_str(), temp.c_str(), true, logForRepl, false, true, mayYield,
              mayBeInterrupted, BSON( "ns" << ns ));
 
-        txn->commitIfNeeded();
+        txn->recoveryUnit()->commitIfNeeded();
         return true;
     }
 

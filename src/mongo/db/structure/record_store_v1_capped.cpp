@@ -201,11 +201,11 @@ namespace mongo {
         int left = regionlen - lenToAlloc;
 
         /* split off some for further use. */
-        txn->writingInt(r->lengthWithHeaders()) = lenToAlloc;
+        txn->recoveryUnit()->writingInt(r->lengthWithHeaders()) = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord* newDel = drec( newDelLoc );
-        DeletedRecord* newDelW = txn->writing(newDel);
+        DeletedRecord* newDelW = txn->recoveryUnit()->writing(newDel);
         newDelW->extentOfs() = r->extentOfs();
         newDelW->lengthWithHeaders() = left;
         newDelW->nextDeleted().Null();
@@ -239,8 +239,8 @@ namespace mongo {
              extLoc = ext->xnext ) {
             ext = _extentManager->getExtent(extLoc);
 
-            txn->writing( &ext->firstRecord )->Null();
-            txn->writing( &ext->lastRecord )->Null();
+            txn->recoveryUnit()->writing( &ext->firstRecord )->Null();
+            txn->recoveryUnit()->writing( &ext->lastRecord )->Null();
 
             addDeletedRec( txn, _findFirstSpot( txn, extLoc, ext ) );
         }
@@ -291,7 +291,7 @@ namespace mongo {
                     a.getOfs() + drec( a )->lengthWithHeaders() == b.getOfs() ) {
 
                 // a & b are adjacent.  merge.
-                txn->writingInt( drec(a)->lengthWithHeaders() ) += drec(b)->lengthWithHeaders();
+                txn->recoveryUnit()->writingInt( drec(a)->lengthWithHeaders() ) += drec(b)->lengthWithHeaders();
                 j++;
                 if ( j == drecs.end() ) {
                     DDD( "\t compact adddelrec2" );
@@ -319,7 +319,7 @@ namespace mongo {
         if ( cappedLastDelRecLastExtent().isNull() )
             setListOfAllDeletedRecords( txn, loc );
         else
-            *txn->writing( &drec(cappedLastDelRecLastExtent())->nextDeleted() ) = loc;
+            *txn->recoveryUnit()->writing( &drec(cappedLastDelRecLastExtent())->nextDeleted() ) = loc;
     }
 
     void CappedRecordStoreV1::cappedCheckMigrate(OperationContext* txn) {
@@ -333,7 +333,7 @@ namespace mongo {
                     continue;
                 DiskLoc last = first;
                 for (; !drec(last)->nextDeleted().isNull(); last = drec(last)->nextDeleted() );
-                *txn->writing(&drec(last)->nextDeleted()) = cappedListOfAllDeletedRecords();
+                *txn->recoveryUnit()->writing(&drec(last)->nextDeleted()) = cappedListOfAllDeletedRecords();
                 setListOfAllDeletedRecords( txn, first );
                 _details->setDeletedListEntry(txn, i, DiskLoc());
             }
@@ -406,8 +406,8 @@ namespace mongo {
             if ( prev.isNull() )
                 setListOfAllDeletedRecords( txn, drec(ret)->nextDeleted() );
             else
-                *txn->writing(&drec(prev)->nextDeleted()) = drec(ret)->nextDeleted();
-            *txn->writing(&drec(ret)->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
+                *txn->recoveryUnit()->writing(&drec(prev)->nextDeleted()) = drec(ret)->nextDeleted();
+            *txn->recoveryUnit()->writing(&drec(ret)->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
             invariant( drec(ret)->extentOfs() < ret.getOfs() );
         }
 
@@ -454,7 +454,7 @@ namespace mongo {
                 // 'end' has been found and removed, so break.
                 break;
             }
-            txn->commitIfNeeded();
+            txn->recoveryUnit()->commitIfNeeded();
             // 'curr' will point to the newest document in the collection.
             DiskLoc curr = theCapExtent()->lastRecord;
             invariant( !curr.isNull() );
@@ -568,7 +568,7 @@ namespace mongo {
     }
 
     void CappedRecordStoreV1::addDeletedRec( OperationContext* txn, const DiskLoc& dloc ) {
-        DeletedRecord* d = txn->writing( drec( dloc ) );
+        DeletedRecord* d = txn->recoveryUnit()->writing( drec( dloc ) );
 
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
         if ( !cappedLastDelRecLastExtent().isValid() ) {
@@ -580,7 +580,7 @@ namespace mongo {
                 DiskLoc i = cappedListOfAllDeletedRecords();
                 for (; !drec(i)->nextDeleted().isNull(); i = drec(i)->nextDeleted() )
                     ;
-                *txn->writing(&drec(i)->nextDeleted()) = dloc;
+                *txn->recoveryUnit()->writing(&drec(i)->nextDeleted()) = dloc;
             }
         }
         else {

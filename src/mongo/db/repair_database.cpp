@@ -244,7 +244,7 @@ namespace mongo {
                   << "db: " << _dbName << " path: " << _pathString;
 
             try {
-                _txn->syncDataAndTruncateJournal();
+                _txn->recoveryUnit()->syncDataAndTruncateJournal();
                 MongoFile::flushAll(true); // need both in case journaling is disabled
                 {
                     Client::Context tempContext( _dbName, _pathString );
@@ -283,7 +283,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
-        txn->syncDataAndTruncateJournal(); // Must be done before and after repair
+        txn->recoveryUnit()->syncDataAndTruncateJournal(); // Must be done before and after repair
 
         intmax_t totalSize = dbSize( dbName );
         intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
@@ -407,7 +407,7 @@ namespace mongo {
                     if ( !result.isOK() )
                         return result.getStatus();
 
-                    txn->commitIfNeeded();
+                    txn->recoveryUnit()->commitIfNeeded();
                     txn->checkForInterrupt(false);
                 }
 
@@ -420,7 +420,7 @@ namespace mongo {
 
             }
 
-            txn->syncDataAndTruncateJournal();
+            txn->recoveryUnit()->syncDataAndTruncateJournal();
             MongoFile::flushAll(true); // need both in case journaling is disabled
 
             txn->checkForInterrupt(false);

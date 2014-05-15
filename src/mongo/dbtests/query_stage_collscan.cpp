@@ -133,7 +133,7 @@ namespace QueryStageCollectionScan {
             BSONObj o = b.done();
             int len = o.objsize();
             Extent *e = extentManager()->getExtent(ext);
-            e = getDur().writing(e);
+            e = _txn.recoveryUnit()->writing(e);
             int ofs;
             if ( e->lastRecord.isNull() ) {
                 ofs = ext.getOfs() + ( e->_extentData - (char *)e );
@@ -144,7 +144,7 @@ namespace QueryStageCollectionScan {
             }
             DiskLoc dl( ext.a(), ofs );
             Record *r = recordStore()->recordFor(dl);
-            r = (Record*) getDur().writingPtr(r, Record::HeaderSize + len);
+            r = (Record*) _txn.recoveryUnit()->writingPtr(r, Record::HeaderSize + len);
             r->lengthWithHeaders() = Record::HeaderSize + len;
             r->extentOfs() = e->myLoc.getOfs();
             r->nextOfs() = DiskLoc::NullOfs;
@@ -153,7 +153,7 @@ namespace QueryStageCollectionScan {
             if ( e->firstRecord.isNull() )
                 e->firstRecord = dl;
             else
-                getDur().writingInt(recordStore()->recordFor(e->lastRecord)->nextOfs()) = ofs;
+                _txn.recoveryUnit()->writingInt(recordStore()->recordFor(e->lastRecord)->nextOfs()) = ofs;
             e->lastRecord = dl;
             return dl;
         }
