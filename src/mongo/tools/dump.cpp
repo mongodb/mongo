@@ -91,7 +91,7 @@ public:
 
     void doCollection( const string coll , Query q, FILE* out , ProgressMeter *m ) {
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
-        if (startsWith(coll.c_str(), "local.oplog."))
+        if (startsWith(coll.c_str(), "local.oplog.") && q.obj.hasField("ts"))
             queryOptions |= QueryOption_OplogReplay;
         else if (mongoDumpGlobalParams.snapShotQuery) {
             q.snapshot();
