@@ -158,7 +158,7 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 	if (!val) { 
      		SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, 
 		#name " is null"); 
-		return 0; 
+		return $null;
 	}
 %enddef
 
@@ -947,7 +947,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The status of the operation.
 	 */
-	public int insert() {
+	public int insert()
+        throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		byte[] value = valuePacker.getValue();
 		keyPacker.reset();
@@ -960,7 +961,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The status of the operation.
 	 */
-	public int update() {
+	public int update()
+        throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		byte[] value = valuePacker.getValue();
 		keyPacker.reset();
@@ -973,7 +975,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The status of the operation.
 	 */
-	public int remove() {
+	public int remove()
+        throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		keyPacker.reset();
 		return remove_wrap(key);
@@ -984,7 +987,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The result of the comparison.
 	 */
-	public int search() {
+	public int search()
+        throws WiredTigerException {
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1485,7 +1489,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The status of the operation.
 	 */
-	public int insert() {
+	public int insert()
+	throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		byte[] value = valuePacker.getValue();
 		keyPacker.reset();
@@ -1498,7 +1503,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The status of the operation.
 	 */
-	public int update() {
+	public int update()
+        throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		byte[] value = valuePacker.getValue();
 		keyPacker.reset();
@@ -1511,7 +1517,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The status of the operation.
 	 */
-	public int remove() {
+	public int remove()
+        throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		keyPacker.reset();
 		return remove_wrap(key);
@@ -1522,7 +1529,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The result of the comparison.
 	 */
-	public int compare(Cursor other) {
+	public int compare(Cursor other)
+        throws WiredTigerException {
 		return compare_wrap(other);
 	}
 
@@ -1531,7 +1539,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The result of the comparison.
 	 */
-	public int next() {
+	public int next()
+        throws WiredTigerException {
 		int ret = next_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1547,7 +1556,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The result of the comparison.
 	 */
-	public int prev() {
+	public int prev()
+        throws WiredTigerException {
 		int ret = prev_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1563,7 +1573,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The result of the comparison.
 	 */
-	public int search() {
+	public int search()
+        throws WiredTigerException {
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1579,7 +1590,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The result of the comparison.
 	 */
-	public SearchStatus search_near() {
+	public SearchStatus search_near()
+        throws WiredTigerException {
 		SearchStatus ret = search_near_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1590,6 +1602,27 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return ret;
 	}
 %}
+
+/* Put a WiredTigerException on all wrapped methods. We'd like this
+ * to only apply to methods returning int.  SWIG doesn't have a way
+ * to do this, so we remove the exception for simple getters and such.
+ */
+%javaexception("com.wiredtiger.db.WiredTigerException") { $action; }
+%javaexception("") wiredtiger_strerror { $action; }
+%javaexception("") __wt_async_op::connection { $action; }
+%javaexception("") __wt_async_op::get_type { $action; }
+%javaexception("") __wt_async_op::get_id { $action; }
+%javaexception("") __wt_async_op::key_format { $action; }
+%javaexception("") __wt_async_op::value_format { $action; }
+%javaexception("") __wt_connection::get_home { $action; }
+%javaexception("") __wt_connection::is_new { $action; }
+%javaexception("") __wt_connection::java_init { $action; }
+%javaexception("") __wt_cursor::key_format { $action; }
+%javaexception("") __wt_cursor::session { $action; }
+%javaexception("") __wt_cursor::uri { $action; }
+%javaexception("") __wt_cursor::value_format { $action; }
+%javaexception("") __wt_session::connection { $action; }
+%javaexception("") __wt_session::java_init { $action; }
 
 /* Remove / rename parts of the C API that we don't want in Java. */
 %immutable __wt_cursor::session;
@@ -1629,8 +1662,6 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 
 %rename(open) wiredtiger_open_wrap;
 %ignore __wt_connection::async_new_op;
-%javaexception("com.wiredtiger.db.WiredTigerException")
-     __wt_connection::async_new_op_wrap { $action; }
 %javamethodmodifiers __wt_connection::async_new_op_wrap "
   /**
    * @copydoc WT_CONNECTION::async_new_op
