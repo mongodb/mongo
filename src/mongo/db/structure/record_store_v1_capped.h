@@ -40,7 +40,7 @@ namespace mongo {
 
     class CappedRecordStoreV1 : public RecordStoreV1Base {
     public:
-        CappedRecordStoreV1( TransactionExperiment* txn,
+        CappedRecordStoreV1( OperationContext* txn,
                              CappedDocumentDeleteCallback* collection,
                              const StringData& ns,
                              RecordStoreV1MetaData* details,
@@ -51,7 +51,7 @@ namespace mongo {
 
         const char* name() const { return "CappedRecordStoreV1"; }
 
-        virtual Status truncate(TransactionExperiment* txn);
+        virtual Status truncate(OperationContext* txn);
 
         /**
          * Truncate documents newer than the document at 'end' from the capped
@@ -60,7 +60,7 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        void temp_cappedTruncateAfter( TransactionExperiment* txn, DiskLoc end, bool inclusive );
+        void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
 
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
@@ -69,7 +69,7 @@ namespace mongo {
 
         virtual bool compactSupported() const { return false; }
 
-        virtual Status compact( TransactionExperiment* txn,
+        virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
                                 CompactStats* stats );
@@ -83,29 +83,29 @@ namespace mongo {
 
         virtual bool isCapped() const { return true; }
 
-        virtual StatusWith<DiskLoc> allocRecord( TransactionExperiment* txn,
+        virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
                                                  int quotaMax );
 
-        virtual void addDeletedRec(TransactionExperiment* txn, const DiskLoc& dloc);
+        virtual void addDeletedRec(OperationContext* txn, const DiskLoc& dloc);
 
     private:
         // -- start copy from cap.cpp --
-        void compact(TransactionExperiment* txn);
+        void compact(OperationContext* txn);
         const DiskLoc& cappedFirstDeletedInCurExtent() const;
-        void setFirstDeletedInCurExtent( TransactionExperiment* txn, const DiskLoc& loc );
-        void cappedCheckMigrate(TransactionExperiment* txn);
-        DiskLoc __capAlloc( TransactionExperiment* txn, int len );
+        void setFirstDeletedInCurExtent( OperationContext* txn, const DiskLoc& loc );
+        void cappedCheckMigrate(OperationContext* txn);
+        DiskLoc __capAlloc( OperationContext* txn, int len );
         bool inCapExtent( const DiskLoc &dl ) const;
         const DiskLoc& cappedListOfAllDeletedRecords() const;
         const DiskLoc& cappedLastDelRecLastExtent() const;
-        void setListOfAllDeletedRecords( TransactionExperiment* txn, const DiskLoc& loc );
-        void setLastDelRecLastExtent( TransactionExperiment* txn, const DiskLoc& loc );
+        void setListOfAllDeletedRecords( OperationContext* txn, const DiskLoc& loc );
+        void setLastDelRecLastExtent( OperationContext* txn, const DiskLoc& loc );
         bool capLooped() const;
         Extent *theCapExtent() const;
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
-        void advanceCapExtent( TransactionExperiment* txn, const StringData& ns );
-        void cappedTruncateLastDelUpdate(TransactionExperiment* txn);
+        void advanceCapExtent( OperationContext* txn, const StringData& ns );
+        void cappedTruncateLastDelUpdate(OperationContext* txn);
 
         /**
          * Truncate documents newer than the document at 'end' from the capped
@@ -113,7 +113,7 @@ namespace mongo {
          * function.  An assertion will be thrown if that is attempted.
          * @param inclusive - Truncate 'end' as well iff true
          */
-        void cappedTruncateAfter(TransactionExperiment* txn,
+        void cappedTruncateAfter(OperationContext* txn,
                                  const char* ns,
                                  DiskLoc end,
                                  bool inclusive);

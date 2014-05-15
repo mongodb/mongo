@@ -32,7 +32,7 @@
 
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/head_manager.h"
 
@@ -47,7 +47,7 @@ namespace mongo {
             return _catalogEntry->head();
         }
 
-        void setHead(TransactionExperiment* txn, const DiskLoc& newHead) {
+        void setHead(OperationContext* txn, const DiskLoc& newHead) {
             _catalogEntry->setHead(txn, newHead);
         }
 
@@ -109,7 +109,7 @@ namespace mongo {
         verify( isReady() == newIsReady );
     }
 
-    void IndexCatalogEntry::setHead( TransactionExperiment* txn, DiskLoc newHead ) {
+    void IndexCatalogEntry::setHead( OperationContext* txn, DiskLoc newHead ) {
         NamespaceDetails* nsd = _collection->detailsWritable();
         int idxNo = _indexNo();
         IndexDetails& id = nsd->idx( idxNo );
@@ -117,7 +117,7 @@ namespace mongo {
         _head = newHead;
     }
 
-    void IndexCatalogEntry::setMultikey( TransactionExperiment* txn ) {
+    void IndexCatalogEntry::setMultikey( OperationContext* txn ) {
         if ( isMultikey() )
             return;
         NamespaceDetails* nsd = _collection->detailsWritable();

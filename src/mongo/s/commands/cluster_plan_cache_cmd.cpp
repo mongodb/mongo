@@ -78,7 +78,7 @@ namespace mongo {
         }
 
         // Cluster plan cache command entry point.
-        bool run(TransactionExperiment* txn, const std::string& dbname,
+        bool run(OperationContext* txn, const std::string& dbname,
                   BSONObj& cmdObj,
                   int options,
                   std::string& errmsg,
@@ -106,7 +106,7 @@ namespace mongo {
     // Cluster plan cache command implementation(s) below
     //
 
-    bool ClusterPlanCacheCmd::run(TransactionExperiment* txn, const std::string& dbName,
+    bool ClusterPlanCacheCmd::run(OperationContext* txn, const std::string& dbName,
                                BSONObj& cmdObj,
                                int options,
                                std::string& errMsg,

@@ -30,7 +30,7 @@
 #include "mongo/db/query/internal_runner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace OplogStartTests {
@@ -38,7 +38,7 @@ namespace OplogStartTests {
     class Base {
     public:
         Base() : _context(ns()) {
-            DurTransaction txn;
+            OperationContextImpl txn;
             Collection* c = _context.db()->getCollection(&txn, ns());
             if (!c) {
                 c = _context.db()->createCollection(&txn, ns());

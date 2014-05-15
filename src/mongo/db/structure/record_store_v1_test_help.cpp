@@ -59,21 +59,21 @@ namespace mongo {
     void DummyRecoveryUnit::syncDataAndTruncateJournal() {
     }
 
-    DummyTransactionExperiment::DummyTransactionExperiment() {
+    DummyOperationContext::DummyOperationContext() {
         _recoveryUnit.reset(new DummyRecoveryUnit());
     }
 
-    ProgressMeter* DummyTransactionExperiment::setMessage(const char* msg,
+    ProgressMeter* DummyOperationContext::setMessage(const char* msg,
                                                           const std::string& name ,
                                                           unsigned long long progressMeterTotal,
                                                           int secondsBetween) {
         invariant( false );
     }
 
-    void DummyTransactionExperiment::checkForInterrupt(bool heedMutex ) const {
+    void DummyOperationContext::checkForInterrupt(bool heedMutex ) const {
     }
 
-    Status DummyTransactionExperiment::checkForInterruptNoAssert() const {
+    Status DummyOperationContext::checkForInterruptNoAssert() const {
         return Status::OK();
     }
 
@@ -98,7 +98,7 @@ namespace mongo {
         return _capExtent;
     }
 
-    void DummyRecordStoreV1MetaData::setCapExtent( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::setCapExtent( OperationContext* txn,
                                                    const DiskLoc& loc ) {
         _capExtent = loc;
     }
@@ -107,7 +107,7 @@ namespace mongo {
         return _capFirstNewRecord;
     }
 
-    void DummyRecordStoreV1MetaData::setCapFirstNewRecord( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::setCapFirstNewRecord( OperationContext* txn,
                                                            const DiskLoc& loc ) {
         _capFirstNewRecord = loc;
     }
@@ -124,14 +124,14 @@ namespace mongo {
         return _numRecords;
     }
 
-    void DummyRecordStoreV1MetaData::incrementStats( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::incrementStats( OperationContext* txn,
                                                      long long dataSizeIncrement,
                                                      long long numRecordsIncrement ) {
         _dataSize += dataSizeIncrement;
         _numRecords += numRecordsIncrement;
     }
 
-    void DummyRecordStoreV1MetaData::setStats( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::setStats( OperationContext* txn,
                                                long long dataSizeIncrement,
                                                long long numRecordsIncrement ) {
         _dataSize = dataSizeIncrement;
@@ -149,7 +149,7 @@ namespace mongo {
         return _deletedLists[bucket];
     }
 
-    void DummyRecordStoreV1MetaData::setDeletedListEntry( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::setDeletedListEntry( OperationContext* txn,
                                                           int bucket,
                                                           const DiskLoc& loc ) {
         invariant( bucket >= 0 );
@@ -159,7 +159,7 @@ namespace mongo {
         _deletedLists[bucket] = loc;
     }
 
-    void DummyRecordStoreV1MetaData::orphanDeletedList(TransactionExperiment* txn) {
+    void DummyRecordStoreV1MetaData::orphanDeletedList(OperationContext* txn) {
         invariant( false );
     }
 
@@ -167,7 +167,7 @@ namespace mongo {
         return _firstExtent;
     }
 
-    void DummyRecordStoreV1MetaData::setFirstExtent( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::setFirstExtent( OperationContext* txn,
                                                      const DiskLoc& loc ) {
         _firstExtent = loc;
     }
@@ -176,7 +176,7 @@ namespace mongo {
         return _lastExtent;
     }
 
-    void DummyRecordStoreV1MetaData::setLastExtent( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::setLastExtent( OperationContext* txn,
                                                     const DiskLoc& loc ) {
         _lastExtent = loc;
     }
@@ -193,7 +193,7 @@ namespace mongo {
         return _lastExtentSize;
     }
 
-    void DummyRecordStoreV1MetaData::setLastExtentSize( TransactionExperiment* txn, int newMax ) {
+    void DummyRecordStoreV1MetaData::setLastExtentSize( OperationContext* txn, int newMax ) {
         _lastExtentSize = newMax;
     }
 
@@ -205,7 +205,7 @@ namespace mongo {
         return _paddingFactor;
     }
 
-    void DummyRecordStoreV1MetaData::setPaddingFactor( TransactionExperiment* txn,
+    void DummyRecordStoreV1MetaData::setPaddingFactor( OperationContext* txn,
                                                        double paddingFactor ) {
         _paddingFactor = paddingFactor;
     }
@@ -219,7 +219,7 @@ namespace mongo {
         }
     }
 
-    Status DummyExtentManager::init(TransactionExperiment* txn) {
+    Status DummyExtentManager::init(OperationContext* txn) {
         return Status::OK();
     }
 
@@ -235,7 +235,7 @@ namespace mongo {
     void DummyExtentManager::flushFiles( bool sync ) {
     }
 
-    DiskLoc DummyExtentManager::allocateExtent( TransactionExperiment* txn,
+    DiskLoc DummyExtentManager::allocateExtent( OperationContext* txn,
                                                 bool capped,
                                                 int size,
                                                 int quotaMax ) {
@@ -261,12 +261,12 @@ namespace mongo {
 
     }
 
-    void DummyExtentManager::freeExtents( TransactionExperiment* txn,
+    void DummyExtentManager::freeExtents( OperationContext* txn,
                                           DiskLoc firstExt, DiskLoc lastExt ) {
         // XXX
     }
 
-    void DummyExtentManager::freeExtent( TransactionExperiment* txn, DiskLoc extent ) {
+    void DummyExtentManager::freeExtent( OperationContext* txn, DiskLoc extent ) {
         // XXX
     }
     void DummyExtentManager::freeListStats( int* numExtents, int64_t* totalFreeSize ) const {
@@ -372,7 +372,7 @@ namespace {
     }
 }
 
-    void initializeV1RS(TransactionExperiment* txn,
+    void initializeV1RS(OperationContext* txn,
                         const LocAndSize* records,
                         const LocAndSize* drecs,
                         DummyExtentManager* em,

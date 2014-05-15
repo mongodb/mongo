@@ -65,7 +65,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
 
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
@@ -120,7 +120,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             result.append("rbid",rbid);
@@ -155,7 +155,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) { }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj["forShell"].trueValue() )
                 lastError.disableForCommand();
 
@@ -182,7 +182,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
-        virtual bool run(TransactionExperiment* txn, const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
+        virtual bool run(OperationContext* txn, const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
             try {
                 rwlock_try_write lk(mutex);
                 return _run(a,b,e,errmsg,c,d);
@@ -277,7 +277,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             int secs = (int) cmdObj.firstElement().numberInt();
@@ -307,7 +307,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             if( !theReplSet->box.getState().primary() ) {
@@ -362,7 +362,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
 
@@ -394,7 +394,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }
-        virtual bool run(TransactionExperiment* txn, const string&, 
+        virtual bool run(OperationContext* txn, const string&, 
                          BSONObj& cmdObj, 
                          int, 
                          string& errmsg, 
@@ -422,7 +422,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetUpdatePosition() : ReplSetCommand("replSetUpdatePosition") { }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg,
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg,
                          BSONObjBuilder& result, bool fromRepl) {
             if (!check(errmsg, result))
                 return false;

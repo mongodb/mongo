@@ -44,7 +44,7 @@ namespace mongo {
 
     class DataFile;
     class Record;
-    class TransactionExperiment;
+    class OperationContext;
 
     struct Extent;
 
@@ -83,13 +83,13 @@ namespace mongo {
         /**
          * opens all current files
          */
-        Status init(TransactionExperiment* txn);
+        Status init(OperationContext* txn);
 
         size_t numFiles() const;
         long long fileSize() const;
 
         // TODO: make private
-        DataFile* getFile( TransactionExperiment* txn,
+        DataFile* getFile( OperationContext* txn,
                            int n,
                            int sizeNeeded = 0,
                            bool preallocateOnly = false );
@@ -97,7 +97,7 @@ namespace mongo {
         void flushFiles( bool sync );
 
         // must call Extent::reuse on the returned extent
-        DiskLoc allocateExtent( TransactionExperiment* txn,
+        DiskLoc allocateExtent( OperationContext* txn,
                                 bool capped,
                                 int size,
                                 int quotaMax );
@@ -105,13 +105,13 @@ namespace mongo {
         /**
          * firstExt has to be == lastExt or a chain
          */
-        void freeExtents( TransactionExperiment* txn, DiskLoc firstExt, DiskLoc lastExt );
+        void freeExtents( OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt );
 
         /**
          * frees a single extent
          * ignores all fields in the Extent except: magic, myLoc, length
          */
-        void freeExtent( TransactionExperiment* txn, DiskLoc extent );
+        void freeExtent( OperationContext* txn, DiskLoc extent );
 
         void printFreeList() const;
 
@@ -153,23 +153,23 @@ namespace mongo {
         /**
          * will return NULL if nothing suitable in free list
          */
-        DiskLoc _allocFromFreeList( TransactionExperiment* txn, int approxSize, bool capped );
+        DiskLoc _allocFromFreeList( OperationContext* txn, int approxSize, bool capped );
 
         /* allocate a new Extent, does not check free list
          * @param maxFileNoForQuota - 0 for unlimited
         */
-        DiskLoc _createExtent( TransactionExperiment* txn, int approxSize, int maxFileNoForQuota );
+        DiskLoc _createExtent( OperationContext* txn, int approxSize, int maxFileNoForQuota );
 
-        DataFile* _addAFile( TransactionExperiment* txn, int sizeNeeded, bool preallocateNextFile );
+        DataFile* _addAFile( OperationContext* txn, int sizeNeeded, bool preallocateNextFile );
 
         DiskLoc _getFreeListStart() const;
         DiskLoc _getFreeListEnd() const;
-        void _setFreeListStart( TransactionExperiment* txn, DiskLoc loc );
-        void _setFreeListEnd( TransactionExperiment* txn, DiskLoc loc );
+        void _setFreeListStart( OperationContext* txn, DiskLoc loc );
+        void _setFreeListEnd( OperationContext* txn, DiskLoc loc );
 
         const DataFile* _getOpenFile( int n ) const;
 
-        DiskLoc _createExtentInFile( TransactionExperiment* txn,
+        DiskLoc _createExtentInFile( OperationContext* txn,
                                      int fileNo,
                                      DataFile* f,
                                      int size,

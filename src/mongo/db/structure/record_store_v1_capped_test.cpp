@@ -40,7 +40,7 @@ namespace {
 
     class DummyCappedDocumentDeleteCallback : public CappedDocumentDeleteCallback {
     public:
-        Status aboutToDeleteCapped( TransactionExperiment* txn, const DiskLoc& loc ) {
+        Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) {
             deleted.push_back( loc );
             return Status::OK();
         }
@@ -49,7 +49,7 @@ namespace {
 
     void simpleInsertTest( const char* buf, int size ) {
 
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;

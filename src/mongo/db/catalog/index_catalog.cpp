@@ -61,7 +61,7 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
@@ -92,7 +92,7 @@ namespace mongo {
         _magic = 123456;
     }
 
-    Status IndexCatalog::init(TransactionExperiment* txn) {
+    Status IndexCatalog::init(OperationContext* txn) {
 
         NamespaceDetails::IndexIterator ii = _details->ii(true);
         while ( ii.more() ) {
@@ -125,7 +125,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(TransactionExperiment* txn,
+    IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
                                                               IndexDescriptor* descriptor) {
         auto_ptr<IndexDescriptor> descriptorCleanup( descriptor );
 
@@ -242,7 +242,7 @@ namespace mongo {
 
     // ---------------------------
 
-    Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( TransactionExperiment* txn,
+    Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( OperationContext* txn,
                                                                const string& newPluginName ) {
 
         // first check if requested index requires pdfile minor version to be bumped
@@ -307,7 +307,7 @@ namespace mongo {
         return StatusWith<BSONObj>( fixed );
     }
 
-    Status IndexCatalog::createIndex( TransactionExperiment* txn,
+    Status IndexCatalog::createIndex( OperationContext* txn,
                                       BSONObj spec,
                                       bool mayInterrupt,
                                       ShutdownBehavior shutdownBehavior ) {
@@ -398,7 +398,7 @@ namespace mongo {
         }
     }
 
-    IndexCatalog::IndexBuildBlock::IndexBuildBlock(TransactionExperiment* txn,
+    IndexCatalog::IndexBuildBlock::IndexBuildBlock(OperationContext* txn,
                                                    Collection* collection,
                                                    const BSONObj& spec )
         : _collection( collection ),
@@ -715,7 +715,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::ensureHaveIdIndex(TransactionExperiment* txn) {
+    Status IndexCatalog::ensureHaveIdIndex(OperationContext* txn) {
         if ( haveIdIndex() )
             return Status::OK();
 
@@ -735,7 +735,7 @@ namespace mongo {
         return s;
     }
 
-    Status IndexCatalog::dropAllIndexes(TransactionExperiment* txn,
+    Status IndexCatalog::dropAllIndexes(OperationContext* txn,
                                         bool includingIdIndex) {
 
         Lock::assertWriteLocked( _collection->_database->name() );
@@ -819,7 +819,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::dropIndex(TransactionExperiment* txn,
+    Status IndexCatalog::dropIndex(OperationContext* txn,
                                    IndexDescriptor* desc ) {
 
         Lock::assertWriteLocked( _collection->_database->name() );
@@ -834,7 +834,7 @@ namespace mongo {
         return _dropIndex(txn, entry);
     }
 
-    Status IndexCatalog::_dropIndex(TransactionExperiment* txn,
+    Status IndexCatalog::_dropIndex(OperationContext* txn,
                                     IndexCatalogEntry* entry ) {
         /**
          * IndexState in order
@@ -901,7 +901,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void IndexCatalog::_deleteIndexFromDisk( TransactionExperiment* txn,
+    void IndexCatalog::_deleteIndexFromDisk( OperationContext* txn,
                                              const string& indexName,
                                              const string& indexNamespace,
                                              int idxNo ) {
@@ -927,7 +927,7 @@ namespace mongo {
         wassert( n == 1 );
     }
 
-    int IndexCatalog::_removeFromSystemIndexes(TransactionExperiment* txn,
+    int IndexCatalog::_removeFromSystemIndexes(OperationContext* txn,
                                                const StringData& indexName) {
         BSONObjBuilder b;
         b.append( "ns", _collection->ns() );
@@ -942,7 +942,7 @@ namespace mongo {
                                                 true ) );
     }
 
-    vector<BSONObj> IndexCatalog::getAndClearUnfinishedIndexes(TransactionExperiment* txn) {
+    vector<BSONObj> IndexCatalog::getAndClearUnfinishedIndexes(OperationContext* txn) {
         vector<BSONObj> toReturn = _unfinishedIndexes;
         _unfinishedIndexes.clear();
         for ( size_t i = 0; i < toReturn.size(); i++ ) {
@@ -963,7 +963,7 @@ namespace mongo {
         return toReturn;
     }
 
-    void IndexCatalog::updateTTLSetting( TransactionExperiment* txn,
+    void IndexCatalog::updateTTLSetting( OperationContext* txn,
                                          const IndexDescriptor* idx,
                                          long long newExpireSeconds ) {
         IndexDetails* indexDetails = _getIndexDetails( idx );
@@ -1177,7 +1177,7 @@ namespace mongo {
 
     // ---------------------------
 
-    Status IndexCatalog::_indexRecord(TransactionExperiment* txn,
+    Status IndexCatalog::_indexRecord(OperationContext* txn,
                                       IndexCatalogEntry* index,
                                       const BSONObj& obj,
                                       const DiskLoc &loc ) {
@@ -1194,7 +1194,7 @@ namespace mongo {
         return index->accessMethod()->insert(txn, obj, loc, options, &inserted);
     }
 
-    Status IndexCatalog::_unindexRecord(TransactionExperiment* txn,
+    Status IndexCatalog::_unindexRecord(OperationContext* txn,
                                         IndexCatalogEntry* index,
                                         const BSONObj& obj,
                                         const DiskLoc &loc,
@@ -1215,7 +1215,7 @@ namespace mongo {
     }
 
 
-    void IndexCatalog::indexRecord(TransactionExperiment* txn,
+    void IndexCatalog::indexRecord(OperationContext* txn,
                                    const BSONObj& obj,
                                    const DiskLoc &loc ) {
 
@@ -1256,7 +1256,7 @@ namespace mongo {
 
     }
 
-    void IndexCatalog::unindexRecord(TransactionExperiment* txn,
+    void IndexCatalog::unindexRecord(OperationContext* txn,
                                      const BSONObj& obj,
                                      const DiskLoc& loc,
                                      bool noWarn) {

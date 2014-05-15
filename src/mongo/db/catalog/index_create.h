@@ -43,12 +43,12 @@ namespace mongo {
     class BSONObj;
     class Collection;
     class IndexCatalogEntry;
-    class TransactionExperiment;
+    class OperationContext;
 
     // Build an index in the foreground
     // If background is false, uses fast index builder
     // If background is true, uses background index builder; blocks until done.
-    void buildAnIndex( TransactionExperiment* txn,
+    void buildAnIndex( OperationContext* txn,
                        Collection* collection,
                        IndexCatalogEntry* btreeState,
                        bool mayInterrupt );
@@ -56,7 +56,7 @@ namespace mongo {
     class MultiIndexBlock {
         MONGO_DISALLOW_COPYING( MultiIndexBlock );
     public:
-        MultiIndexBlock(TransactionExperiment* txn,
+        MultiIndexBlock(OperationContext* txn,
                         Collection* collection );
         ~MultiIndexBlock();
 
@@ -86,7 +86,7 @@ namespace mongo {
         std::vector<IndexState> _states;
 
         // Not owned here, must outlive 'this'
-        TransactionExperiment* _txn;
+        OperationContext* _txn;
     };
 
 } // namespace mongo

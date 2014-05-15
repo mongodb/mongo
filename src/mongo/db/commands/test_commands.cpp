@@ -37,7 +37,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -55,7 +55,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "internal. for testing only.";
         }
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "godinsert" ].valuestrsafe();
             log() << "test only command godinsert invoked coll:" << coll << endl;
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
@@ -93,7 +93,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
         CmdSleep() : Command("sleep") { }
-        bool run(TransactionExperiment* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "test only command sleep invoked" << endl;
             long long millis = 10 * 1000;
 
@@ -133,7 +133,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
-        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "captrunc" ].valuestrsafe();
             uassert( 13416, "captrunc must specify a collection", !coll.empty() );
             NamespaceString nss( dbname, coll );
@@ -180,7 +180,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
             NamespaceString nss( dbname, coll );

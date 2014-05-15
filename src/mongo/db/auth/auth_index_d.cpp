@@ -38,7 +38,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -84,7 +84,7 @@ namespace {
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
             Client::WriteContext wctx(systemUsers);
-            DurTransaction txn;
+            OperationContextImpl txn;
             Collection* collection = wctx.ctx().db()->getCollection(NamespaceString(systemUsers));
             if (!collection) {
                 return;
@@ -97,7 +97,7 @@ namespace {
         }
     }
 
-    void createSystemIndexes(TransactionExperiment* txn, Collection* collection) {
+    void createSystemIndexes(OperationContext* txn, Collection* collection) {
         invariant( collection );
         const NamespaceString& ns = collection->ns();
         if (ns == AuthorizationManager::usersCollectionNamespace) {

@@ -36,7 +36,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -90,7 +90,7 @@ namespace mongo {
             // This write lock is held throughout the index building process
             // for this namespace.
             Client::WriteContext ctx(ns);
-            DurTransaction txn;  // XXX???
+            OperationContextImpl txn;  // XXX???
 
             Collection* collection = ctx.ctx().db()->getCollection( ns );
             if ( collection == NULL )

@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/record_store_v1_base.h"
 
 namespace mongo {
@@ -51,11 +51,11 @@ namespace mongo {
         virtual void syncDataAndTruncateJournal();
     };
 
-    class DummyTransactionExperiment : public TransactionExperiment {
+    class DummyOperationContext : public OperationContext {
     public:
-        DummyTransactionExperiment();
+        DummyOperationContext();
 
-        virtual ~DummyTransactionExperiment() { }
+        virtual ~DummyOperationContext() { }
 
         virtual RecoveryUnit* recoveryUnit() const {
             return _recoveryUnit.get();
@@ -80,48 +80,48 @@ namespace mongo {
         virtual ~DummyRecordStoreV1MetaData(){}
 
         virtual const DiskLoc& capExtent() const;
-        virtual void setCapExtent( TransactionExperiment* txn, const DiskLoc& loc );
+        virtual void setCapExtent( OperationContext* txn, const DiskLoc& loc );
 
         virtual const DiskLoc& capFirstNewRecord() const;
-        virtual void setCapFirstNewRecord( TransactionExperiment* txn, const DiskLoc& loc );
+        virtual void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc );
 
         virtual bool capLooped() const;
 
         virtual long long dataSize() const;
         virtual long long numRecords() const;
 
-        virtual void incrementStats( TransactionExperiment* txn,
+        virtual void incrementStats( OperationContext* txn,
                                      long long dataSizeIncrement,
                                      long long numRecordsIncrement );
 
-        virtual void setStats( TransactionExperiment* txn,
+        virtual void setStats( OperationContext* txn,
                                long long dataSizeIncrement,
                                long long numRecordsIncrement );
 
         virtual const DiskLoc& deletedListEntry( int bucket ) const;
-        virtual void setDeletedListEntry( TransactionExperiment* txn,
+        virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc );
-        virtual void orphanDeletedList(TransactionExperiment* txn);
+        virtual void orphanDeletedList(OperationContext* txn);
 
         virtual const DiskLoc& firstExtent() const;
-        virtual void setFirstExtent( TransactionExperiment* txn, const DiskLoc& loc );
+        virtual void setFirstExtent( OperationContext* txn, const DiskLoc& loc );
 
         virtual const DiskLoc& lastExtent() const;
-        virtual void setLastExtent( TransactionExperiment* txn, const DiskLoc& loc );
+        virtual void setLastExtent( OperationContext* txn, const DiskLoc& loc );
 
         virtual bool isCapped() const;
 
         virtual bool isUserFlagSet( int flag ) const;
 
         virtual int lastExtentSize() const;
-        virtual void setLastExtentSize( TransactionExperiment* txn, int newMax );
+        virtual void setLastExtentSize( OperationContext* txn, int newMax );
 
         virtual long long maxCappedDocs() const;
 
         virtual double paddingFactor() const;
 
-        virtual void setPaddingFactor( TransactionExperiment* txn, double paddingFactor );
+        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor );
 
     protected:
 
@@ -148,22 +148,22 @@ namespace mongo {
     public:
         virtual ~DummyExtentManager();
 
-        virtual Status init(TransactionExperiment* txn);
+        virtual Status init(OperationContext* txn);
 
         virtual size_t numFiles() const;
         virtual long long fileSize() const;
 
         virtual void flushFiles( bool sync );
 
-        virtual DiskLoc allocateExtent( TransactionExperiment* txn,
+        virtual DiskLoc allocateExtent( OperationContext* txn,
                                         bool capped,
                                         int size,
                                         int quotaMax );
 
-        virtual void freeExtents( TransactionExperiment* txn,
+        virtual void freeExtents( OperationContext* txn,
                                   DiskLoc firstExt, DiskLoc lastExt );
 
-        virtual void freeExtent( TransactionExperiment* txn, DiskLoc extent );
+        virtual void freeExtent( OperationContext* txn, DiskLoc extent );
 
         virtual void freeListStats( int* numExtents, int64_t* totalFreeSize ) const;
 
@@ -209,7 +209,7 @@ namespace mongo {
      *
      * ExtentManager and MetaData must both be empty.
      */
-    void initializeV1RS(TransactionExperiment* txn,
+    void initializeV1RS(OperationContext* txn,
                         const LocAndSize* records,
                         const LocAndSize* drecs,
                         DummyExtentManager* em,

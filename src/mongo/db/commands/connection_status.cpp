@@ -46,7 +46,7 @@ namespace mongo {
             h << "Returns connection-specific information such as logged-in users";
         }
 
-        bool run(TransactionExperiment* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
+        bool run(OperationContext* txn, const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool fromRepl) {
             AuthorizationSession* authSession =
                     ClientBasic::getCurrent()->getAuthorizationSession();

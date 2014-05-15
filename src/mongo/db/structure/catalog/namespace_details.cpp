@@ -43,7 +43,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/structure/catalog/hashtab.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/startup_test.h"
 
@@ -84,7 +84,7 @@ namespace mongo {
         memset(_reserved, 0, sizeof(_reserved));
     }
 
-    NamespaceDetails::Extra* NamespaceDetails::allocExtra( TransactionExperiment* txn,
+    NamespaceDetails::Extra* NamespaceDetails::allocExtra( OperationContext* txn,
                                                            const StringData& ns,
                                                            NamespaceIndex& ni,
                                                            int nindexessofar) {
@@ -119,7 +119,7 @@ namespace mongo {
         return e;
     }
 
-    bool NamespaceDetails::setIndexIsMultikey(TransactionExperiment* txn, int i, bool multikey) {
+    bool NamespaceDetails::setIndexIsMultikey(OperationContext* txn, int i, bool multikey) {
         massert(16577, "index number greater than NIndexesMax", i < NIndexesMax );
 
         unsigned long long mask = 1ULL << i;
@@ -146,7 +146,7 @@ namespace mongo {
         return true;
     }
 
-    IndexDetails& NamespaceDetails::getNextIndexDetails(TransactionExperiment* txn,
+    IndexDetails& NamespaceDetails::getNextIndexDetails(OperationContext* txn,
                                                         Collection* collection) {
         IndexDetails *id;
         try {
@@ -220,7 +220,7 @@ namespace mongo {
     }
 
     // must be called when renaming a NS to fix up extra
-    void NamespaceDetails::copyingFrom( TransactionExperiment* txn,
+    void NamespaceDetails::copyingFrom( OperationContext* txn,
                                         const char* thisns,
                                         NamespaceIndex& ni,
                                         NamespaceDetails* src) {
@@ -242,20 +242,20 @@ namespace mongo {
         }
     }
 
-    NamespaceDetails* NamespaceDetails::writingWithoutExtra( TransactionExperiment* txn ) {
+    NamespaceDetails* NamespaceDetails::writingWithoutExtra( OperationContext* txn ) {
         return txn->writing( this );
     }
 
 
     // XXX - this method should go away
-    NamespaceDetails *NamespaceDetails::writingWithExtra( TransactionExperiment* txn ) {
+    NamespaceDetails *NamespaceDetails::writingWithExtra( OperationContext* txn ) {
         for( Extra *e = extra(); e; e = e->next( this ) ) {
             txn->writing( e );
         }
         return writingWithoutExtra( txn );
     }
 
-    void NamespaceDetails::setMaxCappedDocs( TransactionExperiment* txn, long long max ) {
+    void NamespaceDetails::setMaxCappedDocs( OperationContext* txn, long long max ) {
         massert( 16499,
                  "max in a capped collection has to be < 2^31 or -1",
                  validMaxCappedDocs( &max ) );
@@ -285,13 +285,13 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    void NamespaceDetails::setLastExtentSize( TransactionExperiment* txn, int newMax ) {
+    void NamespaceDetails::setLastExtentSize( OperationContext* txn, int newMax ) {
         if ( _lastExtentSize == newMax )
             return;
         txn->writingInt(_lastExtentSize) = newMax;
     }
 
-    void NamespaceDetails::incrementStats( TransactionExperiment* txn,
+    void NamespaceDetails::incrementStats( OperationContext* txn,
                                            long long dataSizeIncrement,
                                            long long numRecordsIncrement ) {
 
@@ -301,7 +301,7 @@ namespace mongo {
         s->nrecords += numRecordsIncrement;
     }
 
-    void NamespaceDetails::setStats( TransactionExperiment* txn,
+    void NamespaceDetails::setStats( OperationContext* txn,
                                      long long dataSize,
                                      long long numRecords ) {
         Stats* s = txn->writing( &_stats );
@@ -309,40 +309,40 @@ namespace mongo {
         s->nrecords = numRecords;
     }
 
-    void NamespaceDetails::setFirstExtent( TransactionExperiment* txn,
+    void NamespaceDetails::setFirstExtent( OperationContext* txn,
                                            const DiskLoc& loc ) {
         *txn->writing( &_firstExtent ) = loc;
     }
 
-    void NamespaceDetails::setLastExtent( TransactionExperiment* txn,
+    void NamespaceDetails::setLastExtent( OperationContext* txn,
                                           const DiskLoc& loc ) {
         *txn->writing( &_lastExtent ) = loc;
     }
 
-    void NamespaceDetails::setCapExtent( TransactionExperiment* txn,
+    void NamespaceDetails::setCapExtent( OperationContext* txn,
                                          const DiskLoc& loc ) {
         *txn->writing( &_capExtent ) = loc;
     }
 
-    void NamespaceDetails::setCapFirstNewRecord( TransactionExperiment* txn,
+    void NamespaceDetails::setCapFirstNewRecord( OperationContext* txn,
                                                  const DiskLoc& loc ) {
         *txn->writing( &_capFirstNewRecord ) = loc;
     }
 
-    void NamespaceDetails::setFirstExtentInvalid( TransactionExperiment* txn ) {
+    void NamespaceDetails::setFirstExtentInvalid( OperationContext* txn ) {
         *txn->writing( &_firstExtent ) = DiskLoc().setInvalid();
     }
 
-    void NamespaceDetails::setLastExtentInvalid( TransactionExperiment* txn ) {
+    void NamespaceDetails::setLastExtentInvalid( OperationContext* txn ) {
         *txn->writing( &_lastExtent ) = DiskLoc().setInvalid();
     }
 
-    void NamespaceDetails::setDeletedListEntry( TransactionExperiment* txn,
+    void NamespaceDetails::setDeletedListEntry( OperationContext* txn,
                                                 int bucket, const DiskLoc& loc ) {
         *txn->writing( &_deletedList[bucket] ) = loc;
     }
 
-    bool NamespaceDetails::setUserFlag( TransactionExperiment* txn, int flags ) {
+    bool NamespaceDetails::setUserFlag( OperationContext* txn, int flags ) {
         if ( ( _userFlags & flags ) == flags )
             return false;
         
@@ -350,7 +350,7 @@ namespace mongo {
         return true;
     }
 
-    bool NamespaceDetails::clearUserFlag( TransactionExperiment* txn, int flags ) {
+    bool NamespaceDetails::clearUserFlag( OperationContext* txn, int flags ) {
         if ( ( _userFlags & flags ) == 0 )
             return false;
 
@@ -358,7 +358,7 @@ namespace mongo {
         return true;
     }
 
-    bool NamespaceDetails::replaceUserFlags( TransactionExperiment* txn, int flags ) {
+    bool NamespaceDetails::replaceUserFlags( OperationContext* txn, int flags ) {
         if ( flags == _userFlags )
             return false;
 
@@ -366,7 +366,7 @@ namespace mongo {
         return true;
     }
 
-    void NamespaceDetails::setPaddingFactor( TransactionExperiment* txn, double paddingFactor ) {
+    void NamespaceDetails::setPaddingFactor( OperationContext* txn, double paddingFactor ) {
         if ( paddingFactor == _paddingFactor )
             return;
 
@@ -388,7 +388,7 @@ namespace mongo {
             ((tmp >> (x+1)) << x);
     }
 
-    void NamespaceDetails::_removeIndexFromMe( TransactionExperiment* txn, int idxNumber ) {
+    void NamespaceDetails::_removeIndexFromMe( OperationContext* txn, int idxNumber ) {
 
         // TODO: don't do this whole thing, do it piece meal for readability
         NamespaceDetails* d = writingWithExtra( txn );
@@ -407,7 +407,7 @@ namespace mongo {
         d->idx( getTotalIndexCount() ) = IndexDetails();
     }
 
-    void NamespaceDetails::swapIndex( TransactionExperiment* txn, int a, int b ) {
+    void NamespaceDetails::swapIndex( OperationContext* txn, int a, int b ) {
 
         // flip main meta data
         IndexDetails temp = idx(a);
@@ -420,7 +420,7 @@ namespace mongo {
         setIndexIsMultikey( txn, b, tempMultikey );
     }
 
-    void NamespaceDetails::orphanDeletedList( TransactionExperiment* txn ) {
+    void NamespaceDetails::orphanDeletedList( OperationContext* txn ) {
         for( int i = 0; i < Buckets; i++ ) {
             *txn->writing(&_deletedList[i]) = DiskLoc();
         }
@@ -438,7 +438,7 @@ namespace mongo {
         return -1;
     }
 
-    void NamespaceDetails::Extra::setNext( TransactionExperiment* txn,
+    void NamespaceDetails::Extra::setNext( OperationContext* txn,
                                            long ofs ) {
         *txn->writing(&_next) = ofs;
     }

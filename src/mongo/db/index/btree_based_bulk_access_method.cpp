@@ -31,7 +31,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile_private.h"  // This is for inDBRepair.
 #include "mongo/db/repl/rs.h"         // This is for ignoreUniqueIndex.
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
@@ -90,7 +90,7 @@ namespace mongo {
         return NULL;
     }
 
-    BtreeBasedBulkAccessMethod::BtreeBasedBulkAccessMethod(TransactionExperiment* txn,
+    BtreeBasedBulkAccessMethod::BtreeBasedBulkAccessMethod(OperationContext* txn,
                                                            BtreeBasedAccessMethod* real,
                                                            BtreeInterface* interface,
                                                            const IndexDescriptor* descriptor,
@@ -108,7 +108,7 @@ namespace mongo {
         _sorter->hintNumObjects(numRecords);
     }
 
-    Status BtreeBasedBulkAccessMethod::insert(TransactionExperiment* txn,
+    Status BtreeBasedBulkAccessMethod::insert(OperationContext* txn,
                                               const BSONObj& obj,
                                               const DiskLoc& loc,
                                               const InsertDeleteOptions& options,

@@ -92,7 +92,7 @@ namespace mongo {
             actions.addAction(ActionType::fsync);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             if (Lock::isLocked()) {
                 errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";

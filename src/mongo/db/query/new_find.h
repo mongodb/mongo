@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-    class TransactionExperiment;
+    class OperationContext;
 
     /**
      * Called from the getMore entry point in ops/query.cpp.
@@ -50,7 +50,7 @@ namespace mongo {
     /**
      * Run the query 'q' and place the result in 'result'.
      */
-    std::string newRunQuery(TransactionExperiment* txn,
+    std::string newRunQuery(OperationContext* txn,
                             Message& m,
                             QueryMessage& q,
                             CurOp& curop,

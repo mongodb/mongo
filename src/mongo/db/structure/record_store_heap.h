@@ -56,14 +56,14 @@ namespace mongo {
 
         virtual Record* recordFor( const DiskLoc& loc ) const;
 
-        virtual void deleteRecord( TransactionExperiment* txn, const DiskLoc& dl );
+        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
 
-        virtual StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
                                                   int quotaMax );
 
-        virtual StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   int quotaMax );
 
@@ -74,23 +74,23 @@ namespace mongo {
 
         virtual std::vector<RecordIterator*> getManyIterators() const;
 
-        virtual Status truncate( TransactionExperiment* txn );
+        virtual Status truncate( OperationContext* txn );
 
         virtual bool compactSupported() const;
-        virtual Status compact( TransactionExperiment* txn,
+        virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
                                 CompactStats* stats );
 
-        virtual Status validate( TransactionExperiment* txn,
+        virtual Status validate( OperationContext* txn,
                                  bool full,
                                  bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
 
-        virtual Status touch( TransactionExperiment* txn, BSONObjBuilder* output ) const;
+        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
-        virtual void increaseStorageSize( TransactionExperiment* txn,  int size, int quotaMax );
+        virtual void increaseStorageSize( OperationContext* txn,  int size, int quotaMax );
 
         virtual int64_t storageSize(BSONObjBuilder* extraInfo = NULL, int infoLevel = 0) const;
 
@@ -111,7 +111,7 @@ namespace mongo {
     private:
         DiskLoc allocateLoc();
         bool cappedAndNeedDelete() const;
-        void cappedDeleteAsNeeded(TransactionExperiment* txn);
+        void cappedDeleteAsNeeded(OperationContext* txn);
 
         // TODO figure out a proper solution to metadata
         const bool _isCapped;

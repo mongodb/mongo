@@ -51,7 +51,7 @@
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/fail_point_service.h"
 
@@ -230,7 +230,7 @@ namespace mongo {
         changeState(MemberState::RS_RECOVERING);
 
         Client::Context ctx("local");
-        DurTransaction txn;
+        OperationContextImpl txn;
         ctx.db()->dropCollection(&txn, "local.oplog.rs");
         {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);

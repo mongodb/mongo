@@ -101,7 +101,7 @@ namespace mongo {
             return false;
         }
 
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
 
@@ -149,7 +149,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
     private:
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
             theReplSet->elect.electCmdReceived(cmdObj, &result);

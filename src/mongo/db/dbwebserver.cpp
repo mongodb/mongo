@@ -50,7 +50,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/stats/snapshots.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/html.h"
@@ -77,7 +77,7 @@ namespace mongo {
         DbWebServer(const string& ip,
                     int port,
                     const AdminAccess* webUsers,
-                    TransactionExperiment::Factory transactionFactory)
+                    OperationContext::Factory transactionFactory)
                 : MiniWebServer("admin web console", ip, port),
                   _webUsers(webUsers),
                   _transactionFactory(transactionFactory) {
@@ -87,7 +87,7 @@ namespace mongo {
 
     private:
         const AdminAccess* _webUsers; // not owned here
-        const TransactionExperiment::Factory _transactionFactory;
+        const OperationContext::Factory _transactionFactory;
 
         void doUnlockedStuff(stringstream& ss) {
             /* this is in the header already ss << "port:      " << port << '\n'; */
@@ -188,7 +188,7 @@ namespace mongo {
             const SockAddr &from
         ) {
 
-            boost::scoped_ptr<TransactionExperiment> txn(_transactionFactory()); // XXX SERVER-13931
+            boost::scoped_ptr<OperationContext> txn(_transactionFactory()); // XXX SERVER-13931
 
             if ( url.size() > 1 ) {
 
@@ -421,7 +421,7 @@ namespace mongo {
     public:
         FavIconHandler() : DbWebHandler( "favicon.ico" , 0 , false ) {}
 
-        virtual void handle( TransactionExperiment* txn,
+        virtual void handle( OperationContext* txn,
                              const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
@@ -436,7 +436,7 @@ namespace mongo {
     public:
         StatusHandler() : DbWebHandler( "_status" , 1 , false ) {}
 
-        virtual void handle( TransactionExperiment* txn,
+        virtual void handle( OperationContext* txn,
                              const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
@@ -488,7 +488,7 @@ namespace mongo {
     public:
         CommandListHandler() : DbWebHandler( "_commands" , 1 , true ) {}
 
-        virtual void handle( TransactionExperiment* txn,
+        virtual void handle( OperationContext* txn,
                              const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
@@ -541,7 +541,7 @@ namespace mongo {
             return _cmd(cmd) != 0;
         }
 
-        virtual void handle( TransactionExperiment* txn,
+        virtual void handle( OperationContext* txn,
                              const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
@@ -577,7 +577,7 @@ namespace mongo {
     // --- external ----
 
     void webServerThread(const AdminAccess* adminAccess,
-                         TransactionExperiment::Factory transactionFactory) {
+                         OperationContext::Factory transactionFactory) {
         boost::scoped_ptr<const AdminAccess> adminAccessPtr(adminAccess); // adminAccess is owned here
         Client::initThread("websvr");
         const int p = serverGlobalParams.port + 1000;

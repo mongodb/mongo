@@ -44,7 +44,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/processinfo.h"
@@ -55,7 +55,7 @@ namespace mongo {
     /**
      * Add the provided (obj, dl) pair to the provided index.
      */
-    static void addKeysToIndex(TransactionExperiment* txn,
+    static void addKeysToIndex(OperationContext* txn,
                                Collection* collection,
                                const IndexDescriptor* descriptor,
                                IndexAccessMethod* accessMethod,
@@ -76,7 +76,7 @@ namespace mongo {
         uassertStatusOK( ret );
     }
 
-    unsigned long long addExistingToIndex( TransactionExperiment* txn,
+    unsigned long long addExistingToIndex( OperationContext* txn,
                                            Collection* collection,
                                            const IndexDescriptor* descriptor,
                                            IndexAccessMethod* accessMethod,
@@ -185,7 +185,7 @@ namespace mongo {
     // ---------------------------
 
     // throws DBException
-    void buildAnIndex( TransactionExperiment* txn,
+    void buildAnIndex( OperationContext* txn,
                        Collection* collection,
                        IndexCatalogEntry* btreeState,
                        bool mayInterrupt ) {
@@ -296,7 +296,7 @@ namespace mongo {
 
     // ----------------------------
 
-    MultiIndexBlock::MultiIndexBlock(TransactionExperiment* txn, Collection* collection)
+    MultiIndexBlock::MultiIndexBlock(OperationContext* txn, Collection* collection)
         : _collection(collection), _txn(txn) {
     }
 

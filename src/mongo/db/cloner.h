@@ -40,7 +40,7 @@ namespace mongo {
     class DBClientBase;
     class DBClientCursor;
     class Query;
-    class TransactionExperiment;
+    class OperationContext;
 
     class Cloner: boost::noncopyable {
     public:
@@ -55,14 +55,14 @@ namespace mongo {
         void setConnection( DBClientBase *c ) { _conn.reset( c ); }
 
         /** copy the entire database */
-        bool go(TransactionExperiment* txn,
+        bool go(OperationContext* txn,
                 Client::Context& ctx,
                 const string& masterHost,
                 const CloneOptions& opts,
                 set<string>* clonedColls,
                 string& errmsg, int *errCode = 0);
 
-        bool copyCollection(TransactionExperiment* txn,
+        bool copyCollection(OperationContext* txn,
                             const string& ns,
                             const BSONObj& query,
                             string& errmsg,
@@ -85,7 +85,7 @@ namespace mongo {
          *                      Currently this will only be set if there is an error in the initial
          *                      system.namespaces query.
          */
-        static bool cloneFrom(TransactionExperiment* txn,
+        static bool cloneFrom(OperationContext* txn,
                               Client::Context& context,
                               const string& masterHost,
                               const CloneOptions& options,
@@ -96,11 +96,11 @@ namespace mongo {
         /**
          * Copy a collection (and indexes) from a remote host
          */
-        static bool copyCollectionFromRemote(TransactionExperiment* txn,
+        static bool copyCollectionFromRemote(OperationContext* txn,
                                              const string& host, const string& ns, string& errmsg);
 
     private:
-        void copy(TransactionExperiment* txn,
+        void copy(OperationContext* txn,
                   Client::Context& ctx,
                   const char *from_ns,
                   const char *to_ns,

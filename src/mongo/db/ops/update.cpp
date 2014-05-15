@@ -49,7 +49,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/platform/unordered_set.h"
 
@@ -416,7 +416,7 @@ namespace mongo {
         }
     } // namespace
 
-    UpdateResult update(TransactionExperiment* txn,
+    UpdateResult update(OperationContext* txn,
                         Database* db,
                         const UpdateRequest& request,
                         OpDebug* opDebug) {
@@ -426,7 +426,7 @@ namespace mongo {
     }
 
     UpdateResult update(
-            TransactionExperiment* txn,
+            OperationContext* txn,
             Database* db,
             const UpdateRequest& request,
             OpDebug* opDebug,

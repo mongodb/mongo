@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    class TransactionExperiment;
+    class OperationContext;
 
     namespace mr {
 
@@ -239,7 +239,7 @@ namespace mongo {
             /**
              * txn must outlive this State.
              */
-            State( TransactionExperiment* txn, const Config& c );
+            State( OperationContext* txn, const Config& c );
             ~State();
 
             void init();
@@ -343,7 +343,7 @@ namespace mongo {
              */
             int _add(InMemory* im , const BSONObj& a);
 
-            TransactionExperiment* _txn;
+            OperationContext* _txn;
             scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
 

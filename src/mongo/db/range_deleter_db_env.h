@@ -51,7 +51,7 @@ namespace mongo {
          *
          * Does not throw Exceptions.
          */
-        virtual bool deleteRange(TransactionExperiment* txn,
+        virtual bool deleteRange(OperationContext* txn,
                                  const StringData& ns,
                                  const BSONObj& inclusiveLower,
                                  const BSONObj& exclusiveUpper,

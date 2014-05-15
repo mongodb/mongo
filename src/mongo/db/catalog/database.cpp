@@ -51,7 +51,7 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
@@ -196,7 +196,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Database::Database(TransactionExperiment* txn, const char *nm, bool& newDb, const string& path )
+    Database::Database(OperationContext* txn, const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
           _extentManager(new MmapV1ExtentManager(_name, _path, storageGlobalParams.directoryperdb)),
@@ -299,7 +299,7 @@ namespace mongo {
     // todo : we stop once a datafile dne.
     //        if one datafile were missing we should keep going for
     //        repair purposes yet we do not.
-    void Database::openAllFiles(TransactionExperiment* txn) {
+    void Database::openAllFiles(OperationContext* txn) {
         verify(this);
         Status s = _extentManager->init(txn);
         if ( !s.isOK() ) {
@@ -307,7 +307,7 @@ namespace mongo {
         }
     }
 
-    void Database::clearTmpCollections(TransactionExperiment* txn) {
+    void Database::clearTmpCollections(OperationContext* txn) {
 
         Lock::assertWriteLocked( _name );
 
@@ -353,7 +353,7 @@ namespace mongo {
 
     void Database::flushFiles( bool sync ) { return _extentManager->flushFiles( sync ); }
 
-    bool Database::setProfilingLevel( TransactionExperiment* txn, int newLevel , string& errmsg ) {
+    bool Database::setProfilingLevel( OperationContext* txn, int newLevel , string& errmsg ) {
         if ( _profile == newLevel )
             return true;
 
@@ -374,7 +374,7 @@ namespace mongo {
         return true;
     }
 
-    Status Database::dropCollection( TransactionExperiment* txn, const StringData& fullns ) {
+    Status Database::dropCollection( OperationContext* txn, const StringData& fullns ) {
         LOG(1) << "dropCollection: " << fullns << endl;
         massertNamespaceNotIndex( fullns, "dropCollection" );
 
@@ -467,11 +467,11 @@ namespace mongo {
     }
 
     Collection* Database::getCollection( const StringData& ns ) {
-        DurTransaction txn; // TODO remove once we require reads to have transactions
+        OperationContextImpl txn; // TODO remove once we require reads to have transactions
         return getCollection(&txn, ns);
     }
 
-    Collection* Database::getCollection( TransactionExperiment* txn, const StringData& ns ) {
+    Collection* Database::getCollection( OperationContext* txn, const StringData& ns ) {
         verify( _name == nsToDatabaseSubstring( ns ) );
 
         scoped_lock lk( _collectionLock );
@@ -504,7 +504,7 @@ namespace mongo {
 
 
 
-    Status Database::renameCollection( TransactionExperiment* txn,
+    Status Database::renameCollection( OperationContext* txn,
                                        const StringData& fromNS,
                                        const StringData& toNS,
                                        bool stayTemp ) {
@@ -574,7 +574,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status Database::_renameSingleNamespace( TransactionExperiment* txn,
+    Status Database::_renameSingleNamespace( OperationContext* txn,
                                              const StringData& fromNS,
                                              const StringData& toNS,
                                              bool stayTemp ) {
@@ -660,10 +660,10 @@ namespace mongo {
     }
 
     Collection* Database::getOrCreateCollection( const StringData& ns ) {
-        DurTransaction txn; // TODO remove once we require reads to have transactions
+        OperationContextImpl txn; // TODO remove once we require reads to have transactions
         return getOrCreateCollection(&txn, ns);
     }
-    Collection* Database::getOrCreateCollection(TransactionExperiment* txn, const StringData& ns) {
+    Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
         Collection* c = getCollection( txn, ns );
         if ( !c ) {
             c = createCollection( txn, ns );
@@ -681,7 +681,7 @@ namespace mongo {
         }
     }
 
-    Collection* Database::createCollection( TransactionExperiment* txn,
+    Collection* Database::createCollection( OperationContext* txn,
                                             const StringData& ns,
                                             const CollectionOptions& options,
                                             bool allocateDefaultSpace,
@@ -777,7 +777,7 @@ namespace mongo {
     }
 
 
-    void Database::_addNamespaceToCatalog( TransactionExperiment* txn,
+    void Database::_addNamespaceToCatalog( OperationContext* txn,
                                            const StringData& ns,
                                            const BSONObj* options ) {
         LOG(1) << "Database::_addNamespaceToCatalog ns: " << ns << endl;
@@ -799,7 +799,7 @@ namespace mongo {
         uassertStatusOK( loc.getStatus() );
     }
 
-    Status Database::_dropNS( TransactionExperiment* txn, const StringData& ns ) {
+    Status Database::_dropNS( OperationContext* txn, const StringData& ns ) {
 
         NamespaceDetails* d = _namespaceIndex.details( ns );
         if ( !d )
@@ -833,7 +833,7 @@ namespace mongo {
             *minor = 0;
             return;
         }
-        DurTransaction txn; // TODO get rid of this once reads need transactions
+        OperationContextImpl txn; // TODO get rid of this once reads need transactions
         const DataFile* df = _extentManager->getFile( &txn, 0 );
         *major = df->getHeader()->version;
         *minor = df->getHeader()->versionMinor;

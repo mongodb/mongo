@@ -41,7 +41,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/time_support.h"
 
@@ -153,7 +153,7 @@ namespace ReplSetTests {
         static void insert( const BSONObj &o, bool god = false ) {
             Lock::DBWrite lk(ns());
             Client::Context ctx(ns());
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -179,7 +179,7 @@ namespace ReplSetTests {
 
         void drop() {
             Client::WriteContext c(ns());
-            DurTransaction txn;
+            OperationContextImpl txn;
 
             Database* db = c.ctx().db();
 
@@ -318,13 +318,13 @@ namespace ReplSetTests {
 
         void create() {
             Client::Context c(_cappedNs);
-            DurTransaction txn;
+            OperationContextImpl txn;
             ASSERT( userCreateNS( &txn, c.db(), _cappedNs, fromjson( spec() ), false ).isOK() );
         }
 
         void dropCapped() {
             Client::Context c(_cappedNs);
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = c.db();
             if ( db->getCollection( &txn, _cappedNs ) ) {
                 db->dropCollection( &txn, _cappedNs );
@@ -361,7 +361,7 @@ namespace ReplSetTests {
         // returns true on success, false on failure
         bool apply(const BSONObj& op) {
             Client::Context ctx( _cappedNs );
-            DurTransaction txn;
+            OperationContextImpl txn;
             // in an annoying twist of api, returns true on failure
             return !applyOperation_inlock(&txn, ctx.db(), op, true);
         }
@@ -392,7 +392,7 @@ namespace ReplSetTests {
 
         void insert() {
             Client::Context ctx(cappedNs());
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection(&txn, cappedNs());
             if (!coll) {

@@ -20,7 +20,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -32,7 +32,7 @@ namespace IndexCatalogTests {
     public:
         IndexIteratorTests() {
             Client::WriteContext ctx(_ns);
-            DurTransaction txn;
+            OperationContextImpl txn;
             _db = ctx.ctx().db();
             _coll = _db->createCollection(&txn, _ns);
             _catalog = _coll->getIndexCatalog();
@@ -40,13 +40,13 @@ namespace IndexCatalogTests {
 
         ~IndexIteratorTests() {
             Client::WriteContext ctx(_ns);
-            DurTransaction txn;
+            OperationContextImpl txn;
             _db->dropCollection(&txn, _ns);
         }
 
         void run() {
             Client::WriteContext ctx(_ns);
-            DurTransaction txn;
+            OperationContextImpl txn;
             int numFinishedIndexesStart = _catalog->numIndexesReady();
 
             BSONObjBuilder b1;

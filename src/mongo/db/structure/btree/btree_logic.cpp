@@ -29,7 +29,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/btree/btree_logic.h"
 #include "mongo/db/structure/btree/key.h"
 #include "mongo/db/structure/record_store.h"
@@ -43,13 +43,13 @@ namespace mongo {
 
     template <class BtreeLayout>
     typename BtreeLogic<BtreeLayout>::Builder*
-    BtreeLogic<BtreeLayout>::newBuilder(TransactionExperiment* trans, bool dupsAllowed) {
+    BtreeLogic<BtreeLayout>::newBuilder(OperationContext* trans, bool dupsAllowed) {
         return new Builder(this, trans, dupsAllowed);
     }
 
     template <class BtreeLayout>
     BtreeLogic<BtreeLayout>::Builder::Builder(BtreeLogic* logic,
-                                              TransactionExperiment* trans,
+                                              OperationContext* trans,
                                               bool dupsAllowed)
         : _logic(logic),
           _dupsAllowed(dupsAllowed),
@@ -241,7 +241,7 @@ namespace mongo {
 
     template <class BtreeLayout>
     typename BtreeLogic<BtreeLayout>::BucketType*
-    BtreeLogic<BtreeLayout>::btreemod(TransactionExperiment* trans, BucketType* bucket) {
+    BtreeLogic<BtreeLayout>::btreemod(OperationContext* trans, BucketType* bucket) {
         trans->writingPtr(bucket, BtreeLayout::BucketSize);
         return bucket;
     }
@@ -426,7 +426,7 @@ namespace mongo {
      * Returns false if a split is required.
      */
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::basicInsert(TransactionExperiment* trans,
+    bool BtreeLogic<BtreeLayout>::basicInsert(OperationContext* trans,
                                               BucketType* bucket,
                                               const DiskLoc bucketLoc,
                                               int& keypos,
@@ -510,7 +510,7 @@ namespace mongo {
      * it.
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::_pack(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::_pack(OperationContext* trans,
                                         BucketType* bucket,
                                         const DiskLoc thisLoc,
                                         int &refPos) {
@@ -1256,7 +1256,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::delBucket(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::delBucket(OperationContext* trans,
                                             BucketType* bucket,
                                             const DiskLoc bucketLoc) {
         invariant(bucketLoc != getRootLoc());
@@ -1270,7 +1270,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::deallocBucket(TransactionExperiment* txn,
+    void BtreeLogic<BtreeLayout>::deallocBucket(OperationContext* txn,
                                                 BucketType* bucket,
                                                 const DiskLoc bucketLoc) {
         bucket->n = BtreeLayout::INVALID_N_SENTINEL;
@@ -1336,7 +1336,7 @@ namespace mongo {
      * May delete the bucket 'bucket' rendering 'bucketLoc' invalid.
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::delKeyAtPos(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::delKeyAtPos(OperationContext* trans,
                                               BucketType* bucket,
                                               const DiskLoc bucketLoc,
                                               int p) {
@@ -1396,7 +1396,7 @@ namespace mongo {
      * legacy btree.
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::deleteInternalKey(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::deleteInternalKey(OperationContext* trans,
                                                     BucketType* bucket,
                                                     const DiskLoc bucketLoc,
                                                     int keypos) {
@@ -1429,7 +1429,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::replaceWithNextChild(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::replaceWithNextChild(OperationContext* trans,
                                                        BucketType* bucket,
                                                        const DiskLoc bucketLoc) {
 
@@ -1539,7 +1539,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doMergeChildren(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::doMergeChildren(OperationContext* trans,
                                                   BucketType* bucket,
                                                   const DiskLoc bucketLoc,
                                                   int leftIndex) {
@@ -1609,7 +1609,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::tryBalanceChildren(TransactionExperiment* trans,
+    bool BtreeLogic<BtreeLayout>::tryBalanceChildren(OperationContext* trans,
                                                      BucketType* bucket,
                                                      const DiskLoc bucketLoc,
                                                      int leftIndex) {
@@ -1625,7 +1625,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::doBalanceLeftToRight(OperationContext* trans,
                                                        BucketType* bucket,
                                                        const DiskLoc bucketLoc,
                                                        int leftIndex,
@@ -1666,7 +1666,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::doBalanceRightToLeft(OperationContext* trans,
                                                        BucketType* bucket,
                                                        const DiskLoc bucketLoc,
                                                        int leftIndex,
@@ -1710,7 +1710,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::doBalanceChildren(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::doBalanceChildren(OperationContext* trans,
                                                     BucketType* bucket,
                                                     const DiskLoc bucketLoc,
                                                     int leftIndex) {
@@ -1739,7 +1739,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(TransactionExperiment* trans,
+    bool BtreeLogic<BtreeLayout>::mayBalanceWithNeighbors(OperationContext* trans,
                                                           BucketType* bucket,
                                                           const DiskLoc bucketLoc) {
         if (bucket->parent.isNull()) {
@@ -1783,7 +1783,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    bool BtreeLogic<BtreeLayout>::unindex(TransactionExperiment* trans,
+    bool BtreeLogic<BtreeLayout>::unindex(OperationContext* trans,
                                           const BSONObj& key,
                                           const DiskLoc& recordLoc) {
         int pos;
@@ -1804,7 +1804,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    inline void BtreeLogic<BtreeLayout>::fix(TransactionExperiment* trans,
+    inline void BtreeLogic<BtreeLayout>::fix(OperationContext* trans,
                                              const DiskLoc bucketLoc,
                                              const DiskLoc child) {
         if (!child.isNull()) {
@@ -1817,7 +1817,7 @@ namespace mongo {
      * Maybe get rid of parent ptrs?
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::fixParentPtrs(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::fixParentPtrs(OperationContext* trans,
                                                 BucketType* bucket,
                                                 const DiskLoc bucketLoc,
                                                 int firstIndex,
@@ -1835,7 +1835,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::setInternalKey(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::setInternalKey(OperationContext* trans,
                                                  BucketType* bucket,
                                                  const DiskLoc bucketLoc,
                                                  int keypos,
@@ -1869,7 +1869,7 @@ namespace mongo {
      * intent code in basicInsert().
      */
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::insertHere(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::insertHere(OperationContext* trans,
                                              const DiskLoc bucketLoc,
                                              int pos,
                                              const KeyDataType& key,
@@ -1915,7 +1915,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    void BtreeLogic<BtreeLayout>::split(TransactionExperiment* trans,
+    void BtreeLogic<BtreeLayout>::split(OperationContext* trans,
                                         BucketType* bucket,
                                         const DiskLoc bucketLoc,
                                         int keypos,
@@ -1995,7 +1995,7 @@ namespace mongo {
     };
 
     template <class BtreeLayout>
-    Status BtreeLogic<BtreeLayout>::initAsEmpty(TransactionExperiment* trans) {
+    Status BtreeLogic<BtreeLayout>::initAsEmpty(OperationContext* trans) {
         if (!_headManager->getHead().isNull()) {
             return Status(ErrorCodes::InternalError, "index already initialized");
         }
@@ -2005,7 +2005,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    DiskLoc BtreeLogic<BtreeLayout>::addBucket(TransactionExperiment* trans) {
+    DiskLoc BtreeLogic<BtreeLayout>::addBucket(OperationContext* trans) {
         DummyDocWriter docWriter(BtreeLayout::BucketSize);
         StatusWith<DiskLoc> loc = _recordStore->insertRecord(trans, &docWriter, 0);
         // XXX: remove this(?) or turn into massert or sanely bubble it back up.
@@ -2200,7 +2200,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    Status BtreeLogic<BtreeLayout>::insert(TransactionExperiment* trans,
+    Status BtreeLogic<BtreeLayout>::insert(OperationContext* trans,
                                            const BSONObj& rawKey,
                                            const DiskLoc& value,
                                            bool dupsAllowed) {
@@ -2227,7 +2227,7 @@ namespace mongo {
     }
 
     template <class BtreeLayout>
-    Status BtreeLogic<BtreeLayout>::_insert(TransactionExperiment* trans,
+    Status BtreeLogic<BtreeLayout>::_insert(OperationContext* trans,
                                             BucketType* bucket,
                                             const DiskLoc bucketLoc,
                                             const KeyDataType& key,

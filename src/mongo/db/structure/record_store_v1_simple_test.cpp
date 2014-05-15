@@ -149,7 +149,7 @@ namespace {
 
     /** alloc() quantizes the requested size using quantizeAllocationSpace() rules. */
     TEST(SimpleRecordStoreV1, AllocQuantized) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
 
@@ -169,7 +169,7 @@ namespace {
      * rules.
      */
     TEST(SimpleRecordStoreV1, AllocIndexNamespaceNotQuantized) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
 
@@ -187,7 +187,7 @@ namespace {
 
     /** alloc() quantizes records in index collections to the nearest multiple of 4. */
     TEST(SimpleRecordStoreV1, AllocIndexNamespaceSlightlyQuantized) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
 
@@ -205,7 +205,7 @@ namespace {
      * 'cook' the deletedList by shrinking the smallest deleted record to size
      * 'newDeletedRecordSize'.
      */
-    void cookDeletedList(TransactionExperiment* txn,
+    void cookDeletedList(OperationContext* txn,
                          RecordStoreV1Base* rs,
                          RecordStoreV1MetaData* md,
                          int newDeletedRecordSize) {
@@ -247,7 +247,7 @@ namespace {
 
     /** alloc() returns a non quantized record larger than the requested size. */
     TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecord) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -266,7 +266,7 @@ namespace {
 
     /** alloc() returns a non quantized record equal to the requested size. */
     TEST(SimpleRecordStoreV1, AllocExactSizeNonQuantizedDeletedRecord) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -288,7 +288,7 @@ namespace {
      * too small to make a DeletedRecord.
      */
     TEST(SimpleRecordStoreV1, AllocQuantizedWithExtra) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -310,7 +310,7 @@ namespace {
      * is large enough to form a new deleted record.
      */
     TEST(SimpleRecordStoreV1, AllocQuantizedWithoutExtra) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -335,7 +335,7 @@ namespace {
      * if a quantized portion of the deleted record could be used instead.
      */
     TEST(SimpleRecordStoreV1, AllocNotQuantizedNearDeletedSize) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -356,7 +356,7 @@ namespace {
 
     /** getRecordAllocationSize() returns its argument when the padding factor is 1.0. */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizeNoPadding) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -366,7 +366,7 @@ namespace {
 
     /** getRecordAllocationSize() multiplies by a padding factor > 1.0. */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizeWithPadding) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -381,7 +381,7 @@ namespace {
      * is set.
      */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizePowerOf2) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(
                                                 false,
@@ -396,7 +396,7 @@ namespace {
      * is set, ignoring the padding factor.
      */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizePowerOf2PaddingIgnored) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(
                                                 false,
@@ -412,7 +412,7 @@ namespace {
     // -----------------
 
     TEST( SimpleRecordStoreV1, FullSimple1 ) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn,
@@ -436,7 +436,7 @@ namespace {
      * Inserts take the first deleted record with the correct size.
      */
     TEST( SimpleRecordStoreV1, InsertTakesFirstDeletedWithExactSize ) {
-        DummyTransactionExperiment txn;
+        DummyOperationContext txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );

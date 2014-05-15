@@ -48,9 +48,9 @@ namespace {
     using mongo::RangeDeleter;
     using mongo::RangeDeleterMockEnv;
     using mongo::RangeDeleterStats;
-    using mongo::TransactionExperiment;
+    using mongo::OperationContext;
 
-    TransactionExperiment* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
+    OperationContext* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
 
     TEST(NoDeletes, InitialState) {
         RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
@@ -88,7 +88,7 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL,
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL,
                                         ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
@@ -131,7 +131,7 @@ namespace {
 
         Notification deleteDone;
         string errMsg;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                         ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),
@@ -175,7 +175,7 @@ namespace {
 
         string errMsg;
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                         ns,
                                         BSON("x" << 0),
                                         BSON("x" << 10),

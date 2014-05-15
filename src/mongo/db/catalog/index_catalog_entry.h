@@ -43,7 +43,7 @@ namespace mongo {
     class IndexAccessMethod;
     class IndexDescriptor;
     class RecordStore;
-    class TransactionExperiment;
+    class OperationContext;
 
     class IndexCatalogEntry {
         MONGO_DISALLOW_COPYING( IndexCatalogEntry );
@@ -73,7 +73,7 @@ namespace mongo {
 
         const DiskLoc& head() const;
 
-        void setHead( TransactionExperiment* txn, DiskLoc newHead );
+        void setHead( OperationContext* txn, DiskLoc newHead );
 
         void setIsReady( bool newIsReady );
 
@@ -83,7 +83,7 @@ namespace mongo {
 
         bool isMultikey() const;
 
-        void setMultikey( TransactionExperiment* txn );
+        void setMultikey( OperationContext* txn );
 
         // if this ready is ready for queries
         bool isReady() const;

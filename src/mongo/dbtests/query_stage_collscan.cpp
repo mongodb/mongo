@@ -42,7 +42,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/record_store.h"
@@ -175,7 +175,7 @@ namespace QueryStageCollectionScan {
 
         Lock::GlobalWrite lk_;
         Client::Context _context;
-        DurTransaction _txn;
+        OperationContextImpl _txn;
     };
 
     class QueryStageCollscanEmpty : public QueryStageCollectionScanCappedBase {

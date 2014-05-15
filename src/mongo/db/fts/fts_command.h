@@ -56,7 +56,7 @@ namespace mongo {
                                        std::vector<Privilege>* out);
 
 
-            bool run(TransactionExperiment* txn, const string& dbname,
+            bool run(OperationContext* txn, const string& dbname,
                      BSONObj& cmdObj,
                      int options,
                      string& errmsg,

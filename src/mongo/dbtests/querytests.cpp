@@ -41,7 +41,7 @@
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -58,7 +58,7 @@ namespace QueryTests {
         Client::Context _context;
         Database* _database;
         Collection* _collection;
-        DurTransaction _txn;
+        OperationContextImpl _txn;
     public:
         Base() : _context( ns() ) {
             _database = _context.db();
@@ -157,7 +157,7 @@ namespace QueryTests {
             // an empty object (one might be allowed inside a reserved namespace at some point).
             Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.querytests" );
-            DurTransaction txn;
+            OperationContextImpl txn;
 
             Database* db = ctx.db();
             if ( db->getCollection( ns() ) ) {
@@ -1174,7 +1174,7 @@ namespace QueryTests {
             string err;
 
             Client::WriteContext ctx( "unittests" );
-            DurTransaction txn;
+            OperationContextImpl txn;
 
             // note that extents are always at least 4KB now - so this will get rounded up a bit.
             ASSERT( userCreateNS( &txn, ctx.ctx().db(), ns(),
@@ -1438,7 +1438,7 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            DurTransaction txn;
+            OperationContextImpl txn;
             string exhaust = newRunQuery( &txn, message, queryMessage, *cc().curop(), result );
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );

@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
@@ -35,26 +35,26 @@
 
 namespace mongo {
 
-    DurTransaction::DurTransaction() {
+    OperationContextImpl::OperationContextImpl() {
         _recovery.reset(new DurRecoveryUnit());
     }
 
-    RecoveryUnit* DurTransaction::recoveryUnit() const {
+    RecoveryUnit* OperationContextImpl::recoveryUnit() const {
         return _recovery.get();
     }
 
-    ProgressMeter* DurTransaction::setMessage(const char* msg,
+    ProgressMeter* OperationContextImpl::setMessage(const char* msg,
                                               const std::string& name,
                                               unsigned long long progressMeterTotal,
                                               int secondsBetween) {
         return &cc().curop()->setMessage( msg, name, progressMeterTotal, secondsBetween );
     }
 
-    void DurTransaction::checkForInterrupt(bool heedMutex) const {
+    void OperationContextImpl::checkForInterrupt(bool heedMutex) const {
         killCurrentOp.checkForInterrupt(heedMutex);
     }
 
-    Status DurTransaction::checkForInterruptNoAssert() const {
+    Status OperationContextImpl::checkForInterruptNoAssert() const {
         const char* killed = killCurrentOp.checkForInterruptNoAssert();
         if ( !killed || !killed[0] )
             return Status::OK();
@@ -62,8 +62,8 @@ namespace mongo {
         return Status( ErrorCodes::Interrupted, killed );
     }
 
-    TransactionExperiment* DurTransaction::factory() {
-        return new DurTransaction();
+    OperationContext* OperationContextImpl::factory() {
+        return new OperationContextImpl();
     }
 
 }  // namespace mongo

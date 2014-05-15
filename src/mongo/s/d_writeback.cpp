@@ -170,7 +170,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             cc().curop()->suppressFromCurop();
             cc().curop()->setExpectedLatencyMs( 30000 );
@@ -226,7 +226,7 @@ namespace mongo {
 
         void help(stringstream& h) const { h<<"internal"; }
 
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             writeBackManager.appendStats( result );
             return true;
         }

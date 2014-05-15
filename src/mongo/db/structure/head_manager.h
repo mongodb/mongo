@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    class TransactionExperiment;
+    class OperationContext;
 
     /**
      * An abstraction for setting and getting data about the 'head' of an index.  This is the data
@@ -44,7 +44,7 @@ namespace mongo {
 
         virtual const DiskLoc& getHead() const = 0;
 
-        virtual void setHead(TransactionExperiment* txn, const DiskLoc& newHead) = 0;
+        virtual void setHead(OperationContext* txn, const DiskLoc& newHead) = 0;
     };
 
 }  // namespace mongo

@@ -257,7 +257,7 @@ namespace mongo {
             actions.addAction(ActionType::cursorInfo);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result,
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result,
                  bool fromRepl ) {
             _appendCursorStats( result );
             return true;

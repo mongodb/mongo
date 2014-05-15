@@ -61,7 +61,7 @@ namespace mongo {
      *
      * If the collection is not sharded, returns CleanupResult_Done.
      */
-    CleanupResult cleanupOrphanedData( TransactionExperiment* txn,
+    CleanupResult cleanupOrphanedData( OperationContext* txn,
                                        const NamespaceString& ns,
                                        const BSONObj& startingFromKeyConst,
                                        bool secondaryThrottle,
@@ -179,7 +179,7 @@ namespace mongo {
         // Output
         static BSONField<BSONObj> stoppedAtKeyField;
 
-        bool run( TransactionExperiment* txn,
+        bool run( OperationContext* txn,
                   string const &db,
                   BSONObj &cmdObj,
                   int,

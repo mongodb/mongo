@@ -54,7 +54,7 @@ namespace mongo {
      * 5. Delete range.
      * 6. Wait until the majority of the secondaries catch up.
      */
-    bool RangeDeleterDBEnv::deleteRange(TransactionExperiment* txn,
+    bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
                                         const StringData& ns,
                                         const BSONObj& inclusiveLower,
                                         const BSONObj& exclusiveUpper,

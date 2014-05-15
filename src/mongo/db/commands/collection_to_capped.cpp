@@ -36,11 +36,11 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
-    Status cloneCollectionAsCapped( TransactionExperiment* txn,
+    Status cloneCollectionAsCapped( OperationContext* txn,
                                     Database* db,
                                     const string& shortFrom,
                                     const string& shortTo,
@@ -142,7 +142,7 @@ namespace mongo {
                                              NamespaceString(dbname, collection)),
                                      targetActions));
         }
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string from = jsobj.getStringField( "cloneCollectionAsCapped" );
             string to = jsobj.getStringField( "toCollection" );
             double size = jsobj.getField( "size" ).number();
@@ -196,7 +196,7 @@ namespace mongo {
             return std::vector<BSONObj>();
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             // calls renamecollection which does a global lock, so we must too:
             //
             Lock::GlobalWrite globalWriteLock;

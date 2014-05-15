@@ -41,7 +41,7 @@ namespace mongo {
 
     class DataFile;
     class Record;
-    class TransactionExperiment;
+    class OperationContext;
 
     struct Extent;
 
@@ -68,7 +68,7 @@ namespace mongo {
         /**
          * opens all current files
          */
-        virtual Status init(TransactionExperiment* txn) = 0;
+        virtual Status init(OperationContext* txn) = 0;
 
         virtual size_t numFiles() const = 0;
         virtual long long fileSize() const = 0;
@@ -76,7 +76,7 @@ namespace mongo {
         virtual void flushFiles( bool sync ) = 0;
 
         // must call Extent::reuse on the returned extent
-        virtual DiskLoc allocateExtent( TransactionExperiment* txn,
+        virtual DiskLoc allocateExtent( OperationContext* txn,
                                         bool capped,
                                         int size,
                                         int quotaMax ) = 0;
@@ -84,14 +84,14 @@ namespace mongo {
         /**
          * firstExt has to be == lastExt or a chain
          */
-        virtual void freeExtents( TransactionExperiment* txn,
+        virtual void freeExtents( OperationContext* txn,
                                   DiskLoc firstExt, DiskLoc lastExt ) = 0;
 
         /**
          * frees a single extent
          * ignores all fields in the Extent except: magic, myLoc, length
          */
-        virtual void freeExtent( TransactionExperiment* txn, DiskLoc extent ) = 0;
+        virtual void freeExtent( OperationContext* txn, DiskLoc extent ) = 0;
 
         virtual void freeListStats( int* numExtents, int64_t* totalFreeSize ) const = 0;
 

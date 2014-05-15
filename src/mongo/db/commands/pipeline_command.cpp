@@ -273,7 +273,7 @@ namespace {
             Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
         }
 
-        virtual bool run(TransactionExperiment* txn, const string &db, BSONObj &cmdObj, int options, string &errmsg,
+        virtual bool run(OperationContext* txn, const string &db, BSONObj &cmdObj, int options, string &errmsg,
                          BSONObjBuilder &result, bool fromRepl) {
 
             string ns = parseNs(db, cmdObj);

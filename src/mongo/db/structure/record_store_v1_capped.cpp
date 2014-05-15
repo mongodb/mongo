@@ -32,7 +32,7 @@
 
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/record_store_v1_capped_iterator.h"
 #include "mongo/util/mmap.h"
@@ -58,7 +58,7 @@
 
 namespace mongo {
 
-    CappedRecordStoreV1::CappedRecordStoreV1( TransactionExperiment* txn,
+    CappedRecordStoreV1::CappedRecordStoreV1( OperationContext* txn,
                                               CappedDocumentDeleteCallback* collection,
                                               const StringData& ns,
                                               RecordStoreV1MetaData* details,
@@ -82,7 +82,7 @@ namespace mongo {
     CappedRecordStoreV1::~CappedRecordStoreV1() {
     }
 
-    StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord( TransactionExperiment* txn,
+    StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord( OperationContext* txn,
                                                           int lenToAlloc,
                                                           int quotaMax ) {
         {
@@ -215,7 +215,7 @@ namespace mongo {
         return StatusWith<DiskLoc>( loc );
     }
 
-    Status CappedRecordStoreV1::truncate(TransactionExperiment* txn) {
+    Status CappedRecordStoreV1::truncate(OperationContext* txn) {
         setLastDelRecLastExtent( txn, DiskLoc() );
         setListOfAllDeletedRecords( txn, DiskLoc() );
 
@@ -248,7 +248,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void CappedRecordStoreV1::temp_cappedTruncateAfter( TransactionExperiment* txn,
+    void CappedRecordStoreV1::temp_cappedTruncateAfter( OperationContext* txn,
                                                         DiskLoc end,
                                                         bool inclusive ) {
         cappedTruncateAfter( txn, _ns.c_str(), end, inclusive );
@@ -259,7 +259,7 @@ namespace mongo {
        this is O(n^2) but we call it for capped tables where typically n==1 or 2!
        (or 3...there will be a little unused sliver at the end of the extent.)
     */
-    void CappedRecordStoreV1::compact(TransactionExperiment* txn) {
+    void CappedRecordStoreV1::compact(OperationContext* txn) {
         DDD( "CappedRecordStoreV1::compact enter" );
 
         vector<DiskLoc> drecs;
@@ -314,7 +314,7 @@ namespace mongo {
             return drec(cappedLastDelRecLastExtent())->nextDeleted();
     }
 
-    void CappedRecordStoreV1::setFirstDeletedInCurExtent( TransactionExperiment* txn,
+    void CappedRecordStoreV1::setFirstDeletedInCurExtent( OperationContext* txn,
                                                           const DiskLoc& loc ) {
         if ( cappedLastDelRecLastExtent().isNull() )
             setListOfAllDeletedRecords( txn, loc );
@@ -322,7 +322,7 @@ namespace mongo {
             *txn->writing( &drec(cappedLastDelRecLastExtent())->nextDeleted() ) = loc;
     }
 
-    void CappedRecordStoreV1::cappedCheckMigrate(TransactionExperiment* txn) {
+    void CappedRecordStoreV1::cappedCheckMigrate(OperationContext* txn) {
         // migrate old RecordStoreV1MetaData format
         if ( _details->capExtent().a() == 0 && _details->capExtent().getOfs() == 0 ) {
             _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
@@ -366,7 +366,7 @@ namespace mongo {
         return inCapExtent( next );
     }
 
-    void CappedRecordStoreV1::advanceCapExtent( TransactionExperiment* txn, const StringData& ns ) {
+    void CappedRecordStoreV1::advanceCapExtent( OperationContext* txn, const StringData& ns ) {
         // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
         // (or DiskLoc() if new capExtent == firstExtent)
         if ( _details->capExtent() == _details->lastExtent() )
@@ -388,7 +388,7 @@ namespace mongo {
         _details->setCapFirstNewRecord( txn, DiskLoc() );
     }
 
-    DiskLoc CappedRecordStoreV1::__capAlloc( TransactionExperiment* txn, int len ) {
+    DiskLoc CappedRecordStoreV1::__capAlloc( OperationContext* txn, int len ) {
         DiskLoc prev = cappedLastDelRecLastExtent();
         DiskLoc i = cappedFirstDeletedInCurExtent();
         DiskLoc ret;
@@ -414,7 +414,7 @@ namespace mongo {
         return ret;
     }
 
-    void CappedRecordStoreV1::cappedTruncateLastDelUpdate(TransactionExperiment* txn) {
+    void CappedRecordStoreV1::cappedTruncateLastDelUpdate(OperationContext* txn) {
         if ( _details->capExtent() == _details->firstExtent() ) {
             // Only one extent of the collection is in use, so there
             // is no deleted record in a previous extent, so nullify
@@ -440,7 +440,7 @@ namespace mongo {
         }
     }
 
-    void CappedRecordStoreV1::cappedTruncateAfter(TransactionExperiment* txn,
+    void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn,
                                                   const char* ns,
                                                   DiskLoc end,
                                                   bool inclusive) {
@@ -545,7 +545,7 @@ namespace mongo {
         return _details->deletedListEntry(0);
     }
 
-    void CappedRecordStoreV1::setListOfAllDeletedRecords( TransactionExperiment* txn,
+    void CappedRecordStoreV1::setListOfAllDeletedRecords( OperationContext* txn,
                                                           const DiskLoc& loc ) {
         return _details->setDeletedListEntry(txn, 0, loc);
     }
@@ -554,7 +554,7 @@ namespace mongo {
         return _details->deletedListEntry(1);
     }
 
-    void CappedRecordStoreV1::setLastDelRecLastExtent( TransactionExperiment* txn,
+    void CappedRecordStoreV1::setLastDelRecLastExtent( OperationContext* txn,
                                                        const DiskLoc& loc ) {
         return _details->setDeletedListEntry(txn, 1, loc);
     }
@@ -567,7 +567,7 @@ namespace mongo {
         return _extentManager->getExtent(_details->capExtent());
     }
 
-    void CappedRecordStoreV1::addDeletedRec( TransactionExperiment* txn, const DiskLoc& dloc ) {
+    void CappedRecordStoreV1::addDeletedRec( OperationContext* txn, const DiskLoc& dloc ) {
         DeletedRecord* d = txn->writing( drec( dloc ) );
 
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
@@ -647,7 +647,7 @@ namespace mongo {
         return iterators.release();
     }
 
-    Status CappedRecordStoreV1::compact( TransactionExperiment* txn,
+    Status CappedRecordStoreV1::compact( OperationContext* txn,
                                          RecordStoreCompactAdaptor* adaptor,
                                          const CompactOptions* options,
                                          CompactStats* stats ) {

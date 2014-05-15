@@ -40,7 +40,7 @@ namespace mongo {
     // used by index and original collections
     class SimpleRecordStoreV1 : public RecordStoreV1Base {
     public:
-        SimpleRecordStoreV1( TransactionExperiment* txn,
+        SimpleRecordStoreV1( OperationContext* txn,
                              const StringData& ns,
                              RecordStoreV1MetaData* details,
                              ExtentManager* em,
@@ -55,10 +55,10 @@ namespace mongo {
 
         virtual std::vector<RecordIterator*> getManyIterators() const;
 
-        virtual Status truncate(TransactionExperiment* txn);
+        virtual Status truncate(OperationContext* txn);
 
         virtual bool compactSupported() const { return true; }
-        virtual Status compact( TransactionExperiment* txn,
+        virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
                                 CompactStats* stats );
@@ -66,17 +66,17 @@ namespace mongo {
     protected:
         virtual bool isCapped() const { return false; }
 
-        virtual StatusWith<DiskLoc> allocRecord( TransactionExperiment* txn,
+        virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
                                                  int quotaMax );
 
-        virtual void addDeletedRec(TransactionExperiment* txn,
+        virtual void addDeletedRec(OperationContext* txn,
                                    const DiskLoc& dloc);
     private:
-        DiskLoc _allocFromExistingExtents( TransactionExperiment* txn,
+        DiskLoc _allocFromExistingExtents( OperationContext* txn,
                                            int lengthWithHeaders );
 
-        void _compactExtent(TransactionExperiment* txn,
+        void _compactExtent(OperationContext* txn,
                             const DiskLoc diskloc,
                             int extentNumber,
                             RecordStoreCompactAdaptor* adaptor,

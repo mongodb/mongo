@@ -51,7 +51,7 @@ namespace mongo {
             return _details->capExtent();
         }
 
-        virtual void setCapExtent( TransactionExperiment* txn, const DiskLoc& loc ) {
+        virtual void setCapExtent( OperationContext* txn, const DiskLoc& loc ) {
             _details->setCapExtent( txn, loc );
         }
 
@@ -59,7 +59,7 @@ namespace mongo {
             return _details->capFirstNewRecord();
         }
 
-        virtual void setCapFirstNewRecord( TransactionExperiment* txn, const DiskLoc& loc ) {
+        virtual void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc ) {
             _details->setCapFirstNewRecord( txn, loc );
         }
 
@@ -74,13 +74,13 @@ namespace mongo {
             return _details->numRecords();
         }
 
-        virtual void incrementStats( TransactionExperiment* txn,
+        virtual void incrementStats( OperationContext* txn,
                                      long long dataSizeIncrement,
                                      long long numRecordsIncrement ) {
             _details->incrementStats( txn, dataSizeIncrement, numRecordsIncrement );
         }
 
-        virtual void setStats( TransactionExperiment* txn,
+        virtual void setStats( OperationContext* txn,
                                long long dataSizeIncrement,
                                long long numRecordsIncrement ) {
             _details->setStats( txn,
@@ -92,13 +92,13 @@ namespace mongo {
             return _details->deletedListEntry( bucket );
         }
 
-        virtual void setDeletedListEntry( TransactionExperiment* txn,
+        virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc ) {
             _details->setDeletedListEntry( txn, bucket, loc );
         }
 
-        virtual void orphanDeletedList(TransactionExperiment* txn) {
+        virtual void orphanDeletedList(OperationContext* txn) {
             _details->orphanDeletedList( txn );
         }
 
@@ -106,7 +106,7 @@ namespace mongo {
             return _details->firstExtent();
         }
 
-        virtual void setFirstExtent( TransactionExperiment* txn, const DiskLoc& loc ) {
+        virtual void setFirstExtent( OperationContext* txn, const DiskLoc& loc ) {
             _details->setFirstExtent( txn, loc );
         }
 
@@ -114,7 +114,7 @@ namespace mongo {
             return _details->lastExtent();
         }
 
-        virtual void setLastExtent( TransactionExperiment* txn, const DiskLoc& loc ) {
+        virtual void setLastExtent( OperationContext* txn, const DiskLoc& loc ) {
             _details->setLastExtent( txn, loc );
         }
 
@@ -130,7 +130,7 @@ namespace mongo {
             return _details->lastExtentSize();
         }
 
-        virtual void setLastExtentSize( TransactionExperiment* txn, int newMax ) {
+        virtual void setLastExtentSize( OperationContext* txn, int newMax ) {
             _details->setLastExtentSize( txn, newMax );
         }
 
@@ -142,7 +142,7 @@ namespace mongo {
             return _details->paddingFactor();
         }
 
-        virtual void setPaddingFactor( TransactionExperiment* txn, double paddingFactor ) {
+        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor ) {
             _details->setPaddingFactor( txn, paddingFactor );
         }
 

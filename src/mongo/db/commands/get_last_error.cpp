@@ -57,7 +57,7 @@ namespace mongo {
             help << "reset error state (used with getpreverror)";
         }
         CmdResetError() : Command("resetError", false, "reseterror") {}
-        bool run(TransactionExperiment* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.get();
             verify( le );
             le->reset();
@@ -91,7 +91,7 @@ namespace mongo {
                  << "  { wtimeout:m} - timeout for w in m milliseconds";
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname,
+        bool run(OperationContext* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,
@@ -262,7 +262,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         CmdGetPrevError() : Command("getPrevError", false, "getpreverror") {}
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.disableForCommand();
             le->appendSelf( result );
             if ( le->valid )

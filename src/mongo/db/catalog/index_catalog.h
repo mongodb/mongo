@@ -35,7 +35,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -58,7 +58,7 @@ namespace mongo {
         ~IndexCatalog();
 
         // must be called before used
-        Status init(TransactionExperiment* txn);
+        Status init(OperationContext* txn);
 
         bool ok() const;
 
@@ -136,31 +136,31 @@ namespace mongo {
 
         // ---- index set modifiers ------
 
-        Status ensureHaveIdIndex(TransactionExperiment* txn);
+        Status ensureHaveIdIndex(OperationContext* txn);
 
         enum ShutdownBehavior {
             SHUTDOWN_CLEANUP, // fully clean up this build
             SHUTDOWN_LEAVE_DIRTY // leave as if kill -9 happened, so have to deal with on restart
         };
 
-        Status createIndex( TransactionExperiment* txn,
+        Status createIndex( OperationContext* txn,
                             BSONObj spec,
                             bool mayInterrupt,
                             ShutdownBehavior shutdownBehavior = SHUTDOWN_CLEANUP );
 
         StatusWith<BSONObj> prepareSpecForCreate( const BSONObj& original ) const;
 
-        Status dropAllIndexes(TransactionExperiment* txn,
+        Status dropAllIndexes(OperationContext* txn,
                               bool includingIdIndex );
 
-        Status dropIndex(TransactionExperiment* txn,
+        Status dropIndex(OperationContext* txn,
                          IndexDescriptor* desc );
 
         /**
          * will drop all incompleted indexes and return specs
          * after this, the indexes can be rebuilt
          */
-        vector<BSONObj> getAndClearUnfinishedIndexes(TransactionExperiment* txn);
+        vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* txn);
 
 
         struct IndexKillCriteria {
@@ -182,7 +182,7 @@ namespace mongo {
          * The specified index must already contain an expireAfterSeconds field, and the value in
          * that field and newExpireSecs must both be numeric.
          */
-        void updateTTLSetting( TransactionExperiment* txn,
+        void updateTTLSetting( OperationContext* txn,
                                const IndexDescriptor* idx,
                                long long newExpireSeconds );
 
@@ -202,7 +202,7 @@ namespace mongo {
          */
         class IndexBuildBlock {
         public:
-            IndexBuildBlock(TransactionExperiment* txn,
+            IndexBuildBlock(OperationContext* txn,
                             Collection* collection,
                             const BSONObj& spec );
 
@@ -239,15 +239,15 @@ namespace mongo {
             IndexCatalogEntry* _entry;
             bool _inProgress;
 
-            TransactionExperiment* _txn;
+            OperationContext* _txn;
         };
 
         // ----- data modifiers ------
 
         // this throws for now
-        void indexRecord(TransactionExperiment* txn, const BSONObj& obj, const DiskLoc &loc);
+        void indexRecord(OperationContext* txn, const BSONObj& obj, const DiskLoc &loc);
 
-        void unindexRecord(TransactionExperiment* txn,
+        void unindexRecord(OperationContext* txn,
                            const BSONObj& obj,
                            const DiskLoc& loc,
                            bool noWarn);
@@ -264,7 +264,7 @@ namespace mongo {
             return _getAccessMethodName( keyPattern );
         }
 
-        Status _upgradeDatabaseMinorVersionIfNeeded( TransactionExperiment* txn,
+        Status _upgradeDatabaseMinorVersionIfNeeded( OperationContext* txn,
                                                      const string& newPluginName );
 
         // public static helpers
@@ -278,7 +278,7 @@ namespace mongo {
         IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
                                                 IndexCatalogEntry* entry );
 
-        int _removeFromSystemIndexes(TransactionExperiment* txn,
+        int _removeFromSystemIndexes(OperationContext* txn,
                                      const StringData& indexName );
 
         bool _shouldOverridePlugin( const BSONObj& keyPattern ) const;
@@ -299,12 +299,12 @@ namespace mongo {
         // meaning we shouldn't modify catalog
         Status _checkUnfinished() const;
 
-        Status _indexRecord(TransactionExperiment* txn,
+        Status _indexRecord(OperationContext* txn,
                             IndexCatalogEntry* index,
                             const BSONObj& obj,
                             const DiskLoc &loc );
 
-        Status _unindexRecord(TransactionExperiment* txn,
+        Status _unindexRecord(OperationContext* txn,
                               IndexCatalogEntry* index,
                               const BSONObj& obj,
                               const DiskLoc &loc,
@@ -313,18 +313,18 @@ namespace mongo {
         /**
          * this does no sanity checks
          */
-        Status _dropIndex(TransactionExperiment* txn,
+        Status _dropIndex(OperationContext* txn,
                           IndexCatalogEntry* entry );
 
         // just does disk hanges
         // doesn't change memory state, etc...
-        void _deleteIndexFromDisk( TransactionExperiment* txn,
+        void _deleteIndexFromDisk( OperationContext* txn,
                                    const string& indexName,
                                    const string& indexNamespace,
                                    int idxNo );
 
         // descriptor ownership passes to _setupInMemoryStructures
-        IndexCatalogEntry* _setupInMemoryStructures(TransactionExperiment* txn,
+        IndexCatalogEntry* _setupInMemoryStructures(OperationContext* txn,
                                                     IndexDescriptor* descriptor );
 
         static BSONObj _fixIndexSpec( const BSONObj& spec );

@@ -35,7 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -70,7 +70,7 @@ namespace mongo {
             return b.obj();
         }
 
-        virtual bool run(TransactionExperiment* txn,  const string& dbname, BSONObj& cmdObj, int options,
+        virtual bool run(OperationContext* txn,  const string& dbname, BSONObj& cmdObj, int options,
                           string& errmsg, BSONObjBuilder& result,
                           bool fromRepl = false ) {
 

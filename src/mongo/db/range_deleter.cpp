@@ -74,7 +74,7 @@ namespace mongo {
         RangeDeleteEntry():
                 secondaryThrottle(true),
                 notifyDone(NULL),
-                transactionFactory(TransactionExperiment::factoryNULL) { // XXX SERVER-13931
+                transactionFactory(OperationContext::factoryNULL) { // XXX SERVER-13931
         }
 
         std::string ns;
@@ -100,7 +100,7 @@ namespace mongo {
         // Important invariant: Can only be set and used by one thread.
         Notification* notifyDone;
 
-        TransactionExperiment::Factory transactionFactory;
+        OperationContext::Factory transactionFactory;
 
         // For debugging only
         BSONObj toBSON() const {
@@ -196,7 +196,7 @@ namespace mongo {
         }
     }
 
-    bool RangeDeleter::queueDelete(TransactionExperiment::Factory transactionFactory,
+    bool RangeDeleter::queueDelete(OperationContext::Factory transactionFactory,
                                    const std::string& ns,
                                    const BSONObj& min,
                                    const BSONObj& max,
@@ -252,7 +252,7 @@ namespace mongo {
         return true;
     }
 
-    bool RangeDeleter::deleteNow(TransactionExperiment* txn,
+    bool RangeDeleter::deleteNow(OperationContext* txn,
                                  const std::string& ns,
                                  const BSONObj& min,
                                  const BSONObj& max,
@@ -475,7 +475,7 @@ namespace mongo {
             }
 
             {
-                boost::scoped_ptr<TransactionExperiment> txn(nextTask->transactionFactory()); // XXX SERVER-13931
+                boost::scoped_ptr<OperationContext> txn(nextTask->transactionFactory()); // XXX SERVER-13931
                 if (!_env->deleteRange(txn.get(),
                                        nextTask->ns,
                                        nextTask->min,

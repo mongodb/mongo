@@ -33,7 +33,7 @@ namespace mongo {
     class Client;
     class Database;
     class Timer;
-    class TransactionExperiment;
+    class OperationContext;
 
 namespace mutablebson {
     class Document;
@@ -72,7 +72,7 @@ namespace mutablebson {
 
            return value is true if succeeded.  if false, set errmsg text.
         */
-        virtual bool run(TransactionExperiment* txn,
+        virtual bool run(OperationContext* txn,
                          const string& db,
                          BSONObj& cmdObj,
                          int options,
@@ -198,7 +198,7 @@ namespace mutablebson {
                                          int queryOptions = 0);
         static Command * findCommand( const string& name );
         // For mongod and webserver.
-        static void execCommand(TransactionExperiment* txn,
+        static void execCommand(OperationContext* txn,
                                 Command* c,
                                 Client& client,
                                 int queryOptions,
@@ -207,7 +207,7 @@ namespace mutablebson {
                                 BSONObjBuilder& result,
                                 bool fromRepl );
         // For mongos
-        static void execCommandClientBasic(TransactionExperiment* txn,
+        static void execCommandClientBasic(OperationContext* txn,
                                            Command* c,
                                            ClientBasic& client,
                                            int queryOptions,
@@ -251,7 +251,7 @@ namespace mutablebson {
                                           bool fromRepl);
     };
 
-    bool _runCommands(TransactionExperiment* txn,
+    bool _runCommands(OperationContext* txn,
                       const char* ns,
                       BSONObj& jsobj,
                       BufBuilder& b,

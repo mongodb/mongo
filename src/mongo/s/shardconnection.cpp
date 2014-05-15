@@ -104,7 +104,7 @@ namespace mongo {
             out->push_back( Privilege( ResourcePattern::forClusterResource(), actions ) );
         }
 
-        virtual bool run( TransactionExperiment* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool ) {
+        virtual bool run( OperationContext* txn, const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool ) {
             // Base pool info
             shardConnectionPool.appendInfo( result );
             // Thread connection info

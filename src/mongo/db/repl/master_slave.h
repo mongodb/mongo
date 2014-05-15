@@ -42,7 +42,7 @@
 namespace mongo {
 
     class Database;
-    class TransactionExperiment;
+    class OperationContext;
 
     // Main entry point for master/slave at startup time.
     void startMasterSlave();
@@ -77,7 +77,7 @@ namespace mongo {
     class ReplSource {
         shared_ptr<threadpool::ThreadPool> tp;
 
-        void resync(TransactionExperiment* txn, const std::string& dbName);
+        void resync(OperationContext* txn, const std::string& dbName);
 
         /** @param alreadyLocked caller already put us in write lock if true */
         void sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked);
@@ -100,7 +100,7 @@ namespace mongo {
 
         ReplSource();
 
-        void resyncDrop( TransactionExperiment* txn, const string& db );
+        void resyncDrop( OperationContext* txn, const string& db );
         // call without the db mutex
         void syncToTailOfRemoteLog();
         string ns() const { return string( "local.oplog.$" ) + sourceName(); }
@@ -112,7 +112,7 @@ namespace mongo {
          * master.
          * @return true iff an op with the specified ns may be applied.
          */
-        bool handleDuplicateDbName( TransactionExperiment* txn,
+        bool handleDuplicateDbName( OperationContext* txn,
                                     const BSONObj &op,
                                     const char* ns,
                                     const char* db );
@@ -123,7 +123,7 @@ namespace mongo {
     public:
         OplogReader oplogReader;
 
-        void applyOperation(TransactionExperiment* txn, Database* db, const BSONObj& op);
+        void applyOperation(OperationContext* txn, Database* db, const BSONObj& op);
         string hostName;    // ip addr or hostname plus optionally, ":<port>"
         string _sourceName;  // a logical source name.
         string sourceName() const { return _sourceName.empty() ? "main" : _sourceName; }
@@ -160,9 +160,9 @@ namespace mongo {
             return wait > 0 ? wait : 0;
         }
 
-        static bool throttledForceResyncDead( TransactionExperiment* txn, const char *requester );
-        static void forceResyncDead( TransactionExperiment* txn, const char *requester );
-        void forceResync( TransactionExperiment* txn, const char *requester );
+        static bool throttledForceResyncDead( OperationContext* txn, const char *requester );
+        static void forceResyncDead( OperationContext* txn, const char *requester );
+        void forceResync( OperationContext* txn, const char *requester );
     };
 
     /**

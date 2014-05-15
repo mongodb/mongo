@@ -109,7 +109,7 @@ namespace {
 namespace mongo {
 
     // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
-    static bool runCommands(TransactionExperiment* txn,
+    static bool runCommands(OperationContext* txn,
                             const char *ns,
                             BSONObj& jsobj,
                             CurOp& curop,
@@ -398,7 +398,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    std::string newRunQuery(TransactionExperiment* txn,
+    std::string newRunQuery(OperationContext* txn,
                             Message& m,
                             QueryMessage& q,
                             CurOp& curop,

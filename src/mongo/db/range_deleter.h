@@ -37,7 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
 
@@ -45,7 +45,7 @@ namespace mongo {
 
     struct RangeDeleterEnv;
     class RangeDeleterStats;
-    class TransactionExperiment;
+    class OperationContext;
 
     /**
      * Class for deleting documents for a given namespace and range.  It contains a queue of
@@ -131,7 +131,7 @@ namespace mongo {
          * Returns true if the task is queued and false If the given range is blacklisted,
          * is already queued, or stopWorkers() was called.
          */
-        bool queueDelete(TransactionExperiment::Factory transactionFactory,
+        bool queueDelete(OperationContext::Factory transactionFactory,
                          const std::string& ns,
                          const BSONObj& min,
                          const BSONObj& max,
@@ -147,7 +147,7 @@ namespace mongo {
          * Returns true if the deletion was performed. False if the range is blacklisted,
          * was already queued, or stopWorkers() was called.
          */
-        bool deleteNow(TransactionExperiment* txn,
+        bool deleteNow(OperationContext* txn,
                        const std::string& ns,
                        const BSONObj& min,
                        const BSONObj& max,
@@ -288,7 +288,7 @@ namespace mongo {
          * Must be a synchronous call. Docs should be deleted after call ends.
          * Must not throw Exceptions.
          */
-        virtual bool deleteRange(TransactionExperiment* txn,
+        virtual bool deleteRange(OperationContext* txn,
                                  const StringData& ns,
                                  const BSONObj& inclusiveLower,
                                  const BSONObj& exclusiveUpper,

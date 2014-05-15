@@ -102,7 +102,7 @@ namespace mongo {
     // Write commands are counted towards their corresponding opcounters, not command opcounters.
     bool WriteCmd::shouldAffectCommandCounter() const { return false; }
 
-    bool WriteCmd::run(TransactionExperiment* txn,
+    bool WriteCmd::run(OperationContext* txn,
                        const string& dbName,
                        BSONObj& cmdObj,
                        int options,

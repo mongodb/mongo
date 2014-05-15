@@ -39,7 +39,7 @@ namespace mongo {
     class CanonicalQuery;
     class Database;
     class DeleteRequest;
-    class TransactionExperiment;
+    class OperationContext;
 
     /**
      * Implementation of the processing of a delete operation in a mongod.
@@ -92,7 +92,7 @@ namespace mongo {
          *
          * Returns the number of documents deleted.
          */
-        long long execute(TransactionExperiment* txn, Database* db);
+        long long execute(OperationContext* txn, Database* db);
 
     private:
         /// Unowned pointer to the request object that this executor will process.

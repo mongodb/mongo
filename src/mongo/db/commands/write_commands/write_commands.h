@@ -73,7 +73,7 @@ namespace mongo {
 
         // Write command entry point.
         virtual bool run(
-                 TransactionExperiment* txn,
+                 OperationContext* txn,
                  const string& dbname,
                  BSONObj& cmdObj,
                  int options,

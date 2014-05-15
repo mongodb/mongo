@@ -37,7 +37,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/lockstate.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/file_allocator.h"
 
 namespace mongo {
@@ -88,7 +88,7 @@ namespace mongo {
     }
 
     /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-    Status DataFile::openExisting( TransactionExperiment* txn, const char *filename ) {
+    Status DataFile::openExisting( OperationContext* txn, const char *filename ) {
         verify( _mb == 0 );
         if( !boost::filesystem::exists(filename) )
             return Status( ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist" );
@@ -118,7 +118,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void DataFile::open( TransactionExperiment* txn,
+    void DataFile::open( OperationContext* txn,
                          const char *filename,
                          int minSize,
                          bool preallocateOnly ) {
@@ -160,7 +160,7 @@ namespace mongo {
         mmf.flush( sync );
     }
 
-    DiskLoc DataFile::allocExtentArea( TransactionExperiment* txn, int size ) {
+    DiskLoc DataFile::allocExtentArea( OperationContext* txn, int size ) {
 
         massert( 10357, "shutdown in progress", !inShutdown() );
         massert( 10359, "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
@@ -178,7 +178,7 @@ namespace mongo {
 
     // -------------------------------------------------------------------------------
 
-    void DataFileHeader::init(TransactionExperiment* txn, int fileno, int filelength, const char* filename) {
+    void DataFileHeader::init(OperationContext* txn, int fileno, int filelength, const char* filename) {
         if ( uninitialized() ) {
             DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
             if( !(filelength > 32768 ) ) {
@@ -217,7 +217,7 @@ namespace mongo {
         }
     }
 
-    void DataFileHeader::checkUpgrade(TransactionExperiment* txn) {
+    void DataFileHeader::checkUpgrade(OperationContext* txn) {
         if ( freeListStart == minDiskLoc ) {
             // we are upgrading from 2.4 to 2.6
             invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real

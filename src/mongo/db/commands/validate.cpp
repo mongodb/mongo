@@ -33,7 +33,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {
@@ -59,7 +59,7 @@ namespace mongo {
         }
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
 
-        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
 
             NamespaceString ns_string(ns);

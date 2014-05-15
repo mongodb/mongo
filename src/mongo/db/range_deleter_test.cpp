@@ -49,9 +49,9 @@ namespace {
     using mongo::RangeDeleter;
     using mongo::RangeDeleterMockEnv;
     using mongo::RangeDeleterStats;
-    using mongo::TransactionExperiment;
+    using mongo::OperationContext;
 
-    TransactionExperiment* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
+    OperationContext* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
 
     // Capped sleep interval is 640 mSec, Nyquist frequency is 1280 mSec => round up to 2 sec.
     const int MAX_IMMEDIATE_DELETE_WAIT_SECS = 2;
@@ -65,7 +65,7 @@ namespace {
         deleter.stopWorkers();
 
         string errMsg;
-        ASSERT_FALSE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_FALSE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                          "test.user",
                                          BSON("x" << 120),
                                          BSON("x" << 200),
@@ -88,7 +88,7 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                         ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
                                         true, &notifyDone, NULL /* errMsg not needed */));
 
@@ -127,7 +127,7 @@ namespace {
         env->addCursorId(ns, 345);
 
         Notification notifyDone;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                         ns, BSON("x" << 0), BSON("x" << 10),  BSON("x" << 1),
                                         true, &notifyDone, NULL /* errMsg not needed */));
 
@@ -246,7 +246,7 @@ namespace {
         env->pauseDeletes();
 
         Notification notifyDone1;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                         ns,
                                         BSON("x" << 10),
                                         BSON("x" << 20),
@@ -265,7 +265,7 @@ namespace {
         ASSERT_EQUALS(1, inProgressCount);
 
         Notification notifyDone2;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                         blockedNS,
                                         BSON("x" << 20),
                                         BSON("x" << 30),
@@ -275,7 +275,7 @@ namespace {
                                         NULL /* don't care errMsg */));
 
         Notification notifyDone3;
-        ASSERT_TRUE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_TRUE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                         ns,
                                         BSON("x" << 30),
                                         BSON("x" << 40),
@@ -363,7 +363,7 @@ namespace {
         ASSERT_TRUE(errMsg.empty());
 
         errMsg.clear();
-        ASSERT_FALSE(deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        ASSERT_FALSE(deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                                          ns, BSON("x" << 120), BSON("x" << 140),  BSON("x" << 1),
                                          false, NULL /* notifier not needed */, &errMsg));
         ASSERT_FALSE(errMsg.empty());
@@ -412,7 +412,7 @@ namespace {
         env->addCursorId(ns, 58);
 
         Notification notifyDone;
-        deleter.queueDelete(TransactionExperiment::factoryNULL, // XXX SERVER-13931
+        deleter.queueDelete(OperationContext::factoryNULL, // XXX SERVER-13931
                             ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1),
                             false, &notifyDone, NULL /* errMsg not needed */);
 

@@ -51,7 +51,7 @@ namespace mongo {
     class NamespaceDetails;
     class IndexCatalog;
     class MultiIndexBlock;
-    class TransactionExperiment;
+    class OperationContext;
 
     class RecordIterator;
     class FlatIterator;
@@ -102,7 +102,7 @@ namespace mongo {
      */
     class Collection : CappedDocumentDeleteCallback {
     public:
-        Collection( TransactionExperiment* txn,
+        Collection( OperationContext* txn,
                     const StringData& fullNS,
                     NamespaceDetails* details,
                     Database* database );
@@ -154,7 +154,7 @@ namespace mongo {
          */
         int64_t countTableScan( const MatchExpression* expression );
 
-        void deleteDocument( TransactionExperiment* txn,
+        void deleteDocument( OperationContext* txn,
                              const DiskLoc& loc,
                              bool cappedOK = false,
                              bool noWarn = false,
@@ -164,15 +164,15 @@ namespace mongo {
          * this does NOT modify the doc before inserting
          * i.e. will not add an _id field for documents that are missing it
          */
-        StatusWith<DiskLoc> insertDocument( TransactionExperiment* txn,
+        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
                                             bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( TransactionExperiment* txn,
+        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
                                             const DocWriter* doc,
                                             bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( TransactionExperiment* txn,
+        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
                                             MultiIndexBlock& indexBlock );
 
@@ -182,7 +182,7 @@ namespace mongo {
          * if not, it is moved
          * @return the post update location of the doc (may or may not be the same as oldLocation)
          */
-        StatusWith<DiskLoc> updateDocument( TransactionExperiment* txn,
+        StatusWith<DiskLoc> updateDocument( OperationContext* txn,
                                             const DiskLoc& oldLocation,
                                             const BSONObj& newDoc,
                                             bool enforceQuota,
@@ -191,21 +191,21 @@ namespace mongo {
         /**
          * right now not allowed to modify indexes
          */
-        Status updateDocumentWithDamages( TransactionExperiment* txn,
+        Status updateDocumentWithDamages( OperationContext* txn,
                                           const DiskLoc& loc,
                                           const char* damangeSource,
                                           const mutablebson::DamageVector& damages );
 
         // -----------
 
-        StatusWith<CompactStats> compact(TransactionExperiment* txn, const CompactOptions* options);
+        StatusWith<CompactStats> compact(OperationContext* txn, const CompactOptions* options);
 
         /**
          * removes all documents as fast as possible
          * indexes before and after will be the same
          * as will other characteristics
          */
-        Status truncate(TransactionExperiment* txn);
+        Status truncate(OperationContext* txn);
 
         /**
          * @param full - does more checks
@@ -214,14 +214,14 @@ namespace mongo {
          *         OK will be returned even if corruption is found
          *         deatils will be in result
          */
-        Status validate( TransactionExperiment* txn,
+        Status validate( OperationContext* txn,
                          bool full, bool scanData,
                          ValidateResults* results, BSONObjBuilder* output );
 
         /**
          * forces data into cache
          */
-        Status touch( TransactionExperiment* txn,
+        Status touch( OperationContext* txn,
                       bool touchData, bool touchIndexes,
                       BSONObjBuilder* output ) const;
 
@@ -232,7 +232,7 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        void temp_cappedTruncateAfter( TransactionExperiment* txn, DiskLoc end, bool inclusive );
+        void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
 
         // -----------
 
@@ -241,7 +241,7 @@ namespace mongo {
         // this will add a new extent the collection
         // the new extent will be returned
         // it will have been added to the linked list already
-        void increaseStorageSize( TransactionExperiment* txn, int size, bool enforceQuota );
+        void increaseStorageSize( OperationContext* txn, int size, bool enforceQuota );
 
         //
         // Stats
@@ -268,33 +268,33 @@ namespace mongo {
 
         // TODO(erh) - below till next mark are suspect
         bool isUserFlagSet( int flag ) const;
-        bool setUserFlag( TransactionExperiment* txn, int flag );
-        bool clearUserFlag( TransactionExperiment* txn, int flag );
+        bool setUserFlag( OperationContext* txn, int flag );
+        bool clearUserFlag( OperationContext* txn, int flag );
 
-        void setMaxCappedDocs( TransactionExperiment* txn, long long max );
+        void setMaxCappedDocs( OperationContext* txn, long long max );
         // --- end suspect things
 
     private:
 
-        Status aboutToDeleteCapped( TransactionExperiment* txn, const DiskLoc& loc );
+        Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc );
 
         /**
          * same semantics as insertDocument, but doesn't do:
          *  - some user error checks
          *  - adjust padding
          */
-        StatusWith<DiskLoc> _insertDocument( TransactionExperiment* txn,
+        StatusWith<DiskLoc> _insertDocument( OperationContext* txn,
                                              const BSONObj& doc,
                                              bool enforceQuota );
 
-        void _compactExtent(TransactionExperiment* txn,
+        void _compactExtent(OperationContext* txn,
                             const DiskLoc diskloc,
                             int extentNumber,
                             MultiIndexBlock& indexesToInsertTo,
                             const CompactOptions* compactOptions,
                             CompactStats* stats );
 
-        void _syncUserFlags(TransactionExperiment* txn); // TODO: this is bizarre, should go away
+        void _syncUserFlags(OperationContext* txn); // TODO: this is bizarre, should go away
 
 
         // @return 0 for inf., otherwise a number of files

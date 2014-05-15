@@ -43,7 +43,7 @@ namespace mongo {
     class BSONObjBuilder;
     class CurOp;
     class OpCounters;
-    class TransactionExperiment;
+    class OperationContext;
     struct LastError;
 
     struct WriteOpStats;
@@ -59,7 +59,7 @@ namespace mongo {
         // State object used by private execInserts.  TODO: Do not expose this type.
         class ExecInsertsState;
 
-        WriteBatchExecutor( TransactionExperiment* txn,
+        WriteBatchExecutor( OperationContext* txn,
                             const BSONObj& defaultWriteConcern,
                             Client* client,
                             OpCounters* opCounters,
@@ -134,7 +134,7 @@ namespace mongo {
                             const WriteErrorDetail* error,
                             CurOp* currentOp );
 
-        TransactionExperiment* _txn;
+        OperationContext* _txn;
 
         // Default write concern, if one isn't provide in the batches.
         const BSONObj _defaultWriteConcern;

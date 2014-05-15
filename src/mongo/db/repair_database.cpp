@@ -225,7 +225,7 @@ namespace mongo {
 
     class RepairFileDeleter {
     public:
-        RepairFileDeleter( TransactionExperiment* txn,
+        RepairFileDeleter( OperationContext* txn,
                            const string& dbName,
                            const string& pathString,
                            const Path& path )
@@ -264,14 +264,14 @@ namespace mongo {
         }
 
     private:
-        TransactionExperiment* _txn;
+        OperationContext* _txn;
         string _dbName;
         string _pathString;
         Path _path;
         bool _success;
     };
 
-    Status repairDatabase( TransactionExperiment* txn,
+    Status repairDatabase( OperationContext* txn,
                            string dbName,
                            bool preserveClonedFilesOnFailure,
                            bool backupOriginalFiles ) {

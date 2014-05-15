@@ -94,7 +94,7 @@ namespace mongo {
              << "N to wait N seconds for other members to catch up.";
     }
 
-    bool CmdShutdown::run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+    bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
         if (!force &&
@@ -191,7 +191,7 @@ namespace mongo {
 
         CmdDropDatabase() : Command("dropDatabase") {}
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // disallow dropping the config database
             if (serverGlobalParams.configsvr && (dbname == "config")) {
                 errmsg = "Cannot drop 'config' database if mongod started with --configsvr";
@@ -275,7 +275,7 @@ namespace mongo {
             return allKilledIndexes;
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
             if ( e.numberInt() != 1 ) {
                 errmsg = "bad option";
@@ -351,7 +351,7 @@ namespace mongo {
 
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
             //
@@ -401,7 +401,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             // This doesn't look like it requires exclusive DB lock, because it uses its own diag
             // locking, but originally the lock was set to be WRITE, so preserving the behaviour.
             //
@@ -448,7 +448,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
         }
 
-        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
@@ -512,7 +512,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             long long skip = 0;
             if ( cmdObj["skip"].isNumber() ) {
                 skip = cmdObj["skip"].numberLong();
@@ -595,7 +595,7 @@ namespace mongo {
 
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
-        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             BSONObjIterator it(cmdObj);
 
             // Extract ns from first cmdObj element.
@@ -653,7 +653,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdListDatabases() : Command("listDatabases" , true ) {}
-        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             vector< string > dbNames;
             getDatabaseNames( dbNames );
             vector< BSONObj > dbInfos;
@@ -735,7 +735,7 @@ namespace mongo {
 
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             Lock::GlobalWrite globalWriteLock;
             Client::Context ctx(dbname);
 
@@ -784,7 +784,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const std::string ns = parseNs(dbname, jsobj);
 
             md5digest d;
@@ -913,7 +913,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             Timer timer;
 
             string ns = jsobj.firstElement().String();
@@ -1070,7 +1070,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::ReadContext cx( ns );
 
@@ -1144,7 +1144,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
 
             Lock::DBWrite dbXLock(dbname);
@@ -1266,7 +1266,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int scale = 1;
             if ( jsobj["scale"].isNumber() ) {
                 scale = jsobj["scale"].numberInt();
@@ -1379,7 +1379,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             BSONObj info = cc().curop()->info();
             result << "you" << info[ "client" ];
             return true;
@@ -1387,7 +1387,7 @@ namespace mongo {
     } cmdWhatsMyUri;
 
 
-    bool _execCommand(TransactionExperiment* txn,
+    bool _execCommand(OperationContext* txn,
                       Command *c,
                       const string& dbname,
                       BSONObj& cmdObj,
@@ -1477,7 +1477,7 @@ namespace mongo {
      - context
      then calls run()
     */
-    void Command::execCommand(TransactionExperiment* txn,
+    void Command::execCommand(OperationContext* txn,
                               Command * c ,
                               Client& client,
                               int queryOptions,
@@ -1603,7 +1603,7 @@ namespace mongo {
 
        returns true if ran a cmd
     */
-    bool _runCommands(TransactionExperiment* txn,
+    bool _runCommands(OperationContext* txn,
                       const char* ns,
                       BSONObj& _cmdobj,
                       BufBuilder& b,

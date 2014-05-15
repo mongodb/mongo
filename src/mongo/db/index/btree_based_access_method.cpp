@@ -44,7 +44,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/btree/btree_interface.h"
 #include "mongo/db/structure/btree/bucket_deletion_notification.h"
 #include "mongo/util/progress_meter.h"
@@ -79,7 +79,7 @@ namespace mongo {
     }
 
     // Find the keys for obj, put them in the tree pointing to loc
-    Status BtreeBasedAccessMethod::insert(TransactionExperiment* txn,
+    Status BtreeBasedAccessMethod::insert(OperationContext* txn,
                                           const BSONObj& obj,
                                           const DiskLoc& loc,
                                           const InsertDeleteOptions& options,
@@ -138,7 +138,7 @@ namespace mongo {
         return ret;
     }
 
-    bool BtreeBasedAccessMethod::removeOneKey(TransactionExperiment* txn,
+    bool BtreeBasedAccessMethod::removeOneKey(OperationContext* txn,
                                               const BSONObj& key,
                                               const DiskLoc& loc) {
         bool ret = false;
@@ -165,7 +165,7 @@ namespace mongo {
     }
 
     // Remove the provided doc from the index.
-    Status BtreeBasedAccessMethod::remove(TransactionExperiment* txn,
+    Status BtreeBasedAccessMethod::remove(OperationContext* txn,
                                           const BSONObj &obj,
                                           const DiskLoc& loc,
                                           const InsertDeleteOptions &options,
@@ -210,7 +210,7 @@ namespace mongo {
         }
     }
 
-    Status BtreeBasedAccessMethod::initializeAsEmpty(TransactionExperiment* txn) {
+    Status BtreeBasedAccessMethod::initializeAsEmpty(OperationContext* txn) {
         return _newInterface->initAsEmpty(txn);
     }
 
@@ -227,7 +227,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeBasedAccessMethod::touch( TransactionExperiment* txn ) const {
+    Status BtreeBasedAccessMethod::touch( OperationContext* txn ) const {
         return _btreeState->recordStore()->touch( txn, NULL );
     }
 
@@ -296,7 +296,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeBasedAccessMethod::update(TransactionExperiment* txn,
+    Status BtreeBasedAccessMethod::update(OperationContext* txn,
                                           const UpdateTicket& ticket,
                                           int64_t* numUpdated) {
         if (!ticket._isValid) {
@@ -323,7 +323,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk(TransactionExperiment* txn) {
+    IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk(OperationContext* txn) {
         // If there's already data in the index, don't do anything.
         if (!_newInterface->isEmpty()) {
             return NULL;

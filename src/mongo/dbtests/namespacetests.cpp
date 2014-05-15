@@ -40,7 +40,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
 #include "mongo/db/structure/record_store_v1_simple.h"
@@ -132,7 +132,7 @@ namespace NamespaceTests {
         public:
             Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
             virtual ~Base() {
-                DurTransaction txn;
+                OperationContextImpl txn;
                 if ( !nsd() )
                     return;
                 _context.db()->dropCollection( &txn, ns() );
@@ -140,7 +140,7 @@ namespace NamespaceTests {
         protected:
             void create() {
                 Lock::GlobalWrite lk;
-                DurTransaction txn;
+                OperationContextImpl txn;
                 ASSERT( userCreateNS( &txn, db(), ns(), fromjson( spec() ), false ).isOK() );
             }
             virtual string spec() const = 0;
@@ -223,7 +223,7 @@ namespace NamespaceTests {
         class SingleAlloc : public Base {
         public:
             void run() {
-                DurTransaction txn;
+                OperationContextImpl txn;
                 create();
                 BSONObj b = bigObj();
                 ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
@@ -235,7 +235,7 @@ namespace NamespaceTests {
         class Realloc : public Base {
         public:
             void run() {
-                DurTransaction txn;
+                OperationContextImpl txn;
                 create();
 
                 const int N = 20;
@@ -259,7 +259,7 @@ namespace NamespaceTests {
         class TwoExtent : public Base {
         public:
             void run() {
-                DurTransaction txn;
+                OperationContextImpl txn;
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
@@ -308,7 +308,7 @@ namespace NamespaceTests {
         class AllocCappedNotQuantized : public Base {
         public:
             void run() {
-                DurTransaction txn;
+                OperationContextImpl txn;
                 create();
                 ASSERT( nsd()->isCapped() );
                 ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
@@ -331,7 +331,7 @@ namespace NamespaceTests {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
             }
             void pass(int p) {
-                DurTransaction txn;
+                OperationContextImpl txn;
                 create();
                 ASSERT_EQUALS( 2, nExtents() );
 
@@ -469,7 +469,7 @@ namespace NamespaceTests {
                 create();
                 NamespaceDetails *nsd = collection()->detailsWritable();
 
-                DurTransaction txn;
+                OperationContextImpl txn;
                 // Set 2 & 54 as multikey
                 nsd->setIndexIsMultikey(&txn, 2, true);
                 nsd->setIndexIsMultikey(&txn, 54, true);

@@ -79,7 +79,7 @@ namespace mongo {
         return status;
     }
 
-    long long DeleteExecutor::execute(TransactionExperiment* txn, Database* db) {
+    long long DeleteExecutor::execute(OperationContext* txn, Database* db) {
         uassertStatusOK(prepare());
         uassert(17417,
                 mongoutils::str::stream() <<

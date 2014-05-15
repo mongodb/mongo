@@ -492,7 +492,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg,
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool fromRepl) {
 
             NamespaceString nss( dbname, cmdObj.firstElement().valuestrsafe() );

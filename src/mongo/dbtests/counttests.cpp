@@ -34,7 +34,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -45,7 +45,7 @@ namespace CountTests {
         Client::Context _context;
         Database* _database;
         Collection* _collection;
-        DurTransaction _txn;
+        OperationContextImpl _txn;
     public:
         Base() : lk(ns()), _context( ns() ) {
             _database = _context.db();

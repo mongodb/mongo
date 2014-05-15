@@ -30,7 +30,7 @@
 #include "mongo/db/repl/master_slave.h"  // replSettings
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -57,7 +57,7 @@ namespace mongo {
         }
 
         CmdResync() : Command("resync") { }
-        virtual bool run(TransactionExperiment* txn,
+        virtual bool run(OperationContext* txn,
                          const string& dbname,
                          BSONObj& cmdObj,
                          int,

@@ -79,7 +79,7 @@ namespace {
     }
 } // namespace
 
-    static void _profile(TransactionExperiment* txn,
+    static void _profile(OperationContext* txn,
                          const Client& c,
                          Database* db,
                          CurOp& currentOp,
@@ -129,7 +129,7 @@ namespace {
         }
     }
 
-    void profile(TransactionExperiment* txn, const Client& c, int op, CurOp& currentOp) {
+    void profile(OperationContext* txn, const Client& c, int op, CurOp& currentOp) {
         // initialize with 1kb to start, to avoid realloc later
         // doing this outside the dblock to improve performance
         BufBuilder profileBufBuilder(1024);
@@ -155,7 +155,7 @@ namespace {
         }
     }
 
-    Collection* getOrCreateProfileCollection(TransactionExperiment* txn,
+    Collection* getOrCreateProfileCollection(OperationContext* txn,
                                              Database *db,
                                              bool force,
                                              string* errmsg ) {

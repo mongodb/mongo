@@ -125,7 +125,7 @@ namespace mongo {
         return hash;
     }
 
-    bool DBHashCmd::run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+    bool DBHashCmd::run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
         Timer timer;
 
         set<string> desiredCollections;

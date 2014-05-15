@@ -33,7 +33,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index/btree_based_bulk_access_method.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/cstdint.h"
@@ -311,7 +311,7 @@ namespace ExtSortTests {
             _client.createCollection( _ns );
             // Take a write lock.
             Client::WriteContext ctx( _ns );
-            DurTransaction txn;
+            OperationContextImpl txn;
             Collection* coll = ctx.ctx().db()->getCollection( _ns );
             // Do a write to ensure the implementation will interrupt sort() even after a write has
             // occurred.
@@ -360,7 +360,7 @@ namespace ExtSortTests {
             _client.createCollection( _ns );
             // Take a write lock.
             Client::WriteContext ctx( _ns );
-            DurTransaction txn;
+            OperationContextImpl txn;
             Collection* coll = ctx.ctx().db()->getCollection( _ns );
             // Do a write to ensure the implementation will interrupt sort() even after a write has
             // occurred.

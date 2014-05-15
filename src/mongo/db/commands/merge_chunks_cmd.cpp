@@ -80,7 +80,7 @@ namespace mongo {
         static BSONField<string> shardNameField;
         static BSONField<string> configField;
 
-        bool run(TransactionExperiment* txn, const string& dbname,
+        bool run(OperationContext* txn, const string& dbname,
                   BSONObj& cmdObj,
                   int,
                   string& errmsg,

@@ -91,7 +91,7 @@ namespace mongo {
 
     // Need a version that takes a Client to match the mongod interface so the web server can call
     // execCommand and not need to worry if it's in a mongod or mongos.
-    void Command::execCommand(TransactionExperiment* txn,
+    void Command::execCommand(OperationContext* txn,
                               Command * c,
                               Client& client,
                               int queryOptions,
@@ -102,7 +102,7 @@ namespace mongo {
         execCommandClientBasic(txn, c, client, queryOptions, ns, cmdObj, result, fromRepl);
     }
 
-    void Command::execCommandClientBasic(TransactionExperiment* txn,
+    void Command::execCommandClientBasic(OperationContext* txn,
                                          Command * c ,
                                          ClientBasic& client,
                                          int queryOptions,

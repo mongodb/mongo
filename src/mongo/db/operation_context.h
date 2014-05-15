@@ -39,20 +39,19 @@ namespace mongo {
     class ProgressMeter;
 
     /**
-     * This name and this class are both a work in progress.
+     * This class encompasses the state required by an operation.
      *
-     * TODO(hk): move up a level, rename to OperationContext (or OpCtx if you're into the whole
-     * brevity thing)
+     * TODO(HK): clarify what this means.  There's one OperationContext for one user operation...
+     *           but is this true for getmore?  Also what about things like fsyncunlock / internal
+     *           users / etc.?
      */
-    class TransactionExperiment  {
-        MONGO_DISALLOW_COPYING(TransactionExperiment);
+    class OperationContext  {
+        MONGO_DISALLOW_COPYING(OperationContext);
     public:
-        virtual ~TransactionExperiment() { }
+        virtual ~OperationContext() { }
 
         /**
          * Interface for durability.  Caller DOES NOT own pointer.
-         *
-         * XXX: what's a better name for this
          */
         virtual RecoveryUnit* recoveryUnit() const = 0;
 
@@ -113,7 +112,7 @@ namespace mongo {
                                           int secondsBetween = 3) = 0;
 
         /**
-         * Returns a TransactionExperiment. Caller takes ownership.
+         * Returns a OperationContext. Caller takes ownership.
          *
          * This interface is used for functions that need to create transactions (aka OpCtx), but
          * don't know which implementation they should create. It allows the calling code to make
@@ -121,16 +120,16 @@ namespace mongo {
          *
          * TODO come up with a better Factory API once we split this class up (SERVER-13931).
          */
-        typedef TransactionExperiment* (*Factory)();
+        typedef OperationContext* (*Factory)();
 
         /**
-         * A TransactionExperiment::Factory that always returns NULL. For things that shouldn't be
+         * A OperationContext::Factory that always returns NULL. For things that shouldn't be
          * touching their txns such as mongos or some unittests.
          */
-        static TransactionExperiment* factoryNULL() { return NULL; }
+        static OperationContext* factoryNULL() { return NULL; }
 
     protected:
-        TransactionExperiment() {}
+        OperationContext() { }
     };
 
 }  // namespace mongo

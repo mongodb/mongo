@@ -35,7 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -68,7 +68,7 @@ namespace mongo {
 
     extern DiagLog _diaglog;
 
-    void assembleResponse( TransactionExperiment* txn,
+    void assembleResponse( OperationContext* txn,
                            Message& m,
                            DbResponse& dbresponse,
                            const HostAndPort &client );
@@ -87,7 +87,7 @@ namespace mongo {
     class DBDirectClient : public DBClientBase {
     public:
         DBDirectClient(); // DEPRECATED
-        DBDirectClient(TransactionExperiment* txn); // txn must outlive this object
+        DBDirectClient(OperationContext* txn); // txn must outlive this object
 
         using DBClientBase::query;
 
@@ -133,8 +133,8 @@ namespace mongo {
 
     private:
         static HostAndPort _clientHost;
-        boost::scoped_ptr<TransactionExperiment> _txnOwned;
-        TransactionExperiment* _txn; // Points either to _txnOwned or a passed-in transaction.
+        boost::scoped_ptr<OperationContext> _txnOwned;
+        OperationContext* _txn; // Points either to _txnOwned or a passed-in transaction.
     };
 
     extern int lockFile;

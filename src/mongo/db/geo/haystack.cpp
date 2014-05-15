@@ -68,7 +68,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int,
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int,
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const string ns = dbname + "." + cmdObj.firstElement().valuestr();
             Client::ReadContext ctx(ns);

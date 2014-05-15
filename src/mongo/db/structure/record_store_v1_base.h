@@ -38,7 +38,7 @@ namespace mongo {
     class DocWriter;
     class ExtentManager;
     class Record;
-    class TransactionExperiment;
+    class OperationContext;
 
     struct Extent;
 
@@ -47,48 +47,48 @@ namespace mongo {
         virtual ~RecordStoreV1MetaData(){}
 
         virtual const DiskLoc& capExtent() const = 0;
-        virtual void setCapExtent( TransactionExperiment* txn, const DiskLoc& loc ) = 0;
+        virtual void setCapExtent( OperationContext* txn, const DiskLoc& loc ) = 0;
 
         virtual const DiskLoc& capFirstNewRecord() const = 0;
-        virtual void setCapFirstNewRecord( TransactionExperiment* txn, const DiskLoc& loc ) = 0;
+        virtual void setCapFirstNewRecord( OperationContext* txn, const DiskLoc& loc ) = 0;
 
         virtual bool capLooped() const = 0;
 
         virtual long long dataSize() const = 0;
         virtual long long numRecords() const = 0;
 
-        virtual void incrementStats( TransactionExperiment* txn,
+        virtual void incrementStats( OperationContext* txn,
                                      long long dataSizeIncrement,
                                      long long numRecordsIncrement ) = 0;
 
-        virtual void setStats( TransactionExperiment* txn,
+        virtual void setStats( OperationContext* txn,
                                long long dataSizeIncrement,
                                long long numRecordsIncrement ) = 0;
 
         virtual const DiskLoc& deletedListEntry( int bucket ) const = 0;
-        virtual void setDeletedListEntry( TransactionExperiment* txn,
+        virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc ) = 0;
-        virtual void orphanDeletedList(TransactionExperiment* txn) = 0;
+        virtual void orphanDeletedList(OperationContext* txn) = 0;
 
         virtual const DiskLoc& firstExtent() const = 0;
-        virtual void setFirstExtent( TransactionExperiment* txn, const DiskLoc& loc ) = 0;
+        virtual void setFirstExtent( OperationContext* txn, const DiskLoc& loc ) = 0;
 
         virtual const DiskLoc& lastExtent() const = 0;
-        virtual void setLastExtent( TransactionExperiment* txn, const DiskLoc& loc ) = 0;
+        virtual void setLastExtent( OperationContext* txn, const DiskLoc& loc ) = 0;
 
         virtual bool isCapped() const = 0;
 
         virtual bool isUserFlagSet( int flag ) const = 0;
 
         virtual int lastExtentSize() const = 0;
-        virtual void setLastExtentSize( TransactionExperiment* txn, int newMax ) = 0;
+        virtual void setLastExtentSize( OperationContext* txn, int newMax ) = 0;
 
         virtual long long maxCappedDocs() const = 0;
 
         virtual double paddingFactor() const = 0;
 
-        virtual void setPaddingFactor( TransactionExperiment* txn, double paddingFactor ) = 0;
+        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor ) = 0;
 
     };
 
@@ -126,28 +126,28 @@ namespace mongo {
 
         Record* recordFor( const DiskLoc& loc ) const;
 
-        void deleteRecord( TransactionExperiment* txn,
+        void deleteRecord( OperationContext* txn,
                            const DiskLoc& dl );
 
-        StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+        StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                           const char* data,
                                           int len,
                                           int quotaMax );
 
-        StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+        StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                           const DocWriter* doc,
                                           int quotaMax );
 
         virtual RecordIterator* getIteratorForRepair() const;
 
-        void increaseStorageSize( TransactionExperiment* txn, int size, int quotaMax );
+        void increaseStorageSize( OperationContext* txn, int size, int quotaMax );
 
-        virtual Status validate( TransactionExperiment* txn,
+        virtual Status validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
 
-        virtual Status touch( TransactionExperiment* txn, BSONObjBuilder* output ) const;
+        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
         const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
@@ -186,12 +186,12 @@ namespace mongo {
 
         virtual bool isCapped() const = 0;
 
-        virtual StatusWith<DiskLoc> allocRecord( TransactionExperiment* txn,
+        virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
                                                  int quotaMax ) = 0;
 
         // TODO: document, remove, what have you
-        virtual void addDeletedRec( TransactionExperiment* txn, const DiskLoc& dloc) = 0;
+        virtual void addDeletedRec( OperationContext* txn, const DiskLoc& dloc) = 0;
 
         // TODO: another sad one
         virtual DeletedRecord* drec( const DiskLoc& loc ) const;
@@ -211,12 +211,12 @@ namespace mongo {
          * finds the first suitable DiskLoc for data
          * will return the DiskLoc of a newly created DeletedRecord
          */
-        DiskLoc _findFirstSpot( TransactionExperiment* txn, const DiskLoc& extDiskLoc, Extent* e );
+        DiskLoc _findFirstSpot( OperationContext* txn, const DiskLoc& extDiskLoc, Extent* e );
 
         /** add a record to the end of the linked list chain within this extent.
             require: you must have already declared write intent for the record header.
         */
-        void _addRecordToRecListInExtent(TransactionExperiment* txn, Record* r, DiskLoc loc);
+        void _addRecordToRecListInExtent(OperationContext* txn, Record* r, DiskLoc loc);
 
         scoped_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;

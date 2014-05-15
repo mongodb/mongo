@@ -38,7 +38,7 @@ namespace mongo {
        justOne: stop after 1 match
        god:     allow access to system namespaces, and don't yield
     */
-    long long deleteObjects(TransactionExperiment* txn,
+    long long deleteObjects(OperationContext* txn,
                             Database* db,
                             const StringData& ns,
                             BSONObj pattern,

@@ -34,7 +34,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -90,7 +90,7 @@ namespace IndexUpdateTests {
         }
 #endif
         Client::WriteContext _ctx;
-        DurTransaction _txn;
+        OperationContextImpl _txn;
     };
 
     /** addKeysToPhaseOne() adds keys from a collection's documents to an external sorter. */
@@ -465,7 +465,7 @@ namespace IndexUpdateTests {
     class HelpersEnsureIndexInterruptDisallowed : public IndexBuildBase {
     public:
         void run() {
-            DurTransaction txn;
+            OperationContextImpl txn;
             // Insert some documents.
             int32_t nDocs = 1000;
             for( int32_t i = 0; i < nDocs; ++i ) {

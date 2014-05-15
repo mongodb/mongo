@@ -72,7 +72,7 @@ namespace mongo {
          *>  "out" : NumberLong(6271151123721111923),
          *>  "ok" : 1 }
          **/
-        bool run(TransactionExperiment* txn, const string& db,
+        bool run(OperationContext* txn, const string& db,
                   BSONObj& cmdObj,
                   int options, string& errmsg,
                   BSONObjBuilder& result,

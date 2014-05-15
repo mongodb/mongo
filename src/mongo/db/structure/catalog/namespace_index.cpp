@@ -33,7 +33,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/exit.h"
 
@@ -50,19 +50,19 @@ namespace mongo {
         return _ht->get(ns);
     }
 
-    void NamespaceIndex::add_ns( TransactionExperiment* txn,
+    void NamespaceIndex::add_ns( OperationContext* txn,
                                  const StringData& ns, const DiskLoc& loc, bool capped) {
         NamespaceDetails details( loc, capped );
         add_ns( txn, ns, &details );
     }
 
-    void NamespaceIndex::add_ns( TransactionExperiment* txn,
+    void NamespaceIndex::add_ns( OperationContext* txn,
                                  const StringData& ns, const NamespaceDetails* details ) {
         Namespace n(ns);
         add_ns( txn, n, details );
     }
 
-    void NamespaceIndex::add_ns( TransactionExperiment* txn,
+    void NamespaceIndex::add_ns( OperationContext* txn,
                                  const Namespace& ns, const NamespaceDetails* details ) {
         string nsString = ns.toString();
         Lock::assertWriteLocked( nsString );
@@ -71,7 +71,7 @@ namespace mongo {
         uassert( 10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
     }
 
-    void NamespaceIndex::kill_ns( TransactionExperiment* txn, const StringData& ns) {
+    void NamespaceIndex::kill_ns( OperationContext* txn, const StringData& ns) {
         Lock::assertWriteLocked(ns);
         if ( !_ht.get() )
             return;
@@ -132,7 +132,7 @@ namespace mongo {
             MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
     }
 
-    NOINLINE_DECL void NamespaceIndex::_init( TransactionExperiment* txn ) {
+    NOINLINE_DECL void NamespaceIndex::_init( OperationContext* txn ) {
         verify( !_ht.get() );
 
         Lock::assertWriteLocked(_database);

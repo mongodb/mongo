@@ -29,7 +29,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
@@ -57,7 +57,7 @@ namespace mongo {
 
             {
                 // Remove _id range [_min, _max).
-                DurTransaction txn;
+                OperationContextImpl txn;
                 Lock::DBWrite lk( ns );
                 Client::Context ctx( ns );
                 KeyRange range( ns,

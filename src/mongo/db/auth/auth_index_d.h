@@ -33,7 +33,7 @@
 namespace mongo {
 
     class Collection;
-    class TransactionExperiment;
+    class OperationContext;
 
 namespace authindex {
 
@@ -41,7 +41,7 @@ namespace authindex {
      * Creates the appropriate indexes on _new_ system collections supporting authentication and
      * authorization.
      */
-    void createSystemIndexes(TransactionExperiment* txn, Collection* collection);
+    void createSystemIndexes(OperationContext* txn, Collection* collection);
 
     /**
      * Ensures that exactly the appropriate indexes to support authentication and authorization

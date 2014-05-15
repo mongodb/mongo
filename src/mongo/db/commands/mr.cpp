@@ -47,7 +47,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/range_preserver.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/s/collection_metadata.h"
@@ -664,7 +664,7 @@ namespace mongo {
             _txn->commitIfNeeded();
         }
 
-        State::State(TransactionExperiment* txn, const Config& c) :
+        State::State(OperationContext* txn, const Config& c) :
                 _config(c),
                 _useIncremental(true),
                 _txn(txn),
@@ -1208,7 +1208,7 @@ namespace mongo {
                 addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
             }
 
-            bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            bool run(OperationContext* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client& client = cc();
                 CurOp * op = client.curop();
@@ -1446,7 +1446,7 @@ namespace mongo {
                 actions.addAction(ActionType::internal);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 ShardedConnectionInfo::addHook();
                 // legacy name
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();

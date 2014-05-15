@@ -34,7 +34,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -63,7 +63,7 @@ namespace mongo {
         cc().curop()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
         Client::WriteContext ctx(ns.getSystemIndexesCollection());
-        DurTransaction txn;
+        OperationContextImpl txn;
 
         Database* db = dbHolder().get(ns.db().toString(), storageGlobalParams.dbpath);
 
@@ -75,7 +75,7 @@ namespace mongo {
         cc().shutdown();
     }
 
-    Status IndexBuilder::build(TransactionExperiment* txn, Database* db) const {
+    Status IndexBuilder::build(OperationContext* txn, Database* db) const {
         const string ns = _index["ns"].String();
 
         Collection* c = db->getCollection( ns );

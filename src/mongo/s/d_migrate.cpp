@@ -65,7 +65,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/write_concern.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -711,7 +711,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             return migrateFromStatus.transferMods( errmsg, result );
         }
     } transferModsCommand;
@@ -728,7 +728,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             return migrateFromStatus.clone( errmsg, result );
         }
     } initialCloneCommand;
@@ -771,7 +771,7 @@ namespace mongo {
             return parseNsFullyQualified(dbname, cmdObj);
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             // 1. parse options
             // 2. make sure my view is complete and lock
             // 3. start migrate
@@ -1500,7 +1500,7 @@ namespace mongo {
                 log() << "forking for cleanup of chunk data" << migrateLog;
 
                 string errMsg;
-                if (!deleter->queueDelete(DurTransaction::factory,
+                if (!deleter->queueDelete(OperationContextImpl::factory,
                                           ns,
                                           min.getOwned(),
                                           max.getOwned(),
@@ -1569,7 +1569,7 @@ namespace mongo {
             active = true;
         }
 
-        void go(TransactionExperiment* txn) {
+        void go(OperationContext* txn) {
             try {
                 _go(txn);
             }
@@ -1596,7 +1596,7 @@ namespace mongo {
             setActive( false );
         }
 
-        void _go(TransactionExperiment* txn) {
+        void _go(OperationContext* txn) {
             verify( getActive() );
             verify( state == READY );
             verify( ! min.isEmpty() );
@@ -1718,7 +1718,7 @@ namespace mongo {
 
             if (state == FAIL || state == ABORT) {
                 string errMsg;
-                if (!getDeleter()->queueDelete(DurTransaction::factory, // XXX SERVER-13931
+                if (!getDeleter()->queueDelete(OperationContextImpl::factory, // XXX SERVER-13931
                                                ns, min, max, shardKeyPattern, secondaryThrottle,
                                                NULL /* notifier */, &errMsg)) {
                     warning() << "Failed to queue delete for migrate abort: " << errMsg << endl;
@@ -1928,7 +1928,7 @@ namespace mongo {
 
         }
 
-        bool apply( TransactionExperiment* txn, const BSONObj& xfer , ReplTime* lastOpApplied ) {
+        bool apply( OperationContext* txn, const BSONObj& xfer , ReplTime* lastOpApplied ) {
             ReplTime dummy;
             if ( lastOpApplied == NULL ) {
                 lastOpApplied = &dummy;
@@ -2134,7 +2134,7 @@ namespace mongo {
 
     void migrateThread() {
         Client::initThread( "migrateThread" );
-        DurTransaction txn;
+        OperationContextImpl txn;
         if (getGlobalAuthorizationManager()->isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
             cc().getAuthorizationSession()->grantInternalAuthorization();
@@ -2156,7 +2156,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             // Active state of TO-side migrations (MigrateStatus) is serialized by distributed
             // collection lock.
@@ -2255,7 +2255,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             migrateStatus.status( result );
             return 1;
         }
@@ -2273,7 +2273,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             bool ok = migrateStatus.startCommit();
             migrateStatus.status( result );
             return ok;
@@ -2292,7 +2292,7 @@ namespace mongo {
             actions.addAction(ActionType::internal);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             migrateStatus.abort();
             migrateStatus.status( result );
             return true;

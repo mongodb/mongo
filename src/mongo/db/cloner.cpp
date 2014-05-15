@@ -52,7 +52,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -96,7 +96,7 @@ namespace mongo {
     Cloner::Cloner() { }
 
     struct Cloner::Fun {
-        Fun( TransactionExperiment* txn, Client::Context& ctx )
+        Fun( OperationContext* txn, Client::Context& ctx )
             :lastLog(0),
              txn(txn),
              context(ctx)
@@ -176,7 +176,7 @@ namespace mongo {
         }
 
         time_t lastLog;
-        TransactionExperiment* txn;
+        OperationContext* txn;
         Client::Context& context;
 
         int64_t numSeen;
@@ -193,7 +193,7 @@ namespace mongo {
     /* copy the specified collection
        isindex - if true, this is system.indexes collection, in which we do some transformation when copying.
     */
-    void Cloner::copy(TransactionExperiment* txn,
+    void Cloner::copy(OperationContext* txn,
                       Client::Context& ctx,
                       const char *from_collection,
                       const char *to_collection,
@@ -277,7 +277,7 @@ namespace mongo {
         return true;
     }
 
-    bool Cloner::copyCollectionFromRemote(TransactionExperiment* txn,
+    bool Cloner::copyCollectionFromRemote(OperationContext* txn,
                                           const string& host,
                                           const string& ns,
                                           string& errmsg) {
@@ -291,7 +291,7 @@ namespace mongo {
         return cloner.copyCollection(txn, ns, BSONObj(), errmsg, true, false, true, false);
     }
 
-    bool Cloner::copyCollection(TransactionExperiment* txn,
+    bool Cloner::copyCollection(OperationContext* txn,
                                 const string& ns,
                                 const BSONObj& query,
                                 string& errmsg,
@@ -334,7 +334,7 @@ namespace mongo {
 
     extern bool inDBRepair;
 
-    bool Cloner::go(TransactionExperiment* txn,
+    bool Cloner::go(OperationContext* txn,
                     Client::Context& context,
                     const string& masterHost,
                     const CloneOptions& opts,
@@ -513,7 +513,7 @@ namespace mongo {
         return true;
     }
 
-    bool Cloner::cloneFrom(TransactionExperiment* txn,
+    bool Cloner::cloneFrom(OperationContext* txn,
                            Client::Context& context,
                            const string& masterHost,
                            const CloneOptions& options,
@@ -558,7 +558,7 @@ namespace mongo {
             return Status::OK();
         }
         CmdClone() : Command("clone") { }
-        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )
                 return false;
@@ -629,7 +629,7 @@ namespace mongo {
                  "is placed at the same db.collection (namespace) as the source.\n"
                  ;
         }
-        virtual bool run(TransactionExperiment* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("from");
             if ( fromhost.empty() ) {
                 errmsg = "missing 'from' parameter";
@@ -696,7 +696,7 @@ namespace mongo {
             help << "get a nonce for subsequent copy db request from secure server\n";
             help << "usage: {copydbgetnonce: 1, fromhost: <hostname>}";
         }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
                 /* copy from self */
@@ -780,7 +780,7 @@ namespace mongo {
             help << "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
                  << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
         }
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string fromhost = cmdObj.getStringField("fromhost");
             bool fromSelf = fromhost.empty();
             if ( fromSelf ) {

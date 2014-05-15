@@ -35,7 +35,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -181,7 +181,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -200,7 +200,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -228,7 +228,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -247,7 +247,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -337,7 +337,7 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(ns());
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {

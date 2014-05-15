@@ -43,7 +43,7 @@
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/platform/bits.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/exit.h"
@@ -120,7 +120,7 @@ namespace {
     void dropAllTempCollections() {
         vector<string> dbNames;
         getDatabaseNames(dbNames);
-        DurTransaction txn;
+        OperationContextImpl txn;
         for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
             // The local db is special because it isn't replicated. It is cleared at startup even on
             // replica set members.
@@ -939,13 +939,13 @@ namespace {
 
     void ReplSetImpl::clearInitialSyncFlag() {
         Lock::DBWrite lk( "local" );
-        DurTransaction txn; // XXX?
+        OperationContextImpl txn; // XXX?
         Helpers::putSingleton(&txn, "local.replset.minvalid", BSON( "$unset" << _initialSyncFlag ));
     }
 
     void ReplSetImpl::setInitialSyncFlag() {
         Lock::DBWrite lk( "local" );
-        DurTransaction txn; // XXX?
+        OperationContextImpl txn; // XXX?
         Helpers::putSingleton(&txn, "local.replset.minvalid", BSON( "$set" << _initialSyncFlag ));
     }
 
@@ -964,7 +964,7 @@ namespace {
         subobj.appendTimestamp("ts", obj["ts"].date());
         subobj.done();
         Lock::DBWrite lk( "local" );
-        DurTransaction txn; // XXX?
+        OperationContextImpl txn; // XXX?
         Helpers::putSingleton(&txn, "local.replset.minvalid", builder.obj());
     }
 

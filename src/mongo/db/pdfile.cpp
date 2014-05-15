@@ -78,7 +78,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/util/processinfo.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -97,7 +97,7 @@ namespace mongo {
      * @param createDefaultIndexes - if false, defers id (and other) index creation.
      * @return true if successful
     */
-    Status userCreateNS( TransactionExperiment* txn,
+    Status userCreateNS( OperationContext* txn,
                          Database* db,
                          const StringData& ns,
                          BSONObj options,
@@ -141,7 +141,7 @@ namespace mongo {
 
     void dropAllDatabasesExceptLocal() {
         Lock::GlobalWrite lk;
-        DurTransaction txn;
+        OperationContextImpl txn;
 
         vector<string> n;
         getDatabaseNames(n);
@@ -155,7 +155,7 @@ namespace mongo {
         }
     }
 
-    void dropDatabase(TransactionExperiment* txn, Database* db ) {
+    void dropDatabase(OperationContext* txn, Database* db ) {
         invariant( db );
 
         string name = db->name(); // just to have safe

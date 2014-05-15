@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    class TransactionExperiment;
+    class OperationContext;
 
     /**
      * When a capped collection has to delete a document, it needs a way to tell the caller
@@ -48,7 +48,7 @@ namespace mongo {
         /**
          * This will be called right before loc is deleted when wrapping.
          */
-        virtual Status aboutToDeleteCapped( TransactionExperiment* txn, const DiskLoc& loc ) = 0;
+        virtual Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) = 0;
     };
 
 }

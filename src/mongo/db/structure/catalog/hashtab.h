@@ -25,7 +25,7 @@
 #include "mongo/pch.h"
 #include <map>
 #include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -122,7 +122,7 @@ namespace mongo {
             return 0;
         }
 
-        void kill(TransactionExperiment* txn, const Key& k) {
+        void kill(OperationContext* txn, const Key& k) {
             bool found;
             int i = _find(k, found);
             if ( i >= 0 && found ) {
@@ -134,7 +134,7 @@ namespace mongo {
         }
 
         /** returns false if too full */
-        bool put(TransactionExperiment* txn, const Key& k, const Type& value) {
+        bool put(OperationContext* txn, const Key& k, const Type& value) {
             bool found;
             int i = _find(k, found);
             if ( i < 0 )

@@ -29,20 +29,17 @@
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 
 #pragma once
 
 namespace mongo {
 
-    /**
-     * TODO(hk): Move to db/ and rename to OperationContextMongoDImpl or something better?
-     */
-    class DurTransaction : public TransactionExperiment  {
+    class OperationContextImpl : public OperationContext  {
     public:
-        DurTransaction();
+        OperationContextImpl();
 
-        virtual ~DurTransaction() { }
+        virtual ~OperationContextImpl() { }
 
         virtual RecoveryUnit* recoveryUnit() const;
 
@@ -56,9 +53,9 @@ namespace mongo {
         virtual Status checkForInterruptNoAssert() const;
 
         /**
-         * Returns a DurTransaction. Caller takes ownership.
+         * Returns an OperationContext. Caller takes ownership.
          */
-        static TransactionExperiment* factory();
+        static OperationContext* factory();
 
     private:
         boost::scoped_ptr<RecoveryUnit> _recovery;

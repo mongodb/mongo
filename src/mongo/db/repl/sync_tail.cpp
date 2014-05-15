@@ -40,7 +40,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -106,7 +106,7 @@ namespace replset {
         }
 
         Client::Context ctx(ns, storageGlobalParams.dbpath);
-        DurTransaction txn;
+        OperationContextImpl txn;
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.

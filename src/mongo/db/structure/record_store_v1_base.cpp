@@ -34,7 +34,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/record_store_v1_repair_iterator.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
@@ -161,7 +161,7 @@ namespace mongo {
 
     }
 
-    DiskLoc RecordStoreV1Base::_findFirstSpot( TransactionExperiment* txn,
+    DiskLoc RecordStoreV1Base::_findFirstSpot( OperationContext* txn,
                                                const DiskLoc& extDiskLoc, Extent* e ) {
         DiskLoc emptyLoc = extDiskLoc;
         emptyLoc.inc( Extent::HeaderSize() );
@@ -205,7 +205,7 @@ namespace mongo {
     }
 
 
-    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( TransactionExperiment* txn,
+    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( OperationContext* txn,
                                                          const DocWriter* doc,
                                                          int quotaMax ) {
         int docSize = doc->documentSize();
@@ -235,7 +235,7 @@ namespace mongo {
     }
 
 
-    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( TransactionExperiment* txn,
+    StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( OperationContext* txn,
                                                          const char* data,
                                                          int len,
                                                          int quotaMax ) {
@@ -265,7 +265,7 @@ namespace mongo {
         return loc;
     }
 
-    void RecordStoreV1Base::deleteRecord( TransactionExperiment* txn, const DiskLoc& dl ) {
+    void RecordStoreV1Base::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
 
         Record* todelete = recordFor( dl );
         invariant( todelete->netLength() >= 4 ); // this is required for defensive code
@@ -329,7 +329,7 @@ namespace mongo {
         return new RecordStoreV1RepairIterator(this);
     }
 
-    void RecordStoreV1Base::_addRecordToRecListInExtent(TransactionExperiment* txn,
+    void RecordStoreV1Base::_addRecordToRecListInExtent(OperationContext* txn,
                                                         Record *r,
                                                         DiskLoc loc) {
         dassert( recordFor(loc) == r );
@@ -348,7 +348,7 @@ namespace mongo {
         }
     }
 
-    void RecordStoreV1Base::increaseStorageSize( TransactionExperiment* txn,
+    void RecordStoreV1Base::increaseStorageSize( OperationContext* txn,
                                                  int size,
                                                  int quotaMax ) {
         DiskLoc eloc = _extentManager->allocateExtent( txn,
@@ -388,7 +388,7 @@ namespace mongo {
         addDeletedRec(txn, emptyLoc);
     }
 
-    Status RecordStoreV1Base::validate( TransactionExperiment* txn,
+    Status RecordStoreV1Base::validate( OperationContext* txn,
                                         bool full, bool scanData,
                                         ValidateAdaptor* adaptor,
                                         ValidateResults* results, BSONObjBuilder* output ) const {
@@ -693,7 +693,7 @@ namespace mongo {
         };
     }
 
-    Status RecordStoreV1Base::touch( TransactionExperiment* txn, BSONObjBuilder* output ) const {
+    Status RecordStoreV1Base::touch( OperationContext* txn, BSONObjBuilder* output ) const {
         Timer t;
 
         // Note: when this class has document level locking, we'll need a lock to get extents

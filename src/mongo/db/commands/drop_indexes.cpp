@@ -39,7 +39,7 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -92,14 +92,14 @@ namespace mongo {
         }
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
             Lock::DBWrite dbXLock(dbname);
             bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
             if (ok && !fromRepl)
                 logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
             return ok;
         }
-        bool wrappedRun(TransactionExperiment* txn,
+        bool wrappedRun(OperationContext* txn,
                         const string& dbname,
                         BSONObj& jsobj,
                         string& errmsg,
@@ -212,7 +212,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             static DBDirectClient db;
 
             BSONElement e = jsobj.firstElement();

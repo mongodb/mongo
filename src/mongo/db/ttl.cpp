@@ -43,7 +43,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -115,7 +115,7 @@ namespace mongo {
                 {
                     string ns = idx["ns"].String();
                     Client::WriteContext ctx( ns );
-                    DurTransaction txn;
+                    OperationContextImpl txn;
                     Collection* collection = ctx.ctx().db()->getCollection( ns );
                     if ( !collection ) {
                         // collection was dropped

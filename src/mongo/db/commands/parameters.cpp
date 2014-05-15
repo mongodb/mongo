@@ -72,7 +72,7 @@ namespace mongo {
             appendParameterNames( help );
             help << "{ getParameter:'*' } to get everything\n";
         }
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             bool all = *cmdObj.firstElement().valuestrsafe() == '*';
 
             int before = result.len();
@@ -126,7 +126,7 @@ namespace mongo {
             help << "{ setParameter:1, <param>:<value> }\n";
             appendParameterNames( help );
         }
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
             bool found = false;
 

@@ -37,7 +37,7 @@
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -110,7 +110,7 @@ namespace mongo {
         // should already have write lock
         const char *ns = o.getStringField("ns");
         Client::Context ctx(ns);
-        DurTransaction txn;
+        OperationContextImpl txn;
 
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log

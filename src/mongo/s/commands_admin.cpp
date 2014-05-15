@@ -114,7 +114,7 @@ namespace mongo {
                 actions.addAction(ActionType::netstat);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("configserver", configServer.getPrimary().getConnString() );
                 result.append("isdbgrid", 1);
                 return true;
@@ -134,7 +134,7 @@ namespace mongo {
                 actions.addAction(ActionType::flushRouterConfig);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 grid.flushConfig();
                 result.appendBool( "flushed" , true );
                 return true;
@@ -151,7 +151,7 @@ namespace mongo {
                 actions.addAction(ActionType::fsync);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( cmdObj["lock"].trueValue() ) {
                     errmsg = "can't do lock through mongos";
                     return false;
@@ -205,7 +205,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return cmdObj.firstElement().valuestrsafe();
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string dbname = parseNs("admin", cmdObj);
 
                 if ( dbname.size() == 0 ) {
@@ -400,7 +400,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return cmdObj.firstElement().valuestrsafe();
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string dbname = parseNs("admin", cmdObj);
                 if ( dbname.size() == 0 ) {
                     errmsg = "no db";
@@ -459,7 +459,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 const string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
@@ -844,7 +844,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "need to specify fully namespace";
@@ -895,7 +895,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
@@ -1057,7 +1057,7 @@ namespace mongo {
             virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
                 return parseNsFullyQualified(dbname, cmdObj);
             }
-            bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
@@ -1165,7 +1165,7 @@ namespace mongo {
                 actions.addAction(ActionType::listShards);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
 
                 vector<BSONObj> all;
@@ -1196,7 +1196,7 @@ namespace mongo {
                 actions.addAction(ActionType::addShard);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg.clear();
 
                 // get replica set component hosts
@@ -1265,7 +1265,7 @@ namespace mongo {
                 actions.addAction(ActionType::removeShard);
                 out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string target = cmdObj.firstElement().valuestrsafe();
                 Shard s = Shard::make( target );
                 if ( ! grid.knowAboutShard( s.getConnString() ) ) {
@@ -1443,7 +1443,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
             IsDbGridCmd() : Command("isdbgrid") { }
-            bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 result.append("isdbgrid", 1);
                 result.append("hostname", getHostNameCached());
                 return true;
@@ -1463,7 +1463,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
             CmdIsMaster() : Command("isMaster" , false , "ismaster") { }
-            virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 result.appendBool("ismaster", true );
                 result.append("msg", "isdbgrid");
                 result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
@@ -1494,7 +1494,7 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << "{whatsmyuri:1}";
             }
-            virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 result << "you" << ClientInfo::get()->getRemote();
                 return true;
             }
@@ -1514,7 +1514,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
             CmdShardingGetPrevError() : Command( "getPrevError" , false , "getpreverror") { }
-            virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg += "getpreverror not supported for sharded environments";
                 return false;
             }
@@ -1534,7 +1534,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {} // No auth required
             CmdShardingGetLastError() : Command("getLastError" , false , "getlasterror") { }
 
-            virtual bool run(TransactionExperiment* txn, const string& dbName,
+            virtual bool run(OperationContext* txn, const string& dbName,
                               BSONObj& cmdObj,
                               int,
                               string& errmsg,
@@ -1687,7 +1687,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
-        bool run(TransactionExperiment* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             LastError *le = lastError.get();
             if ( le )
                 le->reset();
@@ -1725,7 +1725,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             vector<Shard> shards;
             Shard::getAllShards( shards );
 
@@ -1852,7 +1852,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& /*result*/, bool /*fromRepl*/) {
             errmsg = "closeAllDatabases isn't supported through mongos";
             return false;
         }
@@ -1871,7 +1871,7 @@ namespace mongo {
                                            const BSONObj& cmdObj) {
             return Status::OK(); // Require no auth since this command isn't supported in mongos
         }
-        bool run(TransactionExperiment* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
+        bool run(OperationContext* txn, const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             if ( jsobj["forShell"].trueValue() ) {
                 lastError.disableForCommand();
                 ClientInfo::get()->disableForCommand();
@@ -1890,7 +1890,7 @@ namespace mongo {
              << "either (1) ran from localhost or (2) authenticated.";
     }
 
-    bool CmdShutdown::run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+    bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         return shutdownHelper();
     }
 

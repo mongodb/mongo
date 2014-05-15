@@ -53,7 +53,7 @@
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/exit.h"
 
@@ -162,7 +162,7 @@ namespace mongo {
         string myname = getHostName();
         {
             Client::WriteContext ctx("local");
-            DurTransaction txn;
+            OperationContextImpl txn;
             // local.me is an identifier for a server for getLastError w:2+
             if (!Helpers::getSingleton("local.me", _me) ||
                 !_me.hasField("host") ||
@@ -196,7 +196,7 @@ namespace mongo {
         {
             OpDebug debug;
             Client::Context ctx("local.sources");
-            DurTransaction txn;
+            OperationContextImpl txn;
 
             const NamespaceString requestNs("local.sources");
             UpdateRequest request(requestNs);
@@ -304,7 +304,7 @@ namespace mongo {
         uassert(17066, "Internal error reading from local.sources", Runner::RUNNER_EOF == state);
     }
 
-    bool ReplSource::throttledForceResyncDead( TransactionExperiment* txn, const char *requester ) {
+    bool ReplSource::throttledForceResyncDead( OperationContext* txn, const char *requester ) {
         if ( time( 0 ) - lastForcedResync > 600 ) {
             forceResyncDead( txn, requester );
             lastForcedResync = time( 0 );
@@ -313,7 +313,7 @@ namespace mongo {
         return false;
     }
 
-    void ReplSource::forceResyncDead( TransactionExperiment* txn, const char *requester ) {
+    void ReplSource::forceResyncDead( OperationContext* txn, const char *requester ) {
         if ( !replAllDead )
             return;
         SourceVector sources;
@@ -325,7 +325,7 @@ namespace mongo {
         replAllDead = 0;
     }
 
-    void ReplSource::forceResync( TransactionExperiment* txn, const char *requester ) {
+    void ReplSource::forceResync( OperationContext* txn, const char *requester ) {
         BSONObj info;
         {
             dbtemprelease t;
@@ -355,14 +355,14 @@ namespace mongo {
         save();
     }
 
-    void ReplSource::resyncDrop( TransactionExperiment* txn, const string& db ) {
+    void ReplSource::resyncDrop( OperationContext* txn, const string& db ) {
         log() << "resync: dropping database " << db;
         Client::Context ctx(db);
         dropDatabase(txn, ctx.db());
     }
 
     /* grab initial copy of a database from the master */
-    void ReplSource::resync(TransactionExperiment* txn, const std::string& dbName) {
+    void ReplSource::resync(OperationContext* txn, const std::string& dbName) {
         const std::string db(dbName);   // need local copy of the name, we're dropping the original
         resyncDrop( txn, db );
         Client::Context ctx( db );
@@ -420,7 +420,7 @@ namespace mongo {
         }
     }
 
-    bool ReplSource::handleDuplicateDbName( TransactionExperiment* txn,
+    bool ReplSource::handleDuplicateDbName( OperationContext* txn,
                                             const BSONObj &op,
                                             const char* ns,
                                             const char* db ) {
@@ -504,7 +504,7 @@ namespace mongo {
         return true;
     }
 
-    void ReplSource::applyOperation(TransactionExperiment* txn, Database* db, const BSONObj& op) {
+    void ReplSource::applyOperation(OperationContext* txn, Database* db, const BSONObj& op) {
         try {
             bool failedUpdate = applyOperation_inlock( txn, db, op );
             if (failedUpdate) {
@@ -598,7 +598,7 @@ namespace mongo {
         }
 
         scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
-        DurTransaction txn; // XXX?
+        OperationContextImpl txn; // XXX?
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -1090,7 +1090,7 @@ namespace mongo {
             int s = 0;
             {
                 Lock::GlobalWrite lk;
-                DurTransaction txn;
+                OperationContextImpl txn;
                 if ( replAllDead ) {
                     // throttledForceResyncDead can throw
                     if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( &txn, "auto" ) ) {

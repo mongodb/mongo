@@ -36,12 +36,12 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
     Database* DatabaseHolder::getOrCreate( const string& ns, const string& path, bool& justCreated ) {
-        DurTransaction txn; // TODO get rid of this once reads require transactions
+        OperationContextImpl txn; // TODO get rid of this once reads require transactions
         string dbname = _todb( ns );
         {
             SimpleMutex::scoped_lock lk(_m);

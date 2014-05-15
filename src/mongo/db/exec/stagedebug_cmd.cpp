@@ -102,7 +102,7 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result,
+        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result,
                  bool fromRepl) {
             BSONElement argElt = cmdObj["stageDebug"];
             if (argElt.eoo() || !argElt.isABSONObj()) { return false; }

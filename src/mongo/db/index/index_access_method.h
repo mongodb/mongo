@@ -32,7 +32,7 @@
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -65,7 +65,7 @@ namespace mongo {
          * 
          * The behavior of the insertion can be specified through 'options'.  
          */
-        virtual Status insert(TransactionExperiment* txn,
+        virtual Status insert(OperationContext* txn,
                               const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
@@ -75,7 +75,7 @@ namespace mongo {
          * Analogous to above, but remove the records instead of inserting them.  If not NULL,
          * numDeleted will be set to the number of keys removed from the index for the document.
          */
-        virtual Status remove(TransactionExperiment* txn,
+        virtual Status remove(OperationContext* txn,
                               const BSONObj& obj,
                               const DiskLoc& loc,
                               const InsertDeleteOptions& options,
@@ -105,7 +105,7 @@ namespace mongo {
          * called.  If the index was changed, we may return an error, as our ticket may have been
          * invalidated.
          */
-        virtual Status update(TransactionExperiment* txn,
+        virtual Status update(OperationContext* txn,
                               const UpdateTicket& ticket,
                               int64_t* numUpdated) = 0;
 
@@ -123,7 +123,7 @@ namespace mongo {
          * only called once for the lifetime of the index
          * if called multiple times, is an error
          */
-        virtual Status initializeAsEmpty(TransactionExperiment* txn) = 0;
+        virtual Status initializeAsEmpty(OperationContext* txn) = 0;
 
         /**
          * Try to page-in the pages that contain the keys generated from 'obj'.
@@ -136,7 +136,7 @@ namespace mongo {
         /**
          * this pages in the entire index
          */
-        virtual Status touch( TransactionExperiment* txn ) const = 0;
+        virtual Status touch( OperationContext* txn ) const = 0;
 
         /**
          * Walk the entire index, checking the internal structure for consistency.
@@ -163,12 +163,12 @@ namespace mongo {
          *
          * Caller owns the returned IndexAccessMethod.
          *
-         * The provided TransactionExperiment must outlive the IndexAccessMethod returned.
+         * The provided OperationContext must outlive the IndexAccessMethod returned.
          *
          * For now (1/8/14) you can only do bulk when the index is empty
          * it will fail if you try other times.
          */
-        virtual IndexAccessMethod* initiateBulk(TransactionExperiment* txn) = 0;
+        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) = 0;
 
         /**
          * Call this when you are ready to finish your bulk work.

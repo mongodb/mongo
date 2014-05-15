@@ -40,7 +40,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
@@ -76,7 +76,7 @@ namespace mongo {
 
     // ----
 
-    Collection::Collection( TransactionExperiment* txn,
+    Collection::Collection( OperationContext* txn,
                             const StringData& fullNS,
                             NamespaceDetails* details,
                             Database* database )
@@ -169,7 +169,7 @@ namespace mongo {
         return BSONObj( rec->data() );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( TransactionExperiment* txn,
+    StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota ) {
         verify( _indexCatalog.numIndexesTotal() == 0 ); // eventually can implement, just not done
@@ -185,7 +185,7 @@ namespace mongo {
         return StatusWith<DiskLoc>( loc );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( TransactionExperiment* txn,
+    StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const BSONObj& docToInsert,
                                                     bool enforceQuota ) {
         if ( _indexCatalog.findIdIndex() ) {
@@ -211,7 +211,7 @@ namespace mongo {
         return status;
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( TransactionExperiment* txn,
+    StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const BSONObj& doc,
                                                     MultiIndexBlock& indexBlock ) {
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
@@ -234,7 +234,7 @@ namespace mongo {
     }
 
 
-    StatusWith<DiskLoc> Collection::_insertDocument( TransactionExperiment* txn,
+    StatusWith<DiskLoc> Collection::_insertDocument( OperationContext* txn,
                                                      const BSONObj& docToInsert,
                                                      bool enforceQuota ) {
 
@@ -271,7 +271,7 @@ namespace mongo {
         return loc;
     }
 
-    Status Collection::aboutToDeleteCapped( TransactionExperiment* txn, const DiskLoc& loc ) {
+    Status Collection::aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) {
 
         BSONObj doc = docFor( loc );
 
@@ -283,7 +283,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Collection::deleteDocument( TransactionExperiment* txn,
+    void Collection::deleteDocument( OperationContext* txn,
                                      const DiskLoc& loc,
                                      bool cappedOK,
                                      bool noWarn,
@@ -316,7 +316,7 @@ namespace mongo {
     Counter64 moveCounter;
     ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", &moveCounter );
 
-    StatusWith<DiskLoc> Collection::updateDocument( TransactionExperiment* txn,
+    StatusWith<DiskLoc> Collection::updateDocument( OperationContext* txn,
                                                     const DiskLoc& oldLocation,
                                                     const BSONObj& objNew,
                                                     bool enforceQuota,
@@ -431,7 +431,7 @@ namespace mongo {
         return StatusWith<DiskLoc>( oldLocation );
     }
 
-    Status Collection::updateDocumentWithDamages( TransactionExperiment* txn,
+    Status Collection::updateDocumentWithDamages( OperationContext* txn,
                                                   const DiskLoc& loc,
                                                   const char* damangeSource,
                                                   const mutablebson::DamageVector& damages ) {
@@ -466,7 +466,7 @@ namespace mongo {
         return _database->getExtentManager();
     }
 
-    void Collection::increaseStorageSize(TransactionExperiment* txn, int size, bool enforceQuota) {
+    void Collection::increaseStorageSize(OperationContext* txn, int size, bool enforceQuota) {
         _recordStore->increaseStorageSize(txn, size, enforceQuota ? largestFileNumberInQuota() : 0);
     }
 
@@ -513,7 +513,7 @@ namespace mongo {
      * 3) truncate record store
      * 4) re-write indexes
      */
-    Status Collection::truncate(TransactionExperiment* txn) {
+    Status Collection::truncate(OperationContext* txn) {
         massert( 17445, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
 
         // 1) store index specs
@@ -548,7 +548,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Collection::temp_cappedTruncateAfter(TransactionExperiment* txn,
+    void Collection::temp_cappedTruncateAfter(OperationContext* txn,
                                               DiskLoc end,
                                               bool inclusive) {
         invariant( isCapped() );
@@ -572,7 +572,7 @@ namespace mongo {
         };
     }
 
-    Status Collection::validate( TransactionExperiment* txn,
+    Status Collection::validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateResults* results, BSONObjBuilder* output ){
 
@@ -614,7 +614,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status Collection::touch( TransactionExperiment* txn,
+    Status Collection::touch( OperationContext* txn,
                               bool touchData, bool touchIndexes,
                               BSONObjBuilder* output ) const {
         if ( touchData ) {
@@ -647,21 +647,21 @@ namespace mongo {
         return _details->isUserFlagSet( flag );
     }
 
-    bool Collection::setUserFlag( TransactionExperiment* txn, int flag ) {
+    bool Collection::setUserFlag( OperationContext* txn, int flag ) {
         if ( !_details->setUserFlag( txn, flag ) )
             return false;
         _syncUserFlags(txn);
         return true;
     }
 
-    bool Collection::clearUserFlag( TransactionExperiment* txn, int flag ) {
+    bool Collection::clearUserFlag( OperationContext* txn, int flag ) {
         if ( !_details->clearUserFlag( txn, flag ) )
             return false;
         _syncUserFlags(txn);
         return true;
     }
 
-    void Collection::_syncUserFlags(TransactionExperiment* txn) {
+    void Collection::_syncUserFlags(OperationContext* txn) {
         if ( _ns.coll() == "system.namespaces" )
             return;
         string system_namespaces = _ns.getSisterNS( "system.namespaces" );
@@ -687,7 +687,7 @@ namespace mongo {
 
     }
 
-    void Collection::setMaxCappedDocs( TransactionExperiment* txn, long long max ) {
+    void Collection::setMaxCappedDocs( OperationContext* txn, long long max ) {
         _details->setMaxCappedDocs( txn, max );
     }
 

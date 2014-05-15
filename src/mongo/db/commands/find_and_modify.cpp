@@ -41,7 +41,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_runner.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -65,7 +65,7 @@ namespace mongo {
             find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
         }
         /* this will eventually replace run,  once sort is handled */
-        bool runNoDirectClient( TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool runNoDirectClient( OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             verify( cmdObj["sort"].eoo() );
 
             const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
@@ -122,7 +122,7 @@ namespace mongo {
             result.append( "value" , p.transform( doc ) );
         }
 
-        static bool runNoDirectClient(TransactionExperiment* txn,
+        static bool runNoDirectClient(OperationContext* txn,
                                       const string& ns, 
                                       const BSONObj& queryOriginal,
                                       const BSONObj& fields,
@@ -297,7 +297,7 @@ namespace mongo {
             return true;
         }
         
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
             DBDirectClient db(txn);
 
             if (cmdObj["sort"].eoo()) {

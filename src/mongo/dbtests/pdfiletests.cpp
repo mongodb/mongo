@@ -39,7 +39,7 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -65,7 +65,7 @@ namespace PdfileTests {
 
             Lock::GlobalWrite lk_;
             Client::Context _context;
-            DurTransaction _txn;
+            OperationContextImpl _txn;
         };
 
         class InsertNoId : public Base {

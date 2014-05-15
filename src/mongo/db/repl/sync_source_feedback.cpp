@@ -37,7 +37,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs.h"  // theReplSet
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -66,7 +66,7 @@ namespace mongo {
         string myname = getHostName();
         {
             Client::WriteContext ctx("local");
-            DurTransaction txn;
+            OperationContextImpl txn;
             // local.me is an identifier for a server for getLastError w:2+
             if (!Helpers::getSingleton("local.me", _me) ||
                 !_me.hasField("host") ||

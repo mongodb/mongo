@@ -49,7 +49,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
@@ -89,7 +89,7 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
-    WriteBatchExecutor::WriteBatchExecutor( TransactionExperiment* txn,
+    WriteBatchExecutor::WriteBatchExecutor( OperationContext* txn,
                                             const BSONObj& wc,
                                             Client* client,
                                             OpCounters* opCounters,
@@ -579,7 +579,7 @@ namespace mongo {
         }
     }
 
-    static void finishCurrentOp( TransactionExperiment* txn,
+    static void finishCurrentOp( OperationContext* txn,
                                  Client* client,
                                  CurOp* currentOp,
                                  WriteErrorDetail* opError ) {
@@ -618,21 +618,21 @@ namespace mongo {
     // - error
     //
 
-    static void singleInsert( TransactionExperiment* txn,
+    static void singleInsert( OperationContext* txn,
                               const BSONObj& docToInsert,
                               Collection* collection,
                               WriteOpResult* result );
 
-    static void singleCreateIndex( TransactionExperiment* txn,
+    static void singleCreateIndex( OperationContext* txn,
                                    const BSONObj& indexDesc,
                                    Collection* collection,
                                    WriteOpResult* result );
 
-    static void multiUpdate( TransactionExperiment* txn,
+    static void multiUpdate( OperationContext* txn,
                              const BatchItemRef& updateItem,
                              WriteOpResult* result );
 
-    static void multiRemove( TransactionExperiment* txn,
+    static void multiRemove( OperationContext* txn,
                              const BatchItemRef& removeItem,
                              WriteOpResult* result );
 
@@ -653,7 +653,7 @@ namespace mongo {
         /**
          * Constructs a new instance, for performing inserts described in "aRequest".
          */
-        explicit ExecInsertsState(TransactionExperiment* txn,
+        explicit ExecInsertsState(OperationContext* txn,
                                   const BatchedCommandRequest* aRequest);
 
         /**
@@ -687,7 +687,7 @@ namespace mongo {
          */
         Collection* getCollection() { return _collection; }
 
-        TransactionExperiment* txn;
+        OperationContext* txn;
 
         // Request object describing the inserts.
         const BatchedCommandRequest* request;
@@ -887,7 +887,7 @@ namespace mongo {
     // IN-DB-LOCK CORE OPERATIONS
     //
 
-    WriteBatchExecutor::ExecInsertsState::ExecInsertsState(TransactionExperiment* txn,
+    WriteBatchExecutor::ExecInsertsState::ExecInsertsState(OperationContext* txn,
                                                            const BatchedCommandRequest* aRequest) :
         txn(txn),
         request(aRequest),
@@ -1015,7 +1015,7 @@ namespace mongo {
      *
      * Might fault or error, otherwise populates the result.
      */
-    static void singleInsert( TransactionExperiment* txn,
+    static void singleInsert( OperationContext* txn,
                               const BSONObj& docToInsert,
                               Collection* collection,
                               WriteOpResult* result ) {
@@ -1042,7 +1042,7 @@ namespace mongo {
      *
      * Might fault or error, otherwise populates the result.
      */
-    static void singleCreateIndex( TransactionExperiment* txn,
+    static void singleCreateIndex( OperationContext* txn,
                                    const BSONObj& indexDesc,
                                    Collection* collection,
                                    WriteOpResult* result ) {
@@ -1065,7 +1065,7 @@ namespace mongo {
         }
     }
 
-    static void multiUpdate( TransactionExperiment* txn,
+    static void multiUpdate( OperationContext* txn,
                              const BatchItemRef& updateItem,
                              WriteOpResult* result ) {
 
@@ -1126,7 +1126,7 @@ namespace mongo {
      *
      * Might fault or error, otherwise populates the result.
      */
-    static void multiRemove( TransactionExperiment* txn,
+    static void multiRemove( OperationContext* txn,
                              const BatchItemRef& removeItem,
                              WriteOpResult* result ) {
 

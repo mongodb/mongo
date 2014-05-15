@@ -44,7 +44,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
@@ -104,7 +104,7 @@ namespace mongo {
     }
 
 
-    StatusWith<CompactStats> Collection::compact( TransactionExperiment* txn,
+    StatusWith<CompactStats> Collection::compact( OperationContext* txn,
                                                   const CompactOptions* compactOptions ) {
         if ( !_recordStore->compactSupported() )
             return StatusWith<CompactStats>( ErrorCodes::BadValue,

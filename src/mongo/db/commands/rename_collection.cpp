@@ -40,7 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -91,14 +91,14 @@ namespace mongo {
             IndexBuilder::restoreIndexes( indexesInProg );
         }
 
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Lock::GlobalWrite globalWriteLock;
             bool ok = wrappedRun(txn, dbname, cmdObj, errmsg, result, fromRepl);
             if (ok && !fromRepl)
                 logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             return ok;
         }
-        virtual bool wrappedRun(TransactionExperiment* txn,
+        virtual bool wrappedRun(OperationContext* txn,
                                 const string& dbname,
                                 BSONObj& cmdObj,
                                 string& errmsg,

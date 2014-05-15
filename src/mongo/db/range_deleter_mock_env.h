@@ -126,7 +126,7 @@ namespace mongo {
          * but simply keeps a record of it. Can also be paused by pauseDeletes and
          * resumed with resumeDeletes.
          */
-        bool deleteRange(TransactionExperiment* txn,
+        bool deleteRange(OperationContext* txn,
                          const StringData& ns,
                          const BSONObj& min,
                          const BSONObj& max,

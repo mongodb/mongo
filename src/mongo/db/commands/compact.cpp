@@ -43,7 +43,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 
@@ -83,7 +83,7 @@ namespace mongo {
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
-        virtual bool run(TransactionExperiment* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string coll = cmdObj.firstElement().valuestr();
             if( coll.empty() || db.empty() ) {
                 errmsg = "no collection name specified";

@@ -41,7 +41,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
     class ApplyOpsCmd : public Command {
@@ -59,7 +59,7 @@ namespace mongo {
             // applyOps can do pretty much anything, so require all privileges.
             RoleGraph::generateUniversalPrivileges(out);
         }
-        virtual bool run(TransactionExperiment* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             if ( cmdObj.firstElement().type() != Array ) {
                 errmsg = "ops has to be an array";

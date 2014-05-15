@@ -66,7 +66,7 @@ namespace mongo {
                 url.find_last_of( '/' ) > 0;
         }
 
-        virtual void handle( TransactionExperiment* txn,
+        virtual void handle( OperationContext* txn,
                              const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {

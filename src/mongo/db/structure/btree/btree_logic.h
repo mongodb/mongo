@@ -32,7 +32,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/btree/btree_ondisk.h"
 #include "mongo/db/structure/btree/key.h"
 #include "mongo/db/structure/btree/bucket_deletion_notification.h"
@@ -101,7 +101,7 @@ namespace mongo {
         private:
             friend class BtreeLogic;
 
-            Builder(BtreeLogic* logic, TransactionExperiment* trans, bool dupsAllowed);
+            Builder(BtreeLogic* logic, OperationContext* trans, bool dupsAllowed);
 
             // Direct ports of functionality
             void newBucket();
@@ -124,18 +124,18 @@ namespace mongo {
             auto_ptr<KeyDataOwnedType> _keyLast;
 
             // Not owned.
-            TransactionExperiment* _trans;
+            OperationContext* _trans;
         };
 
         /**
          * Caller owns the returned pointer.
          * 'this' must outlive the returned pointer.
          */
-        Builder* newBuilder(TransactionExperiment* trans, bool dupsAllowed);
+        Builder* newBuilder(OperationContext* trans, bool dupsAllowed);
 
         Status dupKeyCheck(const BSONObj& key, const DiskLoc& loc) const;
 
-        Status insert(TransactionExperiment* trans,
+        Status insert(OperationContext* trans,
                       const BSONObj& rawKey,
                       const DiskLoc& value,
                       bool dupsAllowed);
@@ -158,7 +158,7 @@ namespace mongo {
 
         bool exists(const KeyDataType& key) const;
 
-        bool unindex(TransactionExperiment* trans,
+        bool unindex(OperationContext* trans,
                      const BSONObj& key,
                      const DiskLoc& recordLoc);
 
@@ -213,7 +213,7 @@ namespace mongo {
         /**
          * Returns OK if the index was uninitialized before, error status otherwise.
          */
-        Status initAsEmpty(TransactionExperiment* trans);
+        Status initAsEmpty(OperationContext* trans);
 
     private:
         friend class BtreeLogic::Builder;
@@ -286,7 +286,7 @@ namespace mongo {
 
         static void setNotPacked(BucketType* bucket);
 
-        static BucketType* btreemod(TransactionExperiment* trans, BucketType* bucket);
+        static BucketType* btreemod(OperationContext* trans, BucketType* bucket);
 
         static int splitPos(BucketType* bucket, int keypos);
 
@@ -312,7 +312,7 @@ namespace mongo {
         // information).
         //
 
-        bool basicInsert(TransactionExperiment* trans,
+        bool basicInsert(OperationContext* trans,
                          BucketType* bucket,
                          const DiskLoc bucketLoc,
                          int& keypos,
@@ -321,7 +321,7 @@ namespace mongo {
 
         void dropFront(BucketType* bucket, int nDrop, int& refpos);
 
-        void _pack(TransactionExperiment* trans, BucketType* bucket, const DiskLoc thisLoc, int &refPos);
+        void _pack(OperationContext* trans, BucketType* bucket, const DiskLoc thisLoc, int &refPos);
 
         void customLocate(DiskLoc* locInOut,
                           int* keyOfsInOut,
@@ -383,7 +383,7 @@ namespace mongo {
                                bool dumpBuckets,
                                unsigned depth);
 
-        DiskLoc addBucket(TransactionExperiment* trans);
+        DiskLoc addBucket(OperationContext* trans);
 
         bool canMergeChildren(BucketType* bucket,
                               const DiskLoc bucketLoc,
@@ -398,7 +398,7 @@ namespace mongo {
 
         void truncateTo(BucketType* bucket, int N, int &refPos);
 
-        void split(TransactionExperiment* trans,
+        void split(OperationContext* trans,
                    BucketType* bucket,
                    const DiskLoc bucketLoc,
                    int keypos,
@@ -407,7 +407,7 @@ namespace mongo {
                    const DiskLoc lchild,
                    const DiskLoc rchild);
 
-        Status _insert(TransactionExperiment* trans,
+        Status _insert(OperationContext* trans,
                        BucketType* bucket,
                        const DiskLoc bucketLoc,
                        const KeyDataType& key,
@@ -417,7 +417,7 @@ namespace mongo {
                        const DiskLoc rightChild);
 
         // TODO take a BucketType*?
-        void insertHere(TransactionExperiment* trans,
+        void insertHere(OperationContext* trans,
                         const DiskLoc bucketLoc,
                         int pos,
                         const KeyDataType& key,
@@ -427,7 +427,7 @@ namespace mongo {
 
         string dupKeyError(const KeyDataType& key) const;
 
-        void setInternalKey(TransactionExperiment* trans,
+        void setInternalKey(OperationContext* trans,
                             BucketType* bucket,
                             const DiskLoc bucketLoc,
                             int keypos,
@@ -436,22 +436,22 @@ namespace mongo {
                             const DiskLoc lchild,
                             const DiskLoc rchild);
 
-        void fix(TransactionExperiment* trans, const DiskLoc bucketLoc, const DiskLoc child);
+        void fix(OperationContext* trans, const DiskLoc bucketLoc, const DiskLoc child);
 
-        void fixParentPtrs(TransactionExperiment* trans,
+        void fixParentPtrs(OperationContext* trans,
                            BucketType* bucket,
                            const DiskLoc bucketLoc,
                            int firstIndex = 0,
                            int lastIndex = -1);
 
-        bool mayBalanceWithNeighbors(TransactionExperiment* trans, BucketType* bucket, const DiskLoc bucketLoc);
+        bool mayBalanceWithNeighbors(OperationContext* trans, BucketType* bucket, const DiskLoc bucketLoc);
 
-        void doBalanceChildren(TransactionExperiment* trans,
+        void doBalanceChildren(OperationContext* trans,
                                BucketType* bucket,
                                const DiskLoc bucketLoc,
                                int leftIndex);
 
-        void doBalanceLeftToRight(TransactionExperiment* trans,
+        void doBalanceLeftToRight(OperationContext* trans,
                                   BucketType* bucket,
                                   const DiskLoc thisLoc,
                                   int leftIndex,
@@ -461,7 +461,7 @@ namespace mongo {
                                   BucketType* r,
                                   const DiskLoc rchild);
 
-        void doBalanceRightToLeft(TransactionExperiment* trans,
+        void doBalanceRightToLeft(OperationContext* trans,
                                   BucketType* bucket,
                                   const DiskLoc bucketLoc,
                                   int leftIndex,
@@ -471,37 +471,37 @@ namespace mongo {
                                   BucketType* r,
                                   const DiskLoc rchild);
 
-        bool tryBalanceChildren(TransactionExperiment* trans,
+        bool tryBalanceChildren(OperationContext* trans,
                                 BucketType* bucket,
                                 const DiskLoc bucketLoc,
                                 int leftIndex);
 
         int indexInParent(BucketType* bucket, const DiskLoc bucketLoc) const;
 
-        void doMergeChildren(TransactionExperiment* trans,
+        void doMergeChildren(OperationContext* trans,
                              BucketType* bucket,
                              const DiskLoc bucketLoc,
                              int leftIndex);
 
-        void replaceWithNextChild(TransactionExperiment* trans,
+        void replaceWithNextChild(OperationContext* trans,
                                   BucketType* bucket,
                                   const DiskLoc bucketLoc);
 
-        void deleteInternalKey(TransactionExperiment* trans,
+        void deleteInternalKey(OperationContext* trans,
                                BucketType* bucket,
                                const DiskLoc bucketLoc,
                                int keypos);
 
-        void delKeyAtPos(TransactionExperiment* trans,
+        void delKeyAtPos(OperationContext* trans,
                          BucketType* bucket,
                          const DiskLoc bucketLoc,
                          int p);
 
-        void delBucket(TransactionExperiment* trans,
+        void delBucket(OperationContext* trans,
                        BucketType* bucket,
                        const DiskLoc bucketLoc);
 
-        void deallocBucket(TransactionExperiment* trans,
+        void deallocBucket(OperationContext* trans,
                            BucketType* bucket,
                            const DiskLoc bucketLoc);
 

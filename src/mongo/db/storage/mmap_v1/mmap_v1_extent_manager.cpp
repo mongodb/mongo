@@ -40,7 +40,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -74,7 +74,7 @@ namespace mongo {
     }
 
 
-    Status MmapV1ExtentManager::init(TransactionExperiment* txn) {
+    Status MmapV1ExtentManager::init(OperationContext* txn) {
         verify( _files.size() == 0 );
 
         for ( int n = 0; n < DiskLoc::MaxFiles; n++ ) {
@@ -113,7 +113,7 @@ namespace mongo {
 
 
     // todo: this is called a lot. streamline the common case
-    DataFile* MmapV1ExtentManager::getFile( TransactionExperiment* txn,
+    DataFile* MmapV1ExtentManager::getFile( OperationContext* txn,
                                       int n,
                                       int sizeNeeded ,
                                       bool preallocateOnly) {
@@ -174,7 +174,7 @@ namespace mongo {
         return preallocateOnly ? 0 : p;
     }
 
-    DataFile* MmapV1ExtentManager::_addAFile( TransactionExperiment* txn,
+    DataFile* MmapV1ExtentManager::_addAFile( OperationContext* txn,
                                         int sizeNeeded,
                                         bool preallocateNextFile ) {
         DEV Lock::assertWriteLocked( _dbname );
@@ -243,7 +243,7 @@ namespace mongo {
         return DataFile::maxSize() - DataFileHeader::HeaderSize - 16;
     }
 
-    DiskLoc MmapV1ExtentManager::_createExtentInFile( TransactionExperiment* txn,
+    DiskLoc MmapV1ExtentManager::_createExtentInFile( OperationContext* txn,
                                                 int fileNo,
                                                 DataFile* f,
                                                 int size,
@@ -276,7 +276,7 @@ namespace mongo {
     }
 
 
-    DiskLoc MmapV1ExtentManager::_createExtent( TransactionExperiment* txn,
+    DiskLoc MmapV1ExtentManager::_createExtent( OperationContext* txn,
                                           int size,
                                           int maxFileNoForQuota ) {
         size = quantizeExtentSize( size );
@@ -315,7 +315,7 @@ namespace mongo {
         msgasserted(14810, "couldn't allocate space for a new extent" );
     }
 
-    DiskLoc MmapV1ExtentManager::_allocFromFreeList( TransactionExperiment* txn,
+    DiskLoc MmapV1ExtentManager::_allocFromFreeList( OperationContext* txn,
                                                int approxSize,
                                                bool capped ) {
         // setup extent constraints
@@ -400,7 +400,7 @@ namespace mongo {
         return best->myLoc;
     }
 
-    DiskLoc MmapV1ExtentManager::allocateExtent( TransactionExperiment* txn,
+    DiskLoc MmapV1ExtentManager::allocateExtent( OperationContext* txn,
                                            bool capped,
                                            int size,
                                            int quotaMax ) {
@@ -423,7 +423,7 @@ namespace mongo {
         return eloc;
     }
 
-    void MmapV1ExtentManager::freeExtent(TransactionExperiment* txn, DiskLoc firstExt ) {
+    void MmapV1ExtentManager::freeExtent(OperationContext* txn, DiskLoc firstExt ) {
         Extent* e = getExtent( firstExt );
         txn->writing( &e->xnext )->Null();
         txn->writing( &e->xprev )->Null();
@@ -445,7 +445,7 @@ namespace mongo {
 
     }
 
-    void MmapV1ExtentManager::freeExtents(TransactionExperiment* txn, DiskLoc firstExt, DiskLoc lastExt) {
+    void MmapV1ExtentManager::freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt) {
 
         if ( firstExt.isNull() && lastExt.isNull() )
             return;
@@ -488,13 +488,13 @@ namespace mongo {
         return file->header()->freeListEnd;
     }
 
-    void MmapV1ExtentManager::_setFreeListStart( TransactionExperiment* txn, DiskLoc loc ) {
+    void MmapV1ExtentManager::_setFreeListStart( OperationContext* txn, DiskLoc loc ) {
         invariant( !_files.empty() );
         DataFile* file = _files[0];
         *txn->writing( &file->header()->freeListStart ) = loc;
     }
 
-    void MmapV1ExtentManager::_setFreeListEnd( TransactionExperiment* txn, DiskLoc loc ) {
+    void MmapV1ExtentManager::_setFreeListEnd( OperationContext* txn, DiskLoc loc ) {
         invariant( !_files.empty() );
         DataFile* file = _files[0];
         *txn->writing( &file->header()->freeListEnd ) = loc;

@@ -36,7 +36,7 @@
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/record_store_v1_simple_iterator.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
@@ -57,7 +57,7 @@ namespace mongo {
     static ServerStatusMetricField<Counter64> dFreelist3( "storage.freelist.search.scanned",
                                                           &freelistIterations );
 
-    SimpleRecordStoreV1::SimpleRecordStoreV1( TransactionExperiment* txn,
+    SimpleRecordStoreV1::SimpleRecordStoreV1( OperationContext* txn,
                                               const StringData& ns,
                                               RecordStoreV1MetaData* details,
                                               ExtentManager* em,
@@ -76,7 +76,7 @@ namespace mongo {
     SimpleRecordStoreV1::~SimpleRecordStoreV1() {
     }
 
-    DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents( TransactionExperiment* txn,
+    DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents( OperationContext* txn,
                                                             int lenToAlloc ) {
         // align very slightly.
         lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
@@ -219,7 +219,7 @@ namespace mongo {
 
     }
 
-    StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord( TransactionExperiment* txn,
+    StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord( OperationContext* txn,
                                                           int lengthWithHeaders,
                                                           int quotaMax ) {
         DiskLoc loc = _allocFromExistingExtents( txn, lengthWithHeaders );
@@ -259,12 +259,12 @@ namespace mongo {
         return StatusWith<DiskLoc>( ErrorCodes::InternalError, "cannot allocate space" );
     }
 
-    Status SimpleRecordStoreV1::truncate(TransactionExperiment* txn) {
+    Status SimpleRecordStoreV1::truncate(OperationContext* txn) {
         return Status( ErrorCodes::InternalError,
                        "SimpleRecordStoreV1::truncate not implemented" );
     }
 
-    void SimpleRecordStoreV1::addDeletedRec( TransactionExperiment* txn, const DiskLoc& dloc ) {
+    void SimpleRecordStoreV1::addDeletedRec( OperationContext* txn, const DiskLoc& dloc ) {
         DeletedRecord* d = drec( dloc );
 
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
@@ -324,7 +324,7 @@ namespace mongo {
         size_t _allocationSize;
     };
 
-    void SimpleRecordStoreV1::_compactExtent(TransactionExperiment* txn,
+    void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
                                              const DiskLoc diskloc,
                                              int extentNumber,
                                              RecordStoreCompactAdaptor* adaptor,
@@ -446,7 +446,7 @@ namespace mongo {
 
     }
 
-    Status SimpleRecordStoreV1::compact( TransactionExperiment* txn,
+    Status SimpleRecordStoreV1::compact( OperationContext* txn,
                                          RecordStoreCompactAdaptor* adaptor,
                                          const CompactOptions* options,
                                          CompactStats* stats ) {

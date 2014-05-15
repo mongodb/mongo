@@ -43,7 +43,7 @@ namespace mongo {
     class IndexCatalog;
     class MmapV1ExtentManager;
     class NamespaceDetails;
-    class TransactionExperiment;
+    class OperationContext;
 
     struct CollectionOptions {
         CollectionOptions() {
@@ -98,7 +98,7 @@ namespace mongo {
     class Database {
     public:
         // you probably need to be in dbHolderMutex when constructing this
-        Database(TransactionExperiment* txn,
+        Database(OperationContext* txn,
                  const char *nm,
                  /*out*/ bool& newDb,
                  const string& path = storageGlobalParams.dbpath);
@@ -111,7 +111,7 @@ namespace mongo {
         const string& name() const { return _name; }
         const string& path() const { return _path; }
 
-        void clearTmpCollections(TransactionExperiment* txn);
+        void clearTmpCollections(OperationContext* txn);
 
         /**
          * tries to make sure that this hasn't been deleted
@@ -132,7 +132,7 @@ namespace mongo {
         /**
          * @return true if success.  false if bad level or error creating profile ns
          */
-        bool setProfilingLevel( TransactionExperiment* txn, int newLevel , string& errmsg );
+        bool setProfilingLevel( OperationContext* txn, int newLevel , string& errmsg );
 
         void flushFiles( bool sync );
 
@@ -156,9 +156,9 @@ namespace mongo {
         MmapV1ExtentManager* getExtentManager() { return _extentManager.get(); }
         const MmapV1ExtentManager* getExtentManager() const { return _extentManager.get(); }
 
-        Status dropCollection( TransactionExperiment* txn, const StringData& fullns );
+        Status dropCollection( OperationContext* txn, const StringData& fullns );
 
-        Collection* createCollection( TransactionExperiment* txn,
+        Collection* createCollection( OperationContext* txn,
                                       const StringData& ns,
                                       const CollectionOptions& options = CollectionOptions(),
                                       bool allocateSpace = true,
@@ -173,16 +173,16 @@ namespace mongo {
 
         Collection* getCollection( const NamespaceString& ns ) { return getCollection( ns.ns() ); }
 
-        Collection* getCollection( TransactionExperiment* txn, const StringData& ns );
+        Collection* getCollection( OperationContext* txn, const StringData& ns );
 
-        Collection* getCollection( TransactionExperiment* txn, const NamespaceString& ns ) {
+        Collection* getCollection( OperationContext* txn, const NamespaceString& ns ) {
             return getCollection( txn, ns.ns() );
         }
 
         Collection* getOrCreateCollection( const StringData& ns );
-        Collection* getOrCreateCollection( TransactionExperiment* txn, const StringData& ns );
+        Collection* getOrCreateCollection( OperationContext* txn, const StringData& ns );
 
-        Status renameCollection( TransactionExperiment* txn,
+        Status renameCollection( OperationContext* txn,
                                  const StringData& fromNS,
                                  const StringData& toNS,
                                  bool stayTemp );
@@ -205,7 +205,7 @@ namespace mongo {
 
         ~Database(); // closes files and other cleanup see below.
 
-        void _addNamespaceToCatalog( TransactionExperiment* txn,
+        void _addNamespaceToCatalog( OperationContext* txn,
                                      const StringData& ns,
                                      const BSONObj* options );
 
@@ -216,7 +216,7 @@ namespace mongo {
          * removes from NamespaceIndex
          * NOT RIGHT NOW, removes cache entry in Database TODO?
          */
-        Status _dropNS( TransactionExperiment* txn, const StringData& ns );
+        Status _dropNS( OperationContext* txn, const StringData& ns );
 
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
@@ -224,9 +224,9 @@ namespace mongo {
          */
         void checkDuplicateUncasedNames(bool inholderlockalready) const;
 
-        void openAllFiles(TransactionExperiment* txn);
+        void openAllFiles(OperationContext* txn);
 
-        Status _renameSingleNamespace( TransactionExperiment* txn,
+        Status _renameSingleNamespace( OperationContext* txn,
                                        const StringData& fromNS,
                                        const StringData& toNS,
                                        bool stayTemp );

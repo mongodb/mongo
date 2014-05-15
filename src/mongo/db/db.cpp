@@ -75,7 +75,7 @@
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
@@ -188,7 +188,7 @@ namespace mongo {
         }
 
         virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
-            DurTransaction txn;
+            OperationContextImpl txn;
             while ( true ) {
                 if ( inShutdown() ) {
                     log() << "got request after shutdown()" << endl;
@@ -282,7 +282,7 @@ namespace mongo {
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web( boost::bind(&webServerThread,
                                            new RestAdminAccess(), // takes ownership
-                                           DurTransaction::factory) ); // XXX SERVER-13931
+                                           OperationContextImpl::factory) ); // XXX SERVER-13931
 
 #if(TESTEXHAUST)
         boost::thread thr(testExhaust);
@@ -292,7 +292,7 @@ namespace mongo {
 
 
     void doDBUpgrade( const string& dbName, DataFileHeader* h ) {
-        DurTransaction txn;
+        OperationContextImpl txn;
         DBDirectClient db(&txn);
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
@@ -359,7 +359,7 @@ namespace mongo {
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
         Lock::GlobalWrite lk;
-        DurTransaction txn;
+        OperationContextImpl txn;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {

@@ -42,7 +42,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -55,7 +55,7 @@ namespace ReplTests {
     class Base {
         Lock::GlobalWrite lk;
         Client::Context _context;
-        mutable DurTransaction _txn;
+        mutable OperationContextImpl _txn;
     public:
         Base() : _context( ns() ) {
             oldRepl();
@@ -132,7 +132,7 @@ namespace ReplTests {
         static int opCount() {
             Lock::GlobalWrite lk;
             Client::Context ctx( cllNS() );
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( cllNS() );
             if ( !coll ) {
@@ -150,7 +150,7 @@ namespace ReplTests {
         }
         static void applyAllOperations() {
             Lock::GlobalWrite lk;
-            DurTransaction txn;
+            OperationContextImpl txn;
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
@@ -182,7 +182,7 @@ namespace ReplTests {
         static void printAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns );
             if ( !coll ) {
@@ -202,7 +202,7 @@ namespace ReplTests {
         static void deleteAll( const char *ns ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns );
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns );
             if ( !coll ) {
@@ -223,7 +223,7 @@ namespace ReplTests {
         static void insert( const BSONObj &o ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            DurTransaction txn;
+            OperationContextImpl txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection( ns() );
             if ( !coll ) {

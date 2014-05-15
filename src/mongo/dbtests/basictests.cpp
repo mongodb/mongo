@@ -32,7 +32,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/db.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/array.h"
 #include "mongo/util/base64.h"
@@ -377,7 +377,7 @@ namespace BasicTests {
     public:
         void run() {
             Lock::GlobalWrite lk;
-            DurTransaction txn;
+            OperationContextImpl txn;
             bool isNew = false;
             // this leaks as ~Database is private
             // if that changes, should put this on the stack

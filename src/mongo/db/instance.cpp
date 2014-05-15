@@ -55,7 +55,7 @@
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -96,11 +96,11 @@ namespace mongo {
     inline void opread(Message& m) { if( _diaglog.getLevel() & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
     inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.writeop((char *) m.singleData(), m.header()->len); }
 
-    void receivedKillCursors(TransactionExperiment* txn, Message& m);
-    void receivedUpdate(TransactionExperiment* txn, Message& m, CurOp& op);
-    void receivedDelete(TransactionExperiment* txn, Message& m, CurOp& op);
-    void receivedInsert(TransactionExperiment* txn, Message& m, CurOp& op);
-    bool receivedGetMore(TransactionExperiment* txn, DbResponse& dbresponse, Message& m, CurOp& curop );
+    void receivedKillCursors(OperationContext* txn, Message& m);
+    void receivedUpdate(OperationContext* txn, Message& m, CurOp& op);
+    void receivedDelete(OperationContext* txn, Message& m, CurOp& op);
+    void receivedInsert(OperationContext* txn, Message& m, CurOp& op);
+    bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop );
 
     int nloggedsome = 0;
 #define LOGWITHRATELIMIT if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
@@ -232,7 +232,7 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
-    static bool receivedQuery(TransactionExperiment* txn, Client& c, DbResponse& dbresponse, Message& m ) {
+    static bool receivedQuery(OperationContext* txn, Client& c, DbResponse& dbresponse, Message& m ) {
         bool ok = true;
         MSGID responseTo = m.header()->id;
 
@@ -329,7 +329,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    void assembleResponse( TransactionExperiment* txn,
+    void assembleResponse( OperationContext* txn,
                            Message& m,
                            DbResponse& dbresponse,
                            const HostAndPort& remote ) {
@@ -514,7 +514,7 @@ namespace mongo {
         debug.reset();
     } /* assembleResponse() */
 
-    void receivedKillCursors(TransactionExperiment* txn, Message& m) {
+    void receivedKillCursors(OperationContext* txn, Message& m) {
         int *x = (int *) m.singleData()->_data;
         x++; // reserved
         int n = *x++;
@@ -563,7 +563,7 @@ namespace mongo {
         delete database; // closes files
     }
 
-    void receivedUpdate(TransactionExperiment* txn, Message& m, CurOp& op) {
+    void receivedUpdate(OperationContext* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
@@ -618,7 +618,7 @@ namespace mongo {
         lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
     }
 
-    void receivedDelete(TransactionExperiment* txn, Message& m, CurOp& op) {
+    void receivedDelete(OperationContext* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
@@ -658,7 +658,7 @@ namespace mongo {
 
     QueryResult* emptyMoreResult(long long);
 
-    bool receivedGetMore(TransactionExperiment* txn, DbResponse& dbresponse, Message& m, CurOp& curop ) {
+    bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop ) {
         bool ok = true;
 
         DbMessage d(m);
@@ -781,7 +781,7 @@ namespace mongo {
         return ok;
     }
 
-    void checkAndInsert(TransactionExperiment* txn,
+    void checkAndInsert(OperationContext* txn,
                         Client::Context& ctx,
                         const char *ns,
                         /*modifies*/BSONObj& js) {
@@ -830,7 +830,7 @@ namespace mongo {
         logOp(txn, "i", ns, js);
     }
 
-    NOINLINE_DECL void insertMulti(TransactionExperiment* txn,
+    NOINLINE_DECL void insertMulti(OperationContext* txn,
                                    Client::Context& ctx,
                                    bool keepGoing,
                                    const char *ns,
@@ -854,7 +854,7 @@ namespace mongo {
         op.debug().ninserted = i;
     }
 
-    void receivedInsert(TransactionExperiment* txn, Message& m, CurOp& op) {
+    void receivedInsert(OperationContext* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
         op.debug().ns = ns;
@@ -942,11 +942,11 @@ namespace mongo {
     }
 
     DBDirectClient::DBDirectClient() 
-        : _txnOwned(new DurTransaction),
+        : _txnOwned(new OperationContextImpl),
           _txn(_txnOwned.get())
     {}
 
-    DBDirectClient::DBDirectClient(TransactionExperiment* txn) 
+    DBDirectClient::DBDirectClient(OperationContext* txn) 
         : _txn(txn)
     {}
 

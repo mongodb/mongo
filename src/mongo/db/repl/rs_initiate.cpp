@@ -178,7 +178,7 @@ namespace mongo {
             actions.addAction(ActionType::replSetConfigure);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
-        virtual bool run(TransactionExperiment* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
             if( !replSet ) {

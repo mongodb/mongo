@@ -45,7 +45,7 @@ namespace mongo {
     class MAdvise;
     class NamespaceDetails;
     class Record;
-    class TransactionExperiment;
+    class OperationContext;
 
     class RecordStoreCompactAdaptor;
     class RecordStore;
@@ -123,14 +123,14 @@ namespace mongo {
 
         virtual Record* recordFor( const DiskLoc& loc ) const = 0;
 
-        virtual void deleteRecord( TransactionExperiment* txn, const DiskLoc& dl ) = 0;
+        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl ) = 0;
 
-        virtual StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
                                                   int quotaMax ) = 0;
 
-        virtual StatusWith<DiskLoc> insertRecord( TransactionExperiment* txn,
+        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   int quotaMax ) = 0;
 
@@ -161,11 +161,11 @@ namespace mongo {
         /**
          * removes all Records
          */
-        virtual Status truncate( TransactionExperiment* txn ) = 0;
+        virtual Status truncate( OperationContext* txn ) = 0;
 
         // does this RecordStore support the compact operation
         virtual bool compactSupported() const = 0;
-        virtual Status compact( TransactionExperiment* txn,
+        virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
                                 CompactStats* stats ) = 0;
@@ -177,7 +177,7 @@ namespace mongo {
          *         OK will be returned even if corruption is found
          *         deatils will be in result
          */
-        virtual Status validate( TransactionExperiment* txn,
+        virtual Status validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const = 0;
@@ -187,11 +187,11 @@ namespace mongo {
          * What cache depends on implementation.
          * @param output (optional) - where to put detailed stats
          */
-        virtual Status touch( TransactionExperiment* txn, BSONObjBuilder* output ) const = 0;
+        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const = 0;
 
         // TODO: this makes me sad, it shouldn't be in the interface
         // do not use this anymore
-        virtual void increaseStorageSize( TransactionExperiment* txn,  int size, int quotaMax ) = 0;
+        virtual void increaseStorageSize( OperationContext* txn,  int size, int quotaMax ) = 0;
 
     protected:
         std::string _ns;

@@ -28,7 +28,7 @@
 
 #include "mongo/db/structure/btree/btree_interface.h"
 
-#include "mongo/db/storage/transaction.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/btree/btree_logic.h"
 
 
@@ -37,7 +37,7 @@ namespace mongo {
     template <class OnDiskFormat>
     class BtreeBuilderInterfaceImpl : public BtreeBuilderInterface {
     public:
-        BtreeBuilderInterfaceImpl(TransactionExperiment* trans,
+        BtreeBuilderInterfaceImpl(OperationContext* trans,
                                   typename BtreeLogic<OnDiskFormat>::Builder* builder)
             : _builder(builder), _trans(trans) { }
 
@@ -55,7 +55,7 @@ namespace mongo {
         typename BtreeLogic<OnDiskFormat>::Builder* _builder;
 
         // Not owned here.
-        TransactionExperiment* _trans;
+        OperationContext* _trans;
     };
 
     template <class OnDiskFormat>
@@ -76,14 +76,14 @@ namespace mongo {
 
         virtual ~BtreeInterfaceImpl() { }
 
-        virtual BtreeBuilderInterface* getBulkBuilder(TransactionExperiment* txn,
+        virtual BtreeBuilderInterface* getBulkBuilder(OperationContext* txn,
                                                       bool dupsAllowed) {
 
             return new BtreeBuilderInterfaceImpl<OnDiskFormat>(
                 txn, _btree->newBuilder(txn, dupsAllowed));
         }
 
-        virtual Status insert(TransactionExperiment* txn,
+        virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
                               const DiskLoc& loc,
                               bool dupsAllowed) {
@@ -91,7 +91,7 @@ namespace mongo {
             return _btree->insert(txn, key, loc, dupsAllowed);
         }
 
-        virtual bool unindex(TransactionExperiment* txn,
+        virtual bool unindex(OperationContext* txn,
                              const BSONObj& key,
                              const DiskLoc& loc) {
 
@@ -185,7 +185,7 @@ namespace mongo {
             _btree->restorePosition(saved.key, saved.loc, direction, bucketInOut, keyOffsetInOut);
         }
 
-        virtual Status initAsEmpty(TransactionExperiment* txn) {
+        virtual Status initAsEmpty(OperationContext* txn) {
             return _btree->initAsEmpty(txn);
         }
 

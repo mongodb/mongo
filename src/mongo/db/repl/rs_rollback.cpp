@@ -41,7 +41,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/storage/mmap_v1/dur_transaction.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 
 /* Scenarios
@@ -337,7 +337,7 @@ namespace mongo {
 
     void ReplSetImpl::syncFixUp(HowToFixUp& h, OplogReader& r) {
         DBClientConnection *them = r.conn();
-        DurTransaction txn;
+        OperationContextImpl txn;
 
         // fetch all first so we needn't handle interruption in a fancy way
 
