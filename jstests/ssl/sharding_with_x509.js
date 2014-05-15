@@ -30,7 +30,7 @@ print( "starting insertion phase" )
 
 // Insert a bunch of data
 var toInsert = 2000;
-var bulk = coll.initializedUnorderedBulkOp();
+var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < toInsert; i++ ){
     bulk.insert({ my: "test", data: "to", insert: i });
 }
@@ -40,10 +40,10 @@ print( "starting updating phase" )
 
 // Update a bunch of data
 var toUpdate = toInsert;
-bulk = coll.initializedUnorderedBulkOp();
+bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < toUpdate; i++ ){
     var id = coll.findOne({ insert : i })._id;
-    bulk.update({ insert : i, _id : id }, { $inc : { counter : 1 } });
+    bulk.find({ insert : i, _id : id }).update({ $inc : { counter : 1 } });
 }
 assert.writeOK(bulk.execute());
 
@@ -51,9 +51,9 @@ print( "starting deletion" )
 
 // Remove a bunch of data
 var toDelete = toInsert / 2;
-bulk = coll.initializedUnorderedBulkOp();
+bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < toDelete; i++ ){
-    bulk.remove({ insert : i });
+    bulk.find({ insert : i }).remove();
 }
 assert.writeOK(bulk.execute());
 
