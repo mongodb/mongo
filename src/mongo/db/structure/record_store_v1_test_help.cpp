@@ -40,12 +40,27 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-    bool DummyTransactionExperiment::commitIfNeeded( bool force ) {
+
+    bool DummyRecoveryUnit::commitIfNeeded( bool force ) {
         return false;
     }
 
-    bool DummyTransactionExperiment::isCommitNeeded() const {
+    bool DummyRecoveryUnit::isCommitNeeded() const {
         return false;
+    }
+
+    void* DummyRecoveryUnit::writingPtr(void* data, size_t len) {
+        return data;
+    }
+
+    void DummyRecoveryUnit::createdFile(const std::string& filename, unsigned long long len) {
+    }
+
+    void DummyRecoveryUnit::syncDataAndTruncateJournal() {
+    }
+
+    DummyTransactionExperiment::DummyTransactionExperiment() {
+        _recoveryUnit.reset(new DummyRecoveryUnit());
     }
 
     ProgressMeter* DummyTransactionExperiment::setMessage(const char* msg,
@@ -53,17 +68,6 @@ namespace mongo {
                                                           unsigned long long progressMeterTotal,
                                                           int secondsBetween) {
         invariant( false );
-    }
-
-    void* DummyTransactionExperiment::writingPtr(void* data, size_t len) {
-        return data;
-    }
-
-    void DummyTransactionExperiment::createdFile(const std::string& filename,
-                                                 unsigned long long len) {
-    }
-
-    void DummyTransactionExperiment::syncDataAndTruncateJournal() {
     }
 
     void DummyTransactionExperiment::checkForInterrupt(bool heedMutex ) const {
