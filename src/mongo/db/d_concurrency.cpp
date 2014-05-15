@@ -54,16 +54,7 @@
 // yielding
 // commitIfNeeded
 
-#define MONGOD_CONCURRENCY_LEVEL_GLOBAL 0
-#define MONGOD_CONCURRENCY_LEVEL_DB 1
-
-#ifndef MONGOD_CONCURRENCY_LEVEL
-#define MONGOD_CONCURRENCY_LEVEL MONGOD_CONCURRENCY_LEVEL_DB
-#endif
-
 namespace mongo { 
-
-    static const bool DB_LEVEL_LOCKING_ENABLED = ( ( MONGOD_CONCURRENCY_LEVEL ) >= MONGOD_CONCURRENCY_LEVEL_DB );
 
     inline LockState& lockState() { 
         return cc().lockState();
@@ -266,9 +257,6 @@ namespace mongo {
             lockState().dump();
             msgasserted(16105, str::stream() << "expected to be write locked for " << ns);
         }
-    }
-    bool Lock::dbLevelLockingEnabled() {
-        return DB_LEVEL_LOCKING_ENABLED;
     }
 
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
@@ -573,25 +561,19 @@ namespace mongo {
         if( ls.isW() )
             return;
 
-        if (DB_LEVEL_LOCKING_ENABLED) {
-            StringData db = nsToDatabaseSubstring( ns );
-            Nestable nested = n(db);
-            if( nested == admin ) { 
-                // we can't nestedly lock both admin and local as implemented. so lock_W.
-                qlk.lock_W();
-                _locked_W = true;
-                return;
-            } 
-            if( !nested )
-                lockOther(db);
-            lockTop(ls);
-            if( nested )
-                lockNestable(nested);
-        } 
-        else {
+        StringData db = nsToDatabaseSubstring( ns );
+        Nestable nested = n(db);
+        if( nested == admin ) { 
+            // we can't nestedly lock both admin and local as implemented. so lock_W.
             qlk.lock_W();
-            _locked_w = true;
-        }
+            _locked_W = true;
+            return;
+        } 
+        if( !nested )
+            lockOther(db);
+        lockTop(ls);
+        if( nested )
+            lockNestable(nested);
     }
 
     void Lock::DBRead::lockDB(const string& ns) {
@@ -604,19 +586,14 @@ namespace mongo {
 
         if ( ls.isRW() )
             return;
-        if (DB_LEVEL_LOCKING_ENABLED) {
-            StringData db = nsToDatabaseSubstring(ns);
-            Nestable nested = n(db);
-            if( !nested )
-                lockOther(db);
-            lockTop(ls);
-            if( nested )
-                lockNestable(nested);
-        } 
-        else {
-            qlk.lock_R();
-            _locked_r = true;
-        }
+
+        StringData db = nsToDatabaseSubstring(ns);
+        Nestable nested = n(db);
+        if( !nested )
+            lockOther(db);
+        lockTop(ls);
+        if( nested )
+            lockNestable(nested);
     }
 
     Lock::DBWrite::DBWrite( const StringData& ns )
@@ -649,11 +626,7 @@ namespace mongo {
         }
 
         if( _locked_w ) {
-            if (DB_LEVEL_LOCKING_ENABLED) {
-                qlk.unlock_w();
-            } else {
-                qlk.unlock_W();
-            }
+            qlk.unlock_w();
         }
 
         if( _locked_W ) {
@@ -676,11 +649,7 @@ namespace mongo {
         }
 
         if( _locked_r ) {
-            if (DB_LEVEL_LOCKING_ENABLED) {
-                qlk.unlock_r();
-            } else {
-                qlk.unlock_R();
-            }
+            qlk.unlock_r();
         }
         _weLocked = 0;
         _locked_r = false;

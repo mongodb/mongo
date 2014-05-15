@@ -182,7 +182,7 @@ namespace ThreadedTests {
                     if( i > N/2 ) { 
                         int q = i % 11;
                         if( q == 0 ) { 
-                            char what = Lock::dbLevelLockingEnabled() ? 'r' : 'R';
+                            char what = 'r';
                             Lock::DBRead r("foo");
                             ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
                             ASSERT( !Lock::nested() );

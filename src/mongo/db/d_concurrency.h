@@ -59,8 +59,6 @@ namespace mongo {
         static bool atLeastReadLocked(const StringData& ns); // true if this db is locked
         static void assertAtLeastReadLocked(const StringData& ns);
         static void assertWriteLocked(const StringData& ns);
-
-        static bool dbLevelLockingEnabled(); 
         
         static LockStat* globalLockStat();
         static LockStat* nestableLockStat( Nestable db );
