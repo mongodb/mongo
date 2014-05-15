@@ -227,6 +227,10 @@ namespace mongo {
                 "disable scripting engine")
                                          .setSources(moe::SourceAllLegacy);
 
+        general_options.addOptionChaining("security.javascriptEnabled", "", moe::Bool,
+                "Enable javascript execution")
+                                         .setSources(moe::SourceYAMLConfig);
+
         // Query Options
 
         general_options.addOptionChaining("notablescan", "notablescan", moe::Switch,
@@ -771,6 +775,19 @@ namespace mongo {
             }
         }
 
+        // "security.javascriptEnabled" comes from the config file, so override it if "noscripting"
+        // is set since that comes from the command line.
+        if (params->count("noscripting")) {
+            Status ret = params->set("security.javascriptEnabled", moe::Value(false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = params->remove("noscripting");
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
         return Status::OK();
     }
 
@@ -901,8 +918,8 @@ namespace mongo {
         if (params.count("net.http.JSONPEnabled")) {
             serverGlobalParams.jsonp = true;
         }
-        if (params.count("noscripting")) {
-            mongodGlobalParams.scriptingEnabled = false;
+        if (params.count("security.javascriptEnabled")) {
+            mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
         }
         if (params.count("storage.preallocDataFiles")) {
             storageGlobalParams.prealloc = params["storage.preallocDataFiles"].as<bool>();
