@@ -50,7 +50,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/stats/snapshots.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/html.h"
