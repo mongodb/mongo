@@ -13,3 +13,23 @@ env.Library(
         '$BUILD_DIR/mongo/bson'
         ]
     )
+
+env.Library(
+    target= 'btree_test_help',
+    source= [
+        'btree_test_help.cpp'
+        ],
+    LIBDEPS= [
+        'btree',
+        '$BUILD_DIR/mongo/db/structure/record_store_v1_test_help'
+        ]
+    )
+
+env.CppUnitTest(
+    target='btree_logic_test',
+    source=['btree_logic_test.cpp'
+            ],
+    LIBDEPS=[
+        'btree_test_help'        
+        ]
+    )

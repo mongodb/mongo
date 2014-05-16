@@ -44,11 +44,11 @@ namespace mongo {
         HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) { }
         virtual ~HeadManagerImpl() { }
 
-        const DiskLoc& getHead() const {
+        const DiskLoc getHead() const {
             return _catalogEntry->head();
         }
 
-        void setHead(OperationContext* txn, const DiskLoc& newHead) {
+        void setHead(OperationContext* txn, const DiskLoc newHead) {
             _catalogEntry->setHead(txn, newHead);
         }
 
