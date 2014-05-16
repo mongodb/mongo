@@ -54,8 +54,6 @@ namespace mongo {
     MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
     MONGO_FP_DECLARE(rsStopHeartbeatRequest);
 
-    unsigned int HeartbeatInfo::numPings;
-
     /* { replSetHeartbeat : <setname> } */
     class CmdReplSetHeartbeat : public ReplSetCommand {
     public:

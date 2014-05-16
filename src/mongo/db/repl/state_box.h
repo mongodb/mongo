@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/repl/health.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo {

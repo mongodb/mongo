@@ -28,18 +28,22 @@
 
 #pragma once
 
+#include "mongo/db/repl/heartbeat_info.h"
+#include "mongo/db/repl/member.h"
 #include "mongo/db/repl/rs_base.h"
-#include "mongo/db/repl/repl_set_health_poll_task.h"
+#include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/state_box.h"
 #include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/value.h"
 
 namespace mongo {
 
     class Cloner;
     struct FixUpInfo;
     class ReplSetCmdline;
+    class ReplSetHealthPollTask;
 
     class ReplicationStartSynchronizer {
     public:

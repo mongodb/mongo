@@ -39,10 +39,8 @@ namespace mongo {
     /* this is supposed to be just basic information on a member,
        and copy constructable. */
     class HeartbeatInfo {
-        unsigned _id;
     public:
-        HeartbeatInfo() : _id(0xffffffff), hbstate(MemberState::RS_UNKNOWN), health(-1.0),
-            downSince(0), lastHeartbeatRecv(0), skew(INT_MIN), authIssue(false), ping(0) { }
+        HeartbeatInfo();
         HeartbeatInfo(unsigned id);
         unsigned id() const { return _id; }
         MemberState hbstate;
@@ -71,8 +69,6 @@ namespace mongo {
          */
         bool maybeUp() const { return health != 0; }
 
-        long long timeDown() const; // ms
-
         /* true if changed in a way of interest to the repl set manager. */
         bool changed(const HeartbeatInfo& old) const;
 
@@ -81,22 +77,8 @@ namespace mongo {
          * the last replSetHeartbeat.
          */
         void updateFromLastPoll(const HeartbeatInfo& newInfo);
+    private:
+        unsigned _id;
     };
-
-    inline HeartbeatInfo::HeartbeatInfo(unsigned id) :
-        _id(id),
-        lastHeartbeatRecv(0),
-        authIssue(false),
-        ping(0) {
-        hbstate = MemberState::RS_UNKNOWN;
-        health = -1.0;
-        downSince = 0;
-        lastHeartbeat = upSince = 0;
-        skew = INT_MIN;
-    }
-
-    inline bool HeartbeatInfo::changed(const HeartbeatInfo& old) const {
-        return health != old.health || hbstate != old.hbstate;
-    }
 
 } // namespace mongo
