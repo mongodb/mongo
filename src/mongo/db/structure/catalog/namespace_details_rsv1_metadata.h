@@ -63,10 +63,6 @@ namespace mongo {
             _details->setCapFirstNewRecord( txn, loc );
         }
 
-        virtual bool capLooped() const {
-            return _details->capLooped();
-        }
-
         virtual long long dataSize() const {
             return _details->dataSize();
         }
