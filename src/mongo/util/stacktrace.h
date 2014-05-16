@@ -35,6 +35,12 @@
 
 #include "mongo/util/log.h"
 
+#if defined(_WIN32)
+// We need to pick up a decl for CONTEXT. Forward declaring would be preferable, but it is
+// unclear that we can do so.
+#include "mongo/platform/windows_basic.h"
+#endif
+
 namespace mongo {
 
     // Print stack trace information to "os", default to the log stream.

@@ -1429,54 +1429,86 @@ def doConfigure(myenv):
         if haveUUThread:
             myenv.Append(CPPDEFINES=['MONGO_HAVE___THREAD'])
 
-    if using_gcc() or using_clang():
-        def CheckGCCAtomicBuiltins(context):
-            test_body = """
-            int main(int argc, char **argv) {
-                int a = 0;
-                int b = 0;
-                int c = 0;
+    def CheckCXX11Atomics(context):
+        test_body = """
+        #include <atomic>
+        int main(int argc, char **argv) {
+            std::atomic<int> a(0);
+            return a.fetch_add(1);
+        }
+        """
+        context.Message('Checking for C++11 <atomic> support... ')
+        ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
+        context.Result(ret)
+        return ret;
 
-                __atomic_compare_exchange(&a, &b, &c, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-                return 0;
-            }
-            """
-            context.Message('Checking for gcc __atomic builtins... ')
-            ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
-            context.Result(ret)
-            return ret
+    def CheckGCCAtomicBuiltins(context):
+        test_body = """
+        int main(int argc, char **argv) {
+            int a = 0;
+            int b = 0;
+            int c = 0;
 
-        def CheckGCCSyncBuiltins(context):
-            test_body = """
-            int main(int argc, char **argv) {
-                int a = 0;
-                return __sync_fetch_and_add(&a, 1);
-            }
+            __atomic_compare_exchange(&a, &b, &c, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+            return 0;
+        }
+        """
+        context.Message('Checking for gcc __atomic builtins... ')
+        ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
+        context.Result(ret)
+        return ret
 
-            //
-            // Figure out if we are using gcc older than 4.2 to target 32-bit x86. If so, error out
-            // even if we were able to compile the __sync statement, due to
-            // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=40693
-            //
-            #if defined(__i386__)
-            #if !defined(__clang__)
-            #if defined(__GNUC__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 2)
-            #error "Refusing to use __sync in 32-bit mode with gcc older than 4.2"
-            #endif
-            #endif
-            #endif
-            """
+    def CheckGCCSyncBuiltins(context):
+        test_body = """
+        int main(int argc, char **argv) {
+            int a = 0;
+            return __sync_fetch_and_add(&a, 1);
+        }
 
-            context.Message('Checking for useable __sync builtins... ')
-            ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
-            context.Result(ret)
-            return ret
+        //
+        // Figure out if we are using gcc older than 4.2 to target 32-bit x86. If so, error out
+        // even if we were able to compile the __sync statement, due to
+        // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=40693
+        //
+        #if defined(__i386__)
+        #if !defined(__clang__)
+        #if defined(__GNUC__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 2)
+        #error "Refusing to use __sync in 32-bit mode with gcc older than 4.2"
+        #endif
+        #endif
+        #endif
+        """
 
-        conf = Configure(myenv, help=False, custom_tests = {
-            'CheckGCCAtomicBuiltins': CheckGCCAtomicBuiltins,
-            'CheckGCCSyncBuiltins': CheckGCCSyncBuiltins,
-        })
+        context.Message('Checking for useable __sync builtins... ')
+        ret = context.TryLink(textwrap.dedent(test_body), '.cpp')
+        context.Result(ret)
+        return ret
 
+    conf = Configure(myenv, help=False, custom_tests = {
+        'CheckCXX11Atomics': CheckCXX11Atomics,
+        'CheckGCCAtomicBuiltins': CheckGCCAtomicBuiltins,
+        'CheckGCCSyncBuiltins': CheckGCCSyncBuiltins,
+    })
+
+    # Figure out what atomics mode to use by way of the tests defined above.
+    #
+    # Non_windows: <atomic> > __atomic > __sync
+    # Windows: <atomic> > Interlocked functions / intrinsics.
+    #
+    # If we are in C++11 mode, try to use <atomic>. This is unusual for us, as typically we
+    # only use __cplusplus >= 201103L to decide if we want to enable a feature. We make a
+    # special case for the atomics and use them on platforms that offer them even if they don't
+    # advertise full conformance. For MSVC systems, if we don't have <atomic> then no more
+    # checks are required. Otherwise, we are on a GCC/clang system, where we may have __atomic
+    # or __sync, so try those in that order next.
+    #
+    # If we don't end up defining a MONGO_HAVE for the atomics, we will end up falling back to
+    # the Microsoft Interlocked functions/intrinsics when using MSVC, or the gcc_intel
+    # implementation of hand-rolled assembly if using gcc/clang.
+
+    if (using_msvc() or (cxx11_mode == "on")) and conf.CheckCXX11Atomics():
+        conf.env.Append(CPPDEFINES=['MONGO_HAVE_CXX11_ATOMICS'])
+    elif using_gcc() or using_clang():
         # Prefer the __atomic builtins. If we don't have those, try for __sync. Otherwise
         # atomic_intrinsics.h will try to fall back to the hand-rolled assembly implementations
         # in atomic_intrinsics_gcc_intel for x86 platforms.
@@ -1485,8 +1517,7 @@ def doConfigure(myenv):
         else:
             if conf.CheckGCCSyncBuiltins():
                 conf.env.Append(CPPDEFINES=["MONGO_HAVE_GCC_SYNC_BUILTINS"])
-
-        myenv = conf.Finish()
+    myenv = conf.Finish()
 
     conf = Configure(myenv)
     libdeps.setup_conftests(conf)
