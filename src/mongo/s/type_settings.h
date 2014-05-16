@@ -73,7 +73,6 @@ namespace mongo {
         static const BSONField<int> chunksize;
         static const BSONField<bool> balancerStopped;
         static const BSONField<BSONObj> balancerActiveWindow;
-        static const BSONField<bool> shortBalancerSleep;
         static const BSONField<bool> secondaryThrottle;
 
         //
@@ -199,27 +198,7 @@ namespace mongo {
                 return balancerActiveWindow.getDefault();
             }
         }
-        void setShortBalancerSleep(bool shortBalancerSleep) {
-            _shortBalancerSleep = shortBalancerSleep;
-            _isShortBalancerSleepSet = true;
-        }
 
-        void unsetShortBalancerSleep() { _isShortBalancerSleepSet = false; }
-
-        bool isShortBalancerSleepSet() const {
-            return _isShortBalancerSleepSet || shortBalancerSleep.hasDefault();
-        }
-
-        // Calling get*() methods when the member is not set and has no default results in undefined
-        // behavior
-        bool getShortBalancerSleep() const {
-            if (_isShortBalancerSleepSet) {
-                return _shortBalancerSleep;
-            } else {
-                dassert(shortBalancerSleep.hasDefault());
-                return shortBalancerSleep.getDefault();
-            }
-        }
         void setSecondaryThrottle(bool secondaryThrottle) {
             _secondaryThrottle = secondaryThrottle;
             _isSecondaryThrottleSet = true;

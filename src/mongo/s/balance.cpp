@@ -431,7 +431,7 @@ namespace mongo {
             break;
         }
 
-        int sleepTime = 30;
+        int sleepTime = 10;
 
         // getConnectioString and dist lock constructor does not throw, which is what we expect on while
         // on the balancer thread
@@ -467,9 +467,6 @@ namespace mongo {
                     continue;
                 }
 
-                sleepTime = balancerConfig[SettingsType::shortBalancerSleep()].trueValue() ? 30 :
-                                                                                             6;
-                
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
                 {
@@ -529,7 +526,7 @@ namespace mongo {
                 
                 conn.done();
 
-                sleepsecs( _balancedLastTime ? sleepTime / 6 : sleepTime );
+                sleepsecs( _balancedLastTime ? sleepTime / 10 : sleepTime );
             }
             catch ( std::exception& e ) {
                 log() << "caught exception while doing balance: " << e.what() << endl;

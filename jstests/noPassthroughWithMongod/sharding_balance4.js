@@ -132,10 +132,8 @@ print( diff1() )
 s.startBalancer();
 
 assert.soon( function(){
-    
     var d = diff1();
     return d < 5;
-} , "balance didn't happen" , 1000 * 60 * 3 , 1 );
-    
+} , "balance didn't happen" , 1000 * 60 * 20 , 1 );
 
 s.stop();

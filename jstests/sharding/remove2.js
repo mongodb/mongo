@@ -19,7 +19,7 @@ removeShard = function(st, replTest) {
         printjson(res);
         return res.ok && res.msg == 'removeshard completed successfully';
     }
-    assert.soon( checkRemoveShard , "failed to remove shard" );
+    assert.soon( checkRemoveShard, "failed to remove shard", 5 * 60000 );
 
     // Need to wait for migration to be over... only works for inline deletes
     checkNSLock = function() {
@@ -59,7 +59,7 @@ addShard = function(st, replTest) {
         var x = st.chunkDiff( coll.getName() , coll.getDB().getName() );
         print( "chunk diff: " + x );
         return x < 2;
-    } , "no balance happened", 5 * 60 * 1000 );
+    } , "no balance happened", 30 * 60 * 1000 );
 
     try {
         assert.eq( 300, coll.find().itcount() );
@@ -122,7 +122,7 @@ assert.eq( 300, coll.find().itcount() );
 
 assert.soon( function() {
     var x = st.chunkDiff( 'remove2' , "test" ); print( "chunk diff: " + x ); return x < 2;
-} , "no balance happened", 5 * 60 * 1000 );
+} , "no balance happened", 30 * 60 * 1000 );
 
 assert.eq( 300, coll.find().itcount() );
 

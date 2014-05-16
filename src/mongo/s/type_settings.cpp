@@ -41,7 +41,6 @@ namespace mongo {
     const BSONField<int> SettingsType::chunksize("value");
     const BSONField<bool> SettingsType::balancerStopped("stopped");
     const BSONField<BSONObj> SettingsType::balancerActiveWindow("activeWindow");
-    const BSONField<bool> SettingsType::shortBalancerSleep("_nosleep");
     const BSONField<bool> SettingsType::secondaryThrottle("_secondaryThrottle");
 
     SettingsType::SettingsType() {
@@ -113,7 +112,6 @@ namespace mongo {
         if (_isBalancerActiveWindowSet) {
             builder.append(balancerActiveWindow(), _balancerActiveWindow);
         }
-        if (_isShortBalancerSleepSet) builder.append(shortBalancerSleep(), _shortBalancerSleep);
         if (_isSecondaryThrottleSet) builder.append(secondaryThrottle(), _secondaryThrottle);
 
         return builder.obj();
@@ -142,10 +140,6 @@ namespace mongo {
                                           &_balancerActiveWindow, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isBalancerActiveWindowSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, shortBalancerSleep, &_shortBalancerSleep, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isShortBalancerSleepSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, secondaryThrottle, &_secondaryThrottle, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;

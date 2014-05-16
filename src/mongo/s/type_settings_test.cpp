@@ -94,7 +94,6 @@ namespace {
                            SettingsType::balancerStopped(true) <<
                            SettingsType::balancerActiveWindow(BSON("start" << "23:00" <<
                                                                    "stop" << "6:00" )) <<
-                           SettingsType::shortBalancerSleep(true) <<
                            SettingsType::secondaryThrottle(true));
         ASSERT(settings.parseBSON(objBalancer, &errMsg));
         ASSERT_EQUALS(errMsg, "");
@@ -103,7 +102,6 @@ namespace {
         ASSERT_EQUALS(settings.getBalancerStopped(), true);
         ASSERT_EQUALS(settings.getBalancerActiveWindow(), BSON("start" << "23:00" <<
                                                                "stop" << "6:00" ));
-        ASSERT_EQUALS(settings.getShortBalancerSleep(), true);
         ASSERT_EQUALS(settings.getSecondaryThrottle(), true);
     }
 

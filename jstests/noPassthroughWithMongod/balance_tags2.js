@@ -3,7 +3,7 @@ s = new ShardingTest( "balance_tags2" , 3 , 1 , 1 ,
                         { sync:true, chunksize : 1 , nopreallocj : true }
                     )
 
-s.config.settings.save({ _id: "balancer", _nosleep: true});
+s.config.settings.save({ _id: "balancer" });
 
 db = s.getDB( "test" );
 var bulk = db.foo.initializeUnorderedBulkOp();

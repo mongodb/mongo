@@ -1,6 +1,6 @@
 
 s = new ShardingTest( "balance_tags1" , 3 , 1 , 1 , { sync:true, chunksize : 1 , nopreallocj : true } )
-s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false, _nosleep: true } } , true );
+s.config.settings.update({ _id: "balancer" }, { $set: { stopped: false }}, true);
 
 db = s.getDB( "test" );
 var bulk = db.foo.initializeUnorderedBulkOp();
