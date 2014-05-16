@@ -525,9 +525,6 @@ if has_option( "mm" ):
 else:
     mmapFiles += [ "util/mmap_${OS_FAMILY}.cpp" ]
 
-if has_option( "asio" ):
-    coreServerFiles += [ "util/net/message_server_asio.cpp" ]
-
 env.Library('index_set', [ 'db/index_set.cpp' ] )
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
