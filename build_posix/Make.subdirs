@@ -5,6 +5,7 @@
 #
 # If the directory exists, it is added to AUTO_SUBDIRS.
 # If a condition is included, the subdir is made conditional via AM_CONDITIONAL
+api/leveldb
 bench/tcbench
 bench/wtperf
 examples/c
