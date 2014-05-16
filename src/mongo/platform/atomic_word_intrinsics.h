@@ -17,6 +17,7 @@
 
 #include <boost/static_assert.hpp>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_intrinsics.h"
 #include "mongo/platform/compiler.h"
 
@@ -44,6 +45,8 @@ namespace mongo {
      */
     template <typename _WordType>
     class AtomicWord {
+        MONGO_DISALLOW_COPYING(AtomicWord);
+
     public:
         /**
          * Underlying value type.

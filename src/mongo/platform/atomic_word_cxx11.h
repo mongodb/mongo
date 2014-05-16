@@ -19,9 +19,22 @@
 #error "Cannot use atomic_word_cxx11.h without C++11 <atomic> support"
 #endif
 
+// This file is a bit unusual. Most other source files in this codebase assume that C++11
+// things are only usable if __cplusplus >= 201103L. However, we have made an explicit decision
+// to use <atomic> when available, even if full C++11 conformance is not advertised. As a
+// result, we unconditionally include <atomic>, but guard all other C++11 features under
+// __cplusplus >= 201103L so that we can work on platforms that don't yet offer those features, but
+// do offer <atomic>
+
 #include <atomic>
 
+#if __cplusplus >= 201103L
+#include <type_traits>
+#endif
+
 #include <boost/static_assert.hpp>
+
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -30,6 +43,11 @@ namespace mongo {
      */
     template <typename _WordType>
     class AtomicWord {
+
+#if __cplusplus < 201103L
+        // AtomicWords are not copyable in C++03.
+        MONGO_DISALLOW_COPYING(AtomicWord);
+#endif
 
     public:
         /**
@@ -41,6 +59,14 @@ namespace mongo {
          * Construct a new word with the given initial value.
          */
         explicit AtomicWord(WordType value=WordType(0)) : _value(value) {}
+
+#if __cplusplus >= 201103L
+        // In C++11, AtomicWords are not copyable or movable.
+        AtomicWord(AtomicWord&) = delete;
+        AtomicWord& operator=(const AtomicWord&) = delete;
+        AtomicWord(AtomicWord&&) = delete;
+        AtomicWord& operator=(AtomicWord&&) = delete;
+#endif
 
         /**
          * Gets the current value of this AtomicWord.
@@ -142,9 +168,20 @@ namespace mongo {
         std::atomic<WordType> _value;
     };
 
+#if __cplusplus >= 201103L
 #define _ATOMIC_WORD_DECLARE(NAME, WTYPE)                               \
     typedef class AtomicWord<WTYPE> NAME;                               \
-    namespace { BOOST_STATIC_ASSERT(sizeof(NAME) == sizeof(WTYPE)); }
+    namespace {                                                         \
+        BOOST_STATIC_ASSERT(sizeof(NAME) == sizeof(WTYPE));             \
+        BOOST_STATIC_ASSERT(std::is_standard_layout<WTYPE>::value);     \
+    } // namespace
+#else
+#define _ATOMIC_WORD_DECLARE(NAME, WTYPE)                               \
+    typedef class AtomicWord<WTYPE> NAME;                               \
+    namespace {                                                         \
+        BOOST_STATIC_ASSERT(sizeof(NAME) == sizeof(WTYPE));             \
+    } // namespace
+#endif
 
     _ATOMIC_WORD_DECLARE(AtomicUInt32, unsigned);
     _ATOMIC_WORD_DECLARE(AtomicUInt64, unsigned long long);
