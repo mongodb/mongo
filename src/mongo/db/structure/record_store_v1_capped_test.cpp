@@ -30,6 +30,7 @@
 
 #include "mongo/db/structure/record_store_v1_capped.h"
 
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/record_store_v1_test_help.h"
 #include "mongo/unittest/unittest.h"
@@ -53,7 +54,7 @@ namespace {
 
     void simpleInsertTest( const char* buf, int size ) {
 
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -96,7 +97,7 @@ namespace {
     }
 
     TEST(CappedRecordStoreV1, EmptySingleExtent) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -133,7 +134,7 @@ namespace {
     }
 
     TEST(CappedRecordStoreV1, FirstLoopWithSingleExtentExactSize) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -179,7 +180,7 @@ namespace {
     }
 
     TEST(CappedRecordStoreV1, NonFirstLoopWithSingleExtentExactSize) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -228,7 +229,7 @@ namespace {
      * Current code always tries to leave 24 bytes to create a DeletedRecord.
      */
     TEST(CappedRecordStoreV1, WillLoopWithout24SpareBytes) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -274,7 +275,7 @@ namespace {
     }
 
     TEST(CappedRecordStoreV1, WontLoopWith24SpareBytes) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -321,7 +322,7 @@ namespace {
     }
 
     TEST(CappedRecordStoreV1, MoveToSecondExtentUnLooped) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -368,7 +369,7 @@ namespace {
     }
 
     TEST(CappedRecordStoreV1, MoveToSecondExtentLooped) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -428,7 +429,7 @@ namespace {
      * This is a minimal example that shows the current allocator laying out records out-of-order.
      */
     TEST(CappedRecordStoreV1Scrambler, Minimal) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;
@@ -478,7 +479,7 @@ namespace {
      * that leaves 4 deleted records in a single extent.
      */
     TEST(CappedRecordStoreV1Scrambler, FourDeletedRecordsInSingleExtent) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
         DummyCappedDocumentDeleteCallback cb;

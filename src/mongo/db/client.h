@@ -108,12 +108,14 @@ namespace mongo {
         BSONObj getHandshake() const { return _handshake; }
         ConnectionId getConnectionId() const { return _connectionId; }
 
-        void writeHappened() { _hasWrittenSinceCheckpoint = true; _hasWrittenThisOperation = true; }
+        // XXX(hk): this is per-thread mmapv1 recovery unit stuff, move into that
+        // impl of recovery unit
+        void writeHappened() { _hasWrittenSinceCheckpoint = true; }
         bool hasWrittenSinceCheckpoint() const { return _hasWrittenSinceCheckpoint; }
         void checkpointHappened() { _hasWrittenSinceCheckpoint = false; }
-        bool hasWrittenThisOperation() const { return _hasWrittenThisOperation; }
+
+        // XXX: this is really a method in the recovery unit iface to reset any state
         void newTopLevelRequest() {
-            _hasWrittenThisOperation = false;
             _hasWrittenSinceCheckpoint = false;
         }
 
@@ -133,7 +135,6 @@ namespace mongo {
         BSONObj _handshake;
         BSONObj _remoteId;
 
-        bool _hasWrittenThisOperation;
         bool _hasWrittenSinceCheckpoint;
 
         LockState _ls;

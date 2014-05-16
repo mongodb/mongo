@@ -701,7 +701,8 @@ namespace mongo {
                     }
                 }
 
-                msgdata = newGetMore(ns,
+                msgdata = newGetMore(txn,
+                                     ns,
                                      ntoreturn,
                                      cursorid,
                                      curop,

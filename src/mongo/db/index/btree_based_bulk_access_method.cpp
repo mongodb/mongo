@@ -120,7 +120,7 @@ namespace mongo {
 
         for (BSONObjSet::iterator it = keys.begin(); it != keys.end(); ++it) {
             // False is for mayInterrupt.
-            _sorter->add(*it, loc, false);
+            _sorter->add(*it, loc);
             _keysInserted++;
         }
 
@@ -147,7 +147,7 @@ namespace mongo {
             _real->_btreeState->setMultikey( _txn );
         }
 
-        _sorter->sort(false);
+        _sorter->sort();
 
         Timer timer;
         IndexCatalogEntry* entry = _real->_btreeState;

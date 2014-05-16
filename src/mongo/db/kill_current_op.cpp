@@ -74,29 +74,6 @@ namespace mongo {
         return _killImpl_inclientlock(i);
     }
 
-    void KillCurrentOp::blockingKill(AtomicUInt opId) {
-        bool killed = false;
-        LOG(1) << "KillCurrentOp: starting blockingkill" << endl;
-
-        boost::scoped_ptr<scoped_lock> clientLock( new scoped_lock( Client::clientsMutex ) );
-        boost::unique_lock<boost::mutex> lck(_mtx);
-
-        bool foundId = _killImpl_inclientlock(opId, &killed);
-        if (!foundId) {
-            // don't wait if not found
-            return;
-        }
-
-        clientLock.reset( NULL ); // unlock client since we don't need it anymore
-
-        // block until the killed operation stops
-        LOG(1) << "KillCurrentOp: waiting for confirmation of kill" << endl;
-        while (killed == false) {
-            _condvar.wait(lck);
-        }
-        LOG(1) << "KillCurrentOp: kill syncing complete" << endl;
-    }
-
     bool KillCurrentOp::_killImpl_inclientlock(AtomicUInt i, bool* pNotifyFlag /* = NULL */) {
         bool found = false;
         {
@@ -129,7 +106,6 @@ namespace mongo {
         if (!haveClient()) 
             return;
         cc().curop()->setKillWaiterFlags();
-        _condvar.notify_all();
     }
 
 namespace {

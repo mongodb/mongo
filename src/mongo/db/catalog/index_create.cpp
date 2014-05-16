@@ -162,7 +162,7 @@ namespace mongo {
             n++;
             progress.hit();
 
-            getDur().commitIfNeeded();
+            txn->recoveryUnit()->commitIfNeeded();
 
             if (canBeKilled) {
                 // Checking for interrupt here is necessary because the bg index 
@@ -278,7 +278,7 @@ namespace mongo {
                     logOp( txn, "d", ns.c_str(), toDelete );
                 }
                 
-                getDur().commitIfNeeded();
+                txn->recoveryUnit()->commitIfNeeded();
 
                 RARELY if ( mayInterrupt ) {
                     txn->checkForInterrupt();

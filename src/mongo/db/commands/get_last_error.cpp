@@ -232,7 +232,7 @@ namespace mongo {
             cc().curop()->setMessage( "waiting for write concern" );
 
             WriteConcernResult wcResult;
-            status = waitForWriteConcern( writeConcern, lastOpTime, &wcResult );
+            status = waitForWriteConcern( txn, writeConcern, lastOpTime, &wcResult );
             wcResult.appendTo( writeConcern, &result );
 
             // For backward compatibility with 2.4, wtimeout returns ok : 1.0

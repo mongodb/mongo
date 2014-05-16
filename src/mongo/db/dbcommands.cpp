@@ -1568,7 +1568,7 @@ namespace mongo {
         client.curop()->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS.getValue())
                                          * 1000);
         try {
-            killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
+            txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
         }
         catch (UserException& e) {
             appendCommandStatus(result, e.toStatus());

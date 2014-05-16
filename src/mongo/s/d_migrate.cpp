@@ -1155,7 +1155,7 @@ namespace mongo {
                     return false;
                 }
 
-                killCurrentOp.checkForInterrupt();
+                txn->checkForInterrupt();
             }
             timing.done(4);
             MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep4);

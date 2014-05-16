@@ -28,7 +28,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/kill_current_op.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/write_concern.h"
@@ -124,7 +124,8 @@ namespace mongo {
         }
     }
 
-    Status waitForWriteConcern( const WriteConcernOptions& writeConcern,
+    Status waitForWriteConcern( OperationContext* txn,
+                                const WriteConcernOptions& writeConcern,
                                 const OpTime& replOpTime,
                                 WriteConcernResult* result ) {
 
@@ -144,11 +145,11 @@ namespace mongo {
             }
             else {
                 // We only need to commit the journal if we're durable
-                getDur().awaitCommit();
+                txn->recoveryUnit()->awaitCommit();
             }
             break;
         case WriteConcernOptions::JOURNAL:
-            getDur().awaitCommit();
+            txn->recoveryUnit()->awaitCommit();
             break;
         }
 
@@ -207,7 +208,7 @@ namespace mongo {
                 }
 
                 sleepmillis(1);
-                killCurrentOp.checkForInterrupt();
+                txn->checkForInterrupt();
             }
         }
         catch( const AssertionException& ex ) {

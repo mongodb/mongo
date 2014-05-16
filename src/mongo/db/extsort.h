@@ -56,20 +56,22 @@ namespace mongo {
 
         BSONObjExternalSorter(const ExternalSortComparison* comp, long maxFileSize=100*1024*1024);
 
-        void add( const BSONObj& o, const DiskLoc& loc, bool mayInterrupt ) {
-            *_mayInterrupt = mayInterrupt;
+        void add( const BSONObj& o, const DiskLoc& loc ) {
             _sorter->add(o.getOwned(), loc);
         }
 
         auto_ptr<Iterator> iterator() { return auto_ptr<Iterator>(_sorter->done()); }
 
-        void sort( bool mayInterrupt ) { *_mayInterrupt = mayInterrupt; }
+        // XXX: do we need this
+        void sort() { }
+
         int numFiles() { return _sorter->numFiles(); }
+
         long getCurSizeSoFar() { return _sorter->memUsed(); }
+
         void hintNumObjects(long long) {} // unused
 
     private:
-        shared_ptr<bool> _mayInterrupt;
         scoped_ptr<Sorter<BSONObj, DiskLoc> > _sorter;
     };
 }

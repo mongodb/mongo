@@ -26,40 +26,40 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
+#include "mongo/db/operation_context.h"
 
-#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 
 namespace mongo {
 
-    DurRecoveryUnit::DurRecoveryUnit() {
-        _hasWrittenSinceCheckpoint = false;
-    }
+    class OperationContextNoop : public OperationContext {
+    public:
+        OperationContextNoop() {
+            _recoveryUnit.reset(new RecoveryUnitNoop());
+        }
 
-    bool DurRecoveryUnit::awaitCommit() {
-        return getDur().awaitCommit();
-    }
+        virtual ~OperationContextNoop() { }
 
-    bool DurRecoveryUnit::commitIfNeeded(bool force) {
-        _hasWrittenSinceCheckpoint = false;
-        return getDur().commitIfNeeded(force);
-    }
+        virtual RecoveryUnit* recoveryUnit() const {
+            return _recoveryUnit.get();
+        }
 
-    bool DurRecoveryUnit::isCommitNeeded() const {
-        return getDur().isCommitNeeded();
-    }
+        virtual ProgressMeter* setMessage(const char* msg,
+                                          const std::string& name ,
+                                          unsigned long long progressMeterTotal,
+                                          int secondsBetween) {
+            invariant(false);
+            return NULL;
+        }
 
-    void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
-        _hasWrittenSinceCheckpoint = true;
-        return getDur().writingPtr(data, len);
-    }
+        virtual void checkForInterrupt(bool heedMutex = true) const { }
 
-    void DurRecoveryUnit::createdFile(const std::string& filename, unsigned long long len) {
-        getDur().createdFile(filename, len);
-    }
+        virtual Status checkForInterruptNoAssert() const {
+            return Status::OK();
+        }
 
-    void DurRecoveryUnit::syncDataAndTruncateJournal() {
-        return getDur().syncDataAndTruncateJournal();
-    }
+    private:
+        boost::scoped_ptr<RecoveryUnitNoop> _recoveryUnit;
+    };
 
 }  // namespace mongo

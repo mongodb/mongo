@@ -30,6 +30,7 @@
 
 #include "mongo/db/structure/record_store_v1_simple.h"
 
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/structure/record_store_v1_test_help.h"
 #include "mongo/unittest/unittest.h"
@@ -151,7 +152,7 @@ namespace {
 
     /** alloc() quantizes the requested size using quantizeAllocationSpace() rules. */
     TEST(SimpleRecordStoreV1, AllocQuantized) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
 
@@ -171,7 +172,7 @@ namespace {
      * rules.
      */
     TEST(SimpleRecordStoreV1, AllocIndexNamespaceNotQuantized) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
 
@@ -189,7 +190,7 @@ namespace {
 
     /** alloc() quantizes records in index collections to the nearest multiple of 4. */
     TEST(SimpleRecordStoreV1, AllocIndexNamespaceSlightlyQuantized) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
 
@@ -205,7 +206,7 @@ namespace {
 
     /** alloc() returns a non quantized record larger than the requested size. */
     TEST(SimpleRecordStoreV1, AllocUseNonQuantizedDeletedRecord) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -236,7 +237,7 @@ namespace {
 
     /** alloc() returns a non quantized record equal to the requested size. */
     TEST(SimpleRecordStoreV1, AllocExactSizeNonQuantizedDeletedRecord) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -270,7 +271,7 @@ namespace {
      * too small to make a DeletedRecord.
      */
     TEST(SimpleRecordStoreV1, AllocQuantizedWithExtra) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -304,7 +305,7 @@ namespace {
      * is large enough to form a new deleted record.
      */
     TEST(SimpleRecordStoreV1, AllocQuantizedWithoutExtra) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -342,7 +343,7 @@ namespace {
      * if a quantized portion of the deleted record could be used instead.
      */
     TEST(SimpleRecordStoreV1, AllocNotQuantizedNearDeletedSize) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -377,7 +378,7 @@ namespace {
 
     /** getRecordAllocationSize() returns its argument when the padding factor is 1.0. */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizeNoPadding) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -387,7 +388,7 @@ namespace {
 
     /** getRecordAllocationSize() multiplies by a padding factor > 1.0. */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizeWithPadding) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -402,7 +403,7 @@ namespace {
      * is set.
      */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizePowerOf2) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(
                                                 false,
@@ -417,7 +418,7 @@ namespace {
      * is set, ignoring the padding factor.
      */
     TEST(SimpleRecordStoreV1, GetRecordAllocationSizePowerOf2PaddingIgnored) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(
                                                 false,
@@ -433,7 +434,7 @@ namespace {
     // -----------------
 
     TEST( SimpleRecordStoreV1, FullSimple1 ) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn,
@@ -457,7 +458,7 @@ namespace {
      * Inserts take the first deleted record with the correct size.
      */
     TEST( SimpleRecordStoreV1, InsertTakesFirstDeletedWithExactSize ) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -506,7 +507,7 @@ namespace {
      * WARNING: this test depends on magic numbers inside RSV1Simple::_allocFromExistingExtents.
      */
     TEST( SimpleRecordStoreV1, InsertLooksForBetterMatchUpTo5Links ) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -558,7 +559,7 @@ namespace {
      * WARNING: this test depends on magic numbers inside RSV1Simple::_allocFromExistingExtents.
      */
     TEST( SimpleRecordStoreV1, InsertLooksForMatchUpTo31Links ) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
@@ -668,7 +669,7 @@ namespace {
      * WARNING: this test depends on magic numbers inside RSV1Simple::_allocFromExistingExtents.
      */
     TEST( SimpleRecordStoreV1, InsertLooksForMatchUpTo31LinksEvenIfFoundOversizedFit ) {
-        DummyOperationContext txn;
+        OperationContextNoop txn;
         DummyExtentManager em;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
         SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );

@@ -40,7 +40,7 @@
 namespace BtreeBuilderTests {
 
     static const char* const _ns = "unittests.btreebuilder";
-    DBDirectClient _client;
+    // DBDirectClient _client;
 
     // QUERY_MIGRATION
 #if 0

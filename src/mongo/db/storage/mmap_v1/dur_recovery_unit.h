@@ -39,9 +39,11 @@ namespace mongo {
      */
     class DurRecoveryUnit : public RecoveryUnit {
     public:
-        DurRecoveryUnit() { }
+        DurRecoveryUnit();
 
         virtual ~DurRecoveryUnit() { }
+
+        virtual bool awaitCommit();
 
         virtual bool commitIfNeeded(bool force = false);
 
@@ -52,6 +54,11 @@ namespace mongo {
         virtual void createdFile(const std::string& filename, unsigned long long len);
 
         virtual void syncDataAndTruncateJournal();
+
+    private:
+        // XXX: this will be meaningful once killCurrentOp doesn't examine this bool's evil sibling
+        // in client.h.  This requires killCurrentOp to go through OperationContext...
+        bool _hasWrittenSinceCheckpoint;
     };
 
 }  // namespace mongo

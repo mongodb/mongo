@@ -148,7 +148,7 @@ namespace mongo {
             return StatusWith<CompactStats>( status );
         }
 
-        killCurrentOp.checkForInterrupt();
+        txn->checkForInterrupt();
 
         CompactStats stats;
 

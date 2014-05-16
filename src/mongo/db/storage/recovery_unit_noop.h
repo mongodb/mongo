@@ -26,40 +26,31 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
-
-#include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 
-    DurRecoveryUnit::DurRecoveryUnit() {
-        _hasWrittenSinceCheckpoint = false;
-    }
+    class RecoveryUnitNoop : public RecoveryUnit {
+    public:
+        virtual bool commitIfNeeded(bool force = false) {
+            return false;
+        }
 
-    bool DurRecoveryUnit::awaitCommit() {
-        return getDur().awaitCommit();
-    }
+        virtual bool awaitCommit() {
+            return true;
+        }
 
-    bool DurRecoveryUnit::commitIfNeeded(bool force) {
-        _hasWrittenSinceCheckpoint = false;
-        return getDur().commitIfNeeded(force);
-    }
+        virtual bool isCommitNeeded() const {
+            return false;
+        }
 
-    bool DurRecoveryUnit::isCommitNeeded() const {
-        return getDur().isCommitNeeded();
-    }
+        virtual void* writingPtr(void* data, size_t len) {
+            return data;
+        }
 
-    void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
-        _hasWrittenSinceCheckpoint = true;
-        return getDur().writingPtr(data, len);
-    }
+        virtual void createdFile(const std::string& filename, unsigned long long len) { }
 
-    void DurRecoveryUnit::createdFile(const std::string& filename, unsigned long long len) {
-        getDur().createdFile(filename, len);
-    }
-
-    void DurRecoveryUnit::syncDataAndTruncateJournal() {
-        return getDur().syncDataAndTruncateJournal();
-    }
+        virtual void syncDataAndTruncateJournal() { }
+    };
 
 }  // namespace mongo

@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     /**
      * Verifies that a WriteConcern is valid for this particular host.
      */
@@ -74,7 +76,8 @@ namespace mongo {
      * Returns NotMaster if the host steps down while waiting for replication
      * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
      */
-    Status waitForWriteConcern( const WriteConcernOptions& writeConcern,
+    Status waitForWriteConcern( OperationContext* txn,
+                                const WriteConcernOptions& writeConcern,
                                 const OpTime& replOpTime,
                                 WriteConcernResult* result );
 

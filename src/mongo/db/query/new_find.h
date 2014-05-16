@@ -44,8 +44,14 @@ namespace mongo {
     /**
      * Called from the getMore entry point in ops/query.cpp.
      */
-    QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
-                            int pass, bool& exhaust, bool* isCursorAuthorized);
+    QueryResult* newGetMore(OperationContext* txn,
+                            const char* ns,
+                            int ntoreturn,
+                            long long cursorid,
+                            CurOp& curop,
+                            int pass,
+                            bool& exhaust,
+                            bool* isCursorAuthorized);
 
     /**
      * Run the query 'q' and place the result in 'result'.

@@ -258,7 +258,7 @@ namespace mongo {
             _client->curop()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
-            Status status = waitForWriteConcern( writeConcern, _client->getLastOp(), &res );
+            Status status = waitForWriteConcern( _txn, writeConcern, _client->getLastOp(), &res );
 
             if ( !status.isOK() ) {
                 wcError.reset( toWriteConcernError( status, res ) );
@@ -820,7 +820,7 @@ namespace mongo {
             if (elapsedTracker.intervalHasElapsed()) {
                 // Consider yielding between inserts.
 
-                killCurrentOp.checkForInterrupt();
+                _txn->checkForInterrupt();
                 elapsedTracker.resetLastTime();
             }
 

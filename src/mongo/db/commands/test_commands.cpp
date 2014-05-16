@@ -117,7 +117,7 @@ namespace mongo {
             }
 
             // Interrupt point for testing (e.g. maxTimeMS).
-            killCurrentOp.checkForInterrupt();
+            txn->checkForInterrupt();
 
             return true;
         }

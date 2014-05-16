@@ -141,8 +141,14 @@ namespace mongo {
      *        when this method returns an empty result, incrementing pass on each call.  
      *        Thus, pass == 0 indicates this is the first "attempt" before any 'awaiting'.
      */
-    QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
-                            int pass, bool& exhaust, bool* isCursorAuthorized) {
+    QueryResult* newGetMore(OperationContext* txn,
+                            const char* ns,
+                            int ntoreturn,
+                            long long cursorid,
+                            CurOp& curop,
+                            int pass,
+                            bool& exhaust,
+                            bool* isCursorAuthorized) {
         exhaust = false;
 
         // This is a read lock.
@@ -192,7 +198,7 @@ namespace mongo {
             // If the operation that spawned this cursor had a time limit set, apply leftover
             // time to this getmore.
             curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
-            killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
+            txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
             if (0 == pass) { 
                 cc->updateSlaveLocation(curop); 
@@ -516,7 +522,7 @@ namespace mongo {
 
         // Handle query option $maxTimeMS (not used with commands).
         curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
-        killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
+        txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
         replVerifyReadsOk(cq->ns(), &pq);

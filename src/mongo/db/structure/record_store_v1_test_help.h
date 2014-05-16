@@ -33,46 +33,9 @@
 #include <vector>
 
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/record_store_v1_base.h"
 
 namespace mongo {
-
-    class DummyRecoveryUnit : public RecoveryUnit {
-    public:
-        virtual bool commitIfNeeded(bool force = false);
-
-        virtual bool isCommitNeeded() const;
-
-        virtual void* writingPtr(void* data, size_t len);
-
-        virtual void createdFile(const std::string& filename, unsigned long long len);
-
-        virtual void syncDataAndTruncateJournal();
-    };
-
-    class DummyOperationContext : public OperationContext {
-    public:
-        DummyOperationContext();
-
-        virtual ~DummyOperationContext() { }
-
-        virtual RecoveryUnit* recoveryUnit() const {
-            return _recoveryUnit.get();
-        }
-
-        virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name ,
-                                          unsigned long long progressMeterTotal,
-                                          int secondsBetween);
-
-        virtual void checkForInterrupt(bool heedMutex = true) const;
-
-        virtual Status checkForInterruptNoAssert() const;
-
-    private:
-        boost::scoped_ptr<DummyRecoveryUnit> _recoveryUnit;
-    };
 
     class DummyRecordStoreV1MetaData : public RecordStoreV1MetaData {
     public:
@@ -227,4 +190,5 @@ namespace mongo {
                          const LocAndSize* drecs,
                          const ExtentManager* em,
                          const DummyRecordStoreV1MetaData* md);
-}
+
+}  // namespace mongo

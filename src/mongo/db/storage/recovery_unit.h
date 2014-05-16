@@ -44,6 +44,11 @@ namespace mongo {
         virtual ~RecoveryUnit() { }
 
         /**
+         * XXX: document
+         */
+        virtual bool awaitCommit() = 0;
+
+        /**
          * Commit if required.  May take a long time.  Returns true if committed.
          *
          * WARNING: Data *must* be in a crash-recoverable state when this is called.

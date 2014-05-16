@@ -53,13 +53,6 @@ namespace mongo {
          * @return if operation was found 
          **/
         bool kill(AtomicUInt i);
-           
-        /** 
-         * blocks until kill is acknowledged by the killee.
-         *
-         * Note: Does not wait for nested ops, only the top level op. 
-         */
-        void blockingKill(AtomicUInt opId);
 
         /** @return true if global interrupt and should terminate the operation */
         bool globalInterruptCheck() const { return _globalKill; }
@@ -83,7 +76,6 @@ namespace mongo {
     private:
         void interruptJs( AtomicUInt *op );
         volatile bool _globalKill;
-        boost::condition _condvar;
         boost::mutex _mtx;
 
         /** 

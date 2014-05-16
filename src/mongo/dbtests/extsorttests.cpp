@@ -62,12 +62,12 @@ namespace ExtSortTests {
         void run() {
             BSONObjExternalSorter sorter( _arbitrarySort );
 
-            sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 1 ), false );
-            sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ), false );
-            sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ), false );
-            sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ), false );
+            sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 1 ));
+            sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ));
+            sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ));
+            sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ));
 
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             int num=0;
@@ -94,12 +94,12 @@ namespace ExtSortTests {
     public:
         void run() {
             BSONObjExternalSorter sorter( _arbitrarySort, 10 );
-            sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 11 ), false );
-            sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ), false );
-            sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ), false );
-            sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ), false );
+            sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 11 ));
+            sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ));
+            sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ));
+            sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ));
 
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             int num=0;
@@ -127,7 +127,7 @@ namespace ExtSortTests {
     public:
         void run() {
             BSONObjExternalSorter sorter( _arbitrarySort, 10 );
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             ASSERT( ! i->more() );
@@ -139,13 +139,13 @@ namespace ExtSortTests {
     public:
         void run() {
             BSONObjExternalSorter sorter( _arbitrarySort );
-            sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 4 ), false );
-            sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 0 ), false );
-            sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 2 ), false );
-            sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 3 ), false );
-            sorter.add( BSON( "x" << 5 ), DiskLoc( 2, 1 ), false );
+            sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 4 ));
+            sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 0 ));
+            sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 2 ));
+            sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 3 ));
+            sorter.add( BSON( "x" << 5 ), DiskLoc( 2, 1 ));
 
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             int num=0;
@@ -172,10 +172,10 @@ namespace ExtSortTests {
         void run() {
             BSONObjExternalSorter sorter( _arbitrarySort, 2000 );
             for ( int i=0; i<10000; i++ ) {
-                sorter.add( BSON( "x" << rand() % 10000 ), DiskLoc( 5, i ), false );
+                sorter.add( BSON( "x" << rand() % 10000 ), DiskLoc( 5, i ));
             }
 
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             int num=0;
@@ -198,10 +198,10 @@ namespace ExtSortTests {
             const int total = 100000;
             BSONObjExternalSorter sorter( _arbitrarySort, total * 2 );
             for ( int i=0; i<total; i++ ) {
-                sorter.add( BSON( "a" << "b" ), DiskLoc( 5, i ), false );
+                sorter.add( BSON( "a" << "b" ), DiskLoc( 5, i ));
             }
 
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             int num=0;
@@ -226,11 +226,10 @@ namespace ExtSortTests {
             BSONObjExternalSorter sorter( _arbitrarySort, total * 2 );
             for ( int i=0; i<total; i++ ) {
                 sorter.add( BSON( "abcabcabcabd" << "basdasdasdasdasdasdadasdasd" << "x" << i ),
-                            DiskLoc( 5, i ),
-                            false );
+                            DiskLoc( 5, i ));
             }
 
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             int num=0;
@@ -257,13 +256,13 @@ namespace ExtSortTests {
             BSONObj x = b.obj();
 
             BSONObjExternalSorter sorter( _arbitrarySort );
-            sorter.add(x, DiskLoc(3,7), false);
-            sorter.add(x, DiskLoc(4,7), false);
-            sorter.add(x, DiskLoc(2,7), false);
-            sorter.add(x, DiskLoc(1,7), false);
-            sorter.add(x, DiskLoc(3,77), false);
+            sorter.add(x, DiskLoc(3,7));
+            sorter.add(x, DiskLoc(4,7));
+            sorter.add(x, DiskLoc(2,7));
+            sorter.add(x, DiskLoc(1,7));
+            sorter.add(x, DiskLoc(3,77));
 
-            sorter.sort( false );
+            sorter.sort();
 
             auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
             while( i->more() ) {
@@ -282,12 +281,12 @@ namespace ExtSortTests {
             int32_t nDocs = 130;
             for( int32_t i = 0; i < nDocs; ++i ) {
                 // Insert values in reverse order, for subsequent sort.
-                sorter.add( BSON( "" << ( nDocs - 1 - i ) ), /* dummy disk loc */ DiskLoc(), true );
+                sorter.add( BSON( "" << ( nDocs - 1 - i ) ), /* dummy disk loc */ DiskLoc() );
             }
             // The sorter's footprint is now positive.
             ASSERT( sorter.getCurSizeSoFar() > 0 );
             // Sort the keys.
-            sorter.sort( true );
+            sorter.sort();
             // Check that the keys have been sorted.
             auto_ptr<BSONObjExternalSorter::Iterator> iterator = sorter.iterator();
             int32_t expectedKey = 0;
@@ -297,116 +296,6 @@ namespace ExtSortTests {
             ASSERT_EQUALS( nDocs, expectedKey );
         }
     };
-
-    /**
-     * BSONObjExternalSorter::add() aborts if the current operation is interrupted, even if storage
-     * system writes have occurred.
-     */
-    class InterruptAdd {
-    public:
-        InterruptAdd( bool mayInterrupt ) :
-            _mayInterrupt( mayInterrupt ) {
-        }
-        void run() {
-            _client.createCollection( _ns );
-            // Take a write lock.
-            Client::WriteContext ctx( _ns );
-            OperationContextImpl txn;
-            Collection* coll = ctx.ctx().db()->getCollection( _ns );
-            // Do a write to ensure the implementation will interrupt sort() even after a write has
-            // occurred.
-            class BSONObjBuilder b;
-            OID id;
-            id.init();
-            b.appendOID( "_id", &id );
-            coll->insertDocument( &txn, b.obj(), true );
-            // Create a sorter with a max file size of only 10k, to trigger a file flush after a
-            // relatively small number of inserts.
-            auto_ptr<ExternalSortComparison> cmp(BtreeBasedBulkAccessMethod::getComparison(0,
-                BSON("a" << 1)));
-            BSONObjExternalSorter sorter(cmp.get(), 10 * 1024 );
-            // Register a request to kill the current operation.
-            cc().curop()->kill();
-            if (_mayInterrupt) {
-                // When enough keys are added to fill the first file, an interruption will be
-                // triggered as the records are sorted for the file.
-                ASSERT_THROWS( addKeysUntilFileFlushed( &sorter, _mayInterrupt ), UserException );
-            }
-            else {
-                // When enough keys are added to fill the first file, an interruption when the
-                // records are sorted for the file is prevented because mayInterrupt == false.
-                addKeysUntilFileFlushed( &sorter, _mayInterrupt );
-            }
-        }
-    private:
-        static void addKeysUntilFileFlushed( BSONObjExternalSorter* sorter, bool mayInterrupt ) {
-            while( sorter->numFiles() == 0 ) {
-                sorter->add( BSON( "" << 1 ), /* dummy disk loc */ DiskLoc(), mayInterrupt );
-            }
-        }
-        bool _mayInterrupt;
-    };
-
-    /**
-     * BSONObjExternalSorter::sort() aborts if the current operation is interrupted, even if storage
-     * system writes have occurred.
-     */
-    class InterruptSort {
-    public:
-        InterruptSort( bool mayInterrupt ) :
-            _mayInterrupt( mayInterrupt ) {
-        }
-        void run() {
-            _client.createCollection( _ns );
-            // Take a write lock.
-            Client::WriteContext ctx( _ns );
-            OperationContextImpl txn;
-            Collection* coll = ctx.ctx().db()->getCollection( _ns );
-            // Do a write to ensure the implementation will interrupt sort() even after a write has
-            // occurred.
-            class BSONObjBuilder b;
-            OID id;
-            id.init();
-            b.appendOID( "_id", &id );
-            coll->insertDocument( &txn, b.obj(), true );
-            // Create a sorter.
-            BSONObjExternalSorter sorter(_aFirstSort);
-            // Add keys to the sorter.
-            int32_t nDocs = 130;
-            for( int32_t i = 0; i < nDocs; ++i ) {
-                sorter.add( BSON( "" << i ), /* dummy disk loc */ DiskLoc(), false );
-            }
-            ASSERT( sorter.getCurSizeSoFar() > 0 );
-            // Register a request to kill the current operation.
-            cc().curop()->kill();
-            if (_mayInterrupt) {
-                // The sort is aborted due to the kill request.
-                ASSERT_THROWS( {
-                    sorter.sort( _mayInterrupt );
-                    auto_ptr<BSONObjExternalSorter::Iterator> iter = sorter.iterator();
-                    while (iter->more()) {
-                        iter->next();
-                    }
-                }, UserException );
-            }
-            else {
-                // Sort the keys.
-                sorter.sort( _mayInterrupt );
-                // Check that the keys have been sorted.
-                auto_ptr<BSONObjExternalSorter::Iterator> iterator = sorter.iterator();
-                int32_t expectedKey = 0;
-                while( iterator->more() ) {
-                    ASSERT_EQUALS( BSON( "" << expectedKey++ ), iterator->next().first );
-                }
-                ASSERT_EQUALS( nDocs, expectedKey );
-            }
-        }
-    private:
-        bool _mayInterrupt;
-    };
-
-
-
 
     class ExtSortTests : public Suite {
     public:
@@ -424,10 +313,6 @@ namespace ExtSortTests {
             add<Sort1e6>();
             add<SortNull>();
             add<Sort130>();
-            add<InterruptAdd>( false );
-            add<InterruptAdd>( true );
-            add<InterruptSort>( false );
-            add<InterruptSort>( true );
         }
     } extSortTests;
 

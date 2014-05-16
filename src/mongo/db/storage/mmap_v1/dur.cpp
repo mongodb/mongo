@@ -186,21 +186,19 @@ namespace mongo {
         }
 
         void* NonDurableImpl::writingPtr(void *x, unsigned len) { 
-            cc().writeHappened();
             return x; 
         }
 
         void NonDurableImpl::declareWriteIntent(void *, unsigned) { 
-            cc().writeHappened(); 
         }
 
         bool NonDurableImpl::commitNow() {
-            cc().checkpointHappened();
+            cc().checkpointHappened();   // XXX: remove when all dur goes through DurRecoveryUnit
             return false;
         }
 
         bool NonDurableImpl::commitIfNeeded(bool) {
-            cc().checkpointHappened();
+            cc().checkpointHappened();   // XXX: remove when all dur goes through DurRecoveryUnit
             return false;
         }
 

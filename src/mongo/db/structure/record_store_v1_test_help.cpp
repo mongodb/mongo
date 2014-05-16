@@ -41,44 +41,6 @@
 
 namespace mongo {
 
-    bool DummyRecoveryUnit::commitIfNeeded( bool force ) {
-        return false;
-    }
-
-    bool DummyRecoveryUnit::isCommitNeeded() const {
-        return false;
-    }
-
-    void* DummyRecoveryUnit::writingPtr(void* data, size_t len) {
-        return data;
-    }
-
-    void DummyRecoveryUnit::createdFile(const std::string& filename, unsigned long long len) {
-    }
-
-    void DummyRecoveryUnit::syncDataAndTruncateJournal() {
-    }
-
-    DummyOperationContext::DummyOperationContext() {
-        _recoveryUnit.reset(new DummyRecoveryUnit());
-    }
-
-    ProgressMeter* DummyOperationContext::setMessage(const char* msg,
-                                                          const std::string& name ,
-                                                          unsigned long long progressMeterTotal,
-                                                          int secondsBetween) {
-        invariant( false );
-    }
-
-    void DummyOperationContext::checkForInterrupt(bool heedMutex ) const {
-    }
-
-    Status DummyOperationContext::checkForInterruptNoAssert() const {
-        return Status::OK();
-    }
-
-    // -----------------------------------------
-
     DummyRecordStoreV1MetaData::DummyRecordStoreV1MetaData( bool capped, int userFlags ) {
         _dataSize = 0;
         _numRecords = 0;

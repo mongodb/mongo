@@ -32,7 +32,6 @@
 
 #include "mongo/db/extsort.h"
 
-#include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -42,34 +41,25 @@ namespace mongo {
         public:
             typedef pair<BSONObj, DiskLoc> Data;
 
-            ComparatorWithInterruptCheck(const ExternalSortComparison* comp,
-                                         boost::shared_ptr<const bool> mayInterrupt)
-                : _comp(comp)
-                , _mayInterrupt(mayInterrupt)
-            {}
+            ComparatorWithInterruptCheck(const ExternalSortComparison* comp)
+                : _comp(comp) { }
 
             int operator() (const Data& l, const Data& r) const {
-                RARELY if (*_mayInterrupt) {
-                    killCurrentOp.checkForInterrupt(!*_mayInterrupt);
-                }
-
                 return _comp->compare(l, r);
             }
 
         private:
             const ExternalSortComparison* _comp;
-            boost::shared_ptr<const bool> _mayInterrupt;
         };
     }
 
     BSONObjExternalSorter::BSONObjExternalSorter(const ExternalSortComparison* comp,
                                                  long maxFileSize)
-        : _mayInterrupt(boost::make_shared<bool>(false))
-        , _sorter(Sorter<BSONObj, DiskLoc>::make(
+        : _sorter(Sorter<BSONObj, DiskLoc>::make(
                     SortOptions().TempDir(storageGlobalParams.dbpath + "/_tmp")
                                  .ExtSortAllowed()
                                  .MaxMemoryUsageBytes(maxFileSize),
-                    ComparatorWithInterruptCheck(comp, _mayInterrupt)))
+                    ComparatorWithInterruptCheck(comp)))
     {}
 }
 
