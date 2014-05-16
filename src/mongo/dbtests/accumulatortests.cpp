@@ -30,7 +30,6 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"

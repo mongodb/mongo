@@ -34,13 +34,13 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace DocumentSourceTests {
@@ -157,7 +157,7 @@ namespace DocumentSourceTests {
         class Base : public CollectionBase {
         public:
             Base()
-                : _ctx(new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns)))
+                : _ctx(new ExpressionContext(&_opCtx, NamespaceString(ns)))
             { _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp"; }
         protected:
             void createSource() {
@@ -182,6 +182,7 @@ namespace DocumentSourceTests {
             DocumentSourceCursor* source() { return _source.get(); }
         private:
             // It is important that these are ordered to ensure correct destruction order.
+            OperationContextImpl _opCtx;
             boost::shared_ptr<Runner> _runner;
             boost::scoped_ptr<ScopedRunnerRegistration> _registration;
             intrusive_ptr<ExpressionContext> _ctx;
@@ -444,7 +445,7 @@ namespace DocumentSourceTests {
                 BSONElement specElement = namedSpec.firstElement();
 
                 intrusive_ptr<ExpressionContext> expressionContext =
-                        new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
+                        new ExpressionContext(&_opCtx, NamespaceString(ns));
                 expressionContext->inShard = inShard;
                 expressionContext->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
@@ -471,6 +472,7 @@ namespace DocumentSourceTests {
                         DocumentSourceGroup::createFromBson( specElement, ctx() );
                 ASSERT_EQUALS( spec, toBson( generated ) );
             }
+            OperationContextImpl _opCtx;
             intrusive_ptr<DocumentSource> _group;
         };
 

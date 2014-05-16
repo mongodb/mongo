@@ -38,7 +38,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -116,9 +115,16 @@ namespace {
             }
         }
 
-        // These are all no-ops for PipelineRunners
-        virtual void saveState() {}
-        virtual bool restoreState(OperationContext* opCtx) { return true; }
+        // Manage our OperationContext. We intentionally don't propagate to child Runner as that is
+        // handled by DocumentSourceCursor as it needs to.
+        virtual void saveState() {
+            _pipeline->getContext()->opCtx = NULL;
+        }
+        virtual bool restoreState(OperationContext* opCtx) {
+            _pipeline->getContext()->opCtx = opCtx;
+            return true;
+        }
+
         virtual const Collection* collection() { return NULL; }
 
         /**
@@ -278,8 +284,7 @@ namespace {
 
             string ns = parseNs(db, cmdObj);
 
-            intrusive_ptr<ExpressionContext> pCtx =
-                new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
+            intrusive_ptr<ExpressionContext> pCtx = new ExpressionContext(txn, NamespaceString(ns));
             pCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
             /* try to parse the command; if this fails, then we didn't run */

@@ -862,9 +862,6 @@
     <ClInclude Include="..\db\instance.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\interrupt_status.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\key.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
@@ -1086,9 +1083,6 @@
     </ClInclude>
     <ClInclude Include="mock\mock_replica_set.h">
       <Filter>dbtests\mock</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\interrupt_status_mongod.h">
-      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="..\base\owned_pointer_map.h">
       <Filter>base</Filter>
@@ -3776,9 +3770,6 @@
     </ClCompile>
     <ClCompile Include="..\util\intrusive_counter.cpp">
       <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\interrupt_status_mongod.cpp">
-      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\base\string_data.cpp">
       <Filter>base</Filter>

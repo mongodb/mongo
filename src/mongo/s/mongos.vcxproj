@@ -3201,7 +3201,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\pch.cpp" />
     <ClCompile Include="..\db\field_parser.cpp" />
     <ClCompile Include="grid.cpp" />
-    <ClCompile Include="interrupt_status_mongos.cpp" />
     <ClCompile Include="metadata_loader.cpp" />
     <ClCompile Include="mongo_version_range.cpp" />
     <ClCompile Include="range_arithmetic.cpp" />
@@ -3833,7 +3832,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\matcher\match_details.h" />
     <ClInclude Include="..\db\pipeline\document_internal.h" />
     <ClInclude Include="..\db\pipeline\pipeline.h" />
-    <ClInclude Include="..\db\interrupt_status.h" />
     <ClInclude Include="..\db\pipeline\accumulator.h" />
     <ClInclude Include="..\db\pipeline\builder.h" />
     <ClInclude Include="..\db\pipeline\document.h" />
@@ -4030,7 +4028,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\field_parser-inl.h" />
     <ClInclude Include="..\db\field_parser.h" />
     <ClInclude Include="grid.h" />
-    <ClInclude Include="interrupt_status_mongos.h" />
     <ClInclude Include="metadata_loader.h" />
     <ClInclude Include="mongo_version_range.h" />
     <ClInclude Include="range_arithmetic.h" />

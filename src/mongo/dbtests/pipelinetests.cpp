@@ -30,12 +30,11 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/interrupt_status.h"
-#include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace PipelineTests {
@@ -252,8 +251,7 @@ namespace PipelineTests {
                     const BSONObj mergePipeExpected = pipelineFromJsonArray(mergePipeJson());
 
                     intrusive_ptr<ExpressionContext> ctx =
-                        new ExpressionContext(InterruptStatusMongod::status,
-                                              NamespaceString("a.collection"));
+                        new ExpressionContext(&_opCtx, NamespaceString("a.collection"));
                     string errmsg;
                     intrusive_ptr<Pipeline> mergePipe =
                         Pipeline::parseCommand(errmsg, inputBson, ctx);
@@ -270,6 +268,9 @@ namespace PipelineTests {
                 }
 
                 virtual ~Base() {};
+
+            private:
+                OperationContextImpl _opCtx;
             };
 
             // General test to make sure all optimizations support empty pipelines

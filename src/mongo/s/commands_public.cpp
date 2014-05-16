@@ -55,7 +55,6 @@
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/interrupt_status_mongos.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/scripting/engine.h"
@@ -2188,7 +2187,7 @@ namespace mongo {
             const string fullns = parseNs(dbName, cmdObj);
 
             intrusive_ptr<ExpressionContext> pExpCtx =
-                new ExpressionContext(InterruptStatusMongos::status, NamespaceString(fullns));
+                new ExpressionContext(txn, NamespaceString(fullns));
             pExpCtx->inRouter = true;
             // explicitly *not* setting pExpCtx->tempDir
 

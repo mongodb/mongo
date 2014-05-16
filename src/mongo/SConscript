@@ -531,7 +531,6 @@ env.Library('index_set', [ 'db/index_set.cpp' ] )
 # libs.
 serverOnlyFiles = [ "db/curop.cpp",
                     "db/kill_current_op.cpp",
-                    "db/interrupt_status_mongod.cpp",
                     "db/d_globals.cpp",
                     "util/compress.cpp",
                     "db/ttl.cpp",
@@ -721,7 +720,6 @@ env.Library('coreshard', ['s/distlock.cpp',
                      's/cluster_ops_impl']);
     
 mongosLibraryFiles = [
-    "s/interrupt_status_mongos.cpp",
     "s/strategy.cpp",
     "s/commands_admin.cpp",
     "s/commands_public.cpp",

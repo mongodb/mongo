@@ -587,9 +587,6 @@
     <ClCompile Include="instance.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
-    <ClCompile Include="interrupt_status_mongod.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="introspect.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -2847,12 +2844,6 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="instance.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="interrupt_status.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="interrupt_status_mongod.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="introspect.h">

@@ -736,8 +736,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />
     <ClInclude Include="..\db\instance.h" />
-    <ClInclude Include="..\db\interrupt_status.h" />
-    <ClInclude Include="..\db\interrupt_status_mongod.h" />
     <ClInclude Include="..\db\intervalbtreecursor.h" />
     <ClInclude Include="..\db\key.h" />
     <ClInclude Include="..\db\keypattern.h" />
@@ -2989,7 +2987,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\index_selection.cpp" />
     <ClCompile Include="..\db\index_set.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
-    <ClCompile Include="..\db\interrupt_status_mongod.cpp" />
     <ClCompile Include="..\db\intervalbtreecursor.cpp" />
     <ClCompile Include="..\db\javatest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

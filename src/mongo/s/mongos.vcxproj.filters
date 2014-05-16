@@ -296,9 +296,6 @@
     <ClInclude Include="..\client\dbclient.h">
       <Filter>client</Filter>
     </ClInclude>
-    <ClCompile Include="interrupt_status_mongos.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\client\distlock.cpp">
       <Filter>client</Filter>
     </ClCompile>
@@ -1983,9 +1980,6 @@
     <ClInclude Include="grid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="interrupt_status_mongos.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\background.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -2056,9 +2050,6 @@
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\dbmessage.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\interrupt_status.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\jsobj.h">

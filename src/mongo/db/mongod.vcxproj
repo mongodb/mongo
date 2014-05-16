@@ -3626,7 +3626,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="hasher.cpp" />
     <ClCompile Include="index_update.cpp" />
-    <ClCompile Include="interrupt_status_mongod.cpp" />
     <ClCompile Include="key.cpp" />
     <ClCompile Include="lockstat.cpp" />
     <ClCompile Include="lockstate.cpp" />
@@ -4809,8 +4808,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="d_globals.h" />
     <ClInclude Include="geo\core.h" />
     <ClInclude Include="instance.h" />
-    <ClInclude Include="interrupt_status.h" />
-    <ClInclude Include="interrupt_status_mongod.h" />
     <ClInclude Include="ops\count.h" />
     <ClInclude Include="ops\delete.h" />
     <ClInclude Include="ops\update.h" />

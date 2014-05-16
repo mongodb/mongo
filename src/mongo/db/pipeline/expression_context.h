@@ -30,20 +30,20 @@
 
 #include <string>
 
-#include "mongo/db/interrupt_status.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
     struct ExpressionContext : public IntrusiveCounterUnsigned {
     public:
-        ExpressionContext(const InterruptStatus& status, const NamespaceString& ns)
+        ExpressionContext(const OperationContext* opCtx, const NamespaceString& ns)
             : inShard(false)
             , inRouter(false)
             , extSortAllowed(false)
             , ns(ns)
-            , interruptStatus(status)
+            , opCtx(opCtx)
             , interruptCounter(interruptCheckPeriod)
         {}
 
@@ -51,9 +51,9 @@ namespace mongo {
          *  @throws if the operation has been interrupted
          */
         void checkForInterrupt() {
-            if (--interruptCounter == 0) {
+            if (opCtx && --interruptCounter == 0) { // XXX SERVER-13931 for opCtx check
                 // The checkForInterrupt could be expensive, at least in relative terms.
-                interruptStatus.checkForInterrupt();
+                opCtx->checkForInterrupt();
                 interruptCounter = interruptCheckPeriod;
             }
         }
@@ -64,7 +64,7 @@ namespace mongo {
         NamespaceString ns;
         std::string tempDir; // Defaults to empty to prevent external sorting in mongos.
 
-        const InterruptStatus& interruptStatus;
+        const OperationContext* opCtx;
         static const int interruptCheckPeriod = 128;
         int interruptCounter; // when 0, check interruptStatus
     };
