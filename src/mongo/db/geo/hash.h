@@ -45,6 +45,8 @@ namespace mongo {
      */
     class GeoHash {
     public:
+        static unsigned int const kMaxBits; // = 32;
+
         GeoHash();
         // The strings are binary values of length <= 64,
         // examples: 1001010100101, 1
@@ -113,6 +115,16 @@ namespace mongo {
         unsigned getBits() const;
 
         GeoHash commonPrefix(const GeoHash& other) const;
+
+        // If this is not a leaf cell, set children[0..3] to the four children of
+        // this cell (in traversal order) and return true. Otherwise returns false.
+        bool subdivide(GeoHash children[4]) const;
+        // Return true if the given cell is contained within this one.
+        bool contains(const GeoHash& other) const;
+        // Return the parent at given level.
+        GeoHash parent(unsigned int level) const;
+        GeoHash parent() const;
+
     private:
         // XXX not sure why this is done exactly.  Why does binary
         // data need to be reversed?  byte ordering of some sort?

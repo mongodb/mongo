@@ -38,9 +38,8 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    inline std::ostream& operator<<(std::ostream &s, const GeoHash &h) {
-        s << h.toString();
-        return s;
+    std::ostream& operator<<(std::ostream &s, const GeoHash &h) {
+        return s << h.toString();
     }
 
     /* 
@@ -105,6 +104,9 @@ namespace mongo {
     inline static long long mask64For(const int i) {
         return 1LL << (63 - i);
     }
+
+    // Definition
+    unsigned int const GeoHash::kMaxBits = 32;
 
     /* This class maps an x,y coordinate pair to a hash value.
      * This should probably be renamed/generalized so that it's more of a planar hash,
@@ -397,6 +399,12 @@ namespace mongo {
      * Maybe there's junk in there?  Not sure why this is done.
      */
     void GeoHash::clearUnusedBits() {
+        // Left shift count should be less than 64
+        if (_bits == 0) {
+            _hash = 0;
+            return;
+        }
+
         static long long FULL = 0xFFFFFFFFFFFFFFFFLL;
         long long mask = FULL << (64 - (_bits * 2));
         _hash &= mask;
@@ -426,6 +434,34 @@ namespace mongo {
         }
         // i is how many bits match between this and other.
         return GeoHash(_hash, i);
+    }
+
+
+    bool GeoHash::subdivide( GeoHash children[4] ) const {
+        if ( _bits == 32 ) {
+            return false;
+        }
+
+        children[0] = GeoHash( _hash, _bits + 1 ); // (0, 0)
+        children[1] = children[0];
+        children[1].setBit( _bits * 2 + 1, 1 ); // (0, 1)
+        children[2] = children[0];
+        children[2].setBit( _bits * 2, 1 ); // (1, 0)
+        children[3] = GeoHash(children[1]._hash | children[2]._hash, _bits + 1); // (1, 1)
+        return true;
+    }
+
+    bool GeoHash::contains(const GeoHash& other) const {
+        return _bits <= other._bits && other.hasPrefix(*this);
+    }
+
+    GeoHash GeoHash::parent(unsigned int level) const {
+        return GeoHash(_hash, level);
+    }
+
+    GeoHash GeoHash::parent() const {
+        verify(_bits > 0);
+        return GeoHash(_hash, _bits - 1);
     }
 
     // Binary data is stored in some particular byte ordering that requires this.

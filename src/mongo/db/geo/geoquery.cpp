@@ -343,6 +343,14 @@ namespace mongo {
             if (box.inside(other._min) && box.inside(other._max)) {
                 return true;
             }
+        } else if (_geometry->_cap && FLAT == _geometry->_cap->crs) {
+            const Circle& circle = _geometry->_cap->circle;
+            const Point& a = other._min;
+            const Point& b = other._max;
+            return distanceWithin(circle.center, a, circle.radius)
+                    && distanceWithin(circle.center, b, circle.radius)
+                    && distanceWithin(circle.center, Point(a.x, b.y), circle.radius)
+                    && distanceWithin(circle.center, Point(b.x, a.y), circle.radius);
         }
 
         // Not sure

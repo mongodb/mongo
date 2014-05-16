@@ -829,14 +829,15 @@ env.Library("geoparser", [ "db/geo/geoparser.cpp", ],
             LIBDEPS = [ "bson",
                         "geometry",
                         '$BUILD_DIR/third_party/s2/s2' ])
-env.Library("geoquery", [ "db/geo/geoquery.cpp", ],
+env.Library("geoquery", [ "db/geo/geoquery.cpp", "db/geo/r2_region_coverer.cpp", ],
             LIBDEPS = [ "bson",
                         "geometry",
+                        "geoparser",
                         '$BUILD_DIR/third_party/s2/s2' ])
 
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
 env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], LIBDEPS = ["geoparser"])
-
+env.CppUnitTest("r2_region_coverer_test",[ "db/geo/r2_region_coverer_test.cpp" ], LIBDEPS = ["geoquery"])
 
 env.CppUnitTest(
     target="index_filter_commands_test",
