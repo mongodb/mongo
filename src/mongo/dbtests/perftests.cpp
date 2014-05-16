@@ -46,7 +46,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/structure/btree/key.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/taskqueue.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/util/checksum.h"
@@ -95,36 +94,6 @@ namespace PerfTests {
         static DBClientType _client;
     };
     DBClientType ClientBase::_client;
-
-    // todo: use a couple threads. not a very good test yet.
-#if 0
-    class TaskQueueTest {
-        static int tot;
-        struct V {
-            int val;
-            static void go(const V &v) { tot += v.val; }
-        };
-    public:
-        void run() {
-            tot = 0;
-            TaskQueue<V> d;
-            int x = 0;
-            for( int i = 0; i < 100; i++ ) {
-                if( i % 30 == 0 )
-                    d.invoke();
-
-                x += i;
-                writelock lk;
-                V v;
-                v.val = i;
-                d.defer(v);
-            }
-            d.invoke();
-            verify( x == tot );
-        }
-    };
-    int TaskQueueTest::tot;
-#endif
 
     /* if you want recording of the timings, place the password for the perf database
         in ./../settings.py:

@@ -53,7 +53,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/curop-inl.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/extsort.h"

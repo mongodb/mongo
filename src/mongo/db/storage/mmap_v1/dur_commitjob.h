@@ -33,7 +33,6 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/durop.h"
-#include "mongo/db/taskqueue.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/mongoutils/hash.h"

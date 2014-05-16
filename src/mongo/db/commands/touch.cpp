@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/curop-inl.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
