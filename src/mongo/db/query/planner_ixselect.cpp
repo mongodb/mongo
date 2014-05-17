@@ -536,10 +536,7 @@ namespace mongo {
     // 2dsphere V2 sparse quirks
     //
 
-    static void stripInvalidAssignmentsTo2dsphereIndex(
-            MatchExpression* node,
-            size_t idx,
-            const unordered_set<StringData, StringData::Hasher>& geoFields) {
+    static void stripInvalidAssignmentsTo2dsphereIndex(MatchExpression* node, size_t idx) {
 
         if (Indexability::nodeCanUseIndexOnOwnField(node)) {
             removeIndexRelevantTag(node, idx);
@@ -556,7 +553,7 @@ namespace mongo {
         if (MatchExpression::AND != nodeType) {
             // It's an OR or some kind of array operator.
             for (size_t i = 0; i < node->numChildren(); ++i) {
-                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx, geoFields);
+                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx);
             }
             return;
         }
@@ -570,7 +567,7 @@ namespace mongo {
             if (NULL == tag) {
                 // 'child' could be a logical operator.  Maybe there are some assignments hiding
                 // inside.
-                stripInvalidAssignmentsTo2dsphereIndex(child, idx, geoFields);
+                stripInvalidAssignmentsTo2dsphereIndex(child, idx);
                 continue;
             }
 
@@ -594,7 +591,7 @@ namespace mongo {
             else {
                 // Recurse on the children to ensure that they're not hiding any assignments
                 // to idx.
-                stripInvalidAssignmentsTo2dsphereIndex(child, idx, geoFields);
+                stripInvalidAssignmentsTo2dsphereIndex(child, idx);
             }
         }
 
@@ -602,7 +599,7 @@ namespace mongo {
         // if we use the index we'll miss results.
         if (!hasGeoField) {
             for (size_t i = 0; i < node->numChildren(); ++i) {
-                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx, geoFields);
+                stripInvalidAssignmentsTo2dsphereIndex(node->getChild(i), idx);
             }
         }
     }
@@ -633,26 +630,22 @@ namespace mongo {
                 continue;
             }
 
-            // Gather the set of geo fields in this index.
-            unordered_set<StringData, StringData::Hasher> geoFields;
+            // If every field is geo don't bother doing anything.
+            bool allFieldsGeo = true;
             BSONObjIterator it(index.keyPattern);
             while (it.more()) {
                 BSONElement elt = it.next();
-                if (String == elt.type()) {
-                    geoFields.insert(elt.fieldName());
+                if (String != elt.type()) {
+                    allFieldsGeo = false;
+                    break;
                 }
             }
-
-            // If every field is geo don't bother doing anything.
-            if (geoFields.size() == static_cast<size_t>(index.keyPattern.nFields())) {
+            if (allFieldsGeo) {
                 continue;
             }
 
-            // You can't have a 2dsphere index without a 2dsphere field.
-            invariant(!geoFields.empty());
-
             // Remove bad assignments from this index.
-            stripInvalidAssignmentsTo2dsphereIndex(node, i, geoFields);
+            stripInvalidAssignmentsTo2dsphereIndex(node, i);
         }
     }
 
