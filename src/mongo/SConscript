@@ -64,8 +64,7 @@ env.Library('foundation',
                      '$BUILD_DIR/mongo/platform/platform',
                      '$BUILD_DIR/mongo/util/concurrency/thread_name',
                      '$BUILD_DIR/third_party/shim_allocator',
-                     '$BUILD_DIR/third_party/shim_boost',
-                     '$BUILD_DIR/third_party/shim_tz'])
+                     '$BUILD_DIR/third_party/shim_boost'])
 
 env.CppUnitTest('text_test', 'util/text_test.cpp', LIBDEPS=['foundation'])
 env.CppUnitTest('util/time_support_test', 'util/time_support_test.cpp', LIBDEPS=['foundation'])
