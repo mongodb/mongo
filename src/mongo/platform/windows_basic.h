@@ -34,6 +34,12 @@
 #error "windows_basic included but _WIN32 is not defined"
 #endif
 
+// "If you define NTDDI_VERSION, you must also define _WIN32_WINNT":
+// http://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+#if defined(NTDDI_VERSION) && !defined(_WIN32_WINNT)
+#error NTDDI_VERSION defined but _WIN32_WINNT is undefined
+#endif
+
 // Ensure that _WIN32_WINNT is set to something before we include windows.h. For server builds
 // both _WIN32_WINNT and NTDDI_VERSION are set as defines on the command line, but we need
 // these here for things like client driver builds, where they may not already be set.
