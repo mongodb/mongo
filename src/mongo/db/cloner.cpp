@@ -466,8 +466,14 @@ namespace mongo {
                 string err;
                 const char *toname = to_name.c_str();
                 /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(toname, options, err, opts.logForRepl, false);
+                bool createStatus = userCreateNS(toname, options, err, opts.logForRepl, false);
+                if ( !createStatus ) {
+                    errmsg = str::stream() << "failed to create collection \"" << to_name << "\": "
+                                           << err;
+                    return false;
+                }
             }
+
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
             if( opts.snapshot )
