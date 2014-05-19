@@ -43,5 +43,11 @@ func main() {
 		Poller:     &poll.DBPoller{},
 		Outputter:  &output.TerminalOutputter{},
 	}
-	top.Run()
+
+	if err := top.Run(); err != nil {
+		fmt.Println(
+			fmt.Sprintf("error running mongotop: %v", err),
+		)
+	}
+
 }

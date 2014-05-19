@@ -33,9 +33,8 @@ type MongoToolOptions struct {
 	Collection string
 
 	// Specify authentication credentials and database
-	User     string
+	Username string
 	Password string
-	AuthDB   string
 
 	// Extra tool-specific options that can be specified by calling
 	// AddOptions
@@ -55,8 +54,8 @@ func (self *MongoToolOptions) Usage() {
 type ExtraOptions interface {
 	Register()
 	PostParse() error
-	Usage()
 	Validate() error
+	Usage()
 }
 
 func (self *MongoToolOptions) AddOptions(opts ExtraOptions) {
@@ -101,18 +100,15 @@ func GetMongoToolOptions() *MongoToolOptions {
 		"Filter by collection")
 	flag.StringVar(&(options.Collection), "c", "", "Filter by collection")
 
-	flag.StringVar(&(options.User), "username", "", "Specify username for"+
+	flag.StringVar(&(options.Username), "username", "", "Specify username for"+
 		" authentication")
-	flag.StringVar(&(options.User), "u", "", "Specify username for"+
+	flag.StringVar(&(options.Username), "u", "", "Specify username for"+
 		" authentication")
 
 	flag.StringVar(&(options.Password), "password", "", "Specify password for"+
 		" authentication")
 	flag.StringVar(&(options.Password), "p", "", "Specify password for"+
 		" authentication")
-
-	flag.StringVar(&(options.AuthDB), "authenticationDatabase", "", "Specify"+
-		" database that holds the user's credentials")
 
 	return options
 
@@ -123,16 +119,20 @@ func (self *MongoToolOptions) ParseAndValidate() error {
 	flag.Parse()
 
 	// run post-parse logic
-	self.PostParse()
-
-	if err := self.ExtraOptions.PostParse(); err != nil {
-		return fmt.Errorf("error executing post-processing of params: %v", err)
+	if err := self.PostParse(); err != nil {
+		return fmt.Errorf("error post-processing tool params: %v", err)
 	}
+
+	// run validation logic
+	if err := self.Validate(); err != nil {
+		return fmt.Errorf("validating tool params failed: %v", err)
+	}
+
 	return nil
 }
 
 // Run the post-parse logic
-func (self *MongoToolOptions) PostParse() {
+func (self *MongoToolOptions) PostParse() error {
 	// build the filter string and options based on the db and collection
 	// specified, if any
 	if self.DB != "" {
@@ -146,4 +146,26 @@ func (self *MongoToolOptions) PostParse() {
 		self.FilterNS = "." + self.Collection
 	}
 
+	// post-parse the extra params
+	if self.ExtraOptions != nil {
+		if err := self.ExtraOptions.PostParse(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Run the validation logic
+func (self *MongoToolOptions) Validate() error {
+
+	// TODO: validate
+
+	if self.ExtraOptions != nil {
+		if err := self.ExtraOptions.Validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

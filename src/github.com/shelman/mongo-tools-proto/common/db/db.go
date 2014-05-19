@@ -27,6 +27,8 @@ func Configure(opts *options.MongoToolOptions) error {
 		url += ":" + opts.Port
 	}
 
+	// TODO: validate
+
 	return nil
 }
 
@@ -68,7 +70,16 @@ func createMasterSession() error {
 		return err
 	}
 
-	// TODO: authenticate
+	// authenticate, if necessary
+	if globalOptions.Username != "" {
+
+		// log in
+		if err := masterSession.DB("admin").Login(globalOptions.Username,
+			globalOptions.Password); err != nil {
+			return fmt.Errorf("error logging in to admin database: %v", err)
+		}
+
+	}
 
 	return nil
 }
