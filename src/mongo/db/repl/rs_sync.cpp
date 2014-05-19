@@ -189,6 +189,10 @@ namespace mongo {
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->syncable() &&
                 targetOpTime.getSecs()+maxSyncSourceLagSecs < m->hbinfo().opTime.getSecs()) {
+                log() << "changing sync target because current sync target's most recent OpTime is "
+                      << targetOpTime.toStringPretty() << " which is more than "
+                      << maxSyncSourceLagSecs << " seconds behind member " << m->fullName()
+                      << " whose most recent OpTime is " << m->hbinfo().opTime.getSecs();
                 return true;
             }
         }
