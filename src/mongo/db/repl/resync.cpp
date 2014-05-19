@@ -68,8 +68,11 @@ namespace mongo {
             const std::string ns = parseNs(dbname, cmdObj);
             Lock::GlobalWrite globalWriteLock;
             Client::Context ctx(ns);
-
             if (replSettings.usingReplSets()) {
+                if (!theReplSet) {
+                    errmsg = "no replication yet active";
+                    return false;
+                }
                 if (theReplSet->isPrimary()) {
                     errmsg = "primaries cannot resync";
                     return false;
