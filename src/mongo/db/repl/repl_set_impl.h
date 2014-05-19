@@ -28,7 +28,9 @@
 
 #pragma once
 
+#include "mongo/db/repl/consensus.h"
 #include "mongo/db/repl/heartbeat_info.h"
+#include "mongo/db/repl/manager.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/rs_base.h"
 #include "mongo/db/repl/rs_config.h"
