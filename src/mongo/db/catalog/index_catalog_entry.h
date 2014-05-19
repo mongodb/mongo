@@ -38,34 +38,32 @@
 
 namespace mongo {
 
-    class Collection;
+    class CollectionCatalogEntry;
+    class CollectionInfoCache;
     class HeadManager;
     class IndexAccessMethod;
     class IndexDescriptor;
-    class RecordStore;
     class OperationContext;
 
     class IndexCatalogEntry {
         MONGO_DISALLOW_COPYING( IndexCatalogEntry );
     public:
-        IndexCatalogEntry( Collection* collection,
+        IndexCatalogEntry( const StringData& ns,
+                           CollectionCatalogEntry* collection, // not owned
                            IndexDescriptor* descriptor, // ownership passes to me
-                           RecordStore* recordStore ); // ownership passes to me
+                           CollectionInfoCache* infoCache ); // not owned, optional
 
         ~IndexCatalogEntry();
 
-        void init( IndexAccessMethod* accessMethod );
+        const string& ns() const { return _ns; }
 
-        const Collection* collection() const { return _collection; }
+        void init( IndexAccessMethod* accessMethod );
 
         IndexDescriptor* descriptor() { return _descriptor; }
         const IndexDescriptor* descriptor() const { return _descriptor; }
 
         IndexAccessMethod* accessMethod() { return _accessMethod; }
         const IndexAccessMethod* accessMethod() const { return _accessMethod; }
-
-        RecordStore* recordStore() { return _recordStore; }
-        const RecordStore* recordStore() const { return _recordStore; }
 
         const Ordering& ordering() const { return _ordering; }
 
@@ -90,19 +88,19 @@ namespace mongo {
 
     private:
 
-        int _indexNo() const;
-
         bool _catalogIsReady() const;
         DiskLoc _catalogHead() const;
         bool _catalogIsMultikey() const;
 
         // -----
 
-        Collection* _collection; // not owned here
+        string _ns;
+
+        CollectionCatalogEntry* _collection; // not owned here
 
         IndexDescriptor* _descriptor; // owned here
 
-        RecordStore* _recordStore; // owned here
+        CollectionInfoCache* _infoCache; // not owned here
 
         IndexAccessMethod* _accessMethod; // owned here
 

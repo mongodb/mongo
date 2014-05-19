@@ -14,5 +14,8 @@ assert.eq( 1, t.count() );
 assert.writeError(t.update( {} , { $set : { x : bigString } } ));
 
 assert.eq( 1, t.count() );
+/* SERVER-13951
 assert.eq( "asd", t.findOne().x ); // make sure doc is the old version
 assert.eq( "asd", t.findOne( { _id : 0 } ).x ); // make sure doc is the old version
+*/
+t.drop(); // SERVER-13951 - remove this line

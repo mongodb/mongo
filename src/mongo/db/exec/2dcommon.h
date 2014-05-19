@@ -141,7 +141,8 @@ namespace twod_exec {
 
     class GeoAccumulator {
     public:
-        GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter);
+        GeoAccumulator(Collection* collection,
+                       TwoDAccessMethod* accessMethod, MatchExpression* filter);
 
         virtual ~GeoAccumulator();
 
@@ -159,6 +160,7 @@ namespace twod_exec {
 
         virtual KeyResult approxKeyCheck(const Point& p, double& keyD) = 0;
 
+        Collection* _collection;
         TwoDAccessMethod* _accessMethod;
         shared_ptr<GeoHashConverter> _converter;
         std::map<DiskLoc, bool> _matched;
@@ -185,7 +187,10 @@ namespace twod_exec {
             DONE
         } _state;
 
-        GeoBrowse(TwoDAccessMethod* accessMethod, std::string type, MatchExpression* filter);
+        GeoBrowse(Collection* collection,
+                  TwoDAccessMethod* accessMethod,
+                  std::string type,
+                  MatchExpression* filter);
 
         virtual bool ok();
         virtual bool advance();

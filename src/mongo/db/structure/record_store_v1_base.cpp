@@ -231,6 +231,8 @@ namespace mongo {
 
         _details->incrementStats( txn, r->netLength(), 1 );
 
+        _paddingFits( txn );
+
         return loc;
     }
 
@@ -243,6 +245,18 @@ namespace mongo {
             return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
                                         "record has to be >= 4 bytes" );
         }
+
+        StatusWith<DiskLoc> status = _insertRecord( txn, data, len, quotaMax );
+        if ( status.isOK() )
+            _paddingFits( txn );
+
+        return status;
+    }
+
+    StatusWith<DiskLoc> RecordStoreV1Base::_insertRecord( OperationContext* txn,
+                                                          const char* data,
+                                                          int len,
+                                                          int quotaMax ) {
 
         int lenWHdr = getRecordAllocationSize( len + Record::HeaderSize );
         fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
@@ -263,6 +277,70 @@ namespace mongo {
         _details->incrementStats( txn, r->netLength(), 1 );
 
         return loc;
+    }
+
+    StatusWith<DiskLoc> RecordStoreV1Base::updateRecord( OperationContext* txn,
+                                                         const DiskLoc& oldLocation,
+                                                         const char* data,
+                                                         int dataSize,
+                                                         int quotaMax,
+                                                         UpdateMoveNotifier* notifier ) {
+        Record* oldRecord = recordFor( oldLocation );
+        if ( oldRecord->netLength() >= dataSize ) {
+            // we fit
+            _paddingFits( txn );
+            memcpy( txn->recoveryUnit()->writingPtr( oldRecord->data(), dataSize ), data, dataSize );
+            return StatusWith<DiskLoc>( oldLocation );
+        }
+
+        if ( isCapped() )
+            return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                        "failing update: objects in a capped ns cannot grow",
+                                        10003 );
+
+        // we have to move
+
+        _paddingTooSmall( txn );
+
+        StatusWith<DiskLoc> newLocation = _insertRecord( txn, data, dataSize, quotaMax );
+        if ( !newLocation.isOK() )
+            return newLocation;
+
+        // insert worked, so we delete old record
+        if ( notifier ) {
+            Status moveStatus = notifier->recordStoreGoingToMove( txn,
+                                                                  oldLocation,
+                                                                  oldRecord->data(),
+                                                                  oldRecord->netLength() );
+            if ( !moveStatus.isOK() )
+                return StatusWith<DiskLoc>( moveStatus );
+        }
+
+        deleteRecord( txn, oldLocation );
+
+        return newLocation;
+    }
+
+
+    Status RecordStoreV1Base::updateWithDamages( OperationContext* txn,
+                                                 const DiskLoc& loc,
+                                                 const char* damangeSource,
+                                                 const mutablebson::DamageVector& damages ) {
+        _paddingFits( txn );
+
+        Record* rec = recordFor( loc );
+        char* root = rec->data();
+
+        // All updates were in place. Apply them via durability and writing pointer.
+        mutablebson::DamageVector::const_iterator where = damages.begin();
+        const mutablebson::DamageVector::const_iterator end = damages.end();
+        for( ; where != end; ++where ) {
+            const char* sourcePtr = damangeSource + where->sourceOffset;
+            void* targetPtr = txn->recoveryUnit()->writingPtr(root + where->targetOffset, where->size);
+            std::memcpy(targetPtr, sourcePtr, where->size);
+        }
+
+        return Status::OK();
     }
 
     void RecordStoreV1Base::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
@@ -688,6 +766,18 @@ namespace mongo {
         return Status::OK();
     }
 
+    void RecordStoreV1Base::appendCustomStats( BSONObjBuilder* result, double scale ) const {
+        result->append( "lastExtentSize", _details->lastExtentSize() / scale );
+        result->append( "paddingFactor", _details->paddingFactor() );
+        result->append( "userFlags", _details->userFlags() );
+
+        if ( isCapped() ) {
+            result->appendBool( "capped", true );
+            result->appendNumber( "max", _details->maxCappedDocs() );
+        }
+    }
+
+
     namespace {
         struct touch_location {
             const char* root;
@@ -815,4 +905,51 @@ namespace mongo {
         return MaxBucket;
     }
 
+    void RecordStoreV1Base::_paddingFits( OperationContext* txn ) {
+        MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
+            double x = max(1.0, _details->paddingFactor() - 0.001 );
+            _details->setPaddingFactor( txn, x );
+        }
+    }
+
+    void RecordStoreV1Base::_paddingTooSmall( OperationContext* txn ) {
+        MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
+            /* the more indexes we have, the higher the cost of a move.  so we take that into
+               account herein.  note on a move that insert() calls paddingFits(), thus
+               here for example with no inserts and nIndexes = 1 we have
+               .001*4-.001 or a 3:1 ratio to non moves -> 75% nonmoves.  insert heavy
+               can pushes this down considerably. further tweaking will be a good idea but
+               this should be an adequate starting point.
+            */
+            double N = 4; // magic
+            double x = min(2.0,_details->paddingFactor() + (0.001 * N));
+            _details->setPaddingFactor( txn, x );
+        }
+    }
+
+    Status RecordStoreV1Base::setCustomOption( OperationContext* txn,
+                                               const BSONElement& option,
+                                               BSONObjBuilder* info ) {
+        if ( str::equals( "usePowerOf2Sizes", option.fieldName() ) ) {
+            bool oldPowerOf2 = _details->isUserFlagSet( Flag_UsePowerOf2Sizes );
+            bool newPowerOf2 = option.trueValue();
+
+            if ( oldPowerOf2 != newPowerOf2 ) {
+                // change userFlags
+                info->appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
+
+                if ( newPowerOf2 )
+                    _details->setUserFlag( txn, Flag_UsePowerOf2Sizes );
+                else
+                    _details->clearUserFlag( txn, Flag_UsePowerOf2Sizes );
+
+                info->appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
+            }
+
+            return Status::OK();
+        }
+
+        return Status( ErrorCodes::InvalidOptions,
+                       str::stream() << "no such option: " << option.fieldName() );
+    }
 }

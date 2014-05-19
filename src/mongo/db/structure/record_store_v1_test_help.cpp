@@ -147,6 +147,30 @@ namespace mongo {
         return _userFlags & flag;
     }
 
+    bool DummyRecordStoreV1MetaData::setUserFlag( OperationContext* txn, int flag ) {
+        if ( ( _userFlags & flag ) == flag )
+            return false;
+
+        _userFlags |= flag;
+        return true;
+
+    }
+    bool DummyRecordStoreV1MetaData::clearUserFlag( OperationContext* txn, int flag ) {
+        if ( ( _userFlags & flag ) == 0 )
+            return false;
+
+        _userFlags &= ~flag;
+        return true;
+
+    }
+    bool DummyRecordStoreV1MetaData::replaceUserFlags( OperationContext* txn, int flags ) {
+        if ( _userFlags == flags )
+            return false;
+        _userFlags = flags;
+        return true;
+    }
+
+
     int DummyRecordStoreV1MetaData::lastExtentSize() const {
         return _lastExtentSize;
     }

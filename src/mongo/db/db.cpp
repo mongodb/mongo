@@ -38,9 +38,9 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/auth_index_d.h"
-#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
@@ -52,7 +52,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -62,12 +61,13 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pdfile_version.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
-#include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/startup_warnings.h"
@@ -75,9 +75,10 @@
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/structure/catalog/namespace_index.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/d_writeback.h"
@@ -327,7 +328,7 @@ namespace mongo {
         }
 
         list<string> collections;
-        db->namespaceIndex().getNamespaces( collections );
+        db->namespaceIndex()->getNamespaces( collections );
 
         // for each collection, ensure there is a $_id_ index
         for (list<string>::iterator i = collections.begin(); i != collections.end(); ++i) {

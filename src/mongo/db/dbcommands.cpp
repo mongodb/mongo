@@ -70,6 +70,7 @@
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage/record.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_logic.h"
@@ -170,7 +171,7 @@ namespace mongo {
                                                      const BSONObj& cmdObj) {
             invariant(db);
             std::list<std::string> collections;
-            db->namespaceIndex().getNamespaces(collections, true /* onlyCollections */);
+            db->namespaceIndex()->getNamespaces(collections, true /* onlyCollections */);
 
             std::vector<BSONObj> allKilledIndexes;
             for (std::list<std::string>::iterator it = collections.begin(); 
@@ -256,7 +257,7 @@ namespace mongo {
                                                      const BSONObj& cmdObj) {
             invariant(db);
             std::list<std::string> collections;
-            db->namespaceIndex().getNamespaces(collections, true /* onlyCollections */);
+            db->namespaceIndex()->getNamespaces(collections, true /* onlyCollections */);
 
             std::vector<BSONObj> allKilledIndexes;
             for (std::list<std::string>::iterator it = collections.begin(); 
@@ -1110,7 +1111,7 @@ namespace mongo {
                                  scale );
             result.append( "nindexes" , collection->getIndexCatalog()->numIndexesReady() );
 
-            collection->appendCustomStats( &result, scale );
+            collection->getRecordStore()->appendCustomStats( &result, scale );
 
             BSONObjBuilder indexSizes;
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
@@ -1165,22 +1166,6 @@ namespace mongo {
                 else if ( LiteParsedQuery::cmdOptionMaxTimeMS == e.fieldNameStringData() ) {
                     // no-op
                 }
-                else if ( str::equals( "usePowerOf2Sizes", e.fieldName() ) ) {
-                    bool oldPowerOf2 = coll->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes);
-                    bool newPowerOf2 = e.trueValue();
-
-                    if ( oldPowerOf2 != newPowerOf2 ) {
-                        // change userFlags
-                        result.appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
-
-                        if ( newPowerOf2 )
-                            coll->setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
-                        else
-                            coll->clearUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
-
-                        result.appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
-                    }
-                }
                 else if ( str::equals( "index", e.fieldName() ) ) {
                     BSONObj indexObj = e.Obj();
                     BSONObj keyPattern = indexObj.getObjectField( "keyPattern" );
@@ -1225,13 +1210,24 @@ namespace mongo {
                     if ( oldExpireSecs != newExpireSecs ) {
                         // change expireAfterSeconds
                         result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
-                        coll->getIndexCatalog()->updateTTLSetting( txn, idx, newExpireSecs.numberLong() );
+                        coll->getCatalogEntry()->updateTTLSetting( txn,
+                                                                   idx->indexName(),
+                                                                   newExpireSecs.numberLong() );
                         result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
                     }
                 }
                 else {
-                    errmsg = str::stream() << "unknown option to collMod: " << e.fieldName();
-                    ok = false;
+                    Status s = coll->getRecordStore()->setCustomOption( txn, e, &result );
+                    if ( s.isOK() ) {
+                        // no-op
+                    }
+                    else if ( s.code() == ErrorCodes::InvalidOptions ) {
+                        errmsg = str::stream() << "unknown option to collMod: " << e.fieldName();
+                        ok = false;
+                    }
+                    else {
+                        return appendCommandStatus( result, s );
+                    }
                 }
             }
             
@@ -1290,7 +1286,7 @@ namespace mongo {
                 d = NULL;
 
             if ( d )
-                d->namespaceIndex().getNamespaces( collections );
+                d->namespaceIndex()->getNamespaces( collections );
 
             long long ncollections = 0;
             long long objects = 0;
@@ -1333,7 +1329,7 @@ namespace mongo {
             result.appendNumber( "indexSize" , indexSize / scale );
             if ( d ) {
                 result.appendNumber( "fileSize" , d->fileSize() / scale );
-                result.appendNumber( "nsSizeMB", (int) d->namespaceIndex().fileLength() / 1024 / 1024 );
+                result.appendNumber( "nsSizeMB", (int) d->namespaceIndex()->fileLength() / 1024 / 1024 );
             }
             else {
                 result.appendNumber( "fileSize" , 0 );

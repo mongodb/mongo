@@ -62,5 +62,6 @@ for (var i = 0; i < 1000; i++) {
 
 // should have trended somewhat higher over the above.
 // speed of increase would be higher with more indexes.
-assert.gt(p.stats().paddingFactor, ps + 0.02 , "padding factor not greater than value (+.02)");
+assert.gt(p.stats().paddingFactor, ps + 0.02 ,
+          "padding factor not greater than value (+.02), ps: " + ps + " now: " + p.stats().paddingFactor);
 p.drop();

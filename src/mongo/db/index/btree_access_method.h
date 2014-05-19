@@ -51,7 +51,8 @@ namespace mongo {
         // superclass and subclasses (like this) can use them.
         using BtreeBasedAccessMethod::_descriptor;
 
-        BtreeAccessMethod(IndexCatalogEntry* btreeState );
+        BtreeAccessMethod(IndexCatalogEntry* btreeState,
+                          RecordStore* rs );
         virtual ~BtreeAccessMethod() { }
 
     private:

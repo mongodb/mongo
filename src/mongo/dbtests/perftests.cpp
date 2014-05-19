@@ -41,6 +41,7 @@
 #include <fstream>
 
 #include "mongo/db/db.h"
+#include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
@@ -52,6 +53,7 @@
 #include "mongo/util/compress.h"
 #include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/mmap.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version_reporting.h"

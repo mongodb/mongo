@@ -104,8 +104,11 @@ namespace twod_exec {
     // GeoAccumulator
     //
 
-    GeoAccumulator::GeoAccumulator(TwoDAccessMethod* accessMethod, MatchExpression* filter)
-        : _accessMethod(accessMethod), _converter(accessMethod->getParams().geoHashConverter),
+    GeoAccumulator::GeoAccumulator(Collection* collection,
+                                   TwoDAccessMethod* accessMethod,
+                                   MatchExpression* filter)
+        : _collection(collection),
+          _accessMethod(accessMethod), _converter(accessMethod->getParams().geoHashConverter),
           _filter(filter),
           _lookedAt(0), _matchesPerfd(0), _objectsLoaded(0), _pointsLoaded(0), _found(0) { }
 
@@ -135,7 +138,7 @@ namespace twod_exec {
                 GeoMatchableDocument md(_accessMethod->getDescriptor()->keyPattern(),
                                         node._key,
                                         node.recordLoc,
-                                        _accessMethod->collection(),
+                                        _collection,
                                         &fetched);
                 bool good = _filter->matches(&md);
 
@@ -306,14 +309,15 @@ namespace twod_exec {
     // GeoBrowse
     //
 
-    GeoBrowse::GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter)
-        : GeoAccumulator(accessMethod, filter),
+    GeoBrowse::GeoBrowse(Collection* collection,
+                         TwoDAccessMethod* accessMethod, string type, MatchExpression* filter)
+        : GeoAccumulator(collection, accessMethod, filter),
         _type(type), _firstCall(true), _nscanned(),
         _centerPrefix(0, 0, 0),
         _descriptor(accessMethod->getDescriptor()),
         _converter(accessMethod->getParams().geoHashConverter),
         _params(accessMethod->getParams()),
-        _collection(accessMethod->collection()) {
+        _collection(collection) {
 
             // Set up the initial expand state
             _state = START;

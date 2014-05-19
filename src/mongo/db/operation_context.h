@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
@@ -78,6 +79,11 @@ namespace mongo {
                                           const std::string& name = "Progress",
                                           unsigned long long progressMeterTotal = 0,
                                           int secondsBetween = 3) = 0;
+
+        /**
+         * @return true if this instance is primary for this namespace
+         */
+        virtual bool isPrimaryFor( const StringData& ns ) = 0;
 
         /**
          * Returns a OperationContext. Caller takes ownership.

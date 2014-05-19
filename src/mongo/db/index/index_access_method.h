@@ -168,7 +168,7 @@ namespace mongo {
          * For now (1/8/14) you can only do bulk when the index is empty
          * it will fail if you try other times.
          */
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) = 0;
+        virtual IndexAccessMethod* initiateBulk(OperationContext* txn, int64_t numRecords ) = 0;
 
         /**
          * Call this when you are ready to finish your bulk work.

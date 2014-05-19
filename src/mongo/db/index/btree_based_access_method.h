@@ -41,6 +41,7 @@
 namespace mongo {
 
     class ExternalSortComparison;
+    class RecordStore;
 
     /**
      * Any access method that is Btree based subclasses from this.
@@ -56,7 +57,8 @@ namespace mongo {
     class BtreeBasedAccessMethod : public IndexAccessMethod {
         MONGO_DISALLOW_COPYING( BtreeBasedAccessMethod );
     public:
-        BtreeBasedAccessMethod( IndexCatalogEntry* btreeState );
+        BtreeBasedAccessMethod( IndexCatalogEntry* btreeState,
+                                RecordStore* recordStore );
 
         virtual ~BtreeBasedAccessMethod() { }
 
@@ -86,7 +88,7 @@ namespace mongo {
 
         virtual Status initializeAsEmpty(OperationContext* txn);
 
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) ;
+        virtual IndexAccessMethod* initiateBulk(OperationContext* txn, int64_t numRecords );
 
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
@@ -111,14 +113,8 @@ namespace mongo {
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
         IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
+        scoped_ptr<RecordStore> _recordStore; // owned by us
         const IndexDescriptor* _descriptor;
-
-        /**
-         * The collection is needed for resolving record locations to actual objects.
-         */
-        const Collection* collection() const {
-            return _btreeState->collection();
-        }
 
     private:
         bool removeOneKey(OperationContext* txn,

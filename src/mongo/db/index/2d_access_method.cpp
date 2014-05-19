@@ -41,8 +41,9 @@
 
 namespace mongo {
 
-    TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState)
-        : BtreeBasedAccessMethod(btreeState) {
+    TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,
+                                       RecordStore* rs)
+        : BtreeBasedAccessMethod(btreeState, rs) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 

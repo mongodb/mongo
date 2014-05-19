@@ -119,7 +119,7 @@ namespace mongo {
             return _notAllowed();
         }
 
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) {
+        virtual IndexAccessMethod* initiateBulk(OperationContext* txn, int64_t numRecords ) {
             return NULL;
         }
 

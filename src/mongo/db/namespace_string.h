@@ -95,6 +95,7 @@ namespace mongo {
         bool isValid() const { return validDBName( db() ) && !coll().empty(); }
 
         bool operator==( const std::string& nsIn ) const { return nsIn == _ns; }
+        bool operator==( const StringData& nsIn ) const { return nsIn == _ns; }
         bool operator==( const NamespaceString& nsIn ) const { return nsIn._ns == _ns; }
 
         bool operator!=( const std::string& nsIn ) const { return nsIn != _ns; }

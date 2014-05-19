@@ -111,7 +111,7 @@ namespace mongo {
             IndexDescriptor* desc = idxs[0];
             HaystackAccessMethod* ham =
                 static_cast<HaystackAccessMethod*>( collection->getIndexCatalog()->getIndex(desc) );
-            ham->searchCommand(nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
+            ham->searchCommand(collection, nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
                                &result, limit);
             return 1;
         }

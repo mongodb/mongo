@@ -39,8 +39,8 @@
 
 namespace mongo {
 
-    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState)
-        : BtreeBasedAccessMethod(btreeState) {
+    HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, RecordStore* rs)
+        : BtreeBasedAccessMethod(btreeState, rs) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 
@@ -57,7 +57,8 @@ namespace mongo {
         ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
     }
 
-    void HaystackAccessMethod::searchCommand(const BSONObj& nearObj, double maxDistance,
+    void HaystackAccessMethod::searchCommand(Collection* collection,
+                                             const BSONObj& nearObj, double maxDistance,
                                              const BSONObj& search, BSONObjBuilder* result,
                                              unsigned limit) {
         Timer t;
@@ -72,7 +73,7 @@ namespace mongo {
         }
         int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
-        GeoHaystackSearchHopper hopper(nearObj, maxDistance, limit, _geoField, collection());
+        GeoHaystackSearchHopper hopper(nearObj, maxDistance, limit, _geoField, collection);
 
         long long btreeMatches = 0;
 
@@ -95,7 +96,7 @@ namespace mongo {
                 unordered_set<DiskLoc, DiskLoc::Hasher> thisPass;
 
 
-                scoped_ptr<Runner> runner(InternalPlanner::indexScan(_btreeState->collection(),
+                scoped_ptr<Runner> runner(InternalPlanner::indexScan(collection,
                                                                      _descriptor, key, key, true));
                 Runner::RunnerState state;
                 DiskLoc loc;

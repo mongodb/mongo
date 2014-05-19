@@ -33,6 +33,7 @@
 #include <list>
 #include <string>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/structure/catalog/hashtab.h"
 #include "mongo/db/structure/catalog/namespace.h"
@@ -46,12 +47,13 @@ namespace mongo {
        if you will: at least the core parts.  (Additional info in system.* collections.)
     */
     class NamespaceIndex {
+        MONGO_DISALLOW_COPYING(NamespaceIndex);
     public:
         NamespaceIndex(const std::string &dir, const std::string &database) :
             _ht( 0 ), _dir( dir ), _database( database ) {}
 
-        /* returns true if new db will be created if we init lazily */
-        bool exists() const;
+        /* returns true if the file represented by this file exists on disk */
+        bool pathExists() const;
 
         void init( OperationContext* txn ) {
             if ( !_ht.get() )
@@ -84,7 +86,7 @@ namespace mongo {
         void maybeMkdir() const;
 
         DurableMappedFile _f;
-        std::auto_ptr<HashTable<Namespace,NamespaceDetails> > _ht;
+        scoped_ptr<HashTable<Namespace,NamespaceDetails> > _ht;
         std::string _dir;
         std::string _database;
     };

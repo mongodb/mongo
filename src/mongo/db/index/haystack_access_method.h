@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    class Collection;
+
     /**
      * Maps (lat, lng) to the bucketSize-sided square bucket that contains it.
      * Examines all documents in a given radius of a given point.
@@ -55,12 +57,13 @@ namespace mongo {
     public:
         using BtreeBasedAccessMethod::_descriptor;
 
-        HaystackAccessMethod(IndexCatalogEntry* btreeState);
+        HaystackAccessMethod(IndexCatalogEntry* btreeState, RecordStore* rs);
         virtual ~HaystackAccessMethod() { }
 
     protected:
         friend class GeoHaystackSearchCommand;
-        void searchCommand(const BSONObj& nearObj, double maxDistance, const BSONObj& search,
+        void searchCommand(Collection* collection,
+                           const BSONObj& nearObj, double maxDistance, const BSONObj& search,
                            BSONObjBuilder* result, unsigned limit);
 
     private:

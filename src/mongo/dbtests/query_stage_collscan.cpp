@@ -50,7 +50,7 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace QueryStageCollectionScan {
-
+#if 0 // SERVER-13640
     //
     // Test some nitty-gritty capped collection details.  Ported and polished from pdfiletests.cpp.
     //
@@ -307,7 +307,7 @@ namespace QueryStageCollectionScan {
         virtual int expectedCount() const { return 4; }
         virtual int nExtents() const { return 3; }
     };
-
+#endif // SERVER-13640
     //
     // Stage-specific tests.
     //
@@ -623,6 +623,7 @@ namespace QueryStageCollectionScan {
 
         void setupTests() {
             // These tests are ported from pdfile.cpp
+            /* SERVER-13640
             add<QueryStageCollscanEmpty>();
             add<QueryStageCollscanEmptyLooped>();
             add<QueryStageCollscanEmptyMultiExtentLooped>();
@@ -636,6 +637,7 @@ namespace QueryStageCollectionScan {
             add<QueryStageCollscanAloneInExtent>();
             add<QueryStageCollscanFirstInExtent>();
             add<QueryStageCollscanLastInExtent>();
+            */
             // These are not.  Stage-specific tests below.
             add<QueryStageCollscanBasicForward>();
             add<QueryStageCollscanBasicBackward>();

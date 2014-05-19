@@ -74,6 +74,11 @@ namespace mongo {
         virtual bool isCapped() const;
 
         virtual bool isUserFlagSet( int flag ) const;
+        virtual int userFlags() const { return _userFlags; }
+        virtual bool setUserFlag( OperationContext* txn, int flag );
+        virtual bool clearUserFlag( OperationContext* txn, int flag );
+        virtual bool replaceUserFlags( OperationContext* txn, int flags );
+
 
         virtual int lastExtentSize() const;
         virtual void setLastExtentSize( OperationContext* txn, int newMax );

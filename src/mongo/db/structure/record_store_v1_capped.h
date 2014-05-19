@@ -83,6 +83,10 @@ namespace mongo {
 
         virtual bool isCapped() const { return true; }
 
+        virtual void setCappedDeleteCallback( CappedDocumentDeleteCallback* cb ) {
+            _deleteCallback = cb;
+        }
+
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
                                                  int quotaMax );

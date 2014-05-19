@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 
 namespace mongo {
 

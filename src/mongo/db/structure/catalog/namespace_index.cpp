@@ -94,8 +94,8 @@ namespace mongo {
         }
     }
 
-    bool NamespaceIndex::exists() const {
-        return !boost::filesystem::exists(path());
+    bool NamespaceIndex::pathExists() const {
+        return boost::filesystem::exists(path());
     }
 
     boost::filesystem::path NamespaceIndex::path() const {

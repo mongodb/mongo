@@ -233,7 +233,9 @@ namespace mongo {
                  << status.toString(),
                  status.isOK() );
 
-        IndexAccessMethod* bulk = doInBackground ? NULL : btreeState->accessMethod()->initiateBulk(txn);
+        IndexAccessMethod* bulk = doInBackground ?
+            NULL : btreeState->accessMethod()->initiateBulk(txn,
+                                                            collection->numRecords());
         scoped_ptr<IndexAccessMethod> bulkHolder(bulk);
         IndexAccessMethod* iam = bulk ? bulk : btreeState->accessMethod();
 
@@ -341,7 +343,7 @@ namespace mongo {
             if ( !status.isOK() )
                 return status;
 
-            state.bulk = state.real->initiateBulk(_txn);
+            state.bulk = state.real->initiateBulk(_txn, _collection->numRecords() );
 
             _states.push_back( state );
         }

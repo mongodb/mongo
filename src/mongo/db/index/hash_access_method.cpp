@@ -33,8 +33,8 @@
 
 namespace mongo {
 
-    HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState)
-        : BtreeBasedAccessMethod(btreeState) {
+    HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState, RecordStore* rs)
+        : BtreeBasedAccessMethod(btreeState, rs) {
 
         const IndexDescriptor* descriptor = btreeState->descriptor();
 

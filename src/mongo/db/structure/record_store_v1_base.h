@@ -80,6 +80,10 @@ namespace mongo {
         virtual bool isCapped() const = 0;
 
         virtual bool isUserFlagSet( int flag ) const = 0;
+        virtual int userFlags() const = 0;
+        virtual bool setUserFlag( OperationContext* txn, int flag ) = 0;
+        virtual bool clearUserFlag( OperationContext* txn, int flag ) = 0;
+        virtual bool replaceUserFlags( OperationContext* txn, int flags ) = 0;
 
         virtual int lastExtentSize() const = 0;
         virtual void setLastExtentSize( OperationContext* txn, int newMax ) = 0;
@@ -138,6 +142,18 @@ namespace mongo {
                                           const DocWriter* doc,
                                           int quotaMax );
 
+        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
+                                                  const DiskLoc& oldLocation,
+                                                  const char* data,
+                                                  int len,
+                                                  int quotaMax,
+                                                  UpdateMoveNotifier* notifier );
+
+        virtual Status updateWithDamages( OperationContext* txn,
+                                          const DiskLoc& loc,
+                                          const char* damangeSource,
+                                          const mutablebson::DamageVector& damages );
+
         virtual RecordIterator* getIteratorForRepair() const;
 
         void increaseStorageSize( OperationContext* txn, int size, int quotaMax );
@@ -146,6 +162,8 @@ namespace mongo {
                                  bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
+
+        virtual void appendCustomStats( BSONObjBuilder* result, double scale ) const;
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
@@ -182,6 +200,9 @@ namespace mongo {
         /* return which "deleted bucket" for this size object */
         static int bucket(int size);
 
+        virtual Status setCustomOption( OperationContext* txn,
+                                        const BSONElement& option,
+                                        BSONObjBuilder* info = NULL );
     protected:
 
         virtual bool isCapped() const = 0;
@@ -217,6 +238,18 @@ namespace mongo {
             require: you must have already declared write intent for the record header.
         */
         void _addRecordToRecListInExtent(OperationContext* txn, Record* r, DiskLoc loc);
+
+        void _paddingTooSmall( OperationContext* txn );
+        void _paddingFits( OperationContext* txn );
+
+        /**
+         * internal
+         * doesn't check inputs or change padding
+         */
+        StatusWith<DiskLoc> _insertRecord( OperationContext* txn,
+                                           const char* data,
+                                           int len,
+                                           int quotaMax );
 
         scoped_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;

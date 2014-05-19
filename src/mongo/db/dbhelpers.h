@@ -28,11 +28,9 @@
 
 #pragma once
 
-// TODO: Remove
-#include "mongo/pch.h"
-
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"
+#include "mongo/db/diskloc.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/s/range_arithmetic.h"
 

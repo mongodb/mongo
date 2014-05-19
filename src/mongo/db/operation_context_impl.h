@@ -52,6 +52,8 @@ namespace mongo {
 
         virtual Status checkForInterruptNoAssert() const;
 
+        virtual bool isPrimaryFor( const StringData& ns );
+
         /**
          * Returns an OperationContext. Caller takes ownership.
          */

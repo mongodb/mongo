@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/mmap.h"
 
 namespace mongo {
 

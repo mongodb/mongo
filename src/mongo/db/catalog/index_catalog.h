@@ -42,10 +42,8 @@ namespace mongo {
 
     class Client;
     class Collection;
-    class NamespaceDetails;
 
     class IndexDescriptor;
-    struct IndexDetails;
     class IndexAccessMethod;
 
     /**
@@ -54,7 +52,7 @@ namespace mongo {
      */
     class IndexCatalog {
     public:
-        IndexCatalog( Collection* collection, NamespaceDetails* details );
+        IndexCatalog( Collection* collection );
         ~IndexCatalog();
 
         // must be called before used
@@ -178,14 +176,6 @@ namespace mongo {
 
         // ---- modify single index
 
-        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
-         * The specified index must already contain an expireAfterSeconds field, and the value in
-         * that field and newExpireSecs must both be numeric.
-         */
-        void updateTTLSetting( OperationContext* txn,
-                               const IndexDescriptor* idx,
-                               long long newExpireSeconds );
-
         bool isMultikey( const IndexDescriptor* idex );
 
         // --- these probably become private?
@@ -274,13 +264,6 @@ namespace mongo {
     private:
         typedef unordered_map<IndexDescriptor*, Client*> InProgressIndexesMap;
 
-        // creates a new thing, no caching
-        IndexAccessMethod* _createAccessMethod( const IndexDescriptor* desc,
-                                                IndexCatalogEntry* entry );
-
-        int _removeFromSystemIndexes(OperationContext* txn,
-                                     const StringData& indexName );
-
         bool _shouldOverridePlugin( const BSONObj& keyPattern ) const;
 
         /**
@@ -289,8 +272,6 @@ namespace mongo {
          * differ, see shouldOverridePlugin.
          */
         std::string _getAccessMethodName(const BSONObj& keyPattern) const;
-
-        IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
 
         void _checkMagic() const;
 
@@ -320,8 +301,7 @@ namespace mongo {
         // doesn't change memory state, etc...
         void _deleteIndexFromDisk( OperationContext* txn,
                                    const std::string& indexName,
-                                   const std::string& indexNamespace,
-                                   int idxNo );
+                                   const std::string& indexNamespace );
 
         // descriptor ownership passes to _setupInMemoryStructures
         IndexCatalogEntry* _setupInMemoryStructures(OperationContext* txn,
@@ -335,7 +315,6 @@ namespace mongo {
 
         int _magic;
         Collection* _collection;
-        NamespaceDetails* _details;
 
         IndexCatalogEntryContainer _entries;
 

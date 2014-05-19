@@ -65,7 +65,8 @@ namespace mongo {
             TwoDAccessMethod* am = static_cast<TwoDAccessMethod*>( indexCatalog->getIndex( desc ) );
 
             auto_ptr<twod_exec::GeoSearch> search;
-            search.reset(new twod_exec::GeoSearch(am,
+            search.reset(new twod_exec::GeoSearch(_params.collection,
+                                           am,
                                            _params.nearQuery.centroid.oldPoint,
                                            _params.numWanted, 
                                            _params.filter,
@@ -162,13 +163,14 @@ namespace twod_exec {
     // GeoHopper
     //
 
-    GeoHopper::GeoHopper(TwoDAccessMethod* accessMethod,
+    GeoHopper::GeoHopper(Collection* collection,
+             TwoDAccessMethod* accessMethod,
             unsigned max,
             const Point& n,
             MatchExpression* filter,
             double maxDistance,
             GeoDistType type)
-        : GeoBrowse(accessMethod, "search", filter),
+        : GeoBrowse(collection, accessMethod, "search", filter),
         _max(max),
         _near(n),
         _maxDistance(maxDistance),
@@ -177,7 +179,7 @@ namespace twod_exec {
                 ? accessMethod->getParams().geoHashConverter->getError()
                 : accessMethod->getParams().geoHashConverter->getErrorSphere()),
         _farthest(0),
-        _collection(accessMethod->collection()) {}
+        _collection(collection) {}
 
     GeoAccumulator:: KeyResult GeoHopper::approxKeyCheck(const Point& p, double& d) {
         // Always check approximate distance, since it lets us avoid doing
@@ -294,13 +296,14 @@ namespace twod_exec {
     // GeoSearch
     //
 
-    GeoSearch::GeoSearch(TwoDAccessMethod* accessMethod,
+    GeoSearch::GeoSearch(Collection* collection,
+            TwoDAccessMethod* accessMethod,
             const Point& startPt,
             int numWanted,
             MatchExpression* filter,
             double maxDistance,
             GeoDistType type)
-        : GeoHopper(accessMethod, numWanted, startPt, filter, maxDistance, type),
+        : GeoHopper(collection, accessMethod, numWanted, startPt, filter, maxDistance, type),
         _start(accessMethod->getParams().geoHashConverter->hash(startPt.x, startPt.y)),
         _numWanted(numWanted),
         _type(type),

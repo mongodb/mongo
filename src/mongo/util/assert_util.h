@@ -234,6 +234,15 @@ namespace mongo {
        display happening.
     */
 #define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (::mongo::msgasserted(msgid, msg), 0) )
+
+    MONGO_CLIENT_API inline void massertStatusOK(const Status& status) {
+        if (MONGO_unlikely(!status.isOK())) {
+            msgasserted((status.location() != 0 ? status.location() : status.code()),
+                        status.reason());
+        }
+    }
+
+
     /* same as massert except no msgid */
 #define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::verifyFailed(#_Expression, __FILE__, __LINE__), 0) )
 

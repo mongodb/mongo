@@ -58,6 +58,10 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual bool isPrimaryFor( const StringData& ns ) {
+            return true;
+        }
+
     private:
         boost::scoped_ptr<RecoveryUnitNoop> _recoveryUnit;
     };

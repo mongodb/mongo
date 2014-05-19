@@ -31,6 +31,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/repl/is_master.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 
 namespace mongo {
@@ -60,6 +61,11 @@ namespace mongo {
             return Status::OK();
 
         return Status( ErrorCodes::Interrupted, killed );
+    }
+
+    bool OperationContextImpl::isPrimaryFor( const StringData& ns ) {
+        string s = ns.toString(); // TODO: fix copy
+        return isMasterNs( s.c_str() );
     }
 
     OperationContext* OperationContextImpl::factory() {

@@ -106,7 +106,8 @@ namespace twod_exec {
     public:
         typedef multiset<GeoPoint> Holder;
 
-        GeoHopper(TwoDAccessMethod* accessMethod,
+        GeoHopper(Collection* collection,
+                  TwoDAccessMethod* accessMethod,
                   unsigned max,
                   const Point& n,
                   MatchExpression* filter,
@@ -146,7 +147,8 @@ namespace twod_exec {
 
     class GeoSearch : public GeoHopper {
     public:
-        GeoSearch(TwoDAccessMethod* accessMethod,
+        GeoSearch(Collection* collection,
+                  TwoDAccessMethod* accessMethod,
                   const Point& startPt,
                   int numWanted = 100,
                   MatchExpression* filter = NULL,

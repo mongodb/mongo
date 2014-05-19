@@ -42,6 +42,7 @@
 namespace mongo {
 
     class BucketDeletionNotification;
+    class RecordStore;
 
     /**
      * This is the logic for manipulating the Btree.  It is (mostly) independent of the on-disk
