@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/mongotop"
 	"github.com/shelman/mongo-tools-proto/mongotop/options"
@@ -11,10 +12,13 @@ import (
 
 func main() {
 
+	// register command-line options, and add mongotop-specific options
 	opts := commonopts.GetMongoToolOptions()
 	topOpts := &options.MongoTopOptions{}
 	opts.AddOptions(topOpts)
-	err := opts.Parse()
+
+	// parse the options
+	err := opts.ParseAndValidate()
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Error: %v", err))
 	}
@@ -29,12 +33,15 @@ func main() {
 		return
 	}
 
+	// we're going to do real work.  configure the db connection
+	db.Configure(opts)
+
+	// instantiate a mongotop instance, and kick it off
 	top := &mongotop.MongoTop{
 		Options:    opts,
 		TopOptions: topOpts,
 		Poller:     &poll.DBPoller{},
 		Outputter:  &output.TerminalOutputter{},
 	}
-
 	top.Run()
 }

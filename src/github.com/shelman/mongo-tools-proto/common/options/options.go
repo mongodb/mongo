@@ -28,7 +28,23 @@ type MongoToolOptions struct {
 	// Port to use
 	Port string
 
+	// Specified database and collection
+	DB         string
+	Collection string
+
+	// Specify authentication credentials and database
+	User     string
+	Password string
+	AuthDB   string
+
+	// Extra tool-specific options that can be specified by calling
+	// AddOptions
 	ExtraOptions
+
+	// Bookkeeping for filtering on database and collection
+	FilterNS       string // the full namespace for filtering
+	FilterOnlyColl bool   // filter only on collection
+	FilterBoth     bool   // filter on both db and collection
 }
 
 func (self *MongoToolOptions) Usage() {
@@ -40,6 +56,7 @@ type ExtraOptions interface {
 	Register()
 	PostParse() error
 	Usage()
+	Validate() error
 }
 
 func (self *MongoToolOptions) AddOptions(opts ExtraOptions) {
@@ -69,25 +86,64 @@ func GetMongoToolOptions() *MongoToolOptions {
 	flag.BoolVar(&(options.Version), "version", false, "Returns the mongotop"+
 		" release number")
 
-	flag.StringVar(&(options.Host), "host", "127.0.0.1", "Specifies a"+
+	flag.StringVar(&(options.Host), "host", "127.0.0.1:27017", "Specifies a"+
 		" resolvable hostname for the mongod to which to connect")
-	flag.StringVar(&(options.Host), "h", "127.0.0.1", "Specifies a"+
+	flag.StringVar(&(options.Host), "h", "127.0.0.1:27017", "Specifies a"+
 		" resolvable hostname for the mongod to which to connect")
 
-	flag.StringVar(&(options.Port), "port", "27017", "Specifies the TCP port"+
+	flag.StringVar(&(options.Port), "port", "", "Specifies the TCP port"+
 		" on which the MongoDB instance listens for client connections")
-	flag.StringVar(&(options.Port), "p", "", "Specifies the TCP port on"+
-		" which the MongoDB instance listens for client connections")
+
+	flag.StringVar(&(options.DB), "db", "", "Filter by database")
+	flag.StringVar(&(options.DB), "d", "", "Filter by database")
+
+	flag.StringVar(&(options.Collection), "collection", "",
+		"Filter by collection")
+	flag.StringVar(&(options.Collection), "c", "", "Filter by collection")
+
+	flag.StringVar(&(options.User), "username", "", "Specify username for"+
+		" authentication")
+	flag.StringVar(&(options.User), "u", "", "Specify username for"+
+		" authentication")
+
+	flag.StringVar(&(options.Password), "password", "", "Specify password for"+
+		" authentication")
+	flag.StringVar(&(options.Password), "p", "", "Specify password for"+
+		" authentication")
+
+	flag.StringVar(&(options.AuthDB), "authenticationDatabase", "", "Specify"+
+		" database that holds the user's credentials")
 
 	return options
 
 }
 
 // Parse the command line args into the mongo options
-func (self *MongoToolOptions) Parse() error {
+func (self *MongoToolOptions) ParseAndValidate() error {
 	flag.Parse()
+
+	// run post-parse logic
+	self.PostParse()
+
 	if err := self.ExtraOptions.PostParse(); err != nil {
 		return fmt.Errorf("error executing post-processing of params: %v", err)
 	}
 	return nil
+}
+
+// Run the post-parse logic
+func (self *MongoToolOptions) PostParse() {
+	// build the filter string and options based on the db and collection
+	// specified, if any
+	if self.DB != "" {
+		self.FilterNS = self.DB + "."
+		if self.Collection != "" {
+			self.FilterBoth = true
+			self.FilterNS += self.Collection
+		}
+	} else if self.Collection != "" {
+		self.FilterOnlyColl = true
+		self.FilterNS = "." + self.Collection
+	}
+
 }

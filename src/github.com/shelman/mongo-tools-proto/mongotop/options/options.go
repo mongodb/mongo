@@ -13,10 +13,6 @@ type MongoTopOptions struct {
 	DB         string
 	Collection string
 	SleepTime  int
-
-	FilterNameSpace string
-	FilterOnlyColl  bool
-	FilterFull      bool
 }
 
 func (self *MongoTopOptions) Usage() {
@@ -25,10 +21,6 @@ func (self *MongoTopOptions) Usage() {
 
 func (self *MongoTopOptions) Register() {
 	flag.BoolVar(&(self.Locks), "locks", false, "Report on lock usage")
-	flag.StringVar(&(self.DB), "db", "", "Filter by db")
-	flag.StringVar(&(self.DB), "d", "", "Filter by db")
-	flag.StringVar(&(self.Collection), "collection", "", "Filter by collection")
-	flag.StringVar(&(self.Collection), "c", "", "Filter by collection")
 }
 
 func (self *MongoTopOptions) PostParse() error {
@@ -38,6 +30,7 @@ func (self *MongoTopOptions) PostParse() error {
 	if len(args) >= 2 {
 		lastArg := args[len(args)-1]
 		secondToLastArg := args[len(args)-2]
+		// TODO: this can be done much better
 		if !strings.HasPrefix(lastArg, "-") &&
 			!strings.Contains(secondToLastArg, "-port") &&
 			!strings.Contains(secondToLastArg, "-p") &&
@@ -51,16 +44,10 @@ func (self *MongoTopOptions) PostParse() error {
 		}
 	}
 
-	if self.DB != "" {
-		self.FilterNameSpace = self.DB + "."
-		if self.Collection != "" {
-			self.FilterFull = true
-			self.FilterNameSpace += self.Collection
-		}
-	} else if self.Collection != "" {
-		self.FilterOnlyColl = true
-		self.FilterNameSpace = "." + self.Collection
-	}
+	return nil
+}
 
+func (self *MongoTopOptions) Validate() error {
+	// unimplemented ftm
 	return nil
 }

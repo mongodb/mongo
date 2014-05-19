@@ -2,7 +2,7 @@ package output
 
 import (
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/mongotop/options"
+	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/result"
 	"sort"
 	"strconv"
@@ -12,7 +12,7 @@ import (
 
 // output top results
 type Outputter interface {
-	Output(*result.TopResults, *options.MongoTopOptions) error
+	Output(*result.TopResults, *commonopts.MongoToolOptions) error
 }
 
 // outputter that sends the results to the terminal
@@ -21,7 +21,7 @@ type TerminalOutputter struct {
 
 // satisfy the Outputter interface
 func (self *TerminalOutputter) Output(results *result.TopResults,
-	opts *options.MongoTopOptions) error {
+	opts *commonopts.MongoToolOptions) error {
 
 	// bookkeep the longest member of each column, for spacing
 	longestNS := len("ns")
@@ -113,14 +113,14 @@ func timeOutputField(timeVal int) string {
 	return strconv.Itoa(timeVal/1000) + "ms"
 }
 
-func skipNamespace(ns string, opts *options.MongoTopOptions) bool {
-	if opts.FilterNameSpace != "" {
-		if opts.FilterFull {
-			return ns != opts.FilterNameSpace
+func skipNamespace(ns string, opts *commonopts.MongoToolOptions) bool {
+	if opts.FilterNS != "" {
+		if opts.FilterBoth {
+			return ns != opts.FilterNS
 		} else if opts.FilterOnlyColl {
-			return !strings.HasSuffix(ns, opts.FilterNameSpace)
+			return !strings.HasSuffix(ns, opts.FilterNS)
 		}
-		return !strings.HasPrefix(ns, opts.FilterNameSpace)
+		return !strings.HasPrefix(ns, opts.FilterNS)
 	}
 	return ns == "" ||
 		!strings.Contains(ns, ".") ||

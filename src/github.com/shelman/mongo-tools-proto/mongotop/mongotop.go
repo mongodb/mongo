@@ -26,12 +26,15 @@ type MongoTop struct {
 
 func (self *MongoTop) Run() error {
 
-	// TODO: do this in poller
-	db.SetHostAndPort(self.Options.Host, self.Options.Port)
-
-	fmt.Println(
-		fmt.Sprintf("connected to %v", db.Url()),
-	)
+	if err := db.ConfirmConnect(); err != nil {
+		msg := fmt.Sprintf("error connecting to db: %v", err)
+		fmt.Println(msg)
+		return fmt.Errorf(msg)
+	} else {
+		fmt.Println(
+			fmt.Sprintf("connected to %v", db.Url()),
+		)
+	}
 
 	for {
 
@@ -43,7 +46,7 @@ func (self *MongoTop) Run() error {
 
 		// output...
 		if err := self.Outputter.Output(pollResults,
-			self.TopOptions); err != nil {
+			self.Options); err != nil {
 			return fmt.Errorf("error outputting results: %v", err)
 		}
 
