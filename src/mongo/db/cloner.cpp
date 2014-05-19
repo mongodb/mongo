@@ -457,10 +457,15 @@ namespace mongo {
             verify(p);
             string to_name = todb + p;
 
-            {
-                /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(txn, context.db(), to_name, options, opts.logForRepl, false);
+            /* we defer building id index for performance - building it in batch is much faster */
+            Status createStatus = userCreateNS( txn, context.db(), to_name, options,
+                                                opts.logForRepl, false );
+            if ( !createStatus.isOK() ) {
+                errmsg = str::stream() << "failed to create collection \"" << to_name << "\": "
+                                       << createStatus.reason();
+                return false;
             }
+
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
             if( opts.snapshot )
