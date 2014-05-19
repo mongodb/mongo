@@ -33,6 +33,7 @@
 #include <dlfcn.h>
 #include <iostream>
 #include <string>
+#include <sys/utsname.h>
 
 #include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"
@@ -170,6 +171,35 @@ namespace {
         os << std::dec << std::nouppercase;
         os << "-----  END BACKTRACE  -----" << std::endl;
     }
+
+namespace {
+
+    void addOSComponentsToSoMap(BSONObjBuilder* soMap);
+
+    /**
+     * Builds the "soMapJson" string, which is a JSON encoding of various pieces of information
+     * about a running process, including the map from load addresses to shared objects loaded at
+     * those addresses.
+     */
+    MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
+        BSONObjBuilder soMap;
+        soMap << "mongodbVersion" << versionString;
+        soMap << "gitVersion" << gitVersion();
+        utsname unameData;
+        if (!uname(&unameData)) {
+            BSONObjBuilder unameBuilder(soMap.subobjStart("uname"));
+            unameBuilder <<
+                "sysname" << unameData.sysname <<
+                "release" << unameData.release <<
+                "version" << unameData.version <<
+                "machine" << unameData.machine;
+        }
+        addOSComponentsToSoMap(&soMap);
+        soMapJson = new std::string(soMap.done().jsonString(Strict));
+        return Status::OK();
+    }
+}  // namespace
+
 }  // namespace mongo
 
 #if defined(__linux__)
@@ -336,23 +366,83 @@ namespace {
         return 0;
     }
 
-    /**
-     * Builds the "soMapJson" string for Linux, which is of the following form:
-     *
-     * '"somap": [<Objects described by outputSOInfo, above>]'
-     */
-    MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
-        BSONObjBuilder soMap;
-        soMap << "mongodbVersion" << versionString;
-        soMap << "gitVersion" << gitVersion();
-        BSONArrayBuilder soList(soMap.subarrayStart("somap"));
+    void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
+        BSONArrayBuilder soList(soMap->subarrayStart("somap"));
         dl_iterate_phdr(outputSOInfo, &soList);
         soList.done();
-        soMapJson = new std::string(soMap.done().jsonString(Strict));
-        return Status::OK();
     }
+
 }  // namespace
 
 }  // namespace mongo
 
+#elif defined(__APPLE__) && defined(__MACH__)
+
+#include <mach-o/dyld.h>
+#include <mach-o/ldsyms.h>
+#include <mach-o/loader.h>
+
+namespace mongo {
+namespace {
+    const char* lcNext(const char* lcCurr) {
+        const load_command* cmd = reinterpret_cast<const load_command*>(lcCurr);
+        return lcCurr + cmd->cmdsize;
+    }
+
+    uint32_t lcType(const char* lcCurr) {
+        const load_command* cmd = reinterpret_cast<const load_command*>(lcCurr);
+        return cmd->cmd;
+    }
+
+    void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
+        const uint32_t numImages = _dyld_image_count();
+        BSONArrayBuilder soList(soMap->subarrayStart("somap"));
+        for (uint32_t i = 0; i < numImages; ++i) {
+            BSONObjBuilder soInfo(soList.subobjStart());
+            const char* name = _dyld_get_image_name(i);
+            if (name)
+                soInfo << "path" << name;
+            const mach_header* header = _dyld_get_image_header(i);
+            if (!header)
+                continue;
+            size_t headerSize;
+            if (header->magic == MH_MAGIC) {
+                headerSize = sizeof(mach_header);
+            }
+            else if (header->magic == MH_MAGIC_64) {
+                headerSize = sizeof(mach_header_64);
+            }
+            else {
+                continue;
+            }
+            soInfo << "machType" << header->filetype;
+            soInfo << "b" << integerToHex(reinterpret_cast<intptr_t>(header));
+            const char* const loadCommandsBegin =
+                reinterpret_cast<const char*>(header) + headerSize;
+            const char* const loadCommandsEnd = loadCommandsBegin + header->sizeofcmds;
+
+            // Search the "load command" data in the Mach object for the entry
+            // encoding the UUID of the object.
+            for (const char* lcCurr = loadCommandsBegin;
+                 lcCurr < loadCommandsEnd;
+                 lcCurr = lcNext(lcCurr)) {
+
+                if (LC_UUID != lcType(lcCurr))
+                    continue;
+
+                const uuid_command* uuidCmd = reinterpret_cast<const uuid_command*>(lcCurr);
+                soInfo << "buildId" << toHex(uuidCmd->uuid, 16);
+                break;
+            }
+        }
+    }
+}  // namepace
+}  // namespace mongo
+#else
+namespace mongo {
+namespace {
+    void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
+    }
+}  // namepace
+}  // namespace mongo
 #endif
