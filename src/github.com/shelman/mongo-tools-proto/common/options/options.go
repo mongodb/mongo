@@ -159,8 +159,6 @@ func (self *MongoToolOptions) PostParse() error {
 // Run the validation logic
 func (self *MongoToolOptions) Validate() error {
 
-	// TODO: validate
-
 	if self.ExtraOptions != nil {
 		if err := self.ExtraOptions.Validate(); err != nil {
 			return err

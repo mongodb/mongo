@@ -66,3 +66,66 @@ func TestAddingExtraOptions(t *testing.T) {
 
 	})
 }
+
+func TestPostParse(t *testing.T) {
+
+	var opts *MongoToolOptions
+
+	Convey("With an instance of MongoToolOptions", t, func() {
+
+		opts = &MongoToolOptions{}
+
+		Convey("when executing the post-parsing step", func() {
+
+			filterDB := "db"
+			filterColl := "coll"
+
+			Convey("specifying no filter should leave the filtering fields"+
+				" blank", func() {
+
+				So(opts.PostParse(), ShouldBeNil)
+				So(opts.FilterNS, ShouldEqual, "")
+				So(opts.FilterBoth, ShouldBeFalse)
+				So(opts.FilterOnlyColl, ShouldBeFalse)
+
+			})
+
+			Convey("specifying only a db filter should lead to only the db"+
+				" being set as a filter", func() {
+
+				opts.DB = filterDB
+				So(opts.PostParse(), ShouldBeNil)
+				So(opts.FilterNS, ShouldEqual, filterDB+".")
+				So(opts.FilterBoth, ShouldBeFalse)
+				So(opts.FilterOnlyColl, ShouldBeFalse)
+
+			})
+
+			Convey("specifying only a collection filter should lead to only"+
+				" the collection being set as a filter", func() {
+
+				opts.Collection = filterColl
+				So(opts.PostParse(), ShouldBeNil)
+				So(opts.FilterNS, ShouldEqual, "."+filterColl)
+				So(opts.FilterBoth, ShouldBeFalse)
+				So(opts.FilterOnlyColl, ShouldBeTrue)
+
+			})
+
+			Convey("specifying both db and collection filters should lead to"+
+				" the entire namespace being filtered", func() {
+
+				opts.DB = filterDB
+				opts.Collection = filterColl
+				So(opts.PostParse(), ShouldBeNil)
+				So(opts.FilterNS, ShouldEqual, filterDB+"."+filterColl)
+				So(opts.FilterBoth, ShouldBeTrue)
+				So(opts.FilterOnlyColl, ShouldBeFalse)
+
+			})
+
+		})
+
+	})
+
+}
