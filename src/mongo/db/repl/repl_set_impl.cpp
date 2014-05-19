@@ -55,30 +55,33 @@ namespace mongo {
         static time_t lastLogged;
         _hbmsgTime = time(0);
 
-        if( s == _hbmsg ) {
+        if (s == _hbmsg) {
             // unchanged
-            if( _hbmsgTime - lastLogged < 60 )
+            if (_hbmsgTime - lastLogged < 60)
                 return;
         }
 
         unsigned sz = s.size();
-        if( sz >= 256 )
+        if (sz >= 256)
             memcpy(_hbmsg, s.c_str(), 255);
         else {
             _hbmsg[sz] = 0;
             memcpy(_hbmsg, s.c_str(), sz);
         }
-        if( !s.empty() ) {
+        if (!s.empty()) {
             lastLogged = _hbmsgTime;
             LOG(logLevel) << "replSet " << s << rsLog;
         }
     }
 
     void ReplSetImpl::goStale(const Member* stale, const BSONObj& oldest) {
-        log() << "replSet error RS102 too stale to catch up, at least from " << stale->fullName() << rsLog;
+        log() << "replSet error RS102 too stale to catch up, at least from "
+              << stale->fullName() << rsLog;
         log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
-        log() << "replSet oldest at " << stale->fullName() << " : " << oldest["ts"]._opTime().toStringLong() << rsLog;
-        log() << "replSet See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" << rsLog;
+        log() << "replSet oldest at " << stale->fullName() << " : "
+              << oldest["ts"]._opTime().toStringLong() << rsLog;
+        log() << "replSet See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember"
+              << rsLog;
 
         // reset minvalid so that we can't become primary prematurely
         setMinValid(oldest);
@@ -106,7 +109,7 @@ namespace {
 
     void ReplSetImpl::assumePrimary() {
         LOG(1) << "replSet assuming primary" << endl;
-        verify( iAmPotentiallyHot() );
+        verify(iAmPotentiallyHot());
 
         // Wait for replication to stop and buffer to be consumed
         LOG(1) << "replSet waiting for replication to finish before becoming primary" << endl;
@@ -141,7 +144,8 @@ namespace {
         }
 
         if (inc) {
-            log() << "replSet going into maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+            log() << "replSet going into maintenance mode (" << _maintenanceMode
+                  << " other tasks)" << rsLog;
 
             _maintenanceMode++;
             changeState(MemberState::RS_RECOVERING);
@@ -165,7 +169,7 @@ namespace {
 
         Member *max = 0;
         set<unsigned>::iterator it = _electableSet.begin();
-        while ( it != _electableSet.end() ) {
+        while (it != _electableSet.end()) {
             const Member *temp = findById(*it);
             if (!temp) {
                 log() << "couldn't find member: " << *it << endl;
@@ -188,7 +192,7 @@ namespace {
             Lock::GlobalWrite lk; // so we are synchronized with _logOp()
 
             LOG(2) << "replSet attempting to relinquish" << endl;
-            if( box.getState().primary() ) {
+            if (box.getState().primary()) {
                 log() << "replSet relinquishing primary state" << rsLog;
                 changeState(MemberState::RS_SECONDARY);
 
@@ -198,22 +202,23 @@ namespace {
                 log() << "replSet closing client sockets after relinquishing primary" << rsLog;
                 MessagingPort::closeAllSockets(ScopedConn::keepOpen);
             }
-            else if( box.getState().startup2() ) {
+            else if (box.getState().startup2()) {
                 // This block probably isn't necessary
                 changeState(MemberState::RS_RECOVERING);
                 return;
             }
         }
 
-        // now that all connections were closed, strip this mongod from all sharding details
-        // if and when it gets promoted to a primary again, only then it should reload the sharding state
-        // the rationale here is that this mongod won't bring stale state when it regains primaryhood
+        // now that all connections were closed, strip this mongod from all sharding details if and
+        // when it gets promoted to a primary again, only then it should reload the sharding state
+        // the rationale here is that this mongod won't bring stale state when it regains
+        // primaryhood
         shardingState.resetShardingState();
     }
 
-    /* look freshly for who is primary - includes relinquishing ourself. */
+    // look freshly for who is primary - includes relinquishing ourself.
     void ReplSetImpl::forgetPrimary() {
-        if( box.getState().primary() )
+        if (box.getState().primary())
             relinquish();
         else {
             box.setOtherPrimary(0);
@@ -223,7 +228,7 @@ namespace {
     // for the replSetStepDown command
     bool ReplSetImpl::_stepDown(int secs) {
         lock lk(this);
-        if( box.getState().primary() ) {
+        if (box.getState().primary()) {
             elect.steppedDown = time(0) + secs;
             log() << "replSet info stepping down as primary secs=" << secs << rsLog;
             relinquish();
@@ -234,15 +239,14 @@ namespace {
 
     bool ReplSetImpl::_freeze(int secs) {
         lock lk(this);
-        /* note if we are primary we remain primary but won't try to elect ourself again until
-           this time period expires.
-           */
-        if( secs == 0 ) {
+        // note if we are primary we remain primary but won't try to elect ourself again until
+        // this time period expires.
+        if (secs == 0) {
             elect.steppedDown = 0;
             log() << "replSet info 'unfreezing'" << rsLog;
         }
         else {
-            if( !box.getState().primary() ) {
+            if (!box.getState().primary()) {
                 elect.steppedDown = time(0) + secs;
                 log() << "replSet info 'freezing' for " << secs << " seconds" << rsLog;
             }
@@ -254,8 +258,8 @@ namespace {
     }
 
     void ReplSetImpl::msgUpdateHBInfo(HeartbeatInfo h) {
-        for( Member *m = _members.head(); m; m=m->next() ) {
-            if( m->id() == h.id() ) {
+        for (Member *m = _members.head(); m; m=m->next()) {
+            if (m->id() == h.id()) {
                 m->_hbinfo.updateFromLastPoll(h);
                 return;
             }
@@ -274,22 +278,25 @@ namespace {
     list<HostAndPort> ReplSetImpl::memberHostnames() const {
         list<HostAndPort> L;
         L.push_back(_self->h());
-        for( Member *m = _members.head(); m; m = m->next() )
+        for (Member *m = _members.head(); m; m = m->next())
             L.push_back(m->h());
         return L;
     }
 
-    void ReplSetImpl::_fillIsMasterHost(const Member *m, vector<string>& hosts, vector<string>& passives, vector<string>& arbiters) {
-        verify( m );
-        if( m->config().hidden )
+    void ReplSetImpl::_fillIsMasterHost(const Member *m,
+                                        vector<string>& hosts,
+                                        vector<string>& passives,
+                                        vector<string>& arbiters) {
+        verify(m);
+        if (m->config().hidden)
             return;
 
-        if( m->potentiallyHot() ) {
+        if (m->potentiallyHot()) {
             hosts.push_back(m->h().toString());
         }
-        else if( !m->config().arbiterOnly ) {
-            if( m->config().slaveDelay ) {
-                /* hmmm - we don't list these as they are stale. */
+        else if (!m->config().arbiterOnly) {
+            if (m->config().slaveDelay) {
+                // hmmm - we don't list these as they are stale.
             }
             else {
                 passives.push_back(m->h().toString());
@@ -313,45 +320,48 @@ namespace {
             vector<string> hosts, passives, arbiters;
             _fillIsMasterHost(_self, hosts, passives, arbiters);
 
-            for( Member *m = _members.head(); m; m = m->next() ) {
-                verify( m );
+            for (Member *m = _members.head(); m; m = m->next()) {
+                verify(m);
                 _fillIsMasterHost(m, hosts, passives, arbiters);
             }
 
-            if( hosts.size() > 0 ) {
+            if (hosts.size() > 0) {
                 b.append("hosts", hosts);
             }
-            if( passives.size() > 0 ) {
+            if (passives.size() > 0) {
                 b.append("passives", passives);
             }
-            if( arbiters.size() > 0 ) {
+            if (arbiters.size() > 0) {
                 b.append("arbiters", arbiters);
             }
         }
 
-        if( !isp ) {
+        if (!isp) {
             const Member *m = sp.primary;
-            if( m )
+            if (m)
                 b.append("primary", m->h().toString());
         }
         else {
             b.append("primary", _self->fullName());
         }
 
-        if( myConfig().arbiterOnly )
+        if (myConfig().arbiterOnly)
             b.append("arbiterOnly", true);
-        if( myConfig().priority == 0 && !myConfig().arbiterOnly)
+        if (myConfig().priority == 0 && !myConfig().arbiterOnly)
             b.append("passive", true);
-        if( myConfig().slaveDelay )
+        if (myConfig().slaveDelay)
             b.append("slaveDelay", myConfig().slaveDelay);
-        if( myConfig().hidden )
+        if (myConfig().hidden)
             b.append("hidden", true);
-        if( !myConfig().buildIndexes )
+        if (!myConfig().buildIndexes)
             b.append("buildIndexes", false);
-        if( !myConfig().tags.empty() ) {
+        if (!myConfig().tags.empty()) {
             BSONObjBuilder a;
-            for( map<string,string>::const_iterator i = myConfig().tags.begin(); i != myConfig().tags.end(); i++ )
+            for (map<string,string>::const_iterator i = myConfig().tags.begin();
+                    i != myConfig().tags.end();
+                    i++) {
                 a.append((*i).first, (*i).second);
+            }
             b.append("tags", a.done());
         }
         b.append("me", myConfig().h.toString());
@@ -362,7 +372,7 @@ namespace {
 
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
-        strcpy( _hbmsg , "initial startup" );
+        strcpy(_hbmsg , "initial startup");
         lastH = 0;
         changeState(MemberState::RS_STARTUP);
 
@@ -373,17 +383,21 @@ namespace {
         loadConfig();
 
         unsigned sss = replSetCmdline.seedSet.size();
-        for( Member *m = head(); m; m = m->next() ) {
+        for (Member *m = head(); m; m = m->next()) {
             replSetCmdline.seedSet.erase(m->h());
         }
-        for( set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin(); i != replSetCmdline.seedSet.end(); i++ ) {
-            if( i->isSelf() ) {
-                if( sss == 1 ) {
-                    LOG(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
+        for (set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin();
+                i != replSetCmdline.seedSet.end();
+                i++) {
+            if (i->isSelf()) {
+                if (sss == 1) {
+                    LOG(1) << "replSet warning self is listed in the seed list and there are no "
+                              "other seeds listed did you intend that?" << rsLog;
                 }
             }
             else {
-                log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
+                log() << "replSet warning command line seed " << i->toString()
+                      << " is not present in the current repl set config" << rsLog;
             }
         }
 
@@ -421,7 +435,7 @@ namespace {
     void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
         Lock::DBRead lk(rsoplog);
         BSONObj o;
-        if( Helpers::getLast(rsoplog, o) ) {
+        if (Helpers::getLast(rsoplog, o)) {
             lastH = o["h"].numberLong();
             lastOpTimeWritten = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
@@ -435,7 +449,7 @@ namespace {
         return o["ts"]._opTime();
     }
 
-    /* call after constructing to start - returns fairly quickly after launching its threads */
+    // call after constructing to start - returns fairly quickly after launching its threads
     void ReplSetImpl::_go() {
         {
             boost::unique_lock<boost::mutex> lk(rss.mtx);
@@ -446,11 +460,12 @@ namespace {
         try {
             loadLastOpTimeWritten();
         }
-        catch(std::exception& e) {
-            log() << "replSet error fatal couldn't query the local " << rsoplog << " collection.  Terminating mongod after 30 seconds." << rsLog;
+        catch (std::exception& e) {
+            log() << "replSet error fatal couldn't query the local " << rsoplog
+                  << " collection.  Terminating mongod after 30 seconds." << rsLog;
             log() << e.what() << rsLog;
             sleepsecs(30);
-            dbexit( EXIT_REPLICATION_ERROR );
+            dbexit(EXIT_REPLICATION_ERROR);
             return;
         }
 
@@ -478,24 +493,22 @@ namespace {
         _self = m;
         _id = m->id();
         _config = m->config();
-        if( m ) _buildIndexes = m->config().buildIndexes;
+        if (m) _buildIndexes = m->config().buildIndexes;
         else _buildIndexes = true;
     }
 
     extern BSONObj *getLastErrorDefault;
 
-    /** @param reconf true if this is a reconfiguration and not an initial load of the configuration.
-        @return true if ok; throws if config really bad; false if config doesn't include self
-    */
+    // @param reconf true if this is a reconfiguration and not an initial load of the configuration.
+    // @return true if ok; throws if config really bad; false if config doesn't include self
     bool ReplSetImpl::initFromConfig(ReplSetConfig& c, bool reconf) {
-        /* NOTE: haveNewConfig() writes the new config to disk before we get here.  So
-                 we cannot error out at this point, except fatally.  Check errors earlier.
-                 */
+        // NOTE: haveNewConfig() writes the new config to disk before we get here.  So
+        //       we cannot error out at this point, except fatally.  Check errors earlier.
         lock lk(this);
 
-        if( getLastErrorDefault || !c.getLastErrorDefaults.isEmpty() ) {
+        if (getLastErrorDefault || !c.getLastErrorDefaults.isEmpty()) {
             // see comment in dbcommands.cpp for getlasterrordefault
-            getLastErrorDefault = new BSONObj( c.getLastErrorDefaults );
+            getLastErrorDefault = new BSONObj(c.getLastErrorDefaults);
         }
 
         list<ReplSetConfig::MemberCfg*> newOnes;
@@ -507,18 +520,20 @@ namespace {
         {
             unsigned nfound = 0;
             int me = 0;
-            for( vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin(); i != c.members.end(); i++ ) {
+            for (vector<ReplSetConfig::MemberCfg>::iterator i = c.members.begin();
+                    i != c.members.end();
+                    i++) {
                 
                 ReplSetConfig::MemberCfg& m = *i;
-                if( m.h.isSelf() ) {
+                if (m.h.isSelf()) {
                     me++;
                 }
                 
-                if( reconf ) {
+                if (reconf) {
                     const Member *old = findById(m._id);
-                    if( old ) {
+                    if (old) {
                         nfound++;
-                        verify( (int) old->id() == m._id );
+                        verify((int) old->id() == m._id);
                         if (!old->config().isSameIgnoringTags(m)) {
                             additive = false;
                         }
@@ -531,7 +546,7 @@ namespace {
                     }
                 }
             }
-            if( me == 0 ) { // we're not in the config -- we must have been removed
+            if (me == 0) { // we're not in the config -- we must have been removed
                 if (state().shunned()) {
                     // already took note of our ejection from the set
                     // so just sit tight and poll again
@@ -556,10 +571,10 @@ namespace {
                 loadConfig();  // redo config from scratch
                 return false; 
             }
-            uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
+            uassert(13302, "replSet error self appears twice in the repl set configuration", me<=1);
 
             // if we found different members that the original config, reload everything
-            if( reconf && config().members.size() != nfound )
+            if (reconf && config().members.size() != nfound)
                 additive = false;
         }
 
@@ -571,13 +586,14 @@ namespace {
         }
 
         _cfg = new ReplSetConfig(c);
-        dassert( &config() == _cfg ); // config() is same thing but const, so we use that when we can for clarity below
-        verify( config().ok() );
-        verify( _name.empty() || _name == config()._id );
+        // config() is same thing but const, so we use that when we can for clarity below
+        dassert(&config() == _cfg);
+        verify(config().ok());
+        verify(_name.empty() || _name == config()._id);
         _name = config()._id;
-        verify( !_name.empty() );
+        verify(!_name.empty());
         // this is a shortcut for simple changes
-        if( additive ) {
+        if (additive) {
             log() << "replSet info : additive change to configuration" << rsLog;
             if (updateConfigs) {
                 // we have new configs for existing members, so we need to repopulate _members
@@ -639,7 +655,7 @@ namespace {
         int oldPrimaryId = -1;
         {
             const Member *p = box.getPrimary();
-            if( p )
+            if (p)
                 oldPrimaryId = p->id();
         }
         forgetPrimary();
@@ -650,37 +666,40 @@ namespace {
         // For logging
         string members = "";
 
-        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = config().members.begin(); i != config().members.end(); i++ ) {
+        for (vector<ReplSetConfig::MemberCfg>::const_iterator i = config().members.begin();
+                i != config().members.end();
+                i++) {
             const ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
-            members += ( members == "" ? "" : ", " ) + m.h.toString();
-            if( m.h.isSelf() ) {
-                verify( me++ == 0 );
+            members += (members == "" ? "" : ", ") + m.h.toString();
+            if (m.h.isSelf()) {
+                verify(me++ == 0);
                 mi = new Member(m.h, m._id, &m, true);
                 if (!reconf) {
                     log() << "replSet I am " << m.h.toString() << rsLog;
                 }
                 setSelfTo(mi);
 
-                if( (int)mi->id() == oldPrimaryId )
+                if ((int)mi->id() == oldPrimaryId)
                     box.setSelfPrimary(mi);
             }
             else {
                 mi = new Member(m.h, m._id, &m, false);
                 _members.push(mi);
-                if( (int)mi->id() == oldPrimaryId )
+                if ((int)mi->id() == oldPrimaryId)
                     box.setOtherPrimary(mi);
             }
         }
 
-        if( me == 0 ){
-            log() << "replSet warning did not detect own host in full reconfig, members " << members << " config: " << c << rsLog;
+        if (me == 0){
+            log() << "replSet warning did not detect own host in full reconfig, members "
+                  << members << " config: " << c << rsLog;
         }
         else {
             // Do this after we've found ourselves, since _self needs
             // to be set before we can start the heartbeat tasks
-            for( Member *mb = _members.head(); mb; mb=mb->next() ) {
-                startHealthTaskFor( mb );
+            for (Member *mb = _members.head(); mb; mb=mb->next()) {
+                startHealthTaskFor(mb);
             }
         }
         return true;
@@ -692,22 +711,23 @@ namespace {
         ReplSetConfig *highest = 0;
         int myVersion = -2000;
         int n = 0;
-        for( vector<ReplSetConfig*>::iterator i = cfgs.begin(); i != cfgs.end(); i++ ) {
+        for (vector<ReplSetConfig*>::iterator i = cfgs.begin(); i != cfgs.end(); i++) {
             ReplSetConfig* cfg = *i;
             DEV { LOG(1) << n+1 << " config shows version " << cfg->version << rsLog; }
-            if( ++n == 1 ) myVersion = cfg->version;
-            if( cfg->ok() && cfg->version > v ) {
+            if (++n == 1) myVersion = cfg->version;
+            if (cfg->ok() && cfg->version > v) {
                 highest = cfg;
                 v = cfg->version;
             }
         }
-        verify( highest );
+        verify(highest);
 
-        if( !initFromConfig(*highest) )
+        if (!initFromConfig(*highest))
             return false;
 
-        if( highest->version > myVersion && highest->version >= 0 ) {
-            log() << "replSet got config version " << highest->version << " from a remote, saving locally" << rsLog;
+        if (highest->version > myVersion && highest->version >= 0) {
+            log() << "replSet got config version " << highest->version
+                  << " from a remote, saving locally" << rsLog;
             highest->saveConfigLocally(BSONObj());
         }
         return true;
@@ -718,34 +738,40 @@ namespace {
         startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
         LOG(1) << "loadConfig() " << rsConfigNs << endl;
 
-        while( 1 ) {
+        while (1) {
             try {
                 OwnedPointerVector<ReplSetConfig> configs;
                 try {
                     configs.mutableVector().push_back(ReplSetConfig::makeDirect());
                 }
-                catch(DBException& e) {
-                    log() << "replSet exception loading our local replset configuration object : " << e.toString() << rsLog;
+                catch (DBException& e) {
+                    log() << "replSet exception loading our local replset configuration object : "
+                          << e.toString() << rsLog;
                 }
-                for( vector<HostAndPort>::const_iterator i = _seeds->begin(); i != _seeds->end(); i++ ) {
+                for (vector<HostAndPort>::const_iterator i = _seeds->begin();
+                        i != _seeds->end();
+                        i++) {
                     try {
-                        configs.mutableVector().push_back( ReplSetConfig::make(*i) );
+                        configs.mutableVector().push_back(ReplSetConfig::make(*i));
                     }
-                    catch( DBException& e ) {
-                        log() << "replSet exception trying to load config from " << *i << " : " << e.toString() << rsLog;
+                    catch (DBException& e) {
+                        log() << "replSet exception trying to load config from " << *i
+                              << " : " << e.toString() << rsLog;
                     }
                 }
                 {
-                    scoped_lock lck( replSettings.discoveredSeeds_mx );
-                    if( replSettings.discoveredSeeds.size() > 0 ) {
+                    scoped_lock lck(replSettings.discoveredSeeds_mx);
+                    if (replSettings.discoveredSeeds.size() > 0) {
                         for (set<string>::iterator i = replSettings.discoveredSeeds.begin(); 
                              i != replSettings.discoveredSeeds.end(); 
                              i++) {
                             try {
-                                configs.mutableVector().push_back( ReplSetConfig::make(HostAndPort(*i)) );
+                                configs.mutableVector().push_back(
+                                                            ReplSetConfig::make(HostAndPort(*i)));
                             }
-                            catch( DBException& ) {
-                                LOG(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
+                            catch (DBException&) {
+                                LOG(1) << "replSet exception trying to load config from discovered "
+                                          "seed " << *i << rsLog;
                                 replSettings.discoveredSeeds.erase(*i);
                             }
                         }
@@ -757,7 +783,7 @@ namespace {
                         configs.mutableVector().push_back(ReplSetConfig::make(replSettings.reconfig,
                                                                        true));
                     }
-                    catch( DBException& re) {
+                    catch (DBException& re) {
                         log() << "replSet couldn't load reconfig: " << re.what() << rsLog;
                         replSettings.reconfig = BSONObj();
                     }
@@ -765,44 +791,51 @@ namespace {
 
                 int nok = 0;
                 int nempty = 0;
-                for( vector<ReplSetConfig*>::iterator i = configs.mutableVector().begin();
-                     i != configs.mutableVector().end(); i++ ) {
-                    if( (*i)->ok() )
+                for (vector<ReplSetConfig*>::iterator i = configs.mutableVector().begin();
+                     i != configs.mutableVector().end(); i++) {
+                    if ((*i)->ok())
                         nok++;
-                    if( (*i)->empty() )
+                    if ((*i)->empty())
                         nempty++;
                 }
-                if( nok == 0 ) {
+                if (nok == 0) {
 
-                    if( nempty == (int) configs.mutableVector().size() ) {
+                    if (nempty == (int) configs.mutableVector().size()) {
                         startupStatus = EMPTYCONFIG;
-                        startupStatusMsg.set("can't get " + rsConfigNs + " config from self or any seed (EMPTYCONFIG)");
-                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed (EMPTYCONFIG)" << rsLog;
+                        startupStatusMsg.set("can't get " + rsConfigNs +
+                                             " config from self or any seed (EMPTYCONFIG)");
+                        log() << "replSet can't get " << rsConfigNs
+                              << " config from self or any seed (EMPTYCONFIG)" << rsLog;
                         static unsigned once;
-                        if( ++once == 1 ) {
-                            log() << "replSet info you may need to run replSetInitiate -- rs.initiate() in the shell -- if that is not already done" << rsLog;
+                        if (++once == 1) {
+                            log() << "replSet info you may need to run replSetInitiate -- rs.initia"
+                                     "te() in the shell -- if that is not already done" << rsLog;
                         }
-                        if( _seeds->size() == 0 ) {
-                            LOG(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
+                        if (_seeds->size() == 0) {
+                            LOG(1) << "replSet info no seed hosts were specified on the --replSet "
+                                      "command line" << rsLog;
                         }
                     }
                     else {
                         startupStatus = EMPTYUNREACHABLE;
-                        startupStatusMsg.set("can't currently get " + rsConfigNs + " config from self or any seed (EMPTYUNREACHABLE)");
-                        log() << "replSet can't get " << rsConfigNs << " config from self or any seed (yet)" << rsLog;
+                        startupStatusMsg.set("can't currently get " + rsConfigNs +
+                                             " config from self or any seed (EMPTYUNREACHABLE)");
+                        log() << "replSet can't get " << rsConfigNs
+                              << " config from self or any seed (yet)" << rsLog;
                     }
 
                     sleepsecs(1);
                     continue;
                 }
 
-                if( !_loadConfigFinish(configs.mutableVector()) ) {
-                    log() << "replSet info Couldn't load config yet. Sleeping 20sec and will try again." << rsLog;
+                if (!_loadConfigFinish(configs.mutableVector())) {
+                    log() << "replSet info Couldn't load config yet. Sleeping 20sec and will try "
+                             "again." << rsLog;
                     sleepsecs(20);
                     continue;
                 }
             }
-            catch(DBException& e) {
+            catch (DBException& e) {
                 startupStatus = BADCONFIG;
                 startupStatusMsg.set("replSet error loading set config (BADCONFIG)");
                 log() << "replSet error loading configurations " << e.toString() << rsLog;
@@ -826,19 +859,19 @@ namespace {
     const BSONObj ReplSetImpl::_initialSyncFlag(BSON(_initialSyncFlagString << true));
 
     void ReplSetImpl::clearInitialSyncFlag() {
-        Lock::DBWrite lk( "local" );
+        Lock::DBWrite lk("local");
         OperationContextImpl txn; // XXX?
-        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON( "$unset" << _initialSyncFlag ));
+        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON("$unset" << _initialSyncFlag));
     }
 
     void ReplSetImpl::setInitialSyncFlag() {
-        Lock::DBWrite lk( "local" );
+        Lock::DBWrite lk("local");
         OperationContextImpl txn; // XXX?
-        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON( "$set" << _initialSyncFlag ));
+        Helpers::putSingleton(&txn, "local.replset.minvalid", BSON("$set" << _initialSyncFlag));
     }
 
     bool ReplSetImpl::getInitialSyncFlag() {
-        Lock::DBRead lk ( "local" );
+        Lock::DBRead lk ("local");
         BSONObj mv;
         if (Helpers::getSingleton("local.replset.minvalid", mv)) {
             return mv[_initialSyncFlagString].trueValue();
@@ -851,7 +884,7 @@ namespace {
         BSONObjBuilder subobj(builder.subobjStart("$set"));
         subobj.appendTimestamp("ts", obj["ts"].date());
         subobj.done();
-        Lock::DBWrite lk( "local" );
+        Lock::DBWrite lk("local");
         OperationContextImpl txn; // XXX?
         Helpers::putSingleton(&txn, "local.replset.minvalid", builder.obj());
     }
