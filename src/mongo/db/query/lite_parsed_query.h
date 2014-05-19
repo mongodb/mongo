@@ -52,7 +52,7 @@ namespace mongo {
          * Fills out a LiteParsedQuery.  Used for debugging and testing, when we don't have a
          * QueryMessage.
          */
-        static Status make(const string& ns,
+        static Status make(const std::string& ns,
                            int ntoskip,
                            int ntoreturn,
                            int queryoptions,
@@ -115,17 +115,17 @@ namespace mongo {
         static BSONObj normalizeSortOrder(const BSONObj& sortObj);
 
         // Names of the maxTimeMS command and query option.
-        static const string cmdOptionMaxTimeMS;
-        static const string queryOptionMaxTimeMS;
+        static const std::string cmdOptionMaxTimeMS;
+        static const std::string queryOptionMaxTimeMS;
 
         // Names of the $meta projection values.
-        static const string metaTextScore;
-        static const string metaGeoNearDistance;
-        static const string metaGeoNearPoint;
-        static const string metaDiskLoc;
-        static const string metaIndexKey;
+        static const std::string metaTextScore;
+        static const std::string metaGeoNearDistance;
+        static const std::string metaGeoNearPoint;
+        static const std::string metaDiskLoc;
+        static const std::string metaIndexKey;
 
-        const string& ns() const { return _ns; }
+        const std::string& ns() const { return _ns; }
         bool isLocalDB() const { return _ns.compare(0, 6, "local.") == 0; }
 
         const BSONObj& getFilter() const { return _filter; }
@@ -153,14 +153,14 @@ namespace mongo {
     private:
         LiteParsedQuery();
 
-        Status init(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
+        Status init(const std::string& ns, int ntoskip, int ntoreturn, int queryOptions,
                     const BSONObj& queryObj, const BSONObj& proj, bool fromQueryMessage);
 
         Status initFullQuery(const BSONObj& top);
 
         static StatusWith<int> parseMaxTimeMS(const BSONElement& maxTimeMSElt);
 
-        string _ns;
+        std::string _ns;
         int _ntoskip;
         int _ntoreturn;
         BSONObj _filter;

@@ -66,14 +66,14 @@ namespace mongo {
         bool allowedToChangeAtRuntime() const { return _allowedToChangeAtRuntime; }
 
 
-        virtual void append( BSONObjBuilder& b, const string& name ) = 0;
+        virtual void append( BSONObjBuilder& b, const std::string& name ) = 0;
 
         virtual Status set( const BSONElement& newValueElement ) = 0;
 
-        virtual Status setFromString( const string& str ) = 0;
+        virtual Status setFromString( const std::string& str ) = 0;
 
     private:
-        string _name;
+        std::string _name;
         bool _allowedToChangeAtStartup;
         bool _allowedToChangeAtRuntime;
     };
@@ -114,7 +114,7 @@ namespace mongo {
               _value( value ) {}
         virtual ~ExportedServerParameter() {}
 
-        virtual void append( BSONObjBuilder& b, const string& name ) {
+        virtual void append( BSONObjBuilder& b, const std::string& name ) {
             b.append( name, *_value );
         }
 
@@ -123,7 +123,7 @@ namespace mongo {
 
         virtual const T& get() const { return *_value; }
 
-        virtual Status setFromString( const string& str );
+        virtual Status setFromString( const std::string& str );
 
     protected:
 

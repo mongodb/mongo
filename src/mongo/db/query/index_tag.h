@@ -73,7 +73,7 @@ namespace mongo {
         // root.  We do this once and store it.
         // TODO: Do a FieldRef / StringData pass.
         // TODO: We might want this inside of the MatchExpression.
-        string path;
+        std::string path;
 
         // Points to the innermost containing $elemMatch. If this tag is
         // attached to an expression not contained in an $elemMatch, then

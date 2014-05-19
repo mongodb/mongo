@@ -67,12 +67,12 @@ namespace mongo {
         extern Alphabet alphabet;
 
 
-        void encode( stringstream& ss , const char * data , int size );
-        string encode( const char * data , int size );
-        string encode( const string& s );
+        void encode( std::stringstream& ss , const char * data , int size );
+        std::string encode( const char * data , int size );
+        std::string encode( const std::string& s );
 
-        void decode( stringstream& ss , const string& s );
-        string decode( const string& s );
+        void decode( std::stringstream& ss , const std::string& s );
+        std::string decode( const std::string& s );
 
         extern const char* chars;
 

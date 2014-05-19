@@ -95,7 +95,7 @@ namespace mongo {
     std::string dateToCtimeString(Date_t date);
 
     /**
-     * Parses a Date_t from an ISO 8601 string representation.
+     * Parses a Date_t from an ISO 8601 std::string representation.
      *
      * Sample formats: "2013-07-23T18:42:14.072-05:00"
      *                 "2013-07-23T18:42:14.072Z"

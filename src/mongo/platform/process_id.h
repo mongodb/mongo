@@ -94,7 +94,7 @@ namespace mongo {
         uint32_t asUInt32() const { return static_cast<uint32_t>(_npid); }
 
         /**
-         * Provides a string representation of the pid.
+         * Provides a std::string representation of the pid.
          */
         std::string toString() const;
 

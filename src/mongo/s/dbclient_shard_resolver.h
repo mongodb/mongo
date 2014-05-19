@@ -60,7 +60,7 @@ namespace mongo {
         Status chooseWriteHost( const std::string& shardName, ConnectionString* shardHost ) const;
         
         /**
-         *  Resolves a replica set connection string to a master, if possible.
+         *  Resolves a replica set connection std::string to a master, if possible.
          * Returns HostNotFound if the master is not reachable
          * Returns ReplicaSetNotFound if the replica set is not being tracked
          */

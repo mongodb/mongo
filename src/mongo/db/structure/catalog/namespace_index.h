@@ -84,7 +84,7 @@ namespace mongo {
         void maybeMkdir() const;
 
         DurableMappedFile _f;
-        auto_ptr<HashTable<Namespace,NamespaceDetails> > _ht;
+        std::auto_ptr<HashTable<Namespace,NamespaceDetails> > _ht;
         std::string _dir;
         std::string _database;
     };

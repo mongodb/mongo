@@ -239,12 +239,12 @@ namespace mongo {
         // _dataSet is used instead to maintain an ordered set of the incomplete data set.
         // When the data set is complete, we copy the items from _dataSet to _data which will
         // be used to provide the results of this stage through _resultIterator.
-        vector<SortableDataItem> _data;
+        std::vector<SortableDataItem> _data;
         typedef std::set<SortableDataItem, WorkingSetComparator> SortableDataItemSet;
         scoped_ptr<SortableDataItemSet> _dataSet;
 
         // Iterates through _data post-sort returning it.
-        vector<SortableDataItem>::iterator _resultIterator;
+        std::vector<SortableDataItem>::iterator _resultIterator;
 
         // We buffer a lot of data and we want to look it up by DiskLoc quickly upon invalidation.
         typedef unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> DataMap;

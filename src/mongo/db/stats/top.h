@@ -96,7 +96,7 @@ namespace mongo {
         mutable SimpleMutex _lock;
         CollectionData _global;
         UsageMap _usage;
-        string _lastDropped;
+        std::string _lastDropped;
     };
 
 } // namespace mongo

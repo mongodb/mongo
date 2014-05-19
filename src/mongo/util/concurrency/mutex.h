@@ -46,7 +46,7 @@
 #include "mongo/util/concurrency/mutexdebugger.h"
 #endif
 
-// Macro to get line as a string constant
+// Macro to get line as a std::string constant
 #define MONGO_STRINGIFY(X) #X
 // Double-expansion trick to get preproc to actually substitute __LINE__
 #define _MONGO_LINE_STRING(LINE) MONGO_STRINGIFY( LINE )

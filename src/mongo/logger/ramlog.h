@@ -105,11 +105,11 @@ namespace mongo {
 
     private:
         static int repeats(const std::vector<const char *>& v, int i);
-        static string clean(const std::vector<const char *>& v, int i, string line="");
-        static string color(const std::string& line);
+        static std::string clean(const std::vector<const char *>& v, int i, std::string line="");
+        static std::string color(const std::string& line);
 
         /* turn http:... into an anchor */
-        static string linkify(const char *s);
+        static std::string linkify(const char *s);
 
         explicit RamLog( const std::string& name );
         ~RamLog(); // want this private as we want to leak so we can use them till the very end
@@ -125,7 +125,7 @@ namespace mongo {
         char lines[N][C];
         unsigned h; // current position
         unsigned n; // number of lines stores 0 o N
-        string _name;
+        std::string _name;
         long long _totalLinesWritten;
 
         time_t _lastWrite;

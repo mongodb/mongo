@@ -47,21 +47,21 @@ namespace mongo {
     class RCVector : public RefCountable {
     public:
         RCVector() {}
-        RCVector(const vector<Value>& v) :vec(v) {}
-        vector<Value> vec;
+        RCVector(const std::vector<Value>& v) :vec(v) {}
+        std::vector<Value> vec;
     };
 
     class RCCodeWScope : public RefCountable {
     public:
-        RCCodeWScope(const string& str, BSONObj obj) :code(str), scope(obj.getOwned()) {}
-        const string code;
+        RCCodeWScope(const std::string& str, BSONObj obj) :code(str), scope(obj.getOwned()) {}
+        const std::string code;
         const BSONObj scope; // Not worth converting to Document for now
     };
 
     class RCDBRef : public RefCountable {
     public:
-        RCDBRef(const string& str, const OID& o) :ns(str), oid(o) {}
-        const string ns;
+        RCDBRef(const std::string& str, const OID& o) :ns(str), oid(o) {}
+        const std::string ns;
         const OID oid;
     };
 
@@ -168,7 +168,7 @@ namespace mongo {
             }
         }
 
-        const vector<Value>& getArray() const {
+        const std::vector<Value>& getArray() const {
             dassert(typeid(*genericRCPtr) == typeid(const RCVector));
             const RCVector* arrayPtr = static_cast<const RCVector*>(genericRCPtr);
             return arrayPtr->vec;

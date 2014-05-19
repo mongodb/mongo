@@ -305,7 +305,7 @@ namespace mongo {
         EdgeSet _roleToMembers;
         RolePrivilegeMap _directPrivilegesForRole;
         RolePrivilegeMap _allPrivilegesForRole;
-        set<RoleName> _allRoles;
+        std::set<RoleName> _allRoles;
     };
 
     void swap(RoleGraph& lhs, RoleGraph& rhs);

@@ -55,7 +55,7 @@ namespace mongo {
 
         void readAt(unsigned long long offset, void *_buf, size_t _len);
 
-        const string _name;
+        const std::string _name;
 
         void truncate(); // Removes extra data after current position
 

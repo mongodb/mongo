@@ -64,7 +64,7 @@ namespace mongo {
          * If requiresDocument() == false, what fields are required to compute
          * the projection?
          */
-        const vector<string>& getRequiredFields() const {
+        const std::vector<std::string>& getRequiredFields() const {
             return _requiredFields;
         }
 
@@ -114,7 +114,7 @@ namespace mongo {
                                                 const std::string& matchfield);
 
         // TODO: stringdata?
-        vector<string> _requiredFields;
+        std::vector<std::string> _requiredFields;
 
         bool _requiresDocument;
 

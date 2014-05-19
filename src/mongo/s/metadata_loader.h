@@ -67,8 +67,8 @@ namespace mongo {
     public:
 
         /**
-         * Takes a connection string to the config servers to be used for loading data. Note
-         * that we make no restrictions about which connection string that is, including
+         * Takes a connection std::string to the config servers to be used for loading data. Note
+         * that we make no restrictions about which connection std::string that is, including
          * CUSTOM, which we rely on in testing.
          */
         explicit MetadataLoader( const ConnectionString& configLoc );
@@ -94,8 +94,8 @@ namespace mongo {
          * @return HostUnreachable if there was an error contacting the config servers
          * @return RemoteChangeDetected if the data loaded was modified by another operation
          */
-        Status makeCollectionMetadata( const string& ns,
-                                       const string& shard,
+        Status makeCollectionMetadata( const std::string& ns,
+                                       const std::string& shard,
                                        const CollectionMetadata* oldMetadata,
                                        CollectionMetadata* metadata ) const;
 
@@ -137,8 +137,8 @@ namespace mongo {
          * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
          *
          */
-        Status initCollection( const string& ns,
-                               const string& shard,
+        Status initCollection( const std::string& ns,
+                               const std::string& shard,
                                CollectionMetadata* metadata ) const;
 
         /**
@@ -154,8 +154,8 @@ namespace mongo {
          * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
          * TODO: @return FailedToParse
          */
-        Status initChunks( const string& ns,
-                           const string& shard,
+        Status initChunks( const std::string& ns,
+                           const std::string& shard,
                            const CollectionMetadata* oldMetadata,
                            CollectionMetadata* metadata ) const;
     };

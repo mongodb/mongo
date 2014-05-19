@@ -94,7 +94,7 @@ namespace twod_exec {
             return _loc;
         }
 
-        string toString() const {
+        std::string toString() const {
             return str::stream() << "Point from " << _key << " - " << _o
                                  << " dist : " << _distance << (_exact ? " (ex)" : " (app)");
         }
@@ -152,7 +152,7 @@ namespace twod_exec {
         long long found() const { return _found; }
 
         virtual void getPointsFor(const BSONObj& key, const BSONObj& obj,
-                                  vector<BSONObj> &locsForNode, bool allPoints = false);
+                                  std::vector<BSONObj> &locsForNode, bool allPoints = false);
 
         virtual int addSpecific(const GeoIndexEntry& node, const Point& p, bool inBounds, double d,
                                 bool newDoc) = 0;
@@ -161,7 +161,7 @@ namespace twod_exec {
 
         TwoDAccessMethod* _accessMethod;
         shared_ptr<GeoHashConverter> _converter;
-        map<DiskLoc, bool> _matched;
+        std::map<DiskLoc, bool> _matched;
 
         MatchExpression* _filter;
 
@@ -185,7 +185,7 @@ namespace twod_exec {
             DONE
         } _state;
 
-        GeoBrowse(TwoDAccessMethod* accessMethod, string type, MatchExpression* filter);
+        GeoBrowse(TwoDAccessMethod* accessMethod, std::string type, MatchExpression* filter);
 
         virtual bool ok();
         virtual bool advance();
@@ -234,9 +234,9 @@ namespace twod_exec {
          */
         bool invalidate(const DiskLoc& dl);
 
-        string _type;
-        list<GeoPoint> _stack;
-        set<BSONObj> _seenIds;
+        std::string _type;
+        std::list<GeoPoint> _stack;
+        std::set<BSONObj> _seenIds;
 
         GeoPoint _cur;
         bool _firstCall;
@@ -253,7 +253,7 @@ namespace twod_exec {
         GeoHash _prefix;
         shared_ptr<GeoHash> _lastPrefix;
         GeoHash _centerPrefix;
-        list<string> _fringe;
+        std::list<std::string> _fringe;
         int recurseDepth;
         Box _centerBox;
 
@@ -262,7 +262,7 @@ namespace twod_exec {
         BtreeLocation _max;
 
         shared_ptr<GeoHash> _expPrefix;
-        mutable vector<GeoHash> _expPrefixes;
+        mutable std::vector<GeoHash> _expPrefixes;
         const IndexDescriptor* _descriptor;
         shared_ptr<GeoHashConverter> _converter;
         TwoDIndexingParams _params;

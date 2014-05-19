@@ -46,10 +46,10 @@ namespace mongo {
 
            @param name comma separated trace names
         */
-        static void setTraces(const string &names);
+        static void setTraces(const std::string &names);
 #endif
 
-        static void setTrace(const string &name, unsigned level);
+        static void setTrace(const std::string &name, unsigned level);
 
         /**
            Test to see if the given trace is on or off.
@@ -57,18 +57,18 @@ namespace mongo {
            @param name the name of the trace to check
            @returns true if the trace is on, false otherwise
         */
-        static unsigned getTrace(const string &name);
+        static unsigned getTrace(const std::string &name);
 
     private:
         Trace();
         ~Trace();
 
         struct Hash :
-        unary_function<string, size_t> {
-            size_t operator()(const string &rS) const;
+        std::unary_function<std::string, size_t> {
+            size_t operator()(const std::string &rS) const;
         };
 
-        typedef boost::unordered_map<string, unsigned, Trace::Hash> MapType;
+        typedef boost::unordered_map<std::string, unsigned, Trace::Hash> MapType;
         class NameMap {
         public:
             NameMap();
@@ -87,7 +87,7 @@ namespace mongo {
 
 namespace mongo {
 
-    inline size_t Trace::Hash::operator()(const string &rS) const {
+    inline size_t Trace::Hash::operator()(const std::string &rS) const {
         size_t seed = 0xf0afbeef;
         boost::hash_combine(seed, rS);
         return seed;

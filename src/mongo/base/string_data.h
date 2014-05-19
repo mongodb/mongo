@@ -40,7 +40,7 @@ namespace mongo {
     using std::string;
 
     /**
-     * A StringData object wraps a 'const string&' or a 'const char*' without copying its
+     * A StringData object wraps a 'const std::string&' or a 'const char*' without copying its
      * contents. The most common usage is as a function argument that takes any of the two
      * forms of strings above. Fundamentally, this class tries go around the fact that string
      * literals in C++ are char[N]'s.
@@ -49,25 +49,25 @@ namespace mongo {
      *
      *  + The object StringData wraps around must be alive while the StringData is.
      *
-     *  + Because string data can be used to pass a substring around, one should never assume a
+     *  + Because std::string data can be used to pass a substring around, one should never assume a
      *    rawData() terminates with a null.
      */
     class StringData {
     public:
 
-        /** Constructs an empty string data */
+        /** Constructs an empty std::string data */
         StringData()
             : _data(NULL), _size(0) {}
 
         /**
-         * Constructs a StringData, for the case where the length of string is not known. 'c'
+         * Constructs a StringData, for the case where the length of std::string is not known. 'c'
          * must be a pointer to a null-terminated string.
          */
         StringData( const char* c )
-            : _data(c), _size((c == NULL) ? 0 : string::npos) {}
+            : _data(c), _size((c == NULL) ? 0 : std::string::npos) {}
 
         /**
-         * Constructs a StringData explicitly, for the case where the length of the string is
+         * Constructs a StringData explicitly, for the case where the length of the std::string is
          * already known. 'c' must be a pointer to a null-terminated string, and len must
          * be the length that strlen(c) would return, a.k.a the index of the terminator in c.
          */
@@ -110,7 +110,7 @@ namespace mongo {
 
         size_t find( char c , size_t fromPos = 0 ) const;
         size_t find( const StringData& needle ) const;
-        size_t rfind( char c, size_t fromPos = string::npos ) const;
+        size_t rfind( char c, size_t fromPos = std::string::npos ) const;
 
         /**
          * Returns true if 'prefix' is a substring of this instance, anchored at position 0.
@@ -135,7 +135,7 @@ namespace mongo {
 
         size_t size() const { fillSize(); return _size; }
         bool empty() const { return size() == 0; }
-        string toString() const { return string(_data, size()); }
+        std::string toString() const { return std::string(_data, size()); }
         char operator[] ( unsigned pos ) const { return _data[pos]; }
 
         /**
@@ -161,7 +161,7 @@ namespace mongo {
         mutable size_t _size;     // 'size' does not include the null terminator
 
         void fillSize() const {
-            if (_size == string::npos) {
+            if (_size == std::string::npos) {
                 _size = strlen(_data);
             }
         }

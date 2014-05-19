@@ -50,7 +50,7 @@ namespace mongo {
      *
      *     // Process the response.
      *     LockpingsType exampleType;
-     *     string errMsg;
+     *     std::string errMsg;
      *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
      *         // Can't use 'exampleType'. Take action.
      *     }
@@ -107,7 +107,7 @@ namespace mongo {
         void cloneTo(LockpingsType* other) const;
 
         /**
-         * Returns a string representation of the current internal state.
+         * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 
@@ -150,7 +150,7 @@ namespace mongo {
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _process;     // (M)  string describing the process holding the lock
+        std::string _process;     // (M)  std::string describing the process holding the lock
         bool _isProcessSet;
         Date_t _ping;     // (M)  last time the holding process updated this document
         bool _isPingSet;

@@ -73,7 +73,7 @@ namespace mongo {
     class CustomConnectHook: public ConnectionString::ConnectionHook {
     public:
         virtual DBClientBase* connect(const ConnectionString& connStr,
-                                      string& errmsg,
+                                      std::string& errmsg,
                                       double socketTimeout)
         {
             // Note - must be new, since it gets owned elsewhere
@@ -98,10 +98,10 @@ namespace mongo {
         }
 
         /**
-         * Returns a connection string to the virtual config server.
+         * Returns a connection std::string to the virtual config server.
          */
         ConnectionString configSvr() const {
-            return ConnectionString(string("$dummy:10000"));
+            return ConnectionString(std::string("$dummy:10000"));
         }
 
         /**

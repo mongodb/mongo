@@ -105,8 +105,8 @@ namespace mongo {
                 return _it->_data[_pos];
             }
 
-            string toString() const {
-                stringstream ss;
+            std::string toString() const {
+                std::stringstream ss;
                 ss << _pos;
                 return ss.str();
             }

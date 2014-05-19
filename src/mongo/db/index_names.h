@@ -57,40 +57,40 @@ namespace mongo {
     };
 
     /**
-     * We use the string representation of index names all over the place, so we declare them all
+     * We use the std::string representation of index names all over the place, so we declare them all
      * once here.
      */
     class IndexNames {
     public:
-        static const string GEO_2D;
-        static const string GEO_HAYSTACK;
-        static const string GEO_2DSPHERE;
-        static const string TEXT;
-        static const string HASHED;
-        static const string BTREE;
+        static const std::string GEO_2D;
+        static const std::string GEO_HAYSTACK;
+        static const std::string GEO_2DSPHERE;
+        static const std::string TEXT;
+        static const std::string HASHED;
+        static const std::string BTREE;
 
         /**
          * True if is a regular (non-plugin) index or uses a plugin that existed before 2.4.
          * These plugins are grandfathered in and allowed to exist in DBs with
          * PDFILE_MINOR_VERSION_22_AND_OLDER
          */
-        static bool existedBefore24(const string& name);
+        static bool existedBefore24(const std::string& name);
 
         /**
-         * Return the first string value in the provided object.  For an index key pattern,
+         * Return the first std::string value in the provided object.  For an index key pattern,
          * a field with a non-string value indicates a "special" (not straight Btree) index.
          */
-        static string findPluginName(const BSONObj& keyPattern);
+        static std::string findPluginName(const BSONObj& keyPattern);
 
         /**
          * Is the provided access method name one we recognize?
          */
-        static bool isKnownName(const string& name);
+        static bool isKnownName(const std::string& name);
 
         /**
          * Convert an index name to an IndexType.
          */
-        static IndexType nameToType(const string& accessMethod);
+        static IndexType nameToType(const std::string& accessMethod);
     };
 
 }  // namespace mongo

@@ -45,7 +45,7 @@ namespace mongo {
 
         Status chooseWriteHost( const std::string& shardName, ConnectionString* shardHost ) const {
             std::string errMsg;
-            *shardHost = ConnectionString::parse( string( "$" ) + shardName + ":12345", errMsg );
+            *shardHost = ConnectionString::parse( std::string( "$" ) + shardName + ":12345", errMsg );
             ASSERT_EQUALS( errMsg, "" );
             return Status::OK();
         }

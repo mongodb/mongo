@@ -43,15 +43,15 @@ namespace mongo {
         //
         memset( buf, 0, sizeof(buf) );
         uassert( 10080 , "ns name too long, max size is 127 bytes", ns.size() <= MaxNsLen);
-        uassert( 17380 , "ns name can't contain embedded '\0' byte", ns.find('\0') == string::npos);
+        uassert( 17380 , "ns name can't contain embedded '\0' byte", ns.find('\0') == std::string::npos);
         ns.copyTo( buf, true );
         return *this;
     }
 
-    inline string Namespace::extraName(int i) const {
+    inline std::string Namespace::extraName(int i) const {
         char ex[] = "$extra";
         ex[5] += i;
-        string s = string(buf) + ex;
+        std::string s = std::string(buf) + ex;
         massert( 10348 , "$extra: ns name too long", s.size() <= MaxNsLen);
         return s;
     }

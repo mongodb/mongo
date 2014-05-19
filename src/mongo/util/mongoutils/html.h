@@ -43,42 +43,40 @@ namespace mongoutils {
 
     namespace html {
 
-        using namespace std;
+        inline std::string _end() { return "</body></html>"; }
+        inline std::string _table() { return "</table>\n\n"; }
+        inline std::string _tr() { return "</tr>\n"; }
 
-        inline string _end() { return "</body></html>"; }
-        inline string _table() { return "</table>\n\n"; }
-        inline string _tr() { return "</tr>\n"; }
-
-        inline string tr() { return "<tr>"; }
-        inline string tr(const std::string& a, const std::string& b) {
-            stringstream ss;
+        inline std::string tr() { return "<tr>"; }
+        inline std::string tr(const std::string& a, const std::string& b) {
+            std::stringstream ss;
             ss << "<tr><td>" << a << "</td><td>" << b << "</td></tr>\n";
             return ss.str();
         }
         template <class T>
-        inline string td(T x) {
-            stringstream ss;
+        inline std::string td(T x) {
+            std::stringstream ss;
             ss << "<td>" << x << "</td>";
             return ss.str();
         }
-        inline string td(const std::string& x) {
+        inline std::string td(const std::string& x) {
             return "<td>" + x + "</td>";
         }
-        inline string th(const std::string& x) {
+        inline std::string th(const std::string& x) {
             return "<th>" + x + "</th>";
         }
 
-        inline void tablecell( stringstream& ss , bool b ) {
+        inline void tablecell( std::stringstream& ss , bool b ) {
             ss << "<td>" << (b ? "<b>X</b>" : "") << "</td>";
         }
 
         template< typename T>
-        inline void tablecell( stringstream& ss , const T& t ) {
+        inline void tablecell( std::stringstream& ss , const T& t ) {
             ss << "<td>" << t << "</td>";
         }
 
-        inline string table(const char *headers[] = 0, bool border = true) {
-            stringstream ss;
+        inline std::string table(const char *headers[] = 0, bool border = true) {
+            std::stringstream ss;
             ss << "\n<table "
                << (border?"border=1 ":"")
                << "cellpadding=2 cellspacing=0>\n";
@@ -93,8 +91,8 @@ namespace mongoutils {
             return ss.str();
         }
 
-        inline string start(const std::string& title) {
-            stringstream ss;
+        inline std::string start(const std::string& title) {
+            std::stringstream ss;
             ss << "<html><head>\n<title>";
             ss << title;
             ss << "</title>\n";
@@ -110,54 +108,54 @@ namespace mongoutils {
             return ss.str();
         }
 
-        inline string red(const std::string& contentHtml, bool color=true) {
+        inline std::string red(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
-            stringstream ss;
+            std::stringstream ss;
             ss << "<span style=\"color:#A00;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string grey(const std::string& contentHtml, bool color=true) {
+        inline std::string grey(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
-            stringstream ss;
+            std::stringstream ss;
             ss << "<span style=\"color:#888;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string blue(const std::string& contentHtml, bool color=true) {
+        inline std::string blue(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
-            stringstream ss;
+            std::stringstream ss;
             ss << "<span style=\"color:#00A;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string yellow(const std::string& contentHtml, bool color=true) {
+        inline std::string yellow(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
-            stringstream ss;
+            std::stringstream ss;
             ss << "<span style=\"color:#A80;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string green(const std::string& contentHtml, bool color=true) {
+        inline std::string green(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
-            stringstream ss;
+            std::stringstream ss;
             ss << "<span style=\"color:#0A0;\">" << contentHtml << "</span>";
             return ss.str();
         }
 
-        inline string p(const std::string& contentHtml) {
-            stringstream ss;
+        inline std::string p(const std::string& contentHtml) {
+            std::stringstream ss;
             ss << "<p>" << contentHtml << "</p>\n";
             return ss.str();
         }
 
-        inline string h2(const std::string& contentHtml) {
-            stringstream ss;
+        inline std::string h2(const std::string& contentHtml) {
+            std::stringstream ss;
             ss << "<h2>" << contentHtml << "</h2>\n";
             return ss.str();
         }
 
         /* does NOT escape the strings. */
-        inline string a(const std::string& href,
+        inline std::string a(const std::string& href,
                         const std::string& title="",
                         const std::string& contentHtml = "") {
-            stringstream ss;
+            std::stringstream ss;
             ss << "<a";
             if( !href.empty() ) ss << " href=\"" << href << '"';
             if( !title.empty() ) ss << " title=\"" << title << '"';
@@ -169,8 +167,8 @@ namespace mongoutils {
         }
 
         /* escape for HTML display */
-        inline string escape(const string& data) {
-            string buffer;
+        inline std::string escape(const std::string& data) {
+            std::string buffer;
             buffer.reserve( data.size() );
             for( size_t pos = 0; pos != data.size(); ++pos ) {
                 switch( data[pos] ) {

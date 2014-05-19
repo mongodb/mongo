@@ -141,13 +141,13 @@ namespace mongo {
 
         // Allow access to arbitrary fields in the per-index info object.  Some indices stash
         // index-specific data there.
-        BSONElement getInfoElement(const string& name) const { return _infoObj[name]; }
+        BSONElement getInfoElement(const std::string& name) const { return _infoObj[name]; }
 
         //
         // "Internals" of accessing the index, used by IndexAccessMethod(s).
         //
 
-        // Return a (rather compact) string representation.
+        // Return a (rather compact) std::string representation.
         std::string toString() const { _checkOk(); return _infoObj.toString(); }
 
         // Return the info object.
@@ -171,7 +171,7 @@ namespace mongo {
              return i.next().eoo();
         }
 
-        static string makeIndexNamespace( const StringData& ns,
+        static std::string makeIndexNamespace( const StringData& ns,
                                           const StringData& name ) {
             return ns.toString() + ".$" + name.toString();
         }

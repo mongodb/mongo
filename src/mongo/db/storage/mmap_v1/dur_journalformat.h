@@ -42,7 +42,7 @@ namespace mongo {
         */
         struct JHeader {
             JHeader() { }
-            JHeader(string fname);
+            JHeader(std::string fname);
 
             char magic[2]; // "j\n". j means journal, then a linefeed, fwiw if you were to run "less" on the file or something...
 
@@ -133,9 +133,9 @@ namespace mongo {
             bool isLocalDbContext() const { return _fileNo & LocalDbBit; }
             void clearLocalDbContextBit() { _fileNo = getFileNo(); }
 
-            static string suffix(int fileno) {
+            static std::string suffix(int fileno) {
                 if( fileno == DotNsSuffix ) return "ns";
-                stringstream ss;
+                std::stringstream ss;
                 ss << fileno;
                 return ss.str();
             }

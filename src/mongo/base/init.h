@@ -97,8 +97,8 @@
  * dependents.
  *
  * NAME is any legitimate name for a C++ symbol.
- * PREREQUISITES is a tuple of 0 or more string literals, i.e., ("a", "b", "c"), or ()
- * DEPENDENTS is a tuple of 0 or more string literals.
+ * PREREQUISITES is a tuple of 0 or more std::string literals, i.e., ("a", "b", "c"), or ()
+ * DEPENDENTS is a tuple of 0 or more std::string literals.
  *
  * At run time, the full set of prerequisites for NAME will be computed as the union of the
  * explicit PREREQUISITES and the set of all other mongo initializers that name NAME in their

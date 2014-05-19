@@ -181,7 +181,7 @@ namespace mongo {
                                  const BSONObj& in, BSONObjBuilder& out);
         /*
          * Operator method to support #RAND_STRING : { key : { #RAND_STRING: [12] } }
-         * The array argument to RAND_STRING is the length of the string that is desired.
+         * The array argument to RAND_STRING is the length of the std::string that is desired.
          * This will evaluate to something like { key : "randomstring" }
          */
         static Status evalRandString(BsonTemplateEvaluator* btl, const char* fieldName,
@@ -189,7 +189,7 @@ namespace mongo {
         /*
          * Operator method to support #CONCAT : { key : { #CONCAT: ["hello", " ", "world", 2012] } }
          * The array argument to CONCAT are the strings to be concatenated. If the argument is not
-         * a string it will be stringified and concatendated.
+         * a std::string it will be stringified and concatendated.
          * This will evaluate to { key : "hello world2012" }
          */
         static Status evalConcat(BsonTemplateEvaluator* btl, const char* fieldName,

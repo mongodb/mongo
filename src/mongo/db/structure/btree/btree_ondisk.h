@@ -267,7 +267,7 @@ namespace mongo {
             invariant( la <= 0xffffff ); // must fit in 3 bytes
             if( la < 0 ) {
                 if ( la != -1 ) {
-                    log() << "btree diskloc isn't negative 1: " << la << endl;
+                    log() << "btree diskloc isn't negative 1: " << la << std::endl;
                     invariant ( la == -1 );
                 }
                 la = 0;
@@ -287,7 +287,7 @@ namespace mongo {
             return DiskLoc(a >> 8, ofs);
         }
 
-        string toString() const { return DiskLoc(*this).toString(); }
+        std::string toString() const { return DiskLoc(*this).toString(); }
     };
 
     struct BtreeBucketV1 {

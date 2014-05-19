@@ -139,7 +139,7 @@ namespace mongo {
         LastError * getSafe() {
             LastError * le = get(false);
             if ( ! le ) {
-                error() << " no LastError!" << endl;
+                error() << " no LastError!" << std::endl;
                 verify( le );
             }
             return le;

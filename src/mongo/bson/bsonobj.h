@@ -425,7 +425,7 @@ namespace mongo {
 
         // Return a version of this object where top level elements of types
         // that are not part of the bson wire protocol are replaced with
-        // string identifier equivalents.
+        // std::string identifier equivalents.
         // TODO Support conversion of element types other than min and max.
         BSONObj clientReadable() const;
 

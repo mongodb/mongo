@@ -276,7 +276,7 @@ namespace mongo {
          * membership and delegation information, a full list of the user's privileges, and a full
          * list of the user's roles, including those roles held implicitly through other roles
          * (indirect roles).  In the event that some of this information is inconsistent, the
-         * document will contain a "warnings" array, with string messages describing
+         * document will contain a "warnings" array, with std::string messages describing
          * inconsistencies.
          *
          * If the user does not exist, returns ErrorCodes::UserNotFound.
@@ -290,7 +290,7 @@ namespace mongo {
          * implicitly through other roles (indirect roles). If "showPrivileges" is true, then the
          * description documents will also include a full list of the role's privileges.
          * In the event that some of this information is inconsistent, the document will contain a
-         * "warnings" array, with string messages describing inconsistencies.
+         * "warnings" array, with std::string messages describing inconsistencies.
          *
          * If the role does not exist, returns ErrorCodes::RoleNotFound.
          */
@@ -306,13 +306,13 @@ namespace mongo {
          * contain description documents for all the builtin roles for the given database, if it
          * is false the result will just include user defined roles.
          * In the event that some of the information in a given role description is inconsistent,
-         * the document will contain a "warnings" array, with string messages describing
+         * the document will contain a "warnings" array, with std::string messages describing
          * inconsistencies.
          */
         Status getRoleDescriptionsForDB(const std::string dbname,
                                         bool showPrivileges,
                                         bool showBuiltinRoles,
-                                        vector<BSONObj>* result);
+                                        std::vector<BSONObj>* result);
 
         /**
          *  Returns the User object for the given userName in the out parameter "acquiredUser".

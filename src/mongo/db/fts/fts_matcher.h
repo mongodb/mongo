@@ -52,7 +52,7 @@ namespace mongo {
              *         so all full phrases and no negated
              */
             bool phrasesMatch( const BSONObj& obj ) const;
-            bool phraseMatch( const string& phrase, const BSONObj& obj ) const;
+            bool phraseMatch( const std::string& phrase, const BSONObj& obj ) const;
 
             bool matchesNonTerm( const BSONObj& obj ) const {
                 return !hasNegativeTerm( obj ) && phrasesMatch( obj );
@@ -62,12 +62,12 @@ namespace mongo {
             /**
              * @return true if raw has a negated term
              */
-            bool _hasNegativeTerm_string( const FTSLanguage* language, const string& raw ) const;
+            bool _hasNegativeTerm_string( const FTSLanguage* language, const std::string& raw ) const;
 
             /**
              * @return true if raw has a phrase
              */
-            bool _phraseMatches( const string& phrase, const string& raw ) const;
+            bool _phraseMatches( const std::string& phrase, const std::string& raw ) const;
 
             FTSQuery _query;
             FTSSpec  _spec;

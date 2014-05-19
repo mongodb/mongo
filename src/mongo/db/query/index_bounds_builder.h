@@ -104,8 +104,8 @@ namespace mongo {
                                           bool startInclusive,
                                           bool endInclusive);
 
-        static Interval makeRangeInterval(const string& start,
-                                          const string& end,
+        static Interval makeRangeInterval(const std::string& start,
+                                          const std::string& end,
                                           bool startInclusive,
                                           bool endInclusive);
 
@@ -114,7 +114,7 @@ namespace mongo {
          * The object must have exactly one field which is the value of the point interval.
          */
         static Interval makePointInterval(const BSONObj& obj);
-        static Interval makePointInterval(const string& str);
+        static Interval makePointInterval(const std::string& str);
         static Interval makePointInterval(double d);
 
         /**
@@ -131,13 +131,13 @@ namespace mongo {
         /**
          * Copied almost verbatim from db/queryutil.cpp.
          *
-         *  returns a string that when used as a matcher, would match a super set of regex()
+         *  returns a std::string that when used as a matcher, would match a super set of regex()
          *
          *  returns "" for complex regular expressions
          *
          *  used to optimize queries in some simple regex cases that start with '^'
          */
-        static string simpleRegex(const char* regex,
+        static std::string simpleRegex(const char* regex,
                                   const char* flags,
                                   BoundsTightness* tightnessOut);
 

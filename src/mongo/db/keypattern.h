@@ -45,7 +45,7 @@ namespace mongo {
      * and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
      * would be valid for index {i:-1} with direction -1.
      */
-    typedef vector<pair<BSONObj,BSONObj> > BoundList;
+    typedef std::vector<std::pair<BSONObj,BSONObj> > BoundList;
 
     /** A KeyPattern is an expression describing a transformation of a document into a
      *  document key.  Document keys are used to store documents in indices and to target
@@ -132,7 +132,7 @@ namespace mongo {
          */
         bool isCoveredBy( const KeyPattern& other ) const;
 
-        string toString() const{ return toBSON().toString(); }
+        std::string toString() const{ return toBSON().toString(); }
 
         /* Given a document, extracts the index key corresponding to this KeyPattern
          * Warning: assumes that there is a *single* key to be extracted!

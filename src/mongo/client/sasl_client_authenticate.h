@@ -49,11 +49,11 @@ namespace mongo {
      * fields below.  Which fields are required depends on the mechanism.  Consult the
      * relevant IETF standards.
      *
-     *     "mechanism": The string name of the sasl mechanism to use.  Mandatory.
+     *     "mechanism": The std::string name of the sasl mechanism to use.  Mandatory.
      *     "autoAuthorize": Truthy values tell the server to automatically acquire privileges on
      *         all resources after successful authentication, which is the default.  Falsey values
      *         instruct the server to await separate privilege-acquisition commands.
-     *     "user": The string name of the user to authenticate.
+     *     "user": The std::string name of the user to authenticate.
      *     "db": The database target of the auth command, which identifies the location
      *         of the credential information for the user.  May be "$external" if credential
      *         information is stored outside of the mongo cluster.
@@ -83,10 +83,10 @@ namespace mongo {
 
     // Constants
 
-    /// String name of the saslStart command.
+    /// std::string name of the saslStart command.
     extern MONGO_CLIENT_API const char* const saslStartCommandName;
 
-    /// String name of the saslContinue command.
+    /// std::string name of the saslContinue command.
     extern MONGO_CLIENT_API const char* const saslContinueCommandName;
 
     /// Name of the saslStart parameter indicating that the server should automatically grant the
@@ -120,11 +120,11 @@ namespace mongo {
     /// Field containing sasl payloads passed to and from the server.
     extern MONGO_CLIENT_API const char* const saslCommandPayloadFieldName;
 
-    /// Field containing the string identifier of the user to authenticate in
+    /// Field containing the std::string identifier of the user to authenticate in
     /// saslClientAuthenticate().
     extern MONGO_CLIENT_API const char* const saslCommandUserFieldName;
 
-    /// Field containing the string identifier of the database containing credential information,
+    /// Field containing the std::string identifier of the database containing credential information,
     /// or "$external" if the credential information is stored outside of the mongo cluster.
     extern MONGO_CLIENT_API const char* const saslCommandUserDBFieldName;
 

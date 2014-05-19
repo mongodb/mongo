@@ -111,12 +111,12 @@ namespace mongo {
      * NOTE: For overlap testing to work correctly, there may be no overlaps present in the map
      * itself.
      */
-    typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+    typedef std::map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
 
     /**
      * A RangeVector is a list of [lower,upper) ranges.
      */
-    typedef vector<pair<BSONObj,BSONObj> > RangeVector;
+    typedef std::vector<std::pair<BSONObj,BSONObj> > RangeVector;
 
     /**
      * Returns the overlap of a range [inclusiveLower, exclusiveUpper) with the provided range map
@@ -144,13 +144,13 @@ namespace mongo {
                            const BSONObj& exclusiveUpper );
 
     /**
-     * String representation of [inclusiveLower, exclusiveUpper)
+     * std::string representation of [inclusiveLower, exclusiveUpper)
      */
     std::string rangeToString( const BSONObj& inclusiveLower,
                                const BSONObj& exclusiveUpper );
 
     /**
-     * String representation of overlapping ranges as a list "[range1),[range2),..."
+     * std::string representation of overlapping ranges as a list "[range1),[range2),..."
      */
     std::string overlapToString( RangeVector overlap );
 

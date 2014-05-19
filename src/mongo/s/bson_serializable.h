@@ -61,7 +61,7 @@ namespace mongo {
         /** Clears the internal state. */
         virtual void clear() = 0;
 
-        /** Returns a string representation of the current internal state. */
+        /** Returns a std::string representation of the current internal state. */
         virtual std::string toString() const = 0;
     };
 

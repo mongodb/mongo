@@ -47,7 +47,7 @@ namespace mongo {
         explicit KeyBson(const BSONObj& obj) : _o(obj) { }
         int woCompare(const KeyBson& r, const Ordering &o) const;
         BSONObj toBson() const { return _o; }
-        string toString() const { return _o.toString(); }
+        std::string toString() const { return _o.toString(); }
         int dataSize() const { return _o.objsize(); }
         const char * data() const { return _o.objdata(); }
         BSONElement _firstElement() const { return _o.firstElement(); }
@@ -86,7 +86,7 @@ namespace mongo {
         int woCompare(const KeyV1& r, const Ordering &o) const;
         bool woEqual(const KeyV1& r) const;
         BSONObj toBson() const;
-        string toString() const { return toBson().toString(); }
+        std::string toString() const { return toBson().toString(); }
 
         /** get the key data we want to store in the btree bucket */
         const char * data() const { return (const char *) _keyData; }

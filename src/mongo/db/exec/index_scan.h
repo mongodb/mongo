@@ -136,8 +136,8 @@ namespace mongo {
         BtreeIndexCursor* _btreeCursor;
         int _keyEltsToUse;
         bool _movePastKeyElts;
-        vector<const BSONElement*> _keyElts;
-        vector<bool> _keyEltsInc;
+        std::vector<const BSONElement*> _keyElts;
+        std::vector<bool> _keyEltsInc;
 
         // Stats
         CommonStats _commonStats;

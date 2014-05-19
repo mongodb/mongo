@@ -57,15 +57,15 @@ namespace mongo {
          * @returns the pipeline, if created, otherwise a NULL reference
          */
         static intrusive_ptr<Pipeline> parseCommand(
-            string& errmsg,
+            std::string& errmsg,
             const BSONObj& cmdObj,
             const intrusive_ptr<ExpressionContext>& pCtx);
 
         /// Helper to implement Command::addRequiredPrivileges
         static void addRequiredPrivileges(Command* commandTemplate,
-                                          const string& dbname,
+                                          const std::string& dbname,
                                           BSONObj cmdObj,
-                                          vector<Privilege>* out);
+                                          std::vector<Privilege>* out);
 
         intrusive_ptr<ExpressionContext> getContext() const { return pCtx; }
 
@@ -122,10 +122,10 @@ namespace mongo {
         bool canRunInMongos() const;
 
         /**
-         * Write the pipeline's operators to a vector<Value>, with the
+         * Write the pipeline's operators to a std::vector<Value>, with the
          * explain flag true (for DocumentSource::serializeToArray()).
          */
-        vector<Value> writeExplainOps() const;
+        std::vector<Value> writeExplainOps() const;
         
         /**
          * Returns the dependencies needed by this pipeline.

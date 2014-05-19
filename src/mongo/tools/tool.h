@@ -51,26 +51,26 @@ namespace mongo {
         Tool();
         virtual ~Tool();
 
-        static auto_ptr<Tool> (*createInstance)();
+        static std::auto_ptr<Tool> (*createInstance)();
 
         int main( int argc , char ** argv, char ** envp );
 
-        string getNS() {
+        std::string getNS() {
             if (toolGlobalParams.coll.size() == 0) {
-                cerr << "no collection specified!" << endl;
+                cerr << "no collection specified!" << std::endl;
                 throw -1;
             }
             return toolGlobalParams.db + "." + toolGlobalParams.coll;
         }
 
-        string getAuthenticationDatabase();
+        std::string getAuthenticationDatabase();
 
         bool isMaster();
         bool isMongos();
 
         virtual int run() = 0;
 
-        virtual void printHelp(ostream &out) = 0;
+        virtual void printHelp(std::ostream &out) = 0;
 
     protected:
 
@@ -88,7 +88,7 @@ namespace mongo {
     };
 
     class BSONTool : public Tool {
-        auto_ptr<Matcher> _matcher;
+        std::auto_ptr<Matcher> _matcher;
 
     public:
         BSONTool();
@@ -105,5 +105,5 @@ namespace mongo {
 }
 
 #define REGISTER_MONGO_TOOL(TYPENAME) \
-    auto_ptr<Tool> createInstanceOfThisTool() {return auto_ptr<Tool>(new TYPENAME());} \
-    auto_ptr<Tool> (*Tool::createInstance)() = createInstanceOfThisTool;
+    std::auto_ptr<Tool> createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
+    std::auto_ptr<Tool> (*Tool::createInstance)() = createInstanceOfThisTool;

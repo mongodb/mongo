@@ -70,7 +70,7 @@ namespace mongo {
 
         // ---- low level access ----
 
-        void reply( Message & response , const string& fromServer );
+        void reply( Message & response , const std::string& fromServer );
 
         Message& m() { return _m; }
         DbMessage& d() { return _d; }

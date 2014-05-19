@@ -35,7 +35,7 @@ namespace mongo {
 namespace logger {
 
     /**
-     * Deprecated utility for associating a string and log level together.
+     * Deprecated utility for associating a std::string and log level together.
      */
     class LabeledLevel {
     public:

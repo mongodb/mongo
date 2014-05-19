@@ -161,7 +161,7 @@ namespace mongo {
             shardName( other.shardName ), shardVersion( other.shardVersion ) {
         }
 
-        ShardEndpoint( const string& shardName,
+        ShardEndpoint( const std::string& shardName,
                        const ChunkVersion& shardVersion ) :
             shardName( shardName ), shardVersion( shardVersion ) {
         }

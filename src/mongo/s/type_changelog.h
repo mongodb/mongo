@@ -50,7 +50,7 @@ namespace mongo {
      *
      *     // Process the response.
      *     ChangelogType exampleType;
-     *     string errMsg;
+     *     std::string errMsg;
      *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
      *         // Can't use 'exampleType'. Take action.
      *     }
@@ -112,7 +112,7 @@ namespace mongo {
         void cloneTo(ChangelogType* other) const;
 
         /**
-         * Returns a string representation of the current internal state.
+         * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 

@@ -55,7 +55,7 @@ namespace mongo {
         /** @return file length */
         unsigned long long length() const { return MemoryMappedFile::length(); }
 
-        string filename() const { return MemoryMappedFile::filename(); }
+        std::string filename() const { return MemoryMappedFile::filename(); }
 
         void flush(bool sync)   { MemoryMappedFile::flush(sync); }
 
@@ -139,13 +139,13 @@ namespace mongo {
         mutex& _mutex() { return _m; }
         DurableMappedFile* find_inlock(void *p, /*out*/ size_t& ofs);
 
-        map<void*,DurableMappedFile*>::iterator finditer_inlock(void *p) { return _views.upper_bound(p); }
+        std::map<void*,DurableMappedFile*>::iterator finditer_inlock(void *p) { return _views.upper_bound(p); }
 
         unsigned numberOfViews_inlock() const { return _views.size(); }
 
     private:
         mutex _m;
-        map<void*, DurableMappedFile*> _views;
+        std::map<void*, DurableMappedFile*> _views;
     };
 
     // allows a pointer into any private view of a DurableMappedFile to be resolved to the DurableMappedFile object

@@ -88,7 +88,7 @@ namespace mongo {
         unordered_set<DiskLoc, DiskLoc::Hasher> _seen;
 
         // Owned by us.  All the children we're reading from.
-        vector<PlanStage*> _children;
+        std::vector<PlanStage*> _children;
 
         // In order to pick the next smallest value, we need each child work(...) until it produces
         // a result.  This is the queue of children that haven't given us a result yet.
@@ -114,7 +114,7 @@ namespace mongo {
         };
 
         // We have a priority queue of these.
-        typedef list<StageWithValue>::iterator MergingRef;
+        typedef std::list<StageWithValue>::iterator MergingRef;
 
         // The comparison function used in our priority queue.
         class StageWithValueComparison {
@@ -132,10 +132,10 @@ namespace mongo {
         };
 
         // The min heap of the results we're returning.
-        std::priority_queue<MergingRef, vector<MergingRef>, StageWithValueComparison> _merging;
+        std::priority_queue<MergingRef, std::vector<MergingRef>, StageWithValueComparison> _merging;
 
         // The data referred to by the _merging queue above.
-        list<StageWithValue> _mergingData;
+        std::list<StageWithValue> _mergingData;
 
         // Stats
         CommonStats _commonStats;

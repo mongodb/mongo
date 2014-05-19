@@ -68,7 +68,7 @@ namespace mongo {
                             TypeExplain** explain);
 
     /**
-     * Returns a short plan summary string describing the leaves of the query solution.
+     * Returns a short plan summary std::string describing the leaves of the query solution.
      *
      * Used for logging.
      */

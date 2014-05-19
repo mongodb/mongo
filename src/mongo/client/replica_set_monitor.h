@@ -119,7 +119,7 @@ namespace mongo {
         std::string getName() const;
 
         /**
-         * Returns a string with the format name/server1,server2.
+         * Returns a std::string with the format name/server1,server2.
          * If name is empty, returns just comma-separated list of servers.
          */
         std::string getServerAddress() const;
@@ -153,7 +153,7 @@ namespace mongo {
 
         /**
          * Removes the ReplicaSetMonitor for the given set name from _sets, which will delete it.
-         * If clearSeedCache is true, then the cached seed string for this Replica Set will be
+         * If clearSeedCache is true, then the cached seed std::string for this Replica Set will be
          * removed from _seedServers.
          */
         static void remove(const std::string& name, bool clearSeedCache = false);

@@ -56,7 +56,7 @@ namespace mongo {
 
         class DurableInterface : boost::noncopyable {
         public:
-            virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << endl; }
+            virtual ~DurableInterface() { log() << "ERROR warning ~DurableInterface not intended to be called" << std::endl; }
 
             /** Declare that a file has been created
                 Normally writes are applied only after journaling, for safety.  But here the file
@@ -97,7 +97,7 @@ namespace mongo {
                 range length.
                 @return new buffer pointer.  this is modified when testIntent is true.
              */
-            virtual void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges ) = 0;
+            virtual void* writingRangesAtOffsets(void *buf, const std::vector< std::pair< long long, unsigned > > &ranges ) = 0;
 
             /** Wait for acknowledgement of the next group commit.
                 @return true if --dur is on.  There will be delay.
@@ -194,7 +194,7 @@ namespace mongo {
         class NonDurableImpl : public DurableInterface {
             void* writingPtr(void *x, unsigned len);
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
-            void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges) { return buf; }
+            void* writingRangesAtOffsets(void *buf, const std::vector< std::pair< long long, unsigned > > &ranges) { return buf; }
             void declareWriteIntent(void *, unsigned);
             void createdFile(const std::string& filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
@@ -209,7 +209,7 @@ namespace mongo {
             bool _aCommitIsNeeded();
             void* writingPtr(void *x, unsigned len);
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len);
-            void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges);
+            void* writingRangesAtOffsets(void *buf, const std::vector< std::pair< long long, unsigned > > &ranges);
             void declareWriteIntent(void *, unsigned);
             void createdFile(const std::string& filename, unsigned long long len);
             bool awaitCommit();

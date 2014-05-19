@@ -60,7 +60,7 @@ namespace mongo {
         virtual Status getRoleDescriptionsForDB(const std::string dbname,
                                                 bool showPrivileges,
                                                 bool showBuiltinRoles,
-                                                vector<BSONObj>* result);
+                                                std::vector<BSONObj>* result);
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 

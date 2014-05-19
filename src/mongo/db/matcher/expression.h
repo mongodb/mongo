@@ -190,7 +190,7 @@ namespace mongo {
         //
         // Debug information
         //
-        virtual string toString() const;
+        virtual std::string toString() const;
         virtual void debugString( StringBuilder& debug, int level = 0 ) const = 0;
 
     protected:

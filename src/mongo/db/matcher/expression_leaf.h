@@ -208,8 +208,8 @@ namespace mongo {
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
-        const string& getString() const { return _regex; }
-        const string& getFlags() const { return _flags; }
+        const std::string& getString() const { return _regex; }
+        const std::string& getFlags() const { return _flags; }
 
     private:
         std::string _regex;

@@ -147,7 +147,7 @@ namespace mongo {
         bool _replacementMode;
 
         // Collection of update mod instances. Owned here.
-        vector<ModifierInterface*> _mods;
+        std::vector<ModifierInterface*> _mods;
 
         // What are the list of fields in the collection over which the update is going to be
         // applied that participate in indices?

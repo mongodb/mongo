@@ -57,7 +57,7 @@ namespace mongo {
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
         // Only one of our fields is hashed.  This is the field name for it.
-        string _hashedField;
+        std::string _hashedField;
 
         // _seed defaults to zero.
         HashSeed _seed;

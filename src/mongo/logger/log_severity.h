@@ -75,7 +75,7 @@ namespace logger {
         inline LogSeverity lessSevere() const;
 
         /**
-         * Returns a string naming this severity level.
+         * Returns a std::string naming this severity level.
          *
          * See toStringData(), below.
          */

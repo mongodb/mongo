@@ -58,14 +58,14 @@ namespace mutablebson {
     protected:
         // The type of the first field in 'cmdObj' must be mongo::String. The first field is
         // interpreted as a collection name.
-        string parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const;
+        std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj) const;
     public:
 
         // Return the namespace for the command. If the first field in 'cmdObj' is of type
         // mongo::String, then that field is interpreted as the collection name, and is
         // appended to 'dbname' after a '.' character. If the first field is not of type
         // mongo::String, then 'dbname' is returned unmodified.
-        virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const;
+        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const;
 
         // Utility that returns a ResourcePattern for the namespace returned from
         // parseNs(dbname, cmdObj).  This will be either an exact namespace resource pattern
@@ -74,7 +74,7 @@ namespace mutablebson {
         ResourcePattern parseResourcePattern(const std::string& dbname,
                                              const BSONObj& cmdObj) const;
 
-        const string name;
+        const std::string name;
 
         /* run the given command
            implement this...
@@ -85,10 +85,10 @@ namespace mutablebson {
            return value is true if succeeded.  if false, set errmsg text.
         */
         virtual bool run(OperationContext* txn,
-                         const string& db,
+                         const std::string& db,
                          BSONObj& cmdObj,
                          int options,
-                         string& errmsg,
+                         std::string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl = false ) = 0;
 
@@ -107,7 +107,7 @@ namespace mutablebson {
             return false;
         }
 
-        void htmlHelp(stringstream&) const;
+        void htmlHelp(std::stringstream&) const;
 
         /* Like adminOnly, but even stricter: we must either be authenticated for admin db,
            or, if running without auth, on the local interface.  Used for things which 
@@ -135,7 +135,7 @@ namespace mutablebson {
          */
         virtual bool shouldAffectCommandCounter() const { return true; }
 
-        virtual void help( stringstream& help ) const;
+        virtual void help( std::stringstream& help ) const;
 
         /**
          * Checks if the given client is authorized to run this command on database "dbname"
@@ -190,25 +190,25 @@ namespace mutablebson {
             return BSONObj();
         }
 
-        static void logIfSlow( const Timer& cmdTimer,  const string& msg);
+        static void logIfSlow( const Timer& cmdTimer,  const std::string& msg);
 
-        static map<string,Command*> * _commands;
-        static map<string,Command*> * _commandsByBestName;
-        static map<string,Command*> * _webCommands;
+        static std::map<std::string,Command*> * _commands;
+        static std::map<std::string,Command*> * _commandsByBestName;
+        static std::map<std::string,Command*> * _webCommands;
 
     public:
         // Stops all index builds required to run this command and returns index builds killed.
         virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
                                                      const BSONObj& cmdObj);
 
-        static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }
-        static const map<string,Command*>* webCommands() { return _webCommands; }
+        static const std::map<std::string,Command*>* commandsByBestName() { return _commandsByBestName; }
+        static const std::map<std::string,Command*>* webCommands() { return _webCommands; }
         /** @return if command was found */
         static void runAgainstRegistered(const char *ns,
                                          BSONObj& jsobj,
                                          BSONObjBuilder& anObjBuilder,
                                          int queryOptions = 0);
-        static Command * findCommand( const string& name );
+        static Command * findCommand( const std::string& name );
         // For mongod and webserver.
         static void execCommand(OperationContext* txn,
                                 Command* c,

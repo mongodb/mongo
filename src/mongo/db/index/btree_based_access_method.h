@@ -139,7 +139,7 @@ namespace mongo {
         BSONObjSet oldKeys, newKeys;
 
         // These point into the sets oldKeys and newKeys.
-        vector<BSONObj*> removed, added;
+        std::vector<BSONObj*> removed, added;
 
         DiskLoc loc;
         bool dupsAllowed;

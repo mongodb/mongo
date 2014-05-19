@@ -73,7 +73,7 @@ namespace mongo {
 
         // following 2 are mutually exclusive, can only have one set
         long long initialNumExtents;
-        vector<long long> initialExtentSizes;
+        std::vector<long long> initialExtentSizes;
 
         // behavior of _id index creation when collection created
         void setNoIdIndex() { autoIndexId = NO; }
@@ -101,15 +101,15 @@ namespace mongo {
         Database(OperationContext* txn,
                  const char *nm,
                  /*out*/ bool& newDb,
-                 const string& path = storageGlobalParams.dbpath);
+                 const std::string& path = storageGlobalParams.dbpath);
 
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
         */
-        static void closeDatabase( const string& db, const string& path );
+        static void closeDatabase( const std::string& db, const std::string& path );
 
-        const string& name() const { return _name; }
-        const string& path() const { return _path; }
+        const std::string& name() const { return _name; }
+        const std::string& path() const { return _path; }
 
         void clearTmpCollections(OperationContext* txn);
 
@@ -132,7 +132,7 @@ namespace mongo {
         /**
          * @return true if success.  false if bad level or error creating profile ns
          */
-        bool setProfilingLevel( OperationContext* txn, int newLevel , string& errmsg );
+        bool setProfilingLevel( OperationContext* txn, int newLevel , std::string& errmsg );
 
         void flushFiles( bool sync );
 
@@ -140,7 +140,7 @@ namespace mongo {
          * @return true if ns is part of the database
          *         ns=foo.bar, db=foo returns true
          */
-        bool ownsNS( const string& ns ) const {
+        bool ownsNS( const std::string& ns ) const {
             if ( ! startsWith( ns , _name ) )
                 return false;
             return ns[_name.size()] == '.';
@@ -189,14 +189,14 @@ namespace mongo {
 
         /**
          * @return name of an existing database with same text name but different
-         * casing, if one exists.  Otherwise the empty string is returned.  If
+         * casing, if one exists.  Otherwise the empty std::string is returned.  If
          * 'duplicates' is specified, it is filled with all duplicate names.
          */
-        static string duplicateUncasedName( bool inholderlockalready, const string &name, const string &path, set< string > *duplicates = 0 );
+        static std::string duplicateUncasedName( bool inholderlockalready, const std::string &name, const std::string &path, std::set< std::string > *duplicates = 0 );
 
         static Status validateDBName( const StringData& dbname );
 
-        const string& getSystemIndexesName() const { return _indexesName; }
+        const std::string& getSystemIndexesName() const { return _indexesName; }
     private:
 
         void _clearCollectionCache( const StringData& fullns );
@@ -231,15 +231,15 @@ namespace mongo {
                                        const StringData& toNS,
                                        bool stayTemp );
 
-        const string _name; // "alleyinsider"
-        const string _path; // "/data/db"
+        const std::string _name; // "alleyinsider"
+        const std::string _path; // "/data/db"
 
         NamespaceIndex _namespaceIndex;
         boost::scoped_ptr<MmapV1ExtentManager> _extentManager;
 
-        const string _profileName; // "alleyinsider.system.profile"
-        const string _namespacesName; // "alleyinsider.system.namespaces"
-        const string _indexesName; // "alleyinsider.system.indexes"
+        const std::string _profileName; // "alleyinsider.system.profile"
+        const std::string _namespacesName; // "alleyinsider.system.namespaces"
+        const std::string _indexesName; // "alleyinsider.system.indexes"
 
         int _profile; // 0=off.
 

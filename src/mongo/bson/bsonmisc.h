@@ -150,13 +150,13 @@ namespace mongo {
         BSONObjBuilderValueStream *s_;
     };
 
-    // Utility class to allow adding a string to BSON as a Symbol
+    // Utility class to allow adding a std::string to BSON as a Symbol
     struct BSONSymbol {
         explicit BSONSymbol(const StringData& sym) :symbol(sym) {}
         StringData symbol;
     };
 
-    // Utility class to allow adding a string to BSON as Code
+    // Utility class to allow adding a std::string to BSON as Code
     struct BSONCode {
         explicit BSONCode(const StringData& str) :code(str) {}
         StringData code;

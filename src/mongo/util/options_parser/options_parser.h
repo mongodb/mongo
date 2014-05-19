@@ -59,7 +59,7 @@ namespace optionenvironment {
      *  // Run the parser
      *  Status ret = parser.run(options, argv, env, &environment);
      *  if (!ret.isOK()) {
-     *      cerr << options.helpString() << endl;
+     *      cerr << options.helpString() << std::endl;
      *      exit(EXIT_FAILURE);
      *  }
      *
@@ -67,11 +67,11 @@ namespace optionenvironment {
      *  ret = environment.get(moe::Key("help"), &displayHelp);
      *  if (!ret.isOK()) {
      *      // Help is a switch, so it should always be set
-     *      cout << "Should not get here" << endl;
+     *      cout << "Should not get here" << std::endl;
      *      exit(EXIT_FAILURE);
      *  }
      *  if (displayHelp) {
-     *      cout << options.helpString() << endl;
+     *      cout << options.helpString() << std::endl;
      *      exit(EXIT_SUCCESS);
      *  }
      *
@@ -107,7 +107,7 @@ namespace optionenvironment {
         Status parseCommandLine(const OptionSection&,
                                 const std::vector<std::string>& argv, Environment*);
 
-        /** Handles parsing of an INI config string and adds the results to the given Environment */
+        /** Handles parsing of an INI config std::string and adds the results to the given Environment */
         Status parseINIConfigFile(const OptionSection&, const std::string& config, Environment*);
 
         /** Gets defaults from the OptionSection and adds them to the given Environment */

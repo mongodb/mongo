@@ -283,7 +283,7 @@ namespace mutablebson {
         /** Get the value from a double valued Element. */
         inline double getValueDouble() const;
 
-        /** Get the value from a string valued Element. */
+        /** Get the value from a std::string valued Element. */
         inline StringData getValueString() const;
 
         /** Get the value from an object valued Element. Note that this may not always be
@@ -508,7 +508,7 @@ namespace mutablebson {
         /** Append the provided double value as a new field with the provided name. */
         Status appendDouble(const StringData& fieldName, double value);
 
-        /** Append the provided string value as a new field with the provided name. */
+        /** Append the provided std::string value as a new field with the provided name. */
         Status appendString(const StringData& fieldName, const StringData& value);
 
         /** Append the provided object as a new field with the provided name. The data in

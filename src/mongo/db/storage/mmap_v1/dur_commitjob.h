@@ -57,7 +57,7 @@ namespace mongo {
             bool contains(const WriteIntent& rhs) const    { return (start() <= rhs.start() && end() >= rhs.end()); }
             // merge into me:
             void absorb(const WriteIntent& other);
-            friend ostream& operator << (ostream& out, const WriteIntent& wi) {
+            friend std::ostream& operator << (std::ostream& out, const WriteIntent& wi) {
                 return (out << "p: " << wi.p << " end: " << wi.end() << " len: " << wi.len);
             }
         private:
@@ -79,7 +79,7 @@ namespace mongo {
             */
             bool checkAndSet(void* p, int len) {
                 unsigned x = mongoutils::hashPointer(p);
-                pair<void*, int>& nd = nodes[x % N];
+                std::pair<void*, int>& nd = nodes[x % N];
                 if( nd.first == p ) {
                     if( nd.second < len ) {
                         nd.second = len;
@@ -93,15 +93,15 @@ namespace mongo {
             }
         private:
             enum { N = Prime }; // this should be small the idea is that it fits in the cpu cache easily
-            pair<void*,int> nodes[N];
+            std::pair<void*,int> nodes[N];
         };
 
         /** our record of pending/uncommitted write intents */
         class IntentsAndDurOps : boost::noncopyable {
         public:
-            vector<WriteIntent> _intents;
+            std::vector<WriteIntent> _intents;
             Already<127> _alreadyNoted;
-            vector< shared_ptr<DurOp> > _durOps; // all the ops other than basic writes
+            std::vector< shared_ptr<DurOp> > _durOps; // all the ops other than basic writes
 
             /** reset the IntentsAndDurOps structure (empties all the above) */
             void clear();
@@ -111,7 +111,7 @@ namespace mongo {
                 wassert( _intents.size() < 2000000 );
             }
             #if defined(DEBUG_WRITE_INTENT)
-            map<void*,int> _debug;
+            std::map<void*,int> _debug;
             #endif
         };
 
@@ -152,7 +152,7 @@ namespace mongo {
             /** note an operation other than a "basic write". threadsafe (locks in the impl) */
             void noteOp(shared_ptr<DurOp> p);
 
-            vector< shared_ptr<DurOp> >& ops() { 
+            std::vector< shared_ptr<DurOp> >& ops() {
                 dassert( Lock::isLocked() );          // a rather weak check, we require more than that
                 groupCommitMutex.dassertLocked(); // this is what really makes the below safe
                 return _intentsAndDurOps._durOps;                
@@ -184,7 +184,7 @@ namespace mongo {
             /** used in prepbasicwrites. sorted so that overlapping and duplicate items 
              * can be merged.  we sort here so the caller receives something they must 
              * keep const from their pov. */
-            const vector<WriteIntent>& getIntentsSorted() {
+            const std::vector<WriteIntent>& getIntentsSorted() {
                 groupCommitMutex.dassertLocked();
                 sort(_intentsAndDurOps._intents.begin(), _intentsAndDurOps._intents.end());
                 return _intentsAndDurOps._intents;

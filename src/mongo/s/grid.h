@@ -51,7 +51,7 @@ namespace mongo {
          * gets the config the db.
          * will return an empty DBConfig if not in db already
          */
-        DBConfigPtr getDBConfig( const StringData& ns , bool create=true , const string& shardNameHint="" );
+        DBConfigPtr getDBConfig( const StringData& ns , bool create=true , const std::string& shardNameHint="" );
 
         /**
          * removes db entry.
@@ -91,25 +91,25 @@ namespace mongo {
          * addShard will create a new shard in the grid. It expects a mongod process to be running
          * on the provided address. Adding a shard that is a replica set is supported.
          *
-         * @param name is an optional string with the name of the shard. if omitted, grid will
+         * @param name is an optional std::string with the name of the shard. if omitted, grid will
          *        generate one and update the parameter.
-         * @param servers is the connection string of the shard being added
+         * @param servers is the connection std::string of the shard being added
          * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
          *        space usage
          * @param errMsg is the error description in case the operation failed.
          * @return true if shard was successfully added.
          */
-        bool addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg );
+        bool addShard( std::string* name , const ConnectionString& servers , long long maxSize , std::string& errMsg );
 
         /**
          * @return true if the config database knows about a host 'name'
          */
-        bool knowAboutShard( const string& name ) const;
+        bool knowAboutShard( const std::string& name ) const;
 
         /**
          * @return true if the chunk balancing functionality is enabled
          */
-        bool shouldBalance( const string& ns = "", BSONObj* balancerDocOut = 0 ) const;
+        bool shouldBalance( const std::string& ns = "", BSONObj* balancerDocOut = 0 ) const;
 
         /**
          * 
@@ -135,7 +135,7 @@ namespace mongo {
 
     private:
         mongo::mutex              _lock;            // protects _databases; TODO: change to r/w lock ??
-        map<string, DBConfigPtr > _databases;       // maps ns to DBConfig's
+        std::map<std::string, DBConfigPtr > _databases;       // maps ns to DBConfig's
         bool                      _allowLocalShard; // can 'localhost' be used in shard addresses?
 
         /**
@@ -143,12 +143,12 @@ namespace mongo {
          * @return true if it managed to generate a shard name. May return false if (currently)
          * 10000 shard
          */
-        bool _getNewShardName( string* name ) const;
+        bool _getNewShardName( std::string* name ) const;
 
         /**
          * @return whether a give dbname is used for shard "local" databases (e.g., admin or local)
          */
-        static bool _isSpecialLocalDB( const string& dbName );
+        static bool _isSpecialLocalDB( const std::string& dbName );
 
         /**
          * @param balancerDoc bson that may contain a marker to stop the balancer

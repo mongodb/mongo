@@ -69,13 +69,13 @@ namespace mongo {
 
         double radius;
 
-        string toString() const {
-            stringstream ss;
-            ss << "maxKeysPerInsert: " << maxKeysPerInsert << endl;
-            ss << "maxCellsInCovering: " << maxCellsInCovering << endl;
-            ss << "finestIndexedLevel: " << finestIndexedLevel << endl;
-            ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << endl;
-            ss << "indexVersion: " << indexVersion << endl;
+        std::string toString() const {
+            std::stringstream ss;
+            ss << "maxKeysPerInsert: " << maxKeysPerInsert << std::endl;
+            ss << "maxCellsInCovering: " << maxCellsInCovering << std::endl;
+            ss << "finestIndexedLevel: " << finestIndexedLevel << std::endl;
+            ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << std::endl;
+            ss << "indexVersion: " << indexVersion << std::endl;
             return ss.str();
         }
 
@@ -91,7 +91,7 @@ namespace mongo {
     public:
         // Given a coverer, region, and field name, generate a BSONObj that we can pass to a
         // FieldRangeSet so that we only examine the keys that the provided region may intersect.
-        static BSONObj coverAsBSON(const vector<S2CellId> &cover, const string& field,
+        static BSONObj coverAsBSON(const std::vector<S2CellId> &cover, const std::string& field,
                                    const int coarsestIndexedLevel);
         static void setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel);
         static bool distanceBetween(const S2Point& us, const BSONObj& them, double *out);

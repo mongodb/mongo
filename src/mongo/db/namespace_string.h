@@ -207,7 +207,7 @@ namespace mongo {
 
     /**
      * NamespaceDBHash and NamespaceDBEquals allow you to do something like
-     * unordered_map<string,int,NamespaceDBHash,NamespaceDBEquals>
+     * unordered_map<std::string,int,NamespaceDBHash,NamespaceDBEquals>
      * and use the full namespace for the string
      * but comparisons are done only on the db piece
      */

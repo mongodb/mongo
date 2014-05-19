@@ -71,7 +71,7 @@ namespace optionenvironment {
      *  // Run the parser
      *  Status ret = parser.run(options, argc, argv, envp, &environment);
      *  if (!ret.isOK()) {
-     *      cerr << options.helpString() << endl;
+     *      cerr << options.helpString() << std::endl;
      *      exit(EXIT_FAILURE);
      *  }
      */
@@ -85,7 +85,7 @@ namespace optionenvironment {
 
         /**
          * Add a sub section to this section.  Used mainly to keep track of section headers for when
-         * we need generate the help string for the command line
+         * we need generate the help std::string for the command line
          */
         Status addSection(const OptionSection& subSection);
 

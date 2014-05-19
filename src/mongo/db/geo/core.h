@@ -42,8 +42,8 @@ namespace mongo {
 
     inline double computeXScanDistance(double y, double maxDistDegrees) {
         // TODO: this overestimates for large maxDistDegrees far from the equator
-        return maxDistDegrees / min(cos(deg2rad(min(+89.0, y + maxDistDegrees))),
-                                    cos(deg2rad(max(-89.0, y - maxDistDegrees))));
+        return maxDistDegrees / std::min(cos(deg2rad(std::min(+89.0, y + maxDistDegrees))),
+                                         cos(deg2rad(std::max(-89.0, y - maxDistDegrees))));
     }
 
 }

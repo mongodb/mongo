@@ -80,7 +80,7 @@ namespace mongo {
         int nestableCount() const { return _nestableCount; }
         
         int otherCount() const { return _otherCount; }
-        const string& otherName() const { return _otherName; }
+        const std::string& otherName() const { return _otherName; }
         WrapperForRWLock* otherLock() const { return _otherLock; }
         
         void enterScopedLock( Lock::ScopedLock* lock );
@@ -108,7 +108,7 @@ namespace mongo {
         int _nestableCount;            // recursive lock count on local or admin db XXX - change name
         
         int _otherCount;               //   >0 means write lock, <0 read lock - XXX change name
-        string _otherName;             // which database are we locking and working with (besides local/admin) 
+        std::string _otherName;             // which database are we locking and working with (besides local/admin)
         WrapperForRWLock* _otherLock;  // so we don't have to check the map too often (the map has a mutex)
 
         // for temprelease
@@ -129,7 +129,7 @@ namespace mongo {
         bool sharedLatching;
         LockStat stats;
     public:
-        string name() const { return rw.name; }
+        std::string name() const { return rw.name; }
         LockStat& getStats() { return stats; }
 
         WrapperForRWLock(const StringData& name)

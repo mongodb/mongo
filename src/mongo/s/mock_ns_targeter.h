@@ -160,7 +160,7 @@ namespace mongo {
 
         KeyRange parseRange( const BSONObj& query ) const {
 
-            string fieldName = query.firstElement().fieldName();
+            std::string fieldName = query.firstElement().fieldName();
 
             if ( query.firstElement().isNumber() ) {
 

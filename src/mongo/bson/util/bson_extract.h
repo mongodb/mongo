@@ -90,7 +90,7 @@ namespace mongo {
     /**
      * Finds a string-typed element named "fieldName" in "object" and stores its value in "out".
      *
-     * Returns Status::OK() and sets *out to the found element's string value on success.  Returns
+     * Returns Status::OK() and sets *out to the found element's std::string value on success.  Returns
      * ErrorCodes::NoSuchKey if there are no matches for "fieldName", and ErrorCodes::TypeMismatch
      * if the type of the matching element is not String.  For return values other than
      * Status::OK(), the resulting value of "*out" is undefined.
@@ -130,7 +130,7 @@ namespace mongo {
                                               long long* out);
 
     /**
-     * Finds a string element named "fieldName" in "object".
+     * Finds a std::string element named "fieldName" in "object".
      *
      * If a field named "fieldName" is present, and is a string, stores the value of the field into
      * "*out".  If no field named fieldName is present, sets "*out" to "defaultValue".  In these

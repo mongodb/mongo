@@ -66,7 +66,7 @@ namespace mongo {
 
         // -----
 
-        bool validates(const DiskLoc diskLoc, std::vector<string>* errors = NULL) const;
+        bool validates(const DiskLoc diskLoc, std::vector<std::string>* errors = NULL) const;
 
         BSONObj dump() const;
 

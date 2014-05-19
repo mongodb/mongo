@@ -179,7 +179,7 @@ namespace optionenvironment {
         OptionDescription& validRange(long min, long max);
 
         /**
-         * Specifies that this option is incompatible with another option.  The string provided must
+         * Specifies that this option is incompatible with another option.  The std::string provided must
          * be the dottedName, which is the name used to access the option in the result Environment.
          *
          * TODO: Find a way to check that that option actually exists in our section somewhere.
@@ -196,7 +196,7 @@ namespace optionenvironment {
         /**
          * Specifies that this option is required to match the given format, specified as a regular
          * expression.  The displayFormat argument is what gets printed to the user in the case
-         * where this constraint is not satisfied.  This is only allowed on String options.
+         * where this constraint is not satisfied.  This is only allowed on std::string options.
          */
         OptionDescription& format(const std::string& regexFormat, const std::string& displayFormat);
 

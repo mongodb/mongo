@@ -38,9 +38,9 @@ namespace mongo {
 
     class Sync {
     protected:
-        string hn;
+        std::string hn;
     public:
-        Sync(const string& hostname) : hn(hostname) {}
+        Sync(const std::string& hostname) : hn(hostname) {}
         virtual ~Sync() {}
         virtual BSONObj getMissingDoc(Database* db, const BSONObj& o);
 
@@ -48,7 +48,7 @@ namespace mongo {
          * If applyOperation_inlock should be called again after an update fails.
          */
         virtual bool shouldRetry(const BSONObj& o);
-        void setHostname(const string& hostname);
+        void setHostname(const std::string& hostname);
     };
 
 }

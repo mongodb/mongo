@@ -85,7 +85,7 @@ namespace mongo {
         const MatchExpression* _filter;
 
         // Owned by us.
-        vector<PlanStage*> _children;
+        std::vector<PlanStage*> _children;
 
         // The current node we're AND-ing against.
         size_t _targetNode;

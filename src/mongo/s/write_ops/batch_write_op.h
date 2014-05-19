@@ -107,7 +107,7 @@ namespace mongo {
          */
         Status targetBatch( const NSTargeter& targeter,
                             bool recordTargetErrors,
-                            vector<TargetedWriteBatch*>* targetedBatches );
+                            std::vector<TargetedWriteBatch*>* targetedBatches );
 
         /**
          * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.

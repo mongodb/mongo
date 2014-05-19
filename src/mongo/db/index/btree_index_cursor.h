@@ -55,8 +55,8 @@ namespace mongo {
         virtual Status seek(const BSONObj& position);
 
         // Btree-specific seeking functions.
-        Status seek(const vector<const BSONElement*>& position,
-                    const vector<bool>& inclusive);
+        Status seek(const std::vector<const BSONElement*>& position,
+                    const std::vector<bool>& inclusive);
 
         /**
          * Seek to the key 'position'.  If 'afterKey' is true, seeks to the first
@@ -69,8 +69,8 @@ namespace mongo {
         Status skip(const BSONObj& keyBegin,
                     int keyBeginLen,
                     bool afterKey,
-                    const vector<const BSONElement*>& keyEnd,
-                    const vector<bool>& keyEndInclusive);
+                    const std::vector<const BSONElement*>& keyEnd,
+                    const std::vector<bool>& keyEndInclusive);
 
         virtual BSONObj getKey() const;
         virtual DiskLoc getValue() const;
@@ -87,7 +87,7 @@ namespace mongo {
 
         virtual Status restorePosition();
 
-        virtual string toString();
+        virtual std::string toString();
 
     private:
         // We keep the constructor private and only allow the AM to create us.

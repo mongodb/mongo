@@ -88,7 +88,7 @@ namespace optionenvironment {
         Status get(double* val) const;
         Status get(int* val) const;
         Status get(long* val) const;
-        Status get(string* val) const;
+        Status get(std::string* val) const;
         Status get(unsigned long long* val) const;
         Status get(unsigned* val) const;
 
@@ -112,7 +112,7 @@ namespace optionenvironment {
         bool equal(const Value&) const;
 
         /**
-         *  Return the string representation of this Value.  This function is used only for
+         *  Return the std::string representation of this Value.  This function is used only for
          *  debugging purposes and does not output data in an easily parseable format.
          */
         std::string toString() const;

@@ -46,7 +46,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out);
 
-        virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool);
+        virtual bool run(OperationContext* txn, const std::string& dbname , BSONObj& cmdObj, int, std::string& errmsg, BSONObjBuilder& result, bool);
 
         void wipeCacheForCollection( const StringData& ns );
 
@@ -54,9 +54,9 @@ namespace mongo {
 
         bool isCachable( const StringData& ns ) const;
 
-        string hashCollection( Database* db, const string& fullCollectionName, bool* fromCache );
+        std::string hashCollection( Database* db, const std::string& fullCollectionName, bool* fromCache );
 
-        map<string,string> _cachedHashed;
+        std::map<std::string,std::string> _cachedHashed;
         mutex _cachedHashedMutex;
 
     };

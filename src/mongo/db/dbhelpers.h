@@ -91,7 +91,7 @@ namespace mongo {
         /**
          * have to be locked already
          */
-        static vector<BSONObj> findAll( const string& ns , const BSONObj& query );
+        static std::vector<BSONObj> findAll( const std::string& ns , const BSONObj& query );
 
         /**
          * @param foundIndex if passed in will be set to 1 if ns and index found
@@ -124,7 +124,7 @@ namespace mongo {
          * o has to have an _id field or will assert
          */
         static void upsert( OperationContext* txn,
-                            const string& ns,
+                            const std::string& ns,
                             const BSONObj& o,
                             bool fromMigrate = false );
 
@@ -192,7 +192,7 @@ namespace mongo {
          */
         static Status getLocsInRange( const KeyRange& range,
                                       long long maxChunkSizeBytes,
-                                      set<DiskLoc>* locs,
+                                      std::set<DiskLoc>* locs,
                                       long long* numDocs,
                                       long long* estChunkSizeBytes );
 
@@ -208,7 +208,7 @@ namespace mongo {
          */
         class RemoveSaver : public boost::noncopyable {
         public:
-            RemoveSaver(const string& type, const string& ns, const string& why);
+            RemoveSaver(const std::string& type, const std::string& ns, const std::string& why);
             ~RemoveSaver();
 
             void goingToDelete( const BSONObj& o );
@@ -216,7 +216,7 @@ namespace mongo {
         private:
             boost::filesystem::path _root;
             boost::filesystem::path _file;
-            ofstream* _out;
+            std::ofstream* _out;
         };
 
     };

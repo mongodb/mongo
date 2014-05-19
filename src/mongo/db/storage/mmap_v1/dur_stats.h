@@ -41,8 +41,8 @@ namespace mongo {
             unsigned _intervalMicros;
             struct S {
                 BSONObj _asObj();
-                string _asCSV();
-                string _CSVHeader();
+                std::string _asCSV();
+                std::string _CSVHeader();
                 void reset();
 
                 unsigned _commits;

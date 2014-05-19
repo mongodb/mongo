@@ -36,8 +36,8 @@ namespace mongo {
     template<class T>
     void _genFieldErrMsg(const BSONElement& elem,
                          const BSONField<T>& field,
-                         const string expected,
-                         string* errMsg)
+                         const std::string expected,
+                         std::string* errMsg)
     {
         if (!errMsg) return;
         *errMsg = stream() << "wrong type for '" << field() << "' field, expected " << expected
@@ -48,7 +48,7 @@ namespace mongo {
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                        const BSONField<T>& field,
                        T* out,
-                       string* errMsg)
+                       std::string* errMsg)
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
@@ -77,12 +77,12 @@ namespace mongo {
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                        const BSONField<T*>& field,
                        T** out,
-                       string* errMsg)
+                       std::string* errMsg)
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
-                auto_ptr<T> temp(new T);
+                std::auto_ptr<T> temp(new T);
                 field.getDefault()->cloneTo(temp.get());
 
                 *out = temp.release();
@@ -98,7 +98,7 @@ namespace mongo {
             return FIELD_INVALID;
         }
 
-        auto_ptr<T> temp(new T);
+        std::auto_ptr<T> temp(new T);
         if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
             return FIELD_INVALID;
         }
@@ -111,7 +111,7 @@ namespace mongo {
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                        const BSONField<T>& field,
                        T** out,
-                       string* errMsg)
+                       std::string* errMsg)
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
@@ -134,7 +134,7 @@ namespace mongo {
             return FIELD_INVALID;
         }
 
-        auto_ptr<T> temp(new T);
+        std::auto_ptr<T> temp(new T);
         if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
             return FIELD_INVALID;
         }
@@ -146,17 +146,17 @@ namespace mongo {
     // Extracts an array into a vector
     template<typename T>
     FieldParser::FieldState FieldParser::extract( BSONObj doc,
-                                                  const BSONField<vector<T> >& field,
-                                                  vector<T>* out,
-                                                  string* errMsg ) {
+                                                  const BSONField<std::vector<T> >& field,
+                                                  std::vector<T>* out,
+                                                  std::string* errMsg ) {
         return extract( doc[field.name()], field, out, errMsg );
     }
 
     template<typename T>
     FieldParser::FieldState FieldParser::extract( BSONElement elem,
-                                                  const BSONField<vector<T> >& field,
-                                                  vector<T>* out,
-                                                  string* errMsg )
+                                                  const BSONField<std::vector<T> >& field,
+                                                  std::vector<T>* out,
+                                                  std::string* errMsg )
     {
         if (elem.eoo()) {
             if (field.hasDefault()) {
@@ -170,7 +170,7 @@ namespace mongo {
 
         if (elem.type() == Array) {
             BSONArray arr = BSONArray(elem.embeddedObject());
-            string elErrMsg;
+            std::string elErrMsg;
 
             // Append all the new elements to the end of the vector
             size_t initialSize = out->size();
@@ -208,9 +208,9 @@ namespace mongo {
 
     template<typename T>
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                                                 const BSONField<vector<T*> >& field,
-                                                 vector<T*>* out,
-                                                 string* errMsg) {
+                                                 const BSONField<std::vector<T*> >& field,
+                                                 std::vector<T*>* out,
+                                                 std::string* errMsg) {
         dassert(!field.hasDefault());
 
         BSONElement elem = doc[field.name()];
@@ -240,7 +240,7 @@ namespace mongo {
                 return FIELD_INVALID;
             }
 
-            auto_ptr<T> toInsert(new T);
+            std::auto_ptr<T> toInsert(new T);
 
             if ( !toInsert->parseBSON( next.embeddedObject(), errMsg )
                  || !toInsert->isValid( errMsg ) ) {
@@ -254,17 +254,17 @@ namespace mongo {
     }
 
     template<typename T>
-    void FieldParser::clearOwnedVector(vector<T*>* vec) {
-        for (typename vector<T*>::iterator it = vec->begin(); it != vec->end(); ++it) {
+    void FieldParser::clearOwnedVector(std::vector<T*>* vec) {
+        for (typename std::vector<T*>::iterator it = vec->begin(); it != vec->end(); ++it) {
             delete (*it);
         }
     }
 
     template<typename T>
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
-                                                 const BSONField<vector<T*> >& field,
-                                                 vector<T*>** out,
-                                                 string* errMsg) {
+                                                 const BSONField<std::vector<T*> >& field,
+                                                 std::vector<T*>** out,
+                                                 std::string* errMsg) {
         dassert(!field.hasDefault());
 
         BSONElement elem = doc[field.name()];
@@ -280,7 +280,7 @@ namespace mongo {
             return FIELD_INVALID;
         }
 
-        auto_ptr<vector<T*> > tempVector(new vector<T*>);
+        std::auto_ptr<std::vector<T*> > tempVector(new std::vector<T*>);
 
         BSONArray arr = BSONArray(elem.embeddedObject());
         BSONObjIterator objIt(arr);
@@ -297,7 +297,7 @@ namespace mongo {
                 return FIELD_INVALID;
             }
 
-            auto_ptr<T> toInsert(new T);
+            std::auto_ptr<T> toInsert(new T);
             if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
                 clearOwnedVector(tempVector.get());
                 return FIELD_INVALID;
@@ -313,17 +313,17 @@ namespace mongo {
     // Extracts an object into a map
     template<typename K, typename T>
     FieldParser::FieldState FieldParser::extract( BSONObj doc,
-                                                  const BSONField<map<K, T> >& field,
-                                                  map<K, T>* out,
-                                                  string* errMsg ) {
+                                                  const BSONField<std::map<K, T> >& field,
+                                                  std::map<K, T>* out,
+                                                  std::string* errMsg ) {
         return extract( doc[field.name()], field, out, errMsg );
     }
 
     template<typename K, typename T>
     FieldParser::FieldState FieldParser::extract( BSONElement elem,
-                                                  const BSONField<map<K, T> >& field,
-                                                  map<K, T>* out,
-                                                  string* errMsg )
+                                                  const BSONField<std::map<K, T> >& field,
+                                                  std::map<K, T>* out,
+                                                  std::string* errMsg )
     {
         if (elem.eoo()) {
             if (field.hasDefault()) {
@@ -337,7 +337,7 @@ namespace mongo {
 
         if (elem.type() == Object) {
             BSONObj obj = elem.embeddedObject();
-            string elErrMsg;
+            std::string elErrMsg;
 
             BSONObjIterator objIt(obj);
             while (objIt.more()) {

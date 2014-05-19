@@ -101,8 +101,8 @@ namespace mongo {
 
         // Helper that acts as an auto-ptr for write and wc errors
         struct GLEErrors {
-            auto_ptr<WriteErrorDetail> writeError;
-            auto_ptr<WCErrorDetail> wcError;
+            std::auto_ptr<WriteErrorDetail> writeError;
+            std::auto_ptr<WCErrorDetail> wcError;
         };
 
         /**
@@ -140,9 +140,9 @@ namespace mongo {
 
     // Used for reporting legacy write concern responses
     struct LegacyWCResponse {
-        string shardHost;
+        std::string shardHost;
         BSONObj gleResponse;
-        string errToReport;
+        std::string errToReport;
     };
 
     /**
@@ -156,5 +156,5 @@ namespace mongo {
                                       const StringData& dbName,
                                       const BSONObj& options,
                                       const HostOpTimeMap& hostOpTimes,
-                                      vector<LegacyWCResponse>* wcResponses );
+                                      std::vector<LegacyWCResponse>* wcResponses );
 }

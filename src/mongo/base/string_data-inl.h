@@ -75,11 +75,11 @@ namespace mongo {
 
     inline size_t StringData::find( char c, size_t fromPos ) const {
         if ( fromPos >= size() )
-            return string::npos;
+            return std::string::npos;
 
         const void* x = memchr( _data + fromPos, c, _size - fromPos );
         if ( x == 0 )
-            return string::npos;
+            return std::string::npos;
         return static_cast<size_t>( static_cast<const char*>(x) - _data );
     }
 
@@ -90,7 +90,7 @@ namespace mongo {
         if ( needleSize == 0 )
             return 0;
         else if ( needleSize > mx )
-            return string::npos;
+            return std::string::npos;
 
         mx -= needleSize;
 
@@ -98,7 +98,7 @@ namespace mongo {
             if ( memcmp( _data + i, needle._data, needleSize ) == 0 )
                 return i;
         }
-        return string::npos;
+        return std::string::npos;
 
     }
 
@@ -111,7 +111,7 @@ namespace mongo {
             if ( *(cur - 1) == c )
                 return (cur - _data) - 1;
         }
-        return string::npos;
+        return std::string::npos;
     }
 
     inline StringData StringData::substr( size_t pos, size_t n ) const {

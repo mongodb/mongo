@@ -59,9 +59,9 @@ namespace mongo {
 
         bool wTimedOut;
         int wTime;
-        vector<BSONObj> writtenTo;
+        std::vector<BSONObj> writtenTo;
 
-        string err; // this is the old err field, should deprecate
+        std::string err; // this is the old err field, should deprecate
     };
 
     /**

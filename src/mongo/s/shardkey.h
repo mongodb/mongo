@@ -90,7 +90,7 @@ namespace mongo {
 
         BSONObj key() const { return pattern.toBSON(); }
 
-        string toString() const;
+        std::string toString() const;
 
         BSONObj extractKey(const BSONObj& from) const;
 
@@ -145,7 +145,7 @@ namespace mongo {
         BSONObj gMax;
 
         /* question: better to have patternfields precomputed or not?  depends on if we use copy constructor often. */
-        set<string> patternfields;
+        std::set<std::string> patternfields;
     };
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const {

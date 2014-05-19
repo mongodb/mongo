@@ -88,8 +88,8 @@ namespace mongo {
         // Gets an iterator over the names of all authenticated users stored in this manager.
         UserNameIterator getAuthenticatedUserNames();
 
-        // Returns a string representing all logged-in users on the current session.
-        // WARNING: this string will contain NUL bytes so don't call c_str()!
+        // Returns a std::string representing all logged-in users on the current session.
+        // WARNING: this std::string will contain NUL bytes so don't call c_str()!
         std::string getAuthenticatedUserNamesToken();
 
         // Removes any authenticated principals whose authorization credentials came from the given
@@ -160,7 +160,7 @@ namespace mongo {
 
         // Like isAuthorizedForPrivilege, above, except returns true if the session is authorized
         // for all of the listed privileges.
-        bool isAuthorizedForPrivileges(const vector<Privilege>& privileges);
+        bool isAuthorizedForPrivileges(const std::vector<Privilege>& privileges);
 
         // Utility function for isAuthorizedForPrivilege(Privilege(resource, action)).
         bool isAuthorizedForActionsOnResource(const ResourcePattern& resource, ActionType action);

@@ -48,7 +48,7 @@ namespace mongo {
         unsigned tid;
 #endif
     public:
-        const string name;
+        const std::string name;
         SimpleRWLock(const StringData& name = "" );
         void lock();
         void unlock();

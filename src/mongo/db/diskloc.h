@@ -90,11 +90,11 @@ namespace mongo {
         }
         bool isValid() const { return _a != -2; }
 
-        string toString() const {
+        std::string toString() const {
             if ( isNull() )
                 return "null";
-            stringstream ss;
-            ss << _a << ':' << hex << ofs;
+            std::stringstream ss;
+            ss << _a << ':' << std::hex << ofs;
             return ss.str();
         }
 

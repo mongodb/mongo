@@ -77,7 +77,7 @@ namespace mongo {
      *     case PlanStage::ADVANCED:
      *         // do something with result
      *         WorkingSetMember* member = workingSet.get(result);
-     *         cout << "Result: " << member->obj << endl;
+     *         cout << "Result: " << member->obj << std::endl;
      *         break;
      *     case PlanStage::IS_EOF:
      *         // All done.  Will fall out of while loop.
@@ -145,7 +145,7 @@ namespace mongo {
             NEED_FETCH,
         };
 
-        static string stateStr(const StageState& state) {
+        static std::string stateStr(const StageState& state) {
             if (ADVANCED == state) {
                 return "ADVANCED";
             }

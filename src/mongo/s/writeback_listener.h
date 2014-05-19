@@ -52,21 +52,21 @@ namespace mongo {
     public:
 
         static void init( DBClientBase& conn );
-        static void init( const string& host );
+        static void init( const std::string& host );
 
     protected:
-        WriteBackListener( const string& addr );
+        WriteBackListener( const std::string& addr );
 
-        string name() const { return _name; }
+        std::string name() const { return _name; }
         void run();
 
     private:
-        string _addr;
-        string _name;
+        std::string _addr;
+        std::string _name;
 
         static mongo::mutex _cacheLock; // protects _cache
-        static unordered_map<string,WriteBackListener*> _cache; // server to listener
-        static unordered_set<string> _seenSets; // cache of set urls we've seen - note this is ever expanding for order, case, changes
+        static unordered_map<std::string,WriteBackListener*> _cache; // server to listener
+        static unordered_set<std::string> _seenSets; // cache of set urls we've seen - note this is ever expanding for order, case, changes
 
     };
 

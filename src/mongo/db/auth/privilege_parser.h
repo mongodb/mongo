@@ -53,8 +53,8 @@ namespace mongo {
 
         static const BSONField<bool> anyResource;
         static const BSONField<bool> cluster;
-        static const BSONField<string> db;
-        static const BSONField<string> collection;
+        static const BSONField<std::string> db;
+        static const BSONField<std::string> collection;
 
         //
         // construction / destruction
@@ -112,11 +112,11 @@ namespace mongo {
         bool _isClusterSet;
 
         // (O) database portion of the resource
-        string _db;
+        std::string _db;
         bool _isDbSet;
 
         // (O) collection portion of the resource
-        string _collection;
+        std::string _collection;
         bool _isCollectionSet;
     };
 
@@ -131,7 +131,7 @@ namespace mongo {
         // schema declarations
         //
 
-        static const BSONField<std::vector<string> > actions;
+        static const BSONField<std::vector<std::string> > actions;
         static const BSONField<ParsedResource> resource;
 
         //
@@ -168,13 +168,13 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setActions(const std::vector<string>& actions);
-        void addToActions(const string& actions);
+        void setActions(const std::vector<std::string>& actions);
+        void addToActions(const std::string& actions);
         void unsetActions();
         bool isActionsSet() const;
         size_t sizeActions() const;
-        const std::vector<string>& getActions() const;
-        const string& getActionsAt(size_t pos) const;
+        const std::vector<std::string>& getActions() const;
+        const std::string& getActionsAt(size_t pos) const;
 
         void setResource(const ParsedResource& resource);
         void unsetResource();
@@ -185,7 +185,7 @@ namespace mongo {
         // Convention: (M)andatory, (O)ptional
 
         // (M) Array of action types
-        std::vector<string> _actions;
+        std::vector<std::string> _actions;
         bool _isActionsSet;
 
         // (M) Object describing the resource pattern of this privilege

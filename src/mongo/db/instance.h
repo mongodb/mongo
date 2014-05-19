@@ -40,13 +40,13 @@
 
 namespace mongo {
 
-    extern string dbExecCommand;
+    extern std::string dbExecCommand;
 
     /** a high level recording of operations to the database - sometimes used for diagnostics 
         and debugging.
         */
     class DiagLog {
-        ofstream *f; // note this is never freed
+        std::ofstream *f; // note this is never freed
         /* 0 = off; 1 = writes, 2 = reads, 3 = both
            7 = log a few reads, and all writes.
         */
@@ -73,7 +73,7 @@ namespace mongo {
                            DbResponse& dbresponse,
                            const HostAndPort &client );
 
-    void getDatabaseNames(vector<std::string> &names,
+    void getDatabaseNames(std::vector<std::string> &names,
                           const std::string& usePath = storageGlobalParams.dbpath);
 
     /* returns true if there is no data on this server.  useful when starting replication.
@@ -91,7 +91,7 @@ namespace mongo {
 
         using DBClientBase::query;
 
-        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual std::auto_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0, int batchSize = 0);
 
         virtual bool isFailed() const {
@@ -102,14 +102,14 @@ namespace mongo {
             return true;
         }
 
-        virtual string toString() const {
+        virtual std::string toString() const {
             return "DBDirectClient";
         }
-        virtual string getServerAddress() const {
+        virtual std::string getServerAddress() const {
             return "localhost"; // TODO: should this have the port?
         }
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
-        virtual void say( Message &toSend, bool isRetry = false , string * actualServer = 0 );
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , std::string * actualServer = 0 );
+        virtual void say( Message &toSend, bool isRetry = false , std::string * actualServer = 0 );
         virtual void sayPiggyBack( Message &toSend ) {
             // don't need to piggy back when connected locally
             return say( toSend );
@@ -121,7 +121,7 @@ namespace mongo {
             return call( toSend , response );
         }
         
-        virtual unsigned long long count(const string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
+        virtual unsigned long long count(const std::string &ns, const BSONObj& query = BSONObj(), int options=0, int limit=0, int skip=0 );
         
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
 

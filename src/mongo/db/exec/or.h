@@ -68,7 +68,7 @@ namespace mongo {
         const MatchExpression* _filter;
 
         // Owned by us.
-        vector<PlanStage*> _children;
+        std::vector<PlanStage*> _children;
 
         // Which of _children are we calling work(...) on now?
         size_t _currentChild;

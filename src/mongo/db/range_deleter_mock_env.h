@@ -45,7 +45,7 @@ namespace mongo {
     };
 
     /**
-     * Comparator function object compatible with std::set.
+     * Comparator function object compatible with set.
      */
     struct DeletedRangeCmp {
         bool operator()(const DeletedRange& lhs, const DeletedRange& rhs) const;
@@ -132,14 +132,14 @@ namespace mongo {
                          const BSONObj& max,
                          const BSONObj& shardKeyPattern,
                          bool secondaryThrottle,
-                         string* errMsg);
+                         std::string* errMsg);
 
         /**
          * Basic implementation of gathering open cursors that matches the signature for
          * RangeDeleterEnv::getCursorIds. The cursors returned can be modified with
          * the setCursorId and clearCursorMap methods.
          */
-        void getCursorIds(const StringData& ns, set<CursorId>* in);
+        void getCursorIds(const StringData& ns, std::set<CursorId>* in);
 
     private:
         // mutex acquisition ordering:

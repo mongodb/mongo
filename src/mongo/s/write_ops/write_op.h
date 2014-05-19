@@ -217,7 +217,7 @@ namespace mongo {
     };
 
     // First value is write item index in the batch, second value is child write op index
-    typedef pair<int, int> WriteOpRef;
+    typedef std::pair<int, int> WriteOpRef;
 
     /**
      * A write with A) a request targeted at a particular shard endpoint, and B) a response targeted

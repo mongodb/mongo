@@ -53,7 +53,7 @@ namespace mongo {
          * Caller owns pointers in 'why'.
          * 'candidateOrder' holds indices into candidates ordered by score (winner in first element).
          */
-        static size_t pickBestPlan(const vector<CandidatePlan>& candidates,
+        static size_t pickBestPlan(const std::vector<CandidatePlan>& candidates,
                                    PlanRankingDecision* why);
 
         /**

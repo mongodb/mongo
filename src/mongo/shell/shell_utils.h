@@ -57,11 +57,11 @@ namespace mongo {
         /** Prompt for confirmation from cin. */
         class Prompter {
         public:
-            Prompter( const string &prompt );
+            Prompter( const std::string &prompt );
             /** @return prompted confirmation or cached confirmation. */
             bool confirm();
         private:
-            const string _prompt;
+            const std::string _prompt;
             bool _confirmed;
         };
 
@@ -72,7 +72,7 @@ namespace mongo {
             void registerConnection( DBClientWithCommands &client );
             void killOperationsOnAllConnections( bool withPrompt ) const;
         private:
-            map<string,set<string> > _connectionUris;
+            std::map<std::string,std::set<std::string> > _connectionUris;
             mutable mongo::mutex _mutex;
         };
         

@@ -50,7 +50,7 @@ namespace mongo {
      *
      *     // Process the response.
      *     ShardType exampleType;
-     *     string errMsg;
+     *     std::string errMsg;
      *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
      *         // Can't use 'exampleType'. Take action.
      *     }
@@ -110,7 +110,7 @@ namespace mongo {
         void cloneTo(ShardType* other) const;
 
         /**
-         * Returns a string representation of the current internal state.
+         * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 
@@ -218,7 +218,7 @@ namespace mongo {
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
         std::string _name;     // (M)  shard's id
         bool _isNameSet;
-        std::string _host;     // (M)  connection string for the host(s)
+        std::string _host;     // (M)  connection std::string for the host(s)
         bool _isHostSet;
         bool _draining;     // (O)  is it draining chunks?
         bool _isDrainingSet;

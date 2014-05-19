@@ -45,10 +45,10 @@
 namespace mongo {
 
     /* @return a dump of the buffer as hex byte ascii output */
-    string hexdump(const char *data, unsigned len);
+    std::string hexdump(const char *data, unsigned len);
 
     template<class T>
-    inline string ToString(const T& t) {
+    inline std::string ToString(const T& t) {
         std::stringstream s;
         s << t;
         return s.str();
@@ -154,8 +154,8 @@ namespace mongo {
             delete[] _buf;
         }
 
-        string toString() const {
-            string s = _buf;
+        std::string toString() const {
+            std::string s = _buf;
             return s;
         }
 
@@ -196,7 +196,7 @@ namespace mongo {
         template<typename U> ptr(const ptr<U>& p) : _p(p) {}
         template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
         template<typename U> ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
-        //template<typename U> ptr(const auto_ptr<U>& p) : _p(p.get()) {}
+        //template<typename U> ptr(const std::auto_ptr<U>& p) : _p(p.get()) {}
 
         // assign to ptr<T>
         ptr& operator= (T* p) { _p = p; return *this; } // needed for NULL
@@ -204,7 +204,7 @@ namespace mongo {
         template<typename U> ptr& operator= (const ptr<U>& p) { _p = p; return *this; }
         template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) { _p = p.get(); return *this; }
         template<typename U> ptr& operator= (const boost::scoped_ptr<U>& p) { _p = p.get(); return *this; }
-        //template<typename U> ptr& operator= (const auto_ptr<U>& p) { _p = p.get(); return *this; }
+        //template<typename U> ptr& operator= (const std::auto_ptr<U>& p) { _p = p.get(); return *this; }
 
         // use
         T* operator->() const { return _p; }

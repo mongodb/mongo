@@ -57,15 +57,15 @@ namespace mongo {
         /** copy the entire database */
         bool go(OperationContext* txn,
                 Client::Context& ctx,
-                const string& masterHost,
+                const std::string& masterHost,
                 const CloneOptions& opts,
-                set<string>* clonedColls,
-                string& errmsg, int *errCode = 0);
+                std::set<std::string>* clonedColls,
+                std::string& errmsg, int *errCode = 0);
 
         bool copyCollection(OperationContext* txn,
-                            const string& ns,
+                            const std::string& ns,
                             const BSONObj& query,
-                            string& errmsg,
+                            std::string& errmsg,
                             bool mayYield,
                             bool mayBeInterrupted,
                             bool copyIndexes = true,
@@ -76,8 +76,8 @@ namespace mongo {
          * @param errCode out  Error code encountered during the query
          * @param errmsg out  Error message encountered during the query
          */
-        static bool validateQueryResults(const auto_ptr<DBClientCursor>& cur, int32_t* errCode,
-                                         string& errmsg);
+        static bool validateQueryResults(const std::auto_ptr<DBClientCursor>& cur, int32_t* errCode,
+                                         std::string& errmsg);
 
         /**
          * @param errmsg out  - Error message (if encountered).
@@ -87,17 +87,17 @@ namespace mongo {
          */
         static bool cloneFrom(OperationContext* txn,
                               Client::Context& context,
-                              const string& masterHost,
+                              const std::string& masterHost,
                               const CloneOptions& options,
-                              string& errmsg,
+                              std::string& errmsg,
                               int* errCode = 0,
-                              set<string>* clonedCollections = 0);
+                              std::set<std::string>* clonedCollections = 0);
 
         /**
          * Copy a collection (and indexes) from a remote host
          */
         static bool copyCollectionFromRemote(OperationContext* txn,
-                                             const string& host, const string& ns, string& errmsg);
+                                             const std::string& host, const std::string& ns, std::string& errmsg);
 
     private:
         void copy(OperationContext* txn,
@@ -113,7 +113,7 @@ namespace mongo {
                   Query q);
 
         struct Fun;
-        auto_ptr<DBClientBase> _conn;
+        std::auto_ptr<DBClientBase> _conn;
     };
 
     struct CloneOptions {
@@ -130,8 +130,8 @@ namespace mongo {
             syncIndexes = true;
         }
 
-        string fromDB;
-        set<string> collsToIgnore;
+        std::string fromDB;
+        std::set<std::string> collsToIgnore;
 
         bool logForRepl;
         bool slaveOk;

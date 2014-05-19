@@ -49,8 +49,8 @@ namespace mongo {
         extern const double MAX_WORD_WEIGHT;
         extern const double DEFAULT_WEIGHT;
 
-        typedef std::map<string,double> Weights; // TODO cool map
-        typedef unordered_map<string,double> TermFrequencyMap;
+        typedef std::map<std::string,double> Weights; // TODO cool map
+        typedef unordered_map<std::string,double> TermFrequencyMap;
 
         struct ScoreHelperStruct {
             ScoreHelperStruct()
@@ -60,7 +60,7 @@ namespace mongo {
             double count;
             double exp;
         };
-        typedef unordered_map<string,ScoreHelperStruct> ScoreHelperMap;
+        typedef unordered_map<std::string,ScoreHelperStruct> ScoreHelperMap;
 
         class FTSSpec {
 
@@ -82,7 +82,7 @@ namespace mongo {
 
             bool wildcard() const { return _wildcard; }
             const FTSLanguage& defaultLanguage() const { return *_defaultLanguage; }
-            const string& languageOverrideField() const { return _languageOverrideField; }
+            const std::string& languageOverrideField() const { return _languageOverrideField; }
 
             size_t numExtraBefore() const { return _extraBefore.size(); }
             const std::string& extraBefore( unsigned i ) const { return _extraBefore[i]; }
@@ -161,17 +161,17 @@ namespace mongo {
             TextIndexVersion _textIndexVersion;
 
             const FTSLanguage* _defaultLanguage;
-            string _languageOverrideField;
+            std::string _languageOverrideField;
             bool _wildcard;
 
             // mapping : fieldname -> weight
             Weights _weights;
 
             // Prefix compound key - used to partition search index
-            std::vector<string> _extraBefore;
+            std::vector<std::string> _extraBefore;
 
             // Suffix compound key - used for covering index behavior
-            std::vector<string> _extraAfter;
+            std::vector<std::string> _extraAfter;
         };
 
     }

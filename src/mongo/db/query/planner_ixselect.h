@@ -46,15 +46,15 @@ namespace mongo {
          * The 'prefix' argument is a path prefix to be prepended to any fields mentioned in
          * predicates encountered.  Some array operators specify a path prefix.
          */
-        static void getFields(MatchExpression* node, string prefix, unordered_set<string>* out);
+        static void getFields(MatchExpression* node, std::string prefix, unordered_set<std::string>* out);
 
         /**
          * Find all indices prefixed by fields we have predicates over.  Only these indices are
          * useful in answering the query.
          */
-        static void findRelevantIndices(const unordered_set<string>& fields,
-                                        const vector<IndexEntry>& indices,
-                                        vector<IndexEntry>* out);
+        static void findRelevantIndices(const unordered_set<std::string>& fields,
+                                        const std::vector<IndexEntry>& indices,
+                                        std::vector<IndexEntry>* out);
 
         /**
          * Return true if the index key pattern field 'elt' (which belongs to 'index') can be used
@@ -84,8 +84,8 @@ namespace mongo {
          * original predicate by having an AND as a parent.
          */
         static void rateIndices(MatchExpression* node,
-                                string prefix,
-                                const vector<IndexEntry>& indices);
+                                std::string prefix,
+                                const std::vector<IndexEntry>& indices);
 
         /**
          * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
@@ -94,7 +94,7 @@ namespace mongo {
          * See the body of this function and the specific stripInvalidAssignments functions for details.
          */
         static void stripInvalidAssignments(MatchExpression* node,
-                                            const vector<IndexEntry>& indices);
+                                            const std::vector<IndexEntry>& indices);
 
     private:
         /**
@@ -129,7 +129,7 @@ namespace mongo {
          * those annotations get removed here.
          */
         static void stripInvalidAssignmentsToTextIndexes(MatchExpression* node,
-                                                         const vector<IndexEntry>& indices);
+                                                         const std::vector<IndexEntry>& indices);
 
         /**
          * For V1 2dsphere indices we ignore the sparse option.  As such we can use an index
@@ -149,7 +149,7 @@ namespace mongo {
          * predicate on every geo field in the index.
          */
         static void stripInvalidAssignmentsTo2dsphereIndices(MatchExpression* node,
-                                                             const vector<IndexEntry>& indices);
+                                                             const std::vector<IndexEntry>& indices);
     };
 
 }  // namespace mongo

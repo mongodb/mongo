@@ -48,7 +48,7 @@ namespace mongo {
         GeoHash();
         // The strings are binary values of length <= 64,
         // examples: 1001010100101, 1
-        explicit GeoHash(const string& hash);
+        explicit GeoHash(const std::string& hash);
         explicit GeoHash(const char *s);
         // bits is how many bits are used to hash each of x and y.
         GeoHash(unsigned x, unsigned y, unsigned bits = 32);
@@ -70,8 +70,8 @@ namespace mongo {
 
         bool hasPrefix(const GeoHash& other) const;
 
-        string toString() const;
-        string toStringHex1() const;
+        std::string toString() const;
+        std::string toStringHex1() const;
 
         void setBit(unsigned pos, bool value);
         bool getBit(unsigned pos) const;
@@ -117,7 +117,7 @@ namespace mongo {
         // XXX not sure why this is done exactly.  Why does binary
         // data need to be reversed?  byte ordering of some sort?
         static void _copyAndReverse(char *dst, const char *src);
-        // Create a hash from the provided string.  Used by the string and char* cons.
+        // Create a hash from the provided string.  Used by the std::string and char* cons.
         void initFromString(const char *s);
         /* Keep the upper _bits*2 bits of _hash, clear the lower bits.
          * Maybe there's junk in there?  XXX Not sure why this is done.

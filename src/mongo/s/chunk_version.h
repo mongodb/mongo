@@ -138,8 +138,8 @@ namespace mongo {
             return _epoch.isSet();
         }
 
-        string toString() const {
-            stringstream ss;
+        std::string toString() const {
+            std::stringstream ss;
             // Similar to month/day/year.  For the most part when debugging, we care about major
             // so it's first
             ss << _major << "|" << _minor << "||" << _epoch;
@@ -237,19 +237,19 @@ namespace mongo {
         // { version : <TS> } and { version : [<TS>,<OID>] } format
         //
 
-        static bool canParseBSON( const BSONElement& el, const string& prefix="" ){
+        static bool canParseBSON( const BSONElement& el, const std::string& prefix="" ){
             bool canParse;
             fromBSON( el, prefix, &canParse );
             return canParse;
         }
 
-        static ChunkVersion fromBSON( const BSONElement& el, const string& prefix="" ){
+        static ChunkVersion fromBSON( const BSONElement& el, const std::string& prefix="" ){
             bool canParse;
             return fromBSON( el, prefix, &canParse );
         }
 
         static ChunkVersion fromBSON( const BSONElement& el,
-                                      const string& prefix,
+                                      const std::string& prefix,
                                       bool* canParse )
         {
             *canParse = true;
@@ -281,33 +281,33 @@ namespace mongo {
         // { version : <TS>, versionEpoch : <OID> } object format
         //
 
-        static bool canParseBSON( const BSONObj& obj, const string& prefix="" ){
+        static bool canParseBSON( const BSONObj& obj, const std::string& prefix="" ){
             bool canParse;
             fromBSON( obj, prefix, &canParse );
             return canParse;
         }
 
-        static ChunkVersion fromBSON( const BSONObj& obj, const string& prefix="" ){
+        static ChunkVersion fromBSON( const BSONObj& obj, const std::string& prefix="" ){
             bool canParse;
             return fromBSON( obj, prefix, &canParse );
         }
 
         static ChunkVersion fromBSON( const BSONObj& obj,
-                                      const string& prefixIn,
+                                      const std::string& prefixIn,
                                       bool* canParse )
         {
             *canParse = true;
 
-            string prefix = prefixIn;
+            std::string prefix = prefixIn;
             // "version" doesn't have a "cluster constanst" because that field is never
             // written to the config.
             if( prefixIn == "" && ! obj[ "version" ].eoo() ){
-                prefix = (string)"version";
+                prefix = (std::string)"version";
             }
             // TODO: use ChunkType::DEPRECATED_lastmod()
             // NOTE: type_chunk.h includes this file
             else if( prefixIn == "" && ! obj["lastmod"].eoo() ){
-                prefix = (string)"lastmod";
+                prefix = (std::string)"lastmod";
             }
 
             ChunkVersion version = fromBSON( obj[ prefix ], prefixIn, canParse );
@@ -413,10 +413,10 @@ namespace mongo {
         // versions that know nothing about epochs.
         //
 
-        BSONObj toBSONWithPrefix( const string& prefixIn ) const {
+        BSONObj toBSONWithPrefix( const std::string& prefixIn ) const {
             BSONObjBuilder b;
 
-            string prefix = prefixIn;
+            std::string prefix = prefixIn;
             if( prefix == "" ) prefix = "version";
 
             b.appendTimestamp( prefix, _combined );
@@ -424,11 +424,11 @@ namespace mongo {
             return b.obj();
         }
 
-        void addToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
+        void addToBSON( BSONObjBuilder& b, const std::string& prefix="" ) const {
             b.appendElements( toBSONWithPrefix( prefix ) );
         }
 
-        void addEpochToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
+        void addEpochToBSON( BSONObjBuilder& b, const std::string& prefix="" ) const {
             b.append( prefix + "Epoch", _epoch );
         }
 
@@ -482,7 +482,7 @@ namespace mongo {
 
     };
 
-    inline ostream& operator<<( ostream &s , const ChunkVersion& v) {
+    inline std::ostream& operator<<( std::ostream &s , const ChunkVersion& v) {
         s << v.toString();
         return s;
     }

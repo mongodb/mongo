@@ -54,7 +54,7 @@ namespace mongo {
         Point(double x, double y);
         explicit Point(const BSONElement& e);
         explicit Point(const BSONObj& o);
-        string toString() const;
+        std::string toString() const;
 
         double x;
         double y;
@@ -75,7 +75,7 @@ namespace mongo {
         Box(Point min, Point max);
 
         BSONArray toBSON() const;
-        string toString() const;
+        std::string toString() const;
 
         bool between(double min, double max, double val, double fudge = 0) const;
         bool onBoundary(double bound, double val, double fudge = 0) const;
@@ -98,7 +98,7 @@ namespace mongo {
     class Polygon {
     public:
         Polygon();
-        Polygon(vector<Point> points);
+        Polygon(std::vector<Point> points);
 
         void add(Point p);
         int size() const;
@@ -123,7 +123,7 @@ namespace mongo {
         Point _centroid;
         Box _bounds;
         bool _boundsCalculated;
-        vector<Point> _points;
+        std::vector<Point> _points;
     };
 
     // Clearly this isn't right but currently it's sufficient.
@@ -166,8 +166,8 @@ namespace mongo {
     };
 
     struct MultiPointWithCRS {
-        vector<S2Point> points;
-        vector<S2Cell> cells;
+        std::vector<S2Point> points;
+        std::vector<S2Cell> cells;
         CRS crs;
     };
 
@@ -182,7 +182,7 @@ namespace mongo {
     };
 
     struct GeometryCollection {
-        vector<PointWithCRS> points;
+        std::vector<PointWithCRS> points;
 
         // The amount of indirection here is painful but we can't operator= scoped_ptr or
         // OwnedPointerVector.

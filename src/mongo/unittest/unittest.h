@@ -265,7 +265,7 @@ namespace mongo {
          */
         class Suite : private boost::noncopyable {
         public:
-            Suite( const string& name );
+            Suite( const std::string& name );
             virtual ~Suite();
 
             template<class T>
@@ -293,7 +293,7 @@ namespace mongo {
              * The implementation of this function must be safe to call during the global static
              * initialization block before main() executes.
              */
-            static Suite *getSuite(const string& name);
+            static Suite *getSuite(const std::string& name);
 
         protected:
             virtual void setupTests();
@@ -367,7 +367,7 @@ namespace mongo {
 
         public:
             /**
-             * file string must stay in scope and remain unchanged for the lifetime
+             * file std::string must stay in scope and remain unchanged for the lifetime
              * of the TestAssertion object.
              */
             TestAssertion( const char* file, unsigned line );

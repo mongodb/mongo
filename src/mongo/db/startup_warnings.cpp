@@ -26,6 +26,8 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/startup_warnings.h"
 
 #include <boost/filesystem/operations.hpp>

@@ -51,8 +51,8 @@ namespace mongo {
 
         virtual LeafMatchExpression* shallowClone() const;
 
-        const string& getQuery() const { return _query; }
-        const string& getLanguage() const { return _language; }
+        const std::string& getQuery() const { return _query; }
+        const std::string& getLanguage() const { return _language; }
     private:
         std::string _query;
         std::string _language;

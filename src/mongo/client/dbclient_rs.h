@@ -58,7 +58,7 @@ namespace mongo {
         using DBClientBase::remove;
 
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
-        DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
+        DBClientReplicaSet( const std::string& name , const std::vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();
 
         /**
@@ -75,26 +75,26 @@ namespace mongo {
          * @param info the result object for the logout command (provided for backwards
          *     compatibility with mongo shell)
          */
-        virtual void logout(const string& dbname, BSONObj& info);
+        virtual void logout(const std::string& dbname, BSONObj& info);
 
         // ----------- simple functions --------------
 
         /** throws userassertion "no master found" */
-        virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual std::auto_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
 
         /** throws userassertion "no master found" */
-        virtual BSONObj findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual BSONObj findOne(const std::string &ns, const Query& query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
 
-        virtual void insert( const string &ns , BSONObj obj , int flags=0);
+        virtual void insert( const std::string &ns , BSONObj obj , int flags=0);
 
         /** insert multiple objects.  Note that single object insert is asynchronous, so this version
             is only nominally faster and not worth a special effort to try to use.  */
-        virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
+        virtual void insert( const std::string &ns, const std::vector< BSONObj >& v , int flags=0);
 
-        virtual void remove( const string &ns , Query obj , int flags );
+        virtual void remove( const std::string &ns , Query obj , int flags );
 
-        virtual void update( const string &ns , Query query , BSONObj obj , int flags );
+        virtual void update( const std::string &ns , Query query , BSONObj obj , int flags );
 
         virtual void killCursor( long long cursorID );
 
@@ -119,9 +119,9 @@ namespace mongo {
 
         // ---- callback pieces -------
 
-        virtual void say( Message &toSend, bool isRetry = false , string* actualServer = 0);
+        virtual void say( Message &toSend, bool isRetry = false , std::string* actualServer = 0);
         virtual bool recv( Message &toRecv );
-        virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL );
+        virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, std::string* targetHost = NULL );
 
         /* this is the callback from our underlying connections to notify us that we got a "not master" error.
          */
@@ -140,16 +140,16 @@ namespace mongo {
 
         double getSoTimeout() const { return _so_timeout; }
 
-        string toString() const { return getServerAddress(); }
+        std::string toString() const { return getServerAddress(); }
 
-        string getServerAddress() const;
+        std::string getServerAddress() const;
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }
         virtual bool lazySupported() const { return true; }
 
         // ---- low level ------
 
-        virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
+        virtual bool call( Message &toSend, Message &response, bool assertOk=true , std::string * actualServer = 0 );
         virtual bool callRead( Message& toSend , Message& response ) { return checkMaster()->callRead( toSend , response ); }
 
         /**
@@ -162,7 +162,7 @@ namespace mongo {
          *
          * @return true if the query/cmd could potentially be sent to a secondary, false otherwise
          */
-        static bool isSecondaryQuery( const string& ns,
+        static bool isSecondaryQuery( const std::string& ns,
                                       const BSONObj& queryObj,
                                       int queryOptions );
 
@@ -184,7 +184,7 @@ namespace mongo {
          * @throws DBException if the directed node cannot accept the query because it
          *     is not a master
          */
-        auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
+        std::auto_ptr<DBClientCursor> checkSlaveQueryResult( std::auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
 
@@ -224,7 +224,7 @@ namespace mongo {
         // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
         ReplicaSetMonitorPtr _getMonitor() const;
 
-        string _setName;
+        std::string _setName;
 
         HostAndPort _masterHost;
         // Note: reason why this is a shared_ptr is because we want _lastSlaveOkConn to
@@ -247,7 +247,7 @@ namespace mongo {
         // we can re-auth
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
-        std::map<string, BSONObj> _auths; // dbName -> auth parameters
+        std::map<std::string, BSONObj> _auths; // dbName -> auth parameters
 
     protected:
 

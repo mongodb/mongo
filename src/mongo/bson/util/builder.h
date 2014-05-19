@@ -203,7 +203,7 @@ namespace mongo {
             str.copyTo( grow(len), includeEndingNull );
         }
 
-        /** @return length of current string */
+        /** @return length of current std::string */
         int len() const { return l; }
         void setlen( int newLen ) { l = newLen; }
         /** @return size of the buffer */
@@ -264,7 +264,7 @@ namespace mongo {
 #define snprintf _snprintf
 #endif
 
-    /** stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
+    /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
     template <typename Allocator>
     class StringBuilderImpl {
     public:
@@ -332,7 +332,7 @@ namespace mongo {
 
         std::string str() const { return std::string(_buf.data, _buf.l); }
 
-        /** size of current string */
+        /** size of current std::string */
         int len() const { return _buf.l; }
 
     private:

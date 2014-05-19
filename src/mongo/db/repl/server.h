@@ -62,12 +62,12 @@ namespace mongo {
 
         private:
             virtual bool initClient() { return true; }
-            virtual string name() const { return _name; }
+            virtual std::string name() const { return _name; }
             void doWork();
             std::deque<lam> d;
             mongo::mutex m;
             boost::condition c;
-            string _name;
+            std::string _name;
             bool rq;
         };
 

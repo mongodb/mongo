@@ -40,7 +40,7 @@ namespace mongo {
     bool isAllDigits( const StringData& str );
 
     // XXX document me
-    // Replaces getFieldDottedOrArray without recursion nor string manipulation
+    // Replaces getFieldDottedOrArray without recursion nor std::string manipulation
     BSONElement getFieldDottedOrArray( const BSONObj& doc,
                                        const FieldRef& path,
                                        size_t* idxPath );

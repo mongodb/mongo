@@ -64,7 +64,7 @@ namespace mongo {
         DBClientBase *createConnection() const;
 
         /**
-         * Connection string describing the host to which to connect.
+         * Connection std::string describing the host to which to connect.
          */
         std::string host;
 
@@ -418,12 +418,12 @@ namespace mongo {
     private:
         // TODO: Same as for createWithConfig.
         static boost::mutex _staticMutex;
-        static map< OID, BenchRunner* > _activeRuns;
+        static std::map< OID, BenchRunner* > _activeRuns;
 
         OID _oid;
         BenchRunState _brState;
         boost::scoped_ptr<BenchRunConfig> _config;
-        vector<BenchRunWorker *> _workers;
+        std::vector<BenchRunWorker *> _workers;
 
         BSONObj before;
         BSONObj after;

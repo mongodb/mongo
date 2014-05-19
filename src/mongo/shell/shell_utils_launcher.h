@@ -92,7 +92,7 @@ namespace mongo {
             /** Register an unregistered pid. */
             void registerPid( ProcessId pid, int output );
             void deletePid( ProcessId pid );
-            void getRegisteredPids( vector<ProcessId> &pids );
+            void getRegisteredPids( std::vector<ProcessId> &pids );
 
         private:
             std::map<int,std::pair<ProcessId,int> > _ports;
@@ -118,7 +118,7 @@ namespace mongo {
             int port() const { return _port; }
 
         private:
-            boost::filesystem::path findProgram( const string &prog );
+            boost::filesystem::path findProgram( const std::string &prog );
             void launchProcess( int child_stdout );
             
             std::vector<std::string> _argv;

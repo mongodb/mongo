@@ -40,14 +40,14 @@ namespace mongo {
      */
     class BtreeKeyGenerator {
     public:
-        BtreeKeyGenerator(vector<const char*> fieldNames, vector<BSONElement> fixed, bool isSparse);
+        BtreeKeyGenerator(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed, bool isSparse);
         virtual ~BtreeKeyGenerator() { }
 
         Status getKeys(const BSONObj &obj, BSONObjSet *keys) const;
 
     protected:
         // These are used by the getKeysImpl(s) below.
-        vector<const char*> _fieldNames;
+        std::vector<const char*> _fieldNames;
         bool _isSparse;
         BSONObj _nullKey; // a full key with all fields null
         BSONObj _nullObj;     // only used for _nullElt
@@ -55,25 +55,25 @@ namespace mongo {
         BSONSizeTracker _sizeTracker;
     private:
         // We have V0 and V1.  Sigh.
-        virtual Status getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        virtual Status getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                                    const BSONObj &obj, BSONObjSet *keys) const = 0;
-        vector<BSONElement> _fixed;
+        std::vector<BSONElement> _fixed;
     };
 
     class BtreeKeyGeneratorV0 : public BtreeKeyGenerator {
     public:
-        BtreeKeyGeneratorV0(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        BtreeKeyGeneratorV0(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                             bool isSparse);
         virtual ~BtreeKeyGeneratorV0() { }
         
     private:
-        virtual Status getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        virtual Status getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                                    const BSONObj &obj, BSONObjSet *keys) const;
     };
 
     class BtreeKeyGeneratorV1 : public BtreeKeyGenerator {
     public:
-        BtreeKeyGeneratorV1(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        BtreeKeyGeneratorV1(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                             bool isSparse);
         virtual ~BtreeKeyGeneratorV1() { }
 
@@ -122,7 +122,7 @@ namespace mongo {
          * Returns the set of index keys generated from 'obj' according to the key pattern
          * in 'fieldNames' through the out-parameter 'keys'.
          */
-        virtual Status getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        virtual Status getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                                    const BSONObj &obj, BSONObjSet *keys) const;
 
         /**
@@ -131,7 +131,7 @@ namespace mongo {
          */
         Status getKeysForElement(const BSONElement& el,
                                  KeygenContext context,
-                                 vector<BSONElement>* out) const;
+                                 std::vector<BSONElement>* out) const;
 
         /**
          * getKeysForElement(...) delegates to this function if 'el' is an indexed array. Special
@@ -139,7 +139,7 @@ namespace mongo {
          */
         Status getKeysForArrayElement(const BSONElement& el,
                                       KeygenContext context,
-                                      vector<BSONElement>* out) const;
+                                      std::vector<BSONElement>* out) const;
 
         /**
          * A helper for getKeysForArrayElement(...) which handles key patterns that have a
@@ -152,7 +152,7 @@ namespace mongo {
         Status handlePositionalKeypattern(const BSONElement& el,
                                           KeygenContext context,
                                           bool* isPositional,
-                                          vector<BSONElement>* out) const;
+                                          std::vector<BSONElement>* out) const;
 
         /**
          * getKeysForElement(...) delegates to this function if 'el' is neither an indexed
@@ -160,7 +160,7 @@ namespace mongo {
          */
         Status getKeysForSimpleElement(const BSONElement& el,
                                        KeygenContext context,
-                                       vector<BSONElement>* out) const;
+                                       std::vector<BSONElement>* out) const;
 
         /**
          * Outputs the final btree keys in 'keys', constructing them using the extracted
@@ -216,7 +216,7 @@ namespace mongo {
         //    [ [ "a", "b", "c" ],
         //      [ "foo" ],
         //      [ "bar", "0", "a" ] ]
-        typedef vector< vector<string> > KeyPattern;
+        typedef std::vector< std::vector<string> > KeyPattern;
         KeyPattern _keyPattern;
 
         // The BSONObj {"": undefined}.

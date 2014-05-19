@@ -52,7 +52,7 @@ namespace mongo {
         /** Creates an empty interval */
         Interval();
 
-        string toString() const {
+        std::string toString() const {
             mongoutils::str::stream ss;
             if (startInclusive) {
                 ss << "[";
@@ -165,7 +165,7 @@ namespace mongo {
         /**
          * toString for IntervalComparison
          */
-        static string cmpstr(IntervalComparison c);
+        static std::string cmpstr(IntervalComparison c);
 
         //
         // Mutation of intervals

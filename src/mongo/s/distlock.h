@@ -54,9 +54,9 @@ namespace mongo {
      */
     class MONGO_CLIENT_API LockException : public DBException {
     public:
-    	LockException( const char * msg , int code ) : DBException( msg, code ) {}
-    	LockException( const string& msg, int code ) : DBException( msg, code ) {}
-    	virtual ~LockException() throw() { }
+        LockException( const char * msg , int code ) : DBException( msg, code ) {}
+        LockException( const std::string& msg, int code ) : DBException( msg, code ) {}
+        virtual ~LockException() throw() { }
     };
 
     /**
@@ -65,7 +65,7 @@ namespace mongo {
     class MONGO_CLIENT_API TimeNotFoundException : public LockException {
     public:
         TimeNotFoundException( const char * msg , int code ) : LockException( msg, code ) {}
-        TimeNotFoundException( const string& msg, int code ) : LockException( msg, code ) {}
+        TimeNotFoundException( const std::string& msg, int code ) : LockException( msg, code ) {}
         virtual ~TimeNotFoundException() throw() { }
     };
 
@@ -104,7 +104,7 @@ namespace mongo {
 
         struct PingData {
 
-            PingData( const string& _id , Date_t _lastPing , Date_t _remote , OID _ts )
+            PingData( const std::string& _id , Date_t _lastPing , Date_t _remote , OID _ts )
                 : id(_id), lastPing(_lastPing), remote(_remote), ts(_ts){
             }
 
@@ -112,23 +112,23 @@ namespace mongo {
                 : id(""), lastPing(0), remote(0), ts(){
             }
 
-            string id;
+            std::string id;
             Date_t lastPing;
             Date_t remote;
             OID ts;
         };
 
-    	class LastPings {
-    	public:
-    	    LastPings() : _mutex( "DistributedLock::LastPings" ) {}
-    	    ~LastPings(){}
+        class LastPings {
+        public:
+            LastPings() : _mutex( "DistributedLock::LastPings" ) {}
+            ~LastPings(){}
 
-    	    PingData getLastPing( const ConnectionString& conn, const string& lockName );
-    	    void setLastPing( const ConnectionString& conn, const string& lockName, const PingData& pd );
+            PingData getLastPing( const ConnectionString& conn, const std::string& lockName );
+            void setLastPing( const ConnectionString& conn, const std::string& lockName, const PingData& pd );
 
-    	    mongo::mutex _mutex;
-    	    map< std::pair<string, string>, PingData > _lastPings;
-    	};
+            mongo::mutex _mutex;
+            std::map< std::pair<std::string, std::string>, PingData > _lastPings;
+        };
 
     	static LastPings lastPings;
 
@@ -143,7 +143,7 @@ namespace mongo {
          * @param legacy use legacy logic
          *
          */
-        DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout = 0, bool asProcess = false );
+        DistributedLock( const ConnectionString& conn , const std::string& name , unsigned long long lockTimeout = 0, bool asProcess = false );
         ~DistributedLock(){};
 
         /**
@@ -156,7 +156,7 @@ namespace mongo {
          * details if not
          * @return true if it managed to grab the lock
          */
-        bool lock_try( const string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
+        bool lock_try( const std::string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
 
         /**
          * Returns true if we currently believe we hold this lock and it was possible to
@@ -164,7 +164,7 @@ namespace mongo {
          * lock is not held or if we failed to contact the config servers within the timeout,
          * returns false.
          */
-        bool isLockHeld( double timeout, string* errMsg );
+        bool isLockHeld( double timeout, std::string* errMsg );
 
         /**
          * Releases a previously taken lock.
@@ -175,7 +175,7 @@ namespace mongo {
 
         bool isRemoteTimeSkewed();
 
-        const string& getProcessId();
+        const std::string& getProcessId();
 
         const ConnectionString& getRemoteConnection();
 
@@ -198,16 +198,16 @@ namespace mongo {
         /**
          * Namespace for lock pings
          */
-        static const string lockPingNS;
+        static const std::string lockPingNS;
 
         /**
          * Namespace for locks
          */
-        static const string locksNS;
+        static const std::string locksNS;
 
         const ConnectionString _conn;
-        const string _name;
-        const string _processId;
+        const std::string _name;
+        const std::string _processId;
 
         // Timeout for lock, usually LOCK_TIMEOUT
         const unsigned long long _lockTimeout;
@@ -223,7 +223,7 @@ namespace mongo {
 
         // May or may not exist, depending on startup
         mongo::mutex _mutex;
-        string _threadId;
+        std::string _threadId;
 
     };
 
@@ -284,7 +284,7 @@ namespace mongo {
          * Returns false if the lock is known _not_ to be held, otherwise asks the underlying
          * lock to issue a 'isLockHeld' call and returns whatever that calls does.
          */
-        bool isLockHeld( double timeout, string* errMsg) {
+        bool isLockHeld( double timeout, std::string* errMsg) {
             if ( !_lock ) {
                 *errMsg = "Lock is not currently set up";
                 return false;
@@ -306,7 +306,7 @@ namespace mongo {
         DistributedLock * _lock;
         bool _got;
         BSONObj _other;
-        string _why;
+        std::string _why;
     };
 
     /**
@@ -317,7 +317,7 @@ namespace mongo {
     class MONGO_CLIENT_API ScopedDistributedLock {
     public:
 
-        ScopedDistributedLock(const ConnectionString& conn, const string& name);
+        ScopedDistributedLock(const ConnectionString& conn, const std::string& name);
 
         virtual ~ScopedDistributedLock();
 
@@ -329,7 +329,7 @@ namespace mongo {
          *
          * @return if the lock was successfully acquired
          */
-        virtual bool tryAcquire(string* errMsg);
+        virtual bool tryAcquire(std::string* errMsg);
 
         /**
          * Tries to unlock the lock if acquired.  Cannot report an error or block indefinitely
@@ -348,7 +348,7 @@ namespace mongo {
          * waitForMillis = -1 indicates we should retry indefinitely.
          * @return true if the lock was acquired
          */
-        bool acquire(long long waitForMillis, string* errMsg);
+        bool acquire(long long waitForMillis, std::string* errMsg);
 
         bool isAcquired() const {
             return _acquired;
@@ -366,17 +366,17 @@ namespace mongo {
             return _lockTryIntervalMillis;
         }
 
-        void setLockMessage(const string& why) {
+        void setLockMessage(const std::string& why) {
             _why = why;
         }
 
-        string getLockMessage() const {
+        std::string getLockMessage() const {
             return _why;
         }
 
     private:
         DistributedLock _lock;
-        string _why;
+        std::string _why;
         long long _lockTryIntervalMillis;
 
         bool _acquired;

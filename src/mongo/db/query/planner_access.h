@@ -140,7 +140,7 @@ namespace mongo {
         static QuerySolutionNode* buildIndexedDataAccess(const CanonicalQuery& query,
                                                          MatchExpression* root,
                                                          bool inArrayOperator,
-                                                         const vector<IndexEntry>& indices);
+                                                         const std::vector<IndexEntry>& indices);
 
         /**
          * Takes ownership of 'root'.
@@ -148,7 +148,7 @@ namespace mongo {
         static QuerySolutionNode* buildIndexedAnd(const CanonicalQuery& query,
                                                   MatchExpression* root,
                                                   bool inArrayOperator,
-                                                  const vector<IndexEntry>& indices);
+                                                  const std::vector<IndexEntry>& indices);
 
         /**
          * Takes ownership of 'root'.
@@ -156,7 +156,7 @@ namespace mongo {
         static QuerySolutionNode* buildIndexedOr(const CanonicalQuery& query,
                                                  MatchExpression* root,
                                                  bool inArrayOperator,
-                                                 const vector<IndexEntry>& indices);
+                                                 const std::vector<IndexEntry>& indices);
 
         /**
          * Traverses the tree rooted at the $elemMatch expression 'node',
@@ -170,8 +170,8 @@ namespace mongo {
          * tagged to use an index.
          */
         static void findElemMatchChildren(const MatchExpression* node,
-                                          vector<MatchExpression*>* out,
-                                          vector<MatchExpression*>* subnodesOut);
+                                          std::vector<MatchExpression*>* out,
+                                          std::vector<MatchExpression*>* subnodesOut);
 
         /**
          * Helper used by buildIndexedAnd and buildIndexedOr.
@@ -189,8 +189,8 @@ namespace mongo {
         static bool processIndexScans(const CanonicalQuery& query,
                                       MatchExpression* root,
                                       bool inArrayOperator,
-                                      const vector<IndexEntry>& indices,
-                                      vector<QuerySolutionNode*>* out);
+                                      const std::vector<IndexEntry>& indices,
+                                      std::vector<QuerySolutionNode*>* out);
 
         //
         // Helpers for creating an index scan.

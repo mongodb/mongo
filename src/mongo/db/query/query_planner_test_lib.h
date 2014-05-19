@@ -53,7 +53,7 @@ namespace mongo {
          */
         static bool solutionMatches(const BSONObj& testSoln, const QuerySolutionNode* trueSoln);
 
-        static bool solutionMatches(const string& testSoln, const QuerySolutionNode* trueSoln) {
+        static bool solutionMatches(const std::string& testSoln, const QuerySolutionNode* trueSoln) {
             return solutionMatches(fromjson(testSoln), trueSoln);
         }
     };

@@ -47,12 +47,12 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out);
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual void help( stringstream& help ) const;
+        virtual void help( std::stringstream& help ) const;
         CmdShutdown() : Command("shutdown") {}
-        bool run(OperationContext* txn, const string& dbname,
+        bool run(OperationContext* txn, const std::string& dbname,
                  BSONObj& cmdObj,
                  int options,
-                 string& errmsg,
+                 std::string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl);
     private:

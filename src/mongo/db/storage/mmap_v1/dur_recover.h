@@ -52,13 +52,13 @@ namespace mongo {
                 DurableMappedFile* newEntry(const ParsedJournalEntry&, RecoveryJob&);
             private:
                 DurableMappedFile *mmf;
-                string dbName;
+                std::string dbName;
                 int fileNo;
             } last;        
         public:
             RecoveryJob() : _lastDataSyncedFromLastRun(0), 
                 _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
-            void go(vector<boost::filesystem::path>& files);
+            void go(std::vector<boost::filesystem::path>& files);
             ~RecoveryJob();
 
             /** @param data data between header and footer. compressed if recovering. */
@@ -70,13 +70,13 @@ namespace mongo {
         private:
             void write(Last& last, const ParsedJournalEntry& entry); // actually writes to the file
             void applyEntry(Last& last, const ParsedJournalEntry& entry, bool apply, bool dump);
-            void applyEntries(const vector<ParsedJournalEntry> &entries);
+            void applyEntries(const std::vector<ParsedJournalEntry> &entries);
             bool processFileBuffer(const void *, unsigned len);
             bool processFile(boost::filesystem::path journalfile);
             void _close(); // doesn't lock
             DurableMappedFile* getDurableMappedFile(const ParsedJournalEntry& entry);
 
-            list<boost::shared_ptr<DurableMappedFile> > _mmfs;
+            std::list<boost::shared_ptr<DurableMappedFile> > _mmfs;
 
             unsigned long long _lastDataSyncedFromLastRun;
             unsigned long long _lastSeqMentionedInConsoleLog;

@@ -85,7 +85,7 @@ namespace mongo {
         PlanCacheIndexTree() : entry(NULL), index_pos(0) { }
 
         ~PlanCacheIndexTree() {
-            for (vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
+            for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
                     it != children.end(); ++it) {
                 delete *it;
             }

@@ -126,8 +126,8 @@ namespace optionenvironment {
         Key _otherKey;
     };
 
-    /** Implementation of a Constraint that enforces a specific format on a string value.  Fails if
-     *  the value of the key is not a string or does not match the given regex.
+    /** Implementation of a Constraint that enforces a specific format on a std::string value.  Fails if
+     *  the value of the key is not a std::string or does not match the given regex.
      */
     class StringFormatKeyConstraint : public KeyConstraint {
     public:

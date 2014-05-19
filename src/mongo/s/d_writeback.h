@@ -58,7 +58,7 @@ namespace mongo {
 
         // a map from mongos's serverIDs to queues of "rejected" operations
         // an operation is rejected if it targets data that does not live on this shard anymore
-        typedef map<string,shared_ptr<QueueInfo> > WriteBackQueuesMap;
+        typedef std::map<std::string,shared_ptr<QueueInfo> > WriteBackQueuesMap;
 
 
     public:
@@ -74,7 +74,7 @@ namespace mongo {
          *
          * @return the writebackId generated
          */
-        OID queueWriteBack( const string& remote , BSONObjBuilder& opBuilder );
+        OID queueWriteBack( const std::string& remote , BSONObjBuilder& opBuilder );
 
         /*
          * @param remote server ID
@@ -82,7 +82,7 @@ namespace mongo {
          *
          * Gets access to server 'remote's queue, which is synchronized.
          */
-        shared_ptr<QueueInfo> getWritebackQueue( const string& remote );
+        shared_ptr<QueueInfo> getWritebackQueue( const std::string& remote );
 
         /*
          * @return true if there is no operation queued for write back
@@ -108,7 +108,7 @@ namespace mongo {
         
         class Cleaner : public PeriodicTask {
         public:
-            virtual string taskName() const { return "WriteBackManager::cleaner"; }
+            virtual std::string taskName() const { return "WriteBackManager::cleaner"; }
             virtual void taskDoWork();
         };
 

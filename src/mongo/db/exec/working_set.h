@@ -115,7 +115,7 @@ namespace mongo {
 
         // All WorkingSetIDs are indexes into this, except for INVALID_ID.
         // Elements are added to _freeList rather than removed when freed.
-        vector<MemberHolder> _data;
+        std::vector<MemberHolder> _data;
 
         // Index into _data, forming a linked-list using MemberHolder::nextFreeOrSelf as the next
         // link. INVALID_ID is the list terminator since 0 is a valid index.
@@ -221,7 +221,7 @@ namespace mongo {
 
         DiskLoc loc;
         BSONObj obj;
-        vector<IndexKeyDatum> keyData;
+        std::vector<IndexKeyDatum> keyData;
         MemberState state;
 
         bool hasLoc() const;
@@ -246,7 +246,7 @@ namespace mongo {
          *
          * Returns false otherwise.  Returning false indicates a query planning error.
          */
-        bool getFieldDotted(const string& field, BSONElement* out) const;
+        bool getFieldDotted(const std::string& field, BSONElement* out) const;
 
         /**
          * Returns expected memory usage of working set member.

@@ -69,92 +69,92 @@ namespace mongo {
         static FieldState extract( BSONObj doc,
                                    const BSONField<bool>& field,
                                    bool* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<bool>& field,
                                    bool* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
                                    const BSONField<BSONArray>& field,
                                    BSONArray* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<BSONArray>& field,
                                    BSONArray* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
                                    const BSONField<BSONObj>& field,
                                    BSONObj* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<BSONObj>& field,
                                    BSONObj* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
                                    const BSONField<Date_t>& field,
                                    Date_t* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<Date_t>& field,
                                    Date_t* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
                                    const BSONField<OpTime>& field,
                                    OpTime* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<OpTime>& field,
                                    OpTime* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
-                                   const BSONField<string>& field,
-                                   string* out,
-                                   string* errMsg = NULL );
+                                   const BSONField<std::string>& field,
+                                   std::string* out,
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
-                                   const BSONField<string>& field,
-                                   string* out,
-                                   string* errMsg = NULL );
+                                   const BSONField<std::string>& field,
+                                   std::string* out,
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
                                    const BSONField<OID>& field,
                                    OID* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<OID>& field,
                                    OID* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
                                    const BSONField<int>& field,
                                    int* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<int>& field,
                                    int* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONObj doc,
                                    const BSONField<long long>& field,
                                    long long* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         static FieldState extract( BSONElement elem,
                                    const BSONField<long long>& field,
                                    long long* out,
-                                   string* errMsg = NULL );
+                                   std::string* errMsg = NULL );
 
         /**
          * The following extractNumber methods do implicit conversion between any numeric type and
@@ -164,22 +164,22 @@ namespace mongo {
         static FieldState extractNumber( BSONObj doc,
                                          const BSONField<int>& field,
                                          int* out,
-                                         string* errMsg = NULL );
+                                         std::string* errMsg = NULL );
 
         static FieldState extractNumber( BSONElement elem,
                                          const BSONField<int>& field,
                                          int* out,
-                                         string* errMsg = NULL );
+                                         std::string* errMsg = NULL );
 
         static FieldState extractNumber( BSONObj doc,
                                          const BSONField<long long>& field,
                                          long long* out,
-                                         string* errMsg = NULL );
+                                         std::string* errMsg = NULL );
 
         static FieldState extractNumber( BSONElement elem,
                                          const BSONField<long long>& field,
                                          long long* out,
-                                         string* errMsg = NULL );
+                                         std::string* errMsg = NULL );
 
         /**
          * Extracts a document id from a particular field name, which may be of any type but Array.
@@ -188,12 +188,12 @@ namespace mongo {
         static FieldState extractID( BSONObj doc,
                                      const BSONField<BSONObj>& field,
                                      BSONObj* out,
-                                     string* errMsg = NULL );
+                                     std::string* errMsg = NULL );
 
         static FieldState extractID( BSONElement elem,
                                      const BSONField<BSONObj>& field,
                                      BSONObj* out,
-                                     string* errMsg = NULL );
+                                     std::string* errMsg = NULL );
 
         // TODO: BSONElement extraction of types below
 
@@ -209,13 +209,13 @@ namespace mongo {
         static FieldState extract(BSONObj doc,
                             const BSONField<T>& field,
                             T* out,
-                            string* errMsg = NULL);
+                            std::string* errMsg = NULL);
 
         template<typename T>
         static FieldState extract(BSONObj doc,
                             const BSONField<T*>& field,
                             T** out,
-                            string* errMsg = NULL);
+                            std::string* errMsg = NULL);
 
         /**
          * Similar to the mandatory 'extract' but on a optional field. '*out' would only be
@@ -228,7 +228,7 @@ namespace mongo {
         static FieldState extract(BSONObj doc,
                             const BSONField<T>& field,
                             T** out,  // alloc variation
-                            string* errMsg = NULL);
+                            std::string* errMsg = NULL);
 
         /**
          * Extracts a mandatory repetition of BSONSerializable structures, 'field', from the
@@ -242,9 +242,9 @@ namespace mongo {
          */
         template<typename T>
         static FieldState extract(BSONObj doc,
-                            const BSONField<vector<T*> >& field,
-                            vector<T*>* out,
-                            string* errMsg = NULL);
+                            const BSONField<std::vector<T*> >& field,
+                            std::vector<T*>* out,
+                            std::string* errMsg = NULL);
 
         /**
          * Similar to the mandatory repetition' extract but on an optional field. '*out' would
@@ -257,9 +257,9 @@ namespace mongo {
          */
         template<typename T>
         static FieldState extract(BSONObj doc,
-                            const BSONField<vector<T*> >& field,
-                            vector<T*>** out,
-                            string* errMsg = NULL);
+                            const BSONField<std::vector<T*> >& field,
+                            std::vector<T*>** out,
+                            std::string* errMsg = NULL);
 
         //
         // ==================== Below DEPRECATED; use types instead ====================
@@ -271,36 +271,36 @@ namespace mongo {
          *
          * It's possible to nest extraction of vectors and maps to any depth, i.e:
          *
-         * vector<map<string,vector<string> > > val;
+         * std::vector<map<std::string,vector<std::string> > > val;
          * FieldParser::extract(doc, field, val, &val);
          */
         template<typename T>
         static FieldState extract( BSONObj doc,
-                                   const BSONField<vector<T> >& field,
-                                   vector<T>* out,
-                                   string* errMsg = NULL );
+                                   const BSONField<std::vector<T> >& field,
+                                   std::vector<T>* out,
+                                   std::string* errMsg = NULL );
 
         template<typename T>
         static FieldState extract( BSONElement elem,
-                                   const BSONField<vector<T> >& field,
-                                   vector<T>* out,
-                                   string* errMsg = NULL );
+                                   const BSONField<std::vector<T> >& field,
+                                   std::vector<T>* out,
+                                   std::string* errMsg = NULL );
 
         template<typename K, typename T>
         static FieldState extract( BSONObj doc,
-                                   const BSONField<map<K, T> >& field,
-                                   map<K, T>* out,
-                                   string* errMsg = NULL );
+                                   const BSONField<std::map<K, T> >& field,
+                                   std::map<K, T>* out,
+                                   std::string* errMsg = NULL );
 
         template<typename K, typename T>
         static FieldState extract( BSONElement elem,
-                                   const BSONField<map<K, T> >& field,
-                                   map<K, T>* out,
-                                   string* errMsg = NULL );
+                                   const BSONField<std::map<K, T> >& field,
+                                   std::map<K, T>* out,
+                                   std::string* errMsg = NULL );
 
     private:
         template<typename T>
-        static void clearOwnedVector(vector<T*>* vec);
+        static void clearOwnedVector(std::vector<T*>* vec);
     };
 
 } // namespace mongo

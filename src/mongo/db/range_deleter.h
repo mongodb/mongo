@@ -304,7 +304,7 @@ namespace mongo {
          * Must be a synchronous call. CursorIds should be populated after call.
          * Must not throw exception.
          */
-        virtual void getCursorIds(const StringData& ns, set<CursorId>* openCursors) = 0;
+        virtual void getCursorIds(const StringData& ns, std::set<CursorId>* openCursors) = 0;
     };
 
 } // namespace mongo

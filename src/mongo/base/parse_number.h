@@ -47,7 +47,7 @@ namespace mongo {
      * on the number", as in strtol.  Returns Status::BadValue if an illegal value is supplied for
      * "base".
      *
-     * The entirety of the string must consist of digits in the given base, except optionally the
+     * The entirety of the std::string must consist of digits in the given base, except optionally the
      * first character may be "+" or "-", and hexadecimal numbers may begin "0x".  Same as strtol,
      * without the property of stripping whitespace at the beginning, and fails to parse if there
      * are non-digit characters at the end of the string.

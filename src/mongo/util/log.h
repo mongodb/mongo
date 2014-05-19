@@ -122,7 +122,7 @@ namespace logger {
     /** output the error # and error message with prefix.
         handy for use as parm in uassert/massert.
         */
-    string errnoWithPrefix( const char * prefix );
+    std::string errnoWithPrefix( const char * prefix );
 
     // Guard that alters the indentation level used by log messages on the current thread.
     // Used only by mongodump (mongo/tools/dump.cpp).  Do not introduce new uses.
@@ -134,7 +134,7 @@ namespace logger {
     extern Tee* const warnings; // Things put here go in serverStatus
     extern Tee* const startupWarningsLog; // Things put here get reported in MMS
 
-    string errnoWithDescription(int errorcode = -1);
+    std::string errnoWithDescription(int errorcode = -1);
 
     /**
      * Write the current context (backtrace), along with the optional "msg".

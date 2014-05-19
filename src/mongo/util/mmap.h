@@ -124,13 +124,13 @@ namespace mongo {
 
         virtual bool isDurableMappedFile() { return false; }
 
-        string filename() const { return _filename; }
+        std::string filename() const { return _filename; }
         void setFilename(const std::string& fn);
 
         virtual uint64_t getUniqueId() const = 0;
 
     private:
-        string _filename;
+        std::string _filename;
         static int _flushAll( bool sync ); // returns n flushed
     protected:
         virtual void close() = 0;

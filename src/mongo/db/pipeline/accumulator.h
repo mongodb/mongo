@@ -168,7 +168,7 @@ namespace mongo {
     private:
         AccumulatorPush();
 
-        vector<Value> vpValue;
+        std::vector<Value> vpValue;
     };
 
 

@@ -425,7 +425,7 @@ namespace mongo {
                         const DiskLoc leftChild,
                         const DiskLoc rightChild);
 
-        string dupKeyError(const KeyDataType& key) const;
+        std::string dupKeyError(const KeyDataType& key) const;
 
         void setInternalKey(OperationContext* txn,
                             BucketType* bucket,
@@ -510,8 +510,8 @@ namespace mongo {
                           const BSONObj& rBegin,
                           int rBeginLen,
                           bool rSup,
-                          const vector<const BSONElement*>& rEnd,
-                          const vector<bool>& rEndInclusive,
+                          const std::vector<const BSONElement*>& rEnd,
+                          const std::vector<bool>& rEndInclusive,
                           const Ordering& o,
                           int direction) const;
 

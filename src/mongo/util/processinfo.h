@@ -55,17 +55,17 @@ namespace mongo {
         /**
          * Get the type of os (e.g. Windows, Linux, Mac OS)
          */
-        const string& getOsType() const { return sysInfo().osType; }
+        const std::string& getOsType() const { return sysInfo().osType; }
 
         /**
          * Get the os Name (e.g. Ubuntu, Gentoo, Windows Server 2008)
          */
-        const string& getOsName() const { return sysInfo().osName; }
+        const std::string& getOsName() const { return sysInfo().osName; }
 
         /**
          * Get the os version (e.g. 10.04, 11.3.0, 6.1 (build 7600))
          */
-        const string& getOsVersion() const { return sysInfo().osVersion; }
+        const std::string& getOsVersion() const { return sysInfo().osVersion; }
 
         /**
          * Get the cpu address size (e.g. 32, 36, 64)
@@ -90,7 +90,7 @@ namespace mongo {
         /**
          * Get the CPU architecture (e.g. x86, x86_64)
          */
-        const string& getArch() const { return sysInfo().cpuArch; }
+        const std::string& getArch() const { return sysInfo().cpuArch; }
 
         /**
          * Determine if NUMA is enabled (interleaved) for this process
@@ -138,7 +138,7 @@ namespace mongo {
          *
          * NOTE: requires blockCheckSupported() == true
          */
-        static bool pagesInMemory(const void* start, size_t numPages, vector<char>* out);
+        static bool pagesInMemory(const void* start, size_t numPages, std::vector<char>* out);
 
     private:
         /**
@@ -146,14 +146,14 @@ namespace mongo {
          */
         class SystemInfo {
         public:
-            string osType;
-            string osName;
-            string osVersion;
+            std::string osType;
+            std::string osName;
+            std::string osVersion;
             unsigned addrSize;
             unsigned long long memSize;
             unsigned numCores;
             unsigned long long pageSize;
-            string cpuArch;
+            std::string cpuArch;
             bool hasNuma;
             BSONObj _extraStats;
 

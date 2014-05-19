@@ -41,18 +41,18 @@ namespace mongo {
      *
      *     In a header file:
      *     // Determines the types for the fields used in a collection.
-     *     static const string MyColl;
+     *     static const std::string MyColl;
      *     struct MyCollFields {
-     *         static BSONField<string> name;
+     *         static BSONField<std::string> name;
      *         static BSONField<bool> draining;
      *         static BSONField<int> count;
      *     };
      *
      *     In a cpp file:
-     *     const string MyColl = "my_collection_name";
+     *     const std::string MyColl = "my_collection_name";
      *
      *     // determines the names used for the fields
-     *     BSONField<string> MyCollFields::name("_id");
+     *     BSONField<std::string> MyCollFields::name("_id");
      *     BSONField<bool> MyCollFields::draining("draining");
      *     BSONField<int> MyCollFields::count("count");
      *

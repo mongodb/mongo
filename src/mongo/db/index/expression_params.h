@@ -50,7 +50,7 @@ namespace mongo {
                     if (e.isNumber()) {
                         order = static_cast<int>(e.Number());
                     }
-                    out->other.push_back(make_pair(e.fieldName(), order));
+                    out->other.push_back(std::make_pair(e.fieldName(), order));
                 }
             }
 
@@ -72,7 +72,7 @@ namespace mongo {
         static void parseHashParams(const BSONObj& infoObj,
                                     HashSeed* seedOut,
                                     int* versionOut,
-                                    string* fieldOut) {
+                                    std::string* fieldOut) {
 
             // Default _seed to DEFAULT_HASH_SEED if "seed" is not included in the index spec
             // or if the value of "seed" is not a number
@@ -101,8 +101,8 @@ namespace mongo {
         }
 
         static void parseHaystackParams(const BSONObj& infoObj,
-                                        string* geoFieldOut,
-                                        vector<string>* otherFieldsOut,
+                                        std::string* geoFieldOut,
+                                        std::vector<std::string>* otherFieldsOut,
                                         double* bucketSizeOut) {
 
             BSONElement e = infoObj["bucketSize"];
@@ -148,7 +148,7 @@ namespace mongo {
                                                                   "coarsestIndexedLevel",
                 S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / out->radius));
 
-            static const string kIndexVersionFieldName("2dsphereIndexVersion");
+            static const std::string kIndexVersionFieldName("2dsphereIndexVersion");
 
             // Determine which version of this index we're using.  If none was set in the descriptor,
             // assume S2_INDEX_VERSION_1 (alas, the first version predates the existence of the version
@@ -171,14 +171,14 @@ namespace mongo {
 
     private:
         static double configValueWithDefaultDouble(const BSONObj& infoObj,
-                                                   const string& name,
+                                                   const std::string& name,
                                                    double def) {
             BSONElement e = infoObj[name];
             if (e.isNumber()) { return e.numberDouble(); }
             return def;
         }
 
-        static int configValueWithDefaultInt(const BSONObj& infoObj, const string& name, int def) {
+        static int configValueWithDefaultInt(const BSONObj& infoObj, const std::string& name, int def) {
             BSONElement e = infoObj[name];
             if (e.isNumber()) { return e.numberInt(); }
             return def;

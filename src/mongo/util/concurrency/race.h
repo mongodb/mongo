@@ -48,11 +48,11 @@ namespace mongo {
         class Block { 
             volatile int n;
             unsigned ncalls;
-            const string file;
+            const std::string file;
             const unsigned line;
             void fail() { 
                 log() << "\n\n\nrace: synchronization (race condition) failure\ncurrent locks this thread (" << getThreadName() << "):" << std::endl
-                      << mutexDebugger.currentlyLocked() << std::endl;
+                      << mutexDebugger.currentlyLocked();
                 printStackTrace();
                 ::abort();
             }

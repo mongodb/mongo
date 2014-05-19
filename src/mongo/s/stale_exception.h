@@ -42,8 +42,8 @@ namespace mongo {
      */
     class StaleConfigException : public AssertionException {
     public:
-        StaleConfigException( const string& ns,
-                              const string& raw,
+        StaleConfigException( const std::string& ns,
+                              const std::string& raw,
                               int code,
                               ChunkVersion received,
                               ChunkVersion wanted,
@@ -61,13 +61,13 @@ namespace mongo {
         }
 
         /** Preferred if we're rebuilding this from a thrown exception */
-        StaleConfigException( const string& raw,
+        StaleConfigException( const std::string& raw,
                               int code,
                               const BSONObj& error,
                               bool justConnection = false )
             : AssertionException( stream() << raw << " ( ns : "
                                            << ( error["ns"].type() == String ?
-                                                error["ns"].String() : string("<unknown>") )
+                                                error["ns"].String() : std::string("<unknown>") )
                                            << ", received : "
                                            << ChunkVersion::fromBSON( error, "vReceived" ).toString()
                                            << ", wanted : "
@@ -93,13 +93,13 @@ namespace mongo {
 
         virtual ~StaleConfigException() throw() {}
 
-        virtual void appendPrefix( stringstream& ss ) const {
+        virtual void appendPrefix( std::stringstream& ss ) const {
             ss << "stale sharding config exception: ";
         }
 
         bool justConnection() const { return _justConnection; }
 
-        string getns() const { return _ns; }
+        std::string getns() const { return _ns; }
 
         /**
          * true if this exception would require a full reload of config data to resolve
@@ -109,12 +109,12 @@ namespace mongo {
                      _received.isSet() != _wanted.isSet();
         }
 
-        static bool parse( const string& big , string& ns , string& raw ) {
-            string::size_type start = big.find( '[' );
-            if ( start == string::npos )
+        static bool parse( const std::string& big , std::string& ns , std::string& raw ) {
+            std::string::size_type start = big.find( '[' );
+            if ( start == std::string::npos )
                 return false;
-            string::size_type end = big.find( ']' ,start );
-            if ( end == string::npos )
+            std::string::size_type end = big.find( ']' ,start );
+            if ( end == std::string::npos )
                 return false;
 
             ns = big.substr( start + 1 , ( end - start ) - 1 );
@@ -144,22 +144,22 @@ namespace mongo {
 
     private:
         bool _justConnection;
-        string _ns;
+        std::string _ns;
         ChunkVersion _received;
         ChunkVersion _wanted;
     };
 
     class SendStaleConfigException : public StaleConfigException {
     public:
-        SendStaleConfigException( const string& ns,
-                                  const string& raw,
+        SendStaleConfigException( const std::string& ns,
+                                  const std::string& raw,
                                   ChunkVersion received,
                                   ChunkVersion wanted,
                                   bool justConnection = false )
             : StaleConfigException( ns, raw, SendStaleConfigCode, received, wanted, justConnection ){
         }
 
-        SendStaleConfigException( const string& raw,
+        SendStaleConfigException( const std::string& raw,
                                   const BSONObj& error,
                                   bool justConnection = false )
             : StaleConfigException( raw, SendStaleConfigCode, error, justConnection ) {
@@ -168,15 +168,15 @@ namespace mongo {
 
     class RecvStaleConfigException : public StaleConfigException {
     public:
-        RecvStaleConfigException( const string& ns,
-                                  const string& raw,
+        RecvStaleConfigException( const std::string& ns,
+                                  const std::string& raw,
                                   ChunkVersion received,
                                   ChunkVersion wanted,
                                   bool justConnection = false )
             : StaleConfigException( ns, raw, RecvStaleConfigCode, received, wanted, justConnection ){
         }
 
-        RecvStaleConfigException( const string& raw,
+        RecvStaleConfigException( const std::string& raw,
                                   const BSONObj& error,
                                   bool justConnection = false )
             : StaleConfigException( raw, RecvStaleConfigCode, error, justConnection ) {

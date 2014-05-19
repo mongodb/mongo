@@ -35,11 +35,11 @@ namespace mongo {
     class EmbeddedBuilder {
     public:
         EmbeddedBuilder( BSONObjBuilder *b ) {
-            _builders.push_back( make_pair( "", b ) );
+            _builders.push_back( std::make_pair( "", b ) );
         }
         // It is assumed that the calls to prepareContext will be made with the 'name'
         // parameter in lex ascending order.
-        void prepareContext( string &name ) {
+        void prepareContext( std::string &name ) {
             int i = 1, n = _builders.size();
             while( i < n &&
                     name.substr( 0, _builders[ i ].first.length() ) == _builders[ i ].first &&
@@ -51,20 +51,20 @@ namespace mongo {
             for( int j = n - 1; j >= i; --j ) {
                 popBuilder();
             }
-            for( string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
+            for( std::string next = splitDot( name ); !next.empty(); next = splitDot( name ) ) {
                 addBuilder( next );
             }
         }
-        void appendAs( const BSONElement &e, string name ) {
+        void appendAs( const BSONElement &e, std::string name ) {
             if ( e.type() == Object && e.valuesize() == 5 ) { // empty object -- this way we can add to it later
-                string dummyName = name + ".foo";
+                std::string dummyName = name + ".foo";
                 prepareContext( dummyName );
                 return;
             }
             prepareContext( name );
             back()->appendAs( e, name );
         }
-        BufBuilder &subarrayStartAs( string name ) {
+        BufBuilder &subarrayStartAs( std::string name ) {
             prepareContext( name );
             return back()->subarrayStart( name );
         }
@@ -73,19 +73,19 @@ namespace mongo {
                 popBuilder();
         }
 
-        static string splitDot( string & str ) {
+        static std::string splitDot( std::string & str ) {
             size_t pos = str.find( '.' );
-            if ( pos == string::npos )
+            if ( pos == std::string::npos )
                 return "";
-            string ret = str.substr( 0, pos );
+            std::string ret = str.substr( 0, pos );
             str = str.substr( pos + 1 );
             return ret;
         }
 
     private:
-        void addBuilder( const string &name ) {
+        void addBuilder( const std::string &name ) {
             shared_ptr< BSONObjBuilder > newBuilder( new BSONObjBuilder( back()->subobjStart( name ) ) );
-            _builders.push_back( make_pair( name, newBuilder.get() ) );
+            _builders.push_back( std::make_pair( name, newBuilder.get() ) );
             _builderStorage.push_back( newBuilder );
         }
         void popBuilder() {
@@ -96,8 +96,8 @@ namespace mongo {
 
         BSONObjBuilder *back() { return _builders.back().second; }
 
-        vector< pair< string, BSONObjBuilder * > > _builders;
-        vector< shared_ptr< BSONObjBuilder > > _builderStorage;
+        std::vector< std::pair< std::string, BSONObjBuilder * > > _builders;
+        std::vector< shared_ptr< BSONObjBuilder > > _builderStorage;
 
     };
 

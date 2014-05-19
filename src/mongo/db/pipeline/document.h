@@ -55,7 +55,7 @@ namespace mongo {
 
     /** A Document is similar to a BSONObj but with a different in-memory representation.
      *
-     *  A Document can be treated as a const map<string, const Value> that is
+     *  A Document can be treated as a const std::map<std::string, const Value> that is
      *  very cheap to copy and is Assignable.  Therefore, it is acceptable to
      *  pass and return by Value. Note that the data in a Document is
      *  immutable, but you can replace a Document instance with assignment.
@@ -88,7 +88,7 @@ namespace mongo {
          *  TODO a version that doesn't use FieldPath
          */
         const Value getNestedField(const FieldPath& fieldNames,
-                                   vector<Position>* positions=NULL) const;
+                                   std::vector<Position>* positions=NULL) const;
 
         /// Number of fields in this document. O(n)
         size_t size() const { return storage().size(); }
@@ -100,7 +100,7 @@ namespace mongo {
         FieldIterator fieldIterator() const;
 
         /// Convenience type for dealing with fields. Used by FieldIterator.
-        typedef pair<StringData, Value> FieldPair;
+        typedef std::pair<StringData, Value> FieldPair;
 
         /** Get the approximate storage size of the document and sub-values in bytes.
          *  Note: Some memory may be shared with other Documents or between fields within
@@ -123,10 +123,10 @@ namespace mongo {
          */
         static int compare(const Document& lhs, const Document& rhs);
 
-        string toString() const;
+        std::string toString() const;
 
         friend
-        ostream& operator << (ostream& out, const Document& doc) { return out << doc.toString(); }
+        std::ostream& operator << (std::ostream& out, const Document& doc) { return out << doc.toString(); }
 
         /** Calculate a hash value.
          *
@@ -356,8 +356,8 @@ namespace mongo {
         }
 
         /// Takes positions vector from Document::getNestedField. All fields in path must exist.
-        MutableValue getNestedField(const vector<Position>& positions);
-        void setNestedField(const vector<Position>& positions, const Value& val) {
+        MutableValue getNestedField(const std::vector<Position>& positions);
+        void setNestedField(const std::vector<Position>& positions, const Value& val) {
             getNestedField(positions) = val;
         }
 
@@ -437,7 +437,7 @@ namespace mongo {
 
         // recursive helpers for same-named public methods
         MutableValue getNestedFieldHelper(const FieldPath& dottedField, size_t level);
-        MutableValue getNestedFieldHelper(const vector<Position>& positions, size_t level);
+        MutableValue getNestedFieldHelper(const std::vector<Position>& positions, size_t level);
 
         // this should only be called by storage methods and peek/freeze
         const DocumentStorage* storagePtr() const {
@@ -541,7 +541,7 @@ namespace mongo {
         Value done() { return Value::consume(_array); }
 
     private:
-        vector<Value> _array;
+        std::vector<Value> _array;
     };
 
 }

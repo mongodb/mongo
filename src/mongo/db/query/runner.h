@@ -64,7 +64,7 @@ namespace mongo {
             RUNNER_ERROR,
         };
 
-        static string statestr(RunnerState s) {
+        static std::string statestr(RunnerState s) {
             if (RUNNER_ADVANCED == s) {
                 return "RUNNER_ADVANCED";
             }
@@ -154,7 +154,7 @@ namespace mongo {
         /**
          * Return the NS that the query is running over.
          */
-        virtual const string& ns() = 0;
+        virtual const std::string& ns() = 0;
 
         /**
          * Return the Collection that the query is running over.

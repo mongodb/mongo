@@ -78,7 +78,7 @@ namespace mongo {
         /**
            Get the source's name.
 
-           @returns the string name of the source as a constant string;
+           @returns the std::string name of the source as a constant string;
              this is static, and there's no need to worry about adopting it
          */
         virtual const char *getSourceName() const;
@@ -144,13 +144,13 @@ namespace mongo {
         }
 
         /**
-         * In the default case, serializes the DocumentSource and adds it to the vector<Value>.
+         * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
          *
          * A subclass may choose to overwrite this, rather than serialize,
          * if it should output multiple stages (eg, $sort sometimes also outputs a $limit).
          */
 
-        virtual void serializeToArray(vector<Value>& array, bool explain = false) const;
+        virtual void serializeToArray(std::vector<Value>& array, bool explain = false) const;
 
         /// Returns true if doesn't require an input source (most DocumentSources do).
         virtual bool isValidInitialSource() const { return false; }
@@ -287,13 +287,13 @@ namespace mongo {
         virtual bool isValidInitialSource() const { return true; }
 
         /* convenient shorthand for a commonly used type */
-        typedef vector<Strategy::CommandResult> ShardOutput;
+        typedef std::vector<Strategy::CommandResult> ShardOutput;
 
         /** Returns the result arrays from shards using the 2.4 protocol.
          *  Call this instead of getNext() if you want access to the raw streams.
          *  This method should only be called at most once.
          */
-        vector<BSONArray> getArrays();
+        std::vector<BSONArray> getArrays();
 
         /**
           Create a DocumentSource that wraps the output of many shards
@@ -353,7 +353,7 @@ namespace mongo {
          * in order to fetch data from the database.
          */
         static intrusive_ptr<DocumentSourceCursor> create(
-            const string& ns,
+            const std::string& ns,
             const boost::shared_ptr<Runner>& runner,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
@@ -397,7 +397,7 @@ namespace mongo {
 
     private:
         DocumentSourceCursor(
-            const string& ns,
+            const std::string& ns,
             const boost::shared_ptr<Runner>& runner,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
@@ -413,7 +413,7 @@ namespace mongo {
         intrusive_ptr<DocumentSourceLimit> _limit;
         long long _docsAddedToBatches; // for _limit enforcement
 
-        const string _ns;
+        const std::string _ns;
         boost::shared_ptr<Runner> _runner; // PipelineRunner holds a weak_ptr to this.
     };
 
@@ -513,7 +513,7 @@ namespace mongo {
         Value expandId(const Value& val);
 
 
-        typedef vector<intrusive_ptr<Accumulator> > Accumulators;
+        typedef std::vector<intrusive_ptr<Accumulator> > Accumulators;
         typedef boost::unordered_map<Value, Accumulators, Value::Hash> GroupsMap;
         GroupsMap groups;
 
@@ -529,9 +529,9 @@ namespace mongo {
 
           These three vectors parallel each other.
         */
-        vector<string> vFieldName;
-        vector<intrusive_ptr<Accumulator> (*)()> vpAccumulatorFactory;
-        vector<intrusive_ptr<Expression> > vpExpression;
+        std::vector<std::string> vFieldName;
+        std::vector<intrusive_ptr<Accumulator> (*)()> vpAccumulatorFactory;
+        std::vector<intrusive_ptr<Expression> > vpExpression;
 
 
         Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
@@ -549,7 +549,7 @@ namespace mongo {
 
         // only used when _spilled
         scoped_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
-        pair<Value, Value> _firstPartOfNextGroup;
+        std::pair<Value, Value> _firstPartOfNextGroup;
         Value _currentId;
         Accumulators _currentAccumulators;
     };
@@ -605,7 +605,7 @@ namespace mongo {
     class DocumentSourceMergeCursors :
         public DocumentSource {
     public:
-        typedef vector<pair<ConnectionString, CursorId> > CursorIds;
+        typedef std::vector<std::pair<ConnectionString, CursorId> > CursorIds;
 
         // virtuals from DocumentSource
         boost::optional<Document> getNext();
@@ -629,7 +629,7 @@ namespace mongo {
          *  Call this instead of getNext() if you want access to the raw streams.
          *  This method should only be called at most once.
          */
-        vector<DBClientCursor*> getCursors();
+        std::vector<DBClientCursor*> getCursors();
 
         /**
          * Returns the next object from the cursor, throwing an appropriate exception if the cursor
@@ -646,7 +646,7 @@ namespace mongo {
         };
 
         // using list to enable removing arbitrary elements
-        typedef list<boost::shared_ptr<CursorAndConnection> > Cursors;
+        typedef std::list<boost::shared_ptr<CursorAndConnection> > Cursors;
 
         DocumentSourceMergeCursors(
             const CursorIds& cursorIds,
@@ -705,7 +705,7 @@ namespace mongo {
         // Sets _tempsNs and prepares it to receive data.
         void prepTempCollection();
 
-        void spill(DBClientBase* conn, const vector<BSONObj>& toInsert);
+        void spill(DBClientBase* conn, const std::vector<BSONObj>& toInsert);
 
         bool _done;
 
@@ -787,7 +787,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual void serializeToArray(vector<Value>& array, bool explain = false) const;
+        virtual void serializeToArray(std::vector<Value>& array, bool explain = false) const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual void dispose();
 
@@ -806,7 +806,7 @@ namespace mongo {
           @param ascending if true, use the key for an ascending sort,
             otherwise, use it for descending
         */
-        void addKey(const string &fieldPath, bool ascending);
+        void addKey(const std::string &fieldPath, bool ascending);
 
         /// Write out a Document whose contents are the sort key.
         Document serializeSortKey(bool explain) const;
@@ -862,13 +862,13 @@ namespace mongo {
         // not.
         class IteratorFromCursor;
         class IteratorFromBsonArray;
-        void populateFromCursors(const vector<DBClientCursor*>& cursors);
-        void populateFromBsonArrays(const vector<BSONArray>& arrays);
+        void populateFromCursors(const std::vector<DBClientCursor*>& cursors);
+        void populateFromBsonArrays(const std::vector<BSONArray>& arrays);
 
         /* these two parallel each other */
-        typedef vector<intrusive_ptr<Expression> > SortKey;
+        typedef std::vector<intrusive_ptr<Expression> > SortKey;
         SortKey vSortKey;
-        vector<char> vAscending; // used like vector<bool> but without specialization
+        std::vector<char> vAscending; // used like std::vector<bool> but without specialization
 
         /// Extracts the fields in vSortKey from the Document;
         Value extractKey(const Document& d) const;

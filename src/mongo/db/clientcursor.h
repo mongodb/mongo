@@ -69,7 +69,7 @@ namespace mongo {
         //
 
         CursorId cursorid() const { return _cursorid; }
-        string ns() const { return _ns; }
+        std::string ns() const { return _ns; }
         const Collection* collection() const { return _collection; }
 
         /**
@@ -164,7 +164,7 @@ namespace mongo {
         unsigned _pinValue;
 
         // The namespace we're operating on.
-        string _ns;
+        std::string _ns;
 
         const Collection* _collection;
 
@@ -227,7 +227,7 @@ namespace mongo {
     /** thread for timing out old cursors */
     class ClientCursorMonitor : public BackgroundJob {
     public:
-        string name() const { return "ClientCursorMonitor"; }
+        std::string name() const { return "ClientCursorMonitor"; }
         void run();
     };
 

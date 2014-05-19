@@ -55,14 +55,14 @@ namespace mongo {
          * May be called if file exists. If file exists, or its allocation has
          *  been requested, size is updated to match existing file size.
          */
-        void requestAllocation( const string &name, long &size );
+        void requestAllocation( const std::string &name, long &size );
 
 
         /**
          * Returns when file has been allocated.  If file exists, size is
          * updated to match existing file size.
          */
-        void allocateAsap( const string &name, unsigned long long &size );
+        void allocateAsap( const std::string &name, unsigned long long &size );
 
         void waitUntilFinished() const;
         
@@ -81,22 +81,22 @@ namespace mongo {
 
         // caller must hold pendingMutex_ lock.  Returns size if allocated or
         // allocation requested, -1 otherwise.
-        long prevSize( const string &name ) const;
+        long prevSize( const std::string &name ) const;
 
         // caller must hold pendingMutex_ lock.
-        bool inProgress( const string &name ) const;
+        bool inProgress( const std::string &name ) const;
 
         /** called from the worked thread */
         static void run( FileAllocator * fa );
 
         // generate a unique name for temporary files
-        string makeTempFileName( boost::filesystem::path root );
+        std::string makeTempFileName( boost::filesystem::path root );
 
         mutable mongo::mutex _pendingMutex;
         mutable boost::condition _pendingUpdated;
 
-        std::list< string > _pending;
-        mutable map< string, long > _pendingSize;
+        std::list< std::string > _pending;
+        mutable std::map< std::string, long > _pendingSize;
 
         // unique number for temporary files
         static unsigned long long _uniqueNumber;

@@ -42,16 +42,16 @@ namespace mongo {
     */
     class DiagStr {
         mutable SpinLock m;
-        string _s;
+        std::string _s;
     public:
         DiagStr(const DiagStr& r) : _s(r.get()) { }
-        DiagStr(const string& r) : _s(r) { }
+        DiagStr(const std::string& r) : _s(r) { }
         DiagStr() { }
         bool empty() const { 
             scoped_spinlock lk(m);
             return _s.empty();
         }
-        string get() const { 
+        std::string get() const {
             scoped_spinlock lk(m);
             return _s;
         }
@@ -59,18 +59,18 @@ namespace mongo {
             scoped_spinlock lk(m);
             _s = s;
         }
-        void set(const string& s) { 
+        void set(const std::string& s) {
             scoped_spinlock lk(m);
             _s = s;
         }
-        operator string() const { return get(); }
-        void operator=(const string& s) { set(s); }
+        operator std::string() const { return get(); }
+        void operator=(const std::string& s) { set(s); }
         void operator=(const DiagStr& rhs) { 
             set( rhs.get() );
         }
 
         // == is not defined.  use get() == ... instead.  done this way so one thinks about if composing multiple operations
-        bool operator==(const string& s) const; 
+        bool operator==(const std::string& s) const;
     };
 
 }

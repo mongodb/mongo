@@ -59,10 +59,10 @@ namespace mongo {
         void logResponse( uint64_t duration, uint64_t bytes );
 
         /**
-         * Render the histogram as string that can be used inside an
+         * Render the histogram as std::string that can be used inside an
          * HTML doc.
          */
-        string toHTML() const;
+        std::string toHTML() const;
 
     private:
         SpinLock   _spinLock;         // protects state below

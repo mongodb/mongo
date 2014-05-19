@@ -42,7 +42,7 @@ namespace mongo {
      * query. The exception is the multi plan runner, in which
      * case plan selection depends on actually running the query.
      *
-     * Currently, just a summary string describing the plan
+     * Currently, just a summary std::string describing the plan
      * used to run the query.
      */
     struct PlanInfo {

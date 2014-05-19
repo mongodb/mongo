@@ -49,12 +49,12 @@ namespace mongo {
             : _name("") , _addr("") , _maxSize(0) , _isDraining( false ) {
         }
 
-        Shard( const string& name , const string& addr, long long maxSize = 0 , bool isDraining = false )
+        Shard( const std::string& name , const std::string& addr, long long maxSize = 0 , bool isDraining = false )
             : _name(name) , _addr( addr ) , _maxSize( maxSize ) , _isDraining( isDraining ) {
             _setAddr( addr );
         }
 
-        Shard( const string& ident ) {
+        Shard( const std::string& ident ) {
             reset( ident );
         }
 
@@ -69,29 +69,29 @@ namespace mongo {
               _maxSize( other->_maxSize ) , _isDraining( other->_isDraining ) {
         }
 
-        static Shard make( const string& ident ) {
+        static Shard make( const std::string& ident ) {
             Shard s;
             s.reset( ident );
             return s;
         }
 
-        static Shard findIfExists( const string& shardName );
+        static Shard findIfExists( const std::string& shardName );
 
         /**
          * @param ident either name or address
          */
-        void reset( const string& ident );
+        void reset( const std::string& ident );
 
         void setAddress( const ConnectionString& cs );
         
         ConnectionString getAddress() const { return _cs; }
 
-        string getName() const {
+        std::string getName() const {
             verify( _name.size() );
             return _name;
         }
 
-        string getConnString() const {
+        std::string getConnString() const {
             verify( _addr.size() );
             return _addr;
         }
@@ -104,11 +104,11 @@ namespace mongo {
             return _isDraining;
         }
 
-        string toString() const {
+        std::string toString() const {
             return _name + ":" + _addr;
         }
 
-        friend ostream& operator << (ostream& out, const Shard& s) {
+        friend std::ostream& operator << (std::ostream& out, const Shard& s) {
             return (out << s.toString());
         }
 
@@ -122,11 +122,11 @@ namespace mongo {
             return ! ( *this == s );
         }
 
-        bool operator==( const string& s ) const {
+        bool operator==( const std::string& s ) const {
             return _name == s || _addr == s;
         }
 
-        bool operator!=( const string& s ) const {
+        bool operator!=( const std::string& s ) const {
             return _name != s && _addr != s;
         }
 
@@ -137,10 +137,10 @@ namespace mongo {
         bool ok() const { return _addr.size() > 0; }
 
         // Set internal to true to run the command with internal authentication privileges.
-        BSONObj runCommand( const string& db , const string& simple ) const {
+        BSONObj runCommand( const std::string& db , const std::string& simple ) const {
             return runCommand( db , BSON( simple << 1 ) );
         }
-        BSONObj runCommand( const string& db , const BSONObj& cmd ) const ;
+        BSONObj runCommand( const std::string& db , const BSONObj& cmd ) const ;
 
         ShardStatus getStatus() const ;
         
@@ -149,14 +149,14 @@ namespace mongo {
          * retursn true if node is the shard 
          * of if the replica set contains node
          */
-        bool containsNode( const string& node ) const;
+        bool containsNode( const std::string& node ) const;
 
-        const set<string>& tags() const { return _tags; }
-        void addTag( const string& tag ) { _tags.insert( tag ); }
+        const std::set<std::string>& tags() const { return _tags; }
+        void addTag( const std::string& tag ) { _tags.insert( tag ); }
 
-        static void getAllShards( vector<Shard>& all );
-        static void printShardInfo( ostream& out );
-        static Shard lookupRSName( const string& name);
+        static void getAllShards( std::vector<Shard>& all );
+        static void printShardInfo( std::ostream& out );
+        static Shard lookupRSName( const std::string& name);
         
         /**
          * @parm current - shard where the chunk/database currently lives in
@@ -166,22 +166,22 @@ namespace mongo {
 
         static void reloadShardInfo();
 
-        static void removeShard( const string& name );
+        static void removeShard( const std::string& name );
 
-        static bool isAShardNode( const string& ident );
+        static bool isAShardNode( const std::string& ident );
 
         static Shard EMPTY;
         
     private:
 
-        void _setAddr( const string& addr );
+        void _setAddr( const std::string& addr );
         
-        string    _name;
-        string    _addr;
+        std::string    _name;
+        std::string    _addr;
         ConnectionString _cs;
         long long _maxSize;    // in MBytes, 0 is unlimited
         bool      _isDraining; // shard is currently being removed
-        set<string> _tags;
+        std::set<std::string> _tags;
     };
     typedef shared_ptr<Shard> ShardPtr;
 
@@ -190,13 +190,13 @@ namespace mongo {
 
         ShardStatus( const Shard& shard , const BSONObj& obj );
 
-        friend ostream& operator << (ostream& out, const ShardStatus& s) {
+        friend std::ostream& operator << (std::ostream& out, const ShardStatus& s) {
             out << s.toString();
             return out;
         }
 
-        string toString() const {
-            stringstream ss;
+        std::string toString() const {
+            std::stringstream ss;
             ss << "shard: " << _shard 
                << " mapped: " << _mapped 
                << " writeLock: " << _writeLock
@@ -220,7 +220,7 @@ namespace mongo {
             return _hasOpsQueued;
         }
 
-        string mongoVersion() const {
+        std::string mongoVersion() const {
             return _mongoVersion;
         }
 
@@ -229,7 +229,7 @@ namespace mongo {
         long long _mapped;
         bool _hasOpsQueued;  // true if 'writebacks' are pending
         double _writeLock;
-        string _mongoVersion;
+        std::string _mongoVersion;
     };
 
     class ChunkManager;
@@ -237,9 +237,9 @@ namespace mongo {
 
     class ShardConnection : public AScopedConnection {
     public:
-        ShardConnection( const Shard * s , const string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-        ShardConnection( const Shard& s , const string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
-        ShardConnection( const string& addr , const string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
+        ShardConnection( const Shard * s , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
+        ShardConnection( const Shard& s , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
+        ShardConnection( const std::string& addr , const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
 
         ~ShardConnection();
 
@@ -273,11 +273,11 @@ namespace mongo {
             return _conn;
         }
 
-        string getHost() const {
+        std::string getHost() const {
             return _addr;
         }
 
-        string getNS() const {
+        std::string getNS() const {
             return _ns;
         }
 
@@ -302,10 +302,10 @@ namespace mongo {
         /**
            this just passes through excpet it checks for stale configs
          */
-        bool runCommand( const string& db , const BSONObj& cmd , BSONObj& res );
+        bool runCommand( const std::string& db , const BSONObj& cmd , BSONObj& res );
 
         /** checks all of my thread local connections for the version of this ns */
-        static void checkMyConnectionVersions( const string & ns );
+        static void checkMyConnectionVersions( const std::string & ns );
 
         /**
          * Returns all the current sharded connections to the pool.
@@ -322,7 +322,7 @@ namespace mongo {
         /**
          * Forgets a namespace to prevent future versioning.
          */
-        static void forgetNS( const string& ns );
+        static void forgetNS( const std::string& ns );
 
     private:
         void _init();
@@ -330,8 +330,8 @@ namespace mongo {
 
         bool _finishedInit;
 
-        string _addr;
-        string _ns;
+        std::string _addr;
+        std::string _ns;
         ChunkManagerPtr _manager;
 
         DBClientBase* _conn;

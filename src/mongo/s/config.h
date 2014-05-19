@@ -83,7 +83,7 @@ namespace mongo {
             bool isDirty() const { return _dirty; }
             bool wasDropped() const { return _dropped; }
             
-            void save( const string& ns );
+            void save( const std::string& ns );
             
             bool unique() const { return _unqiue; }
             BSONObj key() const { return _key; } 
@@ -97,11 +97,11 @@ namespace mongo {
             bool _dropped;
         };
 
-        typedef map<string,CollectionInfo> Collections;
+        typedef std::map<std::string,CollectionInfo> Collections;
 
     public:
 
-        DBConfig( string name )
+        DBConfig( std::string name )
             : _name( name ) ,
               _primary("config","") ,
               _shardingEnabled(false),
@@ -111,7 +111,7 @@ namespace mongo {
         }
         virtual ~DBConfig() {}
 
-        string getName() const { return _name; };
+        std::string getName() const { return _name; };
 
         /**
          * @return if anything in this db is partitioned or not
@@ -130,38 +130,38 @@ namespace mongo {
          * WARNING: It's not safe to place initial chunks onto non-primary shards using this method.
          * The initShards parameter allows legacy behavior expected by map-reduce.
          */
-        ChunkManagerPtr shardCollection( const string& ns ,
+        ChunkManagerPtr shardCollection( const std::string& ns ,
                                          ShardKeyPattern fieldsAndOrder ,
                                          bool unique ,
-                                         vector<BSONObj>* initPoints = 0,
-                                         vector<Shard>* initShards = 0 );
+                                         std::vector<BSONObj>* initPoints = 0,
+                                         std::vector<Shard>* initShards = 0 );
 
         /**
            @return true if there was sharding info to remove
          */
-        bool removeSharding( const string& ns );
+        bool removeSharding( const std::string& ns );
 
         /**
          * @return whether or not the 'ns' collection is partitioned
          */
-        bool isSharded( const string& ns );
+        bool isSharded( const std::string& ns );
 
         // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
         // neither if the collection doesn't exist.
-        void getChunkManagerOrPrimary( const string& ns, ChunkManagerPtr& manager, ShardPtr& primary );
+        void getChunkManagerOrPrimary( const std::string& ns, ChunkManagerPtr& manager, ShardPtr& primary );
 
-        ChunkManagerPtr getChunkManager( const string& ns , bool reload = false, bool forceReload = false );
-        ChunkManagerPtr getChunkManagerIfExists( const string& ns , bool reload = false, bool forceReload = false );
+        ChunkManagerPtr getChunkManager( const std::string& ns , bool reload = false, bool forceReload = false );
+        ChunkManagerPtr getChunkManagerIfExists( const std::string& ns , bool reload = false, bool forceReload = false );
 
-        const Shard& getShard( const string& ns );
+        const Shard& getShard( const std::string& ns );
         /**
          * @return the correct for shard for the ns
          * if the namespace is sharded, will return NULL
          */
-        ShardPtr getShardIfExists( const string& ns );
+        ShardPtr getShardIfExists( const std::string& ns );
 
         const Shard& getPrimary() const {
-            uassert( 8041 , (string)"no primary shard configured for db: " + _name , _primary.ok() );
+            uassert( 8041 , (std::string)"no primary shard configured for db: " + _name , _primary.ok() );
             return _primary;
         }
 
@@ -170,7 +170,7 @@ namespace mongo {
         bool load();
         bool reload();
 
-        bool dropDatabase( string& errmsg );
+        bool dropDatabase( std::string& errmsg );
 
         // model stuff
 
@@ -179,29 +179,29 @@ namespace mongo {
 
         void unserialize(const BSONObj& from);
 
-        void getAllShards(set<Shard>& shards) const;
+        void getAllShards(std::set<Shard>& shards) const;
 
-        void getAllShardedCollections(set<string>& namespaces) const;
+        void getAllShardedCollections(std::set<std::string>& namespaces) const;
 
     protected:
 
         /**
             lockless
         */
-        bool _isSharded( const string& ns );
+        bool _isSharded( const std::string& ns );
 
-        bool _dropShardedCollections( int& num, set<Shard>& allServers , string& errmsg );
+        bool _dropShardedCollections( int& num, std::set<Shard>& allServers , std::string& errmsg );
 
         bool _load();
         bool _reload();
         void _save( bool db = true, bool coll = true );
 
-        string _name; // e.g. "alleyinsider"
+        std::string _name; // e.g. "alleyinsider"
         Shard _primary; // e.g. localhost , mongo.foo.com:9999
         bool _shardingEnabled;
 
-        //map<string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
-        //map<string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
+        //map<std::string,CollectionInfo> _sharded; // { "alleyinsider.blog.posts" : { ts : 1 }  , ... ] - all ns that are sharded
+        //map<std::string,ChunkManagerPtr> _shards; // this will only have entries for things that have been looked at
 
         Collections _collections;
 
@@ -217,7 +217,7 @@ namespace mongo {
 
         bool ok( bool checkConsistency = false );
 
-        virtual string modelServer() {
+        virtual std::string modelServer() {
             uassert( 10190 ,  "ConfigServer not setup" , _primary.ok() );
             return _primary.getConnString();
         }
@@ -225,7 +225,7 @@ namespace mongo {
         /**
            call at startup, this will initiate connection to the grid db
         */
-        bool init( vector<string> configHosts );
+        bool init( std::vector<std::string> configHosts );
 
         bool init( const std::string& s );
 
@@ -234,10 +234,10 @@ namespace mongo {
          * hostname:port entries are unique. Otherwise return false
          * and fill errmsg with message containing the offending server.
          */
-        bool checkHostsAreUnique( const vector<string>& configHosts, string* errmsg );
+        bool checkHostsAreUnique( const std::vector<std::string>& configHosts, std::string* errmsg );
 
         bool allUp();
-        bool allUp( string& errmsg );
+        bool allUp( std::string& errmsg );
 
         int dbConfigVersion();
         int dbConfigVersion( DBClientBase& conn );
@@ -253,13 +253,13 @@ namespace mongo {
          *
          * This call is guaranteed never to throw.
          */
-        void logChange( const string& what , const string& ns , const BSONObj& detail = BSONObj() );
+        void logChange( const std::string& what , const std::string& ns , const BSONObj& detail = BSONObj() );
 
         ConnectionString getConnectionString() const {
             return ConnectionString( _primary.getConnString() , ConnectionString::SYNC );
         }
 
-        void replicaSetChange(const string& setName, const string& newConnectionString);
+        void replicaSetChange(const std::string& setName, const std::string& newConnectionString);
 
         static int VERSION;
 
@@ -268,11 +268,11 @@ namespace mongo {
          * check to see if all config servers have the same state
          * will try tries time to make sure not catching in a bad state
          */
-        bool checkConfigServersConsistent( string& errmsg , int tries = 4 ) const;
+        bool checkConfigServersConsistent( std::string& errmsg , int tries = 4 ) const;
 
     private:
-        string getHost( const std::string& name , bool withPort );
-        vector<string> _config;
+        std::string getHost( const std::string& name , bool withPort );
+        std::vector<std::string> _config;
     };
 
 } // namespace mongo

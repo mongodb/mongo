@@ -112,7 +112,7 @@ namespace mongo {
               maxDistance(std::numeric_limits<double>::max()),
               isNearSphere(false) { }
 
-        NearQuery(const string& f)
+        NearQuery(const std::string& f)
             : field(f),
               minDistance(0),
               maxDistance(std::numeric_limits<double>::max()),
@@ -121,7 +121,7 @@ namespace mongo {
         Status parseFrom(const BSONObj &obj);
 
         // The name of the field that contains the geometry.
-        string field;
+        std::string field;
 
         // The starting point of the near search.
         PointWithCRS centroid;
@@ -136,8 +136,8 @@ namespace mongo {
         // It's either $near or $nearSphere.
         bool isNearSphere;
 
-        string toString() const {
-            stringstream ss;
+        std::string toString() const {
+            std::stringstream ss;
             ss << " field=" << field;
             ss << " maxdist=" << maxDistance;
             ss << " isNearSphere=" << isNearSphere;
@@ -153,7 +153,7 @@ namespace mongo {
     class GeoQuery {
     public:
         GeoQuery() : field(""), predicate(INVALID) {}
-        GeoQuery(const string& f) : field(f), predicate(INVALID) {}
+        GeoQuery(const std::string& f) : field(f), predicate(INVALID) {}
 
         enum Predicate {
             WITHIN,
@@ -166,7 +166,7 @@ namespace mongo {
 
         bool hasS2Region() const;
         const S2Region& getRegion() const;
-        string getField() const { return field; }
+        std::string getField() const { return field; }
 
         Predicate getPred() const { return predicate; }
         const GeometryContainer& getGeometry() const { return geoContainer; }
@@ -177,7 +177,7 @@ namespace mongo {
         bool parseNewQuery(const BSONObj &obj);
 
         // Name of the field in the query.
-        string field;
+        std::string field;
         GeometryContainer geoContainer;
         Predicate predicate;
     };

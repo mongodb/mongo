@@ -62,12 +62,12 @@ namespace mongo {
          *
          * This version should be used by internal commands when possible.
          */
-        void commandOp( const string& db,
+        void commandOp( const std::string& db,
                         const BSONObj& command,
                         int options,
-                        const string& versionedNS,
+                        const std::string& versionedNS,
                         const BSONObj& targetingQuery,
-                        vector<CommandResult>* results );
+                        std::vector<CommandResult>* results );
 
         /**
          * Executes a command represented in the Request on the sharded cluster.

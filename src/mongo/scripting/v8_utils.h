@@ -50,7 +50,7 @@ namespace mongo {
     std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::Value>& o);
     std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::TryCatch>* try_catch);
 
-    /** Simple v8 object to string conversion helper */
+    /** Simple v8 object to std::string conversion helper */
     std::string toSTLString(const v8::Handle<v8::Value>& o);
 
     /** Like toSTLString but doesn't allocate a new std::string
@@ -92,7 +92,7 @@ namespace mongo {
         v8::String::Utf8Value _str;
     };
 
-    /** Get the properties of an object (and it's prototype) as a comma-delimited string */
+    /** Get the properties of an object (and it's prototype) as a comma-delimited std::string */
     std::string v8ObjectToString(const v8::Handle<v8::Object>& o);
 
     class V8Scope;

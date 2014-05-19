@@ -50,8 +50,8 @@ namespace mongo {
     typedef shared_ptr<const Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
-    typedef map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
-    typedef map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
+    typedef std::map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
+    typedef std::map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
 
     typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
 
@@ -95,8 +95,8 @@ namespace mongo {
         //  to a subset of fields).
         bool containsPoint( const BSONObj& point ) const;
 
-        string genID() const;
-        static string genID( const string& ns , const BSONObj& min );
+        std::string genID() const;
+        static std::string genID( const std::string& ns , const BSONObj& min );
 
         //
         // chunk version support
@@ -146,7 +146,7 @@ namespace mongo {
          *
          * @throws UserException
          */
-        Status multiSplit( const vector<BSONObj>& splitPoints ) const;
+        Status multiSplit( const std::vector<BSONObj>& splitPoints ) const;
 
         /**
          * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
@@ -161,7 +161,7 @@ namespace mongo {
          * @param maxPoints limits the number of split points that are needed, zero is max (optional)
          * @param maxObjs limits the number of objects in each chunk, zero is as max (optional)
          */
-        void pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize , int maxPoints = 0, int maxObjs = 0) const;
+        void pickSplitVector( std::vector<BSONObj>& splitPoints , int chunkSize , int maxPoints = 0, int maxObjs = 0) const;
 
         //
         // migration support
@@ -223,15 +223,15 @@ namespace mongo {
         // accessors and helpers
         //
 
-        string toString() const;
+        std::string toString() const;
 
-        friend ostream& operator << (ostream& out, const Chunk& c) { return (out << c.toString()); }
+        friend std::ostream& operator << (std::ostream& out, const Chunk& c) { return (out << c.toString()); }
 
         // chunk equality is determined by comparing the min and max bounds of the chunk
         bool operator==(const Chunk& s) const;
         bool operator!=(const Chunk& s) const { return ! ( *this == s ); }
 
-        string getns() const;
+        std::string getns() const;
         Shard getShard() const { return _shard; }
         const ChunkManager* getManager() const { return _manager; }
         
@@ -320,7 +320,7 @@ namespace mongo {
             verify(min.getMax() == max.getMin());
         }
 
-        friend ostream& operator<<(ostream& out, const ChunkRange& cr) {
+        friend std::ostream& operator<<(std::ostream& out, const ChunkRange& cr) {
             return (out << "ChunkRange(min=" << cr._min << ", max=" << cr._max << ", shard=" << cr._shard <<")");
         }
 
@@ -361,18 +361,18 @@ namespace mongo {
     */
     class ChunkManager {
     public:
-        typedef map<Shard,ChunkVersion> ShardVersionMap;
+        typedef std::map<Shard,ChunkVersion> ShardVersionMap;
 
         // Loads a new chunk manager from a collection document
         ChunkManager( const BSONObj& collDoc );
 
         // Creates an empty chunk manager for the namespace
-        ChunkManager( const string& ns, const ShardKeyPattern& pattern, bool unique );
+        ChunkManager( const std::string& ns, const ShardKeyPattern& pattern, bool unique );
 
         // Updates a chunk manager based on an older manager
         ChunkManager( ChunkManagerPtr oldManager );
 
-        string getns() const { return _ns; }
+        std::string getns() const { return _ns; }
 
         const ShardKeyPattern& getShardKey() const {  return _key; }
 
@@ -391,21 +391,21 @@ namespace mongo {
         //
 
         // Creates new chunks based on info in chunk manager
-        void createFirstChunks( const string& config,
+        void createFirstChunks( const std::string& config,
                                 const Shard& primary,
-                                const vector<BSONObj>* initPoints,
-                                const vector<Shard>* initShards );
+                                const std::vector<BSONObj>* initPoints,
+                                const std::vector<Shard>* initShards );
 
         // Loads existing ranges based on info in chunk manager
-        void loadExistingRanges( const string& config );
+        void loadExistingRanges( const std::string& config );
 
 
         // Helpers for load
         void calcInitSplitsAndShards( const Shard& primary,
-                                      const vector<BSONObj>* initPoints,
-                                      const vector<Shard>* initShards,
-                                      vector<BSONObj>* splitPoints,
-                                      vector<Shard>* shards ) const;
+                                      const std::vector<BSONObj>* initPoints,
+                                      const std::vector<Shard>* initShards,
+                                      std::vector<BSONObj>* splitPoints,
+                                      std::vector<Shard>* shards ) const;
 
         //
         // Methods to use once loaded / created
@@ -434,10 +434,10 @@ namespace mongo {
 
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
-        void getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const;
-        void getAllShards( set<Shard>& all ) const;
+        void getShardsForQuery( std::set<Shard>& shards , const BSONObj& query ) const;
+        void getAllShards( std::set<Shard>& all ) const;
         /** @param shards set to the shards covered by the interval [min, max], see SERVER-4791 */
-        void getShardsForRange( set<Shard>& shards, const BSONObj& min, const BSONObj& max ) const;
+        void getShardsForRange( std::set<Shard>& shards, const BSONObj& min, const BSONObj& max ) const;
 
         // Transforms query into bounds for each field in the shard key
         // for example :
@@ -468,7 +468,7 @@ namespace mongo {
         bool compatibleWith( const Chunk& other ) const;
         bool compatibleWith( ChunkPtr other ) const { if( ! other ) return false; return compatibleWith( *other ); }
 
-        string toString() const;
+        std::string toString() const;
 
         ChunkVersion getVersion( const StringData& shardName ) const;
         ChunkVersion getVersion( const Shard& shard ) const;
@@ -488,28 +488,28 @@ namespace mongo {
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
 
         void markMinorForReload( ChunkVersion majorVersion ) const;
-        void getMarkedMinorVersions( set<ChunkVersion>& minorVersions ) const;
+        void getMarkedMinorVersions( std::set<ChunkVersion>& minorVersions ) const;
 
     private:
 
         // helpers for loading
 
         // returns true if load was consistent
-        bool _load( const string& config, ChunkMap& chunks, set<Shard>& shards,
+        bool _load( const std::string& config, ChunkMap& chunks, std::set<Shard>& shards,
                                     ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
         static bool _isValid(const ChunkMap& chunks);
 
         // end helpers
 
         // All members should be const for thread-safety
-        const string _ns;
+        const std::string _ns;
         const ShardKeyPattern _key;
         const bool _unique;
 
         const ChunkMap _chunkMap;
         const ChunkRangeManager _chunkRanges;
 
-        const set<Shard> _shards;
+        const std::set<Shard> _shards;
 
         const ShardVersionMap _shardVersions; // max version per shard
 
@@ -537,8 +537,8 @@ namespace mongo {
                 _staleMinorSetMutex( "SplitHeuristics::staleMinorSet" ),
                 _staleMinorCount( 0 ) {}
 
-            void markMinorForReload( const string& ns, ChunkVersion majorVersion );
-            void getMarkedMinorVersions( set<ChunkVersion>& minorVersions );
+            void markMinorForReload( const std::string& ns, ChunkVersion majorVersion );
+            void getMarkedMinorVersions( std::set<ChunkVersion>& minorVersions );
 
             TicketHolder _splitTickets;
 
@@ -546,7 +546,7 @@ namespace mongo {
 
             // mutex protects below
             int _staleMinorCount;
-            set<ChunkVersion> _staleMinorSet;
+            std::set<ChunkVersion> _staleMinorSet;
 
             // Test whether we should split once data * splitTestFactor > chunkSize (approximately)
             static const int splitTestFactor = 5;
@@ -610,10 +610,10 @@ namespace mongo {
         Chunk _c;
     };
     */
-    inline string Chunk::genID() const { return genID(_manager->getns(), _min); }
+    inline std::string Chunk::genID() const { return genID(_manager->getns(), _min); }
 
     bool setShardVersion( DBClientBase & conn,
-                          const string& ns,
+                          const std::string& ns,
                           ChunkVersion version,
                           ChunkManagerPtr manager,
                           bool authoritative,

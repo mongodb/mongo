@@ -175,7 +175,7 @@ namespace mongo {
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const StringData& db);
-            void lockDB(const string& ns);
+            void lockDB(const std::string& ns);
             void unlockDB();
 
         protected:
@@ -190,7 +190,7 @@ namespace mongo {
             bool _locked_w;
             bool _locked_W;
             WrapperForRWLock *_weLocked;
-            const string _what;
+            const std::string _what;
             bool _nested;
         };
 
@@ -199,7 +199,7 @@ namespace mongo {
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const StringData& db);
-            void lockDB(const string& ns);
+            void lockDB(const std::string& ns);
             void unlockDB();
 
         protected:
@@ -213,7 +213,7 @@ namespace mongo {
         private:
             bool _locked_r;
             WrapperForRWLock *_weLocked;
-            string _what;
+            std::string _what;
             bool _nested;
             
         };

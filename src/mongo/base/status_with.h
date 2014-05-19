@@ -81,7 +81,7 @@ namespace mongo {
 
         bool isOK() const { return _status.isOK(); }
 
-        string toString() const { return _status.toString(); }
+        std::string toString() const { return _status.toString(); }
     private:
         Status _status;
         T _t;

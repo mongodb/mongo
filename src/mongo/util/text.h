@@ -39,7 +39,7 @@ namespace mongo {
 
     class StringSplitter {
     public:
-        /** @param big the string to be split
+        /** @param big the std::string to be split
             @param splitter the delimiter
         */
         StringSplitter( const char * big , const char * splitter )
@@ -49,7 +49,7 @@ namespace mongo {
         /** @return true if more to be taken via next() */
         bool more() const { return _big[0] != 0; }
 
-        /** get next split string fragment */
+        /** get next split std::string fragment */
         std::string next();
 
         void split( std::vector<std::string>& l );
@@ -66,7 +66,7 @@ namespace mongo {
     };
 
     /* This doesn't defend against ALL bad UTF8, but it will guarantee that the
-     * string can be converted to sequence of codepoints. However, it doesn't
+     * std::string can be converted to sequence of codepoints. However, it doesn't
      * guarantee that the codepoints are valid.
      */
     bool isValidUTF8(const char *s);

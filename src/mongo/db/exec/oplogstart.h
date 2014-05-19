@@ -111,7 +111,7 @@ namespace mongo {
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;
 
-        string _ns;
+        std::string _ns;
 
         MatchExpression* _filter;
 

@@ -53,7 +53,7 @@ namespace mongo {
         /**
            Check for interrupt.
 
-           @returns a pointer to a string with additional information; will be
+           @returns a pointer to a std::string with additional information; will be
              "" if there hasn't been an interrupt.  These strings are static
              and don't need to be freed.
          */

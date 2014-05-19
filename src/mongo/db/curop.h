@@ -125,7 +125,7 @@ namespace mongo {
 
         void recordStats();
 
-        string report( const CurOp& curop ) const;
+        std::string report( const CurOp& curop ) const;
 
         /**
          * Appends stored data and information from curop to the builder.
@@ -173,7 +173,7 @@ namespace mongo {
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert
         int keyUpdates;
-        ThreadSafeString planSummary; // a brief string describing the query solution
+        ThreadSafeString planSummary; // a brief std::string describing the query solution
 
         // New Query Framework debugging/profiling info
         // TODO: should this really be an opaque BSONObj?  Not sure.
@@ -291,12 +291,12 @@ namespace mongo {
         // Fetches less information than "info()"; used to search for ops with certain criteria
         BSONObj description();
 
-        string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
+        std::string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
         ProgressMeter& setMessage(const char * msg,
                                   std::string name = "Progress",
                                   unsigned long long progressMeterTotal = 0,
                                   int secondsBetween = 3);
-        string getMessage() const { return _message.toString(); }
+        std::string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _wrapped; }
         void kill(bool* pNotifyFlag = NULL); 

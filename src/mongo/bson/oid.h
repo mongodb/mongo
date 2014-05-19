@@ -60,7 +60,7 @@ namespace mongo {
             kIncSize = 3
         };
 
-        /** init from a 24 char hex string */
+        /** init from a 24 char hex std::string */
         explicit OID(const std::string &s) { init(s); }
 
         /** init from a reference to a 12-byte array */
@@ -97,7 +97,7 @@ namespace mongo {
          * */
         void initSequential();
 
-        /** init from a 24 char hex string */
+        /** init from a 24 char hex std::string */
         void init( const std::string& s );
 
         /** Set to the min/max OID that could be generated at given timestamp. */

@@ -120,8 +120,8 @@ namespace mongo {
          */
         virtual Status restorePosition() = 0;
 
-        // Return a string describing the cursor.
-        virtual string toString() = 0;
+        // Return a std::string describing the cursor.
+        virtual std::string toString() = 0;
 
         /**
          *  Add debugging info to the provided builder.

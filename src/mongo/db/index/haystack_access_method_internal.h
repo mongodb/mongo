@@ -49,7 +49,7 @@ namespace mongo {
         GeoHaystackSearchHopper(const BSONObj& nearObj, 
                                 double maxDistance,
                                 unsigned limit,
-                                const string& geoField,
+                                const std::string& geoField,
                                 const Collection* collection)
             : _collection(collection),
               _near(nearObj), 
@@ -83,8 +83,8 @@ namespace mongo {
         Point _near;
         double _maxDistance;
         unsigned _limit;
-        const string _geoField;
-        vector<DiskLoc> _locs;
+        const std::string _geoField;
+        std::vector<DiskLoc> _locs;
     };
 
 }  // namespace mongo

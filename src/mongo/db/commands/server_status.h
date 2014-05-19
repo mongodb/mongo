@@ -40,10 +40,10 @@ namespace mongo {
 
     class ServerStatusSection {
     public:
-        ServerStatusSection( const string& sectionName );
+        ServerStatusSection( const std::string& sectionName );
         virtual ~ServerStatusSection(){}
 
-        const string& getSectionName() const { return _sectionName; }
+        const std::string& getSectionName() const { return _sectionName; }
 
         /**
          * if this returns true, if the user doesn't mention this section
@@ -77,12 +77,12 @@ namespace mongo {
         virtual BSONObj generateSection(const BSONElement& configElement) const = 0;
 
     private:
-        const string _sectionName;
+        const std::string _sectionName;
     };
 
     class OpCounterServerStatusSection : public ServerStatusSection {
     public:
-        OpCounterServerStatusSection( const string& sectionName, OpCounters* counters );
+        OpCounterServerStatusSection( const std::string& sectionName, OpCounters* counters );
         virtual bool includeByDefault() const { return true; }
         
         virtual BSONObj generateSection(const BSONElement& configElement) const;

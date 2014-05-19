@@ -75,11 +75,11 @@ namespace mongo {
             // This includes rum for the NUL byte so it can be used when sizing buffers.
             MaxNsLenWithNUL = 128,
 
-            // MaxNsLenWithNUL excluding the NUL byte. Use this when comparing string lengths.
+            // MaxNsLenWithNUL excluding the NUL byte. Use this when comparing std::string lengths.
             MaxNsLen = MaxNsLenWithNUL - 1,
 
             // Maximum allowed length of fully qualified namespace name of any real collection.
-            // Does not include NUL so it can be directly compared to string lengths.
+            // Does not include NUL so it can be directly compared to std::string lengths.
             MaxNsColletionLen = MaxNsLen - 7/*strlen(".$extra")*/,
         };
     private:

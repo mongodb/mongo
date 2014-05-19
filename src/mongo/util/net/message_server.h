@@ -65,7 +65,7 @@ namespace mongo {
     public:
         struct Options {
             int port;                   // port to bind to
-            string ipList;             // addresses to bind to
+            std::string ipList;             // addresses to bind to
 
             Options() : port(0), ipList("") {}
         };

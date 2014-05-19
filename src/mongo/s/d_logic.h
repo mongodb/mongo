@@ -52,32 +52,32 @@ namespace mongo {
         ShardingState();
 
         bool enabled() const { return _enabled; }
-        const string& getConfigServer() const { return _configServer; }
-        void enable( const string& server );
+        const std::string& getConfigServer() const { return _configServer; }
+        void enable( const std::string& server );
 
         // Initialize sharding state and begin authenticating outgoing connections and handling
         // shard versions.  If this is not run before sharded operations occur auth will not work
         // and versions will not be tracked.
-        static void initialize(const string& server);
+        static void initialize(const std::string& server);
 
-        void gotShardName( const string& name );
-        bool setShardName( const string& name ); // Same as above, does not throw
-        string getShardName() { scoped_lock lk(_mutex); return _shardName; }
+        void gotShardName( const std::string& name );
+        bool setShardName( const std::string& name ); // Same as above, does not throw
+        std::string getShardName() { scoped_lock lk(_mutex); return _shardName; }
 
         // Helpers for SetShardVersion which report the host name sent to this shard when the shard
         // name does not match.  Do not use in other places.
         // TODO: Remove once SSV is deprecated
-        void gotShardNameAndHost( const string& name, const string& host );
-        bool setShardNameAndHost( const string& name, const string& host );
+        void gotShardNameAndHost( const std::string& name, const std::string& host );
+        bool setShardNameAndHost( const std::string& name, const std::string& host );
 
         /** Reverts back to a state where this mongod is not sharded. */
         void resetShardingState(); 
 
         // versioning support
 
-        bool hasVersion( const string& ns );
-        bool hasVersion( const string& ns , ChunkVersion& version );
-        const ChunkVersion getVersion( const string& ns ) const;
+        bool hasVersion( const std::string& ns );
+        bool hasVersion( const std::string& ns , ChunkVersion& version );
+        const ChunkVersion getVersion( const std::string& ns ) const;
 
         /**
          * If the metadata for 'ns' at this shard is at or above the requested version,
@@ -97,7 +97,7 @@ namespace mongo {
          *     and deadlocks may occur with shard-as-a-config.  Therefore, nothing here guarantees
          *     that 'latestShardVersion' is indeed the current one on return.
          */
-        Status refreshMetadataIfNeeded( const string& ns,
+        Status refreshMetadataIfNeeded( const std::string& ns,
                                         const ChunkVersion& reqShardVersion,
                                         ChunkVersion* latestShardVersion );
 
@@ -123,14 +123,14 @@ namespace mongo {
          * @return !OK if something else went wrong during reload
          * @return latestShardVersion the version that is now stored for this collection
          */
-        Status refreshMetadataNow( const string& ns, ChunkVersion* latestShardVersion );
+        Status refreshMetadataNow( const std::string& ns, ChunkVersion* latestShardVersion );
 
         void appendInfo( BSONObjBuilder& b );
 
         // querying support
 
-        bool needCollectionMetadata( const string& ns ) const;
-        CollectionMetadataPtr getCollectionMetadata( const string& ns );
+        bool needCollectionMetadata( const std::string& ns ) const;
+        CollectionMetadataPtr getCollectionMetadata( const std::string& ns );
 
         // chunk migrate and split support
 
@@ -151,7 +151,7 @@ namespace mongo {
          * @param min max the chunk to eliminate from the current metadata
          * @param version at which the new metadata should be at
          */
-        void donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version );
+        void donateChunk( const std::string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version );
 
         /**
          * Creates and installs new chunk metadata for a given collection by reclaiming a previously
@@ -167,7 +167,7 @@ namespace mongo {
          * @param ns the collection
          * @param prevMetadata the previous metadata before we donated a chunk
          */
-        void undoDonateChunk( const string& ns, CollectionMetadataPtr prevMetadata );
+        void undoDonateChunk( const std::string& ns, CollectionMetadataPtr prevMetadata );
 
         /**
          * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
@@ -178,11 +178,11 @@ namespace mongo {
          *
          * @return false with errMsg if the range is owned by this shard
          */
-        bool notePending( const string& ns,
+        bool notePending( const std::string& ns,
                           const BSONObj& min,
                           const BSONObj& max,
                           const OID& epoch,
-                          string* errMsg );
+                          std::string* errMsg );
 
         /**
          * Stops tracking a chunk range between 'min' and 'max' that previously was having data
@@ -196,11 +196,11 @@ namespace mongo {
          * @return false with errMsg if the range is owned by the shard or the epoch of the metadata
          * has changed
          */
-        bool forgetPending( const string& ns,
+        bool forgetPending( const std::string& ns,
                             const BSONObj& min,
                             const BSONObj& max,
                             const OID& epoch,
-                            string* errMsg );
+                            std::string* errMsg );
 
         /**
          * Creates and installs a new chunk metadata for a given collection by splitting one of its
@@ -215,7 +215,7 @@ namespace mongo {
          * @param splitKeys point in which to split
          * @param version at which the new metadata should be at
          */
-        void splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
+        void splitChunk( const std::string& ns , const BSONObj& min , const BSONObj& max , const std::vector<BSONObj>& splitKeys ,
                          ChunkVersion version );
 
         /**
@@ -231,7 +231,7 @@ namespace mongo {
          * @param minKey maxKey the range which should be merged
          * @param newShardVersion the shard version the newly merged chunk should have
          */
-        void mergeChunks( const string& ns,
+        void mergeChunks( const std::string& ns,
                           const BSONObj& minKey,
                           const BSONObj& maxKey,
                           ChunkVersion mergedVersion );
@@ -247,7 +247,7 @@ namespace mongo {
          * TESTING ONLY
          * Uninstalls the metadata for a given collection.
          */
-        void resetMetadata( const string& ns );
+        void resetMetadata( const std::string& ns );
 
     private:
 
@@ -255,16 +255,16 @@ namespace mongo {
          * Refreshes collection metadata by asking the config server for the latest information.
          * May or may not be based on a requested version.
          */
-        Status doRefreshMetadata( const string& ns,
+        Status doRefreshMetadata( const std::string& ns,
                                   const ChunkVersion& reqShardVersion,
                                   bool useRequestedVersion,
                                   ChunkVersion* latestShardVersion );
 
         bool _enabled;
 
-        string _configServer;
+        std::string _configServer;
 
-        string _shardName;
+        std::string _shardName;
 
         // protects state below
         mutable mongo::mutex _mutex;
@@ -273,7 +273,7 @@ namespace mongo {
         mutable TicketHolder _configServerTickets;
 
         // Map from a namespace into the metadata we need for each collection on this shard
-        typedef map<string,CollectionMetadataPtr> CollectionMetadataMap;
+        typedef std::map<std::string,CollectionMetadataPtr> CollectionMetadataMap;
         CollectionMetadataMap _collMetadata;
     };
 
@@ -291,8 +291,8 @@ namespace mongo {
         bool hasID() const { return _id.isSet(); }
         void setID( const OID& id );
 
-        const ChunkVersion getVersion( const string& ns ) const;
-        void setVersion( const string& ns , const ChunkVersion& version );
+        const ChunkVersion getVersion( const std::string& ns ) const;
+        void setVersion( const std::string& ns , const ChunkVersion& version );
 
         static ShardedConnectionInfo* get( bool create );
         static void reset();
@@ -310,7 +310,7 @@ namespace mongo {
         OID _id;
         bool _forceVersionOk; // if this is true, then chunk version #s aren't check, and all ops are allowed
 
-        typedef map<string,ChunkVersion> NSVersionMap;
+        typedef std::map<std::string,ChunkVersion> NSVersionMap;
         NSVersionMap _versions;
 
         static boost::thread_specific_ptr<ShardedConnectionInfo> _tl;
@@ -334,20 +334,20 @@ namespace mongo {
     // --- core ---
     // -----------------
 
-    unsigned long long extractVersion( BSONElement e , string& errmsg );
+    unsigned long long extractVersion( BSONElement e , std::string& errmsg );
 
 
     /**
      * @return true if we have any shard info for the ns
      */
-    bool haveLocalShardingInfo( const string& ns );
+    bool haveLocalShardingInfo( const std::string& ns );
 
     /**
      * @return true if the current threads shard version is ok, or not in sharded version
      * Also returns an error message and the Config/ChunkVersions causing conflicts
      */
-    bool shardVersionOk( const string& ns,
-                         string& errmsg,
+    bool shardVersionOk( const std::string& ns,
+                         std::string& errmsg,
                          ChunkVersion& received,
                          ChunkVersion& wanted );
 

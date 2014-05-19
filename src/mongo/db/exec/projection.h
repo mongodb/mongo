@@ -138,10 +138,10 @@ namespace mongo {
 
         // Field names can be empty in 2.4 and before so we can't use them as a sentinel value.
         // If the i-th entry is true we include the i-th field in the key.
-        vector<bool> _includeKey;
+        std::vector<bool> _includeKey;
 
         // If the i-th entry of _includeKey is true this is the field name for the i-th key field.
-        vector<StringData> _keyFieldNames;
+        std::vector<StringData> _keyFieldNames;
     };
 
 }  // namespace mongo

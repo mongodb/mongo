@@ -69,7 +69,7 @@ namespace mongo {
         bool readable() const { return s == RS_PRIMARY || s == RS_SECONDARY; }
         bool shunned() const { return s == RS_SHUNNED; }
 
-        string toString() const;
+        std::string toString() const;
 
         bool operator==(const MemberState& r) const { return s == r.s; }
         bool operator!=(const MemberState& r) const { return s != r.s; }

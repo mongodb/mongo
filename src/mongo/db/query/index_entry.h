@@ -43,10 +43,10 @@ namespace mongo {
          * Use this constructor if you're making an IndexEntry from the catalog.
          */
         IndexEntry(const BSONObj& kp,
-                   const string& accessMethod,
+                   const std::string& accessMethod,
                    bool mk,
                    bool sp,
-                   const string& n,
+                   const std::string& n,
                    const BSONObj& io)
             : keyPattern(kp),
               multikey(mk),
@@ -63,7 +63,7 @@ namespace mongo {
         IndexEntry(const BSONObj& kp,
                    bool mk,
                    bool sp,
-                   const string& n,
+                   const std::string& n,
                    const BSONObj& io)
             : keyPattern(kp),
               multikey(mk),
@@ -93,7 +93,7 @@ namespace mongo {
 
         bool sparse;
 
-        string name;
+        std::string name;
 
         // Geo indices have extra parameters.  We need those available to plan correctly.
         BSONObj infoObj;

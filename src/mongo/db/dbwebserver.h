@@ -48,55 +48,55 @@ namespace mongo {
 
     class DbWebHandler : public Prioritizable {
     public:
-        DbWebHandler( const string& name , double priority , bool requiresREST );
+        DbWebHandler( const std::string& name , double priority , bool requiresREST );
         virtual ~DbWebHandler() {}
 
-        virtual bool handles( const string& url ) const { return url == _defaultUrl; }
+        virtual bool handles( const std::string& url ) const { return url == _defaultUrl; }
 
-        virtual bool requiresREST( const string& url ) const { return _requiresREST; }
+        virtual bool requiresREST( const std::string& url ) const { return _requiresREST; }
 
         virtual void handle( OperationContext* txn,
                              const char *rq, // the full request
                              const std::string& url,
                              BSONObj params,
                              // set these and return them:
-                             string& responseMsg,
+                             std::string& responseMsg,
                              int& responseCode,
-                             vector<string>& headers, // if completely empty, content-type: text/html will be added
+                             std::vector<std::string>& headers, // if completely empty, content-type: text/html will be added
                              const SockAddr &from
                            ) = 0;
 
-        string toString() const { return _toString; }
-        static DbWebHandler * findHandler( const string& url );
+        std::string toString() const { return _toString; }
+        static DbWebHandler * findHandler( const std::string& url );
 
     private:
-        string _name;
+        std::string _name;
         bool _requiresREST;
 
-        string _defaultUrl;
-        string _toString;
+        std::string _defaultUrl;
+        std::string _toString;
 
-        static vector<DbWebHandler*> * _handlers;
+        static std::vector<DbWebHandler*> * _handlers;
     };
 
     class WebStatusPlugin : public Prioritizable {
     public:
-        WebStatusPlugin( const string& secionName , double priority , const string& subheader = "" );
+        WebStatusPlugin( const std::string& secionName , double priority , const std::string& subheader = "" );
         virtual ~WebStatusPlugin() {}
 
-        virtual void run( stringstream& ss ) = 0;
+        virtual void run( std::stringstream& ss ) = 0;
         /** called when web server stats up */
         virtual void init() = 0;
 
         static void initAll();
-        static void runAll( stringstream& ss );
+        static void runAll( std::stringstream& ss );
     private:
-        string _name;
-        string _subHeading;
-        static vector<WebStatusPlugin*> * _plugins;
+        std::string _name;
+        std::string _subHeading;
+        static std::vector<WebStatusPlugin*> * _plugins;
 
     };
     void webServerThread( const AdminAccess* admins, OperationContext::Factory transactionFactory );
-    string prettyHostName();
+    std::string prettyHostName();
 
 };

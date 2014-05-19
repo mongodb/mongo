@@ -67,7 +67,7 @@ namespace mongo {
     class Client : public ClientBasic {
     public:
         // always be in clientsMutex when manipulating this. killop stuff uses these.
-        static set<Client*>& clients;
+        static std::set<Client*>& clients;
         static mongo::mutex& clientsMutex;
         static int getActiveClientCount( int& writers , int& readers );
         class Context;
@@ -90,7 +90,7 @@ namespace mongo {
          */
         bool shutdown();
 
-        string clientAddress(bool includePort=false) const;
+        std::string clientAddress(bool includePort=false) const;
         CurOp* curop() const { return _curOp; }
         Context* getContext() const { return _context; }
         const StringData desc() const { return _desc; }
@@ -102,7 +102,7 @@ namespace mongo {
 
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
-        string toString() const;
+        std::string toString() const;
         bool gotHandshake( const BSONObj& o );
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
@@ -125,7 +125,7 @@ namespace mongo {
         Client(const std::string& desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
-        string _threadId; // "" on non support systems
+        std::string _threadId; // "" on non support systems
         CurOp * _curOp;
         Context * _context;
         bool _shutdown; // to track if Client::shutdown() gets called
@@ -161,7 +161,7 @@ namespace mongo {
         class Context : boost::noncopyable {
         public:
             /** this is probably what you want */
-            Context(const string& ns, const std::string& path=storageGlobalParams.dbpath,
+            Context(const std::string& ns, const std::string& path=storageGlobalParams.dbpath,
                     bool doVersion = true);
 
             /** note: this does not call finishInit -- i.e., does not call 
@@ -171,13 +171,13 @@ namespace mongo {
             Context(const std::string& ns , Database * db);
 
             // used by ReadContext
-            Context(const string& path, const string& ns, Database *db, bool doVersion = true);
+            Context(const std::string& path, const std::string& ns, Database *db, bool doVersion = true);
 
             ~Context();
             Client* getClient() const { return _client; }
             Database* db() const { return _db; }
             const char * ns() const { return _ns.c_str(); }
-            bool equals(const string& ns, const string& path=storageGlobalParams.dbpath) const {
+            bool equals(const std::string& ns, const std::string& path=storageGlobalParams.dbpath) const {
                 return _ns == ns && _path == path;
             }
 
@@ -185,10 +185,10 @@ namespace mongo {
             bool justCreated() const { return _justCreated; }
 
             /** @return true iff the current Context is using db/path */
-            bool inDB(const string& db, const string& path=storageGlobalParams.dbpath) const;
+            bool inDB(const std::string& db, const std::string& path=storageGlobalParams.dbpath) const;
 
             void _clear() { // this is sort of an "early destruct" indication, _ns can never be uncleared
-                const_cast<string&>(_ns).clear();
+                const_cast<std::string&>(_ns).clear();
                 _db = 0;
             }
 
@@ -208,10 +208,10 @@ namespace mongo {
             void checkNsAccess( bool doauth, int lockState );
             Client * const _client;
             Context * const _oldContext;
-            const string _path;
+            const std::string _path;
             bool _justCreated;
             bool _doVersion;
-            const string _ns;
+            const std::string _ns;
             Database * _db;
             
             Timer _timer;
@@ -219,7 +219,7 @@ namespace mongo {
 
         class WriteContext : boost::noncopyable {
         public:
-            WriteContext(const string& ns,
+            WriteContext(const std::string& ns,
                          const std::string& path=storageGlobalParams.dbpath,
                          bool doVersion = true);
             Context& ctx() { return _c; }

@@ -71,14 +71,14 @@ namespace mongo {
                                       2 + S2::kAvgEdge.GetClosestLevel(edgeLen)));
             coverer.set_max_level(4 + coverer.min_level());
 
-            vector<S2CellId> cover;
+            std::vector<S2CellId> cover;
             coverer.GetCovering(region, &cover);
 
             // Look at the cells we cover and all cells that are within our covering and finer.
             // Anything with our cover as a strict prefix is contained within the cover and should
             // be intersection tested.
             bool considerCoarser = false;
-            set<string> intervalSet;
+            std::set<std::string> intervalSet;
             for (size_t i = 0; i < cover.size(); ++i) {
                 intervalSet.insert(cover[i].toString());
                 // If any of our covers could be covered by something in the index, we have
@@ -88,7 +88,7 @@ namespace mongo {
                 }
             }
 
-            set<string> exactSet;
+            std::set<std::string> exactSet;
             if (considerCoarser) {
                 // Look at the cells that cover us.  We want to look at every cell that contains the
                 // covering we would index on if we were to insert the query geometry.  We generate
@@ -113,18 +113,18 @@ namespace mongo {
 
             // We turned the cell IDs into strings which define point intervals or prefixes of
             // strings we want to look for.
-            set<string>::iterator exactIt = exactSet.begin();
-            set<string>::iterator intervalIt = intervalSet.begin();
+            std::set<std::string>::iterator exactIt = exactSet.begin();
+            std::set<std::string>::iterator intervalIt = intervalSet.begin();
             while (exactSet.end() != exactIt && intervalSet.end() != intervalIt) {
-                const string& exact = *exactIt;
-                const string& ival = *intervalIt;
+                const std::string& exact = *exactIt;
+                const std::string& ival = *intervalIt;
                 if (exact < ival) {
                     // add exact
                     oilOut->intervals.push_back(IndexBoundsBuilder::makePointInterval(exact));
                     exactIt++;
                 }
                 else {
-                    string end = ival;
+                    std::string end = ival;
                     end[end.size() - 1]++;
                     oilOut->intervals.push_back(
                         IndexBoundsBuilder::makeRangeInterval(ival, end, true, false));
@@ -142,8 +142,8 @@ namespace mongo {
             else if (intervalSet.end() != intervalIt) {
                 verify(exactSet.end() == exactIt);
                 do {
-                    const string& ival = *intervalIt;
-                    string end = ival;
+                    const std::string& ival = *intervalIt;
+                    std::string end = ival;
                     end[end.size() - 1]++;
                     oilOut->intervals.push_back(
                         IndexBoundsBuilder::makeRangeInterval(ival, end, true, false));
@@ -154,7 +154,7 @@ namespace mongo {
             // Make sure that our intervals don't overlap each other and are ordered correctly.
             // This perhaps should only be done in debug mode.
             if (!oilOut->isValidFor(1)) {
-                cout << "check your assumptions! OIL = " << oilOut->toString() << endl;
+                cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
                 verify(0);
             }
         }

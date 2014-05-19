@@ -313,7 +313,7 @@ namespace mutablebson {
         /** Create a new double Element with the given value and field name. */
         Element makeElementDouble(const StringData& fieldName, double value);
 
-        /** Create a new string Element with the given value and field name. */
+        /** Create a new std::string Element with the given value and field name. */
         Element makeElementString(const StringData& fieldName, const StringData& value);
 
         /** Create a new empty object Element with the given field name. */

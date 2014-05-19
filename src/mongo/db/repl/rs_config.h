@@ -38,7 +38,7 @@
 
 namespace mongo {
     class Member;
-    const string rsConfigNs = "local.system.replset";
+    const std::string rsConfigNs = "local.system.replset";
 
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
@@ -82,14 +82,14 @@ namespace mongo {
             int slaveDelay;       /* seconds.  int rather than unsigned for convenient to/front bson conversion. */
             bool hidden;          /* if set, don't advertise to drives in isMaster. for non-primaries (priority 0) */
             bool buildIndexes;    /* if false, do not create any non-_id indexes */
-            map<string,string> tags;     /* tagging for data center, rack, etc. */
+            std::map<std::string,std::string> tags;     /* tagging for data center, rack, etc. */
         private:
-            set<TagSubgroup*> _groups; // the subgroups this member belongs to
+            std::set<TagSubgroup*> _groups; // the subgroups this member belongs to
         public:
-            const set<TagSubgroup*>& groups() const { 
+            const std::set<TagSubgroup*>& groups() const {
                 return _groups;
             }
-            set<TagSubgroup*>& groupsw() {
+            std::set<TagSubgroup*>& groupsw() {
                 return _groups;
             }
             void check() const;   /* check validity, assert if not. */
@@ -98,7 +98,7 @@ namespace mongo {
             void updateGroups(const OpTime& last) {
                 RACECHECK
                 scoped_lock lk(ReplSetConfig::groupMx);
-                for (set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
+                for (std::set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
                     (*it)->updateLast(last);
                 }
             }
@@ -115,8 +115,8 @@ namespace mongo {
 
                     // if they are the same size and not equal, at least one
                     // element in A must be different in B
-                    for (map<string,string>::const_iterator lit = tags.begin(); lit != tags.end(); lit++) {
-                        map<string,string>::const_iterator rit = r.tags.find((*lit).first);
+                    for (std::map<std::string,std::string>::const_iterator lit = tags.begin(); lit != tags.end(); lit++) {
+                        std::map<std::string,std::string>::const_iterator rit = r.tags.find((*lit).first);
 
                         if (rit == r.tags.end() || (*lit).second != (*rit).second) {
                             return false;
@@ -129,8 +129,8 @@ namespace mongo {
             bool operator!=(const MemberCfg& r) const { return !(*this == r); }
         };
 
-        vector<MemberCfg> members;
-        string _id;
+        std::vector<MemberCfg> members;
+        std::string _id;
         int version;
 
         struct HealthOptions {
@@ -156,26 +156,26 @@ namespace mongo {
         };
 
         HealthOptions ho;
-        string md5;
+        std::string md5;
         BSONObj getLastErrorDefaults;
-        map<string,TagRule*> rules;
+        std::map<std::string,TagRule*> rules;
 
-        list<HostAndPort> otherMemberHostnames() const; // except self
+        std::list<HostAndPort> otherMemberHostnames() const; // except self
 
         /** @return true if could connect, and there is no cfg object there at all */
         bool empty() const { return version == EMPTYCONFIG; }
 
-        string toString() const { return asBson().toString(); }
+        std::string toString() const { return asBson().toString(); }
 
         /** validate the settings. does not call check() on each member, you have to do that separately. */
         void checkRsConfig() const;
 
         /** check if modification makes sense */
-        static bool legalChange(const ReplSetConfig& old, const ReplSetConfig& n, string& errmsg);
+        static bool legalChange(const ReplSetConfig& old, const ReplSetConfig& n, std::string& errmsg);
 
         //static void receivedNewConfig(BSONObj);
         void saveConfigLocally(BSONObj comment); // to local db
-        string saveConfigEverywhere(); // returns textual info on what happened
+        std::string saveConfigEverywhere(); // returns textual info on what happened
 
         /**
          * Update members' groups when the config changes but members stay the same.
@@ -248,14 +248,14 @@ namespace mongo {
         struct TagSubgroup : boost::noncopyable {
             ~TagSubgroup(); // never called; not defined
             TagSubgroup(const std::string& nm) : name(nm) { }
-            const string name;
+            const std::string name;
             OpTime last;
-            vector<TagClause*> clauses;
+            std::vector<TagClause*> clauses;
 
             // this probably won't actually point to valid members after the
             // subgroup is created, as initFromConfig() makes a copy of the
             // config
-            set<MemberCfg*> m;
+            std::set<MemberCfg*> m;
 
             void updateLast(const OpTime& op);
 
@@ -279,9 +279,9 @@ namespace mongo {
          */
         struct TagClause {
             OpTime last;
-            map<string,TagSubgroup*> subgroups;
+            std::map<std::string,TagSubgroup*> subgroups;
             TagRule *rule;
-            string name;
+            std::string name;
             /**
              * If we have get a clause like {machines : 3} and this server is
              * tagged with "machines", then it's really {machines : 2}, as we
@@ -292,7 +292,7 @@ namespace mongo {
             int actualTarget;
 
             void updateLast(const OpTime& op);
-            string toString() const;
+            std::string toString() const;
         };
 
         /**
@@ -316,15 +316,15 @@ namespace mongo {
          * "ny" -> {A, B},{C}
          * "sf" -> {D},{E}
          */
-        void _populateTagMap(map<string,TagClause> &tagMap);
+        void _populateTagMap(std::map<std::string,TagClause> &tagMap);
 
     public:
         struct TagRule {
-            vector<TagClause*> clauses;
+            std::vector<TagClause*> clauses;
             OpTime last;
 
             void updateLast(const OpTime& op);
-            string toString() const;
+            std::string toString() const;
         };
     };
 

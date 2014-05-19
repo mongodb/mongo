@@ -40,8 +40,8 @@ namespace mongo {
      * path + dbname -> Database
      */
     class DatabaseHolder {
-        typedef map<string,Database*> DBs;
-        typedef map<string,DBs> Paths;
+        typedef std::map<std::string,Database*> DBs;
+        typedef std::map<std::string,DBs> Paths;
         // todo: we want something faster than this if called a lot:
         mutable SimpleMutex _m;
         Paths _paths;
@@ -49,42 +49,42 @@ namespace mongo {
     public:
         DatabaseHolder() : _m("dbholder"),_size(0) { }
 
-        bool __isLoaded( const string& ns , const string& path ) const {
+        bool __isLoaded( const std::string& ns , const std::string& path ) const {
             SimpleMutex::scoped_lock lk(_m);
             Paths::const_iterator x = _paths.find( path );
             if ( x == _paths.end() )
                 return false;
             const DBs& m = x->second;
 
-            string db = _todb( ns );
+            std::string db = _todb( ns );
 
             DBs::const_iterator it = m.find(db);
             return it != m.end();
         }
         // must be write locked as otherwise isLoaded could go false->true on you 
         // in the background and you might not expect that.
-        bool _isLoaded( const string& ns , const string& path ) const {
+        bool _isLoaded( const std::string& ns , const std::string& path ) const {
             Lock::assertWriteLocked(ns);
             return __isLoaded(ns,path);
         }
 
-        Database * get( const string& ns , const string& path ) const {
+        Database * get( const std::string& ns , const std::string& path ) const {
             SimpleMutex::scoped_lock lk(_m);
             Lock::assertAtLeastReadLocked(ns);
             Paths::const_iterator x = _paths.find( path );
             if ( x == _paths.end() )
                 return 0;
             const DBs& m = x->second;
-            string db = _todb( ns );
+            std::string db = _todb( ns );
             DBs::const_iterator it = m.find(db);
             if ( it != m.end() )
                 return it->second;
             return 0;
         }
 
-        Database* getOrCreate( const string& ns , const string& path , bool& justCreated );
+        Database* getOrCreate( const std::string& ns , const std::string& path , bool& justCreated );
 
-        void erase( const string& ns , const string& path ) {
+        void erase( const std::string& ns , const std::string& path ) {
             SimpleMutex::scoped_lock lk(_m);
             verify( Lock::isW() );
             DBs& m = _paths[path];
@@ -92,7 +92,7 @@ namespace mongo {
         }
 
         /** @param force - force close even if something underway - use at shutdown */
-        bool closeAll( const string& path , BSONObjBuilder& result, bool force );
+        bool closeAll( const std::string& path , BSONObjBuilder& result, bool force );
 
         // "info" as this is informational only could change on you if you are not write locked
         int sizeInfo() const { return _size; }
@@ -101,7 +101,7 @@ namespace mongo {
          * gets all unique db names, ignoring paths
          * need some lock
          */
-        void getAllShortNames( set<string>& all ) const {
+        void getAllShortNames( std::set<std::string>& all ) const {
             SimpleMutex::scoped_lock lk(_m);
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
@@ -112,14 +112,14 @@ namespace mongo {
         }
 
     private:
-        static string _todb( const string& ns ) {
-            string d = __todb( ns );
-            uassert( 13280 , (string)"invalid db name: " + ns , NamespaceString::validDBName( d ) );
+        static std::string _todb( const std::string& ns ) {
+            std::string d = __todb( ns );
+            uassert( 13280 , (std::string)"invalid db name: " + ns , NamespaceString::validDBName( d ) );
             return d;
         }
-        static string __todb( const string& ns ) {
+        static std::string __todb( const std::string& ns ) {
             size_t i = ns.find( '.' );
-            if ( i == string::npos ) {
+            if ( i == std::string::npos ) {
                 uassert( 13074 , "db name can't be empty" , ns.size() );
                 return ns;
             }

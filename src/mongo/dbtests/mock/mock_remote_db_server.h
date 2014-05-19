@@ -40,7 +40,7 @@
 namespace mongo {
 
     const std::string IdentityNS("local.me");
-    const BSONField<string> HostField("host");
+    const BSONField<std::string> HostField("host");
 
     /**
      * A very simple mock that acts like a database server. Every object keeps track of its own
@@ -136,7 +136,7 @@ namespace mongo {
          * @param obj the document to insert.
          * @param flags ignored.
          */
-        void insert(const string& ns, BSONObj obj, int flags = 0);
+        void insert(const std::string& ns, BSONObj obj, int flags = 0);
 
         /**
          * Removes documents from this server.
@@ -145,7 +145,7 @@ namespace mongo {
          * @param query ignored.
          * @param flags ignored.
          */
-        void remove(const string& ns, Query query, int flags = 0);
+        void remove(const std::string& ns, Query query, int flags = 0);
 
         //
         // DBClientBase methods
@@ -172,7 +172,7 @@ namespace mongo {
         double getSoTimeout() const;
 
         /**
-         * @return the exact string address passed to hostAndPort parameter of the
+         * @return the exact std::string address passed to hostAndPort parameter of the
          *     constructor. In other words, doesn't automatically append a
          *     'default' port if none is specified.
          */
@@ -212,7 +212,7 @@ namespace mongo {
         void checkIfUp(InstanceID id) const;
 
         typedef unordered_map<std::string, boost::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
-        typedef unordered_map<std::string, vector<BSONObj> > MockDataMgr;
+        typedef unordered_map<std::string, std::vector<BSONObj> > MockDataMgr;
 
         bool _isRunning;
 

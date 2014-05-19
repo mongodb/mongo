@@ -40,7 +40,7 @@ namespace mongo {
         virtual bool isWriteCommandForConfigServer() const;
         virtual bool slaveOk() const;
         virtual bool adminOnly() const;
-        virtual void help(stringstream& ss) const;
+        virtual void help(std::stringstream& ss) const;
 
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,

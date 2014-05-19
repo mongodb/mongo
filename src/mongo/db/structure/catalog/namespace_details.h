@@ -264,7 +264,7 @@ namespace mongo {
         */
         void paddingFits( OperationContext* txn ) {
             MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
-                double x = max(1.0, _paddingFactor - 0.001 );
+                double x = std::max(1.0, _paddingFactor - 0.001 );
                 setPaddingFactor( txn, x );
             }
         }
@@ -277,8 +277,8 @@ namespace mongo {
                    can pushes this down considerably. further tweaking will be a good idea but 
                    this should be an adequate starting point.
                 */
-                double N = min(_nIndexes,7) + 3;
-                double x = min(2.0,_paddingFactor + (0.001 * N));
+                double N = std::min(_nIndexes,7) + 3;
+                double x = std::min(2.0,_paddingFactor + (0.001 * N));
                 setPaddingFactor( txn, x );
             }
         }

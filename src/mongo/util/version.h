@@ -41,7 +41,7 @@ namespace mongo {
     extern const BSONArray versionArray;
     std::string mongodVersion();
 
-    // Convert a version string into a numeric array
+    // Convert a version std::string into a numeric array
     BSONArray toVersionArray(const char* version);
 
     // Checks whether another version is the same major version as us

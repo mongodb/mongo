@@ -88,7 +88,7 @@ namespace mongo {
         void insert( uint32_t element );
 
         /**
-         * Render the histogram as string that can be used inside an
+         * Render the histogram as std::string that can be used inside an
          * HTML doc.
          */
         std::string toHTML() const;

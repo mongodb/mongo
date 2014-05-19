@@ -47,7 +47,7 @@ namespace mongo {
         int port;
         int delay;
         int connectTimeoutSec;
-        string destUri;
+        std::string destUri;
 
         MongoBridgeGlobalParams() : port(0), delay(0), connectTimeoutSec(15) {}
     };

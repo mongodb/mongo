@@ -55,7 +55,7 @@ namespace mongo {
      * compatible, and an error Status if anything else goes wrong.
      */
     Status checkClusterMongoVersions(const ConnectionString& configLoc,
-                                     const string& minMongoVersion);
+                                     const std::string& minMongoVersion);
 
     /**
      * Returns all collections in the cluster, found at this moment.
@@ -63,7 +63,7 @@ namespace mongo {
      * Returns OK if loaded successfully, error Status if not.
      */
     Status findAllCollections(const ConnectionString& configLoc,
-                              OwnedPointerMap<string, CollectionType>* collections);
+                              OwnedPointerMap<std::string, CollectionType>* collections);
 
     /**
      * Returns all collections in the cluster, but does not throw an error if epochs are not
@@ -72,7 +72,7 @@ namespace mongo {
      * Returns OK if loaded successfully, error Status if not.
      */
     Status findAllCollectionsV3(const ConnectionString& configLoc,
-                                OwnedPointerMap<string, CollectionType>* collections);
+                                OwnedPointerMap<std::string, CollectionType>* collections);
 
     /**
      * Returns all chunks for a collection in the cluster.
@@ -80,7 +80,7 @@ namespace mongo {
      * Returns OK if loaded successfully, error Status if not.
      */
     Status findAllChunks(const ConnectionString& configLoc,
-                         const string& ns,
+                         const std::string& ns,
                          OwnedPointerVector<ChunkType>* chunks);
 
     /**
@@ -89,9 +89,9 @@ namespace mongo {
      * Returns OK if loaded successfully, error Status if not.
      */
     Status logConfigChange(const ConnectionString& configLoc,
-                           const string& clientHost,
-                           const string& ns,
-                           const string& description,
+                           const std::string& clientHost,
+                           const std::string& ns,
+                           const std::string& description,
                            const BSONObj& details);
 
     //
@@ -103,6 +103,6 @@ namespace mongo {
     void _checkGLE(ScopedDbConnection& conn);
 
     // Helper function which throws for invalid cursor initialization
-    DBClientCursor* _safeCursor(auto_ptr<DBClientCursor> cursor);
+    DBClientCursor* _safeCursor(std::auto_ptr<DBClientCursor> cursor);
 
 }

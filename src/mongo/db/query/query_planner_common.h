@@ -95,7 +95,7 @@ namespace mongo {
                 }
                 else {
                     for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
-                        vector<Interval>& iv = isn->bounds.fields[i].intervals;
+                        std::vector<Interval>& iv = isn->bounds.fields[i].intervals;
                         // Step 1: reverse the list.
                         std::reverse(iv.begin(), iv.end());
                         // Step 2: reverse each interval.
@@ -106,7 +106,7 @@ namespace mongo {
                 }
 
                 if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
-                    QLOG() << "Invalid bounds: " << isn->bounds.toString() << endl;
+                    QLOG() << "Invalid bounds: " << isn->bounds.toString() << std::endl;
                     verify(0);
                 }
 

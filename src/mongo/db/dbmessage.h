@@ -57,20 +57,20 @@ namespace mongo {
    then for:
 
    dbInsert:
-      string collection;
+      std::string collection;
       a series of JSObjects
    dbDelete:
-      string collection;
+      std::string collection;
       int flags=0; // 1=DeleteSingle
       JSObject query;
    dbUpdate:
-      string collection;
+      std::string collection;
       int flags; // 1=upsert
       JSObject query;
       JSObject objectToUpdate;
         objectToUpdate may include { $inc: <field> } or { $set: ... }, see struct Mod.
    dbQuery:
-      string collection;
+      std::string collection;
       int nToSkip;
       int nToReturn; // how many you want back as the beginning of the cursor data (0=no limit)
                      // greater than zero is simply a hint on how many objects to send back per "cursor batch".
@@ -78,7 +78,7 @@ namespace mongo {
       JSObject query;
       [JSObject fieldsToReturn]
    dbGetMore:
-      string collection; // redundant, might use for security.
+      std::string collection; // redundant, might use for security.
       int nToReturn;
       int64 cursorID;
    dbKillCursors=2007:
@@ -285,7 +285,7 @@ namespace mongo {
     struct DbResponse {
         Message *response;
         MSGID responseTo;
-        string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
+        std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
         DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt){ }
         DbResponse() {
             response = 0;

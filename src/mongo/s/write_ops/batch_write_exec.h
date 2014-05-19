@@ -93,7 +93,7 @@ namespace mongo {
         MultiCommandDispatch* _dispatcher;
 
         // Stats
-        auto_ptr<BatchWriteExecStats> _stats;
+        std::auto_ptr<BatchWriteExecStats> _stats;
     };
 
     struct HostOpTime {

@@ -48,7 +48,7 @@ namespace mongo {
         checking.  if you want to say 'my param MUST be a relative path", use this.
     */
     struct RelativePath {
-        string _p;
+        std::string _p;
 
         bool empty() const { return _p.empty(); }
 
@@ -61,8 +61,8 @@ namespace mongo {
         /** from a full path */
         static RelativePath fromFullPath(boost::filesystem::path f) {
             boost::filesystem::path dbp(storageGlobalParams.dbpath); // normalizes / and backslash
-            string fullpath = f.string();
-            string relative = str::after(fullpath, dbp.string());
+            std::string fullpath = f.string();
+            std::string relative = str::after(fullpath, dbp.string());
             if( relative.empty() ) {
                 log() << "warning file is not under db path? " << fullpath << ' ' << dbp.string();
                 RelativePath rp;
@@ -77,13 +77,13 @@ namespace mongo {
             return rp;
         }
 
-        string toString() const { return _p; }
+        std::string toString() const { return _p; }
 
         bool operator!=(const RelativePath& r) const { return _p != r._p; }
         bool operator==(const RelativePath& r) const { return _p == r._p; }
         bool operator<(const RelativePath& r) const { return _p < r._p; }
 
-        string asFullPath() const {
+        std::string asFullPath() const {
             boost::filesystem::path x(storageGlobalParams.dbpath);
             x /= _p;
             return x.string();
@@ -91,7 +91,7 @@ namespace mongo {
 
     };
 
-    inline dev_t getPartition(const string& path){
+    inline dev_t getPartition(const std::string& path){
         struct stat stats;
 
         if (stat(path.c_str(), &stats) != 0){
@@ -101,7 +101,7 @@ namespace mongo {
         return stats.st_dev;
     }
     
-    inline bool onSamePartition(const string& path1, const string& path2){
+    inline bool onSamePartition(const std::string& path1, const std::string& path2){
         dev_t dev1 = getPartition(path1);
         dev_t dev2 = getPartition(path2);
 

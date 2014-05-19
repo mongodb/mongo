@@ -138,7 +138,7 @@ namespace twod_exec {
 
         // Safe to use currently since we don't yield in $near searches.  If we do start to yield,
         // we may need to replace dirtied disklocs in our holder / ensure our logic is correct.
-        map<DiskLoc, Holder::iterator> _seenPts;
+        std::map<DiskLoc, Holder::iterator> _seenPts;
 
     private:
         const Collection* _collection;
@@ -172,7 +172,7 @@ namespace twod_exec {
         // Whether the current box overlaps our search area
         virtual double intersectsBox(Box& cur) { return cur.intersects(_want); }
 
-        set< pair<DiskLoc,int> > _seen;
+        std::set< std::pair<DiskLoc,int> > _seen;
         GeoHash _start;
         int _numWanted;
         double _scanDistance;

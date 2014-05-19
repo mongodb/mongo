@@ -66,17 +66,17 @@ namespace mongo {
         // ActionSet.
         bool isSupersetOf(const ActionSet& other) const;
 
-        // Returns the string representation of this ActionSet
+        // Returns the std::string representation of this ActionSet
         std::string toString() const;
 
         // Returns a vector of strings representing the actions in the ActionSet.
         std::vector<std::string> getActionsAsStrings() const;
 
-        // Takes a comma-separated string of action type string representations and returns
+        // Takes a comma-separated std::string of action type std::string representations and returns
         // an int bitmask of the actions.
         static Status parseActionSetFromString(const std::string& actionsString, ActionSet* result);
 
-        // Takes a vector of action type string representations and returns an ActionSet of the
+        // Takes a vector of action type std::string representations and returns an ActionSet of the
         // actions.
         static Status parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,
                                                      ActionSet* result);

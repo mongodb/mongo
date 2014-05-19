@@ -66,8 +66,8 @@ namespace mongo {
     private:
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
 
-        string _geoField;
-        vector<string> _otherFields;
+        std::string _geoField;
+        std::vector<std::string> _otherFields;
         double _bucketSize;
     };
 

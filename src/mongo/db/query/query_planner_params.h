@@ -88,7 +88,7 @@ namespace mongo {
         size_t options;
 
         // What indices are available for planning?
-        vector<IndexEntry> indices;
+        std::vector<IndexEntry> indices;
 
         // What's our shard key?  If INCLUDE_SHARD_FILTER is set we will create a shard filtering
         // stage.  If we know the shard key, we can perform covering analysis instead of always

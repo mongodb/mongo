@@ -375,7 +375,7 @@ namespace mongo {
             return appendCode(fieldName, code.code);
         }
 
-        /** Append a string element.
+        /** Append a std::string element.
             @param sz size includes terminating null character */
         BSONObjBuilder& append(const StringData& fieldName, const char *str, int sz) {
             _b.appendNum((char) String);
@@ -384,15 +384,15 @@ namespace mongo {
             _b.appendBuf(str, sz);
             return *this;
         }
-        /** Append a string element */
+        /** Append a std::string element */
         BSONObjBuilder& append(const StringData& fieldName, const char *str) {
             return append(fieldName, str, (int) strlen(str)+1);
         }
-        /** Append a string element */
+        /** Append a std::string element */
         BSONObjBuilder& append(const StringData& fieldName, const std::string& str) {
             return append(fieldName, str.c_str(), (int) str.size()+1);
         }
-        /** Append a string element */
+        /** Append a std::string element */
         BSONObjBuilder& append(const StringData& fieldName, const StringData& str) {
             _b.appendNum((char) String);
             _b.appendStr(fieldName);
@@ -863,7 +863,7 @@ namespace mongo {
             long int n;
             Status status = parseNumberFromStringWithBase( name, 10, &n );
             uassert( 13048,
-                     (string)"can't append to array using string field name: " + name.toString(),
+                     (std::string)"can't append to array using std::string field name: " + name.toString(),
                      status.isOK() );
             fill(n);
         }

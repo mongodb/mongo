@@ -46,12 +46,12 @@ namespace mongo {
             /*
              * Helper method to get return entry from the FTSIndex as a BSONObj
              * @param weight, the weight of the term in the entry
-             * @param term, the string term in the entry
+             * @param term, the std::string term in the entry
              * @param indexPrefix, the fields that go in the index first
              * @param textIndexVersion, index version. affects key format.
              */
             static BSONObj getIndexKey( double weight,
-                                        const string& term,
+                                        const std::string& term,
                                         const BSONObj& indexPrefix,
                                         TextIndexVersion textIndexVersion );
 
@@ -60,10 +60,10 @@ namespace mongo {
              * Helper method to get return entry from the FTSIndex as a BSONObj
              * @param b, reference to the BSONOBjBuilder
              * @param weight, the weight of the term in the entry
-             * @param term, the string term in the entry
+             * @param term, the std::string term in the entry
              * @param textIndexVersion, index version. affects key format.
              */
-            static void _appendIndexKey( BSONObjBuilder& b, double weight, const string& term,
+            static void _appendIndexKey( BSONObjBuilder& b, double weight, const std::string& term,
                                          TextIndexVersion textIndexVersion );
         };
 

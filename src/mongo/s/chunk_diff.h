@@ -75,10 +75,10 @@ namespace mongo {
          *
          * TODO: Make a standard VersionedRange to encapsulate this info in both mongod and mongos?
          */
-        void attach( const string& ns,
+        void attach( const std::string& ns,
                      RangeMap& currMap,
                      ChunkVersion& maxVersion,
-                     map<ShardType, ChunkVersion>& maxShardVersions )
+                     std::map<ShardType, ChunkVersion>& maxShardVersions )
         {
             _ns = ns;
             _currMap = &currMap;
@@ -123,8 +123,8 @@ namespace mongo {
         virtual BSONObj minFrom( const ValType& max ) const { verify( false ); return BSONObj(); }
 
         virtual std::pair<BSONObj,ValType> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const = 0;
-        virtual ShardType shardFor( const string& name ) const = 0;
-        virtual string nameFrom( const ShardType& shard ) const = 0;
+        virtual ShardType shardFor( const std::string& name ) const = 0;
+        virtual std::string nameFrom( const ShardType& shard ) const = 0;
 
         ///
         /// End adapter functions
@@ -146,8 +146,8 @@ namespace mongo {
         // specified.
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
         // Throws a DBException on connection errors
-        int calculateConfigDiff( string config,
-                                 const set<ChunkVersion>& extraMinorVersions = set<ChunkVersion>() );
+        int calculateConfigDiff( std::string config,
+                                 const std::set<ChunkVersion>& extraMinorVersions = std::set<ChunkVersion>() );
 
         // Applies changes to the config data from a cursor passed in
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
@@ -156,14 +156,14 @@ namespace mongo {
 
         // Returns the query needed to find new changes to a collection from the config server
         // Needed only if a custom connection is required to the config server
-        Query configDiffQuery( const set<ChunkVersion>& extraMinorVersions = set<ChunkVersion>() ) const;
+        Query configDiffQuery( const std::set<ChunkVersion>& extraMinorVersions = std::set<ChunkVersion>() ) const;
 
     private:
 
-        string _ns;
+        std::string _ns;
         RangeMap* _currMap;
         ChunkVersion* _maxVersion;
-        map<ShardType, ChunkVersion>* _maxShardVersions;
+        std::map<ShardType, ChunkVersion>* _maxShardVersions;
 
         // Store for later use
         int _validDiffs;

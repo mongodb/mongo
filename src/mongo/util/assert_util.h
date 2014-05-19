@@ -279,7 +279,7 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        stringstream ss; \
+        std::stringstream ss; \
         ss << "caught exception: " << e.what() << ' ' << __FILE__ << ' ' << __LINE__; \
         msgasserted( 13294 , ss.str() ); \
     } catch ( ... ) { \
@@ -290,7 +290,7 @@ namespace mongo {
     try { \
         expression; \
     } catch ( const std::exception &e ) { \
-        stringstream ss; \
+        std::stringstream ss; \
         ss << msg << " caught exception exception: " << e.what();   \
         msgasserted( 14043 , ss.str() );        \
     } catch ( ... ) { \

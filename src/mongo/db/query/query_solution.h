@@ -53,9 +53,9 @@ namespace mongo {
         }
 
         /**
-         * Return a string representation of this node and any children.
+         * Return a std::string representation of this node and any children.
          */
-        string toString() const;
+        std::string toString() const;
 
         /**
          * What stage should this be transcribed to?  See stage_types.h.
@@ -103,7 +103,7 @@ namespace mongo {
          *
          * TODO: 'field' is probably more appropriate as a FieldRef or string.
          */
-        virtual bool hasField(const string& field) const = 0;
+        virtual bool hasField(const std::string& field) const = 0;
 
         /**
          * Returns true if the tree rooted at this node provides data that is sorted by the
@@ -143,7 +143,7 @@ namespace mongo {
         }
 
         // These are owned here.
-        vector<QuerySolutionNode*> children;
+        std::vector<QuerySolutionNode*> children;
 
         // If a stage has a non-NULL filter all values outputted from that stage must pass that
         // filter.
@@ -199,9 +199,9 @@ namespace mongo {
         boost::scoped_ptr<SolutionCacheData> cacheData;
 
         /**
-         * Output a human-readable string representing the plan.
+         * Output a human-readable std::string representing the plan.
          */
-        string toString() {
+        std::string toString() {
             if (NULL == root) {
                 return "empty query solution";
             }
@@ -224,7 +224,7 @@ namespace mongo {
 
         // text's return is LOC_AND_UNOWNED_OBJ so it's fetched and has all fields.
         bool fetched() const { return true; }
-        bool hasField(const string& field) const { return true; }
+        bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sort; }
 
@@ -251,7 +251,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
-        bool hasField(const string& field) const { return true; }
+        bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sort; }
 
@@ -260,7 +260,7 @@ namespace mongo {
         BSONObjSet _sort;
 
         // Name of the namespace.
-        string name;
+        std::string name;
 
         // Should we make a tailable cursor?
         bool tailable;
@@ -280,7 +280,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
-        bool hasField(const string& field) const;
+        bool hasField(const std::string& field) const;
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return children.back()->getSort(); }
 
@@ -298,7 +298,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
-        bool hasField(const string& field) const;
+        bool hasField(const std::string& field) const;
         bool sortedByDiskLoc() const { return true; }
         const BSONObjSet& getSort() const { return _sort; }
 
@@ -316,7 +316,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
-        bool hasField(const string& field) const;
+        bool hasField(const std::string& field) const;
         bool sortedByDiskLoc() const {
             // Even if our children are sorted by their diskloc or other fields, we don't maintain
             // any order on the output.
@@ -340,7 +340,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const;
-        bool hasField(const string& field) const;
+        bool hasField(const std::string& field) const;
         bool sortedByDiskLoc() const { return false; }
 
         const BSONObjSet& getSort() const { return _sorts; }
@@ -370,7 +370,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
-        bool hasField(const string& field) const { return true; }
+        bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
@@ -390,7 +390,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return false; }
-        bool hasField(const string& field) const;
+        bool hasField(const std::string& field) const;
         bool sortedByDiskLoc() const;
         const BSONObjSet& getSort() const { return _sorts; }
 
@@ -448,7 +448,7 @@ namespace mongo {
          */
         bool fetched() const { return true; }
 
-        bool hasField(const string& field) const {
+        bool hasField(const std::string& field) const {
             // TODO: Returning false isn't always the right answer -- we may either be including
             // certain fields, or we may be dropping fields (in which case hasField returns true).
             //
@@ -502,7 +502,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
-        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool hasField(const std::string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return false; }
 
         const BSONObjSet& getSort() const { return _sorts; }
@@ -536,7 +536,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
-        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool hasField(const std::string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
@@ -553,7 +553,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
-        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool hasField(const std::string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
@@ -576,7 +576,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return false; }
-        bool hasField(const string& field) const;
+        bool hasField(const std::string& field) const;
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sorts; }
         BSONObjSet _sorts;
@@ -596,7 +596,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
-        bool hasField(const string& field) const { return true; }
+        bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sorts; }
 
@@ -620,7 +620,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
-        bool hasField(const string& field) const { return true; }
+        bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return _sorts; }
 
@@ -654,7 +654,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return children[0]->fetched(); }
-        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool hasField(const std::string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
         const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
@@ -677,7 +677,7 @@ namespace mongo {
         bool fetched() const { return children[0]->fetched(); }
 
         // Any flagged results are OWNED_OBJ and as such they'll have any field we need.
-        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool hasField(const std::string& field) const { return children[0]->hasField(field); }
 
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }
@@ -702,7 +702,7 @@ namespace mongo {
         // This stage is created "on top" of normal planning and as such the properties
         // below don't really matter.
         bool fetched() const { return false; }
-        bool hasField(const string& field) const { return !indexKeyPattern[field].eoo(); }
+        bool hasField(const std::string& field) const { return !indexKeyPattern[field].eoo(); }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }
 
@@ -729,7 +729,7 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }
-        bool hasField(const string& field) const { return true; }
+        bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }
 

@@ -39,7 +39,7 @@ namespace mongo {
         /** the writeahead journal for durability */
         class Journal {
         public:
-            string dir; // set by journalMakeDir() during initialization
+            std::string dir; // set by journalMakeDir() during initialization
 
             Journal();
 
@@ -92,13 +92,13 @@ namespace mongo {
             unsigned long long _curFileId; // current file id see JHeader::fileId
 
             struct JFile {
-                string filename;
+                std::string filename;
                 unsigned long long lastEventTimeMs;
             };
 
             // files which have been closed but not unlinked (rotated out) yet
             // ordered oldest to newest
-            list<JFile> _oldJournalFiles; // use _curLogFileMutex
+            std::list<JFile> _oldJournalFiles; // use _curLogFileMutex
 
             // lsn related
             static void preFlush();

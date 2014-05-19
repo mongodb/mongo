@@ -72,7 +72,7 @@ namespace mongo {
             */
             virtual void replay() = 0;
 
-            virtual string toString() = 0;
+            virtual std::string toString() = 0;
 
             /** if the op requires all file to be closed before doing its work, returns true. */
             virtual bool needFilesClosed() { return false; }
@@ -92,7 +92,7 @@ namespace mongo {
             /** param f filename to create with path */
             FileCreatedOp(const std::string& f, unsigned long long l);
             virtual void replay();
-            virtual string toString();
+            virtual std::string toString();
             virtual bool needFilesClosed();
         protected:
             virtual void _serialize(AlignedBuilder& ab);
@@ -108,12 +108,12 @@ namespace mongo {
             DropDbOp(const std::string& db) :
                 DurOp(JEntry::OpCode_DropDb), _db(db) { }
             virtual void replay();
-            virtual string toString() { return string("DropDbOp ") + _db; }
+            virtual std::string toString() { return std::string("DropDbOp ") + _db; }
             virtual bool needFilesClosed() { return true; }
         protected:
             virtual void _serialize(AlignedBuilder& ab);
         private:
-            string _db;
+            std::string _db;
         };
 
     }

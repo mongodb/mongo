@@ -248,9 +248,9 @@ namespace mongo {
             return type() == jstNULL;
         }
 
-        /** Size (length) of a string element.
-            You must assure of type String first.
-            @return string size including terminating null
+        /** Size (length) of a std::string element.
+            You must assure of type std::string first.
+            @return std::string size including terminating null
         */
         int valuestrsize() const {
             return *reinterpret_cast< const int* >( value() );
@@ -268,11 +268,11 @@ namespace mongo {
             return value() + 4;
         }
 
-        /** Get the string value of the element.  If not a string returns "". */
+        /** Get the std::string value of the element.  If not a std::string returns "". */
         const char *valuestrsafe() const {
             return type() == mongo::String ? valuestr() : "";
         }
-        /** Get the string value of the element.  If not a string returns "". */
+        /** Get the std::string value of the element.  If not a std::string returns "". */
         std::string str() const {
             return type() == mongo::String ? std::string(valuestr(), valuestrsize()-1) : std::string();
         }
@@ -347,7 +347,7 @@ namespace mongo {
             return (BinDataType)c;
         }
 
-        /** Retrieve the regex string for a Regex element */
+        /** Retrieve the regex std::string for a Regex element */
         const char *regex() const {
             verify(type() == RegEx);
             return value();

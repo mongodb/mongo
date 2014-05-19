@@ -96,8 +96,8 @@ namespace mongo {
         IndexDescriptor* findIndexByPrefix( const BSONObj &keyPattern,
                                             bool requireSingleKey ) const;
 
-        void findIndexByType( const string& type,
-                              vector<IndexDescriptor*>& matches,
+        void findIndexByType( const std::string& type,
+                              std::vector<IndexDescriptor*>& matches,
                               bool includeUnfinishedIndexes = false ) const;
 
         // never returns NULL
@@ -160,7 +160,7 @@ namespace mongo {
          * will drop all incompleted indexes and return specs
          * after this, the indexes can be rebuilt
          */
-        vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* txn);
+        std::vector<BSONObj> getAndClearUnfinishedIndexes(OperationContext* txn);
 
 
         struct IndexKillCriteria {
@@ -229,12 +229,12 @@ namespace mongo {
 
             Collection* _collection;
             IndexCatalog* _catalog;
-            string _ns;
+            std::string _ns;
 
             BSONObj _spec;
 
-            string _indexName;
-            string _indexNamespace;
+            std::string _indexName;
+            std::string _indexNamespace;
 
             IndexCatalogEntry* _entry;
             bool _inProgress;
@@ -260,12 +260,12 @@ namespace mongo {
 
         // ------- temp internal -------
 
-        string getAccessMethodName(const BSONObj& keyPattern) {
+        std::string getAccessMethodName(const BSONObj& keyPattern) {
             return _getAccessMethodName( keyPattern );
         }
 
         Status _upgradeDatabaseMinorVersionIfNeeded( OperationContext* txn,
-                                                     const string& newPluginName );
+                                                     const std::string& newPluginName );
 
         // public static helpers
 
@@ -288,7 +288,7 @@ namespace mongo {
          * use, not the plugin name inside of the provided key pattern.  To understand when these
          * differ, see shouldOverridePlugin.
          */
-        string _getAccessMethodName(const BSONObj& keyPattern) const;
+        std::string _getAccessMethodName(const BSONObj& keyPattern) const;
 
         IndexDetails* _getIndexDetails( const IndexDescriptor* descriptor ) const;
 
@@ -319,8 +319,8 @@ namespace mongo {
         // just does disk hanges
         // doesn't change memory state, etc...
         void _deleteIndexFromDisk( OperationContext* txn,
-                                   const string& indexName,
-                                   const string& indexNamespace,
+                                   const std::string& indexName,
+                                   const std::string& indexNamespace,
                                    int idxNo );
 
         // descriptor ownership passes to _setupInMemoryStructures

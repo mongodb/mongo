@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    typedef pair<BSONObj, DiskLoc> ExternalSortDatum;
+    typedef std::pair<BSONObj, DiskLoc> ExternalSortDatum;
 
     /**
      * To external sort, you provide a pointer to an implementation of this class.
@@ -51,7 +51,7 @@ namespace mongo {
     // TODO This class will probably disappear in the future or be replaced with a typedef
     class BSONObjExternalSorter : boost::noncopyable {
     public:
-        typedef pair<BSONObj, DiskLoc> Data;
+        typedef std::pair<BSONObj, DiskLoc> Data;
         typedef SortIteratorInterface<BSONObj, DiskLoc> Iterator;
 
         BSONObjExternalSorter(const ExternalSortComparison* comp, long maxFileSize=100*1024*1024);
@@ -60,7 +60,7 @@ namespace mongo {
             _sorter->add(o.getOwned(), loc);
         }
 
-        auto_ptr<Iterator> iterator() { return auto_ptr<Iterator>(_sorter->done()); }
+        std::auto_ptr<Iterator> iterator() { return std::auto_ptr<Iterator>(_sorter->done()); }
 
         // XXX: do we need this
         void sort() { }

@@ -78,7 +78,7 @@ namespace auth {
                                                    const StringData& cmdName,
                                                    const std::string& dbname,
                                                    std::string* parsedName,
-                                                   vector<RoleName>* parsedRoleNames,
+                                                   std::vector<RoleName>* parsedRoleNames,
                                                    BSONObj* parsedWriteConcern);
 
     /**

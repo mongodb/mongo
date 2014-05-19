@@ -46,7 +46,7 @@ namespace mongo {
 
     namespace mr {
 
-        typedef vector<BSONObj> BSONList;
+        typedef std::vector<BSONObj> BSONList;
 
         class State;
 
@@ -104,8 +104,8 @@ namespace mongo {
             ScriptingFunction func() const { return _func; }
 
         private:
-            string _type;
-            string _code; // actual javascript code
+            std::string _type;
+            std::string _code; // actual javascript code
             BSONObj _wantedScope; // this is for CodeWScope
 
             Scope * _scope; // this is not owned by us, and might be shared
@@ -164,17 +164,17 @@ namespace mongo {
             }
         };
 
-        typedef map< BSONObj,BSONList,TupleKeyCmp > InMemory; // from key to list of tuples
+        typedef std::map< BSONObj,BSONList,TupleKeyCmp > InMemory; // from key to list of tuples
 
         /**
          * holds map/reduce config information
          */
         class Config {
         public:
-            Config( const string& _dbname , const BSONObj& cmdObj );
+            Config( const std::string& _dbname , const BSONObj& cmdObj );
 
-            string dbname;
-            string ns;
+            std::string dbname;
+            std::string ns;
 
             // options
             bool verbose;
@@ -197,8 +197,8 @@ namespace mongo {
             BSONObj scopeSetup;
 
             // output tables
-            string incLong;
-            string tempNamespace;
+            std::string incLong;
+            std::string tempNamespace;
 
             enum OutputType {
                 REPLACE , // atomically replace the collection
@@ -207,15 +207,15 @@ namespace mongo {
                 INMEMORY // only store in memory, limited in size
             };
             struct OutputOptions {
-                string outDB;
-                string collectionName;
-                string finalNamespace;
+                std::string outDB;
+                std::string collectionName;
+                std::string finalNamespace;
                 // if true, no lock during output operation
                 bool outNonAtomic;
                 OutputType outType;
             } outputOptions;
 
-            static OutputOptions parseOutputOptions(const string& dbname, const BSONObj& cmdObj);
+            static OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdObj);
 
             // max number of keys allowed in JS map before switching mode
             long jsMaxKeys;
@@ -310,7 +310,7 @@ namespace mongo {
             /**
              * inserts with correct replication semantics
              */
-            void insert( const string& ns , const BSONObj& o );
+            void insert( const std::string& ns , const BSONObj& o );
 
             // ------ simple accessors -----
 

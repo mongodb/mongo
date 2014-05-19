@@ -52,18 +52,18 @@ namespace mongo {
             BSONObj hydrate( const BSONObj& key ) const;
 
             void addNo() { _add( false , "" ); }
-            void addYes( const string& name ) { _add( true , name ); }
+            void addYes( const std::string& name ) { _add( true , name ); }
 
         private:
 
-            void _add( bool b , const string& name ) {
+            void _add( bool b , const std::string& name ) {
                 _include.push_back( b );
                 _names.push_back( name );
                 _stringSize += name.size();
             }
 
-            vector<bool> _include; // one entry per field in key.  true iff should be in output
-            vector<string> _names; // name of field since key doesn't have names
+            std::vector<bool> _include; // one entry per field in key.  true iff should be in output
+            std::vector<std::string> _names; // name of field since key doesn't have names
 
             int _stringSize;
         };
@@ -129,7 +129,7 @@ namespace mongo {
          * Validate the given query satisfies this projection's positional operator.
          * NOTE: this function is only used to validate projections with a positional operator.
          * @param   query       User-supplied query specifier
-         * @return  Field name if found, empty string otherwise.
+         * @return  Field name if found, empty std::string otherwise.
          */
         void validateQuery( const BSONObj query ) const;
 
@@ -142,14 +142,14 @@ namespace mongo {
         void append( BSONObjBuilder& b , const BSONElement& e, const MatchDetails* details = NULL,
                      const ArrayOpType arrayOpType = ARRAY_OP_NORMAL ) const;
 
-        void add( const string& field, bool include );
-        void add( const string& field, int skip, int limit );
+        void add( const std::string& field, bool include );
+        void add( const std::string& field, int skip, int limit );
         void appendArray( BSONObjBuilder& b , const BSONObj& a , bool nested=false) const;
 
         bool _include; // true if default at this level is to include
         bool _special; // true if this level can't be skipped or included without recursing
 
-        //TODO: benchmark vector<pair> vs map
+        //TODO: benchmark std::vector<pair> vs map
         typedef StringMap<boost::shared_ptr<Projection> > FieldMap;
         FieldMap _fields;
         BSONObj _source;

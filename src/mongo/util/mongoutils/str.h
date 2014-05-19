@@ -55,7 +55,7 @@ namespace mongoutils {
 
             since the following doesn't work:
 
-               (stringstream() << 1).str();
+               (std::stringstream() << 1).str();
         */
         class stream {
         public:
@@ -98,7 +98,7 @@ namespace mongoutils {
 
         inline bool equals( const char * a , const char * b ) { return strcmp( a , b ) == 0; }
 
-        /** find char x, and return rest of string thereafter, or "" if not found */
+        /** find char x, and return rest of std::string thereafter, or "" if not found */
         inline const char * after(const char *s, char x) {
             const char *p = strchr(s, x);
             return (p != 0) ? p+1 : "";
@@ -108,7 +108,7 @@ namespace mongoutils {
             return (p != 0) ? std::string(p+1) : "";
         }
 
-        /** find string x, and return rest of string thereafter, or "" if not found */
+        /** find std::string x, and return rest of std::string thereafter, or "" if not found */
         inline const char * after(const char *s, const char *x) {
             const char *p = strstr(s, x);
             return (p != 0) ? p+strlen(x) : "";
@@ -129,13 +129,13 @@ namespace mongoutils {
             return strchr(s.c_str(), x) != 0;
         }
 
-        /** @return everything before the character x, else entire string */
+        /** @return everything before the character x, else entire std::string */
         inline std::string before(const std::string& s, char x) {
             const char *p = strchr(s.c_str(), x);
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;
         }
 
-        /** @return everything before the string x, else entire string */
+        /** @return everything before the std::string x, else entire std::string */
         inline std::string before(const std::string& s, const std::string& x) {
             const char *p = strstr(s.c_str(), x.c_str());
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;
@@ -157,7 +157,7 @@ namespace mongoutils {
         inline int shareCommonPrefix(const std::string &a, const std::string &b)
         { return shareCommonPrefix(a.c_str(), b.c_str()); }
 
-        /** string to unsigned. zero if not a number. can end with non-num chars */
+        /** std::string to unsigned. zero if not a number. can end with non-num chars */
         inline unsigned toUnsigned(const std::string& a) {
             unsigned x = 0;
             const char *p = a.c_str();
@@ -170,8 +170,8 @@ namespace mongoutils {
             return x;
         }
 
-        /** split a string on a specific char.  We don't split N times, just once
-            on the first occurrence.  If char not present entire string is in L
+        /** split a std::string on a specific char.  We don't split N times, just once
+            on the first occurrence.  If char not present entire std::string is in L
             and R is empty.
             @return true if char found
         */

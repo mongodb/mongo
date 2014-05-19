@@ -98,7 +98,7 @@ namespace mongo {
 
     // Legacy interface for getting options in tools
     // TODO: Remove this when we use the new interface everywhere
-    std::string getParam(std::string name, string def="");
+    std::string getParam(std::string name, std::string def="");
     int getParam(std::string name, int def);
     bool hasParam(std::string name);
 
