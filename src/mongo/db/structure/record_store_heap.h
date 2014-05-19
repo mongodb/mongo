@@ -66,6 +66,18 @@ namespace mongo {
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   int quotaMax );
+                                                  
+        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
+                                                  const DiskLoc& oldLocation,
+                                                  const char* data,
+                                                  int len,
+                                                  int quotaMax,
+                                                  UpdateMoveNotifier* notifier );
+                                                  
+        virtual Status updateWithDamages( OperationContext* txn,
+                                          const DiskLoc& loc,
+                                          const char* damangeSource,
+                                          const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIterator( const DiskLoc& start, bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
@@ -87,8 +99,14 @@ namespace mongo {
                                  bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
+                                 
+        virtual void appendCustomStats( BSONObjBuilder* result, double scale ) const;
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
+        
+        virtual Status setCustomOption( OperationContext* txn,
+                                        const BSONElement& option,
+                                        BSONObjBuilder* info = NULL );
 
         virtual void increaseStorageSize( OperationContext* txn,  int size, int quotaMax );
 

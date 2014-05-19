@@ -155,6 +155,22 @@ namespace mongo {
 
         return StatusWith<DiskLoc>(loc);
     }
+    
+    StatusWith<DiskLoc> HeapRecordStore::updateRecord(OperationContext* txn,
+                                                      const DiskLoc& oldLocation,
+                                                      const char* data,
+                                                      int len,
+                                                      int quotaMax,
+                                                      UpdateMoveNotifier* notifier ) {
+        invariant(!"updateRecord not yet implemented");
+    }
+    
+    Status HeapRecordStore::updateWithDamages( OperationContext* txn,
+                                               const DiskLoc& loc,
+                                               const char* damangeSource,
+                                               const mutablebson::DamageVector& damages ) {
+        invariant(!"updateRecord not yet implemented");
+    }
 
     RecordIterator* HeapRecordStore::getIterator(const DiskLoc& start,
                                                  bool tailable,
@@ -224,6 +240,10 @@ namespace mongo {
         return Status::OK();
 
     }
+    
+    void HeapRecordStore::appendCustomStats( BSONObjBuilder* result, double scale ) const {
+        invariant(!"appendCustomStats not yet implemented");
+    }
 
     Status HeapRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
         if (output) {
@@ -231,6 +251,11 @@ namespace mongo {
             output->append("millis", 0);
         }
         return Status::OK();
+    }
+    
+    Status HeapRecordStore::setCustomOption(
+                OperationContext* txn, const BSONElement& option, BSONObjBuilder* info) {
+        invariant(!"setCustomOption not yet implemented");
     }
 
     void HeapRecordStore::increaseStorageSize(OperationContext* txn,  int size, int quotaMax) {
