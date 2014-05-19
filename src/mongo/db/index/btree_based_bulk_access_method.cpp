@@ -32,6 +32,7 @@
 #include "mongo/db/pdfile_private.h"  // This is for inDBRepair.
 #include "mongo/db/repl/rs.h"         // This is for ignoreUniqueIndex.
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
@@ -44,57 +45,32 @@ namespace mongo {
     // XXX TODO: rename to something more descriptive, etc. etc.
     int oldCompare(const BSONObj& l,const BSONObj& r, const Ordering &o);
 
-    class BtreeExternalSortComparisonV0 : public ExternalSortComparison {
+    class BtreeExternalSortComparison {
     public:
-        BtreeExternalSortComparisonV0(const BSONObj& ordering)
-            : _ordering(Ordering::make(ordering)){
+        BtreeExternalSortComparison(const BSONObj& ordering, int version)
+            : _ordering(Ordering::make(ordering)),
+              _version(version) {
+            invariant(version == 1 || version == 0);
         }
 
-        virtual ~BtreeExternalSortComparisonV0() { }
+        typedef std::pair<BSONObj, DiskLoc> Data;
 
-        virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const {
-            int x = oldCompare(l.first, r.first, _ordering);
+        int operator() (const Data& l, const Data& r) const {
+            int x = (_version == 1
+                        ? l.first.woCompare(r.first, _ordering, /*considerfieldname*/false)
+                        : oldCompare(l.first, r.first, _ordering));
             if (x) { return x; }
             return l.second.compare(r.second);
         }
     private:
         const Ordering _ordering;
+        const int _version;
     };
-
-    class BtreeExternalSortComparisonV1 : public ExternalSortComparison {
-    public:
-        BtreeExternalSortComparisonV1(const BSONObj& ordering)
-            : _ordering(Ordering::make(ordering)) {
-        }
-
-        virtual ~BtreeExternalSortComparisonV1() { }
-
-        virtual int compare(const ExternalSortDatum& l, const ExternalSortDatum& r) const {
-            int x = l.first.woCompare(r.first, _ordering, /*considerfieldname*/false);
-            if (x) { return x; }
-            return l.second.compare(r.second);
-        }
-    private:
-        const Ordering _ordering;
-    };
-
-    // static
-    ExternalSortComparison* BtreeBasedBulkAccessMethod::getComparison(int version, const BSONObj& keyPattern) {
-        if (0 == version) {
-            return new BtreeExternalSortComparisonV0(keyPattern);
-        }
-        else if (1 == version) {
-            return new BtreeExternalSortComparisonV1(keyPattern);
-        }
-        verify( 0 );
-        return NULL;
-    }
 
     BtreeBasedBulkAccessMethod::BtreeBasedBulkAccessMethod(OperationContext* txn,
                                                            BtreeBasedAccessMethod* real,
                                                            BtreeInterface* interface,
-                                                           const IndexDescriptor* descriptor,
-                                                           int numRecords) {
+                                                           const IndexDescriptor* descriptor) {
         _real = real;
         _interface = interface;
         _txn = txn;
@@ -103,9 +79,11 @@ namespace mongo {
         _keysInserted = 0;
         _isMultiKey = false;
 
-        _sortCmp.reset(getComparison(descriptor->version(), descriptor->keyPattern()));
-        _sorter.reset(new BSONObjExternalSorter(_sortCmp.get()));
-        _sorter->hintNumObjects(numRecords);
+        _sorter.reset(BSONObjExternalSorter::make(
+                    SortOptions().TempDir(storageGlobalParams.dbpath + "/_tmp")
+                                 .ExtSortAllowed()
+                                 .MaxMemoryUsageBytes(100*1024*1024),
+                    BtreeExternalSortComparison(descriptor->keyPattern(), descriptor->version())));
     }
 
     Status BtreeBasedBulkAccessMethod::insert(OperationContext* txn,
@@ -147,8 +125,6 @@ namespace mongo {
             _real->_btreeState->setMultikey( _txn );
         }
 
-        _sorter->sort();
-
         Timer timer;
         IndexCatalogEntry* entry = _real->_btreeState;
 
@@ -157,7 +133,7 @@ namespace mongo {
 
         bool dropDups = entry->descriptor()->dropDups() || inDBRepair;
 
-        scoped_ptr<BSONObjExternalSorter::Iterator> i(_sorter->iterator());
+        scoped_ptr<BSONObjExternalSorter::Iterator> i(_sorter->done());
 
         // verifies that pm and op refer to the same ProgressMeter
         ProgressMeter& pm = op->setMessage("Index Bulk Build: (2/3) btree bottom up",
@@ -171,7 +147,7 @@ namespace mongo {
 
         while (i->more()) {
             // Get the next datum and add it to the builder.
-            ExternalSortDatum d = i->next();
+            BSONObjExternalSorter::Data d = i->next();
             Status status = builder->addKey(d.first, d.second);
 
             if (!status.isOK()) {
@@ -215,3 +191,6 @@ namespace mongo {
     }
 
 }  // namespace mongo
+
+#include "mongo/db/sorter/sorter.cpp"
+MONGO_CREATE_SORTER(mongo::BSONObj, mongo::DiskLoc, mongo::BtreeExternalSortComparison);

@@ -32,7 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/extsort.h"
+#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/index/btree_based_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -50,8 +50,7 @@ namespace mongo {
         BtreeBasedBulkAccessMethod(OperationContext* txn,
                                    BtreeBasedAccessMethod* real,
                                    BtreeInterface* interface,
-                                   const IndexDescriptor* descriptor,
-                                   int numRecords);
+                                   const IndexDescriptor* descriptor);
 
         ~BtreeBasedBulkAccessMethod() {}
 
@@ -119,11 +118,13 @@ namespace mongo {
             return _notAllowed();
         }
 
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn, int64_t numRecords ) {
+        virtual IndexAccessMethod* initiateBulk(OperationContext* txn) {
             return NULL;
         }
 
     private:
+        typedef Sorter<BSONObj, DiskLoc> BSONObjExternalSorter;
+
         Status _notAllowed() const {
             return Status(ErrorCodes::InternalError, "cannot use bulk for this yet");
         }
@@ -136,9 +137,6 @@ namespace mongo {
 
         // The external sorter.
         boost::scoped_ptr<BSONObjExternalSorter> _sorter;
-
-        // A comparison object required by the sorter.
-        boost::scoped_ptr<ExternalSortComparison> _sortCmp;
 
         // How many docs are we indexing?
         unsigned long long _docsInserted;

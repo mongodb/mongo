@@ -511,19 +511,6 @@ src/mongo/db/durop.cpp
 * 13628 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/durop.cpp#L158) recover failure writing file 
 
 
-src/mongo/db/extsort.cpp
-----
-* 10048 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/extsort.cpp#L93) already sorted
-* 10049 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/extsort.cpp#L118) sorted already
-* 10050 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/extsort.cpp#L139) bad
-* 10308 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/extsort.cpp#L250) mmap failed
-
-
-src/mongo/db/extsort.h
-----
-* 10052 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/extsort.h#L105) not sorted
-
-
 src/mongo/db/geo/2d.cpp
 ----
 * 13022 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/geo/2d.cpp#L120) can't have 2 geo field

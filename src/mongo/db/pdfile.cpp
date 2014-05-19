@@ -56,7 +56,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/curop.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/extsort.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"

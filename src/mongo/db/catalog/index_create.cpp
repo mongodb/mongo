@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/extsort.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/query/internal_plans.h"
@@ -232,8 +231,7 @@ namespace mongo {
                  status.isOK() );
 
         IndexAccessMethod* bulk = doInBackground ?
-            NULL : btreeState->accessMethod()->initiateBulk(txn,
-                                                            collection->numRecords());
+            NULL : btreeState->accessMethod()->initiateBulk(txn);
         scoped_ptr<IndexAccessMethod> bulkHolder(bulk);
         IndexAccessMethod* iam = bulk ? bulk : btreeState->accessMethod();
 
@@ -341,7 +339,7 @@ namespace mongo {
             if ( !status.isOK() )
                 return status;
 
-            state.bulk = state.real->initiateBulk(_txn, _collection->numRecords() );
+            state.bulk = state.real->initiateBulk(_txn);
 
             _states.push_back( state );
         }

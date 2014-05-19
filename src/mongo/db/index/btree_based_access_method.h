@@ -88,7 +88,7 @@ namespace mongo {
 
         virtual Status initializeAsEmpty(OperationContext* txn);
 
-        virtual IndexAccessMethod* initiateBulk(OperationContext* txn, int64_t numRecords );
+        virtual IndexAccessMethod* initiateBulk(OperationContext* txn);
 
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,

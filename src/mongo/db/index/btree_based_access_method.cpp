@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/extsort.h"
 #include "mongo/db/index/btree_based_bulk_access_method.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/jsobj.h"
@@ -323,8 +322,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk(OperationContext* txn,
-                                                            int64_t numRecords ) {
+    IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk(OperationContext* txn) {
         // If there's already data in the index, don't do anything.
         if (!_newInterface->isEmpty()) {
             return NULL;
@@ -333,8 +331,7 @@ namespace mongo {
         return new BtreeBasedBulkAccessMethod(txn,
                                               this,
                                               _newInterface.get(),
-                                              _descriptor,
-                                              static_cast<int>( numRecords ) );
+                                              _descriptor);
     }
 
     Status BtreeBasedAccessMethod::commitBulk(IndexAccessMethod* bulkRaw,
