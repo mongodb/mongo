@@ -42,17 +42,16 @@ replTest.restart(BID);
 // check that it is in recovery mode
 assert.soon(function() {
     try {
-        var result = b_conn.getDB("admin").runCommand({isMaster: 1});
-        printjson(result);
-        return !result.ismaster && !result.secondary;
+        var result = b_conn.getDB("admin").runCommand({replSetGetStatus: 1});
+        return (result.members[1].stateStr === "RECOVERING");
     }
     catch ( e ) {
         print( e );
     }
-});
+}, "node didn't enter RECOVERING state");
 
 // run resync and wait for it to happen
-b_conn.getDB("admin").runCommand({resync:1});
+assert.commandWorked(b_conn.getDB("admin").runCommand({resync:1}));
 replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 
