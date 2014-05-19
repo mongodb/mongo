@@ -411,6 +411,16 @@ namespace mongo {
 
                 LOG(2) << "\t cloner got " << collection << endl;
 
+                BSONElement collectionOptions = collection["options"];
+                if ( collectionOptions.isABSONObj() ) {
+                    Status parseOptionsStatus = CollectionOptions().parse(collectionOptions.Obj());
+                    if ( !parseOptionsStatus.isOK() ) {
+                        errmsg = str::stream() << "invalid collection options: " << collection
+                                               << ", reason: " << parseOptionsStatus.reason();
+                        return false;
+                    }
+                }
+
                 BSONElement e = collection.getField("name");
                 if ( e.eoo() ) {
                     string s = "bad system.namespaces object " + collection.toString();
