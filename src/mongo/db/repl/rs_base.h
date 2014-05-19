@@ -33,6 +33,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace replset {
 
     /**
      * most operations on a ReplSet object should be done while locked. that
@@ -88,4 +89,5 @@ namespace mongo {
         bool lockedByMe() { return _lockedByMe.get(); }
     };
 
+} // namespace replset
 } // namespace mongo

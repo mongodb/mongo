@@ -96,24 +96,24 @@ namespace mongo {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
         if (!force &&
-                theReplSet &&
-                theReplSet->getConfig().members.size() > 1 &&
-                theReplSet->isPrimary()) {
+                replset::theReplSet &&
+                replset::theReplSet->getConfig().members.size() > 1 &&
+                replset::theReplSet->isPrimary()) {
             long long timeout, now, start;
             timeout = now = start = curTimeMicros64()/1000000;
             if (cmdObj.hasField("timeoutSecs")) {
                 timeout += cmdObj["timeoutSecs"].numberLong();
             }
 
-            OpTime lastOp = theReplSet->lastOpTimeWritten;
-            OpTime closest = theReplSet->lastOtherOpTime();
+            OpTime lastOp = replset::theReplSet->lastOpTimeWritten;
+            OpTime closest = replset::theReplSet->lastOtherOpTime();
             long long int diff = lastOp.getSecs() - closest.getSecs();
             while (now <= timeout && (diff < 0 || diff > 10)) {
                 sleepsecs(1);
                 now++;
 
-                lastOp = theReplSet->lastOpTimeWritten;
-                closest = theReplSet->lastOtherOpTime();
+                lastOp = replset::theReplSet->lastOpTimeWritten;
+                closest = replset::theReplSet->lastOtherOpTime();
                 diff = lastOp.getSecs() - closest.getSecs();
             }
 
@@ -125,13 +125,13 @@ namespace mongo {
             }
 
             // step down
-            theReplSet->stepDown(120);
+            replset::theReplSet->stepDown(120);
 
             log() << "waiting for secondaries to catch up" << endl;
 
-            lastOp = theReplSet->lastOpTimeWritten;
+            lastOp = replset::theReplSet->lastOpTimeWritten;
             while (lastOp != closest && now - start < 60) {
-                closest = theReplSet->lastOtherOpTime();
+                closest = replset::theReplSet->lastOtherOpTime();
 
                 now++;
                 sleepsecs(1);
@@ -217,7 +217,7 @@ namespace mongo {
                 log() << "dropDatabase " << dbname << " finished";
 
                 if (!fromRepl)
-                    logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                    replset::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             }
 
             result.append( "dropped" , dbname );
@@ -479,7 +479,7 @@ namespace mongo {
 
             if ( s.isOK() ) {
                 if (!fromRepl)
-                    logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                    replset::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
                 return true;
             }
             
@@ -496,7 +496,7 @@ namespace mongo {
         CmdCount() : Command("count") { }
         virtual bool slaveOk() const {
             // ok on --slave setups
-            return replSettings.slave == SimpleSlave;
+            return replset::replSettings.slave == replset::SimpleSlave;
         }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool maintenanceOk() const { return false; }
@@ -1198,7 +1198,7 @@ namespace mongo {
             }
             
             if (ok && !fromRepl)
-                logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                replset::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
 
             return ok;
         }
@@ -1310,10 +1310,11 @@ namespace mongo {
        assumption needs to be audited and documented. */
     class MaintenanceModeSetter {
     public:
-        MaintenanceModeSetter() : maintenanceModeSet(theReplSet->setMaintenanceMode(true)) {}
+        MaintenanceModeSetter() : maintenanceModeSet(replset::theReplSet->setMaintenanceMode(true))
+            {}
         ~MaintenanceModeSetter() {
             if(maintenanceModeSet)
-                theReplSet->setMaintenanceMode(false);
+                replset::theReplSet->setMaintenanceMode(false);
         } 
     private:
         bool maintenanceModeSet;
@@ -1407,7 +1408,7 @@ namespace mongo {
         }
 
         bool canRunHere =
-            isMasterNs(dbname.c_str()) ||
+            replset::isMasterNs(dbname.c_str()) ||
             c->slaveOk() ||
             ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) ||
             fromRepl;
@@ -1418,7 +1419,10 @@ namespace mongo {
             return;
         }
 
-        if ( ! c->maintenanceOk() && theReplSet && ! isMasterNs( dbname.c_str() ) && ! theReplSet->isSecondary() ) {
+        if (!c->maintenanceOk()
+                && replset::theReplSet
+                && !replset::isMasterNs(dbname.c_str())
+                && !replset::theReplSet->isSecondary()) {
             result.append( "note" , "from execCommand" );
             appendCommandStatus(result, false, "node is recovering");
             return;
@@ -1430,7 +1434,7 @@ namespace mongo {
 
         client.curop()->setCommand(c);
 
-        if (c->maintenanceMode() && theReplSet) {
+        if (c->maintenanceMode() && replset::theReplSet) {
             mmSetter.reset(new MaintenanceModeSetter());
         }
 
@@ -1474,11 +1478,12 @@ namespace mongo {
         appendCommandStatus(result, retval, errmsg);
         
         // For commands from mongos, append some info to help getLastError(w) work.
-        if (theReplSet) {
+        if (replset::theReplSet) {
             // Detect mongos connections by looking for setShardVersion to have been run previously
             // on this connection.
             if (shardingState.needCollectionMetadata(dbname)) {
-                appendGLEHelperData(result, client.getLastOp(), theReplSet->getElectionId());
+                appendGLEHelperData(result, client.getLastOp(),
+                                    replset::theReplSet->getElectionId());
             }
         }
         return;

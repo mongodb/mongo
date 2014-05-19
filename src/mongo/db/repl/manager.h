@@ -32,6 +32,7 @@
 #include "mongo/db/repl/server.h"
 
 namespace mongo {
+namespace replset {
     class Member;
     class ReplSetImpl;
 
@@ -56,4 +57,5 @@ namespace mongo {
         void msgCheckNewState();
     };
 
-}
+} // namespace replset
+} // namespace mongo

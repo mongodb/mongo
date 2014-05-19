@@ -43,6 +43,7 @@
 using namespace bson;
 
 namespace mongo {
+namespace replset {
 
     void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial);
 
@@ -452,4 +453,5 @@ namespace mongo {
         }
     } cmdReplSetUpdatePosition;
 
-}
+} // namespace replset
+} // namespace mongo

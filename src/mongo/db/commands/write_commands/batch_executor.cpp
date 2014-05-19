@@ -353,10 +353,10 @@ namespace mongo {
                 response->setWriteConcernError( wcError.release() );
             }
 
-            if ( anyReplEnabled() ) {
+            if (replset::anyReplEnabled()) {
                 response->setLastOp( _client->getLastOp() );
-                if (theReplSet) {
-                    response->setElectionId( theReplSet->getElectionId() );
+                if (replset::theReplSet) {
+                    response->setElectionId(replset::theReplSet->getElectionId());
                 }
             }
 
@@ -434,7 +434,7 @@ namespace mongo {
     }
 
     static bool checkIsMasterForCollection(const std::string& ns, WriteOpResult* result) {
-        if (!isMasterNs(ns.c_str())) {
+        if (!replset::isMasterNs(ns.c_str())) {
             WriteErrorDetail* errorDetail = new WriteErrorDetail;
             result->setError(errorDetail);
             errorDetail->setErrCode(ErrorCodes::NotMaster);
@@ -1030,7 +1030,7 @@ namespace mongo {
             result->setError(toWriteError(status.getStatus()));
         }
         else {
-            logOp( txn, "i", insertNS.c_str(), docToInsert );
+            replset::logOp( txn, "i", insertNS.c_str(), docToInsert );
             txn->recoveryUnit()->commitIfNeeded();
             result->getStats().n = 1;
         }
@@ -1060,7 +1060,7 @@ namespace mongo {
             result->setError(toWriteError(status));
         }
         else {
-            logOp( txn, "i", indexNS.c_str(), indexDesc );
+            replset::logOp( txn, "i", indexNS.c_str(), indexDesc );
             result->getStats().n = 1;
         }
     }

@@ -279,7 +279,7 @@ namespace mongo {
         server->setupSockets();
 
         logStartup();
-        startReplication();
+        replset::startReplication();
         if (serverGlobalParams.isHttpInterfaceEnabled)
             boost::thread web( stdx::bind(&webServerThread,
                                            new RestAdminAccess(), // takes ownership
@@ -371,7 +371,7 @@ namespace mongo {
             DataFile *p = ctx.db()->getExtentManager()->getFile( &txn, 0 );
             DataFileHeader *h = p->getHeader();
 
-            if ( replSettings.usingReplSets() ) {
+            if (replset::replSettings.usingReplSets()) {
                 // we only care about the _id index if we are in a replset
                 checkForIdIndexes(ctx.db());
             }
@@ -478,7 +478,7 @@ namespace mongo {
      */
     unsigned long long checkIfReplMissingFromCommandLine() {
         Lock::GlobalWrite lk; // this is helpful for the query below to work as you can't open files when readlocked
-        if (!replSettings.usingReplSets()) {
+        if (!replset::replSettings.usingReplSets()) {
             DBDirectClient c;
             return c.count("local.system.replset");
         }
@@ -653,8 +653,8 @@ namespace mongo {
             l << "MongoDB starting : pid=" << pid
               << " port=" << serverGlobalParams.port
               << " dbpath=" << storageGlobalParams.dbpath;
-            if( replSettings.master ) l << " master=" << replSettings.master;
-            if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
+            if( replset::replSettings.master ) l << " master=" << replset::replSettings.master;
+            if( replset::replSettings.slave )  l << " slave=" << (int) replset::replSettings.slave;
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
         DEV log() << "_DEBUG build (which is slower)" << endl;
@@ -722,9 +722,9 @@ namespace mongo {
         // On replica set members we only clear temp collections on DBs other than "local" during
         // promotion to primary. On pure slaves, they are only cleared when the oplog tells them to.
         // The local DB is special because it is not replicated.  See SERVER-10927 for more details.
-        const bool shouldClearNonLocalTmpCollections = !(missingRepl
-                                                         || replSettings.usingReplSets()
-                                                         || replSettings.slave == SimpleSlave);
+        const bool shouldClearNonLocalTmpCollections =!(missingRepl
+                                         || replset::replSettings.usingReplSets()
+                                         || replset::replSettings.slave == replset::SimpleSlave);
         repairDatabasesAndCheckVersion(shouldClearNonLocalTmpCollections);
 
         if (mongodGlobalParams.upgrade)

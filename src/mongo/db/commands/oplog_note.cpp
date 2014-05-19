@@ -62,7 +62,7 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
-            if (!replSettings.master) {
+            if (!replset::replSettings.master) {
                 return appendCommandStatus(result, Status(
                         ErrorCodes::NoReplicationEnabled,
                         "Must have replication set up to run \"appendOplogNote\""));
@@ -73,7 +73,7 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            logOpComment(dataElement.Obj());
+            replset::logOpComment(dataElement.Obj());
             return true;
         }
 

@@ -36,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace replset {
 
     /** we allow queries to SimpleSlave's */
     void replVerifyReadsOk(const std::string& ns, const LiteParsedQuery* pq) {
@@ -62,4 +63,5 @@ namespace mongo {
         }
     }
 
+} // namespace replset
 } // namespace mongo

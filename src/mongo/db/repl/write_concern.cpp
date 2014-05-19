@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/is_master.h"
@@ -43,10 +44,7 @@
 #define REPLDEBUG(x)
 
 namespace mongo {
-
-    // this is defined in fsync.cpp
-    // need to figure out where to put for real
-    bool lockedForWriting();
+namespace replset {
 
     using namespace mongoutils;
 
@@ -367,4 +365,5 @@ namespace mongo {
     unsigned getSlaveCount() {
         return slaveTracking.getSlaveCount();
     }
-}
+} // namespace replset
+} // namespace mongo

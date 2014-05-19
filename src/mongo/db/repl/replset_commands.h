@@ -35,8 +35,10 @@
 #include "mongo/db/repl/rs.h" // replSet bool
 
 namespace mongo {
+namespace replset {
 
     extern bool replSetBlind;
+    extern unsigned replSetForceInitialSyncFailure;
 
     /**
      * Base class for repl set commands.  Checks basic things such if we're in
@@ -73,4 +75,5 @@ namespace mongo {
         }
     };
 
+} // namespace replset
 } // namespace mongo

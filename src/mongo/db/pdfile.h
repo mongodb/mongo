@@ -49,6 +49,8 @@ namespace mongo {
 
     void dropDatabase(OperationContext* txn, Database* db);
 
+    void dropAllDatabasesExceptLocal();
+
     Status userCreateNS( OperationContext* txn,
                          Database* db,
                          const StringData& ns,

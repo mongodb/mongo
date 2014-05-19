@@ -56,6 +56,7 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+namespace replset {
 
     using namespace bson;
 
@@ -300,4 +301,5 @@ namespace mongo {
             changeState(MemberState::RS_RECOVERING);
         }
     }
-}
+} // namespace replset
+} // namespace mongo

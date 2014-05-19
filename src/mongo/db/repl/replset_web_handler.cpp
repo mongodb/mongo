@@ -36,10 +36,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-    extern void fillRsLog(std::stringstream&);
-
-namespace {
+namespace replset {
 
     using namespace bson;
     using namespace mongoutils;
@@ -129,5 +126,5 @@ namespace {
 
     } replSetHandler;
 
-}  // namespace
-}  // namespace mongo
+} // namespace replset
+} // namespace mongo

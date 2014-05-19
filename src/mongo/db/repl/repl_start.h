@@ -34,6 +34,7 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+namespace replset {
 
     void parseReplsetCmdLine(const std::string& cfgString,
                              std::string& setname,
@@ -57,4 +58,5 @@ namespace mongo {
     // This function starts replica set or master/slave replication
     // based on command line/config parameters.
     void startReplication();
-}
+} // namespace replset
+} // namespace mongo

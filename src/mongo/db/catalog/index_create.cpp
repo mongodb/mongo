@@ -63,7 +63,7 @@ namespace mongo {
         options.dupsAllowed = true;
 
         if ( descriptor->isIdIndex() || descriptor->unique() ) {
-            if ( !ignoreUniqueIndex( descriptor ) ) {
+            if (!replset::ignoreUniqueIndex(descriptor)) {
                 options.dupsAllowed = false;
             }
         }
@@ -132,7 +132,7 @@ namespace mongo {
                     runner->saveState();
                     BSONObj toDelete;
                     collection->deleteDocument( txn, loc, false, true, &toDelete );
-                    logOp( txn, "d", ns.c_str(), toDelete );
+                    replset::logOp(txn, "d", ns.c_str(), toDelete);
 
                     if (!runner->restoreState(txn)) {
                         // Runner got killed somehow.  This probably shouldn't happen.
@@ -272,8 +272,8 @@ namespace mongo {
                                             false /* cappedOk */,
                                             true /* noWarn */,
                                             &toDelete );
-                if (isMasterNs(ns.c_str())) {
-                    logOp( txn, "d", ns.c_str(), toDelete );
+                if (replset::isMasterNs(ns.c_str())) {
+                    replset::logOp(txn, "d", ns.c_str(), toDelete);
                 }
                 
                 txn->recoveryUnit()->commitIfNeeded();

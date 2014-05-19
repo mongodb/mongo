@@ -191,7 +191,7 @@ namespace mongo {
             storageGlobalParams.dur = true;
         }
 
-        replSettings.oplogSize = 10 * 1024 * 1024;
+        replset::replSettings.oplogSize = 10 * 1024 * 1024;
 
         DEV log() << "_DEBUG build" << endl;
         if( sizeof(void*)==4 )

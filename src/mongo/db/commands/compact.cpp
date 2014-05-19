@@ -35,20 +35,18 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/d_concurrency.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/rs.h"
 
 namespace mongo {
-
-    // from repl/rs.cpp
-    bool isCurrentlyAReplSetPrimary();
 
     class CompactCmd : public Command {
     public:
@@ -90,7 +88,7 @@ namespace mongo {
                 return false;
             }
 
-            if( isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue() ) {
+            if (replset::isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue()) {
                 errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
                 return false;
             }

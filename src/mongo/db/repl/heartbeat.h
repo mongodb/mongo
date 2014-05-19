@@ -31,8 +31,9 @@
 #include <string>
 
 namespace mongo {
-
     class BSONObj;
+
+namespace replset {
 
     /* throws */
     bool requestHeartbeat(const std::string& setname,
@@ -42,4 +43,5 @@ namespace mongo {
                           int myConfigVersion,
                           int& theirConfigVersion,
                           bool checkEmpty = false);
-}
+} // namespace replset
+} // namespace mongo

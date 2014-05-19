@@ -96,7 +96,7 @@ namespace mongo {
             Lock::DBWrite dbXLock(dbname);
             bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
             if (ok && !fromRepl)
-                logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                replset::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
             return ok;
         }
         bool wrappedRun(OperationContext* txn,

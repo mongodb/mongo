@@ -50,7 +50,6 @@
 
 namespace mongo {
 
-    extern const char *replInfo;
     bool getInitialSyncCompleted();
 
     using namespace bson;
@@ -278,16 +277,17 @@ namespace mongo {
             ss << "# databases: " << dbHolder().sizeInfo() << '\n';
             ss << "# Cursors: " << ClientCursor::totalOpen() << '\n';
             ss << "replication: ";
-            if( *replInfo )
-                ss << "\nreplInfo:  " << replInfo << "\n\n";
-            if( replSet ) {
-                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << replSettings.replSet;
+            if (*replset::replInfo)
+                ss << "\nreplInfo:  " << replset::replInfo << "\n\n";
+            if (replset::replSet) {
+                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>"
+                   << replset::replSettings.replSet;
             }
-            if ( replAllDead )
-                ss << "\n<b>replication replAllDead=" << replAllDead << "</b>\n";
+            if (replset::replAllDead)
+                ss << "\n<b>replication replAllDead=" << replset::replAllDead << "</b>\n";
             else {
-                ss << "\nmaster: " << replSettings.master << '\n';
-                ss << "slave:  " << replSettings.slave << '\n';
+                ss << "\nmaster: " << replset::replSettings.master << '\n';
+                ss << "slave:  " << replset::replSettings.slave << '\n';
                 ss << '\n';
             }
 

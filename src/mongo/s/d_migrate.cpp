@@ -805,15 +805,15 @@ namespace mongo {
             // if we do a w=2 after every write
             bool secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
             if ( secondaryThrottle ) {
-                if ( theReplSet ) {
-                    if ( theReplSet->config().getMajority() <= 1 ) {
+                if (replset::theReplSet) {
+                    if (replset::theReplSet->config().getMajority() <= 1) {
                         secondaryThrottle = false;
                         warning() << "not enough nodes in set to use secondaryThrottle: "
-                                  << " majority: " << theReplSet->config().getMajority()
+                                  << " majority: " << replset::theReplSet->config().getMajority()
                                   << endl;
                     }
                 }
-                else if ( !anyReplEnabled() ) {
+                else if (!replset::anyReplEnabled() ) {
                     secondaryThrottle = false;
                     warning() << "secondaryThrottle selected but no replication" << endl;
                 }
@@ -1602,7 +1602,8 @@ namespace mongo {
             verify( ! min.isEmpty() );
             verify( ! max.isEmpty() );
             
-            replSetMajorityCount = theReplSet ? theReplSet->config().getMajority() : 0;
+            replSetMajorityCount = replset::theReplSet ?
+                                        replset::theReplSet->config().getMajority() : 0;
 
             log() << "starting receiving-end of migration of chunk " << min << " -> " << max <<
                     " for collection " << ns << " from " << from
@@ -1672,8 +1673,8 @@ namespace mongo {
                     }
 
                     // make sure to create index on secondaries as well
-                    logOp( txn, "i", db->getSystemIndexesName().c_str(), idx,
-                           NULL, NULL, true /* fromMigrate */ );
+                    replset::logOp(txn, "i", db->getSystemIndexesName().c_str(), idx,
+                                   NULL, NULL, true /* fromMigrate */);
                 }
 
                 timing.done(1);
@@ -1770,7 +1771,8 @@ namespace mongo {
                         clonedBytes += o.objsize();
 
                         if ( secondaryThrottle && thisTime > 0 ) {
-                            if ( ! waitForReplication( cc().getLastOp(), 2, 60 /* seconds to wait */ ) ) {
+                            if (!replset::waitForReplication(cc().getLastOp(),
+                                                             2, 60 /* seconds to wait */)) {
                                 warning() << "secondaryThrottle on, but doc insert timed out after 60 seconds, continuing" << endl;
                             }
                         }
@@ -1813,7 +1815,7 @@ namespace mongo {
                             return;
                         }
                         
-                        if ( opReplicatedEnough( lastOpApplied ) )
+                        if (opReplicatedEnough(lastOpApplied))
                             break;
                         
                         if ( i > 100 ) {
@@ -2025,7 +2027,7 @@ namespace mongo {
             // if replication is on, try to force enough secondaries to catch up
             // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
             //      for now, we try to replicate to a sensible number of secondaries
-            return mongo::opReplicatedEnough( lastOpApplied , replSetMajorityCount );
+            return replset::opReplicatedEnough(lastOpApplied, replSetMajorityCount);
         }
 
         bool flushPendingWrites( const ReplTime& lastOpApplied ) {
@@ -2228,7 +2230,7 @@ namespace mongo {
                 migrateStatus.shardKeyPattern = keya.getOwned();
             }
 
-            if ( migrateStatus.secondaryThrottle && ! anyReplEnabled() ) {
+            if (migrateStatus.secondaryThrottle && ! replset::anyReplEnabled()) {
                 warning() << "secondaryThrottle asked for, but not replication" << endl;
                 migrateStatus.secondaryThrottle = false;
             }

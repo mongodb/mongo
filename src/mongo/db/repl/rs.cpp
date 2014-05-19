@@ -42,6 +42,7 @@
 using namespace std;
 
 namespace mongo {
+namespace replset {
     
     using namespace bson;
 
@@ -56,7 +57,7 @@ namespace mongo {
         return theReplSet && theReplSet->isPrimary();
     }
 
-    void replset::sethbmsg(const string& s, const int level) {
+    void sethbmsg(const string& s, const int level) {
         if (theReplSet) {
             theReplSet->sethbmsg(s, level);
         }
@@ -204,5 +205,5 @@ namespace mongo {
         }
 
     } replIndexPrefetch;
-}
-
+} // namespace replset
+} // namespace mongo

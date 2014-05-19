@@ -41,8 +41,10 @@
 #include "mongo/util/concurrency/value.h"
 
 namespace mongo {
-
     class Cloner;
+
+namespace replset {
+
     struct FixUpInfo;
     class ReplSetCmdline;
     class ReplSetHealthPollTask;
@@ -350,4 +352,5 @@ namespace mongo {
         static const char* _initialSyncFlagString;
         static const BSONObj _initialSyncFlag;
     };
+} // namespace replset
 } // namespace mongo

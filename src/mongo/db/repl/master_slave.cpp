@@ -58,6 +58,7 @@
 #include "mongo/util/exit.h"
 
 namespace mongo {
+namespace replset {
 
     void pretouchOperation(const BSONObj& op);
     void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
@@ -1308,5 +1309,5 @@ namespace mongo {
         }
     }
 
+} // namespace replset
 } // namespace mongo
-

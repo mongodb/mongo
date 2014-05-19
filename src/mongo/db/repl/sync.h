@@ -33,8 +33,9 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-
     class Database;
+
+namespace replset {
 
     class Sync {
     protected:
@@ -51,4 +52,5 @@ namespace mongo {
         void setHostname(const std::string& hostname);
     };
 
-}
+} // namespace replset
+} // namespace mongo

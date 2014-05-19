@@ -29,11 +29,12 @@
 #pragma once
 
 namespace mongo {
-
     class BSONObj;
     class Database;
     class OperationContext;
     class OpTime;
+
+namespace replset {
 
     // These functions redefine the function for logOp(),
     // for either master/slave or replica sets.
@@ -112,4 +113,5 @@ namespace mongo {
      * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
      */
     void initOpTimeFromOplog(const std::string& oplogNS);
-}
+} // namespace replset
+} // namespace mongo

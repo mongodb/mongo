@@ -164,7 +164,7 @@ namespace mongo {
     void ClientCursor::updateSlaveLocation( CurOp& curop ) {
         if ( _slaveReadTill.isNull() )
             return;
-        mongo::updateSlaveLocation( curop , _ns.c_str() , _slaveReadTill );
+        mongo::replset::updateSlaveLocation(curop, _ns.c_str(), _slaveReadTill);
     }
 
     //

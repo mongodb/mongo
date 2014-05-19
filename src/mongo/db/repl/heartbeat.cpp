@@ -48,6 +48,7 @@
 #include "mongo/util/ramlog.h"
 
 namespace mongo {
+namespace replset {
 
     using namespace bson;
 
@@ -257,7 +258,8 @@ namespace mongo {
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }
 
-}
+} // namespace replset
+} // namespace mongo
 
 /* todo:
    stop bg job and delete on removefromset

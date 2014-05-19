@@ -329,7 +329,7 @@ namespace mongo {
             options.logIfError = false;
             options.dupsAllowed =
                 !(KeyPattern::isIdKeyPattern(descriptor->keyPattern()) || descriptor->unique())
-                || ignoreUniqueIndex(descriptor);
+                || replset::ignoreUniqueIndex(descriptor);
             UpdateTicket* updateTicket = new UpdateTicket();
             updateTickets.mutableMap()[descriptor] = updateTicket;
             Status ret = iam->validateUpdate(objOld, objNew, oldLocation, options, updateTicket );

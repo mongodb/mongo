@@ -33,6 +33,7 @@
 
 
 namespace mongo {
+namespace replset {
 
     using namespace mongoutils::html;
 
@@ -87,4 +88,5 @@ namespace mongo {
         return hbinfo().up() && (config().buildIndexes || !buildIndexes) && state().readable();
     }
 
+} // namespace replset
 } // namespace mongo

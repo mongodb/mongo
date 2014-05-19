@@ -38,8 +38,9 @@
 
  */
 namespace mongo {
-
     class CurOp;
+
+namespace replset {
 
     bool updateSlaveLocations(BSONArray optimes);
 
@@ -56,4 +57,5 @@ namespace mongo {
 
     void resetSlaveCache();
     unsigned getSlaveCount();
-}
+} // namespace replset
+} // namespace mongo

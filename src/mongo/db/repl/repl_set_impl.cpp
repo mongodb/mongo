@@ -30,6 +30,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/commands/get_last_error.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context_impl.h"
@@ -43,6 +44,7 @@
 #include "mongo/util/exit.h"
 
 namespace mongo {
+namespace replset {
 #ifdef MONGO_PLATFORM_64
     const int ReplSetImpl::replWriterThreadCount = 16;
     const int ReplSetImpl::replPrefetcherThreadCount = 16;
@@ -497,8 +499,6 @@ namespace {
         else _buildIndexes = true;
     }
 
-    extern BSONObj *getLastErrorDefault;
-
     // @param reconf true if this is a reconfiguration and not an initial load of the configuration.
     // @return true if ok; throws if config really bad; false if config doesn't include self
     bool ReplSetImpl::initFromConfig(ReplSetConfig& c, bool reconf) {
@@ -914,4 +914,5 @@ namespace {
         return true;
     }
 
+} // namespace replset
 } // namespace mongo

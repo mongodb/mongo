@@ -31,11 +31,10 @@
 #include "mongo/db/repl/initial_sync.h"
 
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
 
 namespace mongo {
-    extern unsigned replSetForceInitialSyncFailure;
-
 namespace replset {
     InitialSync::InitialSync(BackgroundSyncInterface *q) : 
         SyncTail(q) {}

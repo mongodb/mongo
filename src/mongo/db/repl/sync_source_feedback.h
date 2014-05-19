@@ -35,6 +35,7 @@
 #include "mongo/util/background.h"
 
 namespace mongo {
+namespace replset {
 
     class Member;
 
@@ -118,4 +119,5 @@ namespace mongo {
         // used to indicate a connection change which has not yet been shook on
         bool _handshakeNeeded;
     };
-}
+} // namespace replset
+} // namespace mongo

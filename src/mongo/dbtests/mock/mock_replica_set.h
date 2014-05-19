@@ -49,7 +49,7 @@ namespace mongo {
      */
     class MockReplicaSet {
     public:
-        typedef std::map<std::string, ReplSetConfig::MemberCfg> ReplConfigMap;
+        typedef std::map<std::string, replset::ReplSetConfig::MemberCfg> ReplConfigMap;
 
         /**
          * Creates a mock replica set and automatically mocks the isMaster

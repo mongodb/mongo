@@ -37,6 +37,8 @@
 namespace mongo {
 
     extern const BSONObj reverseNaturalObj; // { $natural : -1 }
+
+namespace replset {
     /**
      * Authenticates conn using the server's cluster-membership credentials.
      *
@@ -163,4 +165,5 @@ namespace mongo {
         bool passthroughHandshake(const mongo::OID& rid, const int f);
     };
 
-}
+} // namespace replset
+} // namespace mongo

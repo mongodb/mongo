@@ -440,14 +440,14 @@ namespace mongo {
                 BSONObj deletedId;
                 collection->deleteDocument( txn, rloc, false, false, &deletedId );
                 // The above throws on failure, and so is not logged
-                logOp(txn, "d", ns.c_str(), deletedId, 0, 0, fromMigrate);
+                replset::logOp(txn, "d", ns.c_str(), deletedId, 0, 0, fromMigrate);
                 numDeleted++;
             }
 
             Timer secondaryThrottleTime;
 
             if ( secondaryThrottle && numDeleted > 0 ) {
-                if ( ! waitForReplication( c.getLastOp(), 2, 60 /* seconds to wait */ ) ) {
+                if (!replset::waitForReplication(c.getLastOp(), 2, 60 /* seconds to wait */)) {
                     warning() << "replication to secondaries for removeRange at least 60 seconds behind" << endl;
                 }
                 millisWaitingForReplication += secondaryThrottleTime.millis();

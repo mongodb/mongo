@@ -65,6 +65,7 @@
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
+namespace replset {
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static Database* localDB = NULL;
@@ -772,4 +773,5 @@ namespace mongo {
             setNewOptime(lastOp[ "ts" ].date());
         }
     }
-}
+} // namespace replset
+} // namespace mongo

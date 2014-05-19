@@ -33,6 +33,7 @@
 #include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo {
+namespace replset {
 
     class Member;
 
@@ -91,4 +92,5 @@ namespace mongo {
         RWLock m;
         SP sp;
     };
+} // namespace replset
 } // namespace mongo

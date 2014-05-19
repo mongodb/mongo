@@ -34,10 +34,14 @@
 #include "mongo/logger/tee.h"
 
 namespace mongo {
+namespace replset {
+
+    void fillRsLog(std::stringstream&);
 
     // ramlog used for replSet actions
     extern logger::Tee* rsLog;
 
     // helper function needed by member.cpp
     std::string ago(time_t t);    
-}
+} // namespace replset
+} // namespace mongo

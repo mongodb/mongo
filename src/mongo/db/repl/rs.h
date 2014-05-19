@@ -63,6 +63,7 @@
  */
 
 namespace mongo {
+namespace replset {
 
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
@@ -73,6 +74,7 @@ namespace mongo {
     // Main entry point for replica sets
     void startReplSets(ReplSetCmdline *replSetCmdline);
 
+    bool isCurrentlyAReplSetPrimary();
 
     /**
      * does local authentication
@@ -109,4 +111,5 @@ namespace mongo {
         return true;
     }
 
-}
+} // namespace replset
+} // namespace mongo

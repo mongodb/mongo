@@ -58,7 +58,7 @@ namespace mongo {
         Client::initThread(name().c_str());
         Lock::ParallelBatchWriterMode::iAmABatchParticipant();
 
-        replLocalAuth();
+        replset::replLocalAuth();
 
         cc().curop()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());

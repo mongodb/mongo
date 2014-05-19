@@ -46,6 +46,7 @@
 using namespace bson;
 
 namespace mongo {
+namespace replset {
 
     mongo::mutex ReplSetConfig::groupMx("RS tag group");
     const int ReplSetConfig::DEFAULT_HB_TIMEOUT = 10;
@@ -763,4 +764,5 @@ namespace mongo {
         _constructed = true;
     }
 
-}
+} // namespace replset
+} // namespace mongo

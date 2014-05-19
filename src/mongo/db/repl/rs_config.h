@@ -37,6 +37,7 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+namespace replset {
     class Member;
     const std::string rsConfigNs = "local.system.replset";
 
@@ -328,4 +329,5 @@ namespace mongo {
         };
     };
 
-}
+} // namespace replset
+} // namespace mongo

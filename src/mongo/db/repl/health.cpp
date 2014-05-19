@@ -47,12 +47,10 @@
 #include "mongo/util/ramlog.h"
 
 namespace mongo {
+namespace replset {
     /* decls for connections.h */
     ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
-}
-
-namespace mongo {
 
     using namespace mongoutils::html;
     using namespace bson;
@@ -468,4 +466,5 @@ namespace mongo {
         if( replSetBlind )
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
-}
+} // namespace replset
+} // namespace mongo

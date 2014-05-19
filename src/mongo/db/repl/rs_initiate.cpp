@@ -53,6 +53,7 @@ using namespace bson;
 using namespace mongoutils;
 
 namespace mongo {
+namespace replset {
 
     /* called on a reconfig AND on initiate
        throws
@@ -298,4 +299,5 @@ namespace mongo {
         }
     } cmdReplSetInitiate;
 
-}
+} // namespace replset
+} // namespace mongo

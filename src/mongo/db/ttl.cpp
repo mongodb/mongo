@@ -67,7 +67,7 @@ namespace mongo {
         
         void doTTLForDB( const string& dbName ) {
 
-            if ( !isMasterNs( dbName.c_str() ) )
+            if (!replset::isMasterNs(dbName.c_str()))
                 return;
 
             vector<BSONObj> indexes;
@@ -122,7 +122,7 @@ namespace mongo {
                         continue;
                     }
 
-                    if ( !isMasterNs( dbName.c_str() ) ) {
+                    if (!replset::isMasterNs(dbName.c_str())) {
                         // we've stepped down since we started this function,
                         // so we should stop working as we only do deletes on the primary
                         break;
@@ -166,7 +166,7 @@ namespace mongo {
                 }
 
                 // if part of replSet but not in a readable state (e.g. during initial sync), skip.
-                if ( theReplSet && !theReplSet->state().readable() )
+                if (replset::theReplSet && !replset::theReplSet->state().readable())
                     continue;
 
                 set<string> dbs;

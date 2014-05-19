@@ -204,7 +204,7 @@ namespace mongo {
 
                 if ( !fromRepl ) {
                     std::string systemIndexes = ns.getSystemIndexesCollection();
-                    logOp( txn, "i", systemIndexes.c_str(), spec );
+                    replset::logOp(txn, "i", systemIndexes.c_str(), spec);
                 }
             }
 

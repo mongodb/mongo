@@ -39,6 +39,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace replset {
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
     void parseReplsetCmdLine(const std::string& cfgString,
@@ -108,4 +109,5 @@ namespace mongo {
         startMasterSlave();
     }
 
+} // namespace replset
 } // namespace mongo

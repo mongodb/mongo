@@ -129,7 +129,7 @@ namespace mongo {
         IndexCatalogEntry* entry = _real->_btreeState;
 
         bool dupsAllowed = !entry->descriptor()->unique()
-                           || ignoreUniqueIndex(entry->descriptor());
+                           || replset::ignoreUniqueIndex(entry->descriptor());
 
         bool dropDups = entry->descriptor()->dropDups() || inDBRepair;
 

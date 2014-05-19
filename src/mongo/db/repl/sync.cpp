@@ -42,6 +42,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace replset {
 
     void Sync::setHostname(const string& hostname) {
         hn = hostname;
@@ -135,4 +136,5 @@ namespace mongo {
             return true;
         }
     }
-}
+} // namespace replset
+} // namespace mongo

@@ -30,27 +30,30 @@
 
 #include "mongo/db/repl/rs.h"
 
+#include "mongo/bson/optime.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/initial_sync.h"
+#include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/bson/optime.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
-#include "mongo/db/repl/initial_sync.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace replset {
 
     using namespace mongoutils;
     using namespace bson;
-
-    void dropAllDatabasesExceptLocal();
 
     // add try/catch with sleep
 
@@ -491,4 +494,5 @@ namespace mongo {
         sethbmsg("initial sync done",0);
     }
 
-}
+} // namespace replset
+} // namespace mongo

@@ -42,6 +42,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/lockstate.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/rwlock.h"
@@ -50,7 +51,6 @@
 
 namespace mongo {
 
-    extern class ReplSet *theReplSet;
     class AuthenticationInfo;
     class Database;
     class CurOp;

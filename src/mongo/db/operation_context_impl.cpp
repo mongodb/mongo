@@ -71,7 +71,7 @@ namespace mongo {
 
     bool OperationContextImpl::isPrimaryFor( const StringData& ns ) {
         string s = ns.toString(); // TODO: fix copy
-        return isMasterNs( s.c_str() );
+        return replset::isMasterNs(s.c_str());
     }
 
     OperationContext* OperationContextImpl::factory() {

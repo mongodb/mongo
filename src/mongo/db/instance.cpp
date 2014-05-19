@@ -548,7 +548,7 @@ namespace mongo {
         Database *database = ctx->db();
         verify( database->name() == db );
 
-        oplogCheckCloseDatabase( database ); // oplog caches some things, dirty its caches
+        replset::oplogCheckCloseDatabase(database); // oplog caches some things, dirty its caches
 
         if( BackgroundOperation::inProgForDb(db) ) {
             log() << "warning: bg op in prog during close db? " << db << endl;
@@ -697,7 +697,7 @@ namespace mongo {
                         last = getLastSetOptime();
                     }
                     else {
-                        waitForOptimeChange(last, 1000/*ms*/);
+                        replset::waitForOptimeChange(last, 1000/*ms*/);
                     }
                 }
 
@@ -811,7 +811,7 @@ namespace mongo {
                 return;
 
             uassertStatusOK( status );
-            logOp( txn, "i", ns, js );
+            replset::logOp(txn, "i", ns, js);
             return;
         }
 
@@ -828,7 +828,7 @@ namespace mongo {
 
         StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );
         uassertStatusOK( status.getStatus() );
-        logOp(txn, "i", ns, js);
+        replset::logOp(txn, "i", ns, js);
     }
 
     NOINLINE_DECL void insertMulti(OperationContext* txn,
@@ -884,7 +884,7 @@ namespace mongo {
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
-        uassert( 10058 , "not master", isMasterNs(ns) );
+        uassert(10058 , "not master", replset::isMasterNs(ns));
 
         if ( handlePossibleShardedMessage( m , 0 ) )
             return;
@@ -933,9 +933,9 @@ namespace mongo {
                 return true;
             // we have a local database.  return true if oplog isn't empty
             {
-                Lock::DBRead lk(rsoplog);
+                Lock::DBRead lk(replset::rsoplog);
                 BSONObj o;
-                if( Helpers::getFirst(rsoplog, o) )
+                if( Helpers::getFirst(replset::rsoplog, o) )
                     return true;
             }
         }
@@ -1115,8 +1115,8 @@ namespace {
 
     void exitCleanly( ExitCode code ) {
         killCurrentOp.killAll();
-        if (theReplSet) {
-            theReplSet->shutdown();
+        if (replset::theReplSet) {
+            replset::theReplSet->shutdown();
         }
 
         {

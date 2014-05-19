@@ -40,9 +40,14 @@
 */
 
 namespace mongo {
+    namespace threadpool {
+        class ThreadPool;
+    }
 
     class Database;
     class OperationContext;
+
+namespace replset {
 
     // Main entry point for master/slave at startup time.
     void startMasterSlave();
@@ -54,15 +59,13 @@ namespace mongo {
     // Global variable that contains a std::string telling why master/slave halted
     extern const char *replAllDead;
 
+    extern const char *replInfo;
+
     /* A replication exception */
     class SyncException : public DBException {
     public:
         SyncException() : DBException( "sync exception" , 10001 ) {}
     };
-
-    namespace threadpool {
-        class ThreadPool;
-    }
 
     /* A Source is a source from which we can pull (replicate) data.
        stored in collection local.sources.
@@ -182,4 +185,5 @@ namespace mongo {
         std::map< std::string, OpTime > _ignores;
     };
 
-}
+} // namespace replset
+} // namespace mongo

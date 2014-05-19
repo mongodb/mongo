@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
+namespace replset {
 
     // operator requested resynchronization of replication (on a slave or secondary). {resync: 1}
     class CmdResync : public Command {
@@ -117,4 +118,5 @@ namespace mongo {
             return true;
         }
     } cmdResync;
-}
+} // namespace replset
+} // namespace mongo

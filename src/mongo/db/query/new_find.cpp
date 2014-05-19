@@ -162,7 +162,7 @@ namespace mongo {
         // passing in a query object (necessary to check SlaveOK query option), the only state where
         // reads are allowed is PRIMARY (or master in master/slave).  This function uasserts if
         // reads are not okay.
-        replVerifyReadsOk(ns, NULL);
+        replset::replVerifyReadsOk(ns, NULL);
 
         // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
         // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
@@ -525,7 +525,7 @@ namespace mongo {
         txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-        replVerifyReadsOk(cq->ns(), &pq);
+        replset::replVerifyReadsOk(cq->ns(), &pq);
 
         // If this exists, the collection is sharded.
         // If it doesn't exist, we can assume we're not sharded.

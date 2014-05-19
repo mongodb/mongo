@@ -36,6 +36,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace replset {
 
     /* We should not allow most operations when not the master
        also we report not master if we are "dead".
@@ -76,4 +77,5 @@ namespace mongo {
         return ns[5] == 0 || ns[5] == '.';
     }
 
+} // namespace replset
 } // namespace mongo

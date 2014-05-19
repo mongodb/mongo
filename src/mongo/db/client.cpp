@@ -309,7 +309,7 @@ namespace mongo {
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
         // _lastOp is never set if replication is off
-        if( theReplSet || ! _lastOp.isNull() ) {
+        if (replset::theReplSet || !_lastOp.isNull()) {
             b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
@@ -351,11 +351,11 @@ namespace mongo {
 
         _handshake = b.obj();
 
-        if (!theReplSet || !o.hasField("member")) {
+        if (!replset::theReplSet || !o.hasField("member")) {
             return false;
         }
 
-        return theReplSet->registerSlave(_remoteId, o["member"].Int());
+        return replset::theReplSet->registerSlave(_remoteId, o["member"].Int());
     }
 
     bool ClientBasic::hasCurrent() {

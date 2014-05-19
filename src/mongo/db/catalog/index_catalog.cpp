@@ -534,7 +534,7 @@ namespace mongo {
         if ( !IndexDescriptor::isIdIndexPattern( key ) ) {
             // for non _id indexes, we check to see if replication has turned off all indexes
             // we _always_ created _id index
-            if( theReplSet && !theReplSet->buildIndexes() ) {
+            if (replset::theReplSet && !replset::theReplSet->buildIndexes()) {
                 // this is not exactly the right error code, but I think will make the most sense
                 return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
             }
@@ -999,7 +999,7 @@ namespace mongo {
             KeyPattern::isIdKeyPattern(index->descriptor()->keyPattern()) ||
             index->descriptor()->unique();
 
-        options.dupsAllowed = ignoreUniqueIndex( index->descriptor() ) || !isUnique;
+        options.dupsAllowed = replset::ignoreUniqueIndex(index->descriptor()) || !isUnique;
 
         int64_t inserted;
         return index->accessMethod()->insert(txn, obj, loc, options, &inserted);
@@ -1092,7 +1092,7 @@ namespace mongo {
             if ( !descriptor->unique() )
                 continue;
 
-            if ( ignoreUniqueIndex(descriptor) )
+            if (replset::ignoreUniqueIndex(descriptor))
                 continue;
 
             IndexAccessMethod* iam = getIndex( descriptor );

@@ -45,6 +45,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
+namespace replset {
 
 
     // our config from command line etc.
@@ -209,4 +210,5 @@ namespace mongo {
 
     OpCounterServerStatusSection replOpCounterServerStatusSection( "opcountersRepl", &replOpCounters );
 
-}
+} // namespace replset
+} // namespace mongo

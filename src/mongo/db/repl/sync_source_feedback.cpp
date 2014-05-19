@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
+namespace replset {
 
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
@@ -286,4 +287,5 @@ namespace mongo {
         }
         cc().shutdown();
     }
-}
+} // namespace replset
+} // namespace mongo

@@ -131,7 +131,11 @@ namespace mongo {
                 invariant(Lock::nested());
 
                 Client::Context ctx(ns);
-                bool failed = applyOperation_inlock(txn, ctx.db(), temp, false, alwaysUpsert);
+                bool failed = replset::applyOperation_inlock(txn,
+                                                             ctx.db(),
+                                                             temp,
+                                                             false,
+                                                             alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
@@ -162,7 +166,7 @@ namespace mongo {
                     }
                 }
 
-                logOp(txn, "c", tempNS.c_str(), cmdBuilder.done());
+                replset::logOp(txn, "c", tempNS.c_str(), cmdBuilder.done());
             }
 
             return errors == 0;
