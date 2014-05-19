@@ -8,8 +8,6 @@ import (
 )
 
 var (
-	mongoHost     string
-	mongoPort     string
 	url           string
 	masterSession *mgo.Session
 	globalOptions *options.MongoToolOptions
@@ -24,11 +22,9 @@ func Configure(opts *options.MongoToolOptions) error {
 	globalOptions = opts
 
 	// set up the host and port
-	mongoHost = opts.Host
-	mongoPort = opts.Port
-	url = mongoHost
-	if mongoPort != "" {
-		url += ":" + mongoPort
+	url = opts.Host
+	if opts.Port != "" {
+		url += ":" + opts.Port
 	}
 
 	return nil
