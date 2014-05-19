@@ -663,7 +663,7 @@ namespace mongo {
             // Restore state after modification
             uassert(17278,
                     "Update could not restore runner state after updating a document.",
-                    runner->restoreState());
+                    runner->restoreState(txn));
 
             // Call logOp if requested.
             if (request.shouldCallLogOp() && !logObj.isEmpty()) {

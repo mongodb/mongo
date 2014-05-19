@@ -451,7 +451,7 @@ namespace mongo {
         }
     }
 
-    bool SubplanRunner::restoreState() {
+    bool SubplanRunner::restoreState(OperationContext* opCtx) {
         if (_killed) {
             return false;
         }
@@ -459,7 +459,7 @@ namespace mongo {
         // We're ranking a sub-plan via an MPR or we're streaming results from this Runner.  Either
         // way, pass on the request.
         if (NULL != _underlyingRunner.get()) {
-            return _underlyingRunner->restoreState();
+            return _underlyingRunner->restoreState(opCtx);
         }
 
         return true;

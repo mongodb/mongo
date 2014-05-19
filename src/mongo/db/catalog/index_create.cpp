@@ -137,7 +137,7 @@ namespace mongo {
                     collection->deleteDocument( txn, loc, false, true, &toDelete );
                     logOp( txn, "d", ns.c_str(), toDelete );
 
-                    if (!runner->restoreState()) {
+                    if (!runner->restoreState(txn)) {
                         // Runner got killed somehow.  This probably shouldn't happen.
                         if (runnerEOF) {
                             // Quote: "We were already at the end.  Normal.

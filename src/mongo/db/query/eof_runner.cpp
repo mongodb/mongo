@@ -52,7 +52,7 @@ namespace mongo {
     void EOFRunner::saveState() {
     }
 
-    bool EOFRunner::restoreState() {
+    bool EOFRunner::restoreState(OperationContext* opCtx) {
         // TODO: Does this value matter?
         return false;
     }

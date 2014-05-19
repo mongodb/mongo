@@ -222,7 +222,7 @@ namespace mongo {
             const int queryOptions = cc->queryOptions();
 
             // Get results out of the runner.
-            runner->restoreState();
+            runner->restoreState(txn);
 
             BSONObj obj;
             Runner::RunnerState state;

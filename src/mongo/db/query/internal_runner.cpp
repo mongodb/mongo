@@ -66,7 +66,7 @@ namespace mongo {
         _exec->saveState();
     }
 
-    bool InternalRunner::restoreState() {
+    bool InternalRunner::restoreState(OperationContext* opCtx) {
         return _exec->restoreState();
     }
 

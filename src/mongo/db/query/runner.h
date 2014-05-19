@@ -35,6 +35,7 @@
 namespace mongo {
 
     class Collection;
+    class OperationContext;
     class DiskLoc;
     class TypeExplain;
     struct PlanInfo;
@@ -149,7 +150,7 @@ namespace mongo {
          * Restore saved state, possibly after a yield.  Return true if the runner is OK, false if
          * it was killed.
          */
-        virtual bool restoreState() = 0;
+        virtual bool restoreState(OperationContext* opCtx) = 0;
 
         /**
          * Return the NS that the query is running over.

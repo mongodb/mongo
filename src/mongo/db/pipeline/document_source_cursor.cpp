@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source.h"
 
 #include "mongo/db/instance.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/query/type_explain.h"
@@ -80,8 +81,9 @@ namespace mongo {
         // so we shouldn't check it again.
         Lock::DBRead lk(_ns);
         Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+        OperationContextImpl opCtx;  // XXX TODO(MATHIAS)
 
-        _runner->restoreState();
+        _runner->restoreState(&opCtx);
 
         int memUsageBytes = 0;
         BSONObj obj;
@@ -201,10 +203,11 @@ namespace {
         {
             Lock::DBRead lk(_ns);
             Client::Context ctx(_ns, storageGlobalParams.dbpath, /*doVersion=*/false);
+            OperationContextImpl opCtx;  // XXX TODO(MATHIAS)
             massert(17392, "No _runner. Were we disposed before explained?",
                     _runner);
 
-            _runner->restoreState();
+            _runner->restoreState(&opCtx);
 
             TypeExplain* explainRaw;
             explainStatus = _runner->getInfo(&explainRaw, NULL);

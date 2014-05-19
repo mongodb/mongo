@@ -68,7 +68,7 @@ namespace mongo {
         _exec->saveState();
     }
 
-    bool SingleSolutionRunner::restoreState() {
+    bool SingleSolutionRunner::restoreState(OperationContext* opCtx) {
         return _exec->restoreState();
     }
 

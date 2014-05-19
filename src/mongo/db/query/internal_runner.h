@@ -68,7 +68,7 @@ namespace mongo {
 
         virtual void saveState();
 
-        virtual bool restoreState();
+        virtual bool restoreState(OperationContext* opCtx);
 
         virtual const std::string& ns();
 

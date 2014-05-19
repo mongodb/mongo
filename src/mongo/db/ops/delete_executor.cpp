@@ -147,7 +147,7 @@ namespace mongo {
             // saving/restoring state repeatedly?
             runner->saveState();
             collection->deleteDocument(txn, rloc, false, false, logop ? &toDelete : NULL );
-            runner->restoreState();
+            runner->restoreState(txn);
 
             nDeleted++;
 

@@ -118,7 +118,7 @@ namespace {
 
         // These are all no-ops for PipelineRunners
         virtual void saveState() {}
-        virtual bool restoreState() { return true; }
+        virtual bool restoreState(OperationContext* opCtx) { return true; }
         virtual const Collection* collection() { return NULL; }
 
         /**

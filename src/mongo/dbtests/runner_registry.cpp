@@ -39,6 +39,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/single_solution_runner.h"
@@ -95,6 +96,7 @@ namespace RunnerRegistry {
         static const char* ns() { return "unittests.RunnerRegistryDiskLocInvalidation"; }
         static DBDirectClient _client;
         auto_ptr<Client::WriteContext> _ctx;
+        OperationContextImpl _opCtx;
     };
 
     DBDirectClient RunnerRegistryBase::_client;
@@ -128,7 +130,7 @@ namespace RunnerRegistry {
             deregisterRunner(run.get());
 
             // And clean up anything that happened before.
-            run->restoreState();
+            run->restoreState(&_opCtx);
 
             // Make sure that the runner moved forward over the deleted data.  We don't see foo==10
             // or foo==11.
@@ -163,7 +165,7 @@ namespace RunnerRegistry {
 
             // Unregister and restore state.
             deregisterRunner(run.get());
-            run->restoreState();
+            run->restoreState(&_opCtx);
 
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
@@ -177,7 +179,7 @@ namespace RunnerRegistry {
 
             // Unregister and restore state.
             deregisterRunner(run.get());
-            run->restoreState();
+            run->restoreState(&_opCtx);
 
             // Runner was killed.
             ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
@@ -208,7 +210,7 @@ namespace RunnerRegistry {
 
             // Unregister and restore state.
             deregisterRunner(run.get());
-            run->restoreState();
+            run->restoreState(&_opCtx);
 
             // Runner was killed.
             ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
@@ -239,7 +241,7 @@ namespace RunnerRegistry {
 
             // Unregister and restore state.
             deregisterRunner(run.get());
-            run->restoreState();
+            run->restoreState(&_opCtx);
 
             // Runner was killed.
             ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
@@ -271,7 +273,7 @@ namespace RunnerRegistry {
 
             // Unregister and restore state.
             deregisterRunner(run.get());
-            run->restoreState();
+            run->restoreState(&_opCtx);
 
             ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
@@ -287,7 +289,7 @@ namespace RunnerRegistry {
 
             // Unregister and restore state.
             deregisterRunner(run.get());
-            run->restoreState();
+            run->restoreState(&_opCtx);
 
             // Runner was killed.
             ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));

@@ -880,7 +880,7 @@ namespace mongo {
          * After calling this method, the temp collection will be completed.
          * If inline, the results will be in the in memory map
          */
-        void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ) {
+        void State::finalReduce(CurOp * op , ProgressMeterHolder& pm ) {
 
             if (_jsMode) {
                 // apply the reduce within JS
@@ -995,7 +995,7 @@ namespace mongo {
                 prev = o;
                 all.push_back( o );
 
-                if (!runner->restoreState()) {
+                if (!runner->restoreState(_txn)) {
                     break;
                 }
 
@@ -1376,7 +1376,7 @@ namespace mongo {
                     // if not inline: dump the in memory map to inc collection, all data is on disk
                     state.dumpToInc();
                     // final reduce
-                    state.finalReduce( op , pm );
+                    state.finalReduce(op , pm );
                     reduceTime += rt.micros();
                     countsBuilder.appendNumber( "reduce" , state.numReduces() );
                     timingBuilder.appendNumber("reduceTime", reduceTime / 1000);

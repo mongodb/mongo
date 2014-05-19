@@ -186,7 +186,7 @@ namespace mongo {
 
     void IDHackRunner::saveState() { }
 
-    bool IDHackRunner::restoreState() { return true; }
+    bool IDHackRunner::restoreState(OperationContext* opCtx) { return true; }
 
     // Nothing to do here, holding no state.
     void IDHackRunner::invalidate(const DiskLoc& dl, InvalidationType type) {

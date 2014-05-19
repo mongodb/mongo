@@ -640,7 +640,7 @@ namespace mongo {
             virtual void saveState() {
                 invariant( false );
             }
-            virtual bool restoreState() {
+            virtual bool restoreState(OperationContext* opCtx) {
                 invariant( false );
             }
             virtual const string& ns() {
