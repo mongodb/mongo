@@ -43,7 +43,7 @@ namespace mongo {
         LockState();
 
         void dump();
-        static void Dump(); 
+
         BSONObj reportState();
         void reportState(BSONObjBuilder& b);
         
@@ -57,7 +57,7 @@ namespace mongo {
         bool isRW() const; // RW
         bool isW() const; // W
         bool hasAnyReadLock() const; // explicitly rR
-        bool hasAnyWriteLock() const; // wWX
+        bool hasAnyWriteLock() const; // wW
         
         bool isLocked( const StringData& ns ); // rwRW
 

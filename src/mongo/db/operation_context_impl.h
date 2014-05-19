@@ -43,6 +43,8 @@ namespace mongo {
 
         virtual RecoveryUnit* recoveryUnit() const;
 
+        virtual LockState* lockState() const;
+
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name ,
                                           unsigned long long progressMeterTotal,

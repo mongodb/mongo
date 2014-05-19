@@ -291,7 +291,6 @@ namespace mongo {
     Client::Context::~Context() {
         DEV verify( _client == currentClient.get() );
         _client->_curOp->recordGlobalTime( _timer.micros() );
-        _client->_curOp->leave( this );
         _client->_context = _oldContext; // note: _oldContext may be null
     }
 

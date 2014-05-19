@@ -34,6 +34,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 
+
 namespace mongo {
 
     OperationContextImpl::OperationContextImpl() {
@@ -42,6 +43,11 @@ namespace mongo {
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {
         return _recovery.get();
+    }
+
+    LockState* OperationContextImpl::lockState() const {
+        // TODO: This will eventually become member of OperationContextImpl
+        return &cc().lockState();
     }
 
     ProgressMeter* OperationContextImpl::setMessage(const char* msg,

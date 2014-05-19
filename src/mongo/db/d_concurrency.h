@@ -86,19 +86,6 @@ namespace mongo {
             static RWLockRecursive &_batchLock;
         };
 
-    private:
-        class ParallelBatchWriterSupport : boost::noncopyable {
-        public:
-            ParallelBatchWriterSupport();
-
-        private:
-            void tempRelease();
-            void relock();
-
-            scoped_ptr<RWLockRecursive::Shared> _lk;
-            friend class ScopedLock;
-        };
-
     public:
 
         class ScopedLock : boost::noncopyable {
@@ -126,6 +113,19 @@ namespace mongo {
             virtual void _relock() = 0;
 
         private:
+
+            class ParallelBatchWriterSupport : boost::noncopyable {
+            public:
+                ParallelBatchWriterSupport();
+
+            private:
+                void tempRelease();
+                void relock();
+
+                scoped_ptr<RWLockRecursive::Shared> _lk;
+                friend class ScopedLock;
+            };
+
             ParallelBatchWriterSupport _pbws_lk;
 
             void _recordTime( long long micros );

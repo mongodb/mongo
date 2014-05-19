@@ -188,7 +188,7 @@ namespace mongo {
             {
                 // "something" is too vague, but we checked for the right db to be locked higher up the call stack
                 if( !Lock::somethingWriteLocked() ) {
-                    LockState::Dump();
+                    txn->lockState()->dump();
                     log() << "*** TEMP NOT INITIALIZING FILE " << filename << ", not in a write lock." << endl;
                     log() << "temp bypass until more elaborate change - case that is manifesting is benign anyway" << endl;
                     return;

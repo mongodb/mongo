@@ -44,6 +44,12 @@ namespace mongo {
             return _recoveryUnit.get();
         }
 
+        virtual LockState* lockState() const {
+            // TODO: Eventually, this should return an actual LockState object. For now,
+            //       LockState depends on the whole world and is not necessary for testing.
+            return NULL;
+        }
+
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name ,
                                           unsigned long long progressMeterTotal,

@@ -264,15 +264,15 @@ namespace mongo {
         lockState()._batchWriter = true;
     }
 
-    Lock::ParallelBatchWriterSupport::ParallelBatchWriterSupport() {
+    Lock::ScopedLock::ParallelBatchWriterSupport::ParallelBatchWriterSupport() {
         relock();
     }
 
-    void Lock::ParallelBatchWriterSupport::tempRelease() {
+    void Lock::ScopedLock::ParallelBatchWriterSupport::tempRelease() {
         _lk.reset( 0 );
     }
 
-    void Lock::ParallelBatchWriterSupport::relock() {
+    void Lock::ScopedLock::ParallelBatchWriterSupport::relock() {
         LockState& ls = lockState();
         if ( ! ls._batchWriter ) {
             AcquiringParallelWriter a(ls);

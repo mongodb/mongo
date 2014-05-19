@@ -201,7 +201,6 @@ namespace mongo {
         void appendQuery( BSONObjBuilder& b , const StringData& name ) const { _query.append( b , name ); }
         
         void enter( Client::Context * context );
-        void leave( Client::Context * context );
         void reset();
         void reset( const HostAndPort& remote, int op );
         void markCommand() { _isCommand = true; }

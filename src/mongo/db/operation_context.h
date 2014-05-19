@@ -34,6 +34,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/lockstate.h"
+
 
 namespace mongo {
 
@@ -55,6 +57,11 @@ namespace mongo {
          * Interface for durability.  Caller DOES NOT own pointer.
          */
         virtual RecoveryUnit* recoveryUnit() const = 0;
+
+        /**
+         * Interface for locking.  Caller DOES NOT own pointer.
+         */
+        virtual LockState* lockState() const = 0;
 
         // --- operation level info? ---
 

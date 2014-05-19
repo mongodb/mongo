@@ -28,15 +28,11 @@
 *    it in the license file.
 */
 
-
-#include "mongo/pch.h"
-
 #include "mongo/db/lockstate.h"
 
-#include "mongo/db/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/client.h"
 #include "mongo/util/mongoutils/str.h"
+
 
 namespace mongo {
 
@@ -148,9 +144,6 @@ namespace mongo {
         res.append( "waitingForLock" , _lockPending );
     }
 
-    void LockState::Dump() {
-        cc().lockState().dump();
-    }
     void LockState::dump() {
         char s = _threadState;
         stringstream ss;

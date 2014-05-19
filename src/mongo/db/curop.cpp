@@ -162,9 +162,6 @@ namespace mongo {
         _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
 
-    void CurOp::leave( Client::Context * context ) {
-    }
-
     void CurOp::recordGlobalTime( long long micros ) const {
         if ( _client ) {
             const LockState& ls = _client->lockState();
