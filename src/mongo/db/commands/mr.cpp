@@ -323,6 +323,8 @@ namespace mongo {
             // Always forget about temporary namespaces, so we don't cache lots of them
             ShardConnection::forgetNS( _config.tempNamespace );
             if (_useIncremental) {
+                // NOTE: this will log the deletion of the inc collection which is unnecessary, but
+                // harmless.
                 _db.dropCollection(_config.incLong);
                 ShardConnection::forgetNS( _config.incLong );
             }
@@ -339,6 +341,7 @@ namespace mongo {
             dropTempCollections();
             if (_useIncremental) {
                 // Create the inc collection and make sure we have index on "0" key.
+                // Intentionally not replicating the inc collection to secondaries.
                 Client::WriteContext incCtx( _config.incLong );
                 Collection* incColl = incCtx.ctx().db()->getCollection( _txn, _config.incLong );
                 if ( !incColl ) {
@@ -346,21 +349,11 @@ namespace mongo {
                     options.setNoIdIndex();
                     options.temp = true;
                     incColl = incCtx.ctx().db()->createCollection( _txn, _config.incLong, options );
-
-                    // Log the createCollection operation.
-                    BSONObjBuilder b;
-                    b.append( "create", nsToCollectionSubstring( _config.incLong ));
-                    b.appendElements( options.toBSON() );
-                    string logNs = nsToDatabase( _config.incLong ) + ".$cmd";
-                    logOp( _txn, "c", logNs.c_str(), b.obj() );
                 }
 
                 BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
                                           << "name" << "_temp_0" );
                 Status status = incColl->getIndexCatalog()->createIndex(_txn, indexSpec, false);
-                // Log the createIndex operation.
-                string logNs = nsToDatabase( _config.incLong ) + ".system.indexes";
-                logOp( _txn, "i", logNs.c_str(), indexSpec );
                 if ( !status.isOK() ) {
                     uasserted( 17305 , str::stream() << "createIndex failed for mr incLong ns: " <<
                             _config.incLong << " err: " << status.code() );
@@ -621,7 +614,7 @@ namespace mongo {
         }
 
         /**
-         * Insert doc in collection
+         * Insert doc in collection. This should be replicated.
          */
         void State::insert( const string& ns , const BSONObj& o ) {
             verify( _onDisk );
@@ -647,7 +640,7 @@ namespace mongo {
         }
 
         /**
-         * Insert doc into the inc collection
+         * Insert doc into the inc collection. This should not be replicated.
          */
         void State::_insertToInc( BSONObj& o ) {
             verify( _onDisk );
@@ -660,7 +653,6 @@ namespace mongo {
                                                   " collection expected: " << _config.incLong );
 
             coll->insertDocument( _txn, o, true );
-            logOp( _txn, "i", _config.incLong.c_str(), o );
             _txn->recoveryUnit()->commitIfNeeded();
         }
 
