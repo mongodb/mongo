@@ -812,6 +812,10 @@ serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_merge.cpp",
                      "s/distlock_test.cpp" ]
 
+if has_option( 'use-cpu-profiler' ):
+    serverOnlyFiles.append( 'db/commands/cpuprofile.cpp' )
+    env.Append(LIBS=['unwind'])
+
 env.Library("defaultversion", "s/default_version.cpp")
 
 # Geo
@@ -926,10 +930,6 @@ mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options_ini
 # ----- TARGETS ------
 
 env.Library("gridfs", "client/gridfs.cpp")
-
-if has_option( 'use-cpu-profiler' ):
-    coreServerFiles.append( 'db/commands/cpuprofile.cpp' )
-    env.Append(LIBS=['unwind'])
 
 env.Library("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "scripting"])
 
