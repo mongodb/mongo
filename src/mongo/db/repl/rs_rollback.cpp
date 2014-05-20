@@ -42,7 +42,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 
 /* Scenarios
  *

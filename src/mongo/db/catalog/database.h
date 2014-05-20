@@ -122,7 +122,7 @@ namespace mongo {
          */
         bool isOk() const { return _magic == 781231; }
 
-        bool isEmpty();
+        bool isEmpty() const;
 
         /**
          * total file size of Database in bytes
@@ -153,8 +153,13 @@ namespace mongo {
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }
 
-        const NamespaceIndex* namespaceIndex() const;
-        NamespaceIndex* namespaceIndex();
+        void getCollectionNamespaces( std::list<std::string>* out ) const;
+
+        void getStats( BSONObjBuilder* output, double scale = 1 );
+
+        long long getIndexSizeForCollection( Collection* collections,
+                                             BSONObjBuilder* details = NULL,
+                                             int scale = 1 );
 
         // TODO: do not think this method should exist, so should try and encapsulate better
         MmapV1ExtentManager* getExtentManager();

@@ -41,7 +41,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/structure/catalog/namespace_index.h"
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -335,7 +334,7 @@ public:
         Database * db = cx.ctx().db();
 
         list<string> namespaces;
-        db->namespaceIndex()->getNamespaces( namespaces );
+        db->getCollectionNamespaces( &namespaces );
 
         boost::filesystem::path root = mongoDumpGlobalParams.outputDirectory;
         root /= dbname;

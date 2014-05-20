@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/operation_context_impl.h"

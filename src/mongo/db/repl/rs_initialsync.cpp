@@ -43,7 +43,6 @@
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

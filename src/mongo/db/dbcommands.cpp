@@ -71,7 +71,6 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/d_writeback.h"
@@ -171,7 +170,7 @@ namespace mongo {
                                                      const BSONObj& cmdObj) {
             invariant(db);
             std::list<std::string> collections;
-            db->namespaceIndex()->getNamespaces(collections, true /* onlyCollections */);
+            db->getCollectionNamespaces(&collections);
 
             std::vector<BSONObj> allKilledIndexes;
             for (std::list<std::string>::iterator it = collections.begin(); 
@@ -257,7 +256,7 @@ namespace mongo {
                                                      const BSONObj& cmdObj) {
             invariant(db);
             std::list<std::string> collections;
-            db->namespaceIndex()->getNamespaces(collections, true /* onlyCollections */);
+            db->getCollectionNamespaces(&collections);
 
             std::vector<BSONObj> allKilledIndexes;
             for (std::list<std::string>::iterator it = collections.begin(); 
@@ -1017,39 +1016,6 @@ namespace mongo {
 
     } cmdDatasize;
 
-    namespace {
-        long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ) {
-            Lock::assertAtLeastReadLocked(ns);
-            Client::Context ctx( ns );
-
-            Collection* coll = ctx.db()->getCollection( ns );
-            if ( !coll )
-                return 0;
-
-            IndexCatalog::IndexIterator ii =
-                coll->getIndexCatalog()->getIndexIterator( true /*includeUnfinishedIndexes*/ );
-
-            long long totalSize = 0;
-
-            while ( ii.more() ) {
-                IndexDescriptor* d = ii.next();
-                string indNS = d->indexNamespace();
-                Collection* indColl = ctx.db()->getCollection( indNS );
-                if ( ! indColl ) {
-                    log() << "error: have index descriptor ["  << indNS
-                          << "] but no entry in the index collection." << endl;
-                    continue;
-                }
-                totalSize += indColl->dataSize();
-                if ( details ) {
-                    long long const indexSize = indColl->dataSize() / scale;
-                    details->appendNumber( d->indexName() , indexSize );
-                }
-            }
-            return totalSize;
-        }
-    }
-
     class CollectionStats : public Command {
     public:
         CollectionStats() : Command( "collStats", false, "collstats" ) {
@@ -1074,8 +1040,8 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::ReadContext cx( ns );
-
-            Collection* collection = cx.ctx().db()->getCollection( ns );
+            Database* db = cx.ctx().db();
+            Collection* collection = db->getCollection( ns );
             if ( !collection ) {
                 errmsg = "Collection [" + ns + "] not found.";
                 return false;
@@ -1114,7 +1080,9 @@ namespace mongo {
             collection->getRecordStore()->appendCustomStats( &result, scale );
 
             BSONObjBuilder indexSizes;
-            result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
+            result.appendNumber( "totalIndexSize" , db->getIndexSizeForCollection(collection,
+                                                                                  &indexSizes,
+                                                                                  scale) / scale );
             result.append("indexSizes", indexSizes.obj());
 
             return true;
@@ -1277,84 +1245,11 @@ namespace mongo {
             }
 
             const string ns = parseNs(dbname, jsobj);
-            list<string> collections;
 
             Client::ReadContext ctx(ns);
             Database* d = ctx.ctx().db();
 
-            if ( d && ( d->isEmpty() || d->getExtentManager()->numFiles() == 0 ) )
-                d = NULL;
-
-            if ( d )
-                d->namespaceIndex()->getNamespaces( collections );
-
-            long long ncollections = 0;
-            long long objects = 0;
-            long long size = 0;
-            long long storageSize = 0;
-            long long numExtents = 0;
-            long long indexes = 0;
-            long long indexSize = 0;
-
-            for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
-                const string ns = *it;
-
-                Collection* collection = d->getCollection( ns );
-                if ( !collection ) {
-                    errmsg = "missing ns: ";
-                    errmsg += ns;
-                    return false;
-                }
-
-                ncollections += 1;
-                objects += collection->numRecords();
-                size += collection->dataSize();
-
-                BSONObjBuilder temp;
-                storageSize += collection->getRecordStore()->storageSize( &temp );
-                numExtents += temp.obj()["numExtents"].numberInt(); // XXX
-
-                indexes += collection->getIndexCatalog()->numIndexesTotal();
-                indexSize += getIndexSizeForCollection(dbname, ns);
-            }
-
-            result.append      ( "db" , dbname );
-            result.appendNumber( "collections" , ncollections );
-            result.appendNumber( "objects" , objects );
-            result.append      ( "avgObjSize" , objects == 0 ? 0 : double(size) / double(objects) );
-            result.appendNumber( "dataSize" , size / scale );
-            result.appendNumber( "storageSize" , storageSize / scale);
-            result.appendNumber( "numExtents" , numExtents );
-            result.appendNumber( "indexes" , indexes );
-            result.appendNumber( "indexSize" , indexSize / scale );
-            if ( d ) {
-                result.appendNumber( "fileSize" , d->fileSize() / scale );
-                result.appendNumber( "nsSizeMB", (int) d->namespaceIndex()->fileLength() / 1024 / 1024 );
-            }
-            else {
-                result.appendNumber( "fileSize" , 0 );
-            }
-
-            BSONObjBuilder dataFileVersion( result.subobjStart( "dataFileVersion" ) );
-            if ( d ) {
-                int major, minor;
-                d->getFileFormat( &major, &minor );
-                dataFileVersion.append( "major", major );
-                dataFileVersion.append( "minor", minor );
-            }
-            dataFileVersion.done();
-
-            if ( d ){
-                int freeListSize = 0;
-                int64_t freeListSpace = 0;
-                d->getExtentManager()->freeListStats( &freeListSize, &freeListSpace );
-
-                BSONObjBuilder extentFreeList( result.subobjStart( "extentFreeList" ) );
-                extentFreeList.append( "num", freeListSize );
-                extentFreeList.appendNumber( "totalSize",
-                                             static_cast<long long>( freeListSpace / scale ) );
-                extentFreeList.done();
-            }
+            d->getStats( &result, scale );
 
             return true;
         }

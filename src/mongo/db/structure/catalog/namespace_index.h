@@ -75,7 +75,7 @@ namespace mongo {
 
         bool allocated() const { return _ht.get() != 0; }
 
-        void getNamespaces( std::list<std::string>& tofill , bool onlyCollections = true ) const;
+        void getCollectionNamespaces( std::list<std::string>* tofill ) const;
 
         boost::filesystem::path path() const;
 

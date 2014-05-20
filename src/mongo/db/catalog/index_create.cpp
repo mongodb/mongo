@@ -45,8 +45,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/structure/catalog/index_details.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
 

@@ -36,7 +36,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/structure/catalog/namespace_index.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/scopeguard.h"
 
@@ -65,7 +64,7 @@ namespace mongo {
                  dbName++) {
                 Client::ReadContext ctx(*dbName);
                 Database* db = ctx.ctx().db();
-                db->namespaceIndex()->getNamespaces(collNames, /* onlyCollections */ true);
+                db->getCollectionNamespaces(&collNames);
             }
             checkNS(collNames);
         }

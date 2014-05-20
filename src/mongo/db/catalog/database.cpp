@@ -319,6 +319,113 @@ namespace mongo {
         return true;
     }
 
+    void Database::getCollectionNamespaces( std::list<std::string>* out ) const {
+        _dbEntry->namespaceIndex().getCollectionNamespaces( out );
+    }
+
+    long long Database::getIndexSizeForCollection(Collection* coll,
+                                                  BSONObjBuilder* details,
+                                                  int scale ) {
+        if ( !coll )
+            return 0;
+
+        IndexCatalog::IndexIterator ii =
+            coll->getIndexCatalog()->getIndexIterator( true /*includeUnfinishedIndexes*/ );
+
+        long long totalSize = 0;
+
+        while ( ii.more() ) {
+            IndexDescriptor* d = ii.next();
+            string indNS = d->indexNamespace();
+            Collection* indColl = getCollection( indNS ); // XXX
+            if ( ! indColl ) {
+                log() << "error: have index descriptor ["  << indNS
+                      << "] but no entry in the index collection." << endl;
+                continue;
+            }
+            totalSize += indColl->dataSize();
+            if ( details ) {
+                long long const indexSize = indColl->dataSize() / scale;
+                details->appendNumber( d->indexName() , indexSize );
+            }
+        }
+        return totalSize;
+    }
+
+    void Database::getStats( BSONObjBuilder* output, double scale ) {
+        bool empty = isEmpty() || getExtentManager()->numFiles() == 0;
+
+        list<string> collections;
+        if ( !empty )
+            getCollectionNamespaces( &collections );
+
+        long long ncollections = 0;
+        long long objects = 0;
+        long long size = 0;
+        long long storageSize = 0;
+        long long numExtents = 0;
+        long long indexes = 0;
+        long long indexSize = 0;
+
+        for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
+            const string ns = *it;
+
+            Collection* collection = getCollection( ns );
+            if ( !collection )
+                continue;
+
+            ncollections += 1;
+            objects += collection->numRecords();
+            size += collection->dataSize();
+
+            BSONObjBuilder temp;
+            storageSize += collection->getRecordStore()->storageSize( &temp );
+            numExtents += temp.obj()["numExtents"].numberInt(); // XXX
+
+            indexes += collection->getIndexCatalog()->numIndexesTotal();
+            indexSize += getIndexSizeForCollection(collection);
+        }
+
+        output->append      ( "db" , _name );
+        output->appendNumber( "collections" , ncollections );
+        output->appendNumber( "objects" , objects );
+        output->append      ( "avgObjSize" , objects == 0 ? 0 : double(size) / double(objects) );
+        output->appendNumber( "dataSize" , size / scale );
+        output->appendNumber( "storageSize" , storageSize / scale);
+        output->appendNumber( "numExtents" , numExtents );
+        output->appendNumber( "indexes" , indexes );
+        output->appendNumber( "indexSize" , indexSize / scale );
+        if ( !empty ) {
+            output->appendNumber( "fileSize" , fileSize() / scale );
+            output->appendNumber( "nsSizeMB", (int)_dbEntry->namespaceIndex().fileLength() / 1024 / 1024 );
+        }
+        else {
+            output->appendNumber( "fileSize" , 0 );
+        }
+
+        BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
+        if ( !empty ) {
+            int major, minor;
+            getFileFormat( &major, &minor );
+            dataFileVersion.append( "major", major );
+            dataFileVersion.append( "minor", minor );
+        }
+        dataFileVersion.done();
+
+        if ( !empty ){
+            int freeListSize = 0;
+            int64_t freeListSpace = 0;
+            getExtentManager()->freeListStats( &freeListSize, &freeListSpace );
+
+            BSONObjBuilder extentFreeList( output->subobjStart( "extentFreeList" ) );
+            extentFreeList.append( "num", freeListSize );
+            extentFreeList.appendNumber( "totalSize",
+                                         static_cast<long long>( freeListSpace / scale ) );
+            extentFreeList.done();
+        }
+
+    }
+
     Status Database::dropCollection( OperationContext* txn, const StringData& fullns ) {
         LOG(1) << "dropCollection: " << fullns << endl;
         massertNamespaceNotIndex( fullns, "dropCollection" );
@@ -624,7 +731,7 @@ namespace mongo {
                                             const CollectionOptions& options,
                                             bool allocateDefaultSpace,
                                             bool createIdIndex ) {
-        massert( 17399, "collection already exists", _dbEntry->namespaceIndex().details( ns ) == NULL );
+        massert( 17399, "collection already exists", getCollection( ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
 
         if ( serverGlobalParams.configsvr &&
@@ -742,15 +849,7 @@ namespace mongo {
         return _dbEntry->getExtentManager();
     }
 
-    const NamespaceIndex* Database::namespaceIndex() const {
-        return &_dbEntry->namespaceIndex();
-    }
-
-    NamespaceIndex* Database::namespaceIndex() {
-        return &_dbEntry->namespaceIndex();
-    }
-
-    bool Database::isEmpty() {
+    bool Database::isEmpty() const {
         return !_dbEntry->namespaceIndex().allocated();
     }
 

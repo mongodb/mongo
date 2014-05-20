@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#pragma once
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"

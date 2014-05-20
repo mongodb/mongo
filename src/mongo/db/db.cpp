@@ -78,7 +78,6 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/catalog/namespace_index.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/d_writeback.h"
@@ -328,7 +327,7 @@ namespace mongo {
         }
 
         list<string> collections;
-        db->namespaceIndex()->getNamespaces( collections );
+        db->getCollectionNamespaces( &collections );
 
         // for each collection, ensure there is a $_id_ index
         for (list<string>::iterator i = collections.begin(); i != collections.end(); ++i) {

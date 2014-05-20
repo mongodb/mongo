@@ -34,7 +34,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/structure/head_manager.h"
 
 namespace mongo {

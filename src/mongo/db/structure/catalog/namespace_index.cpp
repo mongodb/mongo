@@ -115,12 +115,9 @@ namespace mongo {
         }
     }
 
-    void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
-        verify( onlyCollections ); // TODO: need to implement this
-        //                                  need stdx::bind or something to make this less ugly
-
+    void NamespaceIndex::getCollectionNamespaces( list<string>* tofill ) const {
         if ( _ht.get() )
-            _ht->iterAll( namespaceGetNamespacesCallback , (void*)&tofill );
+            _ht->iterAll( namespaceGetNamespacesCallback , (void*)tofill );
     }
 
     void NamespaceIndex::maybeMkdir() const {

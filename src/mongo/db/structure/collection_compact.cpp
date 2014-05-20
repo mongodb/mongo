@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
