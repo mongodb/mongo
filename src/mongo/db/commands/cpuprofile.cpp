@@ -96,10 +96,11 @@ namespace mongo {
         public:
             CpuProfilerStartCommand() : CpuProfilerCommand( commandName ) {}
 
-            virtual bool run( string const &db,
+            virtual bool run( OperationContext* txn,
+                              std::string const &db,
                               BSONObj &cmdObj,
                               int options,
-                              string &errmsg,
+                              std::string &errmsg,
                               BSONObjBuilder &result,
                               bool fromRepl );
 
@@ -113,10 +114,11 @@ namespace mongo {
         public:
             CpuProfilerStopCommand() : CpuProfilerCommand( commandName ) {}
 
-            virtual bool run( string const &db,
+            virtual bool run( OperationContext* txn,
+                              std::string const &db,
                               BSONObj &cmdObj,
                               int options,
-                              string &errmsg,
+                              std::string &errmsg,
                               BSONObjBuilder &result,
                               bool fromRepl );
 
@@ -126,10 +128,11 @@ namespace mongo {
         char const *const CpuProfilerStartCommand::commandName = "_cpuProfilerStart";
         char const *const CpuProfilerStopCommand::commandName = "_cpuProfilerStop";
 
-        bool CpuProfilerStartCommand::run( string const &db,
+        bool CpuProfilerStartCommand::run( OperationContext* txn,
+                                           std::string const &db,
                                            BSONObj &cmdObj,
                                            int options,
-                                           string &errmsg,
+                                           std::string &errmsg,
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
             Lock::DBWrite dbXLock(db);
@@ -143,10 +146,11 @@ namespace mongo {
             return true;
         }
 
-        bool CpuProfilerStopCommand::run( string const &db,
+        bool CpuProfilerStopCommand::run( OperationContext* txn,
+                                          std::string const &db,
                                           BSONObj &cmdObj,
                                           int options,
-                                          string &errmsg,
+                                          std::string &errmsg,
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
             Lock::DBWrite dbXLock(db);
