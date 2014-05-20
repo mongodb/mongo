@@ -38,17 +38,10 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/ops/update.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/structure/catalog/namespace_details.h"
-#include "mongo/db/structure/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/structure/record_store_v1_capped.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/storage/extent.h"
-#include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/storage/record.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
 

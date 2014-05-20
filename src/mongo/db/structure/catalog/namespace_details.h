@@ -229,7 +229,7 @@ namespace mongo {
         BOOST_STATIC_ASSERT( NIndexesMax <= 64 ); // multiKey bits
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) == 496 );
     }; // NamespaceDetails
-    BOOST_STATIC_ASSERT( sizeof(NamespaceDetails) == 496 ); // XXX
+    BOOST_STATIC_ASSERT( sizeof(NamespaceDetails) == 496 );
 #pragma pack()
 
 } // namespace mongo
