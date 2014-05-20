@@ -30,6 +30,15 @@ env.CppUnitTest(
     source=['btree_logic_test.cpp'
             ],
     LIBDEPS=[
+        'btree_test_help'
+        ]
+    )
+
+env.CppUnitTest(
+    target='btree_builder_test',
+    source=['btree_builder_test.cpp'
+            ],
+    LIBDEPS=[
         'btree_test_help'        
         ]
     )
