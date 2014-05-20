@@ -173,7 +173,6 @@ namespace mongo {
         _ns( ns ), 
         _db(db)
     {
-        verify( db == 0 || db->isOk() );
         _client->_context = this;
     }
 

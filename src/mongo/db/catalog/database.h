@@ -117,11 +117,6 @@ namespace mongo {
 
         void clearTmpCollections(OperationContext* txn);
 
-        /**
-         * tries to make sure that this hasn't been deleted
-         */
-        bool isOk() const { return _magic == 781231; }
-
         bool isEmpty() const;
 
         /**
@@ -246,8 +241,6 @@ namespace mongo {
         const std::string _indexesName; // "alleyinsider.system.indexes"
 
         int _profile; // 0=off.
-
-        int _magic; // used for making sure the object is still loaded in memory
 
         // TODO: make sure deletes go through
         // this in some ways is a dupe of _namespaceIndex

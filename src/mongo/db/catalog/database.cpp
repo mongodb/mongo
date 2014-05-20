@@ -155,7 +155,6 @@ namespace mongo {
 
     Database::~Database() {
         verify( Lock::isW() );
-        _magic = 0;
 
         for ( CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i )
             delete i->second;
@@ -211,7 +210,6 @@ namespace mongo {
         }
 
         _profile = serverGlobalParams.defaultProfile;
-        _magic = 781231;
         newDb = !_dbEntry->exists();
     }
 
