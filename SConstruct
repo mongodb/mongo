@@ -1356,6 +1356,38 @@ def doConfigure(myenv):
             print( 'Failed to enable sanitizer with flag: ' + sanitizer_option )
             Exit(1)
 
+    # When using msvc, check for VS 2013 Update 2+ so we can use new compiler flags
+    if using_msvc():
+        haveVS2013Update2OrLater = False
+        def CheckVS2013Update2(context):
+            test_body = """
+            #if _MSC_VER < 1800 || (_MSC_VER == 1800 && _MSC_FULL_VER < 180030501)
+            #error Old Version
+            #endif
+            int main(int argc, char* argv[]) {
+            return 0;
+            }
+            """
+            context.Message('Checking for VS 2013 Update 2 or Later... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckVS2013Update2' : CheckVS2013Update2,
+        })
+        haveVS2013Update2OrLater = conf.CheckVS2013Update2()
+        conf.Finish()
+
+        if haveVS2013Update2OrLater and optBuild:
+            # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
+            #
+            myenv.Append( CCFLAGS=["/Gw", "/Gy"] )
+            myenv.Append( LINKFLAGS=["/OPT:REF"])
+
+            # http://blogs.msdn.com/b/vcblog/archive/2014/03/25/linker-enhancements-in-visual-studio-2013-update-2-ctp2.aspx
+            #
+            myenv.Append( CCFLAGS=["/Zc:inline"])
+
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):
         if using_msvc():
