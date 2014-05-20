@@ -10,8 +10,8 @@ flags = {
 ###################################################
 	'cache_flush' : [
 		'SYNC_CHECKPOINT',
+		'SYNC_CLOSE',
 		'SYNC_DISCARD',
-		'SYNC_DISCARD_NOWRITE',
 		'SYNC_WRITE_LEAVES',
 	],
 	'file_types' : [

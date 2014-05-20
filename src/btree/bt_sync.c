@@ -205,7 +205,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * to introduce bugs when the reconciliation of other page types
 		 * changes, and there's no advantage to doing so.
 		 */
-		if (syncop == WT_SYNC_DISCARD && __wt_page_is_modified(page))
+		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
 			WT_ERR(__wt_rec_write(
 			    session, ref, NULL, WT_SKIP_UPDATE_ERR));
 
@@ -222,7 +222,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		    session, &next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
 
 		switch (syncop) {
-		case WT_SYNC_DISCARD:
+		case WT_SYNC_CLOSE:
 			/*
 			 * Evict the page.
 			 * Do not attempt to evict pages expected to be merged
@@ -234,7 +234,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			    !F_ISSET(page->modify, WT_PM_REC_EMPTY))
 				WT_ERR(__wt_rec_evict(session, ref, 1));
 			break;
-		case WT_SYNC_DISCARD_NOWRITE:
+		case WT_SYNC_DISCARD:
 			/*
 			 * Discard the page, whether clean or dirty.
 			 *
@@ -298,7 +298,7 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 
 	switch (op) {
 	case WT_SYNC_CHECKPOINT:
-	case WT_SYNC_DISCARD:
+	case WT_SYNC_CLOSE:
 		/*
 		 * XXX
 		 * Set the checkpoint reference for reconciliation -- this is
@@ -315,8 +315,8 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	case WT_SYNC_WRITE_LEAVES:
 		WT_ERR(__sync_file(session, op));
 		break;
+	case WT_SYNC_CLOSE:
 	case WT_SYNC_DISCARD:
-	case WT_SYNC_DISCARD_NOWRITE:
 		WT_ERR(__evict_file(session, op));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
@@ -324,7 +324,7 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 
 err:	switch (op) {
 	case WT_SYNC_CHECKPOINT:
-	case WT_SYNC_DISCARD:
+	case WT_SYNC_CLOSE:
 		btree->ckpt = NULL;
 		break;
 	}
