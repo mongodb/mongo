@@ -28,7 +28,7 @@
 #include "thread.h"
 
 static void
-file_create(void)
+file_create(const char *name)
 {
 	WT_SESSION *session;
 	int ret;
@@ -47,7 +47,7 @@ file_create(void)
 	if (ftype == FIX)
 		(void)snprintf(p, (size_t)(end - p), ",value_format=3t");
 
-	if ((ret = session->create(session, FNAME, config)) != 0)
+	if ((ret = session->create(session, name, config)) != 0)
 		if (ret != EEXIST)
 			die("session.create", ret);
 
@@ -56,7 +56,7 @@ file_create(void)
 }
 
 void
-load(void)
+load(const char *name)
 {
 	WT_CURSOR *cursor;
 	WT_ITEM *key, _key, *value, _value;
@@ -65,13 +65,13 @@ load(void)
 	u_int keyno;
 	int ret;
 
-	file_create();
+	file_create(name);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
 	if ((ret =
-	    session->open_cursor(session, FNAME, NULL, "bulk", &cursor)) != 0)
+	    session->open_cursor(session, name, NULL, "bulk", &cursor)) != 0)
 		die("cursor.open", ret);
 
 	key = &_key;
@@ -95,6 +95,22 @@ load(void)
 		if ((ret = cursor->insert(cursor)) != 0)
 			die("cursor.insert", ret);
 	}
+
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
+}
+
+void
+verify(const char *name)
+{
+	WT_SESSION *session;
+	int ret;
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("conn.session", ret);
+
+	if ((ret = session->verify(session, name, NULL)) != 0)
+		die("session.create", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);

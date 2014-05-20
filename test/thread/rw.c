@@ -32,12 +32,14 @@ static void *reader(void *);
 static void *writer(void *);
 
 typedef struct {
+	char *name;				/* object name */
+
 	int remove;				/* cursor.remove */
 	int update;				/* cursor.update */
 	int reads;				/* cursor.search */
-} STATS;
+} INFO;
 
-static STATS *run_stats;
+static INFO *run_info;
 
 /*
  * r --
@@ -74,11 +76,22 @@ rw_start(u_int readers, u_int writers)
 	int ret;
 	void *thread_ret;
 
-	/* Create statistics and thread structures. */
-	if ((run_stats = calloc(
-	    (size_t)(readers + writers), sizeof(*run_stats))) == NULL ||
+	/* Create per-thread structures. */
+	if ((run_info = calloc(
+	    (size_t)(readers + writers), sizeof(*run_info))) == NULL ||
 	    (tids = calloc((size_t)(readers + writers), sizeof(*tids))) == NULL)
 		die("calloc", errno);
+
+	/* Create the files and load the initial records. */
+	for (i = 0; i < readers + writers; ++i) {
+		if ((run_info[i].name = malloc(64)) == NULL)
+			die("malloc", errno);
+		if (i == 0 || multiple_files) {
+			snprintf(run_info[i].name, 64, FNAME, i);
+			load(run_info[i].name);
+		} else
+			run_info[i].name = run_info[0].name;
+	}
 
 	(void)gettimeofday(&start, NULL);
 
@@ -103,9 +116,24 @@ rw_start(u_int readers, u_int writers)
 	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
 	    seconds, (int)(((readers + writers) * nops) / seconds));
 
+	/* Verify the files. */
+	for (i = 0; i < readers + writers; ++i) {
+		verify(run_info[i].name);
+		if (!multiple_files)
+			break;
+	}
+
+	/* Output run statistics. */
 	print_stats(readers + writers);
 
-	free(run_stats);
+	/* Free allocated memory. */
+	for (i = 0; i < readers + writers; ++i) {
+		free(run_info[i].name);
+		if (!multiple_files)
+			break;
+	}
+
+	free(run_info);
 	free(tids);
 
 	return (0);
@@ -147,7 +175,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor)
 static void *
 reader(void *arg)
 {
-	STATS *s;
+	INFO *s;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	pthread_t tid;
@@ -159,7 +187,7 @@ reader(void *arg)
 	printf(" read thread %2d starting: tid: %p\n", id, (void *)tid);
 	sched_yield();		/* Get all the threads created. */
 
-	s = &run_stats[id];
+	s = &run_info[id];
 
 	if (session_per_op) {
 		for (i = 0; i < nops; ++i, ++s->reads, sched_yield()) {
@@ -167,7 +195,7 @@ reader(void *arg)
 			    conn, NULL, NULL, &session)) != 0)
 				die("conn.open_session", ret);
 			if ((ret = session->open_cursor(
-			    session, FNAME, NULL, NULL, &cursor)) != 0)
+			    session, s->name, NULL, NULL, &cursor)) != 0)
 				die("session.open_cursor", ret);
 			reader_op(session, cursor);
 			if ((ret = session->close(session, NULL)) != 0)
@@ -178,7 +206,7 @@ reader(void *arg)
 		    conn, NULL, NULL, &session)) != 0)
 			die("conn.open_session", ret);
 		if ((ret = session->open_cursor(
-		    session, FNAME, NULL, NULL, &cursor)) != 0)
+		    session, s->name, NULL, NULL, &cursor)) != 0)
 			die("session.open_cursor", ret);
 		for (i = 0; i < nops; ++i, ++s->reads, sched_yield())
 			reader_op(session, cursor);
@@ -194,7 +222,7 @@ reader(void *arg)
  *	Write operation.
  */
 static inline void
-writer_op(WT_SESSION *session, WT_CURSOR *cursor, STATS *s)
+writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *key, _key, *value, _value;
 	u_int keyno;
@@ -242,7 +270,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, STATS *s)
 static void *
 writer(void *arg)
 {
-	STATS *s;
+	INFO *s;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	pthread_t tid;
@@ -254,7 +282,7 @@ writer(void *arg)
 	printf("write thread %2d starting: tid: %p\n", id, (void *)tid);
 	sched_yield();		/* Get all the threads created. */
 
-	s = &run_stats[id];
+	s = &run_info[id];
 
 	if (session_per_op) {
 		for (i = 0; i < nops; ++i, sched_yield()) {
@@ -262,7 +290,7 @@ writer(void *arg)
 			    conn, NULL, NULL, &session)) != 0)
 				die("conn.open_session", ret);
 			if ((ret = session->open_cursor(
-			    session, FNAME, NULL, NULL, &cursor)) != 0)
+			    session, s->name, NULL, NULL, &cursor)) != 0)
 				die("session.open_cursor", ret);
 			writer_op(session, cursor, s);
 			if ((ret = session->close(session, NULL)) != 0)
@@ -273,7 +301,7 @@ writer(void *arg)
 		    conn, NULL, NULL, &session)) != 0)
 			die("conn.open_session", ret);
 		if ((ret = session->open_cursor(
-		    session, FNAME, NULL, NULL, &cursor)) != 0)
+		    session, s->name, NULL, NULL, &cursor)) != 0)
 			die("session.open_cursor", ret);
 		for (i = 0; i < nops; ++i, sched_yield())
 			writer_op(session, cursor, s);
@@ -291,10 +319,10 @@ writer(void *arg)
 static void
 print_stats(u_int nthreads)
 {
-	STATS *s;
+	INFO *s;
 	u_int id;
 
-	s = run_stats;
+	s = run_info;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf("%3d: read %6d, remove %6d, update %6d\n",
 		    id, s->reads, s->remove, s->update);
