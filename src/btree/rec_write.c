@@ -1082,7 +1082,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 *
 			 * We should never be here during eviction, a child page
 			 * in this state within an evicted page's subtree would
-			 * have caused normaly eviction to fail, and exclusive
+			 * have caused noramlly eviction to fail, and exclusive
 			 * eviction shouldn't ever see pages being read.
 			 */
 			WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
