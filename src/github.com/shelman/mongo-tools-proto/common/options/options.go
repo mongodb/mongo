@@ -116,6 +116,8 @@ func GetMongoToolOptions() *MongoToolOptions {
 
 // Parse the command line args into the mongo options
 func (self *MongoToolOptions) ParseAndValidate() error {
+
+	// parse
 	flag.Parse()
 
 	// run post-parse logic

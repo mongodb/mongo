@@ -2,7 +2,6 @@ package mongotop
 
 import (
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
@@ -26,13 +25,12 @@ type MongoTop struct {
 
 func (self *MongoTop) Run() error {
 
-	if err := db.ConfirmConnect(); err != nil {
-		msg := fmt.Sprintf("error connecting to db: %v", err)
-		fmt.Println(msg)
-		return fmt.Errorf(msg)
+	connectionUrl, err := self.Poller.Connect()
+	if err != nil {
+		return fmt.Errorf("error connecting: %v", err)
 	} else {
 		fmt.Println(
-			fmt.Sprintf("connected to %v", db.Url()),
+			fmt.Sprintf("connected to %v", connectionUrl),
 		)
 	}
 

@@ -32,7 +32,7 @@ func (self *MockExtraOptions) Usage() {
 	self.UsageCalled = true
 }
 
-func TestAddingExtraOptions(t *testing.T) {
+func TestExtraOptions(t *testing.T) {
 
 	var mongoToolOptions *MongoToolOptions
 
@@ -52,7 +52,8 @@ func TestAddingExtraOptions(t *testing.T) {
 			})
 
 			Convey("the parsing and validating functions for the extra options"+
-				" should be called automatically", func() {
+				" should be called automatically by the top-level parsing and"+
+				" validating", func() {
 
 				extra := &MockExtraOptions{}
 				mongoToolOptions.AddOptions(extra)

@@ -8,6 +8,7 @@ import (
 
 // responsible for polling for results
 type Poller interface {
+	Connect() (string, error)
 	Poll() (*result.TopResults, error)
 }
 
@@ -15,7 +16,10 @@ type Poller interface {
 type DBPoller struct {
 }
 
-// satisfy the Poller interface
+func (self *DBPoller) Connect() (string, error) {
+	return db.Url(), db.ConfirmConnect()
+}
+
 func (self *DBPoller) Poll() (*result.TopResults, error) {
 
 	// get a db session
