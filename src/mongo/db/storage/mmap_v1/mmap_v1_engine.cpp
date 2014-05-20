@@ -54,10 +54,10 @@ namespace mongo {
                                                           const StringData& name,
                                                           const StringData& path,
                                                           bool directoryPerDB )
-        : _name( name.toString() ),
+        : DatabaseCatalogEntry( name ),
           _path( path.toString() ),
           _extentManager( name, path, directoryPerDB ),
-          _namespaceIndex( _path, _name ) {
+          _namespaceIndex( _path, name.toString() ) {
 
         try {
             _checkDuplicateUncasedNames();
@@ -74,15 +74,15 @@ namespace mongo {
                 _namespaceIndex.init( txn );
 
                 // upgrade freelist
-                string oldFreeList = _name + ".$freelist";
-                NamespaceDetails* details = _namespaceIndex.details( oldFreeList );
+                NamespaceString oldFreeList( name, "$freelist" );
+                NamespaceDetails* details = _namespaceIndex.details( oldFreeList.ns() );
                 if ( details ) {
                     if ( !details->firstExtent.isNull() ) {
                         _extentManager.freeExtents(txn,
                                                    details->firstExtent,
                                                    details->lastExtent);
                     }
-                    _namespaceIndex.kill_ns( txn, oldFreeList );
+                    _namespaceIndex.kill_ns( txn, oldFreeList.ns() );
                 }
             }
         }
@@ -105,12 +105,16 @@ namespace mongo {
     MMAP1DatabaseCatalogEntry::~MMAP1DatabaseCatalogEntry() {
     }
 
+    void MMAP1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {
+        _namespaceIndex.getCollectionNamespaces( tofill );
+    }
+
     void MMAP1DatabaseCatalogEntry::_checkDuplicateUncasedNames() const {
-        string duplicate = Database::duplicateUncasedName(true, _name, _path );
+        string duplicate = Database::duplicateUncasedName(true, name(), _path );
         if ( !duplicate.empty() ) {
             stringstream ss;
             ss << "db already exists with different case already have: [" << duplicate
-               << "] trying to create [" << _name << "]";
+               << "] trying to create [" << name() << "]";
             uasserted( DatabaseDifferCaseCode , ss.str() );
         }
     }
@@ -281,7 +285,7 @@ namespace mongo {
     }
 
     RecordStoreV1Base* MMAP1DatabaseCatalogEntry::_getIndexRecordStore( OperationContext* txn ) {
-        NamespaceString nss( _name, "system.indexes" );
+        NamespaceString nss( name(), "system.indexes" );
         RecordStoreV1Base* rs = _getRecordStore( txn, nss.ns() );
         if ( rs != NULL )
             return rs;
@@ -295,7 +299,7 @@ namespace mongo {
 
     RecordStoreV1Base* MMAP1DatabaseCatalogEntry::_getNamespaceRecordStore( OperationContext* txn,
                                                                             const StringData& whosAsking) {
-        NamespaceString nss( _name, "system.namespaces" );
+        NamespaceString nss( name(), "system.namespaces" );
         if ( nss == whosAsking )
             return NULL;
         RecordStoreV1Base* rs = _getRecordStore( txn, nss.ns() );

@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/structure/catalog/namespace_index.h"
 
@@ -46,7 +47,7 @@ namespace mongo {
     class RecordStoreV1Base;
     class OperationContext;
 
-    class MMAP1DatabaseCatalogEntry {
+    class MMAP1DatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
         MMAP1DatabaseCatalogEntry( OperationContext* txn,
                                    const StringData& name,
@@ -61,6 +62,8 @@ namespace mongo {
                                  const StringData& ns,
                                  const CollectionOptions& options,
                                  bool allocateDefaultSpace );
+
+        void getCollectionNamespaces( std::list<std::string>* tofill ) const;
 
         /*
          * ownership passes to caller
@@ -102,7 +105,6 @@ namespace mongo {
          */
         void _checkDuplicateUncasedNames() const;
 
-        std::string _name;
         std::string _path;
 
         MmapV1ExtentManager _extentManager;

@@ -32,6 +32,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
@@ -64,7 +65,7 @@ namespace mongo {
                  dbName++) {
                 Client::ReadContext ctx(*dbName);
                 Database* db = ctx.ctx().db();
-                db->getCollectionNamespaces(&collNames);
+                db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
             }
             checkNS(collNames);
         }

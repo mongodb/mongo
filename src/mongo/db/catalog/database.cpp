@@ -317,10 +317,6 @@ namespace mongo {
         return true;
     }
 
-    void Database::getCollectionNamespaces( std::list<std::string>* out ) const {
-        _dbEntry->namespaceIndex().getCollectionNamespaces( out );
-    }
-
     long long Database::getIndexSizeForCollection(Collection* coll,
                                                   BSONObjBuilder* details,
                                                   int scale ) {
@@ -355,7 +351,7 @@ namespace mongo {
 
         list<string> collections;
         if ( !empty )
-            getCollectionNamespaces( &collections );
+            _dbEntry->getCollectionNamespaces( &collections );
 
         long long ncollections = 0;
         long long objects = 0;
@@ -849,6 +845,10 @@ namespace mongo {
 
     bool Database::isEmpty() const {
         return !_dbEntry->namespaceIndex().allocated();
+    }
+
+    const DatabaseCatalogEntry* Database::getDatabaseCatalogEntry() const {
+        return _dbEntry.get();
     }
 
 } // namespace mongo

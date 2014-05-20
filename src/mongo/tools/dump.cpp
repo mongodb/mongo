@@ -38,6 +38,7 @@
 #include "mongo/client/auth_helpers.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/collection.h"
@@ -334,7 +335,7 @@ public:
         Database * db = cx.ctx().db();
 
         list<string> namespaces;
-        db->getCollectionNamespaces( &namespaces );
+        db->getDatabaseCatalogEntry()->getCollectionNamespaces( &namespaces );
 
         boost::filesystem::path root = mongoDumpGlobalParams.outputDirectory;
         root /= dbname;

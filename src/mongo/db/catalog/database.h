@@ -40,6 +40,7 @@
 namespace mongo {
 
     class Collection;
+    class DatabaseCatalogEntry;
     class DataFile;
     class ExtentManager;
     class IndexCatalog;
@@ -148,13 +149,13 @@ namespace mongo {
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }
 
-        void getCollectionNamespaces( std::list<std::string>* out ) const;
-
         void getStats( BSONObjBuilder* output, double scale = 1 );
 
         long long getIndexSizeForCollection( Collection* collections,
                                              BSONObjBuilder* details = NULL,
                                              int scale = 1 );
+
+        const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
 
         // TODO: do not think this method should exist, so should try and encapsulate better
         MmapV1ExtentManager* getExtentManager();

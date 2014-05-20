@@ -33,6 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/timer.h"
@@ -147,7 +148,7 @@ namespace mongo {
         Client::ReadContext ctx(ns);
         Database* db = ctx.ctx().db();
         if ( db )
-            db->getCollectionNamespaces( &colls );
+            db->getDatabaseCatalogEntry()->getCollectionNamespaces( &colls );
         colls.sort();
 
         result.appendNumber( "numCollections" , (long long)colls.size() );
