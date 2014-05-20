@@ -689,8 +689,13 @@ printShardingStatus = function( configDB , verbose ){
                             output( "\t\t\tshard key: " + tojson(coll.key) );
                             output( "\t\t\tchunks:" );
 
-                            res = configDB.chunks.group( { cond : { ns : coll._id } , key : { shard : 1 },
-                                reduce : function( doc , out ){ out.nChunks++; } , initial : { nChunks : 0 } } );
+                            res = configDB.chunks.aggregate( { $match : { ns : coll._id } } ,
+                                                             { $group : { _id : "$shard" ,
+                                                                          cnt : { $sum : 1 } } } ,
+                                                             { $project : { _id : 0 ,
+                                                                            shard : "$_id" ,
+                                                                            nChunks : "$cnt" } } ,
+                                                             { $sort : { shard : 1 } } ).toArray();
                             var totalChunks = 0;
                             res.forEach( function(z){
                                 totalChunks += z.nChunks;
