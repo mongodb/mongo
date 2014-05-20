@@ -1020,10 +1020,14 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 		case WT_REF_LOCKED:
 			/*
-			 * If being called by the eviction server, the evicted
-			 * page's subtree, including this child, was selected
-			 * for eviction by us and the state is stable until we
-			 * reset it, it's an in-memory state.
+			 * Locked.
+			 *
+			 * If evicting, the evicted page's subtree, including
+			 * this child, was selected for eviction by us and the
+			 * state is stable until we reset it, it's an in-memory
+			 * state.  This is the expected state for a child being
+			 * merged into a page (where the page was selected by
+			 * the eviction server for eviction).
 			 */
 			if (F_ISSET(r, WT_EVICTING))
 				goto in_memory;
@@ -1044,12 +1048,15 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * In memory.
 			 *
-			 * We should never be here during eviction, a child page
-			 * in this state within an evicted page's subtree would
-			 * have either caused eviction to fail or have had its
-			 * state set to WT_REF_LOCKED.
+			 * If evicting, the evicted page's subtree, including
+			 * this child, was selected for eviction by us and the
+			 * state is stable until we reset it, it's an in-memory
+			 * state.  This is the expected state for a child being
+			 * merged into a page (where the page belongs to a file
+			 * being discarded from the cache during close).
 			 */
-			WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
+			if (F_ISSET(r, WT_EVICTING))
+				goto in_memory;
 
 			/*
 			 * If called during checkpoint, acquire a hazard pointer
@@ -1075,7 +1082,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 *
 			 * We should never be here during eviction, a child page
 			 * in this state within an evicted page's subtree would
-			 * have caused eviction to fail.
+			 * have caused normaly eviction to fail, and exclusive
+			 * eviction shouldn't ever see pages being read.
 			 */
 			WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
 			goto done;
