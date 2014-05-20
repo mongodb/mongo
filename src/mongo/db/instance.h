@@ -81,13 +81,23 @@ namespace mongo {
     */
     bool replHasDatabases();
 
-    /** "embedded" calls to the local server directly. 
-        Caller does not need to lock, that is handled within.
+    /**
+     * Embedded calls to the local server using the DBClientBase API without going over the network.
+     *
+     * Caller does not need to lock, that is handled within.
+     *
+     * All operations are performed within the scope of a passed-in OperationContext (except when
+     * using the deprecated constructor). You must ensure that the OperationContext is valid when
+     * calling into any function. If you ever need to change the OperationContext, that can be done
+     * without the overhead of creating a new DBDirectClient by calling setOpCtx(), after which all
+     * operations will use the new OperationContext.
      */
     class DBDirectClient : public DBClientBase {
     public:
         DBDirectClient(); // DEPRECATED
-        DBDirectClient(OperationContext* txn); // txn must outlive this object
+        DBDirectClient(OperationContext* txn);
+
+        void setOpCtx(OperationContext* txn) { _txn = txn; };
 
         using DBClientBase::query;
 

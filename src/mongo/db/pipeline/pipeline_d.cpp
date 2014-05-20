@@ -46,7 +46,17 @@ namespace mongo {
 namespace {
     class MongodImplementation : public DocumentSourceNeedsMongod::MongodInterface {
     public:
-        DBClientBase* directClient() { return &_client; }
+        MongodImplementation(const intrusive_ptr<ExpressionContext>& ctx)
+            : _ctx(ctx)
+            , _client(ctx->opCtx)
+        {}
+
+        DBClientBase* directClient() {
+            // opCtx may have changed since our last call
+            invariant(_ctx->opCtx);
+            _client.setOpCtx(_ctx->opCtx);
+            return &_client;
+        }
 
         bool isSharded(const NamespaceString& ns) {
             const ChunkVersion unsharded(0, 0, OID());
@@ -60,6 +70,7 @@ namespace {
         }
 
     private:
+        intrusive_ptr<ExpressionContext> _ctx;
         DBDirectClient _client;
     };
 }
@@ -80,7 +91,8 @@ namespace {
             DocumentSourceNeedsMongod* needsMongod =
                 dynamic_cast<DocumentSourceNeedsMongod*>(sources[i].get());
             if (needsMongod) {
-                needsMongod->injectMongodInterface(boost::make_shared<MongodImplementation>());
+                needsMongod->injectMongodInterface(
+                    boost::make_shared<MongodImplementation>(pExpCtx));
             }
         }
 

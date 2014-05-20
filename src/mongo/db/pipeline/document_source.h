@@ -215,7 +215,11 @@ namespace mongo {
         public:
             virtual ~MongodInterface() {};
 
-            virtual DBClientBase* directClient() = 0; // Always returns a DBDirectClient
+            /**
+             * Always returns a DBDirectClient.
+             * Callers must not cache the returned pointer outside the scope of a single function.
+             */
+            virtual DBClientBase* directClient() = 0;
 
             // Note that in some rare cases this could return a false negative but will never return
             // a false positive. This method will be fixed in the future once it becomes possible to

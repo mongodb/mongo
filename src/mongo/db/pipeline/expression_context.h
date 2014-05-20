@@ -38,7 +38,7 @@ namespace mongo {
 
     struct ExpressionContext : public IntrusiveCounterUnsigned {
     public:
-        ExpressionContext(const OperationContext* opCtx, const NamespaceString& ns)
+        ExpressionContext(OperationContext* opCtx, const NamespaceString& ns)
             : inShard(false)
             , inRouter(false)
             , extSortAllowed(false)
@@ -64,7 +64,7 @@ namespace mongo {
         NamespaceString ns;
         std::string tempDir; // Defaults to empty to prevent external sorting in mongos.
 
-        const OperationContext* opCtx;
+        OperationContext* opCtx;
         static const int interruptCheckPeriod = 128;
         int interruptCounter; // when 0, check interruptStatus
     };
