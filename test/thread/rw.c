@@ -83,15 +83,14 @@ rw_start(u_int readers, u_int writers)
 		die("calloc", errno);
 
 	/* Create the files and load the initial records. */
-	for (i = 0; i < readers + writers; ++i) {
-		if ((run_info[i].name = malloc(64)) == NULL)
-			die("malloc", errno);
+	for (i = 0; i < readers + writers; ++i)
 		if (i == 0 || multiple_files) {
+			if ((run_info[i].name = malloc(64)) == NULL)
+				die("malloc", errno);
 			snprintf(run_info[i].name, 64, FNAME, i);
 			load(run_info[i].name);
 		} else
 			run_info[i].name = run_info[0].name;
-	}
 
 	(void)gettimeofday(&start, NULL);
 
