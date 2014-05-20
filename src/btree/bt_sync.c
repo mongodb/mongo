@@ -204,10 +204,15 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * Don't limit this test to any particular page type, that tends
 		 * to introduce bugs when the reconciliation of other page types
 		 * changes, and there's no advantage to doing so.
+		 *
+		 * Eviction can also fail because an update cannot be written.
+		 * If sessions have disjoint sets of files open, updates in a
+		 * no-longer-referenced file may not yet be globally visible,
+		 * and the write will fail with EBUSY.  Our caller handles that
+		 * error, retrying later.
 		 */
 		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
-			WT_ERR(__wt_rec_write(
-			    session, ref, NULL, WT_SKIP_UPDATE_ERR));
+			WT_ERR(__wt_rec_write(session, ref, NULL, WT_EVICTING));
 
 		/*
 		 * We can't evict the page just returned to us (it marks our

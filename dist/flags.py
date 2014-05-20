@@ -41,7 +41,7 @@ flags = {
 		'READ_WONT_NEED',
 	],
 	'rec_write' : [
-		'EVICTION_LOCKED',
+		'EVICTING',
 		'SKIP_UPDATE_ERR',
 		'SKIP_UPDATE_RESTORE'
 	],
