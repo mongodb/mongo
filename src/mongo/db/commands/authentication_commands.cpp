@@ -28,6 +28,7 @@
 
 #include "mongo/db/commands/authentication_commands.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
@@ -52,6 +53,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -282,6 +284,39 @@ namespace mongo {
     }
 
 #ifdef MONGO_SSL
+    void canonicalizeClusterDN(std::vector<std::string>* dn) {
+        // remove all RDNs we don't care about
+        for (std::vector<string>::iterator it=dn->begin(); it != dn->end(); it++) {
+            boost::algorithm::trim(*it);
+            if (!mongoutils::str::startsWith(it->c_str(), "DC=") &&
+                !mongoutils::str::startsWith(it->c_str(), "O=") && 
+                !mongoutils::str::startsWith(it->c_str(), "OU=")) { 
+                dn->erase(it--);
+            }
+        }
+        std::stable_sort(dn->begin(), dn->end());
+    }
+
+    bool CmdAuthenticate::_clusterIdMatch(const std::string& subjectName, 
+                                          const std::string& srvSubjectName) {
+        std::vector<string> clientRDN = StringSplitter::split(subjectName, ",");
+        std::vector<string> serverRDN = StringSplitter::split(srvSubjectName, ",");
+
+        canonicalizeClusterDN(&clientRDN);
+        canonicalizeClusterDN(&serverRDN);
+
+        if (clientRDN.size() == 0 || clientRDN.size() != serverRDN.size()) {
+            return false;
+        }
+
+        for (size_t i=0; i < serverRDN.size(); i++) {
+            if(clientRDN[i] != serverRDN[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+ 
     Status CmdAuthenticate::_authenticateX509(const UserName& user, const BSONObj& cmdObj) {
         if (!getSSLManager()) {
             return Status(ErrorCodes::ProtocolError,
@@ -302,18 +337,10 @@ namespace mongo {
         }
         else {
             std::string srvSubjectName = getSSLManager()->getServerSubjectName();
-            
-            size_t srvClusterIdPos = srvSubjectName.find(",OU=");
-            size_t peerClusterIdPos = subjectName.find(",OU=");
-
-            std::string srvClusterId = srvClusterIdPos != std::string::npos ? 
-                srvSubjectName.substr(srvClusterIdPos) : "";
-            std::string peerClusterId = peerClusterIdPos != std::string::npos ? 
-                subjectName.substr(peerClusterIdPos) : "";
-
+ 
             // Handle internal cluster member auth, only applies to server-server connections
-            int clusterAuthMode = serverGlobalParams.clusterAuthMode.load(); 
-            if (srvClusterId == peerClusterId && !srvClusterId.empty()) {
+            if (_clusterIdMatch(subjectName, srvSubjectName)) {
+                int clusterAuthMode = serverGlobalParams.clusterAuthMode.load(); 
                 if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
                     clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {
                     return Status(ErrorCodes::AuthenticationFailed, "The provided certificate " 

@@ -76,6 +76,7 @@ namespace mongo {
                              const BSONObj& cmdObj);
         Status _authenticateCR(const UserName& user, const BSONObj& cmdObj);
         Status _authenticateX509(const UserName& user, const BSONObj& cmdObj);
+        bool _clusterIdMatch(const std::string& subjectName, const std::string& srvSubjectName);
     };
 
     extern CmdAuthenticate cmdAuthenticate;
