@@ -83,8 +83,8 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 			else
 				fmt = cursor->key_format;
 		}
-		ret = __wt_cursor_alloc_unpack_json(session, buffer, size, fmt,
-		    &json->key_names, &json->key_buf, 1, ap);
+		ret = __wt_json_alloc_unpack(session, buffer, size, fmt,
+		    json, 1, ap);
 	} else {
 		if (WT_CURSOR_RECNO(cursor) &&
 		    !F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -212,9 +212,8 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 		WT_ERR(__wt_cursor_get_raw_value(child, &item));
 		fmt = F_ISSET(cursor, WT_CURSTD_RAW) ?
 		    "u" : cursor->value_format;
-		ret = __wt_cursor_alloc_unpack_json(session, item.data,
-		    item.size, fmt, &json->value_names,
-		    &json->value_buf, 0, ap);
+		ret = __wt_json_alloc_unpack(session, item.data,
+		    item.size, fmt, json, 0, ap);
 	} else {
 		WT_ERR(child->get_value(child, &item));
 
@@ -324,7 +323,7 @@ __curdump_close(WT_CURSOR *cursor)
 		WT_TRET(child->close(child));
 	/* We shared the child's URI. */
 	cursor->uri = NULL;
-	__wt_cursor_close_json(session, cursor);
+	__wt_json_close(session, cursor);
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END(session, ret);

@@ -75,8 +75,8 @@ __json_struct_unpackv(WT_SESSION_IMPL *session,
 	/* Unpacking a cursor marked as json implies a single arg. */
 	*va_arg(ap, const char **) = jbuf;
 
-	WT_ERR(__pack_name_init(session, names, iskey, &packname));
-	WT_ERR(__pack_init(session, &pack, fmt));
+	WT_RET(__pack_name_init(session, names, iskey, &packname));
+	WT_RET(__pack_init(session, &pack, fmt));
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		if (needcr) {
 			WT_ASSERT(session, jbufsize >= 3);
@@ -85,8 +85,8 @@ __json_struct_unpackv(WT_SESSION_IMPL *session,
 			jbufsize -= 2;
 		}
 		needcr = 1;
-		WT_ERR(__unpack_read(session, &pv, &p, (size_t)(end - p)));
-		WT_ERR(__pack_name_next(&packname, &name));
+		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
+		WT_RET(__pack_name_next(&packname, &name));
 		jsize = __wt_json_unpack_put(
 		    session, &pv, jbuf, jbufsize, &name);
 		WT_ASSERT(session, jsize <= jbufsize);
@@ -101,36 +101,45 @@ __json_struct_unpackv(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, jbufsize == 1);
 
-err:	return (ret);
+	return (ret);
 }
 
 /*
- * __wt_cursor_alloc_unpack_json --
+ * __wt_json_alloc_unpack --
  *	Allocate space for, and unpack an entry into JSON format.
  */
 int
-__wt_cursor_alloc_unpack_json(WT_SESSION_IMPL *session, const void *buffer,
-    size_t size, const char *fmt, WT_CONFIG_ITEM *names,
-    char **json_bufp, int iskey, va_list ap)
+__wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer,
+    size_t size, const char *fmt, WT_CURSOR_JSON *json,
+    int iskey, va_list ap)
 {
+	WT_CONFIG_ITEM *names;
 	WT_DECL_RET;
 	size_t needed;
+	char **json_bufp;
 
-	WT_ERR(__json_struct_size(session, buffer, size, fmt, names,
+	if (iskey) {
+		names = &json->key_names;
+		json_bufp = &json->key_buf;
+	} else {
+		names = &json->value_names;
+		json_bufp = &json->value_buf;
+	}
+	WT_RET(__json_struct_size(session, buffer, size, fmt, names,
 	    iskey, &needed));
-	WT_ERR(__wt_realloc(session, NULL, needed + 1, json_bufp));
-	WT_ERR(__json_struct_unpackv(session, buffer, size, fmt,
+	WT_RET(__wt_realloc(session, NULL, needed + 1, json_bufp));
+	WT_RET(__json_struct_unpackv(session, buffer, size, fmt,
 	    names, *json_bufp, needed + 1, iskey, ap));
 
-err:	return (ret);
+	return (ret);
 }
 
 /*
- * __wt_cursor_close_json --
+ * __wt_json_close --
  *	Release any json related resources.
  */
 void
-__wt_cursor_close_json(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
+__wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_JSON *json;
 
