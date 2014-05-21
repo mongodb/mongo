@@ -63,7 +63,7 @@ namespace mongo {
                 delete _candidates[_backupPlanIdx].solution;
                 delete _candidates[_backupPlanIdx].root;
             }
-	}
+        }
         else {
             for (size_t ix = 0; ix < _candidates.size(); ++ix) {
                 delete _candidates[ix].solution;
@@ -90,27 +90,27 @@ namespace mongo {
         if (!bestPlanChosen()) { return false; }
 
         // We must have returned all our cached results
-	// and there must be no more results from the best plan.
-	CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
+        // and there must be no more results from the best plan.
+        CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
         return bestPlan.results.empty() && bestPlan.root->isEOF();
     }
 
     PlanStage::StageState MultiPlanStage::work(WorkingSetID* out) {
-	if (_failure) {
+        if (_failure) {
             *out = _statusMemberId;
             return PlanStage::FAILURE;
         }
 
-	CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
+        CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
 
         // Look for an already produced result that provides the data the caller wants.
         if (!bestPlan.results.empty()) {
             *out = bestPlan.results.front();
             bestPlan.results.pop_front();
-	    return PlanStage::ADVANCED;
+            return PlanStage::ADVANCED;
         }
 
-	// best plan had no (or has no more) cached results
+        // best plan had no (or has no more) cached results
 
         StageState state = bestPlan.root->work(out);
 
@@ -126,17 +126,17 @@ namespace mongo {
 
             _collection->infoCache()->getPlanCache()->remove(*_query);
 
-	    _bestPlanIdx = _backupPlanIdx;
-	    _backupPlanIdx = kNoSuchPlan;
+            _bestPlanIdx = _backupPlanIdx;
+            _backupPlanIdx = kNoSuchPlan;
 
-	    return _candidates[_bestPlanIdx].root->work(out);
+            return _candidates[_bestPlanIdx].root->work(out);
         }
 
         if (hasBackupPlan() && PlanStage::ADVANCED == state) {
             QLOG() << "Best plan had a blocking sort, became unblocked, deleting backup plan\n";
-	    delete _candidates[_backupPlanIdx].solution;
-	    delete _candidates[_backupPlanIdx].root;
-	    _backupPlanIdx = kNoSuchPlan;
+            delete _candidates[_backupPlanIdx].solution;
+            delete _candidates[_backupPlanIdx].root;
+            _backupPlanIdx = kNoSuchPlan;
         }
 
         return state;
@@ -174,9 +174,9 @@ namespace mongo {
         // after transferring ownership of 'ranking' to plan cache.
         std::vector<size_t> candidateOrder = ranking->candidateOrder;
 
-	CandidatePlan& bestCandidate = _candidates[_bestPlanIdx];
-	std::list<WorkingSetID>& alreadyProduced = bestCandidate.results;
-	QuerySolution* bestSolution = bestCandidate.solution;
+        CandidatePlan& bestCandidate = _candidates[_bestPlanIdx];
+        std::list<WorkingSetID>& alreadyProduced = bestCandidate.results;
+        QuerySolution* bestSolution = bestCandidate.solution;
 
         QLOG() << "Winning solution:\n" << bestSolution->toString() << endl;
         LOG(2) << "Winning plan: " << getPlanSummary(*bestSolution);
@@ -301,7 +301,7 @@ namespace mongo {
 
                 // Propagate most recent seen failure to parent.
                 if (PlanStage::FAILURE == state) {
-		    BSONObj objOut;
+                    BSONObj objOut;
                     WorkingSetCommon::getStatusMemberObject(*candidate.ws, id, &objOut);
                     _statusMemberId = id;
                 }
@@ -319,9 +319,9 @@ namespace mongo {
     void MultiPlanStage::prepareToYield() {
         if (_failure) return;
 
-	// this logic is from multi_plan_runner
-	// but does it really make sense to operate on
-	// the _bestPlan if we've switched to the backup?
+        // this logic is from multi_plan_runner
+        // but does it really make sense to operate on
+        // the _bestPlan if we've switched to the backup?
 
         if (bestPlanChosen()) {
             _candidates[_bestPlanIdx].root->prepareToYield();
@@ -337,9 +337,9 @@ namespace mongo {
     void MultiPlanStage::recoverFromYield() {
         if (_failure) return;
 
-	// this logic is from multi_plan_runner
-	// but does it really make sense to operate on
-	// the _bestPlan if we've switched to the backup?
+        // this logic is from multi_plan_runner
+        // but does it really make sense to operate on
+        // the _bestPlan if we've switched to the backup?
 
         if (bestPlanChosen()) {
             _candidates[_bestPlanIdx].root->recoverFromYield();
@@ -353,14 +353,13 @@ namespace mongo {
     }
 
     namespace {
-        void invalidateHelper(
-            WorkingSet* ws, // may flag for review
-            const DiskLoc& dl,
-            list<WorkingSetID>* idsToInvalidate,
-            const Collection* collection
-        ) {
+
+        void invalidateHelper(WorkingSet* ws, // may flag for review
+                              const DiskLoc& dl,
+                              list<WorkingSetID>* idsToInvalidate,
+                              const Collection* collection) {
             for (list<WorkingSetID>::iterator it = idsToInvalidate->begin();
-		 it != idsToInvalidate->end();) {
+                 it != idsToInvalidate->end();) {
                 WorkingSetMember* member = ws->get(*it);
                 if (member->hasLoc() && member->loc == dl) {
                     list<WorkingSetID>::iterator next = it;
@@ -381,19 +380,19 @@ namespace mongo {
         if (_failure) { return; }
 
         if (bestPlanChosen()) {
-	    CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
+            CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
             bestPlan.root->invalidate(dl, type);
-	    invalidateHelper(bestPlan.ws, dl, &bestPlan.results, _collection);
+            invalidateHelper(bestPlan.ws, dl, &bestPlan.results, _collection);
             if (hasBackupPlan()) {
-	        CandidatePlan& backupPlan = _candidates[_backupPlanIdx];
+                CandidatePlan& backupPlan = _candidates[_backupPlanIdx];
                 backupPlan.root->invalidate(dl, type);
-		invalidateHelper(backupPlan.ws, dl, &backupPlan.results, _collection);
+                invalidateHelper(backupPlan.ws, dl, &backupPlan.results, _collection);
             }
         }
         else {
             for (size_t ix = 0; ix < _candidates.size(); ++ix) {
                 _candidates[ix].root->invalidate(dl, type);
-		invalidateHelper(_candidates[ix].ws, dl, &_candidates[ix].results, _collection);
+                invalidateHelper(_candidates[ix].ws, dl, &_candidates[ix].results, _collection);
             }
         }
     }
@@ -431,11 +430,11 @@ namespace mongo {
 
     PlanStageStats* MultiPlanStage::getStats() {
         if (bestPlanChosen()) {
-	    return _candidates[_bestPlanIdx].root->getStats();
-	}
-	if (hasBackupPlan()) {
-	    return _candidates[_backupPlanIdx].root->getStats();
-	}
+            return _candidates[_bestPlanIdx].root->getStats();
+        }
+        if (hasBackupPlan()) {
+            return _candidates[_backupPlanIdx].root->getStats();
+        }
         _commonStats.isEOF = isEOF();
 
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_MULTI_PLAN));
