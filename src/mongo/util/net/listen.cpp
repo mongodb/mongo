@@ -176,7 +176,7 @@ namespace mongo {
 
 #if !defined(_WIN32)
             if (me.getType() == AF_UNIX) {
-                if (chmod(me.getAddr().c_str(), 0777) == -1) {
+                if (chmod(me.getAddr().c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
                     error() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
                 }
                 ListeningSockets::get()->addPath( me.getAddr() );
