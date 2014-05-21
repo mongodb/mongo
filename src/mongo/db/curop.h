@@ -31,8 +31,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/client.h"
 #include "mongo/db/structure/catalog/namespace.h"
