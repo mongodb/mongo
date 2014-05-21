@@ -209,7 +209,7 @@ dump_json_separator(void)
 
 /*
  * dump_json_table_begin --
- *	Ouput the JSON syntax that starts a table, along with its config.
+ *	Output the JSON syntax that starts a table, along with its config.
  */
 static int
 dump_json_table_begin(WT_CURSOR *cursor, const char *uri, const char *config)
@@ -632,14 +632,14 @@ dup_json_string(const char *str, char **result)
 
 	nchars = 0;
 	for (p = str; *p; p++, nchars++)
-		nchars += __unpack_json_char(*p, NULL, 0, 0);
+		nchars += __wt_json_unpack_char(*p, NULL, 0, 0);
 	q = malloc(nchars + 1);
 	if (q == NULL)
 		return (1);
 	*result = q;
 	left = nchars;
 	for (p = str; *p; p++, nchars++) {
-		nchars = __unpack_json_char(*p, q, left, 0);
+		nchars = __wt_json_unpack_char(*p, q, left, 0);
 		left -= nchars;
 		q += nchars;
 	}

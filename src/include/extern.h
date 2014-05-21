@@ -663,6 +663,24 @@ extern int __wt_curds_create( WT_SESSION_IMPL *session,
 extern int __wt_curdump_create(WT_CURSOR *child,
     WT_CURSOR *owner,
     WT_CURSOR **cursorp);
+extern int __wt_cursor_alloc_unpack_json(WT_SESSION_IMPL *session,
+    const void *buffer,
+    size_t size,
+    const char *fmt,
+    WT_CONFIG_ITEM *names,
+    char **json_bufp,
+    int iskey,
+    va_list ap);
+extern void __wt_cursor_close_json(WT_SESSION_IMPL *session, WT_CURSOR *cursor);
+extern size_t __wt_json_unpack_char(char ch,
+    char *buf,
+    size_t bufsz,
+    int force_unicode);
+extern size_t __wt_json_unpack_put(WT_SESSION_IMPL *session,
+    void *voidpv,
+    char *buf,
+    size_t bufsz,
+    WT_CONFIG_ITEM *name);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
@@ -706,10 +724,7 @@ extern int __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key);
 extern void __wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key);
 extern int __wt_cursor_get_raw_value(WT_CURSOR *cursor, WT_ITEM *value);
 extern void __wt_cursor_set_raw_value(WT_CURSOR *cursor, WT_ITEM *value);
-extern int __wt_cursor_get_keyv(WT_CURSOR *cursor,
-    WT_CURSOR *container,
-    uint32_t flags,
-    va_list ap);
+extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap);
@@ -1280,7 +1295,6 @@ extern int __wt_schema_project_in(WT_SESSION_IMPL *session,
     const char *proj_arg,
     va_list ap);
 extern int __wt_schema_project_out(WT_SESSION_IMPL *session,
-    WT_CURSOR *container,
     WT_CURSOR **cp,
     const char *proj_arg,
     va_list ap);

@@ -54,7 +54,7 @@ __wt_curtable_get_key(WT_CURSOR *cursor, ...)
 	primary = *ctable->cg_cursors;
 
 	va_start(ap, cursor);
-	ret = __wt_cursor_get_keyv(primary, cursor, cursor->flags, ap);
+	ret = __wt_cursor_get_keyv(primary, cursor->flags, ap);
 	va_end(ap);
 
 	return (ret);
@@ -80,8 +80,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(primary);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK) &&
-	    !F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
 		ret = __wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value);
@@ -91,7 +90,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 			item->size = cursor->value.size;
 		}
 	} else
-		ret = __wt_schema_project_out(session, cursor,
+		ret = __wt_schema_project_out(session,
 		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
 
@@ -679,7 +678,8 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
  *	set json_key_names, json_value_names to comma separated lists
  *	of column names.
  */
-static int __curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
+static int
+__curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
     const WT_CONFIG_ITEM *colconf)
 {
 	WT_CURSOR_JSON *json;
@@ -697,7 +697,7 @@ static int __curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
 	}
 
 	nkeys = 0;
-	for ( ;*keyformat; keyformat++) {
+	for (; *keyformat; keyformat++) {
 		if (!isdigit(*keyformat))
 			nkeys++;
 	}

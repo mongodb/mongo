@@ -337,6 +337,7 @@ btree
 btrees
 buf
 bufs
+bufsz
 builtin
 bytelock
 bytestring
@@ -578,6 +579,8 @@ inuse
 io
 ip
 ispo
+jrx
+json
 kb
 kcell
 keycmp

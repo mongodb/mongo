@@ -73,7 +73,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 			item->size = cursor->value.size;
 		}
 	} else
-		ret = __wt_schema_project_out(session, cursor,
+		ret = __wt_schema_project_out(session,
 		    cindex->cg_cursors, cindex->value_plan, ap);
 	va_end(ap);
 

@@ -17,7 +17,7 @@ __async_get_key(WT_ASYNC_OP *asyncop, ...)
 	va_list ap;
 
 	va_start(ap, asyncop);
-	ret = __wt_cursor_get_keyv(&asyncop->c, &asyncop->c, asyncop->c.flags, ap);
+	ret = __wt_cursor_get_keyv(&asyncop->c, asyncop->c.flags, ap);
 	va_end(ap);
 	return (ret);
 }
