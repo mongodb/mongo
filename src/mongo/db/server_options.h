@@ -33,14 +33,17 @@
 
 namespace mongo {
 
+    const int DEFAULT_UNIX_PERMS = 0700;
+
     struct ServerGlobalParams {
 
         ServerGlobalParams() :
             port(DefaultDBPort), rest(false), jsonp(false), indexBuildRetry(true), quiet(false),
             configsvr(false), cpu(false), objcheck(true), defaultProfile(0),
             slowMS(100), defaultLocalThresholdMillis(15), moveParanoia(true),
-            noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN),
-            logAppend(false), logWithSyslog(false), isHttpInterfaceEnabled(false)
+            noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN), 
+            unixSocketPermissions(DEFAULT_UNIX_PERMS), logAppend(false), logWithSyslog(false), 
+            isHttpInterfaceEnabled(false)
         {
             started = time(0);
         }
@@ -80,6 +83,8 @@ namespace mongo {
         std::string socket;    // UNIX domain socket directory
 
         int maxConns;          // Maximum number of simultaneous open connections.
+
+        int unixSocketPermissions; // permissions for the UNIX domain socket
 
         std::string keyFile;   // Path to keyfile, or empty if none.
         std::string pidFile;   // Path to pid file, or empty if none.
