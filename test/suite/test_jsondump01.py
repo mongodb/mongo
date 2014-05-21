@@ -34,8 +34,8 @@ from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
 
 # A 'fake' cursor based on a set of rows.
-# It emulates a WT cursor well enough for the *_check_cursor methods;
-# they just need an iterable object.
+# It emulates a WT cursor well enough for the *_check_cursor methods.
+# They just need an iterable object.
 class FakeCursor:
     def __init__(self, keyfmt, valuefmt, rows):
         self.key_format = keyfmt
