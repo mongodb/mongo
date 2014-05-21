@@ -513,14 +513,7 @@ err:	session->dhandle = saved_dhandle;
 void
 __wt_conn_btree_close(WT_SESSION_IMPL *session)
 {
-	WT_DATA_HANDLE *dhandle;
-
-	dhandle = session->dhandle;
-
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-	WT_ASSERT(session, dhandle->session_ref > 0);
-
-	--dhandle->session_ref;
+	(void)WT_ATOMIC_SUB(session->dhandle->session_ref, 1);
 }
 
 /*
@@ -686,13 +679,8 @@ restart:
 	 * any of the files were dirty.  Clean up that list before we shut down
 	 * the metadata entry, for good.
 	 */
-	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL) {
-		F_SET(session, WT_SESSION_SCHEMA_LOCKED);
-		__wt_spin_lock(session, &conn->schema_lock);
+	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
 		__wt_session_discard_btree(session, dhandle_cache);
-		__wt_spin_unlock(session, &conn->schema_lock);
-		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
-	}
 
 	/* Close the metadata file handle. */
 	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)

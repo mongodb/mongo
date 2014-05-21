@@ -29,18 +29,13 @@ __session_reset_cursors(WT_SESSION_IMPL *session)
  * __session_close_cache --
  *	Close any cached handles in a session.  Called holding the schema lock.
  */
-static int
+static void
 __session_close_cache(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
-	WT_DECL_RET;
 
 	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
 		__wt_session_discard_btree(session, dhandle_cache);
-
-	__wt_schema_close_tables(session);
-
-	return (ret);
 }
 
 /*
@@ -78,7 +73,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int tret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -104,9 +98,11 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	WT_ASSERT(session, session->ncursors == 0);
 
-	/* Acquire the schema lock: we may be closing btree handles. */
-	WT_WITH_SCHEMA_LOCK(session, tret = __session_close_cache(session));
-	WT_TRET(tret);
+	/* Discard cached handles. */
+	__session_close_cache(session);
+
+	/* Close all tables. */
+	__wt_schema_close_tables(session);
 
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);

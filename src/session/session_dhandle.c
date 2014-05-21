@@ -294,21 +294,6 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 }
 
 /*
- * __session_open_btree --
- *	Wrapper function to first sweep the session handles and then get the
- * btree handle; must be called with schema lock.
- */
-static int
-__session_open_btree(WT_SESSION_IMPL *session,
-    const char *name, const char *ckpt, const char *op_cfg[], uint32_t flags)
-{
-	WT_RET(__session_dhandle_sweep(session, flags));
-	WT_RET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
-
-	return (0);
-}
-
-/*
  * __wt_session_get_btree --
  *	Get a btree handle for the given name, set session->dhandle.
  */
@@ -356,13 +341,15 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	}
 
 	if (dhandle_cache == NULL) {
+		/* Sweep the handle list to remove any dead handles. */
+		WT_RET(__session_dhandle_sweep(session, flags));
+
 		/*
-		 * If we don't already hold the schema lock, get it now so that
-		 * we can find and/or open the handle.  We call a wrapper
-		 * function to sweep the handle list to remove any dead handles.
+		 * Acquire the schema lock if we don't already hold it, find
+		 * and/or open the handle.
 		 */
 		WT_WITH_SCHEMA_LOCK(session, ret =
-		    __session_open_btree(session, uri, checkpoint, cfg, flags));
+		    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
 		WT_RET(ret);
 
 		if (!candidate)
