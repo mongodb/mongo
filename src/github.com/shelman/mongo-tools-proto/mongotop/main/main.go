@@ -34,7 +34,9 @@ func main() {
 	}
 
 	// we're going to do real work.  configure the db connection
-	db.Configure(opts)
+	if err := db.Configure(opts); err != nil {
+		panic(fmt.Sprintf("Error configuring db connection: %v", err))
+	}
 
 	// instantiate a mongotop instance, and kick it off
 	top := &mongotop.MongoTop{

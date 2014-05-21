@@ -16,7 +16,7 @@ var (
 	masterSession *mgo.Session
 	globalOptions *options.MongoToolOptions
 	dialTimeout   = 3 * time.Second
-	certPool      *x509.CertPool
+	rootCerts     *x509.CertPool
 
 	// the dial info to use for connecting
 	dialInfo *mgo.DialInfo
@@ -62,8 +62,8 @@ func Configure(opts *options.MongoToolOptions) error {
 		}
 
 		// TODO: support nil, blah-blah
-		certPool = x509.NewCertPool()
-		if !certPool.AppendCertsFromPEM([]byte(rootCert)) {
+		rootCerts = x509.NewCertPool()
+		if !rootCerts.AppendCertsFromPEM([]byte(rootCert)) {
 			return fmt.Errorf("error creating cert: %v", err)
 		}
 
@@ -83,14 +83,14 @@ func dialWithSSL(addr *mgo.ServerAddr) (net.Conn, error) {
 	if globalOptions.SSLAllowInvalidCertificates {
 		config.InsecureSkipVerify = true
 	}
-	config.RootCAs = certPool
+	config.RootCAs = rootCerts
 
 	return tls.Dial("tcp", addr.String(), config)
 }
 
 // Confirm whether the db can be reached.
 func ConfirmConnect() error {
-	session, err := mgo.DialWithTimeout(url, 1*time.Second)
+	session, err := mgo.DialWithInfo(dialInfo)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func createMasterSession() error {
 
 	// init the master session
 	var err error
-	masterSession, err = mgo.DialWithTimeout(url, dialTimeout)
+	masterSession, err = mgo.DialWithInfo(dialInfo)
 	if err != nil {
 		return err
 	}
