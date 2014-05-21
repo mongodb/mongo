@@ -92,10 +92,7 @@ public:
         case jstOID:
             return "ObjectID(" + object.OID().toString() + ")"; // OIDs are always 24 bytes
         case Date:
-            // We need to check if we can actually format this date.  See SERVER-13760.
-            return object.Date().millis > Date_t::maxFormatableDate ?
-                        csvEscape(object.jsonString(Strict, false)) :
-                        dateToISOStringUTC(object.Date());
+            return dateToISOStringUTC(object.Date());
         case Timestamp:
             return csvEscape(object.jsonString(Strict, false));
         case RegEx:

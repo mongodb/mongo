@@ -180,10 +180,6 @@ namespace {
             swull = dateFromISOString("2058-02-20T18:29:11.100Z");
             ASSERT_OK(swull.getStatus());
             ASSERT_EQUALS(swull.getValue(), 2781455351100ULL);
-
-            swull = dateFromISOString("3001-01-01T08:00:00.000Z");
-            ASSERT_OK(swull.getStatus());
-            ASSERT_EQUALS(swull.getValue(), 32535244800000ULL);
         }
 
         swull = dateFromISOString("2013-02-20T18:29:11.100Z");
@@ -254,15 +250,6 @@ namespace {
             swull = dateFromISOString("2058-02-20T13:29:11.100-0500");
             ASSERT_OK(swull.getStatus());
             ASSERT_EQUALS(swull.getValue(), 2781455351100ULL);
-
-            swull = dateFromISOString("3000-12-31T23:59:59Z");
-            ASSERT_OK(swull.getStatus());
-            ASSERT_EQUALS(swull.getValue(), 32535215999000ULL);
-        }
-        else {
-            swull = dateFromISOString("2038-01-19T03:14:07Z");
-            ASSERT_OK(swull.getStatus());
-            ASSERT_EQUALS(swull.getValue(), 2147483647000ULL);
         }
 
         swull = dateFromISOString("2013-02-20T13:29:11.100-0500");
