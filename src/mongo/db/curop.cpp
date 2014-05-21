@@ -81,7 +81,6 @@ namespace mongo {
         _message = "";
         _progressMeter.finished();
         _killPending.store(0);
-        killCurrentOp.notifyAllWaiters();
         _numYields = 0;
         _expectedLatencyMs = 0;
         _lockStat.reset();
@@ -126,8 +125,6 @@ namespace mongo {
     }
 
     CurOp::~CurOp() {
-        killCurrentOp.notifyAllWaiters();
-
         if ( _wrapped ) {
             scoped_lock bl(Client::clientsMutex);
             _client->_curOp = _wrapped;
@@ -250,17 +247,8 @@ namespace mongo {
         return bob.obj();
     }
 
-    void CurOp::setKillWaiterFlags() {
-        for (size_t i = 0; i < _notifyList.size(); ++i)
-            *(_notifyList[i]) = true;
-        _notifyList.clear();
-    }
-
-    void CurOp::kill(bool* pNotifyFlag /* = NULL */) {
+    void CurOp::kill() {
         _killPending.store(1);
-        if (pNotifyFlag) {
-            _notifyList.push_back(pNotifyFlag);
-        }
     }
 
     void CurOp::setMaxTimeMicros(uint64_t maxTimeMicros) {

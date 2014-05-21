@@ -298,7 +298,7 @@ namespace mongo {
         std::string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _wrapped; }
-        void kill(bool* pNotifyFlag = NULL); 
+        void kill(); 
         bool killPendingStrict() const { return _killPending.load(); }
         bool killPending() const { return _killPending.loadRelaxed(); }
         void yielded() { _numYields++; }
@@ -312,8 +312,6 @@ namespace mongo {
         
         const LockStat& lockStat() const { return _lockStat; }
         LockStat& lockStat() { return _lockStat; }
-
-        void setKillWaiterFlags();
 
         /**
          * this should be used very sparingly
@@ -347,8 +345,6 @@ namespace mongo {
         AtomicInt32 _killPending;
         int _numYields;
         LockStat _lockStat;
-        // _notifyList is protected by the global killCurrentOp's mtx.
-        std::vector<bool*> _notifyList;
         
         // this is how much "extra" time a query might take
         // a writebacklisten for example will block for 30s 
