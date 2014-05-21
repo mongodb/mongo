@@ -194,9 +194,6 @@ namespace replset {
                     fixUpInfo.collectionsToResync.insert(to);
                     return;
                 }
-                else if (cmdname == "reIndex") {
-                    return;
-                }
                 else if (cmdname == "dropDatabase") {
                     log() << "replSet error rollback : can't rollback drop database full resync "
                           << "will be required" << rsLog;
