@@ -193,16 +193,12 @@ namespace mongo {
             }
         }
 
-        // Store the choice we just made in the cache. We do
-        // not cache the query if:
-        //   1) The query is of a type that is not safe to cache, or
-        //   2) the winning plan did not actually produce any results,
-        //   without hitting EOF. In this case, we have no information to
-        //   suggest that this plan is good.
-        const PlanStageStats* bestStats = ranking->stats.vector()[0];
-        if (PlanCache::shouldCacheQuery(*_query)
-            && (!alreadyProduced.empty() || bestStats->common.isEOF)) {
-
+        // Store the choice we just made in the cache. In order to do so,
+        //   1) the query must be of a type that is safe to cache, and
+        //   2) two or more plans cannot have tied for the win. Caching in the
+        //   case of ties can cause successive queries of the same shape to
+        //   use a bad index.
+        if (PlanCache::shouldCacheQuery(*_query) && !ranking->tieForBest) {
             // Create list of candidate solutions for the cache with
             // the best solution at the front.
             std::vector<QuerySolution*> solutions;

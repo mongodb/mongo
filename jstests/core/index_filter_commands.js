@@ -26,7 +26,12 @@ var t = db.jstests_index_filter_commands;
 
 t.drop();
 
+// Setup the data so that plans will not tie given the indices and query
+// below. Tying plans will not be cached, and we need cached shapes in
+// order to test the filter functionality.
 t.save({a: 1});
+t.save({a: 1});
+t.save({a: 1, b: 1});
 
 // Add 2 indexes.
 // 1st index is more efficient.
@@ -38,7 +43,7 @@ t.ensureIndex(indexA1);
 t.ensureIndex(indexA1B1);
 t.ensureIndex(indexA1C1);
 
-var queryA1 = {a: 1};
+var queryA1 = {a: 1, b: 1};
 var projectionA1 = {_id: 0, a: 1};
 var sortA1 = {a: -1};
 
