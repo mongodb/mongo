@@ -25,6 +25,7 @@ type MongoTop struct {
 
 func (self *MongoTop) Run() error {
 
+	// make the initial connection
 	connectionUrl, err := self.Poller.Connect()
 	if err != nil {
 		return fmt.Errorf("error connecting: %v", err)

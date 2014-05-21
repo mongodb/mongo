@@ -36,6 +36,15 @@ type MongoToolOptions struct {
 	Username string
 	Password string
 
+	// SSL options
+	SSL                         bool
+	SSLCAFile                   string
+	SSLPEMKeyFile               string
+	SSLPEMKeyPassword           string
+	SSLCRLFile                  string
+	SSLAllowInvalidCertificates bool
+	SSLFipsMode                 bool
+
 	// Extra tool-specific options that can be specified by calling
 	// AddOptions
 	ExtraOptions
@@ -44,6 +53,7 @@ type MongoToolOptions struct {
 	FilterNS       string // the full namespace for filtering
 	FilterOnlyColl bool   // filter only on collection
 	FilterBoth     bool   // filter on both db and collection
+
 }
 
 func (self *MongoToolOptions) Usage() {
@@ -109,6 +119,18 @@ func GetMongoToolOptions() *MongoToolOptions {
 		" authentication")
 	flag.StringVar(&(options.Password), "p", "", "Specify password for"+
 		" authentication")
+
+	flag.BoolVar(&(options.SSL), "ssl", false, "Use ssl")
+	flag.StringVar(&(options.SSLCAFile), "sslCAFile", "", "Specify a .pem file")
+	flag.StringVar(&(options.SSLPEMKeyFile), "sslPEMKeyFile", "", "Specify a"+
+		" .pem key file")
+	flag.StringVar(&(options.SSLPEMKeyPassword), "sslPEMKeyPassword", "",
+		"Specify a password to decrypt the file")
+	flag.StringVar(&(options.SSLCRLFile), "sslCRLFile", "", "Specify a crl"+
+		" file")
+	flag.BoolVar(&(options.SSLAllowInvalidCertificates),
+		"sslAllowInvalidCertificates", false, "Allow invalid certs")
+	flag.BoolVar(&(options.SSLFipsMode), "sslFIPSMode", false, "Use fips mode")
 
 	return options
 

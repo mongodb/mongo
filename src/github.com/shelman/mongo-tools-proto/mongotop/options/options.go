@@ -24,6 +24,8 @@ func (self *MongoTopOptions) Register() {
 }
 
 func (self *MongoTopOptions) PostParse() error {
+
+	// TODO: clean this up
 	// get the sleep time, which is the final command line arg
 	self.SleepTime = 1
 	args := os.Args

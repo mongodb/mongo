@@ -1,9 +1,13 @@
 package db
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/options"
+	"io/ioutil"
 	"labix.org/v2/mgo"
+	"net"
 	"time"
 )
 
@@ -12,6 +16,10 @@ var (
 	masterSession *mgo.Session
 	globalOptions *options.MongoToolOptions
 	dialTimeout   = 3 * time.Second
+	certPool      *x509.CertPool
+
+	// the dial info to use for connecting
+	dialInfo *mgo.DialInfo
 )
 
 // Configure the connection to the mongod, based on the options passed in,
@@ -27,9 +35,57 @@ func Configure(opts *options.MongoToolOptions) error {
 		url += ":" + opts.Port
 	}
 
+	// create the dial info to use when connecting
+	dialInfo = &mgo.DialInfo{
+		Addrs:   []string{url}, // TODO: change if repl set?
+		Timeout: dialTimeout,
+		Source:  "admin",
+	}
+
+	if globalOptions.Username != "" {
+		dialInfo.Mechanism = "MONGODB-CR"
+		dialInfo.Username = globalOptions.Username
+		dialInfo.Password = globalOptions.Password
+	}
+
+	// configure ssl, if necessary
+	// TODO: errs, validate
+	if globalOptions.SSL {
+		dialInfo.Mechanism = "MONGODB-X509"
+		dialInfo.DialServer = dialWithSSL
+
+		// read in the certificate authority file and add it to the cert chain
+		rootCert, err := ioutil.ReadFile(globalOptions.SSLCAFile)
+		if err != nil {
+			return fmt.Errorf("error reading certificate authority file: %v",
+				err)
+		}
+
+		// TODO: support nil, blah-blah
+		certPool = x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM([]byte(rootCert)) {
+			return fmt.Errorf("error creating cert: %v", err)
+		}
+
+		// TODO: other files...
+	}
+
 	// TODO: validate
 
 	return nil
+}
+
+// Custom dialer for the DialServer field of the mgo.DialInfo struct, set up
+// to use ssl
+func dialWithSSL(addr *mgo.ServerAddr) (net.Conn, error) {
+
+	config := &tls.Config{}
+	if globalOptions.SSLAllowInvalidCertificates {
+		config.InsecureSkipVerify = true
+	}
+	config.RootCAs = certPool
+
+	return tls.Dial("tcp", addr.String(), config)
 }
 
 // Confirm whether the db can be reached.
