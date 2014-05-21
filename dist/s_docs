@@ -127,7 +127,8 @@ while :
 		clean=1
 		shift;;
 	-l)	# Generate the top-level landing page in ../docs/top
-		filter="$filter; cat top/Doxyfile"
+		filter="$filter| sed '/GENERATE_MAN/s,=.*,=NO,';"
+		filter="$filter cat top/Doxyfile"
 		additional_languages=0
 		shift;;
 	-p)	# Generate PDFs
