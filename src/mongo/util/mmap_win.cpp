@@ -371,6 +371,18 @@ namespace mongo {
                                       &oldProtection );
             if ( !ok ) {
                 DWORD dosError = GetLastError();
+
+                if (dosError == ERROR_COMMITMENT_LIMIT) {
+                    // System has run out of memory between physical RAM & page file, tell the user
+                    BSONObjBuilder bb;
+
+                    ProcessInfo p;
+                    p.getExtraInfo(bb);
+
+                    log() << "MongoDB has exhausted the system memory capacity.";
+                    log() << "Current Memory Status: " << bb.obj().toString();
+                }
+
                 log() << "VirtualProtect for " << mmf->filename()
                         << " chunk " << chunkno
                         << " failed with " << errnoWithDescription( dosError )
