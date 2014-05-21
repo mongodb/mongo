@@ -60,11 +60,6 @@ struct __wt_named_data_source {
 #define	WT_NUM_INTERNAL_SESSIONS	2
 
 /*
- * Periodically clear out unused dhandles from the connection list.
- */
-#define	WT_DHANDLE_SWEEP_TRIGGER	10
-
-/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -114,7 +109,6 @@ struct __wt_connection_impl {
 	pthread_t cache_evict_tid;	/* Eviction server thread ID */
 	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
-	int32_t	dhandle_dead;		/* Not locked: dead dhandles seen */
 	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
 					/* Locked: data handle list */
 	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
@@ -229,6 +223,11 @@ struct __wt_connection_impl {
 	off_t		log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 	uint32_t	txn_logsync;	/* Log sync configuration */
+
+	WT_SESSION_IMPL *sweep_session;	/* Handle sweep session */
+	pthread_t	 sweep_tid;	/* Handle sweep thread */
+	int		 sweep_tid_set;	/* Handle sweep thread set */
+	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

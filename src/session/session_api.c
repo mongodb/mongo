@@ -36,7 +36,7 @@ __session_close_cache(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 
 	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
-		WT_TRET(__wt_session_discard_btree(session, dhandle_cache));
+		__wt_session_discard_btree(session, dhandle_cache);
 
 	__wt_schema_close_tables(session);
 

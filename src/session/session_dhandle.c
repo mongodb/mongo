@@ -286,8 +286,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 		    dhandle->session_inuse == 0 &&
 		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
-			WT_RET(
-			    __wt_session_discard_btree(session, dhandle_cache));
+			__wt_session_discard_btree(session, dhandle_cache);
 		}
 		dhandle_cache = dhandle_cache_next;
 	}
@@ -431,12 +430,11 @@ err:	session->dhandle = saved_dhandle;
  * __wt_session_discard_btree --
  *	Discard our reference to the btree.
  */
-int
+void
 __wt_session_discard_btree(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
 {
 	WT_DATA_HANDLE *saved_dhandle;
-	WT_DECL_RET;
 
 	SLIST_REMOVE(
 	    &session->dhandles, dhandle_cache, __wt_data_handle_cache, l);
@@ -445,9 +443,8 @@ __wt_session_discard_btree(
 	session->dhandle = dhandle_cache->dhandle;
 
 	__wt_overwrite_and_free(session, dhandle_cache);
-	ret = __wt_conn_btree_close(session, 0);
+	__wt_conn_btree_close(session);
 
 	/* Restore the original handle in the session. */
 	session->dhandle = saved_dhandle;
-	return (ret);
 }
