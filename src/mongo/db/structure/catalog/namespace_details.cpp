@@ -35,6 +35,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db.h"
@@ -216,22 +217,8 @@ namespace mongo {
     void NamespaceDetails::setMaxCappedDocs( OperationContext* txn, long long max ) {
         massert( 16499,
                  "max in a capped collection has to be < 2^31 or -1",
-                 validMaxCappedDocs( &max ) );
+                 CollectionOptions::validMaxCappedDocs( &max ) );
         maxDocsInCapped = max;
-    }
-
-    bool NamespaceDetails::validMaxCappedDocs( long long* max ) {
-        if ( *max <= 0 ||
-             *max == numeric_limits<long long>::max() ) {
-            *max = 0x7fffffff;
-            return true;
-        }
-
-        if ( *max < ( 0x1LL << 31 ) ) {
-            return true;
-        }
-
-        return false;
     }
 
     /* ------------------------------------------------------------------------- */

@@ -161,12 +161,6 @@ namespace mongo {
     public:
         void setMaxCappedDocs( OperationContext* txn, long long max );
 
-        /**
-         * @param max in and out, will be adjusted
-         * @return if the value is valid at all
-         */
-        static bool validMaxCappedDocs( long long* max );
-
         enum UserFlags {
             Flag_UsePowerOf2Sizes = 1 << 0
         };

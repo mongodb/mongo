@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -49,51 +50,6 @@ namespace mongo {
     class NamespaceDetails;
     class NamespaceIndex;
     class OperationContext;
-
-    struct CollectionOptions {
-        CollectionOptions() {
-            reset();
-        }
-
-        void reset() {
-            capped = false;
-            cappedSize = 0;
-            cappedMaxDocs = 0;
-            initialNumExtents = 0;
-            initialExtentSizes.clear();
-            autoIndexId = DEFAULT;
-            flags = 0;
-            flagsSet = false;
-            temp = false;
-        }
-
-        Status parse( const BSONObj& obj );
-        BSONObj toBSON() const;
-
-        // ----
-
-        bool capped;
-        long long cappedSize;
-        long long cappedMaxDocs;
-
-        // following 2 are mutually exclusive, can only have one set
-        long long initialNumExtents;
-        std::vector<long long> initialExtentSizes;
-
-        // behavior of _id index creation when collection created
-        void setNoIdIndex() { autoIndexId = NO; }
-        enum {
-            DEFAULT, // currently yes for most collections, NO for some system ones
-            YES, // create _id index
-            NO // do not create _id index
-        } autoIndexId;
-
-        // user flags
-        int flags;
-        bool flagsSet;
-
-        bool temp;
-    };
 
     /**
      * Database represents a database database

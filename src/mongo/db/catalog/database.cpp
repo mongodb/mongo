@@ -40,6 +40,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/structure/catalog/index_details.h"
@@ -60,91 +61,6 @@
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {
-
-    Status CollectionOptions::parse( const BSONObj& options ) {
-        reset();
-
-        BSONObjIterator i( options );
-        while ( i.more() ) {
-            BSONElement e = i.next();
-            StringData fieldName = e.fieldName();
-
-            if ( fieldName == "capped" ) {
-                capped = e.trueValue();
-            }
-            else if ( fieldName == "size" ) {
-                if ( !e.isNumber() )
-                    return Status( ErrorCodes::BadValue, "size has to be a number" );
-                cappedSize = e.numberLong();
-                if ( cappedSize < 0 )
-                    return Status( ErrorCodes::BadValue, "size has to be >= 0" );
-                cappedSize += 0xff;
-                cappedSize &= 0xffffffffffffff00LL;
-            }
-            else if ( fieldName == "max" ) {
-                if ( !e.isNumber() )
-                    return Status( ErrorCodes::BadValue, "max has to be a number" );
-                cappedMaxDocs = e.numberLong();
-                if ( !NamespaceDetails::validMaxCappedDocs( &cappedMaxDocs ) )
-                    return Status( ErrorCodes::BadValue,
-                                   "max in a capped collection has to be < 2^31 or not set" );
-            }
-            else if ( fieldName == "$nExtents" ) {
-                if ( e.type() == Array ) {
-                    BSONObjIterator j( e.Obj() );
-                    while ( j.more() ) {
-                        BSONElement inner = j.next();
-                        initialExtentSizes.push_back( inner.numberInt() );
-                    }
-                }
-                else {
-                    initialNumExtents = e.numberLong();
-                }
-            }
-            else if ( fieldName == "autoIndexId" ) {
-                if ( e.trueValue() )
-                    autoIndexId = YES;
-                else
-                    autoIndexId = NO;
-            }
-            else if ( fieldName == "flags" ) {
-                flags = e.numberInt();
-                flagsSet = true;
-            }
-            else if ( fieldName == "temp" ) {
-                temp = e.trueValue();
-            }
-        }
-
-        return Status::OK();
-    }
-
-    BSONObj CollectionOptions::toBSON() const {
-        BSONObjBuilder b;
-        if ( capped ) {
-            b.appendBool( "capped", true );
-            if ( cappedSize )
-                b.appendNumber( "size", cappedSize );
-            if ( cappedMaxDocs )
-                b.appendNumber( "max", cappedMaxDocs );
-        }
-
-        if ( initialNumExtents )
-            b.appendNumber( "$nExtents", initialNumExtents );
-        if ( !initialExtentSizes.empty() )
-            b.append( "$nExtents", initialExtentSizes );
-
-        if ( autoIndexId != DEFAULT )
-            b.appendBool( "autoIndexId", autoIndexId == YES );
-
-        if ( flagsSet )
-            b.append( "flags", flags );
-
-        if ( temp )
-            b.appendBool( "temp", true );
-
-        return b.obj();
-    }
 
     void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
         massert( 17320,
