@@ -55,7 +55,7 @@ void S2PolygonBuilderOptions::set_vertex_merge_radius(S1Angle const& angle) {
 }
 
 void S2PolygonBuilderOptions::set_edge_splice_fraction(double fraction) {
-  CHECK(fraction < sqrt(3) / 2);
+  CHECK(fraction < sqrt(3.) / 2);
   edge_splice_fraction_ = fraction;
 }
 
