@@ -55,4 +55,34 @@ namespace mongo {
         checkRoundTrip( options );
     }
 
+    TEST( CollectionOptions, ErrorBadSize ) {
+        ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: true, size: -1}" ) ) );
+        ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: false, size: -1}" ) ) );
+    }
+
+    TEST( CollectionOptions, ErrorBadMax ) {
+        ASSERT_NOT_OK( CollectionOptions().parse( BSON( "capped" << true << "max"
+                                                                 << ( 1LL << 31 ) ) ) );
+    }
+
+    TEST( CollectionOptions, IgnoreSizeWrongType ) {
+        CollectionOptions options;
+        ASSERT_OK( options.parse( fromjson( "{size: undefined, capped: undefined}" ) ) );
+        ASSERT_EQUALS( options.capped, false );
+        ASSERT_EQUALS( options.cappedSize, 0 );
+    }
+
+    TEST( CollectionOptions, IgnoreMaxWrongType ) {
+        CollectionOptions options;
+        ASSERT_OK( options.parse( fromjson( "{capped: true, size: 1024, max: ''}" ) ) );
+        ASSERT_EQUALS( options.capped, true );
+        ASSERT_EQUALS( options.cappedSize, 1024 );
+        ASSERT_EQUALS( options.cappedMaxDocs, 0 );
+    }
+
+    TEST( CollectionOptions, IgnoreUnregisteredFields ) {
+        ASSERT_OK( CollectionOptions().parse( BSON( "create" << "c" ) ) );
+        ASSERT_OK( CollectionOptions().parse( BSON( "foo" << "bar" ) ) );
+    }
+
 }
