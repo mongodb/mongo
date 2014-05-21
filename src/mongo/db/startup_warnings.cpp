@@ -72,6 +72,20 @@ namespace mongo {
             warned = true;
         }
 
+#if defined(_WIN32) && !defined(_WIN64)
+        // Warn user that they are running a 32-bit app on 64-bit Windows
+        BOOL wow64Process;
+        BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
+        if (retWow64 && wow64Process) {
+            log() << "** NOTE: This is a 32-bit MongoDB binary running on a 64-bit operating"
+                    << startupWarningsLog;
+            log() << "**      system. Switch to a 64-bit build of MongoDB to"
+                    << startupWarningsLog;
+            log() << "**      support larger databases." << startupWarningsLog;
+            warned = true;
+        }
+#endif
+
         if (!ProcessInfo::blockCheckSupported()) {
             log() << startupWarningsLog;
             log() << "** NOTE: your operating system version does not support the method that "

@@ -105,6 +105,12 @@ namespace mongo {
             info.append("availPageFileMB", static_cast<int>(mse.ullAvailPageFile / 1024 / 1024));
             info.append("ramMB", static_cast<int>(mse.ullTotalPhys / 1024 / 1024));
         }
+
+#ifndef _WIN64
+        BOOL wow64Process;
+        BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
+        info.append("wow64Process", static_cast<bool>(retWow64 && wow64Process));
+#endif
     }
 
     void ProcessInfo::SystemInfo::collectSystemInfo() {
