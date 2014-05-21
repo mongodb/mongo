@@ -46,6 +46,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/mechanism_scram.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/user.h"
@@ -53,8 +54,10 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/random.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/sequence_util.h"
@@ -376,7 +379,8 @@ namespace mongo {
                                " with '$external' as the user's source db"));
             }
 
-            if (args.hasHashedPassword && args.userName.getDB() == "$external") {
+            if ((args.hasHashedPassword) && 
+                 args.userName.getDB() == "$external") {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::BadValue,
@@ -411,11 +415,56 @@ namespace mongo {
                                   args.userName.getUser());
             userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
                                   args.userName.getDB());
-            if (args.hasHashedPassword) {
-                userObjBuilder.append("credentials", BSON("MONGODB-CR" << args.hashedPassword));
-            } else {
+            if (!args.hasHashedPassword) { 
                 // Must be an external user
                 userObjBuilder.append("credentials", BSON("external" << true));
+            }
+            else if (args.mechanism == "SCRAM-SHA-1") { 
+                // TODO: configure the default iteration count via setParameter
+                const int iterationCount = 10000;
+                const int saltLenQWords = 2;
+
+                // Generate salt
+                uint64_t userSalt[saltLenQWords];
+                scoped_ptr<SecureRandom> sr(SecureRandom::create());
+
+                userSalt[0] = sr->nextInt64();
+                userSalt[1] = sr->nextInt64();
+                std::string encodedUserSalt = 
+                    base64::encode(reinterpret_cast<char*>(&userSalt[0]), sizeof(userSalt));
+
+                // Compute SCRAM secrets serverKey and storedKey
+                unsigned char storedKey[scramHashSize];
+                unsigned char serverKey[scramHashSize];
+
+                computeSCRAMProperties(args.hashedPassword,
+                                                reinterpret_cast<unsigned char*>(userSalt),
+                                                saltLenQWords*sizeof(uint64_t),
+                                                iterationCount,
+                                                storedKey,
+                                                serverKey);
+
+                std::string encodedStoredKey = 
+                    base64::encode(reinterpret_cast<char*>(&storedKey[0]), scramHashSize);
+                std::string encodedServerKey = 
+                    base64::encode(reinterpret_cast<char*>(&serverKey[0]), scramHashSize);
+
+                userObjBuilder.append("credentials", BSON("SCRAM-SHA-1" << 
+                                                     BSON("iterationCount" << iterationCount <<
+                                                          "salt" << encodedUserSalt << 
+                                                          "storedKey" << encodedStoredKey <<
+                                                          "serverKey" << encodedServerKey)));
+            }
+            else if(args.mechanism == "MONGODB-CR" || 
+                    args.mechanism == "CRAM-MD5" || 
+                    args.mechanism.empty()) {
+                userObjBuilder.append("credentials", BSON("MONGODB-CR" << args.hashedPassword));
+            }
+            else {
+                return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::BadValue, 
+                               "Unsupported password authentication mechanism " + args.mechanism));
             }
             if (args.hasCustomData) {
                 userObjBuilder.append("customData", args.customData);
