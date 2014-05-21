@@ -675,11 +675,6 @@ extern size_t __wt_json_unpack_char(char ch,
     char *buf,
     size_t bufsz,
     int force_unicode);
-extern size_t __wt_json_unpack_put(WT_SESSION_IMPL *session,
-    void *voidpv,
-    char *buf,
-    size_t bufsz,
-    WT_CONFIG_ITEM *name);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],

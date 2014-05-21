@@ -8,6 +8,112 @@
 #include "wt_internal.h"
 
 /*
+ * __json_unpack_put --
+ *	Calculate the size of a packed byte string as formatted for JSON.
+ */
+static size_t
+__json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
+    char *buf, size_t bufsz, WT_CONFIG_ITEM *name)
+{
+	WT_PACK_VALUE *pv;
+	const char *p, *end;
+	size_t s, n;
+
+	pv = (WT_PACK_VALUE *)voidpv;
+	s = (size_t)snprintf(buf, bufsz, "\"%.*s\" : ",
+	    (int)name->len, name->str);
+	if (s <= bufsz) {
+		bufsz -= s;
+		buf += s;
+	}
+	else
+		bufsz = 0;
+
+	switch (pv->type) {
+	case 'x':
+		return (0);
+	case 's':
+	case 'S':
+		/* Account for '"' quote in front and back. */
+		s += 2;
+		p = (const char *)pv->u.s;
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		if (pv->type == 's' || pv->havesize) {
+			end = p + pv->size;
+			for ( ; p < end; p++) {
+				n = __wt_json_unpack_char(*p, buf, bufsz, 0);
+				if (n > bufsz)
+					bufsz = 0;
+				else {
+					bufsz -= n;
+					buf += n;
+				}
+				s += n;
+			}
+		} else
+			for ( ; *p; p++) {
+				n = __wt_json_unpack_char(*p, buf, bufsz, 0);
+				if (n > bufsz)
+					bufsz = 0;
+				else {
+					bufsz -= n;
+					buf += n;
+				}
+				s += n;
+			}
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		return (s);
+	case 'U':
+	case 'u':
+		s += 2;
+		p = (const char *)pv->u.item.data;
+		end = p + pv->u.item.size;
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		for ( ; p < end; p++) {
+			n = __wt_json_unpack_char(*p, buf, bufsz, 1);
+			if (n > bufsz)
+				bufsz = 0;
+			else {
+				bufsz -= n;
+				buf += n;
+			}
+			s += n;
+		}
+		if (bufsz > 0) {
+			*buf++ = '"';
+			bufsz--;
+		}
+		return (s);
+	case 'b':
+	case 'h':
+	case 'i':
+	case 'l':
+	case 'q':
+		return (s + (size_t)snprintf(buf, bufsz, "%" PRId64, pv->u.i));
+	case 'B':
+	case 't':
+	case 'H':
+	case 'I':
+	case 'L':
+	case 'Q':
+	case 'r':
+	case 'R':
+		return (s + (size_t)snprintf(buf, bufsz, "%" PRId64, pv->u.u));
+	}
+	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
+	return ((size_t)-1);
+}
+
+/*
  * __json_struct_size --
  *	Calculate the size of a packed byte string as formatted for JSON.
  */
@@ -38,7 +144,7 @@ __json_struct_size(WT_SESSION_IMPL *session, const void *buffer,
 		needcr = 1;
 		WT_ERR(__unpack_read(session, &pv, &p, (size_t)(end - p)));
 		WT_ERR(__pack_name_next(&packname, &name));
-		result += __wt_json_unpack_put(session, &pv, NULL, 0, &name);
+		result += __json_unpack_put(session, &pv, NULL, 0, &name);
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -87,7 +193,7 @@ __json_struct_unpackv(WT_SESSION_IMPL *session,
 		needcr = 1;
 		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
 		WT_RET(__pack_name_next(&packname, &name));
-		jsize = __wt_json_unpack_put(
+		jsize = __json_unpack_put(
 		    session, &pv, jbuf, jbufsize, &name);
 		WT_ASSERT(session, jsize <= jbufsize);
 		jbuf += jsize;
@@ -215,110 +321,4 @@ __wt_json_unpack_char(char ch, char *buf, size_t bufsz, int force_unicode)
 			*buf++ = '0' + h;
 	}
 	return (6);
-}
-
-/*
- * __wt_json_unpack_put --
- *	Calculate the size of a packed byte string as formatted for JSON.
- */
-size_t
-__wt_json_unpack_put(WT_SESSION_IMPL *session, void *voidpv,
-    char *buf, size_t bufsz, WT_CONFIG_ITEM *name)
-{
-	WT_PACK_VALUE *pv;
-	const char *p, *end;
-	size_t s, n;
-
-	pv = (WT_PACK_VALUE *)voidpv;
-	s = (size_t)snprintf(buf, bufsz, "\"%.*s\" : ",
-	    (int)name->len, name->str);
-	if (s <= bufsz) {
-		bufsz -= s;
-		buf += s;
-	}
-	else
-		bufsz = 0;
-
-	switch (pv->type) {
-	case 'x':
-		return (0);
-	case 's':
-	case 'S':
-		/* Account for '"' quote in front and back. */
-		s += 2;
-		p = (const char *)pv->u.s;
-		if (bufsz > 0) {
-			*buf++ = '"';
-			bufsz--;
-		}
-		if (pv->type == 's' || pv->havesize) {
-			end = p + pv->size;
-			for ( ; p < end; p++) {
-				n = __wt_json_unpack_char(*p, buf, bufsz, 0);
-				if (n > bufsz)
-					bufsz = 0;
-				else {
-					bufsz -= n;
-					buf += n;
-				}
-				s += n;
-			}
-		} else
-			for ( ; *p; p++) {
-				n = __wt_json_unpack_char(*p, buf, bufsz, 0);
-				if (n > bufsz)
-					bufsz = 0;
-				else {
-					bufsz -= n;
-					buf += n;
-				}
-				s += n;
-			}
-		if (bufsz > 0) {
-			*buf++ = '"';
-			bufsz--;
-		}
-		return (s);
-	case 'U':
-	case 'u':
-		s += 2;
-		p = (const char *)pv->u.item.data;
-		end = p + pv->u.item.size;
-		if (bufsz > 0) {
-			*buf++ = '"';
-			bufsz--;
-		}
-		for ( ; p < end; p++) {
-			n = __wt_json_unpack_char(*p, buf, bufsz, 1);
-			if (n > bufsz)
-				bufsz = 0;
-			else {
-				bufsz -= n;
-				buf += n;
-			}
-			s += n;
-		}
-		if (bufsz > 0) {
-			*buf++ = '"';
-			bufsz--;
-		}
-		return (s);
-	case 'b':
-	case 'h':
-	case 'i':
-	case 'l':
-	case 'q':
-		return (s + (size_t)snprintf(buf, bufsz, "%" PRId64, pv->u.i));
-	case 'B':
-	case 't':
-	case 'H':
-	case 'I':
-	case 'L':
-	case 'Q':
-	case 'r':
-	case 'R':
-		return (s + (size_t)snprintf(buf, bufsz, "%" PRId64, pv->u.u));
-	}
-	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
-	return ((size_t)-1);
 }
