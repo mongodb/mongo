@@ -116,7 +116,10 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 			txn_state->snap_min = current_id;
 			__txn_sort_snapshot(session, 0, current_id);
 		}
-		return;
+		/* Check that the oldest ID has not moved in the meantime. */
+		if (prev_oldest_id == txn_global->oldest_id &&
+		    txn_global->scan_count == 0)
+			return;
 	}
 
 	/*

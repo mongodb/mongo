@@ -40,7 +40,7 @@
 #include <wiredtiger.h>
 #include <gcc.h>				/* WiredTiger internal */
 
-#define	FNAME		"file:__wt"		/* File name */
+#define	FNAME		"file:wt.%03d"		/* File name */
 #define	FNAME_STAT	"__stats"		/* File name for statistics */
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
@@ -49,11 +49,13 @@ typedef enum { FIX, ROW, VAR } __ftype;		/* File type */
 extern __ftype ftype;
 
 extern int   log_print;				/* Log print per operation */
+extern int   multiple_files;			/* File per thread */
 extern u_int nkeys;				/* Keys to load */
 extern u_int nops;				/* Operations per thread */
 extern int   session_per_op;			/* New session per operation */
 
 void die(const char *, int) WT_GCC_ATTRIBUTE((noreturn));
-void load(void);
+void load(const char *);
 int  rw_start(u_int, u_int);
 void stats(void);
+void verify(const char *);
