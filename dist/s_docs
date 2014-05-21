@@ -16,6 +16,15 @@ type doxygen > /dev/null 2>&1 || {
 
 e=0
 
+changelog()
+{
+	# convert the top-level NEWS file into a change log page in the docs
+	(echo "WiredTiger Change Log"
+	 echo "====================="
+	 echo
+	 cat ../NEWS) > ../src/docs/changelog.md
+}
+
 sectionchk()
 {
 	# sections are a global name space for doxygen, and must be uniquely
@@ -139,6 +148,9 @@ while :
 		break;;
 	esac
 done
+
+# Generate the change log
+changelog
 
 # Spell and section-name check the documentation.
 spellchk

@@ -277,7 +277,7 @@ EXTENSION_MAPPING      =
 # can mix doxygen, HTML, and XML commands with Markdown formatting. 
 # Disable only in case of backward compatibilities issues.
 
-MARKDOWN_SUPPORT       = NO
+MARKDOWN_SUPPORT       = YES
 
 # When enabled doxygen tries to link words that correspond to documented classes, 
 # or namespaces to their corresponding documentation. Such a link can be 
@@ -720,6 +720,7 @@ FILE_PATTERNS          = *.c \
                          *.php3 \
                          *.inc \
                          *.m \
+                         *.md \
                          *.mm \
                          *.dox \
                          *.py \
