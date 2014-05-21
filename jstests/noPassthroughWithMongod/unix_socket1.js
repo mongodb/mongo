@@ -21,6 +21,12 @@ if ( ! _isWindows() ) {
     var sock2 = new Mongo(path+"/mongodb-"+ports[0]+".sock");
     sockdb2 = sock2.getDB(db.getName())
     assert( sockdb2.runCommand('ping').ok );
+
+    //Test the naming of the unix socket
+    var log = db.adminCommand({ getLog: 'global' });
+    var ll = log.log.pop()
+    assert( ll.match("anonymous unix socket"), "Log message did not contain 'anonymous unix socket'");
+    
 } else {
     print("Not testing unix sockets on Windows");
 }
