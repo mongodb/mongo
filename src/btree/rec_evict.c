@@ -366,7 +366,7 @@ __rec_review(
 	 * they are not expected to split).
 	 */
 	if (__wt_page_is_modified(page)) {
-		flags = WT_EVICTION_LOCKED;
+		flags = WT_EVICTING;
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
 		else if (top && !WT_PAGE_IS_INTERNAL(page) &&

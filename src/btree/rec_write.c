@@ -355,7 +355,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	    WT_VERB_RECONCILE, "%s", __wt_page_type_string(page->type)));
 	WT_STAT_FAST_CONN_INCR(session, rec_pages);
 	WT_STAT_FAST_DATA_INCR(session, rec_pages);
-	if (LF_ISSET(WT_EVICTION_LOCKED)) {
+	if (LF_ISSET(WT_EVICTING)) {
 		WT_STAT_FAST_CONN_INCR(session, rec_pages_eviction);
 		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
 	}
@@ -864,13 +864,18 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	r->leave_dirty = 1;
 
-	/* If we are checkpointing, continue: we'll write what we can. */
-	if (!F_ISSET(r, WT_EVICTION_LOCKED))
+	/* If we're not evicting, we're done, we know what we'll write. */
+	if (!F_ISSET(r, WT_EVICTING))
 		return (0);
 
+	/* In some cases, there had better not be any updates we can't write. */
+	if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
+		WT_PANIC_RETX(session,
+		    "reconciliation illegally skipped an update");
+
 	/*
-	 * If we are evicting and we aren't able to save/restore the
-	 * not-yet-visible updates, the page can't be evicted.
+	 * If evicting and we aren't able to save/restore the not-yet-visible
+	 * updates, the page can't be evicted.
 	 */
 	if (!F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
@@ -1015,12 +1020,16 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 		case WT_REF_LOCKED:
 			/*
-			 * If being called by the eviction server, the evicted
-			 * page's subtree, including this child, was selected
-			 * for eviction by us and the state is stable until we
-			 * reset it, it's an in-memory state.
+			 * Locked.
+			 *
+			 * If evicting, the evicted page's subtree, including
+			 * this child, was selected for eviction by us and the
+			 * state is stable until we reset it, it's an in-memory
+			 * state.  This is the expected state for a child being
+			 * merged into a page (where the page was selected by
+			 * the eviction server for eviction).
 			 */
-			if (F_ISSET(r, WT_EVICTION_LOCKED))
+			if (F_ISSET(r, WT_EVICTING))
 				goto in_memory;
 
 			/*
@@ -1039,12 +1048,15 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * In memory.
 			 *
-			 * We should never be here during eviction, a child page
-			 * in this state within an evicted page's subtree would
-			 * have either caused eviction to fail or have had its
-			 * state set to WT_REF_LOCKED.
+			 * If evicting, the evicted page's subtree, including
+			 * this child, was selected for eviction by us and the
+			 * state is stable until we reset it, it's an in-memory
+			 * state.  This is the expected state for a child being
+			 * merged into a page (where the page belongs to a file
+			 * being discarded from the cache during close).
 			 */
-			WT_ASSERT(session, !F_ISSET(r, WT_EVICTION_LOCKED));
+			if (F_ISSET(r, WT_EVICTING))
+				goto in_memory;
 
 			/*
 			 * If called during checkpoint, acquire a hazard pointer
@@ -1070,9 +1082,10 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 *
 			 * We should never be here during eviction, a child page
 			 * in this state within an evicted page's subtree would
-			 * have caused eviction to fail.
+			 * have caused normally eviction to fail, and exclusive
+			 * eviction shouldn't ever see pages being read.
 			 */
-			WT_ASSERT(session, !F_ISSET(r, WT_EVICTION_LOCKED));
+			WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
 			goto done;
 
 		case WT_REF_SPLIT:
@@ -1147,15 +1160,15 @@ __rec_child_deleted(
 	 */
 	if (page_del != NULL && !__wt_txn_visible(session, page_del->txnid)) {
 		/*
-		 * In some cases (for example, when closing a file), there had
-		 * better not be any updates we can't write.
+		 * In some cases, there had better not be any updates we can't
+		 * write.
 		 */
 		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
 			WT_PANIC_RETX(session,
 			    "reconciliation illegally skipped an update");
 
 		/* If this page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTION_LOCKED))
+		if (F_ISSET(r, WT_EVICTING))
 			return (EBUSY);
 	}
 
@@ -4706,14 +4719,6 @@ err:			__wt_scr_free(&tkey);
 	 * there's no risk of that happening).
 	 */
 	if (r->leave_dirty) {
-		/*
-		 * In some cases (for example, when closing a file), there had
-		 * better not be any updates we can't write.
-		 */
-		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
-			WT_PANIC_RETX(session,
-			    "reconciliation illegally skipped an update");
-
 		mod->first_dirty_txn = r->skipped_txn;
 
 		btree->modified = 1;
