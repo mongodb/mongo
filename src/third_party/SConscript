@@ -68,9 +68,9 @@ elif use_system_version_of_library("tcmalloc"):
                     env['LIBDEPS_TCMALLOC_SYSLIBDEP']
                 ] )
 else:
-    env.SConscript('gperftools-2.2/SConscript')
+    env.SConscript('gperftools-2.0/SConscript')
     env.Library('shim_allocator', 'shim_allocator.cpp',
-                      LIBDEPS=['gperftools-2.2/tcmalloc_minimal'])
+                      LIBDEPS=['gperftools-2.0/tcmalloc_minimal'])
 
 if use_system_version_of_library("stemmer"):
     env.Library("shim_stemmer", ['shim_stemmer.cpp'],
