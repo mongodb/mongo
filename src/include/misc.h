@@ -160,7 +160,7 @@
 
 /* Check if a string matches a byte string of len bytes. */
 #define	WT_STRING_MATCH(str, bytes, len)				\
-	(strncmp(str, bytes, len) == 0 && ((uint8_t *)str)[(len)] == '\0')
+	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /*
  * Macro that produces a string literal that isn't wrapped in quotes, to avoid
