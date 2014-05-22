@@ -71,10 +71,12 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 
 	for (i = 0; i < argc; i++) {
-		if (json && i > 0) {
-			free(name);
+		if (json && i > 0)
 			if ((ret = dump_json_separator()) != 0)
 				goto err;
+		if (name != NULL) {
+			free(name);
+			name = NULL;
 		}
 		if ((name = util_name(argv[i], "table",
 		    UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
@@ -225,7 +227,7 @@ dump_json_table_begin(WT_CURSOR *cursor, const char *uri, const char *config)
 	}
 	++name;
 
-	if ((ret = dup_json_string(config, &jsonconfig) != 0))
+	if ((ret = dup_json_string(config, &jsonconfig)) != 0)
 		return (util_cerr(uri, "config dup", ret));
 	if (printf("    \"%s\" : [\n        {\n", uri) < 0)
 		return (util_err(EIO, NULL));
@@ -260,7 +262,7 @@ dump_json_table_cg(WT_CURSOR *cursor,
 	const char *key, *skip, *value;
 	int exact, once;
 	char *jsonconfig;
-	static const char *indent = "                ";
+	static const char * const indent = "                ";
 
 	once = 0;
 	if (printf("            \"%s\" : [", header) < 0)
@@ -307,7 +309,7 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (util_cerr(uri, "get_value", ret));
 
-		if ((ret = dup_json_string(value, &jsonconfig) != 0))
+		if ((ret = dup_json_string(value, &jsonconfig)) != 0)
 			return (util_cerr(uri, "config dup", ret));
 		ret = printf("%s\n"
 		    "%s{\n"
@@ -638,7 +640,7 @@ dup_json_string(const char *str, char **result)
 	*result = q;
 	left = nchars;
 	for (p = str; *p; p++, nchars++) {
-		nchars = __wt_json_unpack_char(*p, q, left, 0);
+		nchars = __wt_json_unpack_char(*p, (u_char *)q, left, 0);
 		left -= nchars;
 		q += nchars;
 	}
