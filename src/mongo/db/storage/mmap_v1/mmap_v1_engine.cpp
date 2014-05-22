@@ -180,12 +180,14 @@ namespace mongo {
             }
             else if ( options.capped ) {
                 // normal
-                while ( rs->storageSize() < options.cappedSize ) {
+                do {
+                    // Must do this at least once, otherwise we leave the collection with no
+                    // extents, which is invalid.
                     int sz = _massageExtentSize( &_extentManager,
                                                  options.cappedSize - rs->storageSize() );
                     sz &= 0xffffff00;
                     rs->increaseStorageSize( txn, sz, -1 );
-                }
+                } while( rs->storageSize() < options.cappedSize );
             }
             else {
                 rs->increaseStorageSize( txn, _extentManager.initialSize( 128 ), -1 );
