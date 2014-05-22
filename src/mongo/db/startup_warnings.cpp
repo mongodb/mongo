@@ -173,6 +173,58 @@ namespace mongo {
                       << startupWarningsLog;
             }
         }
+
+        // Transparent Hugepages checks
+        bool hasHugePages = false;
+        try {
+            hasHugePages = boost::filesystem::exists("/sys/kernel/mm/transparent_hugepage/enabled");
+
+            if (hasHugePages) {
+                std::ifstream f1("/sys/kernel/mm/transparent_hugepage/enabled");
+                std::string line;
+                if (!std::getline(f1, line)) {
+                    warning() << "failed to read from /sys/kernel/mm/transparent_hugepage/enabled: "
+                              << ((f1.eof()) ? "EOF" : errnoWithDescription())
+                              << startupWarningsLog;
+                    warned = true;
+                }
+                else {
+                    std::string::size_type pos_begin = line.find("[");
+                    std::string::size_type pos_end = line.find("]");
+                    if (pos_begin == string::npos || pos_end == string::npos ||
+                        pos_begin >= pos_end) {
+                        warning() << "cannot parse line: '" << line << "'"
+                              << startupWarningsLog;
+                        warned = true;
+                    }
+
+                    std::string op_mode = line.substr(pos_begin + 1, pos_end - pos_begin - 1);
+                    if (op_mode == "always") {
+                        log() << startupWarningsLog;
+                        log() <<
+                            "** WARNING: /sys/kernel/mm/transparent_hugepage/enabled is 'always'."
+                            << startupWarningsLog;
+                        log() << "**        We suggest setting it to 'never'"
+                              << startupWarningsLog;
+                        warned = true;
+                    }
+                    else if (op_mode != "madvise" && op_mode != "never") {
+                        log() << startupWarningsLog;
+                        log() << "** WARNING: unrecognized transparent HugePages mode of operation '"
+                              << op_mode << "'"
+                              << startupWarningsLog;
+                    }
+                }
+            }
+        }
+        catch (const boost::filesystem::filesystem_error& err) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: Cannot detect if transparent HugePages feature is enabled. "
+                    << "Failed to probe \"" << err.path1().string() << "\": "
+                    << err.code().message()
+                    << startupWarningsLog;
+        }
+
 #endif
 
 #if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
