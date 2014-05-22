@@ -231,6 +231,7 @@ __wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer,
 		names = &json->value_names;
 		json_bufp = &json->value_buf;
 	}
+	needed = 0;
 	WT_RET(__json_struct_size(session, buffer, size, fmt, names,
 	    iskey, &needed));
 	WT_RET(__wt_realloc(session, NULL, needed + 1, json_bufp));
