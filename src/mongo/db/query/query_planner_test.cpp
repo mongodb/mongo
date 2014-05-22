@@ -878,6 +878,33 @@ namespace {
                                     " b: [[1,1,true,true], [5,5,true,true]]}}}]}}}}");
     }
 
+    // SERVER-13960: properly handle $or with a mix of exact and inexact predicates.
+    TEST_F(QueryPlannerTest, OrInexactWithExact) {
+        addIndex(BSON("name" << 1));
+        runQuery(fromjson("{$or: [{name: 'thomas'}, {name: /^alexand(er|ra)/}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {filter:"
+                                "{$or: [{name: 'thomas'}, {name: /^alexand(er|ra)/}]},"
+                                "pattern: {name: 1}}}}}");
+    }
+
+    // SERVER-13960
+    TEST_F(QueryPlannerTest, OrInexactWithExact2) {
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        runQuery(fromjson("{$or: [{a: 'foo'}, {a: /bar/}, {b: 'foo'}, {b: /bar/}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {or: {nodes: ["
+                                "{ixscan: {filter: {$or:[{a:'foo'},{a:/bar/}]},"
+                                    "pattern: {a: 1}}},"
+                                "{ixscan: {filter: {$or:[{b:'foo'},{b:/bar/}]},"
+                                    "pattern: {b: 1}}}]}}}}");
+    }
+
     //
     // Min/Max
     //
@@ -1856,9 +1883,7 @@ namespace {
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{or: {nodes: ["
-                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
-                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}]}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
     }
 
     TEST_F(QueryPlannerTest, Or2DSphereSameFieldNonNearMultikey) {
@@ -1871,9 +1896,7 @@ namespace {
 
         assertNumSolutions(2U);
         assertSolutionExists("{cscan: {dir: 1}}");
-        assertSolutionExists("{or: {nodes: ["
-                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}},"
-                                "{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}]}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: '2dsphere'}}}}}");
     }
 
     TEST_F(QueryPlannerTest, CompoundMultikey2DSphereNear) {

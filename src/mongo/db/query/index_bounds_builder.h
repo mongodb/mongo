@@ -41,15 +41,24 @@ namespace mongo {
      */
     class IndexBoundsBuilder {
     public:
+        /**
+         * Describes various degrees of precision with which predicates can be evaluated based
+         * on the index bounds.
+         *
+         * The integer values of the enum are significant, and are assigned in order of
+         * increasing tightness. These values are used when we need to do comparison between two
+         * BoundsTightness values. Such comparisons can answer questions such as "Does predicate
+         * X have tighter or looser bounds than predicate Y?".
+         */
         enum BoundsTightness {
-            // Index bounds are exact.
-            EXACT,
+            // Index bounds are inexact, but no fetch is required
+            INEXACT_COVERED = 0,
 
             // Index bounds are inexact, and a fetch is required.
-            INEXACT_FETCH,
+            INEXACT_FETCH = 1,
 
-            // Index bounds are inexact, but no fetch is required
-            INEXACT_COVERED
+            // Index bounds are exact.
+            EXACT = 2
         };
 
         /**
