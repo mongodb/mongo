@@ -320,3 +320,51 @@ __wt_json_unpack_char(char ch, char *buf, size_t bufsz, int force_unicode)
 	}
 	return (6);
 }
+
+/*
+ * __wt_json_column_init --
+ *	set json_key_names, json_value_names to comma separated lists
+ *	of column names.
+ */
+int
+__wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
+    const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
+{
+	WT_CURSOR_JSON *json;
+	const char *p, *end, *beginkey;
+	uint32_t keycnt, nkeys;
+
+	json = (WT_CURSOR_JSON *)cursor->json_private;
+	beginkey = colconf->str;
+	end = beginkey + colconf->len;
+
+	if (idxconf != NULL) {
+		json->key_names.str = idxconf->str;
+		json->key_names.len = idxconf->len;
+	} else if (colconf->len > 0 && *beginkey == '(') {
+		beginkey++;
+		if (end[-1] == ')')
+			end--;
+	}
+
+	for (nkeys = 0; *keyformat; keyformat++)
+		if (!isdigit(*keyformat))
+			nkeys++;
+
+	p = beginkey;
+	keycnt = 0;
+	while (p < end && keycnt < nkeys) {
+		if (*p == ',')
+			keycnt++;
+		p++;
+	}
+	json->value_names.str = p;
+	json->value_names.len = WT_PTRDIFF(end, p);
+	if (idxconf == NULL) {
+		if (p > beginkey)
+			p--;
+		json->key_names.str = beginkey;
+		json->key_names.len = WT_PTRDIFF(p, beginkey);
+	}
+	return (0);
+}

@@ -8,43 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __curindex_json_init --
- *	set json->key_names, json->value_names to comma separated lists
- *	of column names.
- */
-static int __curindex_json_init(WT_CURSOR *cursor, const char *keyformat,
-    const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
-{
-	WT_CURSOR_JSON *json;
-	const char *p, *end;
-	uint32_t keycnt, nkeys;
-
-	json = (WT_CURSOR_JSON *)cursor->json_private;
-	json->key_names.str = idxconf->str;
-	json->key_names.len = idxconf->len;
-
-	nkeys = 0;
-	for ( ;*keyformat; keyformat++) {
-		if (!isdigit(*keyformat))
-			nkeys++;
-	}
-
-	p = colconf->str;
-	end = p + colconf->len;
-
-	keycnt = 0;
-	while (p < end && keycnt < nkeys) {
-		if (*p == ',')
-			keycnt++;
-		p++;
-	}
-	json->value_names.str = p;
-	json->value_names.len = WT_PTRDIFF(end, p);
-
-	return (0);
-}
-
-/*
  * __curindex_get_value --
  *	WT_CURSOR->get_value implementation for index cursors.
  */
@@ -483,10 +446,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
-	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
-		WT_ERR(__curindex_json_init(cursor, table->key_format,
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
+		WT_ERR(__wt_json_column_init(cursor, table->key_format,
 			&idx->colconf, &table->colconf));
-	}
 
 	if (0) {
 err:		WT_TRET(__curindex_close(cursor));

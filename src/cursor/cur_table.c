@@ -9,8 +9,6 @@
 
 static int __curtable_open_indices(WT_CURSOR_TABLE *ctable);
 static int __curtable_update(WT_CURSOR *cursor);
-static int __curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
-    const WT_CONFIG_ITEM *colconf);
 
 #define	APPLY_CG(ctable, f) do {					\
 	WT_CURSOR **__cp;						\
@@ -674,51 +672,6 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 }
 
 /*
- * __curtable_json_init --
- *	set json_key_names, json_value_names to comma separated lists
- *	of column names.
- */
-static int
-__curtable_json_init(WT_CURSOR *cursor, const char *keyformat,
-    const WT_CONFIG_ITEM *colconf)
-{
-	WT_CURSOR_JSON *json;
-	const char *p, *end, *beginkey;
-	uint32_t nkeys;
-
-	json = (WT_CURSOR_JSON *)cursor->json_private;
-
-	beginkey = colconf->str;
-	end = beginkey + colconf->len;
-	if (colconf->len > 0 && *beginkey == '(') {
-		beginkey++;
-		if (end[-1] == ')')
-			end--;
-	}
-
-	nkeys = 0;
-	for (; *keyformat; keyformat++) {
-		if (!isdigit(*keyformat))
-			nkeys++;
-	}
-
-	p = beginkey;
-	while (p < end && nkeys > 0) {
-		if (*p == ',')
-			nkeys--;
-		p++;
-	}
-	json->value_names.str = p;
-	json->value_names.len = WT_PTRDIFF(end, p);
-	if (p > beginkey)
-		p--;
-	json->key_names.str = beginkey;
-	json->key_names.len = WT_PTRDIFF(p, beginkey);
-
-	return (0);
-}
-
-/*
  * __wt_curtable_open --
  *	WT_SESSION->open_cursor method for table cursors.
  */
@@ -814,10 +767,9 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
-	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
-		WT_ERR(__curtable_json_init(cursor, table->key_format,
-		    &table->colconf));
-	}
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
+		WT_ERR(__wt_json_column_init(cursor, table->key_format,
+		    NULL, &table->colconf));
 
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for
