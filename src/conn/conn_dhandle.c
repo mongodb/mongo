@@ -104,7 +104,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
 			WT_RET(__conn_dhandle_open_lock(
 			    session, dhandle, flags));
-			++dhandle->session_ref;
+			(void)WT_ATOMIC_ADD(dhandle->session_ref, 1);
 			session->dhandle = dhandle;
 			return (0);
 		}
@@ -612,10 +612,11 @@ __wt_conn_dhandle_discard_single(
 	__wt_spin_lock(session, &conn->dhandle_lock);
 
 	/*
-	 * Check if the handle was re-opened while we waited; this should only
-	 * happen when called from the periodic sweep code, of course.
+	 * Check if the handle was reacquired by a session while we waited;
+	 * this should only happen when called from the periodic sweep code, of
+	 * course.
 	 */
-	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+	if (dhandle->session_ref != 0)
 		ret = EBUSY;
 	else
 		SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);

@@ -61,7 +61,8 @@ __sweep(WT_SESSION_IMPL *session)
 			}
 			WT_RET(ret);
 
-			ret = __wt_conn_btree_sync_and_close(session);
+			WT_WITH_DHANDLE(session, dhandle,
+			    ret = __wt_conn_btree_sync_and_close(session));
 			if (ret == EBUSY)
 				ret = 0;
 
