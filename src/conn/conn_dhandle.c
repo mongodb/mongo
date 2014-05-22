@@ -313,9 +313,13 @@ __conn_btree_open(
 	 * this function isn't called if the handle is already open in the
 	 * required mode.
 	 *
-	 * XXXKEITH
-	 * Is it possible for this call to return EBUSY because there's an
-	 * update in the object that's not yet globally visible?
+	 * This call can return EBUSY if there's an update in the object that's
+	 * not yet globally visible.  That's not a problem because it can only
+	 * happen when we're switching from a normal handle to a "special" one,
+	 * so we're returning EBUSY to an attempt to verify or do other special
+	 * operations.  The reverse won't happen because when the handle from a
+	 * verify or other special operation is closed, there won't be updates
+	 * in the tree that can block the close.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_RET(__wt_conn_btree_sync_and_close(session));
