@@ -2032,7 +2032,7 @@ __rec_split_raw_worker(
 		 * retry.
 		 *
 		 * Reset the resulting slots count, just in case the compression
-		 * function left it set before giving up.
+		 * function modified it before giving up.
 		 */
 		result_slots = 0;
 		break;
@@ -3899,10 +3899,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			}
 
 			/*
-			 * In one path above, we copied the key from the page
-			 * rather than building the actual key.  In that case,
-			 * we have to build the actual key now because we are
-			 * about to promote it.
+			 * In one path above, we copied address blocks from the
+			 * page rather than building the actual key.  In that
+			 * case, we have to build the actual key now because we
+			 * are about to promote it.
 			 */
 			if (onpage_ovfl) {
 				WT_ERR(__wt_buf_set(session,
