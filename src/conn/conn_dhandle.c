@@ -616,7 +616,7 @@ __wt_conn_dhandle_discard_single(
 	 * this should only happen when called from the periodic sweep code, of
 	 * course.
 	 */
-	if (dhandle->session_ref != 0)
+	if (!final && dhandle->session_ref != 0)
 		ret = EBUSY;
 	else
 		SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
