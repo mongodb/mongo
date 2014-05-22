@@ -49,7 +49,7 @@
  *         --cpppath=/usr/local/include --libpath=/usr/local/lib
  */
 
-#include "third_party/gperftools-2.0/src/gperftools/profiler.h"
+#include "third_party/gperftools-2.2/src/gperftools/profiler.h"
 
 #include <string>
 #include <vector>

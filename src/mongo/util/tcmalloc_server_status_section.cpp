@@ -27,7 +27,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <third_party/gperftools-2.0/src/gperftools/malloc_extension.h>
+#include <third_party/gperftools-2.2/src/gperftools/malloc_extension.h>
 
 #include "mongo/db/commands/server_status.h"
 
