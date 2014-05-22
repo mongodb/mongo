@@ -135,33 +135,33 @@ class test_jsondump02(wttest.WiredTigerTestCase):
                 ('"ikey" : 4,\n"Skey" : "key4"',
                  '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64')))
         # The dump config currently is not supported for the index type.
-        #self.check_json(uri4index1, (
-        #        ('"Skey" : "key1"',
-        #         '"S1" : "val1",\n"i2" : 1,\n"S3" : "val1",\n"i4" : 1'),
-        #        ('"Skey" : "key2"',
-        #         '"S1" : "val4",\n"i2" : 4,\n"S3" : "val8",\n"i4" : 8'),
-        #        ('"Skey" : "key3"',
-        #         '"S1" : "val9",\n"i2" : 9,\n"S3" : "val27",\n"i4" : 27'),
-        #        ('"Skey" : "key4"',
-        #         '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64')))
-        #self.check_json(uri4index2, (
-        #        ('"S3" : "val1"',
-        #         '"S1" : "val1",\n"i2" : 1,\n"S3" : "val1",\n"i4" : 1'),
-        #        ('"S3" : "val27"',
-        #         '"S1" : "val9",\n"i2" : 9,\n"S3" : "val27",\n"i4" : 27'),
-        #        ('"S3" : "val64"',
-        #         '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64'),
-        #        ('"S3" : "val8"',
-        #         '"S1" : "val4",\n"i2" : 4,\n"S3" : "val8",\n"i4" : 8')))
-        #self.check_json(uri4index3, (
-        #        ('"i2" : 1,\n"i4" : 1',
-        #         '"S1" : "val1",\n"i2" : 1,\n"S3" : "val1",\n"i4" : 1'),
-        #        ('"i2" : 4,\n"i4" : 8',
-        #         '"S1" : "val4",\n"i2" : 4,\n"S3" : "val8",\n"i4" : 8'),
-        #        ('"i2" : 9,\n"i4" : 27',
-        #         '"S1" : "val9",\n"i2" : 9,\n"S3" : "val27",\n"i4" : 27'),
-        #        ('"i2" : 16,\n"i4" : 64',
-        #         '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64')))
+        self.check_json(uri4index1, (
+                ('"Skey" : "key1"',
+                 '"S1" : "val1",\n"i2" : 1,\n"S3" : "val1",\n"i4" : 1'),
+                ('"Skey" : "key2"',
+                 '"S1" : "val4",\n"i2" : 4,\n"S3" : "val8",\n"i4" : 8'),
+                ('"Skey" : "key3"',
+                 '"S1" : "val9",\n"i2" : 9,\n"S3" : "val27",\n"i4" : 27'),
+                ('"Skey" : "key4"',
+                 '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64')))
+        self.check_json(uri4index2, (
+                ('"S3" : "val1"',
+                 '"S1" : "val1",\n"i2" : 1,\n"S3" : "val1",\n"i4" : 1'),
+                ('"S3" : "val27"',
+                 '"S1" : "val9",\n"i2" : 9,\n"S3" : "val27",\n"i4" : 27'),
+                ('"S3" : "val64"',
+                 '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64'),
+                ('"S3" : "val8"',
+                 '"S1" : "val4",\n"i2" : 4,\n"S3" : "val8",\n"i4" : 8')))
+        self.check_json(uri4index3, (
+                ('"i2" : 1,\n"i4" : 1',
+                 '"S1" : "val1",\n"i2" : 1,\n"S3" : "val1",\n"i4" : 1'),
+                ('"i2" : 4,\n"i4" : 8',
+                 '"S1" : "val4",\n"i2" : 4,\n"S3" : "val8",\n"i4" : 8'),
+                ('"i2" : 9,\n"i4" : 27',
+                 '"S1" : "val9",\n"i2" : 9,\n"S3" : "val27",\n"i4" : 27'),
+                ('"i2" : 16,\n"i4" : 64',
+                 '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64')))
 
     def test_json_illegal(self):
         """

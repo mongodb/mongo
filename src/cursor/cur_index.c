@@ -25,8 +25,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSTD_RAW) &&
-	    !F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
+	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		ret = __wt_schema_project_merge(session,
 		    cindex->cg_cursors, cindex->value_plan,
 		    cursor->value_format, &cursor->value);
@@ -359,7 +358,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* update */
 	    __wt_cursor_notsup,		/* remove */
 	    __curindex_close);		/* close */
-	WT_CONFIG_ITEM cval;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(tmp);
@@ -368,11 +366,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_TABLE *table;
 	const char *columns, *idxname, *tablename;
 	size_t namesize;
-
-	WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
-	if (cval.len != 0)
-		WT_RET_MSG(session, ENOTSUP,
-		    "dump is not supported for index tables");
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "index:") ||
