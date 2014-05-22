@@ -76,9 +76,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	return (t_ret);
 }
 
-typedef struct {
-	WT_ASYNC_CALLBACK cb = { cb_asyncop };
-}xxx
+WT_ASYNC_CALLBACK cb = { cb_asyncop };
 /*! [example callback implementation] */
 #define	MAX_KEYS	15
 
