@@ -10,8 +10,8 @@ flags = {
 ###################################################
 	'cache_flush' : [
 		'SYNC_CHECKPOINT',
+		'SYNC_CLOSE',
 		'SYNC_DISCARD',
-		'SYNC_DISCARD_NOWRITE',
 		'SYNC_WRITE_LEAVES',
 	],
 	'file_types' : [
@@ -41,7 +41,7 @@ flags = {
 		'READ_WONT_NEED',
 	],
 	'rec_write' : [
-		'EVICTION_LOCKED',
+		'EVICTING',
 		'SKIP_UPDATE_ERR',
 		'SKIP_UPDATE_RESTORE'
 	],
@@ -92,6 +92,7 @@ flags = {
 		'CONN_SERVER_ASYNC',
 		'CONN_SERVER_CHECKPOINT',
 		'CONN_SERVER_STATISTICS',
+		'CONN_SERVER_SWEEP',
 		'CONN_WAS_BACKUP',
 	],
 	'session' : [

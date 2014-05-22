@@ -1,4 +1,9 @@
 #! /bin/sh
 
 # Smoke-test format as part of running "make check".
-./t -1 -c "." data_source=table file_type=row ops=100000 rows=10000 threads=4
+args="-1 -c "." data_source=table ops=100000 rows=10000 threads=4"
+
+./t $args file_type=fix || exit 1
+./t $args file_type=row || exit 1
+./t $args file_type=row data_source=lsm || exit 1
+./t $args file_type=var || exit 1

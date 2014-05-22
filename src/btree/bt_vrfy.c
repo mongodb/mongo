@@ -124,8 +124,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 #endif
 			ret = __verify_tree(session, &btree->root, vs);
 
-			WT_TRET(__wt_bt_cache_op(
-			    session, NULL, WT_SYNC_DISCARD_NOWRITE));
+			WT_TRET(
+			    __wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
 		}
 
 		/* Unload the checkpoint. */

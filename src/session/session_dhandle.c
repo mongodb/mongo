@@ -286,26 +286,10 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 		    dhandle->session_inuse == 0 &&
 		    now - dhandle->timeofdeath > WT_DHANDLE_SWEEP_WAIT) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
-			WT_RET(
-			    __wt_session_discard_btree(session, dhandle_cache));
+			__wt_session_discard_btree(session, dhandle_cache);
 		}
 		dhandle_cache = dhandle_cache_next;
 	}
-	return (0);
-}
-
-/*
- * __session_open_btree --
- *	Wrapper function to first sweep the session handles and then get the
- * btree handle; must be called with schema lock.
- */
-static int
-__session_open_btree(WT_SESSION_IMPL *session,
-    const char *name, const char *ckpt, const char *op_cfg[], uint32_t flags)
-{
-	WT_RET(__session_dhandle_sweep(session, flags));
-	WT_RET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
-
 	return (0);
 }
 
@@ -357,13 +341,15 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	}
 
 	if (dhandle_cache == NULL) {
+		/* Sweep the handle list to remove any dead handles. */
+		WT_RET(__session_dhandle_sweep(session, flags));
+
 		/*
-		 * If we don't already hold the schema lock, get it now so that
-		 * we can find and/or open the handle.  We call a wrapper
-		 * function to sweep the handle list to remove any dead handles.
+		 * Acquire the schema lock if we don't already hold it, find
+		 * and/or open the handle.
 		 */
 		WT_WITH_SCHEMA_LOCK(session, ret =
-		    __session_open_btree(session, uri, checkpoint, cfg, flags));
+		    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
 		WT_RET(ret);
 
 		if (!candidate)
@@ -431,12 +417,11 @@ err:	session->dhandle = saved_dhandle;
  * __wt_session_discard_btree --
  *	Discard our reference to the btree.
  */
-int
+void
 __wt_session_discard_btree(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
 {
 	WT_DATA_HANDLE *saved_dhandle;
-	WT_DECL_RET;
 
 	SLIST_REMOVE(
 	    &session->dhandles, dhandle_cache, __wt_data_handle_cache, l);
@@ -445,9 +430,8 @@ __wt_session_discard_btree(
 	session->dhandle = dhandle_cache->dhandle;
 
 	__wt_overwrite_and_free(session, dhandle_cache);
-	ret = __wt_conn_btree_close(session, 0);
+	__wt_conn_btree_close(session);
 
 	/* Restore the original handle in the session. */
 	session->dhandle = saved_dhandle;
-	return (ret);
 }
