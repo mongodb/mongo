@@ -374,7 +374,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 
 	/* Copy the dump flags from the child cursor. */
 	F_SET(cursor, F_ISSET(child,
-	    WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRINT | WT_CURSTD_DUMP_HEX));
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRINT));
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		WT_ERR(__wt_calloc_def(session, 1, &json));
 		cursor->json_private = child->json_private = json;
