@@ -540,23 +540,22 @@ namespace mongo {
                             BenchRunEventTrace _bret(&_stats.insertCounter);
 
                             BSONObjBuilder builder;
+                            BSONObj insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
                             builder.append("insert",
                                 nsToCollectionSubstring(ns));
                             BSONArrayBuilder docBuilder(
                                 builder.subarrayStart("documents"));
-                            docBuilder.append(fixQuery(e["doc"].Obj(),
-                                bsonTemplateEvaluator));
+                            docBuilder.append(insertDoc);
                             docBuilder.done();
-                            BSONObj insertObj = builder.obj();
 
                             if (useWriteCmd) {
                                 // TODO: Replace after SERVER-11774.
                                 conn->runCommand(
                                     nsToDatabaseSubstring(ns).toString(),
-                                    insertObj, result);
+                                    builder.done(), result);
                             }
                             else {
-                                conn->insert(ns, insertObj);
+                                conn->insert(ns, insertDoc);
                                 if (safe)
                                     result = conn->getLastErrorDetailed();
                             }
@@ -605,7 +604,7 @@ namespace mongo {
                                 docBuilder.done();
                                 conn->runCommand(
                                     nsToDatabaseSubstring(ns).toString(),
-                                    builder.obj(), result);
+                                    builder.done(), result);
                             }
                             else {
                                 conn->remove(ns, fixQuery(query,
