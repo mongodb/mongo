@@ -115,21 +115,6 @@ namespace mongo {
             #endif
         };
 
-        /** so we don't have to lock the groupCommitMutex too often */
-        class ThreadLocalIntents {
-            enum { N = 21 };
-            std::vector<dur::WriteIntent> intents;
-            bool condense();
-            void _unspool();
-        public:
-            ThreadLocalIntents();
-            ~ThreadLocalIntents();
-            void unspool();
-            void push(const WriteIntent& i);
-            int n_informational() const { return intents.size(); }
-            static AtomicUInt nSpooled;
-        };
-
         /** A commit job object for a group commit.  Currently there is one instance of this object.
 
             concurrency: assumption is caller is appropriately locking.
@@ -140,17 +125,15 @@ namespace mongo {
             void _committingReset();
             ~CommitJob(){ verify(!"shouldn't destroy CommitJob!"); }
 
-            /** record/note an intent to write */
-            void note(void* p, int len);
-            // only called by : 
-            friend class ThreadLocalIntents;
-
         public:
             SimpleMutex groupCommitMutex;
             CommitJob();
 
             /** note an operation other than a "basic write". threadsafe (locks in the impl) */
             void noteOp(shared_ptr<DurOp> p);
+
+            /** record/note an intent to write */
+            void note(void* p, int len);
 
             std::vector< shared_ptr<DurOp> >& ops() {
                 dassert( Lock::isLocked() );          // a rather weak check, we require more than that
@@ -198,7 +181,6 @@ namespace mongo {
             size_t _bytes;
         public:
             NotifyAll _notify;                  // for getlasterror fsync:true acknowledgements
-            unsigned _nSinceCommitIfNeededCall; // for asserts and debugging
         };
 
         extern CommitJob& commitJob;
