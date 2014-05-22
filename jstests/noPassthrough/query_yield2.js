@@ -63,7 +63,7 @@ print( tojson( currentOp ) );
 len = currentOp.inprog.length;
 if ( len ) {
     print( "Shell ==== This test is broken: db.currentOp().inprog.length is " + len );
-    throw "query_yield2.js test is broken";
+    throw Error("query_yield2.js test is broken");
 }
 print( "Shell ==== The test is working so far: db.currentOp().inprog.length is " + len );
 
@@ -111,7 +111,7 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ) {
             print( "Shell ==== TEST FAILED!  db.currentOp().inprog.length is " + len );
             print( "Shell ==== Dump of db.currentOp:" );
             print( tojson( currentOp ) );
-            throw "TEST FAILED!";
+            throw Error("TEST FAILED!");
         }
     }
     assert.gt( 200, insertTime, "Insert took too long (" + insertTime + " ms), should be less than 200 ms" );
@@ -130,7 +130,7 @@ if ( len != 0 ) {
     print( "Shell ==== Final sanity check FAILED!  db.currentOp().inprog.length is " + len );
     print( "Shell ==== Dump of db.currentOp:" );
     print( tojson( currentOp ) );
-    throw "TEST FAILED!";
+    throw Error("TEST FAILED!");
 }
 print( "Shell ==== Test completed successfully, shutting down server" );
 testServer.stop();

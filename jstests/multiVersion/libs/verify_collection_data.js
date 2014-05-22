@@ -98,7 +98,7 @@ function CollectionDataValidator() {
     this.validateCollectionData = function (collection) {
 
         if (!initialized) {
-            throw "validateCollectionWithAllData called, but data is not initialized";
+            throw Error("validateCollectionWithAllData called, but data is not initialized");
         }
 
         // Get the metadata for this collection

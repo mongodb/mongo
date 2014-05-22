@@ -27,7 +27,7 @@ function mytest( coll , i , loopNumber ){
     x = coll.find( { _id : i } ).explain();
     if ( x )
         return;
-    throw "can't find " + i + " in " + coll.getName() + " on loopNumber: " + loopNumber +  " explain: " + tojson( x );
+    throw Error( "can't find " + i + " in " + coll.getName() + " on loopNumber: " + loopNumber +  " explain: " + tojson( x ) );
 }
 
 loopNumber = 0

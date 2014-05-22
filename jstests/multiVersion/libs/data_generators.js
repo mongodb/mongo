@@ -624,12 +624,12 @@ function CollectionMetadataGenerator(options) {
         if (options.hasOwnProperty(option)) {
             if (option === 'capped') {
                 if (typeof(options['capped']) !== 'boolean') {
-                    throw "\"capped\" options must be boolean in CollectionMetadataGenerator";
+                    throw Error("\"capped\" options must be boolean in CollectionMetadataGenerator");
                 }
                 capped = options['capped'];
             }
             else {
-                throw "Unsupported key in options passed to CollectionMetadataGenerator: " + option;
+                throw Error("Unsupported key in options passed to CollectionMetadataGenerator: " + option);
             }
         }
     }
