@@ -268,14 +268,12 @@ __wt_json_unpack_char(char ch, char *buf, size_t bufsz, int force_unicode)
 	char abbrev;
 	u_char h;
 
-	if (!force_unicode) {
+	if (!force_unicode)
 		if (isprint(ch) && ch != '\\' && ch != '"') {
-			if (bufsz >= 1) {
+			if (bufsz >= 1)
 				*buf = ch;
-			}
 			return (1);
-		}
-		else {
+		} else {
 			abbrev = '\0';
 			switch (ch) {
 			case '\\':
@@ -303,7 +301,6 @@ __wt_json_unpack_char(char ch, char *buf, size_t bufsz, int force_unicode)
 				return (2);
 			}
 		}
-	}
 	if (bufsz >= 6) {
 		*buf++ = '\\';
 		*buf++ = 'u';

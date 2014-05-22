@@ -583,8 +583,7 @@ dump_record(WT_CURSOR *cursor, const char *name, int reverse, int json)
 		prefix = "\n            {\n";
 		infix = ",\n";
 		suffix = "\n            }";
-	}
-	else {
+	} else {
 		prefix = "";
 		infix = "\n";
 		suffix = "\n";

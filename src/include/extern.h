@@ -663,18 +663,6 @@ extern int __wt_curds_create( WT_SESSION_IMPL *session,
 extern int __wt_curdump_create(WT_CURSOR *child,
     WT_CURSOR *owner,
     WT_CURSOR **cursorp);
-extern int __wt_json_alloc_unpack(WT_SESSION_IMPL *session,
-    const void *buffer,
-    size_t size,
-    const char *fmt,
-    WT_CURSOR_JSON *json,
-    int iskey,
-    va_list ap);
-extern void __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor);
-extern size_t __wt_json_unpack_char(char ch,
-    char *buf,
-    size_t bufsz,
-    int force_unicode);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
@@ -691,6 +679,18 @@ extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_json_alloc_unpack(WT_SESSION_IMPL *session,
+    const void *buffer,
+    size_t size,
+    const char *fmt,
+    WT_CURSOR_JSON *json,
+    int iskey,
+    va_list ap);
+extern void __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor);
+extern size_t __wt_json_unpack_char(char ch,
+    char *buf,
+    size_t bufsz,
+    int force_unicode);
 extern int __wt_curmetadata_open(WT_SESSION_IMPL *session,
     const char *uri,
     WT_CURSOR *owner,
