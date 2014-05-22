@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+const (
+	AUTH_STANDARD = "MONGODB-CR"
+	AUTH_SSL      = "MONGODB-X509"
+)
+
 var (
 	url           string
 	masterSession *mgo.Session
@@ -43,7 +48,7 @@ func Configure(opts *options.MongoToolOptions) error {
 	}
 
 	if globalOptions.Username != "" {
-		dialInfo.Mechanism = "MONGODB-CR"
+		dialInfo.Mechanism = AUTH_STANDARD
 		dialInfo.Username = globalOptions.Username
 		dialInfo.Password = globalOptions.Password
 	}
@@ -51,7 +56,7 @@ func Configure(opts *options.MongoToolOptions) error {
 	// configure ssl, if necessary
 	// TODO: errs, validate
 	if globalOptions.SSL {
-		dialInfo.Mechanism = "MONGODB-X509"
+		dialInfo.Mechanism = AUTH_SSL
 		dialInfo.DialServer = dialWithSSL
 
 		// read in the certificate authority file and add it to the cert chain
@@ -63,7 +68,7 @@ func Configure(opts *options.MongoToolOptions) error {
 
 		// TODO: support nil, blah-blah
 		rootCerts = x509.NewCertPool()
-		if !rootCerts.AppendCertsFromPEM([]byte(rootCert)) {
+		if !rootCerts.AppendCertsFromPEM(rootCert) {
 			return fmt.Errorf("error creating cert: %v", err)
 		}
 
