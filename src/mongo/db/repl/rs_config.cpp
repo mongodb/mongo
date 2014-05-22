@@ -496,7 +496,6 @@ namespace replset {
         static const set<string> legals(legal, legal + 4);
         assertOnlyHas(o, legals);
 
-        md5 = o.md5();
         _id = o["_id"].String();
         if( o["version"].ok() ) {
             version = o["version"].numberInt();
@@ -651,7 +650,6 @@ namespace replset {
     }
 
     void ReplSetConfig::init(BSONObj cfg, bool force) {
-        _constructed = false;
         clear();
         from(cfg);
         if( force ) {
@@ -661,7 +659,6 @@ namespace replset {
         if( version < 1 )
             version = 1;
         _ok = true;
-        _constructed = true;
     }
 
     ReplSetConfig* ReplSetConfig::make(const HostAndPort& h) {
@@ -685,7 +682,6 @@ namespace replset {
     void ReplSetConfig::init(const HostAndPort& h) {
         LOG(2) << "ReplSetConfig load " << h.toString() << rsLog;
 
-        _constructed = false;
         clear();
         int level = 2;
         DEV level = 0;
@@ -761,7 +757,6 @@ namespace replset {
         checkRsConfig();
         _ok = true;
         LOG(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
-        _constructed = true;
     }
 
 } // namespace replset

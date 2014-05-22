@@ -157,7 +157,7 @@ namespace replset {
         };
 
         HealthOptions ho;
-        std::string md5;
+
         BSONObj getLastErrorDefaults;
         std::map<std::string,TagRule*> rules;
 
@@ -195,8 +195,6 @@ namespace replset {
         void setMajority();
     public:
         int getMajority() const;
-
-        bool _constructed;
 
         /**
          * Get the timeout to use for heartbeats.
