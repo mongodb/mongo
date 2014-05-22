@@ -270,7 +270,7 @@ __wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, int force_unicode)
 	if (!force_unicode) {
 		if (isprint(ch) && ch != '\\' && ch != '"') {
 			if (bufsz >= 1)
-				*buf = ch;
+				*buf = (u_char)ch;
 			return (1);
 		} else {
 			abbrev = '\0';
@@ -295,7 +295,7 @@ __wt_json_unpack_char(char ch, u_char *buf, size_t bufsz, int force_unicode)
 			if (abbrev != '\0') {
 				if (bufsz >= 2) {
 					*buf++ = '\\';
-					*buf = abbrev;
+					*buf = (u_char)abbrev;
 				}
 				return (2);
 			}
