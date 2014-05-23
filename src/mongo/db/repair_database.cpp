@@ -318,7 +318,7 @@ namespace mongo {
             Database* tempDatabase = NULL;
             {
                 bool justCreated = false;
-                tempDatabase = dbHolderW().getOrCreate( dbName, reservedPathString, justCreated );
+                tempDatabase = dbHolderW().getOrCreate(txn, dbName, reservedPathString, justCreated);
                 invariant( justCreated );
             }
 

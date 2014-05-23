@@ -47,12 +47,13 @@ namespace mongo {
     AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
-    Status AuthzManagerExternalStateMongod::_getUserDocument(const UserName& userName,
-                                                             BSONObj* userDoc) {
+    Status AuthzManagerExternalStateMongod::_getUserDocument(
+                OperationContext* txn, const UserName& userName, BSONObj* userDoc) {
 
-        Client::ReadContext ctx("admin");
+        Client::ReadContext ctx(txn, "admin");
+
         int authzVersion;
-        Status status = getStoredAuthorizationVersion(&authzVersion);
+        Status status = getStoredAuthorizationVersion(txn, &authzVersion);
         if (!status.isOK())
             return status;
 
@@ -67,6 +68,7 @@ namespace mongo {
         }
 
         status = findOne(
+                txn,
                 (authzVersion == AuthorizationManager::schemaVersion26Final ?
                  AuthorizationManager::usersCollectionNamespace :
                  AuthorizationManager::usersAltCollectionNamespace),
@@ -102,11 +104,13 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::findOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             BSONObj* result) {
 
-        Client::ReadContext ctx(collectionName.ns());
+        Client::ReadContext ctx(txn, collectionName.ns());
+
         BSONObj found;
         if (Helpers::findOne(ctx.ctx().db()->getCollection(collectionName),
                              query,

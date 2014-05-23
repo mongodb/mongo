@@ -145,7 +145,7 @@ namespace mongo {
         list<string> colls;
         const string ns = parseNs(dbname, cmdObj);
 
-        Client::ReadContext ctx(ns);
+        Client::ReadContext ctx(txn, ns);
         Database* db = ctx.ctx().db();
         if ( db )
             db->getDatabaseCatalogEntry()->getCollectionNamespaces( &colls );

@@ -104,7 +104,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::ReadContext context( nss.ns() );
+            Client::ReadContext context(txn, nss.ns());
 
             Database* db = context.ctx().db();
             Collection* collection = db->getCollection( nss.ns() );

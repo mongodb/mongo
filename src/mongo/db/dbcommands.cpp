@@ -321,7 +321,8 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return true; }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
+        virtual Status checkAuthForCommand(OperationContext* txn,
+                                           ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
@@ -330,6 +331,7 @@ namespace mongo {
                 // If you just want to get the current profiling level you can do so with just
                 // read access to system.profile, even if you can't change the profiling level.
                 if (authzSession->isAuthorizedForActionsOnResource(
+                        txn,
                         ResourcePattern::forExactNamespace(NamespaceString(dbname,
                                                                            "system.profile")),
                         ActionType::find)) {
@@ -338,7 +340,7 @@ namespace mongo {
             }
 
             if (authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(dbname), ActionType::enableProfiler)) {
+                    txn, ResourcePattern::forDatabaseName(dbname), ActionType::enableProfiler)) {
                 return Status::OK();
             }
 
@@ -353,7 +355,7 @@ namespace mongo {
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
             //
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(dbname);
 
             BSONElement e = cmdObj.firstElement();
@@ -403,7 +405,7 @@ namespace mongo {
             // This doesn't look like it requires exclusive DB lock, because it uses its own diag
             // locking, but originally the lock was set to be WRITE, so preserving the behaviour.
             //
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(dbname);
 
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
@@ -457,7 +459,7 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(nsToDrop);
             Database* db = ctx.db();
 
@@ -528,7 +530,7 @@ namespace mongo {
 
             // This acquires the DB read lock
             //
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
 
             string err;
             int errCode;
@@ -572,22 +574,23 @@ namespace mongo {
             help << "create a collection explicitly\n"
                 "{ create: <ns>[, capped: <bool>, size: <collSizeInBytes>, max: <nDocs>] }";
         }
-        virtual Status checkAuthForCommand(ClientBasic* client,
+        virtual Status checkAuthForCommand(OperationContext* txn,
+                                           ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
             if (cmdObj["capped"].trueValue()) {
                 if (!authzSession->isAuthorizedForActionsOnResource(
-                        parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
+                        txn, parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
                     return Status(ErrorCodes::Unauthorized, "unauthorized");
                 }
             }
 
             // ActionType::createCollection or ActionType::insert are both acceptable
             if (authzSession->isAuthorizedForActionsOnResource(
-                    parseResourcePattern(dbname, cmdObj), ActionType::createCollection) ||
+                    txn, parseResourcePattern(dbname, cmdObj), ActionType::createCollection) ||
                 authzSession->isAuthorizedForActionsOnResource(
-                    parseResourcePattern(dbname, cmdObj), ActionType::insert)) {
+                    txn, parseResourcePattern(dbname, cmdObj), ActionType::insert)) {
                 return Status::OK();
             }
 
@@ -621,7 +624,7 @@ namespace mongo {
                     !options["capped"].trueValue() || options["size"].isNumber() ||
                         options.hasField("$nExtents"));
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(ns);
 
             // Create collection.
@@ -667,7 +670,7 @@ namespace mongo {
                 totalSize += size;
                 
                 {
-                    Client::ReadContext rc( *i + ".system.namespaces" );
+                    Client::ReadContext rc(txn, *i + ".system.namespaces");
                     b.appendBool( "empty", rc.ctx().db()->isEmpty() );
                 }
                 
@@ -695,7 +698,7 @@ namespace mongo {
                 b.append( "sizeOnDisk" , (double)1.0 );
 
                 {
-                    Client::ReadContext ctx( name );
+                    Client::ReadContext ctx(txn, name);
                     b.appendBool( "empty", ctx.ctx().db()->isEmpty() );
                 }
 
@@ -812,7 +815,7 @@ namespace mongo {
 
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
             Collection* coll = ctx.ctx().db()->getCollection(ns);
 
             CanonicalQuery* cq;
@@ -920,7 +923,7 @@ namespace mongo {
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
             bool estimate = jsobj["estimate"].trueValue();
 
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
 
             Collection* collection = ctx.ctx().db()->getCollection( ns );
 
@@ -1037,7 +1040,7 @@ namespace mongo {
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
-            Client::ReadContext cx( ns );
+            Client::ReadContext cx(txn, ns);
             Database* db = cx.ctx().db();
             Collection* collection = db->getCollection( ns );
             if ( !collection ) {
@@ -1114,7 +1117,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx( ns );
 
             Collection* coll = ctx.db()->getCollection( ns );
@@ -1244,7 +1247,7 @@ namespace mongo {
 
             const string ns = parseNs(dbname, jsobj);
 
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
             Database* d = ctx.ctx().db();
 
             d->getStats( &result, scale );
@@ -1401,7 +1404,7 @@ namespace mongo {
                                                        fieldIsPresent, 
                                                        parsedUserNames);
 
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
+        Status status = _checkAuthorization(txn, c, &client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {
             appendCommandStatus(result, status);
             return;

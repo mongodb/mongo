@@ -42,7 +42,8 @@
 namespace mongo {
 namespace rename_collection {
 
-    Status checkAuthForRenameCollectionCommand(ClientBasic* client,
+    Status checkAuthForRenameCollectionCommand(OperationContext* txn,
+                                               ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
         NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));
@@ -55,6 +56,7 @@ namespace rename_collection {
             // or dest collection, then you get can do the rename, even without insert on the
             // destination collection.
             bool canRename = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    txn,
                     ResourcePattern::forDatabaseName(sourceNS.db()),
                     ActionType::renameCollectionSameDB);
 
@@ -62,14 +64,15 @@ namespace rename_collection {
             if (dropTarget) {
                 canDropTargetIfNeeded =
                         client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                            txn,
                             ResourcePattern::forExactNamespace(targetNS),
                             ActionType::dropCollection);
             }
 
             bool canReadSrc = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(sourceNS), ActionType::find);
+                    txn, ResourcePattern::forExactNamespace(sourceNS), ActionType::find);
             bool canReadDest = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(targetNS), ActionType::find);
+                    txn, ResourcePattern::forExactNamespace(targetNS), ActionType::find);
 
             if (canRename && canDropTargetIfNeeded && (canReadSrc || !canReadDest)) {
                 return Status::OK();
@@ -81,7 +84,7 @@ namespace rename_collection {
         actions.addAction(ActionType::find);
         actions.addAction(ActionType::dropCollection);
         if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(sourceNS), actions)) {
+                txn, ResourcePattern::forExactNamespace(sourceNS), actions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
@@ -93,7 +96,7 @@ namespace rename_collection {
             actions.addAction(ActionType::dropCollection);
         }
         if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(targetNS), actions)) {
+                txn, ResourcePattern::forExactNamespace(targetNS), actions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 

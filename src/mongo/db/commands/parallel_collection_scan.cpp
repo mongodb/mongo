@@ -148,13 +148,14 @@ namespace mongo {
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
+        virtual Status checkAuthForCommand(OperationContext* txn,
+                                           ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::find);
             Privilege p(parseResourcePattern(dbname, cmdObj), actions);
-            if ( client->getAuthorizationSession()->isAuthorizedForPrivilege(p) )
+            if ( client->getAuthorizationSession()->isAuthorizedForPrivilege(txn, p) )
                 return Status::OK();
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -165,7 +166,7 @@ namespace mongo {
 
             NamespaceString ns( dbname, cmdObj[name].String() );
 
-            Client::ReadContext ctx(ns.ns());
+            Client::ReadContext ctx(txn, ns.ns());
 
             Database* db = ctx.ctx().db();
             Collection* collection = db->getCollection( ns );

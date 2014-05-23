@@ -28,8 +28,6 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/db/dbhelpers.h"
@@ -82,8 +80,8 @@ namespace repl {
         log() << "replSet info saving a newer config version to local.system.replset: "
               << newConfigBSON << rsLog;
         {
-            Client::WriteContext cx( rsConfigNs );
             OperationContextImpl txn;
+            Client::WriteContext cx(&txn, rsConfigNs);
 
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably

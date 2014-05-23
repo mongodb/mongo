@@ -51,13 +51,14 @@ namespace mongo {
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return false; } // TODO: this could be made true...
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
+        virtual Status checkAuthForCommand(OperationContext* txn,
+                                           ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::createIndex);
             Privilege p(parseResourcePattern(dbname, cmdObj), actions);
-            if ( client->getAuthorizationSession()->isAuthorizedForPrivilege(p) )
+            if (client->getAuthorizationSession()->isAuthorizedForPrivilege(txn, p))
                 return Status::OK();
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -132,9 +133,7 @@ namespace mongo {
                 // as many calls are ensureIndex (and hence no-ops), this is good so its a shared
                 // lock for common calls. We only take write lock if needed.
                 // Note: createIndexes command does not currently respect shard versioning.
-                Client::ReadContext readContext( ns,
-                                                 storageGlobalParams.dbpath,
-                                                 false /* doVersion */ );
+                Client::ReadContext readContext(txn, ns, false /* doVersion */);
                 const Collection* collection = readContext.ctx().db()->getCollection( ns.ns() );
                 if ( collection ) {
                     for ( size_t i = 0; i < specs.size(); i++ ) {
@@ -164,9 +163,7 @@ namespace mongo {
 
             // now we know we have to create index(es)
             // Note: createIndexes command does not currently respect shard versioning.
-            Client::WriteContext writeContext( ns.ns(),
-                                               storageGlobalParams.dbpath,
-                                               false /* doVersion */ );
+            Client::WriteContext writeContext(txn, ns.ns(), false /* doVersion */ );
             Database* db = writeContext.ctx().db();
 
             Collection* collection = db->getCollection( txn, ns.ns() );

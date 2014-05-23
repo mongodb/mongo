@@ -902,7 +902,7 @@ namespace mongo {
         }
 
         invariant(!_context.get());
-        _writeLock.reset(new Lock::DBWrite(request->getNS()));
+        _writeLock.reset(new Lock::DBWrite(txn->lockState(), request->getNS()));
         if (!checkIsMasterForCollection(request->getNS(), result)) {
             return false;
         }
@@ -1087,7 +1087,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock( nsString.ns() );
+        Lock::DBWrite writeLock(txn->lockState(), nsString.ns());
         ///////////////////////////////////////////
 
         if ( !checkShardVersion( &shardingState, *updateItem.getRequest(), result ) )
@@ -1144,7 +1144,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock( nss.ns() );
+        Lock::DBWrite writeLock(txn->lockState(), nss.ns());
         ///////////////////////////////////////////
 
         // Check version once we're locked

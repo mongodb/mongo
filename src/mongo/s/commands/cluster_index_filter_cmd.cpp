@@ -64,13 +64,15 @@ namespace mongo {
             ss << _helpText;
         }
 
-        Status checkAuthForCommand( ClientBasic* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj ) {
+        Status checkAuthForCommand(OperationContext* txn,
+                                   ClientBasic* client,
+                                   const std::string& dbname,
+                                   const BSONObj& cmdObj ) {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
             ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
     
-            if (authzSession->isAuthorizedForActionsOnResource(pattern,
+            if (authzSession->isAuthorizedForActionsOnResource(txn,
+                                                               pattern,
                                                                ActionType::planCacheIndexFilter)) {
                 return Status::OK();
             }

@@ -71,13 +71,13 @@ namespace mongo {
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
         // TODO: try to eliminate the need for this call.
-        void startRequest();
+        void startRequest(OperationContext* txn);
 
         /**
          * Adds the User identified by "UserName" to the authorization session, acquiring privileges
          * for it in the process.
          */
-        Status addAndAuthorizeUser(const UserName& userName);
+        Status addAndAuthorizeUser(OperationContext* txn, const UserName& userName);
 
         // Returns the authenticated user with the given name.  Returns NULL
         // if no such user is found.
@@ -109,15 +109,16 @@ namespace mongo {
 
         // Checks if this connection has the privileges necessary to perform the given query on the
         // given namespace.
-        Status checkAuthForQuery(const NamespaceString& ns, const BSONObj& query);
+        Status checkAuthForQuery(OperationContext* txn, const NamespaceString& ns, const BSONObj& query);
 
         // Checks if this connection has the privileges necessary to perform a getMore on the given
         // cursor in the given namespace.
-        Status checkAuthForGetMore(const NamespaceString& ns, long long cursorID);
+        Status checkAuthForGetMore(OperationContext* txn, const NamespaceString& ns, long long cursorID);
 
         // Checks if this connection has the privileges necessary to perform the given update on the
         // given namespace.
-        Status checkAuthForUpdate(const NamespaceString& ns,
+        Status checkAuthForUpdate(OperationContext* txn, 
+                                  const NamespaceString& ns,
                                   const BSONObj& query,
                                   const BSONObj& update,
                                   bool upsert);
@@ -125,27 +126,29 @@ namespace mongo {
         // Checks if this connection has the privileges necessary to insert the given document
         // to the given namespace.  Correctly interprets inserts to system.indexes and performs
         // the proper auth checks for index building.
-        Status checkAuthForInsert(const NamespaceString& ns, const BSONObj& document);
+        Status checkAuthForInsert(
+                    OperationContext* txn, const NamespaceString& ns, const BSONObj& document);
 
         // Checks if this connection has the privileges necessary to perform a delete on the given
         // namespace.
-        Status checkAuthForDelete(const NamespaceString& ns, const BSONObj& query);
+        Status checkAuthForDelete(
+                    OperationContext* txn, const NamespaceString& ns, const BSONObj& query);
 
         // Checks if this connection has the privileges necessary to grant the given privilege
         // to a role.
-        Status checkAuthorizedToGrantPrivilege(const Privilege& privilege);
+        Status checkAuthorizedToGrantPrivilege(OperationContext* txn, const Privilege& privilege);
 
         // Checks if this connection has the privileges necessary to revoke the given privilege
         // from a role.
-        Status checkAuthorizedToRevokePrivilege(const Privilege& privilege);
+        Status checkAuthorizedToRevokePrivilege(OperationContext* txn, const Privilege& privilege);
 
         // Utility function for isAuthorizedForActionsOnResource(
         //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
-        bool isAuthorizedToGrantRole(const RoleName& role);
+        bool isAuthorizedToGrantRole(OperationContext* txn, const RoleName& role);
 
         // Utility function for isAuthorizedForActionsOnResource(
         //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
-        bool isAuthorizedToRevokeRole(const RoleName& role);
+        bool isAuthorizedToRevokeRole(OperationContext* txn, const RoleName& role);
 
         // Returns true if the current session is authenticated as the given user and that user
         // is allowed to change his/her own password
@@ -163,26 +166,31 @@ namespace mongo {
         //
         // Contains all the authorization logic including handling things like the localhost
         // exception.
-        bool isAuthorizedForPrivilege(const Privilege& privilege);
+        bool isAuthorizedForPrivilege(OperationContext* txn, const Privilege& privilege);
 
         // Like isAuthorizedForPrivilege, above, except returns true if the session is authorized
         // for all of the listed privileges.
-        bool isAuthorizedForPrivileges(const std::vector<Privilege>& privileges);
+        bool isAuthorizedForPrivileges(
+                    OperationContext* txn, const std::vector<Privilege>& privileges);
 
         // Utility function for isAuthorizedForPrivilege(Privilege(resource, action)).
-        bool isAuthorizedForActionsOnResource(const ResourcePattern& resource, ActionType action);
+        bool isAuthorizedForActionsOnResource(
+                    OperationContext* txn, const ResourcePattern& resource, ActionType action);
 
         // Utility function for isAuthorizedForPrivilege(Privilege(resource, actions)).
-        bool isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+        bool isAuthorizedForActionsOnResource(OperationContext* txn,
+                                              const ResourcePattern& resource,
                                               const ActionSet& actions);
 
         // Utility function for
         // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), action).
-        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, ActionType action);
+        bool isAuthorizedForActionsOnNamespace(
+                    OperationContext* txn, const NamespaceString& ns, ActionType action);
 
         // Utility function for
         // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), actions).
-        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, const ActionSet& actions);
+        bool isAuthorizedForActionsOnNamespace(
+                    OperationContext* txn, const NamespaceString& ns, const ActionSet& actions);
 
         // Replaces the vector of UserNames that a system user is impersonating with a new vector.
         // The auditing system adds these to each audit record in the log.
@@ -203,12 +211,12 @@ namespace mongo {
 
         // If any users authenticated on this session are marked as invalid this updates them with
         // up-to-date information. May require a read lock on the "admin" db to read the user data.
-        void _refreshUserInfoAsNeeded();
+        void _refreshUserInfoAsNeeded(OperationContext* txn);
 
         // Checks if this connection is authorized for the given Privilege, ignoring whether or not
         // we should even be doing authorization checks in general.  Note: this may acquire a read
         // lock on the admin database (to update out-of-date user privilege information).
-        bool _isAuthorizedForPrivilege(const Privilege& privilege);
+        bool _isAuthorizedForPrivilege(OperationContext* txn, const Privilege& privilege);
 
         scoped_ptr<AuthzSessionExternalState> _externalState;
 

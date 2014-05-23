@@ -42,7 +42,8 @@ namespace mongo {
         virtual bool adminOnly() const;
         virtual void help(std::stringstream& ss) const;
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
+        virtual Status checkAuthForCommand(OperationContext* txn,
+                                           ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj);
     };

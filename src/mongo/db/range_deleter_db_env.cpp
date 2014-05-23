@@ -156,9 +156,10 @@ namespace mongo {
         return true;
     }
 
-    void RangeDeleterDBEnv::getCursorIds(const StringData& ns,
+    void RangeDeleterDBEnv::getCursorIds(OperationContext* txn,
+                                         const StringData& ns,
                                          std::set<CursorId>* openCursors) {
-        Client::ReadContext ctx(ns.toString());
+        Client::ReadContext ctx(txn, ns.toString());
         Collection* collection = ctx.ctx().db()->getCollection( ns );
         if ( !collection )
             return;

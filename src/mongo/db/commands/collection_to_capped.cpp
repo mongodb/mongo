@@ -153,7 +153,7 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(dbname);
 
             Status status = cloneCollectionAsCapped( txn, ctx.db(), from, to, size, temp, true );

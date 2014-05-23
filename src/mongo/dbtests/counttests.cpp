@@ -41,13 +41,16 @@
 namespace CountTests {
 
     class Base {
+        OperationContextImpl _txn;
         Lock::DBWrite lk;
+
         Client::Context _context;
+
         Database* _database;
         Collection* _collection;
-        OperationContextImpl _txn;
+
     public:
-        Base() : lk(ns()), _context( ns() ) {
+        Base() : lk(_txn.lockState(), ns()), _context( ns() ) {
             _database = _context.db();
             _collection = _database->getCollection( ns() );
             if ( _collection ) {

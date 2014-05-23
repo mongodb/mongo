@@ -124,7 +124,7 @@ namespace mongo {
                            string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string ns = parseNs(dbname, cmdObj);
 
-        Status status = runIndexFilterCommand(ns, cmdObj, &result);
+        Status status = runIndexFilterCommand(txn, ns, cmdObj, &result);
 
         if (!status.isOK()) {
             addStatus(status, result);
@@ -144,12 +144,14 @@ namespace mongo {
         ss << helpText;
     }
 
-    Status IndexFilterCommand::checkAuthForCommand(ClientBasic* client, const std::string& dbname,
-                                            const BSONObj& cmdObj) {
+    Status IndexFilterCommand::checkAuthForCommand(OperationContext* txn,
+                                                   ClientBasic* client,
+                                                   const std::string& dbname,
+                                                   const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = client->getAuthorizationSession();
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheIndexFilter)) {
+        if (authzSession->isAuthorizedForActionsOnResource(txn, pattern, ActionType::planCacheIndexFilter)) {
             return Status::OK();
         }
 
@@ -159,9 +161,12 @@ namespace mongo {
     ListFilters::ListFilters() : IndexFilterCommand("planCacheListFilters",
         "Displays index filters for all query shapes in a collection.") { }
 
-    Status ListFilters::runIndexFilterCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
+    Status ListFilters::runIndexFilterCommand(OperationContext* txn,
+                                              const string& ns,
+                                              BSONObj& cmdObj,
+                                              BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext readCtx(ns);
+        Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
         PlanCache* unused;
@@ -218,9 +223,12 @@ namespace mongo {
         "Clears index filter for a single query shape or, "
         "if the query shape is omitted, all filters for the collection.") { }
 
-    Status ClearFilters::runIndexFilterCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
+    Status ClearFilters::runIndexFilterCommand(OperationContext* txn,
+                                               const std::string& ns,
+                                               BSONObj& cmdObj,
+                                               BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext readCtx(ns);
+        Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
         PlanCache* planCache;
@@ -306,9 +314,12 @@ namespace mongo {
     SetFilter::SetFilter() : IndexFilterCommand("planCacheSetFilter",
         "Sets index filter for a query shape. Overrides existing filter.") { }
 
-    Status SetFilter::runIndexFilterCommand(const string& ns, BSONObj& cmdObj, BSONObjBuilder* bob) {
+    Status SetFilter::runIndexFilterCommand(OperationContext* txn,
+                                            const std::string& ns,
+                                            BSONObj& cmdObj,
+                                            BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext readCtx(ns);
+        Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
         PlanCache* planCache;

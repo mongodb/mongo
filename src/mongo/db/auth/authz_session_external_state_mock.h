@@ -62,7 +62,7 @@ namespace mongo {
             _allowLocalhostReturnValue = returnValue;
         }
 
-        virtual void startRequest() {}
+        virtual void startRequest(OperationContext* txn) {}
 
     private:
         bool _ignoreAuthChecksReturnValue;

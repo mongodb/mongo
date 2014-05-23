@@ -75,14 +75,15 @@ namespace mongo {
             help << "{ clone : \"host13\" }";
         }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
+        virtual Status checkAuthForCommand(OperationContext* txn,
+                                           ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             ActionSet actions;
             actions.addAction(ActionType::insert);
             actions.addAction(ActionType::createIndex);
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(dbname), actions)) {
+                    txn, ResourcePattern::forDatabaseName(dbname), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
             return Status::OK();
@@ -118,7 +119,7 @@ namespace mongo {
 
             set<string> clonedColls;
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context context( dbname );
 
             Cloner cloner;

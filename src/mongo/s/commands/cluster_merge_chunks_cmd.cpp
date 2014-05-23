@@ -52,10 +52,12 @@ namespace mongo {
               << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ] }";
         }
 
-        virtual Status checkAuthForCommand(ClientBasic* client,
+        virtual Status checkAuthForCommand(OperationContext* txn,
+                                           ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    txn,
                     ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                     ActionType::splitChunk)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");

@@ -121,8 +121,9 @@ namespace mongo {
         QueryMessage q(d);
         BSONObjBuilder b;
 
+        OperationContextImpl txn;
         const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::inprog);
+                &txn, ResourcePattern::forClusterResource(), ActionType::inprog);
 
         audit::logInProgAuthzCheck(
                 &cc(), q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
@@ -182,8 +183,10 @@ namespace mongo {
         DbMessage d(m);
         QueryMessage q(d);
         BSONObj obj;
+
+        OperationContextImpl txn;
         const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::killop);
+                &txn, ResourcePattern::forClusterResource(), ActionType::killop);
         audit::logKillOpAuthzCheck(&cc(),
                                    q.query,
                                    isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
@@ -210,8 +213,10 @@ namespace mongo {
     bool _unlockFsync();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
+
+        OperationContextImpl txn;
         const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::unlock);
+                &txn, ResourcePattern::forClusterResource(), ActionType::unlock);
         audit::logFsyncUnlockAuthzCheck(
                 &cc(), isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
         if (!isAuthorized) {
@@ -249,7 +254,7 @@ namespace mongo {
             if (!ns.isCommand()) {
                 // Auth checking for Commands happens later.
                 Client* client = &cc();
-                Status status = client->getAuthorizationSession()->checkAuthForQuery(ns, q.query);
+                Status status = client->getAuthorizationSession()->checkAuthForQuery(txn, ns, q.query);
                 audit::logQueryAuthzCheck(client, ns, q.query, status.code());
                 uassertStatusOK(status);
             }
@@ -341,7 +346,7 @@ namespace mongo {
 
         Client& c = cc();
         if (!c.isGod())
-            c.getAuthorizationSession()->startRequest();
+            c.getAuthorizationSession()->startRequest(txn);
 
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
@@ -528,7 +533,7 @@ namespace mongo {
             verify( n < 30000 );
         }
 
-        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(n, (long long *) x);
+        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(txn, n, (long long *) x);
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
@@ -581,7 +586,8 @@ namespace mongo {
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
 
-        Status status = cc().getAuthorizationSession()->checkAuthForUpdate(ns,
+        Status status = cc().getAuthorizationSession()->checkAuthForUpdate(txn,
+                                                                           ns,
                                                                            query,
                                                                            toupdate,
                                                                            upsert);
@@ -603,7 +609,7 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(ns.ns());
+        Lock::DBWrite lk(txn->lockState(), ns.ns());
 
         // if this ever moves to outside of lock, need to adjust check
         // Client::Context::_finishInit
@@ -630,7 +636,7 @@ namespace mongo {
         verify( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
 
-        Status status = cc().getAuthorizationSession()->checkAuthForDelete(ns, pattern);
+        Status status = cc().getAuthorizationSession()->checkAuthForDelete(txn, ns, pattern);
         audit::logDeleteAuthzCheck(&cc(), ns, pattern, status.code());
         uassertStatusOK(status);
 
@@ -643,7 +649,7 @@ namespace mongo {
         request.setUpdateOpLog(true);
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
-        Lock::DBWrite lk(ns.ns());
+        Lock::DBWrite lk(txn->lockState(), ns.ns());
 
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
@@ -684,7 +690,7 @@ namespace mongo {
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
                 Status status = cc().getAuthorizationSession()->checkAuthForGetMore(
-                        nsString, cursorid);
+                        txn, nsString, cursorid);
                 audit::logGetMoreAuthzCheck(&cc(), nsString, cursorid, status.code());
                 uassertStatusOK(status);
 
@@ -717,7 +723,7 @@ namespace mongo {
                     // because it may now be out of sync with the client's iteration state.
                     // SERVER-7952
                     // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                    CollectionCursorCache::eraseCursorGlobal( cursorid );
+                    CollectionCursorCache::eraseCursorGlobal(txn, cursorid );
                 }
                 ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
                 ok = false;
@@ -875,12 +881,12 @@ namespace mongo {
             // Check auth for insert (also handles checking if this is an index build and checks
             // for the proper privileges in that case).
             const NamespaceString nsString(ns);
-            Status status = cc().getAuthorizationSession()->checkAuthForInsert(nsString, obj);
+            Status status = cc().getAuthorizationSession()->checkAuthForInsert(txn, nsString, obj);
             audit::logInsertAuthzCheck(&cc(), nsString, obj, status.code());
             uassertStatusOK(status);
         }
 
-        Lock::DBWrite lk(ns);
+        Lock::DBWrite lk(txn->lockState(), ns);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
@@ -924,7 +930,7 @@ namespace mongo {
        local database does NOT count except for rsoplog collection.
        used to set the hasData field on replset heartbeat command response
     */
-    bool replHasDatabases() {
+    bool replHasDatabases(OperationContext* txn) {
         vector<string> names;
         getDatabaseNames(names);
         if( names.size() >= 2 ) return true;
@@ -933,7 +939,7 @@ namespace mongo {
                 return true;
             // we have a local database.  return true if oplog isn't empty
             {
-                Lock::DBRead lk(repl::rsoplog);
+                Lock::DBRead lk(txn->lockState(), repl::rsoplog);
                 BSONObj o;
                 if( Helpers::getFirst(repl::rsoplog, o) )
                     return true;
@@ -1002,7 +1008,9 @@ namespace {
     }
 
     void DBDirectClient::killCursor( long long id ) {
-        CollectionCursorCache::eraseCursorGlobal( id );
+        // The killCursor command on the DB client is only used by sharding,
+        // so no need to have it for MongoD.
+        verify(!"killCursor should not be used in MongoD");
     }
 
     HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
@@ -1013,7 +1021,9 @@ namespace {
                 << " to zero in query: " << query << endl;
             skip = 0;
         }
-        Lock::DBRead lk( ns );
+
+        OperationContextImpl txn;
+        Lock::DBRead lk(txn.lockState(), ns);
         string errmsg;
         int errCode;
         long long res = runCount( ns, _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );

@@ -37,6 +37,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/get_runner.h"
 #include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_knobs.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/dbtests/dbtests.h"
+
 
 namespace mongo {
 
@@ -59,7 +61,7 @@ namespace PlanRankingTests {
     class PlanRankingTestBase {
     public:
         PlanRankingTestBase() : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans) {
-            Client::WriteContext ctx(ns);
+            Client::WriteContext ctx(&_txn, ns);
             _client.dropCollection(ns);
         }
 
@@ -69,12 +71,12 @@ namespace PlanRankingTests {
         }
 
         void insert(const BSONObj& obj) {
-            Client::WriteContext ctx(ns);
+            Client::WriteContext ctx(&_txn, ns);
             _client.insert(ns, obj);
         }
 
         void addIndex(const BSONObj& obj) {
-            Client::WriteContext ctx(ns);
+            Client::WriteContext ctx(&_txn, ns);
             _client.ensureIndex(ns, obj);
         }
 
@@ -85,7 +87,7 @@ namespace PlanRankingTests {
          * Takes ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
          */
         QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(&_txn, ns);
             Collection* collection = ctx.ctx().db()->getCollection(ns);
 
             QueryPlannerParams plannerParams;
@@ -135,15 +137,16 @@ namespace PlanRankingTests {
         // determining the number of documents in the tests below.
         static const int N;
 
+        OperationContextImpl _txn;
+
     private:
-        static DBDirectClient _client;
+
+        DBDirectClient _client;
         scoped_ptr<MultiPlanStage> _mps;
         // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
         // Restored at end of test invocation regardless of test result.
         bool _internalQueryForceIntersectionPlans;
     };
-
-    DBDirectClient PlanRankingTestBase::_client;
 
     // static
     const int PlanRankingTestBase::N = internalQueryPlanEvaluationWorks + 1000;

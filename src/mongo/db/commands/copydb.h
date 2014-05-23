@@ -37,10 +37,12 @@
 namespace mongo {
 
     class ClientBasic;
+    class OperationContext;
 
 namespace copydb {
 
-    Status checkAuthForCopydbCommand(ClientBasic* client,
+    Status checkAuthForCopydbCommand(OperationContext* txn,
+                                     ClientBasic* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj);
 

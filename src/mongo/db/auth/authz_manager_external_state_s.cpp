@@ -70,7 +70,8 @@ namespace mongo {
         }
     }
 
-    Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(int* outVersion) {
+    Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(
+                                                OperationContext* txn, int* outVersion) {
         scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
                 AuthorizationManager::usersCollectionNamespace));
         Status status = auth::getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
@@ -78,8 +79,8 @@ namespace mongo {
         return status;
     }
 
-    Status AuthzManagerExternalStateMongos::getUserDescription(const UserName& userName,
-                                                               BSONObj* result) {
+    Status AuthzManagerExternalStateMongos::getUserDescription(
+                    OperationContext* txn, const UserName& userName, BSONObj* result) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
                     AuthorizationManager::usersCollectionNamespace));
@@ -190,6 +191,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::findOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& queryDoc,
             BSONObj* result) {

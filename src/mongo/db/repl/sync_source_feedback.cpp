@@ -66,8 +66,9 @@ namespace repl {
     void SyncSourceFeedback::ensureMe() {
         string myname = getHostName();
         {
-            Client::WriteContext ctx("local");
             OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, "local");
+
             // local.me is an identifier for a server for getLastError w:2+
             if (!Helpers::getSingleton("local.me", _me) ||
                 !_me.hasField("host") ||

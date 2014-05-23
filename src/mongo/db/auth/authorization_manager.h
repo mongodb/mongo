@@ -53,6 +53,7 @@ namespace mongo {
 
     class AuthzManagerExternalState;
     class UserDocumentParser;
+    class OperationContext;
 
     /**
      * Internal secret key info.
@@ -164,7 +165,7 @@ namespace mongo {
          * returns a non-OK status.  When returning a non-OK status, *version will be set to
          * schemaVersionInvalid (0).
          */
-        Status getAuthorizationVersion(int* version);
+        Status getAuthorizationVersion(OperationContext* txn, int* version);
 
         /**
          * Returns the user cache generation identifier.
@@ -172,7 +173,7 @@ namespace mongo {
         OID getCacheGeneration();
 
         // Returns true if there exists at least one privilege document in the system.
-        bool hasAnyPrivilegeDocuments() const;
+        bool hasAnyPrivilegeDocuments(OperationContext* txn) const;
 
         /**
          * Updates the auth schema version document to reflect that the system is upgraded to
@@ -281,7 +282,7 @@ namespace mongo {
          *
          * If the user does not exist, returns ErrorCodes::UserNotFound.
          */
-        Status getUserDescription(const UserName& userName, BSONObj* result);
+        Status getUserDescription(OperationContext* txn, const UserName& userName, BSONObj* result);
 
         /**
          * Writes into "result" a document describing the named role and returns Status::OK().  The
@@ -324,7 +325,7 @@ namespace mongo {
          *  The AuthorizationManager retains ownership of the returned User object.
          *  On non-OK Status return values, acquiredUser will not be modified.
          */
-        Status acquireUser(const UserName& userName, User** acquiredUser);
+        Status acquireUser(OperationContext* txn, const UserName& userName, User** acquiredUser);
 
         /**
          * Decrements the refcount of the given User object.  If the refcount has gone to zero,
@@ -339,8 +340,9 @@ namespace mongo {
          *
          * Bumps the returned **acquiredUser's reference count on success.
          */
-        Status acquireV1UserProbedForDb(
-                const UserName& userName, const StringData& dbname, User** acquiredUser);
+        Status acquireV1UserProbedForDb(OperationContext* txn,
+                                        const UserName& userName,
+                                        const StringData& dbname, User** acquiredUser);
 
         /**
          * Marks the given user as invalid and removes it from the user cache.
@@ -399,7 +401,8 @@ namespace mongo {
          * On failure, returns a status other than Status::OK().  In this case, is is typically safe
          * to try again.
          */
-        Status upgradeSchemaStep(const BSONObj& writeConcern, bool* isDone);
+        Status upgradeSchemaStep(
+                        OperationContext* txn, const BSONObj& writeConcern, bool* isDone);
 
         /**
          * Performs up to maxSteps steps in the process of upgrading the stored authorization data
@@ -414,7 +417,7 @@ namespace mongo {
          * progress performing the upgrade, and the specific code and message in the returned status
          * may provide additional information.
          */
-        Status upgradeSchema(int maxSteps, const BSONObj& writeConcern);
+        Status upgradeSchema(OperationContext* txn, int maxSteps, const BSONObj& writeConcern);
 
         /**
          * Hook called by replication code to let the AuthorizationManager observe changes
@@ -458,14 +461,18 @@ namespace mongo {
          * Fetches user information from a v2-schema user document for the named user,
          * and stores a pointer to a new user object into *acquiredUser on success.
          */
-        Status _fetchUserV2(const UserName& userName, std::auto_ptr<User>* acquiredUser);
+        Status _fetchUserV2(OperationContext* txn,
+                            const UserName& userName,
+                            std::auto_ptr<User>* acquiredUser);
 
         /**
          * Fetches user information from a v1-schema user document for the named user, possibly
          * examining system.users collections from userName.getDB() and admin.system.users in the
          * process.  Stores a pointer to a new user object into *acquiredUser on success.
          */
-        Status _fetchUserV1(const UserName& userName, std::auto_ptr<User>* acquiredUser);
+        Status _fetchUserV1(OperationContext* txn,
+                            const UserName& userName,
+                            std::auto_ptr<User>* acquiredUser);
 
         /**
          * True if access control enforcement is enabled in this AuthorizationManager.

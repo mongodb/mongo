@@ -50,7 +50,7 @@ namespace QueryStageMergeSortTests {
         QueryStageMergeSortTestBase() { }
 
         virtual ~QueryStageMergeSortTestBase() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -95,23 +95,25 @@ namespace QueryStageMergeSortTests {
         }
 
         static const char* ns() { return "unittests.QueryStageMergeSort"; }
-    private:
-        static DBDirectClient _client;
-    };
 
-    DBDirectClient QueryStageMergeSortTestBase::_client;
+    protected:
+        OperationContextImpl _txn;
+
+    private:
+        DBDirectClient _client;
+    };
 
     // SERVER-1205:
     // find($or[{a:1}, {b:1}]).sort({c:1}) with indices {a:1, c:1} and {b:1, c:1}.
     class QueryStageMergeSortPrefixIndex : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             const int N = 50;
@@ -170,12 +172,12 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortDups : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             const int N = 50;
@@ -233,12 +235,12 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortDupsNoDedup : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             const int N = 50;
@@ -297,12 +299,12 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortPrefixIndexReverse : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             const int N = 50;
@@ -362,12 +364,12 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortOneStageEOF : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             const int N = 50;
@@ -425,12 +427,12 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortManyShort : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             WorkingSet* ws = new WorkingSet();
@@ -478,12 +480,12 @@ namespace QueryStageMergeSortTests {
     class QueryStageMergeSortInvalidation : public QueryStageMergeSortTestBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&txn, ns());
+                coll = db->createCollection(&_txn, ns());
             }
 
             WorkingSet ws;

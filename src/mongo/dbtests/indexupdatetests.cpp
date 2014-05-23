@@ -55,7 +55,7 @@ namespace IndexUpdateTests {
     class IndexBuildBase {
     public:
         IndexBuildBase() :
-            _ctx( _ns ) {
+            _ctx(&_txn, _ns) {
             _client.createCollection( _ns );
         }
         ~IndexBuildBase() {
@@ -91,8 +91,9 @@ namespace IndexUpdateTests {
             return collection()->getIndexCatalog()->findIndexByName( "a_1" );
         }
 #endif
-        Client::WriteContext _ctx;
+
         OperationContextImpl _txn;
+        Client::WriteContext _ctx;
     };
 
     /** addKeysToPhaseOne() adds keys from a collection's documents to an external sorter. */
