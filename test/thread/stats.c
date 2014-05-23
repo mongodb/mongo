@@ -62,26 +62,24 @@ stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
 
-	if (multiple_files)
-		return;
-
 	/* File statistics. */
-	(void)snprintf(name, sizeof(name), "statistics:" FNAME, 0);
-	if ((ret =
-	    session->open_cursor(session, name, NULL, NULL, &cursor)) != 0)
-		die("session.open_cursor", ret);
+	if (!multiple_files) {
+		(void)snprintf(name, sizeof(name), "statistics:" FNAME, 0);
+		if ((ret = session->open_cursor(
+		    session, name, NULL, NULL, &cursor)) != 0)
+			die("session.open_cursor", ret);
 
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-		(void)fprintf(fp, "%s=%s\n", desc, pval);
+		while ((ret = cursor->next(cursor)) == 0 &&
+		    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+			(void)fprintf(fp, "%s=%s\n", desc, pval);
 
-	if (ret != WT_NOTFOUND)
-		die("cursor.next", ret);
-	if ((ret = cursor->close(cursor)) != 0)
-		die("cursor.close", ret);
+		if (ret != WT_NOTFOUND)
+			die("cursor.next", ret);
+		if ((ret = cursor->close(cursor)) != 0)
+			die("cursor.close", ret);
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
-
+		if ((ret = session->close(session, NULL)) != 0)
+			die("session.close", ret);
+	}
 	(void)fclose(fp);
 }
