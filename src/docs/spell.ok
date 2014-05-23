@@ -87,6 +87,7 @@ callbk
 cd
 cdb
 cds
+changelog
 checksum
 checksums
 ckp
@@ -216,6 +217,7 @@ maxintlitem
 maxintlpage
 maxleafitem
 maxleafpage
+md
 memalloc
 memfree
 memp

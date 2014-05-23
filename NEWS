@@ -13,16 +13,16 @@ choosing space saving over performance is up to the application. [#981]
 Change the default leaf_page_max setting from 1MB to 32KB. Choosing a large
 default leaf_page_max led to poor performance in out of cache workloads.
 
-Remove the "--enable-debug" option to configure. It is more standard to set
-CFLAGS="-g" variable instead.
+Remove the `--enable-debug` option to configure. It is more standard to set
+`CFLAGS="-g"` variable instead.
 
 Save the wiredtiger_open configuration when a database is created, so that
 settings like cache size, extensions and logging are set consistently by all
 subsequent users of the database.
 
-Add an "--enable-verbose" option to configure. In order to access the verbose
+Add an `--enable-verbose` option to configure. In order to access the verbose
 message functionality available as part of the wiredtiger_open and
-WT_CONNECTION::reconfigure APIs, it is necessary to pass the --enable-verbose
+WT_CONNECTION::reconfigure APIs, it is necessary to pass the `--enable-verbose`
 option to configure.
 
 Enhance the metadata cursor implementation (i.e: cursors created with a
@@ -1484,8 +1484,8 @@ the end of every test.
 WiredTiger release 1.1.1, 2012-03-12
 ------------------------------------
 
-Default to a verbose build: that can be switched off by running "configure
---enable-silent-rules").
+Default to a verbose build: that can be switched off by running `configure
+--enable-silent-rules`).
 
 Account for all memory allocated when reading a page into cache.  Total memory
 usage is now much closer to the cache size when using many small keys and

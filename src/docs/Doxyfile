@@ -277,7 +277,7 @@ EXTENSION_MAPPING      =
 # can mix doxygen, HTML, and XML commands with Markdown formatting. 
 # Disable only in case of backward compatibilities issues.
 
-MARKDOWN_SUPPORT       = NO
+MARKDOWN_SUPPORT       = YES
 
 # When enabled doxygen tries to link words that correspond to documented classes, 
 # or namespaces to their corresponding documentation. Such a link can be 
@@ -720,6 +720,7 @@ FILE_PATTERNS          = *.c \
                          *.php3 \
                          *.inc \
                          *.m \
+                         *.md \
                          *.mm \
                          *.dox \
                          *.py \
@@ -1451,31 +1452,6 @@ MAN_LINKS              = NO
 # the code including all documentation.
 
 GENERATE_XML           = NO
-
-# The XML_OUTPUT tag is used to specify where the XML pages will be put. 
-# If a relative path is entered the value of OUTPUT_DIRECTORY will be 
-# put in front of it. If left blank `xml' will be used as the default path.
-
-XML_OUTPUT             = xml
-
-# The XML_SCHEMA tag can be used to specify an XML schema, 
-# which can be used by a validating XML parser to check the 
-# syntax of the XML files.
-
-XML_SCHEMA             = 
-
-# The XML_DTD tag can be used to specify an XML DTD, 
-# which can be used by a validating XML parser to check the 
-# syntax of the XML files.
-
-XML_DTD                = 
-
-# If the XML_PROGRAMLISTING tag is set to YES Doxygen will 
-# dump the program listings (including syntax highlighting 
-# and cross-referencing information) to the XML output. Note that 
-# enabling this will significantly increase the size of the XML output.
-
-XML_PROGRAMLISTING     = YES
 
 #---------------------------------------------------------------------------
 # configuration options for the AutoGen Definitions output

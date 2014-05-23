@@ -37,6 +37,8 @@ For more information about using WiredTiger, see:
 
 - @subpage upgrading
 
+- @subpage md_changelog
+
 - @subpage admin
 
 - @subpage license
