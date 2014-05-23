@@ -11,7 +11,8 @@
 #define	UTIL_FILE_OK		0x02		/* file: prefix OK */
 #define	UTIL_INDEX_OK		0x04		/* index: prefix OK */
 #define	UTIL_LSM_OK		0x08		/* lsm: prefix OK */
-#define	UTIL_TABLE_OK		0x10		/* table: prefix OK */
+#define	UTIL_METADATA_OK	0x10		/* metadata: prefix OK */
+#define	UTIL_TABLE_OK		0x20		/* table: prefix OK */
 
 /* all known prefixes OK */
 #define	UTIL_ALL_OK							\

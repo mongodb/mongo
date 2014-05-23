@@ -258,6 +258,10 @@ util_name(const char *s, const char *type, u_int flags)
 		if (!(flags & UTIL_LSM_OK))
 			goto type_err;
 		copy = 1;
+	} else if (WT_PREFIX_MATCH(s, "metadata:")) {
+		if (!(flags & UTIL_METADATA_OK))
+			goto type_err;
+		copy = 1;
 	} else if (WT_PREFIX_MATCH(s, "statistics:")) {
 		goto type_err;
 	} else if (WT_PREFIX_MATCH(s, "table:")) {
