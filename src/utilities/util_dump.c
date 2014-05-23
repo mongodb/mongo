@@ -219,6 +219,8 @@ dump_json_table_begin(WT_CURSOR *cursor, const char *uri, const char *config)
 	const char *name;
 	char *jsonconfig;
 
+	jsonconfig = NULL;
+
 	/* Get the table name. */
 	if ((name = strchr(uri, ':')) == NULL) {
 		fprintf(stderr, "%s: %s: corrupted uri\n", progname, uri);
@@ -229,23 +231,26 @@ dump_json_table_begin(WT_CURSOR *cursor, const char *uri, const char *config)
 	if ((ret = dup_json_string(config, &jsonconfig)) != 0)
 		return (util_cerr(uri, "config dup", ret));
 	if (printf("    \"%s\" : [\n        {\n", uri) < 0)
-		return (util_err(EIO, NULL));
+		goto eio;
 	if (printf("            \"config\" : \"%s\",\n", jsonconfig) < 0)
-		return (util_err(EIO, NULL));
-	free(jsonconfig);
+		goto eio;
 
 	if ((ret = dump_json_table_cg(
 	    cursor, uri, name, "colgroup:", "colgroups")) == 0) {
 		if (printf(",\n") < 0)
-			ret = util_err(EIO, NULL);
-		else
-			ret = dump_json_table_cg(
-			    cursor, uri, name, "index:", "indices");
+			goto eio;
+		ret =
+		    dump_json_table_cg(cursor, uri, name, "index:", "indices");
 	}
 
 	if (printf("\n        },\n        [") < 0)
-		return (util_err(EIO, NULL));
+		goto eio;
 
+	if (0) {
+eio:		ret = util_err(EIO, NULL);
+	}
+
+	free(jsonconfig);
 	return (ret);
 }
 
