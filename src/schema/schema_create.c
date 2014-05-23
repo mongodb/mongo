@@ -65,7 +65,7 @@ __create_file(WT_SESSION_IMPL *session,
 
 	fileconf = NULL;
 
-	is_metadata = strcmp(uri, WT_METADATA_URI) == 0;
+	is_metadata = strcmp(uri, WT_METAFILE_URI) == 0;
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))

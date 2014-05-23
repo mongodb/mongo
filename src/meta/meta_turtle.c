@@ -54,7 +54,7 @@ __metadata_init(WT_SESSION_IMPL *session)
 	 * lower level code checks that it is appropriately synchronized.
 	 */
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_create(session, WT_METADATA_URI, NULL));
+	    ret = __wt_schema_create(session, WT_METAFILE_URI, NULL));
 
 	return (ret);
 }
@@ -196,7 +196,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 	/* Create the turtle file. */
 	WT_RET(__metadata_config(session, &metaconf));
-	WT_ERR(__wt_turtle_update(session, WT_METADATA_URI, metaconf));
+	WT_ERR(__wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 
 	/* Remove the backup file if it exists, we'll never read it again. */
 	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
@@ -236,7 +236,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, const char **valuep)
 		ret = __wt_errno();
 	__wt_free(session, path);
 	if (fp == NULL)
-		return (strcmp(key, WT_METADATA_URI) == 0 ?
+		return (strcmp(key, WT_METAFILE_URI) == 0 ?
 		    __metadata_config(session, valuep) : ret);
 
 	/* Search for the key. */

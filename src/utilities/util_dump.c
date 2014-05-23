@@ -78,8 +78,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			free(name);
 			name = NULL;
 		}
-		if ((name = util_name(argv[i], "table",
-		    UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
+		if ((name = util_name(argv[i], "table")) == NULL)
 			goto err;
 
 		if (json && dump_json_table_config(session, name) != 0)
@@ -143,9 +142,9 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 
 	/* Open a metadata cursor. */
 	if ((ret = session->open_cursor(
-	    session, "metadata:", NULL, NULL, &cursor)) != 0) {
+	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, "metadata:", wiredtiger_strerror(ret));
+		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
 		return (1);
 	}
 	/*
@@ -348,9 +347,10 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 	if (WT_PREFIX_MATCH(uri, "table:")) {
 		/* Open a metadata cursor. */
 		if ((ret = session->open_cursor(
-		    session, "metadata:", NULL, NULL, &cursor)) != 0) {
+		    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 			fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-			    progname, "metadata:", wiredtiger_strerror(ret));
+			    progname, WT_METADATA_URI,
+			    wiredtiger_strerror(ret));
 			return (1);
 		}
 
