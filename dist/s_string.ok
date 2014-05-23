@@ -805,6 +805,7 @@ searchable
 sed
 serializable
 sessionp
+setstr
 setv
 sfence
 sii

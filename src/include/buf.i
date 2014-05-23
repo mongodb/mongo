@@ -87,7 +87,7 @@ __wt_buf_set(
 static inline int
 __wt_buf_setstr(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *s)
 {
-        return (__wt_buf_set(session, buf, s, strlen(s) + 1));
+	return (__wt_buf_set(session, buf, s, strlen(s) + 1));
 }
 
 /*
