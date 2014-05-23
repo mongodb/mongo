@@ -63,9 +63,10 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	va_start(ap, cursor);
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
+
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		json = (WT_CURSOR_JSON *)cursor->json_private;
 		WT_ASSERT(session, json != NULL);
@@ -106,9 +107,9 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 		} else
 			*va_arg(ap, const char **) = cursor->key.data;
 	}
-	va_end(ap);
 
-err:	API_END(session, ret);
+err:	va_end(ap);
+	API_END(session, ret);
 	return (ret);
 }
 
@@ -203,9 +204,10 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	va_start(ap, cursor);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
+
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		json = (WT_CURSOR_JSON *)cursor->json_private;
 		WT_ASSERT(session, json != NULL);
@@ -227,9 +229,9 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 		} else
 			*va_arg(ap, const char **) = cursor->value.data;
 	}
-	va_end(ap);
 
-err:	API_END(session, ret);
+err:	va_end(ap);
+	API_END(session, ret);
 	return (ret);
 }
 
