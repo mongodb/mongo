@@ -248,7 +248,7 @@ namespace replset {
         return !( vUp * 2 > _totalVotes() );
     }
 
-    const time_t LeaseTime = 30;
+    const time_t LeaseTime = 3;
 
     SimpleMutex Consensus::lyMutex("ly");
 
