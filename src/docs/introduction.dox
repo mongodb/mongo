@@ -3,10 +3,17 @@
 WiredTiger is an high performance, scalable, production quality, NoSQL,
 Open Source extensible platform for data management.
 
-WiredTiger supports both traditional row-oriented storage, where all
-columns of a row are stored together, and column-oriented storage, where
-one or more columns can be stored individually, allowing more efficient
-access and storage.
+WiredTiger supports row-oriented storage (where all columns of a row are
+stored together), and column-oriented storage (where columns are stored
+in groups), allowing for more efficient access and storage of column
+subsets.  Additionally, WiredTiger supports log-structured merge trees
+(LSM), for sustained throughput under random insert workloads.
+
+WiredTiger includes ACID transactions with standard isolation levels and
+durability at both checkpoint and fine-grained granularity.
+
+WiredTiger can be used as a simple key/value store, but also has a
+complete schema layer, including indices and projections.
 
 For more information on the WiredTiger architecture and why it might be
 right for your project, see:
