@@ -37,7 +37,7 @@
 #include "mongo/db/repl/rs_config.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     int ReplSetHealthPollTask::s_try_offset = 0;
 
@@ -293,5 +293,5 @@ namespace replset {
             mem.electionTime = info["electionTime"].Date();
         }
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

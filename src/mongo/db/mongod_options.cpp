@@ -1002,36 +1002,36 @@ namespace mongo {
             storageGlobalParams.noTableScan = params["notablescan"].as<bool>();
         }
         if (params.count("master")) {
-            replset::replSettings.master = params["master"].as<bool>();
+            repl::replSettings.master = params["master"].as<bool>();
         }
         if (params.count("slave") && params["slave"].as<bool>() == true) {
-            replset::replSettings.slave = replset::SimpleSlave;
+            repl::replSettings.slave = repl::SimpleSlave;
         }
         if (params.count("slavedelay")) {
-            replset::replSettings.slavedelay = params["slavedelay"].as<int>();
+            repl::replSettings.slavedelay = params["slavedelay"].as<int>();
         }
         if (params.count("fastsync")) {
-            replset::replSettings.fastsync = params["fastsync"].as<bool>();
+            repl::replSettings.fastsync = params["fastsync"].as<bool>();
         }
         if (params.count("autoresync")) {
-            replset::replSettings.autoresync = params["autoresync"].as<bool>();
+            repl::replSettings.autoresync = params["autoresync"].as<bool>();
         }
         if (params.count("source")) {
             /* specifies what the source in local.sources should be */
-            replset::replSettings.source = params["source"].as<string>().c_str();
+            repl::replSettings.source = params["source"].as<string>().c_str();
         }
         if( params.count("pretouch") ) {
-            replset::replSettings.pretouch = params["pretouch"].as<int>();
+            repl::replSettings.pretouch = params["pretouch"].as<int>();
         }
         if (params.count("replication.replSetName")) {
-            replset::replSettings.replSet = params["replication.replSetName"].as<string>().c_str();
+            repl::replSettings.replSet = params["replication.replSetName"].as<string>().c_str();
         }
         if (params.count("replication.replSet")) {
             /* seed list of hosts for the repl set */
-            replset::replSettings.replSet = params["replication.replSet"].as<string>().c_str();
+            repl::replSettings.replSet = params["replication.replSet"].as<string>().c_str();
         }
         if (params.count("replication.secondaryIndexPrefetch")) {
-            replset::replSettings.rsIndexPrefetch =
+            repl::replSettings.rsIndexPrefetch =
                 params["replication.secondaryIndexPrefetch"].as<std::string>();
         }
 
@@ -1040,7 +1040,7 @@ namespace mongo {
         }
 
         if (params.count("only")) {
-            replset::replSettings.only = params["only"].as<string>().c_str();
+            repl::replSettings.only = params["only"].as<string>().c_str();
         }
         if( params.count("storage.nsSize") ) {
             int x = params["storage.nsSize"].as<int>();
@@ -1062,8 +1062,8 @@ namespace mongo {
                    << "MB is too big for 32 bit version. Use 64 bit build instead.";
                 return Status(ErrorCodes::BadValue, sb.str());
             }
-            replset::replSettings.oplogSize = x * 1024 * 1024;
-            verify(replset::replSettings.oplogSize > 0);
+            repl::replSettings.oplogSize = x * 1024 * 1024;
+            verify(repl::replSettings.oplogSize > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
@@ -1098,9 +1098,9 @@ namespace mongo {
             params["sharding.clusterRole"].as<std::string>() == "configsvr") {
             serverGlobalParams.configsvr = true;
             storageGlobalParams.smallfiles = true; // config server implies small files
-            if (replset::replSettings.usingReplSets()
-                    || replset::replSettings.master
-                    || replset::replSettings.slave) {
+            if (repl::replSettings.usingReplSets()
+                    || repl::replSettings.master
+                    || repl::replSettings.slave) {
                 return Status(ErrorCodes::BadValue,
                               "replication should not be enabled on a config server");
             }
@@ -1113,9 +1113,9 @@ namespace mongo {
 
             if (!params.count("storage.dbPath"))
                 storageGlobalParams.dbpath = "/data/configdb";
-            replset::replSettings.master = true;
+            repl::replSettings.master = true;
             if (!params.count("replication.oplogSizeMB"))
-                replset::replSettings.oplogSize = 5 * 1024 * 1024;
+                repl::replSettings.oplogSize = 5 * 1024 * 1024;
         }
 
         if (params.count("sharding.archiveMovedChunks")) {
@@ -1150,8 +1150,8 @@ namespace mongo {
             storageGlobalParams.repairpath = storageGlobalParams.dbpath;
         }
 
-        if (replset::replSettings.pretouch)
-            log() << "--pretouch " << replset::replSettings.pretouch;
+        if (repl::replSettings.pretouch)
+            log() << "--pretouch " << repl::replSettings.pretouch;
 
         // Check if we are 32 bit and have not explicitly specified any journaling options
         if (sizeof(void*) == 4 && !params.count("storage.journal.enabled")) {

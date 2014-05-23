@@ -511,7 +511,7 @@ namespace mongo {
 
         uassert(ErrorCodes::NotMaster,
                 mongoutils::str::stream() << "Not primary while updating " << nsString.ns(),
-                !request.shouldCallLogOp() || replset::isMasterNs(nsString.ns().c_str()));
+                !request.shouldCallLogOp() || repl::isMasterNs(nsString.ns().c_str()));
 
         while (true) {
             // Get next doc, and location
@@ -668,7 +668,7 @@ namespace mongo {
             // Call logOp if requested.
             if (request.shouldCallLogOp() && !logObj.isEmpty()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
-                replset::logOp(txn, "u", nsString.ns().c_str(), logObj , &idQuery,
+                repl::logOp(txn, "u", nsString.ns().c_str(), logObj , &idQuery,
                       NULL, request.isFromMigration());
             }
 
@@ -782,7 +782,7 @@ namespace mongo {
                                                                 !request.isGod() /*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
         if (request.shouldCallLogOp()) {
-            replset::logOp(txn, "i", nsString.ns().c_str(), newObj,
+            repl::logOp(txn, "i", nsString.ns().c_str(), newObj,
                            NULL, NULL, request.isFromMigration());
         }
 

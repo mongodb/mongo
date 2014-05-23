@@ -37,7 +37,7 @@ namespace mongo {
 
     class OpTime;
 
-namespace replset {
+namespace repl {
 
     class HeartbeatInfo;
     class Member;
@@ -116,5 +116,5 @@ namespace replset {
     protected:
         TopologyCoordinator() {}
     };
-} // namespace replset
+} // namespace repl
 } // namespace mongo

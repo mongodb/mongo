@@ -37,7 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     class ReplSetImpl;
     struct Target;
@@ -87,5 +87,5 @@ namespace replset {
         OpTime getElectionTime() const { return _electionTime; }
         void setElectionTime(OpTime electionTime) { _electionTime = electionTime; }
     };
-} // namespace replset
+} // namespace repl
 } // namespace mongo

@@ -88,7 +88,7 @@ namespace mongo {
                 return false;
             }
 
-            if (replset::isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue()) {
+            if (repl::isCurrentlyAReplSetPrimary() && !cmdObj["force"].trueValue()) {
                 errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
                 return false;
             }

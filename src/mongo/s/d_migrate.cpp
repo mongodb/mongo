@@ -805,15 +805,15 @@ namespace mongo {
             // if we do a w=2 after every write
             bool secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
             if ( secondaryThrottle ) {
-                if (replset::theReplSet) {
-                    if (replset::theReplSet->config().getMajority() <= 1) {
+                if (repl::theReplSet) {
+                    if (repl::theReplSet->config().getMajority() <= 1) {
                         secondaryThrottle = false;
                         warning() << "not enough nodes in set to use secondaryThrottle: "
-                                  << " majority: " << replset::theReplSet->config().getMajority()
+                                  << " majority: " << repl::theReplSet->config().getMajority()
                                   << endl;
                     }
                 }
-                else if (!replset::anyReplEnabled() ) {
+                else if (!repl::anyReplEnabled() ) {
                     secondaryThrottle = false;
                     warning() << "secondaryThrottle selected but no replication" << endl;
                 }
@@ -1602,8 +1602,8 @@ namespace mongo {
             verify( ! min.isEmpty() );
             verify( ! max.isEmpty() );
             
-            replSetMajorityCount = replset::theReplSet ?
-                                        replset::theReplSet->config().getMajority() : 0;
+            replSetMajorityCount = repl::theReplSet ?
+                                        repl::theReplSet->config().getMajority() : 0;
 
             log() << "starting receiving-end of migration of chunk " << min << " -> " << max <<
                     " for collection " << ns << " from " << from
@@ -1673,7 +1673,7 @@ namespace mongo {
                     }
 
                     // make sure to create index on secondaries as well
-                    replset::logOp(txn, "i", db->getSystemIndexesName().c_str(), idx,
+                    repl::logOp(txn, "i", db->getSystemIndexesName().c_str(), idx,
                                    NULL, NULL, true /* fromMigrate */);
                 }
 
@@ -1771,7 +1771,7 @@ namespace mongo {
                         clonedBytes += o.objsize();
 
                         if ( secondaryThrottle && thisTime > 0 ) {
-                            if (!replset::waitForReplication(cc().getLastOp(),
+                            if (!repl::waitForReplication(cc().getLastOp(),
                                                              2, 60 /* seconds to wait */)) {
                                 warning() << "secondaryThrottle on, but doc insert timed out after 60 seconds, continuing" << endl;
                             }
@@ -2027,7 +2027,7 @@ namespace mongo {
             // if replication is on, try to force enough secondaries to catch up
             // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
             //      for now, we try to replicate to a sensible number of secondaries
-            return replset::opReplicatedEnough(lastOpApplied, replSetMajorityCount);
+            return repl::opReplicatedEnough(lastOpApplied, replSetMajorityCount);
         }
 
         bool flushPendingWrites( const ReplTime& lastOpApplied ) {
@@ -2230,7 +2230,7 @@ namespace mongo {
                 migrateStatus.shardKeyPattern = keya.getOwned();
             }
 
-            if (migrateStatus.secondaryThrottle && ! replset::anyReplEnabled()) {
+            if (migrateStatus.secondaryThrottle && ! repl::anyReplEnabled()) {
                 warning() << "secondaryThrottle asked for, but not replication" << endl;
                 migrateStatus.secondaryThrottle = false;
             }

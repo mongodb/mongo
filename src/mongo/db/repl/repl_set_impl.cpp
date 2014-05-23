@@ -44,7 +44,7 @@
 #include "mongo/util/exit.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 #ifdef MONGO_PLATFORM_64
     const int ReplSetImpl::replWriterThreadCount = 16;
     const int ReplSetImpl::replPrefetcherThreadCount = 16;
@@ -115,7 +115,7 @@ namespace {
 
         // Wait for replication to stop and buffer to be consumed
         LOG(1) << "replSet waiting for replication to finish before becoming primary" << endl;
-        replset::BackgroundSync::get()->stopReplicationAndFlushBuffer();
+        repl::BackgroundSync::get()->stopReplicationAndFlushBuffer();
 
         // Lock here to prevent stepping down & becoming primary from getting interleaved
         LOG(1) << "replSet waiting for global write lock";
@@ -914,5 +914,5 @@ namespace {
         return true;
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

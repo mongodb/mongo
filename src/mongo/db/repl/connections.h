@@ -39,7 +39,7 @@
 #include "mongo/db/repl/rs_config.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     /** here we keep a single connection (with reconnect) for a set of hosts,
         one each, and allow one user at a time per host.  if in use already for that
@@ -177,5 +177,5 @@ namespace replset {
         // Keep trying to connect if we're not yet connected
         connect();
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

@@ -37,7 +37,7 @@
 #include "mongo/util/concurrency/list.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     class TagSubgroup;
 
@@ -184,5 +184,5 @@ namespace replset {
 
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

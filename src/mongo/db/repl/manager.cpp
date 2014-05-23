@@ -36,7 +36,7 @@
 #include "mongo/db/client.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     /* check members OTHER THAN US to see if they think they are primary */
     const Member * Manager::findOtherPrimary(bool& two) {
@@ -289,5 +289,5 @@ namespace replset {
         busyWithElectSelf = false;
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

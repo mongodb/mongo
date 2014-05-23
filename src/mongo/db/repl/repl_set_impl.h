@@ -43,7 +43,7 @@
 namespace mongo {
     class Cloner;
 
-namespace replset {
+namespace repl {
 
     struct FixUpInfo;
     class ReplSetCmdline;
@@ -281,7 +281,7 @@ namespace replset {
     private:
         bool _syncDoInitialSync_clone(Cloner &cloner, const char *master,
                                       const list<string>& dbs, bool dataPass);
-        bool _syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r ,
+        bool _syncDoInitialSync_applyToHead( repl::SyncTail& syncer, OplogReader* r ,
                                              const Member* source, const BSONObj& lastOp,
                                              BSONObj& minValidOut);
         void _syncDoInitialSync();
@@ -352,5 +352,5 @@ namespace replset {
         static const char* _initialSyncFlagString;
         static const BSONObj _initialSyncFlag;
     };
-} // namespace replset
+} // namespace repl
 } // namespace mongo

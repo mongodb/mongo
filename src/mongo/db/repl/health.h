@@ -34,7 +34,7 @@
 #include "mongo/logger/tee.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     void fillRsLog(std::stringstream&);
 
@@ -43,5 +43,5 @@ namespace replset {
 
     // helper function needed by member.cpp
     std::string ago(time_t t);    
-} // namespace replset
+} // namespace repl
 } // namespace mongo

@@ -50,7 +50,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     using namespace mongoutils;
     using namespace bson;
@@ -268,14 +268,14 @@ namespace replset {
      * @param syncer either initial sync (can reclone missing docs) or "normal" sync (no recloning)
      * @param r      the oplog reader
      * @param source the sync target
-     * @param lastOp the op to start syncing at.  replset::InitialSync writes this and then moves to
-     *               the queue.  replset::SyncTail does not write this, it moves directly to the
+     * @param lastOp the op to start syncing at.  repl::InitialSync writes this and then moves to
+     *               the queue.  repl::SyncTail does not write this, it moves directly to the
      *               queue.
      * @param minValid populated by this function. The most recent op on the sync target's oplog,
      *                 this function syncs to this value (inclusive)
      * @return if applying the oplog succeeded
      */
-    bool ReplSetImpl::_syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r,
+    bool ReplSetImpl::_syncDoInitialSync_applyToHead( repl::SyncTail& syncer, OplogReader* r,
                                                       const Member* source, const BSONObj& lastOp ,
                                                       BSONObj& minValid ) {
         /* our cloned copy will be strange until we apply oplog events that occurred
@@ -358,8 +358,8 @@ namespace replset {
      * closer to the latest op time before it can transition to secondary state.
      */
     void ReplSetImpl::_syncDoInitialSync() {
-        replset::InitialSync init(replset::BackgroundSync::get());
-        replset::SyncTail tail(replset::BackgroundSync::get());
+        repl::InitialSync init(repl::BackgroundSync::get());
+        repl::SyncTail tail(repl::BackgroundSync::get());
         sethbmsg("initial sync pending",0);
 
         // if this is the first node, it may have already become primary
@@ -488,11 +488,11 @@ namespace replset {
 
         // If we just cloned & there were no ops applied, we still want the primary to know where
         // we're up to
-        replset::BackgroundSync::notify();
+        repl::BackgroundSync::notify();
 
         changeState(MemberState::RS_RECOVERING);
         sethbmsg("initial sync done",0);
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

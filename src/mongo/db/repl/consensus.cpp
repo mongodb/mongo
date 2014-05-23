@@ -33,7 +33,7 @@
 #include "mongo/db/repl/replset_commands.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     /** the first cmd called by a node seeking election and it's a basic sanity 
         test: do any of the nodes it can reach know that it can't be the primary?
@@ -488,5 +488,5 @@ namespace replset {
         }
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

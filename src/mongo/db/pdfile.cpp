@@ -132,7 +132,7 @@ namespace mongo {
                 options = b.obj();
             }
             string logNs = nsToDatabase(ns) + ".$cmd";
-            replset::logOp(txn, "c", logNs.c_str(), options);
+            repl::logOp(txn, "c", logNs.c_str(), options);
         }
 
         return Status::OK();

@@ -72,9 +72,9 @@ namespace mongo {
         catch (const DBException& e) {
             warning() << "Index rebuilding did not complete: " << e.what() << endl;
         }
-        boost::unique_lock<boost::mutex> lk(replset::ReplSet::rss.mtx);
-        replset::ReplSet::rss.indexRebuildDone = true;
-        replset::ReplSet::rss.cond.notify_all();
+        boost::unique_lock<boost::mutex> lk(repl::ReplSet::rss.mtx);
+        repl::ReplSet::rss.indexRebuildDone = true;
+        repl::ReplSet::rss.cond.notify_all();
         LOG(1) << "checking complete" << endl;
     }
 

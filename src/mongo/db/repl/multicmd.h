@@ -34,7 +34,7 @@
 #include "mongo/util/background.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     struct Target {
         Target(std::string hostport) : toHost(hostport), ok(false) { }
@@ -87,5 +87,5 @@ namespace replset {
             (*i)->wait();
         }
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

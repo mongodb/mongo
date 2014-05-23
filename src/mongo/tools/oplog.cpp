@@ -53,7 +53,7 @@ public:
 
         toolInfoLog() << "going to connect" << std::endl;
         
-        replset::OplogReader r;
+        repl::OplogReader r;
         r.setTailingQueryOptions( QueryOption_SlaveOk | QueryOption_AwaitData );
         r.connect(mongoOplogGlobalParams.from);
 

@@ -982,7 +982,7 @@ namespace mongo {
             }
 
             // we can run on a slave up to here
-            if (!replset::_isMaster()) {
+            if (!repl::_isMaster()) {
                 result.append( "errmsg" , "not master" );
                 result.append( "note" , "from post init in setShardVersion" );
                 return false;
@@ -1259,7 +1259,7 @@ namespace mongo {
         if ( ! shardingState.enabled() )
             return true;
 
-        if (!replset::isMasterNs(ns.c_str()))  {
+        if (!repl::isMasterNs(ns.c_str()))  {
             // right now connections to secondaries aren't versioned at all
             return true;
         }

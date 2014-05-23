@@ -199,7 +199,7 @@ namespace mongo {
             IndexBuilder::restoreIndexes(indexes);
 
             if (!fromRepl)
-                replset::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             return true;
         }
     };

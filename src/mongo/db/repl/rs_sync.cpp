@@ -56,7 +56,7 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     using namespace bson;
 
@@ -171,7 +171,7 @@ namespace replset {
         }
 
         // record the previous member we were syncing from
-        const Member *prev = replset::BackgroundSync::get()->getSyncTarget();
+        const Member *prev = repl::BackgroundSync::get()->getSyncTarget();
         if (prev) {
             result.append("prevSyncTarget", prev->fullName());
         }
@@ -227,7 +227,7 @@ namespace replset {
         }
 
         /* we have some data.  continue tailing. */
-        replset::SyncTail tail(replset::BackgroundSync::get());
+        repl::SyncTail tail(repl::BackgroundSync::get());
         tail.oplogApplication();
     }
 
@@ -301,5 +301,5 @@ namespace replset {
             changeState(MemberState::RS_RECOVERING);
         }
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

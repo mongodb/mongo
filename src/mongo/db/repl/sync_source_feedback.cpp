@@ -40,7 +40,7 @@
 #include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
@@ -255,7 +255,7 @@ namespace replset {
             if (state.primary() || state.fatal() || state.startup()) {
                 continue;
             }
-            const Member* target = replset::BackgroundSync::get()->getSyncTarget();
+            const Member* target = repl::BackgroundSync::get()->getSyncTarget();
             if (_syncTarget != target) {
                 _resetConnection();
                 _syncTarget = target;
@@ -287,5 +287,5 @@ namespace replset {
         }
         cc().shutdown();
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

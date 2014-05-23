@@ -35,7 +35,7 @@
 namespace mongo {
     class Database;
 
-namespace replset {
+namespace repl {
 
     class Sync {
     protected:
@@ -52,5 +52,5 @@ namespace replset {
         void setHostname(const std::string& hostname);
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

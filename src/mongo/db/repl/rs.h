@@ -63,7 +63,7 @@
  */
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
@@ -110,5 +110,5 @@ namespace replset {
         return true;
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

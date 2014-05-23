@@ -36,7 +36,7 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     // This interface exists to facilitate easier testing;
     // the test infrastructure implements these functions with stubs.
@@ -141,5 +141,5 @@ namespace replset {
     };
 
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

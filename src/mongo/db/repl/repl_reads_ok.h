@@ -34,10 +34,10 @@
 namespace mongo {
     class LiteParsedQuery;
 
-namespace replset {
+namespace repl {
 
     // Check to see if slaveOk reads are allowed,
     // based on read preference and query options
     void replVerifyReadsOk(const std::string& ns, const LiteParsedQuery* pq);
-} // namespace replset
+} // namespace repl
 } // namespace mongo

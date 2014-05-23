@@ -47,7 +47,7 @@ namespace mongo {
     class Database;
     class OperationContext;
 
-namespace replset {
+namespace repl {
 
     // Main entry point for master/slave at startup time.
     void startMasterSlave();
@@ -185,5 +185,5 @@ namespace replset {
         std::map< std::string, OpTime > _ignores;
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

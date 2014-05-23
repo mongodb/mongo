@@ -40,7 +40,7 @@
 #include "mongo/db/stats/timer_stats.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     int SleepToAllowBatchingMillis = 2;
     const int BatchIsSmallish = 40000; // bytes
@@ -514,5 +514,5 @@ namespace replset {
         _assumingPrimary = false;
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

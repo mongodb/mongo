@@ -95,7 +95,7 @@ namespace mongo {
             Lock::GlobalWrite globalWriteLock;
             bool ok = wrappedRun(txn, dbname, cmdObj, errmsg, result, fromRepl);
             if (ok && !fromRepl)
-                replset::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
             return ok;
         }
         virtual bool wrappedRun(OperationContext* txn,

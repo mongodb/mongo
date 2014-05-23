@@ -212,7 +212,7 @@ namespace mongo {
 
             // If we got an electionId, make sure it matches
             if (electionIdPresent) {
-                if (!replset::theReplSet) {
+                if (!repl::theReplSet) {
                     // Ignore electionIds of 0 from mongos.
                     if (electionId != OID()) {
                         errmsg = "wElectionId passed but no replication active";
@@ -221,9 +221,9 @@ namespace mongo {
                     }
                 } 
                 else {
-                    if (electionId != replset::theReplSet->getElectionId()) {
+                    if (electionId != repl::theReplSet->getElectionId()) {
                         LOG(3) << "oid passed in is " << electionId
-                               << ", but our id is " << replset::theReplSet->getElectionId();
+                               << ", but our id is " << repl::theReplSet->getElectionId();
                         errmsg = "election occurred after write";
                         result.append("code", ErrorCodes::WriteConcernFailed);
                         return false;

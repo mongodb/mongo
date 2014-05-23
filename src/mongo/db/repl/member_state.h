@@ -31,7 +31,7 @@
 #pragma once
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
 
     /*
@@ -93,5 +93,5 @@ namespace replset {
         return "";
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

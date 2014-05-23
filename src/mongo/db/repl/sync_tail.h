@@ -34,7 +34,7 @@
 #include "mongo/db/repl/sync.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     class BackgroundSyncInterface;
 
@@ -138,5 +138,5 @@ namespace replset {
     void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
     void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

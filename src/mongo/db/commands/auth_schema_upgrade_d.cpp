@@ -43,20 +43,20 @@ namespace mongo {
 namespace {
 
     Status checkReplicaMemberVersions() {
-        if (!replset::theReplSet)
+        if (!repl::theReplSet)
             return Status::OK();
 
 
-        std::list<replset::Target> rsMembers;
+        std::list<repl::Target> rsMembers;
         try {
-            const unsigned rsSelfId = replset::theReplSet->selfId();
-            const std::vector<replset::ReplSetConfig::MemberCfg>& rsMemberConfigs =
-                replset::theReplSet->config().members;
+            const unsigned rsSelfId = repl::theReplSet->selfId();
+            const std::vector<repl::ReplSetConfig::MemberCfg>& rsMemberConfigs =
+                repl::theReplSet->config().members;
             for (size_t i = 0; i < rsMemberConfigs.size(); ++i) {
                 const unsigned otherId = rsMemberConfigs[i]._id;
                 if (rsSelfId == otherId)
                     continue;
-                const replset::Member* other = replset::theReplSet->findById(otherId);
+                const repl::Member* other = repl::theReplSet->findById(otherId);
                 if (!other) {
                     log() << "During authSchemaUpgrade, no information about replica set member "
                         "with id " << otherId << "; ignoring.";
@@ -67,7 +67,7 @@ namespace {
                         " is down; ignoring.";
                     continue;
                 }
-                rsMembers.push_back(replset::Target(other->fullName()));
+                rsMembers.push_back(repl::Target(other->fullName()));
             }
 
             multiCommand(BSON("buildInfo" << 1), rsMembers);
@@ -76,7 +76,7 @@ namespace {
             return ex.toStatus();
         }
 
-        for (std::list<replset::Target>::const_iterator iter = rsMembers.begin();
+        for (std::list<repl::Target>::const_iterator iter = rsMembers.begin();
              iter != rsMembers.end();
              ++iter) {
 

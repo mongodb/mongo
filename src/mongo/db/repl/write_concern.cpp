@@ -44,7 +44,7 @@
 #define REPLDEBUG(x)
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     using namespace mongoutils;
 
@@ -365,5 +365,5 @@ namespace replset {
     unsigned getSlaveCount() {
         return slaveTracking.getSlaveCount();
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

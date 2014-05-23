@@ -48,7 +48,7 @@
 #include "mongo/util/ramlog.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     using namespace bson;
 
@@ -141,7 +141,7 @@ namespace replset {
             result.append("hbmsg", theReplSet->hbmsg());
             result.append("time", (long long) time(0));
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
-            const Member *syncTarget = replset::BackgroundSync::get()->getSyncTarget();
+            const Member *syncTarget = repl::BackgroundSync::get()->getSyncTarget();
             if (syncTarget) {
                 result.append("syncingTo", syncTarget->fullName());
             }
@@ -248,17 +248,17 @@ namespace replset {
 
         // this ensures that will have bgsync's s_instance at all points where it is needed
         // so that we needn't check for its existence
-        replset::BackgroundSync* sync = replset::BackgroundSync::get();
+        repl::BackgroundSync* sync = repl::BackgroundSync::get();
 
         boost::thread t(startSyncThread);
 
-        boost::thread producer(stdx::bind(&replset::BackgroundSync::producerThread, sync));
+        boost::thread producer(stdx::bind(&repl::BackgroundSync::producerThread, sync));
         theReplSet->syncSourceFeedback.go();
 
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo
 
 /* todo:

@@ -32,7 +32,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     class ReplSet : public ReplSetImpl {
     public:
@@ -97,5 +97,5 @@ namespace replset {
         ReplSet();
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

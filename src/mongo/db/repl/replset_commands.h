@@ -35,7 +35,7 @@
 #include "mongo/db/repl/rs.h" // replSet bool
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     extern bool replSetBlind;
     extern unsigned replSetForceInitialSyncFailure;
@@ -75,5 +75,5 @@ namespace replset {
         }
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

@@ -33,7 +33,7 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     unsigned int HeartbeatInfo::numPings;
 
@@ -85,5 +85,5 @@ namespace replset {
     }
 
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

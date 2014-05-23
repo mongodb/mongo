@@ -277,17 +277,17 @@ namespace mongo {
             ss << "# databases: " << dbHolder().sizeInfo() << '\n';
             ss << "# Cursors: " << ClientCursor::totalOpen() << '\n';
             ss << "replication: ";
-            if (*replset::replInfo)
-                ss << "\nreplInfo:  " << replset::replInfo << "\n\n";
-            if (replset::replSet) {
+            if (*repl::replInfo)
+                ss << "\nreplInfo:  " << repl::replInfo << "\n\n";
+            if (repl::replSet) {
                 ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>"
-                   << replset::replSettings.replSet;
+                   << repl::replSettings.replSet;
             }
-            if (replset::replAllDead)
-                ss << "\n<b>replication replAllDead=" << replset::replAllDead << "</b>\n";
+            if (repl::replAllDead)
+                ss << "\n<b>replication replAllDead=" << repl::replAllDead << "</b>\n";
             else {
-                ss << "\nmaster: " << replset::replSettings.master << '\n';
-                ss << "slave:  " << replset::replSettings.slave << '\n';
+                ss << "\nmaster: " << repl::replSettings.master << '\n';
+                ss << "slave:  " << repl::replSettings.slave << '\n';
                 ss << '\n';
             }
 

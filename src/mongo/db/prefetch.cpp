@@ -117,16 +117,16 @@ namespace mongo {
     void prefetchIndexPages(Collection* collection, const BSONObj& obj) {
         DiskLoc unusedDl; // unused
         BSONObjSet unusedKeys;
-        replset::ReplSetImpl::IndexPrefetchConfig prefetchConfig =
-                                                    replset::theReplSet->getIndexPrefetchConfig();
+        repl::ReplSetImpl::IndexPrefetchConfig prefetchConfig =
+                                                    repl::theReplSet->getIndexPrefetchConfig();
 
         // do we want prefetchConfig to be (1) as-is, (2) for update ops only, or (3) configured per op type?  
         // One might want PREFETCH_NONE for updates, but it's more rare that it is a bad idea for inserts.  
         // #3 (per op), a big issue would be "too many knobs".
         switch (prefetchConfig) {
-        case replset::ReplSetImpl::PREFETCH_NONE:
+        case repl::ReplSetImpl::PREFETCH_NONE:
             return;
-        case replset::ReplSetImpl::PREFETCH_ID_ONLY:
+        case repl::ReplSetImpl::PREFETCH_ID_ONLY:
         {
             TimerHolder timer( &prefetchIndexStats);
             // on the update op case, the call to prefetchRecordPages will touch the _id index.
@@ -144,7 +144,7 @@ namespace mongo {
             }
             break;
         }
-        case replset::ReplSetImpl::PREFETCH_ALL:
+        case repl::ReplSetImpl::PREFETCH_ALL:
         {
             // indexCount includes all indexes, including ones
             // in the process of being built

@@ -42,7 +42,7 @@
 using namespace std;
 
 namespace mongo {
-namespace replset {
+namespace repl {
     
     using namespace bson;
 
@@ -139,7 +139,7 @@ namespace replset {
     }
 
     void ReplSet::shutdown() {
-        replset::BackgroundSync::shutdown();
+        repl::BackgroundSync::shutdown();
     }
 
     void replLocalAuth() {
@@ -205,5 +205,5 @@ namespace replset {
         }
 
     } replIndexPrefetch;
-} // namespace replset
+} // namespace repl
 } // namespace mongo

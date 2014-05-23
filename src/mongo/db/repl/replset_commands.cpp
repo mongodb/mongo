@@ -43,7 +43,7 @@
 using namespace bson;
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     void checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial);
 
@@ -83,7 +83,7 @@ namespace replset {
             }
 
             if (cmdObj.hasElement("sethbmsg")) {
-                replset::sethbmsg(cmdObj["sethbmsg"].String());
+                repl::sethbmsg(cmdObj["sethbmsg"].String());
                 return true;
             }
 
@@ -453,5 +453,5 @@ namespace replset {
         }
     } cmdReplSetUpdatePosition;
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

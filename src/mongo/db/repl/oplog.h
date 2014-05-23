@@ -34,7 +34,7 @@ namespace mongo {
     class OperationContext;
     class OpTime;
 
-namespace replset {
+namespace repl {
 
     // These functions redefine the function for logOp(),
     // for either master/slave or replica sets.
@@ -113,5 +113,5 @@ namespace replset {
      * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
      */
     void initOpTimeFromOplog(const std::string& oplogNS);
-} // namespace replset
+} // namespace repl
 } // namespace mongo

@@ -45,7 +45,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     //number of readers created;
     //  this happens when the source source changes, a reconfig/network-error or the cursor dies
@@ -189,5 +189,5 @@ namespace replset {
         tailingQuery(ns, query.done(), fields);
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

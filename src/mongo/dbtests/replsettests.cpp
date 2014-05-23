@@ -48,10 +48,10 @@
 namespace ReplSetTests {
     const int replWriterThreadCount(32);
     const int replPrefetcherThreadCount(32);
-    class ReplSetTest : public mongo::replset::ReplSet {
-        mongo::replset::ReplSetConfig *_config;
-        mongo::replset::ReplSetConfig::MemberCfg *_myConfig;
-        mongo::replset::BackgroundSyncInterface *_syncTail;
+    class ReplSetTest : public mongo::repl::ReplSet {
+        mongo::repl::ReplSetConfig *_config;
+        mongo::repl::ReplSetConfig::MemberCfg *_myConfig;
+        mongo::repl::BackgroundSyncInterface *_syncTail;
     public:
         static const int replWriterThreadCount;
         static const int replPrefetcherThreadCount;
@@ -60,7 +60,7 @@ namespace ReplSetTests {
             ret->init();
             // we need to get() the BackgroundSync so that it has its s_instance initialized
             // since applyOps() eventually calls notify() which makes use of the s_instance
-            mongo::replset::BackgroundSync::get();
+            mongo::repl::BackgroundSync::get();
             return ret.release();
         }
         virtual ~ReplSetTest() {
@@ -76,16 +76,16 @@ namespace ReplSetTests {
         virtual bool tryToGoLiveAsASecondary(OpTime& minvalid) {
             return false;
         }
-        virtual const mongo::replset::ReplSetConfig& config() {
+        virtual const mongo::repl::ReplSetConfig& config() {
             return *_config;
         }
-        virtual const mongo::replset::ReplSetConfig::MemberCfg& myConfig() {
+        virtual const mongo::repl::ReplSetConfig::MemberCfg& myConfig() {
             return *_myConfig;
         }
         virtual bool buildIndexes() const {
             return true;
         }
-        void setSyncTail(replset::BackgroundSyncInterface *syncTail) {
+        void setSyncTail(repl::BackgroundSyncInterface *syncTail) {
             _syncTail = syncTail;
         }
     private:
@@ -95,13 +95,13 @@ namespace ReplSetTests {
         void init() {
             BSONArrayBuilder members;
             members.append(BSON("_id" << 0 << "host" << "host1"));
-            _config = mongo::replset::ReplSetConfig::make(BSON("_id" << "foo"
+            _config = mongo::repl::ReplSetConfig::make(BSON("_id" << "foo"
                                                             << "members" << members.arr()));
-            _myConfig = new mongo::replset::ReplSetConfig::MemberCfg();
+            _myConfig = new mongo::repl::ReplSetConfig::MemberCfg();
         }
     };
 
-    class BackgroundSyncTest : public replset::BackgroundSyncInterface {
+    class BackgroundSyncTest : public repl::BackgroundSyncInterface {
         std::queue<BSONObj> _queue;
     public:
         BackgroundSyncTest() {}
@@ -116,7 +116,7 @@ namespace ReplSetTests {
         virtual void consume() {
             _queue.pop();
         }
-        virtual mongo::replset::Member* getSyncTarget() {
+        virtual mongo::repl::Member* getSyncTarget() {
             return 0;
         }
         void addDoc(BSONObj doc) {
@@ -133,7 +133,7 @@ namespace ReplSetTests {
         static DBDirectClient client_;
     protected:
         static BackgroundSyncTest* _bgsync;
-        static replset::SyncTail* _tailer;
+        static repl::SyncTail* _tailer;
     public:
         Base() {
         }
@@ -186,30 +186,30 @@ namespace ReplSetTests {
             db->dropCollection(&txn, ns());
         }
         static void setup() {
-            mongo::replset::replSettings.replSet = "foo";
-            mongo::replset::replSettings.oplogSize = 5 * 1024 * 1024;
-            mongo::replset::createOplog();
+            mongo::repl::replSettings.replSet = "foo";
+            mongo::repl::replSettings.oplogSize = 5 * 1024 * 1024;
+            mongo::repl::createOplog();
 
             // setup background sync instance
             _bgsync = new BackgroundSyncTest();
 
             // setup tail
-            _tailer = new replset::SyncTail(_bgsync);
+            _tailer = new repl::SyncTail(_bgsync);
 
             // setup theReplSet
             ReplSetTest *rst = ReplSetTest::make();
             rst->setSyncTail(_bgsync);
 
-            delete replset::theReplSet;
-            replset::theReplSet = rst;
+            delete repl::theReplSet;
+            repl::theReplSet = rst;
         }
     };
 
     DBDirectClient Base::client_;
     BackgroundSyncTest* Base::_bgsync = NULL;
-    replset::SyncTail* Base::_tailer = NULL;
+    repl::SyncTail* Base::_tailer = NULL;
 
-    class MockInitialSync : public replset::InitialSync {
+    class MockInitialSync : public repl::InitialSync {
         int step;
     public:
         MockInitialSync() : InitialSync(0), step(0), failOnStep(SUCCEED), retry(true) {}
@@ -250,19 +250,19 @@ namespace ReplSetTests {
             // all three should succeed
             std::vector<BSONObj> ops;
             ops.push_back(obj);
-            replset::multiInitialSyncApply(ops, &mock);
+            repl::multiInitialSyncApply(ops, &mock);
 
             mock.failOnStep = MockInitialSync::FAIL_FIRST_APPLY;
-            replset::multiInitialSyncApply(ops, &mock);
+            repl::multiInitialSyncApply(ops, &mock);
 
             mock.retry = false;
-            replset::multiInitialSyncApply(ops, &mock);
+            repl::multiInitialSyncApply(ops, &mock);
 
             drop();
         }
     };
 
-    class SyncTest2 : public replset::InitialSync {
+    class SyncTest2 : public repl::InitialSync {
     public:
         bool insertOnRetry;
         SyncTest2() : InitialSync(0), insertOnRetry(false) {}
@@ -359,7 +359,7 @@ namespace ReplSetTests {
             Client::Context ctx( _cappedNs );
             OperationContextImpl txn;
             // in an annoying twist of api, returns true on failure
-            return !mongo::replset::applyOperation_inlock(&txn, ctx.db(), op, true);
+            return !mongo::repl::applyOperation_inlock(&txn, ctx.db(), op, true);
         }
 
         void run() {
@@ -367,7 +367,7 @@ namespace ReplSetTests {
 
             BSONObj op = updateFail();
 
-            mongo::replset::Sync s("");
+            mongo::repl::Sync s("");
             verify(!s.shouldRetry(op));
         }
     };
@@ -527,7 +527,7 @@ namespace ReplSetTests {
         void run() {
             const int expected = 100;
 
-            replset::theReplSet->syncSourceFeedback.ensureMe();
+            repl::theReplSet->syncSourceFeedback.ensureMe();
 
             drop();
             addInserts(100);

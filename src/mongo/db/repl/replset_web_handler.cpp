@@ -36,7 +36,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     using namespace bson;
     using namespace mongoutils;
@@ -126,5 +126,5 @@ namespace replset {
 
     } replSetHandler;
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

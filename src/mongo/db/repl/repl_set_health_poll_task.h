@@ -36,7 +36,7 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     /**
      * Poll every other set member to check its status.
@@ -91,5 +91,5 @@ namespace replset {
         time_t _timeout;
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

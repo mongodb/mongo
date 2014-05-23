@@ -33,7 +33,7 @@
 namespace mongo {
     class BSONObj;
 
-namespace replset {
+namespace repl {
 
     /* throws */
     bool requestHeartbeat(const std::string& setname,
@@ -43,5 +43,5 @@ namespace replset {
                           int myConfigVersion,
                           int& theirConfigVersion,
                           bool checkEmpty = false);
-} // namespace replset
+} // namespace repl
 } // namespace mongo

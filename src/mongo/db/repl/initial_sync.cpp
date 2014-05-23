@@ -35,7 +35,7 @@
 #include "mongo/db/repl/rs.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
     InitialSync::InitialSync(BackgroundSyncInterface *q) : 
         SyncTail(q) {}
 
@@ -58,5 +58,5 @@ namespace replset {
         return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

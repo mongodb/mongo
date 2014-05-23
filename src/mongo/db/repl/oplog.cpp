@@ -65,7 +65,7 @@
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static Database* localDB = NULL;
@@ -151,7 +151,7 @@ namespace replset {
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
 
-                replset::BackgroundSync::notify();
+                repl::BackgroundSync::notify();
             }
         }
 
@@ -773,5 +773,5 @@ namespace replset {
             setNewOptime(lastOp[ "ts" ].date());
         }
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

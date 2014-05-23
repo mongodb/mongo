@@ -31,7 +31,7 @@
 #include "mongo/db/repl/sync_tail.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     class BackgroundSyncInterface;
 
@@ -50,5 +50,5 @@ namespace replset {
         BSONObj oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

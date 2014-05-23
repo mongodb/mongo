@@ -107,7 +107,7 @@ namespace mongo {
 
                 toCollection->insertDocument( txn, obj, true );
                 if ( logForReplication )
-                    replset::logOp(txn, "i", toNs.c_str(), obj);
+                    repl::logOp(txn, "i", toNs.c_str(), obj);
                 txn->recoveryUnit()->commitIfNeeded();
             }
         }
@@ -241,7 +241,7 @@ namespace mongo {
                 return appendCommandStatus( result, status );
 
             if (!fromRepl)
-                replset::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
             return true;
         }
     } cmdConvertToCapped;

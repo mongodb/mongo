@@ -47,7 +47,7 @@
 #include "mongo/util/ramlog.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
     /* decls for connections.h */
     ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());
     mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
@@ -456,7 +456,7 @@ namespace replset {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", myState.s);
-        const Member *syncTarget = replset::BackgroundSync::get()->getSyncTarget();
+        const Member *syncTarget = repl::BackgroundSync::get()->getSyncTarget();
         if ( syncTarget &&
             (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_SHUNNED) ) {
@@ -466,5 +466,5 @@ namespace replset {
         if( replSetBlind )
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
-} // namespace replset
+} // namespace repl
 } // namespace mongo

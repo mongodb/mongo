@@ -82,7 +82,7 @@
  */
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     using namespace bson;
 
@@ -742,5 +742,5 @@ namespace replset {
         return 0;
     }
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

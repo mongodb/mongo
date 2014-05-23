@@ -32,7 +32,7 @@
 #include "mongo/db/repl/rs_sync.h" // maxSyncSourceLagSecs
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     TopologyCoordinatorImpl::TopologyCoordinatorImpl() :
         _majorityNumber(0) {
@@ -263,5 +263,5 @@ namespace replset {
     }
 
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

@@ -35,7 +35,7 @@
 #include "mongo/util/concurrency/value.h"
 
 namespace mongo {
-namespace replset {
+namespace repl {
 
     /* this is supposed to be just basic information on a member,
        and copy constructable. */
@@ -82,5 +82,5 @@ namespace replset {
         unsigned _id;
     };
 
-} // namespace replset
+} // namespace repl
 } // namespace mongo

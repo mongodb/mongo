@@ -404,7 +404,7 @@ namespace mongo {
                     b.append( "create", nsToCollectionSubstring( _config.tempNamespace ));
                     b.appendElements( options.toBSON() );
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".$cmd";
-                    replset::logOp(_txn, "c", logNs.c_str(), b.obj());
+                    repl::logOp(_txn, "c", logNs.c_str(), b.obj());
                 }
 
                 for ( vector<BSONObj>::iterator it = indexesToInsert.begin();
@@ -412,7 +412,7 @@ namespace mongo {
                     tempColl->getIndexCatalog()->createIndex(_txn, *it, false );
                     // Log the createIndex operation.
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
-                    replset::logOp(_txn, "i", logNs.c_str(), *it);
+                    repl::logOp(_txn, "i", logNs.c_str(), *it);
                 }
             }
 
@@ -636,7 +636,7 @@ namespace mongo {
             BSONObj bo = b.obj();
 
             coll->insertDocument( _txn, bo, true );
-            replset::logOp(_txn, "i", ns.c_str(), bo);
+            repl::logOp(_txn, "i", ns.c_str(), bo);
         }
 
         /**
@@ -1182,7 +1182,7 @@ namespace mongo {
             /* why !replset ?
                bad things happen with --slave (i think because of this)
             */
-            virtual bool slaveOk() const { return !replset::replSet; }
+            virtual bool slaveOk() const { return !repl::replSet; }
 
             virtual bool slaveOverrideOk() const { return true; }
 
@@ -1238,10 +1238,10 @@ namespace mongo {
                     return false;
                 }
 
-                if (replset::replSet && state.isOnDisk()) {
+                if (repl::replSet && state.isOnDisk()) {
                     // this means that it will be doing a write operation, make sure we are on Master
                     // ideally this check should be in slaveOk(), but at that point config is not known
-                    if (!replset::isMasterNs(dbname.c_str())) {
+                    if (!repl::isMasterNs(dbname.c_str())) {
                         errmsg = "not master";
                         return false;
                     }
@@ -1428,7 +1428,7 @@ namespace mongo {
         public:
             void help(stringstream& h) const { h << "internal"; }
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ) {}
-            virtual bool slaveOk() const { return !replset::replSet; }
+            virtual bool slaveOk() const { return !repl::replSet; }
             virtual bool slaveOverrideOk() const { return true; }
             virtual bool isWriteCommandForConfigServer() const { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,

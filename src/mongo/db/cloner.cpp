@@ -164,7 +164,7 @@ namespace mongo {
                 }
                 uassertStatusOK( loc.getStatus() );
                 if (logForRepl)
-                    replset::logOp(txn, "i", to_collection, js);
+                    repl::logOp(txn, "i", to_collection, js);
 
                 txn->recoveryUnit()->commitIfNeeded();
 
@@ -250,7 +250,7 @@ namespace mongo {
                 }
 
                 if (logForRepl)
-                    replset::logOp(txn, "i", to_collection, spec);
+                    repl::logOp(txn, "i", to_collection, spec);
 
                 txn->recoveryUnit()->commitIfNeeded();
 
@@ -287,7 +287,7 @@ namespace mongo {
         // cloner owns _conn in auto_ptr
         cloner.setConnection(tmpConn);
         uassert(15908, errmsg,
-                tmpConn->connect(host, errmsg) && replset::replAuthenticate(tmpConn));
+                tmpConn->connect(host, errmsg) && repl::replAuthenticate(tmpConn));
 
         return cloner.copyCollection(txn, ns, BSONObj(), errmsg, true, false, true, false);
     }
@@ -371,7 +371,7 @@ namespace mongo {
                 auto_ptr<DBClientBase> con( cs.connect( errmsg ));
                 if ( !con.get() )
                     return false;
-                if (!replset::replAuthenticate(con.get()))
+                if (!repl::replAuthenticate(con.get()))
                     return false;
                 
                 _conn = con;

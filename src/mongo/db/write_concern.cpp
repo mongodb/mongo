@@ -53,8 +53,8 @@ namespace mongo {
         }
 
         const bool isConfigServer = serverGlobalParams.configsvr;
-        const bool isMasterSlaveNode = replset::anyReplEnabled() && !replset::theReplSet;
-        const bool isReplSetNode = replset::anyReplEnabled() && replset::theReplSet;
+        const bool isMasterSlaveNode = repl::anyReplEnabled() && !repl::theReplSet;
+        const bool isReplSetNode = repl::anyReplEnabled() && repl::theReplSet;
 
         if ( isConfigServer || ( !isMasterSlaveNode && !isReplSetNode ) ) {
 
@@ -167,12 +167,12 @@ namespace mongo {
             return Status::OK();
         }
 
-        if (!replset::anyReplEnabled() || serverGlobalParams.configsvr) {
+        if (!repl::anyReplEnabled() || serverGlobalParams.configsvr) {
             // no replication check needed (validated above)
             return Status::OK();
         }
 
-        const bool isMasterSlaveNode = replset::anyReplEnabled() && !replset::theReplSet;
+        const bool isMasterSlaveNode = repl::anyReplEnabled() && !repl::theReplSet;
         if ( writeConcern.wMode == "majority" && isMasterSlaveNode ) {
             // with master/slave, majority is equivalent to w=1
             return Status::OK();
@@ -189,11 +189,11 @@ namespace mongo {
             while ( 1 ) {
 
                 if ( writeConcern.wNumNodes > 0 ) {
-                    if (replset::opReplicatedEnough(replOpTime, writeConcern.wNumNodes)) {
+                    if (repl::opReplicatedEnough(replOpTime, writeConcern.wNumNodes)) {
                         break;
                     }
                 }
-                else if (replset::opReplicatedEnough(replOpTime, writeConcern.wMode)) {
+                else if (repl::opReplicatedEnough(replOpTime, writeConcern.wMode)) {
                     break;
                 }
 
@@ -217,7 +217,7 @@ namespace mongo {
         }
 
         // Add stats
-        result->writtenTo = replset::getHostsWrittenTo(replOpTime);
+        result->writtenTo = repl::getHostsWrittenTo(replOpTime);
         result->wTime = gleTimerHolder.recordMillis();
 
         return replStatus;

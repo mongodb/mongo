@@ -87,7 +87,7 @@ namespace mongo {
                                                       exclusiveUpper,
                                                       keyPattern),
                                              false, /*maxInclusive*/
-                                             replset::replSet ? secondaryThrottle : false,
+                                             repl::replSet ? secondaryThrottle : false,
                                              serverGlobalParams.moveParanoia ? &removeSaver : NULL,
                                              true, /*fromMigrate*/
                                              true); /*onlyRemoveOrphans*/
@@ -124,10 +124,10 @@ namespace mongo {
             }
         }
 
-        if (replset::replSet) {
+        if (repl::replSet) {
             Timer elapsedTime;
             ReplTime lastOpApplied = cc().getLastOp().asDate();
-            while (!replset::opReplicatedEnough(lastOpApplied,
+            while (!repl::opReplicatedEnough(lastOpApplied,
                                        BSON("w" << "majority").firstElement())) {
                 if (elapsedTime.seconds() >= 3600) {
                     *errMsg = str::stream() << "rangeDeleter timed out after "
