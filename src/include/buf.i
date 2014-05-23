@@ -81,6 +81,16 @@ __wt_buf_set(
 }
 
 /*
+ * __wt_buf_setstr --
+ *	Set the contents of the buffer to a NUL-terminated string.
+ */
+static inline int
+__wt_buf_setstr(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *s)
+{
+        return (__wt_buf_set(session, buf, s, strlen(s) + 1));
+}
+
+/*
  * __wt_buf_set_printable --
  *	Set the contents of the buffer to a printable representation of a
  * byte string.

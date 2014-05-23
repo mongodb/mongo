@@ -29,8 +29,7 @@ util_upgrade(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-	if ((name = util_name(*argv,
-	    "table", UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
+	if ((name = util_name(*argv, "table")) == NULL)
 		return (1);
 
 	if ((ret = session->upgrade(session, name, NULL)) != 0) {
