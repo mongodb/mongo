@@ -107,49 +107,43 @@ __async_new_op_alloc(WT_CONNECTION_IMPL *conn, const char *uri,
 {
 	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	uint32_t found, i, save_i, view;
+	uint32_t i, save_i, view;
 
 	async = conn->async;
 	session = conn->default_session;
 	WT_STAT_FAST_CONN_INCR(conn->default_session, async_op_alloc);
 	*opp = NULL;
-	op = NULL;
+
 retry:
-	ret = 0;
+	op = NULL;
 	WT_ORDERED_READ(save_i, async->ops_index);
 	/*
 	 * Look after the last one allocated for a free one.  We'd expect
 	 * ops to be freed mostly FIFO so we should quickly find one.
 	 */
-	for (view = 1, found = 0, i = save_i;
-	    i < conn->async_size; i++, view++) {
+	for (view = 1, i = save_i; i < conn->async_size; i++, view++) {
 		op = &async->async_ops[i];
-		if (op->state == WT_ASYNCOP_FREE) {
-			found = 1;
+		if (op->state == WT_ASYNCOP_FREE)
 			break;
-		}
 	}
+
 	/*
 	 * Loop around back to the beginning if we need to.
 	 */
-	if (!found) {
+	if (op == NULL || op->state != WT_ASYNCOP_FREE)
 		for (i = 0; i < save_i; i++, view++) {
 			op = &async->async_ops[i];
-			if (op->state == WT_ASYNCOP_FREE) {
-				found = 1;
+			if (op->state == WT_ASYNCOP_FREE)
 				break;
-			}
 		}
-	}
+
 	/*
 	 * We still haven't found one.  Return an error.
 	 */
-	if (!found) {
-		ret = ENOMEM;
+	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
 		WT_STAT_FAST_CONN_INCR(session, async_full);
-		goto err;
+		WT_RET(ENOMEM);
 	}
 	/*
 	 * Set the state of this op handle as READY for the user to use.
@@ -161,13 +155,12 @@ retry:
 		goto retry;
 	}
 	WT_STAT_FAST_CONN_INCRV(conn->default_session, async_alloc_view, view);
-	WT_ERR(__async_get_format(conn, uri, config, op));
+	WT_RET(__async_get_format(conn, uri, config, op));
 	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
 	op->optype = WT_AOP_NONE;
 	(void)WT_ATOMIC_STORE(async->ops_index, (i + 1) % conn->async_size);
 	*opp = op;
-err:
-	return (ret);
+	return (0);
 }
 
 /*
@@ -187,6 +180,8 @@ __async_config(WT_SESSION_IMPL *session,
 	if ((ret = __wt_config_gets(
 	    session, cfg, "async.enabled", &cval)) == 0)
 		*runp = cval.val != 0;
+	WT_RET_NOTFOUND_OK(ret);
+
 	/*
 	 * Even if async is turned off, we want to parse and store the
 	 * default values so that reconfigure can just enable them.
@@ -194,6 +189,7 @@ __async_config(WT_SESSION_IMPL *session,
 	if ((ret = __wt_config_gets(
 	    session, cfg, "async.ops_max", &cval)) == 0)
 		conn->async_size = (uint32_t)cval.val;
+	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_gets(
 	    session, cfg, "async.threads", &cval)) == 0) {
@@ -203,8 +199,7 @@ __async_config(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	ret = 0;
-	return (ret);
+	return (0);
 }
 
 /*
