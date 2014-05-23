@@ -78,9 +78,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			free(name);
 			name = NULL;
 		}
-		if ((name = util_name(argv[i], "table",
-		    UTIL_FILE_OK | UTIL_INDEX_OK | UTIL_LSM_OK |
-		    UTIL_METADATA_OK | UTIL_TABLE_OK)) == NULL)
+		if ((name = util_name(argv[i], "table")) == NULL)
 			goto err;
 
 		if (json && dump_json_table_config(session, name) != 0)

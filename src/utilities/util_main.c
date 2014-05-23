@@ -231,47 +231,18 @@ usage(void)
  *	Build a name.
  */
 char *
-util_name(const char *s, const char *type, u_int flags)
+util_name(const char *s, const char *type)
 {
 	size_t len;
-	int copy;
 	char *name;
 
-	copy = 0;
-	if (WT_PREFIX_MATCH(s, "backup:")) {
-		goto type_err;
-	} else if (WT_PREFIX_MATCH(s, "colgroup:")) {
-		if (!(flags & UTIL_COLGROUP_OK))
-			goto type_err;
-		copy = 1;
-	} else if (WT_PREFIX_MATCH(s, "config:")) {
-		goto type_err;
-	} else if (WT_PREFIX_MATCH(s, "file:")) {
-		if (!(flags & UTIL_FILE_OK))
-			goto type_err;
-		copy = 1;
-	} else if (WT_PREFIX_MATCH(s, "index:")) {
-		if (!(flags & UTIL_INDEX_OK))
-			goto type_err;
-		copy = 1;
-	} else if (WT_PREFIX_MATCH(s, "lsm:")) {
-		if (!(flags & UTIL_LSM_OK))
-			goto type_err;
-		copy = 1;
-	} else if (WT_PREFIX_MATCH(s, "metadata:")) {
-		if (!(flags & UTIL_METADATA_OK))
-			goto type_err;
-		copy = 1;
-	} else if (WT_PREFIX_MATCH(s, "statistics:")) {
-		goto type_err;
-	} else if (WT_PREFIX_MATCH(s, "table:")) {
-		if (!(flags & UTIL_TABLE_OK)) {
-type_err:		fprintf(stderr,
-			    "%s: %s: unsupported object type: %s\n",
-			    progname, command, s);
-			return (NULL);
-		}
-		copy = 1;
+	if (WT_PREFIX_MATCH(s, "backup:") ||
+	    WT_PREFIX_MATCH(s, "config:") ||
+	    WT_PREFIX_MATCH(s, "statistics:")) {
+		fprintf(stderr,
+		    "%s: %s: unsupported object type: %s\n",
+		    progname, command, s);
+		return (NULL);
 	}
 
 	len = strlen(type) + strlen(s) + 2;
@@ -280,7 +251,11 @@ type_err:		fprintf(stderr,
 		return (NULL);
 	}
 
-	if (copy)
+	/*
+	 * If the string has a URI prefix, use it verbatim, otherwise prepend
+	 * the default type for the operation.
+	 */
+	if (strchr(s, ':') != NULL)
 		strcpy(name, s);
 	else
 		snprintf(name, len, "%s:%s", type, s);
