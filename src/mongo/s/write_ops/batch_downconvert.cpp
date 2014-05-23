@@ -149,11 +149,37 @@ namespace mongo {
         return Status::OK();
     }
 
-    void BatchSafeWriter::extractGLEStats( const BSONObj& gleResponse, GLEStats* stats ) {
+    void BatchSafeWriter::extractGLEStats(const BSONObj& gleResponse,
+                                          const BatchItemRef& batchItem,
+                                          GLEStats* stats) {
+
         stats->n = gleResponse["n"].numberInt();
+
         if ( !gleResponse["upserted"].eoo() ) {
             stats->upsertedId = gleResponse["upserted"].wrap( "upserted" );
         }
+        else if (batchItem.getOpType() == BatchedCommandRequest::BatchType_Update
+                 && !gleResponse["updatedExisting"].eoo()
+                 && !gleResponse["updatedExisting"].trueValue() && stats->n == 1) {
+
+            // v2.4 doesn't include the upserted field when the upserted id isn't an OID.
+            // Note that updatedExisting only appears in GLE after update.
+
+            // Rip out the upserted _id from the request item
+            // This is only safe b/c v2.4 doesn't allow modifiers on _id
+            BSONObj upsertedId;
+            if (!batchItem.getUpdate()->getUpdateExpr()["_id"].eoo()) {
+                upsertedId = batchItem.getUpdate()->getUpdateExpr()["_id"].wrap("upserted");
+            }
+            else if (!batchItem.getUpdate()->getQuery()["_id"].eoo()) {
+                upsertedId = batchItem.getUpdate()->getQuery()["_id"].wrap("upserted");
+            }
+
+            dassert(!upsertedId.isEmpty());
+
+            stats->upsertedId = upsertedId;
+        }
+
         if ( gleResponse["lastOp"].type() == Timestamp ) {
             stats->lastOp = gleResponse["lastOp"]._opTime();
         }
@@ -223,7 +249,7 @@ namespace mongo {
             //
 
             GLEStats stats;
-            extractGLEStats( gleResult, &stats );
+            extractGLEStats( gleResult, itemRef, &stats );
 
             // Special case for making legacy "n" field result for insert match the write
             // command result.

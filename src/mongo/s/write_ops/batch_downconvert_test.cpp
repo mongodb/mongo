@@ -57,7 +57,8 @@ namespace {
         ASSERT( !errors.wcError.get() );
 
         BatchSafeWriter::GLEStats stats;
-        BatchSafeWriter::extractGLEStats( gleResponse, &stats );
+        const BatchedCommandRequest dummyRequest(BatchedCommandRequest::BatchType_Insert);
+        BatchSafeWriter::extractGLEStats(gleResponse, BatchItemRef(&dummyRequest, 0), &stats);
         ASSERT_EQUALS( stats.n, 0 );
         ASSERT( stats.upsertedId.isEmpty() );
     }
@@ -186,9 +187,49 @@ namespace {
         ASSERT( !errors.wcError.get() );
 
         BatchSafeWriter::GLEStats stats;
-        BatchSafeWriter::extractGLEStats( gleResponse, &stats );
+        const BatchedCommandRequest dummyRequest(BatchedCommandRequest::BatchType_Delete);
+        BatchSafeWriter::extractGLEStats(gleResponse, BatchItemRef(&dummyRequest, 0), &stats);
         ASSERT_EQUALS( stats.n, 2 );
         ASSERT( stats.upsertedId.isEmpty() );
+    }
+
+    TEST(GLEParsing, UpsertedStats) {
+        const BSONObj gleResponse = fromjson( "{ok: 1.0, n: 1, upserted: 'abcde',"
+                                              " updatedExisting: false}" );
+
+        BatchSafeWriter::GLEStats stats;
+        const BatchedCommandRequest dummyRequest(BatchedCommandRequest::BatchType_Update);
+        BatchSafeWriter::extractGLEStats(gleResponse, BatchItemRef(&dummyRequest, 0), &stats);
+        ASSERT_EQUALS( stats.n, 1 );
+        ASSERT_EQUALS( stats.upsertedId.firstElement().str(), "abcde" );
+    }
+
+    TEST(GLEParsing, UpsertedV24Stats) {
+
+        // v24 doesn't give us back non-OID upserted ids
+
+        BatchedCommandRequest request(BatchedCommandRequest::BatchType_Update);
+
+        auto_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument);
+        updateDoc->setQuery(BSON("_id" << "abcde"));
+        updateDoc->setUpdateExpr(BSONObj());
+        request.getUpdateRequest()->addToUpdates(updateDoc.release());
+
+        updateDoc.reset(new BatchedUpdateDocument);
+        updateDoc->setQuery(BSON("_id" << "12345"));
+        updateDoc->setUpdateExpr(BSON("_id" << "abcde"));
+        request.getUpdateRequest()->addToUpdates(updateDoc.release());
+
+        const BSONObj gleResponse = fromjson("{ok: 1.0, n: 1, updatedExisting: false}");
+
+        BatchSafeWriter::GLEStats stats;
+        BatchSafeWriter::extractGLEStats(gleResponse, BatchItemRef(&request, 0), &stats);
+        ASSERT_EQUALS(stats.n, 1);
+        ASSERT_EQUALS(stats.upsertedId.firstElement().str(), "abcde");
+
+        BatchSafeWriter::extractGLEStats(gleResponse, BatchItemRef(&request, 1), &stats);
+        ASSERT_EQUALS(stats.n, 1);
+        ASSERT_EQUALS(stats.upsertedId.firstElement().str(), "abcde");
     }
 
     TEST(GLEParsing, ReplTimeoutErrWithStats) {
@@ -205,7 +246,8 @@ namespace {
         ASSERT_EQUALS( errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed );
 
         BatchSafeWriter::GLEStats stats;
-        BatchSafeWriter::extractGLEStats( gleResponse, &stats );
+        const BatchedCommandRequest dummyRequest(BatchedCommandRequest::BatchType_Insert);
+        BatchSafeWriter::extractGLEStats(gleResponse, BatchItemRef(&dummyRequest, 0), &stats);
         ASSERT_EQUALS( stats.n, 1 );
         ASSERT_EQUALS( stats.upsertedId.firstElement().str(), "abcde" );
     }

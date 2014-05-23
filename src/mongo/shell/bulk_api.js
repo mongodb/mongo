@@ -1034,8 +1034,25 @@ var _bulk_api_module = (function() {
         }
 
         if(_legacyOp.batchType == UPDATE) {
-          if(result.upserted) {
+
+          // Unfortunately v2.4 GLE does not include the upserted field when
+          // the upserted _id is non-OID type.  We can detect this by the
+          // updatedExisting field + an n of 1
+          var upserted = result.upserted !== undefined ||
+                         (result.updatedExisting === false && result.n == 1);
+
+          if(upserted) {
             batchResult.n = batchResult.n + 1;
+
+            // If we don't have an upserted value, see if we can pull it from the update or the
+            // query
+            if (result.upserted === undefined) {
+                result.upserted = _legacyOp.operation.u._id;
+                if (result.upserted === undefined) {
+                    result.upserted = _legacyOp.operation.q._id;
+                }
+            }
+
             batchResult.upserted.push({
                 index: _legacyOp.index
               , _id: result.upserted

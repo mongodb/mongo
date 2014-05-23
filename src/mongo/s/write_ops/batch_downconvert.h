@@ -126,7 +126,9 @@ namespace mongo {
         /**
          * Given a GLE response, pulls out stats for the previous write operation.
          */
-        static void extractGLEStats( const BSONObj& gleResponse, GLEStats* stats );
+        static void extractGLEStats(const BSONObj& gleResponse,
+                                    const BatchItemRef& batchItem,
+                                    GLEStats* stats);
 
         /**
          * Given a GLE response, strips out all non-write-concern related information
