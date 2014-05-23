@@ -1,5 +1,5 @@
 /**
- * This test checks update write command corner cases:
+ * This test checks update write command corner cases for mongos:
  *   -- nModified behavior
  *   -- other?
  */
@@ -81,6 +81,31 @@ var req = {update:coll24.getName(),
 var res = assert.commandWorked(coll24.getDB().runCommand(req));
 assert.eq(undefined, res.nModified, tojson(res))
 assert.eq(22, res.n, tojson(res))
+
+// Test non-OID upsert behavior
+
+// 2.6 mongod shard
+var upsertedId = ObjectId().toString();
+var req = {update:coll26.getName(),
+           updates:[
+                {q:{_id:upsertedId}, u:{$set:{a:1}}, upsert:true}
+           ]
+       };
+var res = assert.commandWorked(coll26.getDB().runCommand(req));
+assert.eq(0, res.nModified, "coll26: " + tojson(res));
+assert.eq(1, res.n, "coll26: " + tojson(res));
+assert.eq(upsertedId, res.upserted[0]._id,  "coll26: " + tojson(res));
+
+// 2.4 mongod shard
+var upsertedId = ObjectId().toString();
+var req = {update:coll24.getName(),
+           updates:[
+                {q:{_id:upsertedId}, u:{$set:{a:1}}, upsert:true}
+           ]
+       };
+var res = assert.commandWorked(coll24.getDB().runCommand(req));
+assert.eq(1, res.n, "coll24: " + tojson(res));
+assert.eq(upsertedId, res.upserted[0]._id,  "coll24: " + tojson(res));
 
 // mixed version mongod shards
 var req = {update:collMixed.getName(),
