@@ -538,4 +538,52 @@ namespace {
         ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
     }
 
+    TEST(BtreeKeyGeneratorTest, ParallelArraysInNestedObjects) {
+        BSONObj keyPattern = fromjson("{'a.a': 1, 'b.a': 1}");
+        BSONObj genKeysFrom = fromjson("{a:{a:[1]}, b:{a:[1]}}");
+        BSONObjSet expectedKeys;
+        ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    }
+
+    TEST(BtreeKeyGeneratorTest, ParallelArraysUneven) {
+        BSONObj keyPattern = fromjson("{'b.a': 1, 'a': 1}");
+        BSONObj genKeysFrom = fromjson("{b:{a:[1]}, a:[1,2]}");
+        BSONObjSet expectedKeys;
+        ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys), UserException);
+    }
+
+    TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallel) {
+        BSONObj keyPattern = fromjson("{'a.b.c': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [1, 2, {b: {c: [3, 4]}}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null}"));
+        expectedKeys.insert(fromjson("{'': 3}"));
+        expectedKeys.insert(fromjson("{'': 4}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, MultipleArraysNotParallelCompound) {
+        BSONObj keyPattern = fromjson("{'a.b.c': 1, 'a.b.d': 1}");
+        BSONObj genKeysFrom = fromjson("{a: [1, 2, {b: {c: [3, 4], d: 5}}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'': null, '': null}"));
+        expectedKeys.insert(fromjson("{'': 3, '': 5}"));
+        expectedKeys.insert(fromjson("{'': 4, '': 5}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
+    TEST(BtreeKeyGeneratorTest, GetKeysComplexNestedArrays) {
+        BSONObj keyPattern = fromjson(
+            "{'a.b.c.d': 1, 'a.g': 1, 'a.b.f': 1, 'a.b.c': 1, 'a.b.e': 1}");
+        BSONObj genKeysFrom = fromjson(
+            "{a: [1, {b: [2, {c: [3, {d: 1}], e: 4}, 5, {f: 6}], g: 7}]}");
+        BSONObjSet expectedKeys;
+        expectedKeys.insert(fromjson("{'':null, '':null, '':null, '':null, '':null}"));
+        expectedKeys.insert(fromjson("{'':null, '':7, '':null, '':null, '':null}"));
+        expectedKeys.insert(fromjson("{'':null, '':7, '':null, '':3, '':4}"));
+        expectedKeys.insert(fromjson("{'':null, '':7, '':6, '':null, '':null}"));
+        expectedKeys.insert(fromjson("{'':1, '':7, '':null, '':{d: 1}, '':4}"));
+        ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys));
+    }
+
 } // namespace
