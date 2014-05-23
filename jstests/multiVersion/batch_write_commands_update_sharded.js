@@ -97,6 +97,8 @@ assert.eq(1, res.n, "coll26: " + tojson(res));
 assert.eq(upsertedId, res.upserted[0]._id,  "coll26: " + tojson(res));
 
 // 2.4 mongod shard
+// TODO: DISABLED UNTIL BACKPORT OF SERVER-13865 to v2.6
+/*
 var upsertedId = ObjectId().toString();
 var req = {update:coll24.getName(),
            updates:[
@@ -106,6 +108,7 @@ var req = {update:coll24.getName(),
 var res = assert.commandWorked(coll24.getDB().runCommand(req));
 assert.eq(1, res.n, "coll24: " + tojson(res));
 assert.eq(upsertedId, res.upserted[0]._id,  "coll24: " + tojson(res));
+*/
 
 // mixed version mongod shards
 var req = {update:collMixed.getName(),
