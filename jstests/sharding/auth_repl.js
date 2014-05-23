@@ -33,7 +33,7 @@ priTestDB.createUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles},
 assert.eq(1, testDB.auth('a', 'a'));
 
 jsTest.log('Sending an authorized query that should be ok');
-assert.writeOK(testColl.insert({ x: 1 }));
+assert.writeOK(testColl.insert({ x: 1 }, { writeConcern: { w: nodeCount }}));
 
 conn.setSlaveOk(true);
 doc = testColl.findOne();
