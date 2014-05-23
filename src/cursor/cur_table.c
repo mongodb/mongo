@@ -767,6 +767,10 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
+		WT_ERR(__wt_json_column_init(cursor, table->key_format,
+		    NULL, &table->colconf));
+
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for
 	 * any operation.  We defer opening index cursors until we need them

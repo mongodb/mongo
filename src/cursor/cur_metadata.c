@@ -232,7 +232,7 @@ __curmetadata_search(WT_CURSOR *cursor)
 	WT_MD_CURSOR_NEEDKEY(cursor);
 
 	if (WT_STRING_MATCH(
-	    (char *)cursor->key.data, "metadata:", cursor->key.size - 1))
+	    "metadata:", cursor->key.data, cursor->key.size - 1))
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 	else {
 		WT_ERR(file_cursor->search(file_cursor));
@@ -267,7 +267,7 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 	WT_MD_CURSOR_NEEDKEY(cursor);
 
 	if (WT_STRING_MATCH(
-	    (char *)cursor->key.data, "metadata:", cursor->key.size - 1)) {
+	    "metadata:", cursor->key.data, cursor->key.size - 1)) {
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 		*exact = 1;
 	} else {

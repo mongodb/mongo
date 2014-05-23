@@ -265,6 +265,10 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
+	if (LF_ISSET(WT_CURSTD_DUMP_JSON) && !LF_ISSET(WT_CURSTD_RAW))
+		WT_ERR_MSG(session, EINVAL,
+		    "Setting keys for JSON cursors not permitted");
+
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -399,6 +403,11 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
+
+	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON) &&
+	    !F_ISSET(cursor, WT_CURSTD_RAW))
+		WT_ERR_MSG(session, EINVAL,
+		    "Setting values for JSON cursors not permitted");
 
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
@@ -620,17 +629,24 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	}
 
 	/* dump */
+	/*
+	 * If an index cursor is opened with dump, then this
+	 * function is called on the index files, with the dump
+	 * config string, and with the index cursor as an owner.
+	 * We don't want to create a dump cursor in that case, because
+	 * we'll create the dump cursor on the index cursor itself.
+	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
-	if (cval.len != 0) {
-		/*
-		 * Dump cursors should not have owners: only the top-level
-		 * cursor should be wrapped in a dump cursor.
-		 */
-		WT_ASSERT(session, owner == NULL);
-
+	if (cval.len != 0 && owner == NULL) {
 		F_SET(cursor,
-		    WT_STRING_MATCH("print", cval.str, cval.len) ?
-		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
+		    WT_STRING_MATCH("json", cval.str, cval.len) ?
+		    WT_CURSTD_DUMP_JSON :
+		    (WT_STRING_MATCH("print", cval.str, cval.len) ?
+		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX));
+		/*
+		 * Dump cursors should not have owners: only the
+		 * top-level cursor should be wrapped in a dump cursor.
+		 */
 		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
 		owner = cdump;
 	} else

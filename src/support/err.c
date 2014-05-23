@@ -426,9 +426,8 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
 	if (handler != NULL && handler->handle_progress != NULL)
-		if ((ret = handler->handle_progress(
-		    handler, wt_session,
-		    s == NULL ? session->name : s, v)) != 0)
+		if ((ret = handler->handle_progress(handler,
+		    wt_session, s == NULL ? session->name : s, v)) != 0)
 			__handler_failure(session, ret, "progress", 0);
 	return (0);
 }
