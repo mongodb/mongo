@@ -406,8 +406,8 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	F_SET(session, WT_SESSION_NO_LOGGING);
 	r.session = session;
 
-	WT_ERR(__wt_metadata_search(session, WT_METADATA_URI, &config));
-	WT_ERR(__recovery_setup_file(&r, WT_METADATA_URI, config));
+	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
+	WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
 	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
 
 	/*

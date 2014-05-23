@@ -64,12 +64,11 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int found;
-	const char *key, *value, *uri;
+	const char *key, *value;
 
 	/* Open the metadata file. */
-	uri = "metadata:";
 	if ((ret = session->open_cursor(
-	    session, uri, NULL, NULL, &cursor)) != 0) {
+	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 		/*
 		 * If there is no metadata (yet), this will return ENOENT.
 		 * Treat that the same as an empty metadata.
@@ -78,7 +77,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 			return (0);
 
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, uri, wiredtiger_strerror(ret));
+		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
 		return (1);
 	}
 
@@ -103,7 +102,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 		 * metadata, it's not a normal "object" in the database.  I'm
 		 * making an exception for the checkpoint and verbose options.
 		 */
-		if (strcmp(key, uri) != 0 || cflag || vflag)
+		if (strcmp(key, WT_METADATA_URI) != 0 || cflag || vflag)
 			printf("%s\n", key);
 
 		if (!cflag && !vflag)

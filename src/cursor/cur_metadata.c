@@ -44,8 +44,8 @@
  * but also check for the internal version of the URI.
  */
 #define	WT_KEY_IS_METADATA(key)						\
-	(WT_STRING_MATCH("metadata:", (key)->data, (key)->size - 1) ||	\
-	    WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1))
+	(WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) ||\
+	 WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1))
 
 /*
  * __curmetadata_metadata_search --
@@ -61,18 +61,17 @@ __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	mdc = (WT_CURSOR_METADATA *)cursor;
 
 	/* The metadata search interface allocates a new string in value. */
-	WT_RET(__wt_metadata_search(session, WT_METADATA_URI, &value));
+	WT_RET(__wt_metadata_search(session, WT_METAFILE_URI, &value));
 
 	/*
 	 * Copy the value to the underlying btree cursor's tmp item which will
 	 * be freed when the cursor is closed.
 	 */
-	ret = __wt_buf_set(session, &cursor->value, value, strlen(value) + 1);
+	ret = __wt_buf_setstr(session, &cursor->value, value);
 	__wt_free(session, value);
 	WT_RET(ret);
 
-	WT_RET(__wt_buf_set(
-	    session, &cursor->key, "metadata:", strlen("metadata:") + 1));
+	WT_RET(__wt_buf_setstr(session, &cursor->key, WT_METADATA_URI));
 
 	F_SET(mdc, WT_MDC_ONMETADATA | WT_MDC_POSITIONED);
 	F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);

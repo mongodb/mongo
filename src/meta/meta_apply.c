@@ -31,7 +31,7 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 		WT_ERR(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
-		else if (strcmp(uri, WT_METADATA_URI) == 0)
+		else if (strcmp(uri, WT_METAFILE_URI) == 0)
 			continue;
 
 		/*
