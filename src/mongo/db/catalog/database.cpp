@@ -58,6 +58,8 @@ namespace mongo {
     Status CollectionOptions::parse( const BSONObj& options ) {
         reset();
 
+        // During parsing, ignore some validation errors in order to accept options objects that
+        // were valid in previous versions of the server.  SERVER-13737.
         BSONObjIterator i( options );
         while ( i.more() ) {
             BSONElement e = i.next();
@@ -67,8 +69,10 @@ namespace mongo {
                 capped = e.trueValue();
             }
             else if ( fieldName == "size" ) {
-                if ( !e.isNumber() )
-                    return Status( ErrorCodes::BadValue, "size has to be a number" );
+                if ( !e.isNumber() ) {
+                    // Ignoring for backwards compatibility.
+                    continue;
+                }
                 cappedSize = e.numberLong();
                 if ( cappedSize < 0 )
                     return Status( ErrorCodes::BadValue, "size has to be >= 0" );
@@ -78,8 +82,10 @@ namespace mongo {
                     cappedSize = Extent::minSize();
             }
             else if ( fieldName == "max" ) {
-                if ( !e.isNumber() )
-                    return Status( ErrorCodes::BadValue, "max has to be a number" );
+                if ( !options["capped"].trueValue() || !e.isNumber() ) {
+                    // Ignoring for backwards compatibility.
+                    continue;
+                }
                 cappedMaxDocs = e.numberLong();
                 if ( !NamespaceDetails::validMaxCappedDocs( &cappedMaxDocs ) )
                     return Status( ErrorCodes::BadValue,

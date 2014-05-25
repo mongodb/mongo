@@ -223,6 +223,51 @@ namespace PdfileTests {
         }
     };
 
+    class CollectionOptionsErrorBadSize {
+    public:
+        void run() {
+            ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: true, size: -1}" ) ) );
+            ASSERT_NOT_OK( CollectionOptions().parse( fromjson( "{capped: false, size: -1}" ) ) );
+        }
+    };
+
+    class CollectionOptionsErrorBadMax {
+    public:
+        void run() {
+            ASSERT_NOT_OK( CollectionOptions().parse( BSON( "capped" << true << "max"
+                                                                     << ( 1LL << 31 ) ) ) );
+        }
+    };
+
+    class CollectionOptionsIgnoreSizeWrongType {
+    public:
+        void run() {
+            CollectionOptions options;
+            ASSERT_OK( options.parse( fromjson( "{size: undefined, capped: undefined}" ) ) );
+            ASSERT_EQUALS( options.capped, false );
+            ASSERT_EQUALS( options.cappedSize, 0 );
+        }
+    };
+
+    class CollectionOptionsIgnoreMaxWrongType {
+    public:
+        void run() {
+            CollectionOptions options;
+            ASSERT_OK( options.parse( fromjson( "{capped: true, size: 4096, max: ''}" ) ) );
+            ASSERT_EQUALS( options.capped, true );
+            ASSERT_EQUALS( options.cappedSize, 4096 );
+            ASSERT_EQUALS( options.cappedMaxDocs, 0 );
+        }
+    };
+
+    class CollectionOptionsIgnoreUnregisteredFields {
+    public:
+        void run() {
+            ASSERT_OK( CollectionOptions().parse( BSON( "create" << "c" ) ) );
+            ASSERT_OK( CollectionOptions().parse( BSON( "foo" << "bar" ) ) );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "pdfile" ) {}
@@ -234,6 +279,11 @@ namespace PdfileTests {
             add< Insert::ValidId >();
             add< ExtentSizing >();
             add< CollectionOptionsRoundTrip >();
+            add< CollectionOptionsErrorBadSize >();
+            add< CollectionOptionsErrorBadMax >();
+            add< CollectionOptionsIgnoreSizeWrongType >();
+            add< CollectionOptionsIgnoreMaxWrongType >();
+            add< CollectionOptionsIgnoreUnregisteredFields >();
         }
     } myall;
 
