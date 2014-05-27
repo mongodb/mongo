@@ -392,9 +392,9 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	WT_UNUSED(flags);
 	op = (WT_ASYNC_OP_IMPL *)asyncop;
 	session = O2S(op);
-	jcb = (JAVA_CALLBACK *)asyncop->c.lang_private;
+	jcb = (JAVA_CALLBACK *)asyncop->async_app_private;
 	conn_jcb = (JAVA_CALLBACK *)S2C(session)->lang_private;
-	asyncop->c.lang_private = NULL;
+	asyncop->async_app_private = NULL;
 
 	/*
 	 * We rely on the fact that the async machinery uses a pool of
@@ -539,7 +539,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	%javamethodmodifiers java_init "protected";
 	int java_init(jobject jasyncop) {
 		JAVA_CALLBACK *jcb =
-		    (JAVA_CALLBACK *)$self->c.lang_private;
+		    (JAVA_CALLBACK *)$self->async_app_private;
 		jcb->jobj = JCALL1(NewGlobalRef, jcb->jnienv, jasyncop);
 		JCALL1(DeleteLocalRef, jcb->jnienv, jasyncop);
 		return (0);
@@ -1766,7 +1766,7 @@ err:	if (ret != 0)
 		(*jenv)->GetJavaVM(jenv, &jcb->javavm);
 		jcb->jcallback = JCALL1(NewGlobalRef, jcb->jnienv, callbackObject);
 		JCALL1(DeleteLocalRef, jcb->jnienv, callbackObject);
-		asyncop->c.lang_private = jcb;
+		asyncop->async_app_private = jcb;
 		asyncop->c.flags |= WT_CURSTD_RAW;
 
 err:		if (ret != 0)

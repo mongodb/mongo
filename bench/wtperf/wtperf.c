@@ -150,7 +150,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	(void)flags;
 	type = op->get_type(op);
 	if (type != WT_AOP_COMPACT) {
-		thread = (CONFIG_THREAD *)op->c.lang_private;
+		thread = (CONFIG_THREAD *)op->async_app_private;
 		cfg = thread->cfg;
 	}
 	trk = NULL;
@@ -174,7 +174,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 			trk = &thread->update;
 			break;
 		case WT_AOP_COMPACT:
-			tables = (uint32_t *)op->c.lang_private;
+			tables = (uint32_t *)op->async_app_private;
 			ATOMIC_ADD(*tables, (uint32_t)-1);
 			break;
 		case WT_AOP_REMOVE:
@@ -337,7 +337,7 @@ retry:		if ((ret = conn->async_new_op(
 			(void)usleep(10000);
 			goto retry;
 		}
-		asyncop->c.lang_private = thread;
+		asyncop->async_app_private = thread;
 		asyncop->set_key(asyncop, key_buf);
 		switch (*op) {
 		case WORKER_READ:
@@ -911,7 +911,7 @@ retry:		if ((ret = conn->async_new_op(
 			(void)usleep(10000);
 			goto retry;
 		}
-		asyncop->c.lang_private = thread;
+		asyncop->async_app_private = thread;
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 		asyncop->set_key(asyncop, key_buf);
@@ -1288,7 +1288,7 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 				}
 				return (ret);
 			}
-			asyncop->c.lang_private = &tables;
+			asyncop->async_app_private = &tables;
 			if ((ret = asyncop->compact(asyncop)) != 0) {
 				lprintf(cfg, ret, 0, "Async compact failed.");
 				return (ret);

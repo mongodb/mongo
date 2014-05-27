@@ -791,6 +791,7 @@ struct __wt_async_op {
 	 * functions to manage them.
 	 */
 #if !defined(SWIG) && !defined(DOXYGEN)
+#define	async_app_private	c.lang_private
 	WT_CURSOR	c;
 #endif
 };
