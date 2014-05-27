@@ -29,7 +29,7 @@
 import sys
 from os.path import join, dirname, abspath
 root_dir = dirname(File('SConscript').rfile().abspath)
-sys.path.append(join(root_dir, 'tools'))
+sys.path.insert(0, join(root_dir, 'tools'))
 import js2c
 
 Import("env windows linux darwin solaris freebsd debugBuild openbsd")
