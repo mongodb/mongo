@@ -141,7 +141,7 @@ namespace repl {
             result.append("hbmsg", theReplSet->hbmsg());
             result.append("time", (long long) time(0));
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
-            const Member *syncTarget = repl::BackgroundSync::get()->getSyncTarget();
+            const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
             if (syncTarget) {
                 result.append("syncingTo", syncTarget->fullName());
             }
@@ -248,11 +248,11 @@ namespace repl {
 
         // this ensures that will have bgsync's s_instance at all points where it is needed
         // so that we needn't check for its existence
-        repl::BackgroundSync* sync = repl::BackgroundSync::get();
+        BackgroundSync* sync = BackgroundSync::get();
 
         boost::thread t(startSyncThread);
 
-        boost::thread producer(stdx::bind(&repl::BackgroundSync::producerThread, sync));
+        boost::thread producer(stdx::bind(&BackgroundSync::producerThread, sync));
         theReplSet->syncSourceFeedback.go();
 
         // member heartbeats are started in ReplSetImpl::initFromConfig

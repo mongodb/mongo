@@ -139,7 +139,7 @@ namespace repl {
     }
 
     void ReplSet::shutdown() {
-        repl::BackgroundSync::shutdown();
+        BackgroundSync::shutdown();
     }
 
     void replLocalAuth() {

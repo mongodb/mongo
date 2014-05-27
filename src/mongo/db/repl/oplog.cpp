@@ -151,7 +151,7 @@ namespace repl {
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
 
-                repl::BackgroundSync::notify();
+                BackgroundSync::notify();
             }
         }
 

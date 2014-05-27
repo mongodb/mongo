@@ -115,7 +115,7 @@ namespace {
 
         // Wait for replication to stop and buffer to be consumed
         LOG(1) << "replSet waiting for replication to finish before becoming primary" << endl;
-        repl::BackgroundSync::get()->stopReplicationAndFlushBuffer();
+        BackgroundSync::get()->stopReplicationAndFlushBuffer();
 
         // Lock here to prevent stepping down & becoming primary from getting interleaved
         LOG(1) << "replSet waiting for global write lock";

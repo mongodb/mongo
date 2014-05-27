@@ -83,7 +83,7 @@ namespace repl {
             }
 
             if (cmdObj.hasElement("sethbmsg")) {
-                repl::sethbmsg(cmdObj["sethbmsg"].String());
+                sethbmsg(cmdObj["sethbmsg"].String());
                 return true;
             }
 

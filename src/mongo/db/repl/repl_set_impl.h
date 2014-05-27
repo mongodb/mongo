@@ -281,7 +281,7 @@ namespace repl {
     private:
         bool _syncDoInitialSync_clone(Cloner &cloner, const char *master,
                                       const list<string>& dbs, bool dataPass);
-        bool _syncDoInitialSync_applyToHead( repl::SyncTail& syncer, OplogReader* r ,
+        bool _syncDoInitialSync_applyToHead( SyncTail& syncer, OplogReader* r ,
                                              const Member* source, const BSONObj& lastOp,
                                              BSONObj& minValidOut);
         void _syncDoInitialSync();

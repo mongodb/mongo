@@ -275,7 +275,7 @@ namespace repl {
      *                 this function syncs to this value (inclusive)
      * @return if applying the oplog succeeded
      */
-    bool ReplSetImpl::_syncDoInitialSync_applyToHead( repl::SyncTail& syncer, OplogReader* r,
+    bool ReplSetImpl::_syncDoInitialSync_applyToHead( SyncTail& syncer, OplogReader* r,
                                                       const Member* source, const BSONObj& lastOp ,
                                                       BSONObj& minValid ) {
         /* our cloned copy will be strange until we apply oplog events that occurred
@@ -358,8 +358,8 @@ namespace repl {
      * closer to the latest op time before it can transition to secondary state.
      */
     void ReplSetImpl::_syncDoInitialSync() {
-        repl::InitialSync init(repl::BackgroundSync::get());
-        repl::SyncTail tail(repl::BackgroundSync::get());
+        InitialSync init(BackgroundSync::get());
+        SyncTail tail(BackgroundSync::get());
         sethbmsg("initial sync pending",0);
 
         // if this is the first node, it may have already become primary
@@ -488,7 +488,7 @@ namespace repl {
 
         // If we just cloned & there were no ops applied, we still want the primary to know where
         // we're up to
-        repl::BackgroundSync::notify();
+        BackgroundSync::notify();
 
         changeState(MemberState::RS_RECOVERING);
         sethbmsg("initial sync done",0);

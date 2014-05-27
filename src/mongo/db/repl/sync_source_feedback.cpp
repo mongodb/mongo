@@ -255,7 +255,7 @@ namespace repl {
             if (state.primary() || state.fatal() || state.startup()) {
                 continue;
             }
-            const Member* target = repl::BackgroundSync::get()->getSyncTarget();
+            const Member* target = BackgroundSync::get()->getSyncTarget();
             if (_syncTarget != target) {
                 _resetConnection();
                 _syncTarget = target;

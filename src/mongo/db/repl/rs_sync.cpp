@@ -171,7 +171,7 @@ namespace repl {
         }
 
         // record the previous member we were syncing from
-        const Member *prev = repl::BackgroundSync::get()->getSyncTarget();
+        const Member *prev = BackgroundSync::get()->getSyncTarget();
         if (prev) {
             result.append("prevSyncTarget", prev->fullName());
         }
@@ -227,7 +227,7 @@ namespace repl {
         }
 
         /* we have some data.  continue tailing. */
-        repl::SyncTail tail(repl::BackgroundSync::get());
+        SyncTail tail(BackgroundSync::get());
         tail.oplogApplication();
     }
 

@@ -456,7 +456,7 @@ namespace repl {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", myState.s);
-        const Member *syncTarget = repl::BackgroundSync::get()->getSyncTarget();
+        const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
         if ( syncTarget &&
             (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_SHUNNED) ) {
