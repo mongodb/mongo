@@ -10,16 +10,23 @@ import (
 	"time"
 )
 
-// output top results
+const (
+	// the format strings for the header row and a normal row of the output
+	HEADER_FORMAT_STRING = "\t%vns\t\t%vtotal\t\t%vread\t\t%vwrite\t\t%v"
+	ROW_FORMAT_STRING    = "\t%v%v\t\t%v%v\t\t%v%v\t\t%v%v"
+)
+
+// Interface to output the results of the top command.
 type Outputter interface {
 	Output(*result.TopResults, *commonopts.MongoToolOptions) error
 }
 
-// outputter that sends the results to the terminal
+// Outputter that formats the results and prints them to the terminal.
 type TerminalOutputter struct {
 }
 
-// satisfy the Outputter interface
+// Implementation of Output.  Formats the results and prints them to stdout
+// as a table.
 func (self *TerminalOutputter) Output(results *result.TopResults,
 	opts *commonopts.MongoToolOptions) error {
 
@@ -65,12 +72,12 @@ func (self *TerminalOutputter) Output(results *result.TopResults,
 	writePadding := strings.Repeat(" ", longestWrite-len("write"))
 
 	// padding
-	fmt.Println()
+	fmt.Printf("\n")
 
 	// print the header column
 	fmt.Println(
 		fmt.Sprintf(
-			"\t%vns\t\t%vtotal\t\t%vread\t\t%vwrite\t\t%v",
+			HEADER_FORMAT_STRING,
 			namespacePadding,
 			totalPadding,
 			readPadding,
@@ -93,7 +100,7 @@ func (self *TerminalOutputter) Output(results *result.TopResults,
 
 		fmt.Println(
 			fmt.Sprintf(
-				"\t%v%v\t\t%v%v\t\t%v%v\t\t%v%v",
+				ROW_FORMAT_STRING,
 				strings.Repeat(" ", longestNS-len(ns)),
 				ns,
 				strings.Repeat(" ", longestTotal-len(totalOutputField)),
@@ -109,10 +116,13 @@ func (self *TerminalOutputter) Output(results *result.TopResults,
 	return nil
 }
 
+// Given the time as an int, returns the string representation to be printed.
 func timeOutputField(timeVal int) string {
 	return strconv.Itoa(timeVal/1000) + "ms"
 }
 
+// Whether or not the given namespace should be skipped (not displayed)
+// in the output.
 func skipNamespace(ns string, opts *commonopts.MongoToolOptions) bool {
 	if opts.FilterNS != "" {
 		if opts.FilterBoth {

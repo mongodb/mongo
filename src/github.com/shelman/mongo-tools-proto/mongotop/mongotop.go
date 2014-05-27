@@ -28,19 +28,30 @@ type MongoTop struct {
 // the results appropriately.
 func (self *MongoTop) Run() error {
 
+	// the top results from the previous run, used for diffing
+	previousResults, err := self.runTopCommand()
+	if err != nil {
+		return fmt.Errorf("error running initial top command: %v", err)
+	}
+
 	for {
 
 		// run the top command against the database
 		topResults, err := self.runTopCommand()
 		if err != nil {
-			return fmt.Errorf("error talking to database: %v", err)
+			return fmt.Errorf("error running top command: %v", err)
 		}
 
+		// diff the results
+		diff := result.Diff(previousResults, topResults)
+
 		// output the results
-		if err := self.Outputter.Output(topResults,
-			self.Options); err != nil {
+		if err := self.Outputter.Output(diff, self.Options); err != nil {
 			return fmt.Errorf("error outputting results: %v", err)
 		}
+
+		// update the previous results
+		previousResults = topResults
 
 		// sleep
 		time.Sleep(time.Duration(self.TopOptions.SleepTime) * time.Second)
