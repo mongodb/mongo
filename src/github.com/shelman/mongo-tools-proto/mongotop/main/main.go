@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
+	"github.com/shelman/mongo-tools-proto/common/util"
 	"github.com/shelman/mongo-tools-proto/mongotop"
 	"github.com/shelman/mongo-tools-proto/mongotop/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
-	"github.com/shelman/mongo-tools-proto/mongotop/poll"
 )
 
 func main() {
@@ -33,23 +33,22 @@ func main() {
 		return
 	}
 
-	// we're going to do real work.  configure the db connection
-	if err := db.Configure(opts); err != nil {
-		panic(fmt.Sprintf("Error configuring db connection: %v", err))
+	// create a session provider to connect to the db
+	sessionProvider, err := db.InitSessionProvider(opts)
+	if err != nil {
+		util.Panicf("error initializing database session: %v", err)
 	}
 
 	// instantiate a mongotop instance, and kick it off
 	top := &mongotop.MongoTop{
-		Options:    opts,
-		TopOptions: topOpts,
-		Poller:     &poll.DBPoller{},
-		Outputter:  &output.TerminalOutputter{},
+		Options:         opts,
+		TopOptions:      topOpts,
+		Outputter:       &output.TerminalOutputter{},
+		SessionProvider: sessionProvider,
 	}
 
 	if err := top.Run(); err != nil {
-		fmt.Println(
-			fmt.Sprintf("error running mongotop: %v", err),
-		)
+		util.Printlnf("error running mongotop: %v", err)
 	}
 
 }

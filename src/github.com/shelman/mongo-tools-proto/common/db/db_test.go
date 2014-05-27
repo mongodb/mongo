@@ -6,36 +6,19 @@ import (
 	"testing"
 )
 
-func TestDBConnection(t *testing.T) {
+func TestSessionProvider(t *testing.T) {
 
-	Convey("When connecting to a mongod", t, func() {
+	var provider *SessionProvider
+	var err error
 
-		Convey("if a session is requested before the connection is"+
-			" configured, an error should be returned", func() {
+	Convey("When using a session provider to connect to the db", t, func() {
 
-			session, err := GetSession()
-			So(session, ShouldBeNil)
-			So(err, ShouldNotBeNil)
-
-		})
-
-		Convey("when running without auth", func() {
-
-			Convey("a correctly configured session should be able to"+
-				" connect", func() {
-
-				opts := &options.MongoToolOptions{}
-				opts.Host = "localhost"
-				So(Configure(opts), ShouldBeNil)
-
-				session, err := GetSession()
-				So(session, ShouldNotBeNil)
-				session.Close()
-				So(err, ShouldBeNil)
-
-			})
-
-		})
+		opts := &options.MongoToolOptions{
+			Host: "localhost",
+			Port: "27017",
+		}
+		provider, err = InitSessionProvider(opts)
+		So(err, ShouldBeNil)
 
 	})
 

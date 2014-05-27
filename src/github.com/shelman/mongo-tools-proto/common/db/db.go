@@ -1,146 +1,97 @@
 package db
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/options"
-	"io/ioutil"
 	"labix.org/v2/mgo"
-	"net"
+	"sync"
 	"time"
 )
 
 const (
+	// authentication types to be passed to the driver
 	AUTH_STANDARD = "MONGODB-CR"
 	AUTH_SSL      = "MONGODB-X509"
 )
 
 var (
-	url           string
-	masterSession *mgo.Session
-	globalOptions *options.MongoToolOptions
-	dialTimeout   = 3 * time.Second
-	rootCerts     *x509.CertPool
-
-	// the dial info to use for connecting
-	dialInfo *mgo.DialInfo
+	// timeout for dialing the database server
+	DialTimeout = 3 * time.Second
 )
 
-// Configure the connection to the mongod, based on the options passed in,
-// without testing the connection.
-func Configure(opts *options.MongoToolOptions) error {
+// Used to manage database sessions
+type SessionProvider struct {
 
-	// cache the options
-	globalOptions = opts
+	// used to avoid a race condition around creating the master session
+	masterSessionLock sync.Mutex
 
-	// set up the host and port
-	url = opts.Host
+	// info for dialing mongodb
+	dialInfo *mgo.DialInfo
+
+	// the master session to use for connection pooling
+	masterSession *mgo.Session
+}
+
+// Initialize a session provider to connect to the database server, based on
+// the options passed in.  Returns a fully initialized provider.
+func InitSessionProvider(opts *options.MongoToolOptions) (*SessionProvider,
+	error) {
+
+	// create the provider
+	provider := &SessionProvider{}
+
+	// create the addresses to be used to connect
+	connectionAddrs, err := createConnectionAddrs(opts)
+	if err != nil {
+		return nil, fmt.Errorf("error building server connection addresses:"+
+			" %v", err)
+	}
+
+	// create the necessary dial info
+	provider.dialInfo = &mgo.DialInfo{
+		Addrs:   connectionAddrs,
+		Timeout: DialTimeout,
+	}
+
+	return provider, nil
+}
+
+// Using the options passed in, build the slice of addresses to be used to
+// connect to the db server.
+func createConnectionAddrs(opts *options.MongoToolOptions) ([]string, error) {
+	// TODO: repl setting, more validation
+
+	url := opts.Host
 	if opts.Port != "" {
 		url += ":" + opts.Port
 	}
 
-	// create the dial info to use when connecting
-	dialInfo = &mgo.DialInfo{
-		Addrs:   []string{url}, // TODO: change if repl set?
-		Timeout: dialTimeout,
-		Source:  "admin",
-	}
-
-	if globalOptions.Username != "" {
-		dialInfo.Mechanism = AUTH_STANDARD
-		dialInfo.Username = globalOptions.Username
-		dialInfo.Password = globalOptions.Password
-	}
-
-	// configure ssl, if necessary
-	// TODO: errs, validate
-	if globalOptions.SSL {
-		dialInfo.Mechanism = AUTH_SSL
-		dialInfo.DialServer = dialWithSSL
-
-		// read in the certificate authority file and add it to the cert chain
-		rootCert, err := ioutil.ReadFile(globalOptions.SSLCAFile)
-		if err != nil {
-			return fmt.Errorf("error reading certificate authority file: %v",
-				err)
-		}
-
-		// TODO: support nil, blah-blah
-		rootCerts = x509.NewCertPool()
-		if !rootCerts.AppendCertsFromPEM(rootCert) {
-			return fmt.Errorf("error creating cert: %v", err)
-		}
-
-		// TODO: other files...
-	}
-
-	// TODO: validate
-
-	return nil
+	return []string{url}, nil
 }
 
-// Custom dialer for the DialServer field of the mgo.DialInfo struct, set up
-// to use ssl
-func dialWithSSL(addr *mgo.ServerAddr) (net.Conn, error) {
+// Returns a session connected to the database server for which the
+// session provider is configured.  Initializes a master session if necessary,
+// in order to do connection pooling.
+func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 
-	config := &tls.Config{}
-	if globalOptions.SSLAllowInvalidCertificates {
-		config.InsecureSkipVerify = true
-	}
-	config.RootCAs = rootCerts
+	// initialize the master session, if necessary
+	if self.masterSession == nil {
 
-	return tls.Dial("tcp", addr.String(), config)
-}
+		// lock to avoid a race condition
+		self.masterSessionLock.Lock()
+		defer self.masterSessionLock.Unlock()
 
-// Confirm whether the db can be reached.
-func ConfirmConnect() error {
-	session, err := mgo.DialWithInfo(dialInfo)
-	if err != nil {
-		return err
-	}
-	session.Close()
-	return nil
-}
-
-func Url() string {
-	return url
-}
-
-func GetSession() (*mgo.Session, error) {
-	if masterSession == nil {
-		if err := createMasterSession(); err != nil {
-			return nil, fmt.Errorf("error connecting to db: %v", err)
+		// check again, in case another goroutine initialized the session in
+		// between the above two checks
+		if self.masterSession == nil {
+			var err error
+			self.masterSession, err = mgo.DialWithInfo(self.dialInfo)
+			if err != nil {
+				return nil, fmt.Errorf("error connecting to db server: %v", err)
+			}
 		}
 	}
-	return masterSession.Copy(), nil
-}
 
-// Create the master session for pooling, authenticating as necessary
-func createMasterSession() error {
-
-	// make sure Configure has been called
-	if globalOptions == nil {
-		return fmt.Errorf("database connection has not been configured yet")
-	}
-
-	// init the master session
-	var err error
-	masterSession, err = mgo.DialWithInfo(dialInfo)
-	if err != nil {
-		return err
-	}
-
-	// authenticate, if necessary
-	if globalOptions.Username != "" {
-
-		// log in
-		if err := masterSession.DB("admin").Login(globalOptions.Username,
-			globalOptions.Password); err != nil {
-			return fmt.Errorf("error logging in to admin database: %v", err)
-		}
-
-	}
-
-	return nil
+	// copy and return the master session
+	return self.masterSession.Copy(), nil
 }
