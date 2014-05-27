@@ -265,10 +265,6 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
-	if (LF_ISSET(WT_CURSTD_DUMP_JSON) && !LF_ISSET(WT_CURSTD_RAW))
-		WT_ERR_MSG(session, EINVAL,
-		    "Setting keys for JSON cursors not permitted");
-
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -403,11 +399,6 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
-
-	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON) &&
-	    !F_ISSET(cursor, WT_CURSTD_RAW))
-		WT_ERR_MSG(session, EINVAL,
-		    "Setting values for JSON cursors not permitted");
 
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
