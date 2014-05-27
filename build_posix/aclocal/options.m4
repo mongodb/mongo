@@ -56,6 +56,32 @@ esac
 AC_MSG_RESULT($wt_cv_enable_java)
 AM_CONDITIONAL([JAVA], [test x$wt_cv_enable_java = xyes])
 
+AC_MSG_CHECKING(if --enable-leveldb option specified)
+AC_ARG_ENABLE(leveldb,
+	[AS_HELP_STRING([--enable-leveldb],
+	    [Build the LevelDB API.])], r=$enableval, r=no)
+wt_cv_enable_hyperleveldb=no
+case "$r" in
+no)	wt_cv_enable_leveldb=no;;
+hyper)	wt_cv_enable_leveldb=yes
+	wt_cv_enable_hyperleveldb=yes;;
+*)	wt_cv_enable_leveldb=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_leveldb)
+if test "$wt_cv_enable_hyperleveldb" = "yes"; then
+	AC_LANG_PUSH([C++])
+	AC_CHECK_HEADER(hyperleveldb/db.h,,
+	    [AC_MSG_ERROR([--enable-leveldb=hyper requires hyperleveldb/db.h])])
+	AC_LANG_POP([C++])
+elif test "$wt_cv_enable_leveldb" = "yes"; then
+	AC_LANG_PUSH([C++])
+	AC_CHECK_HEADER(leveldb/db.h,,
+	    [AC_MSG_ERROR([--enable-leveldb requires leveldb/db.h])])
+	AC_LANG_POP([C++])
+fi
+AM_CONDITIONAL([HYPERLEVELDB], [test "$wt_cv_enable_hyperleveldb" = "yes"])
+AM_CONDITIONAL([LEVELDB], [test "$wt_cv_enable_leveldb" = "yes"])
+
 AC_MSG_CHECKING(if --enable-python option specified)
 AC_ARG_ENABLE(python,
 	[AS_HELP_STRING([--enable-python],

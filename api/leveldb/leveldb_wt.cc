@@ -16,7 +16,7 @@ using leveldb::Range;
 using leveldb::Slice;
 using leveldb::Snapshot;
 using leveldb::Status;
-#ifndef WITHOUT_HYPERLEVELDB
+#ifdef HAVE_HYPERLEVELDB
 namespace leveldb {
 class ReplayIterator;
 }
@@ -234,7 +234,7 @@ public:
 	virtual Status Get(const ReadOptions& options,
 		     const Slice& key, std::string* value);
 
-#ifndef WITHOUT_HYPERLEVELDB
+#ifdef HAVE_HYPERLEVELDB
 	virtual Status LiveBackup(const Slice& name) { return Status::NotSupported("sorry!"); }
 	virtual void GetReplayTimestamp(std::string* timestamp) {}
 	virtual void AllowGarbageCollectBeforeTimestamp(const std::string& timestamp) {}
@@ -419,7 +419,7 @@ DbImpl::Get(const ReadOptions& options,
 	return Status::OK();
 }
 
-#ifdef WITHOUT_HYPERLEVELDB
+#ifndef HAVE_HYPERLEVELDB
 Status
 DbImpl::Get(const ReadOptions& options,
 	     const Slice& key, Value* value)

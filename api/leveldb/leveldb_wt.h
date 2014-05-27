@@ -1,4 +1,4 @@
-#ifndef WITHOUT_HYPERLEVELDB
+#ifdef HAVE_HYPERLEVELDB
 #include <hyperleveldb/comparator.h>
 #include <hyperleveldb/db.h>
 #include <hyperleveldb/env.h>

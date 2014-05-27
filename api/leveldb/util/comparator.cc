@@ -12,7 +12,7 @@ namespace leveldb {
 
 Comparator::~Comparator() { }
 
-#ifndef WITHOUT_HYPERLEVELDB
+#ifdef HAVE_HYPERLEVELDB
 uint64_t Comparator::KeyNum(const Slice& key) const {
   return 0;
 }

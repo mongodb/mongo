@@ -6,7 +6,7 @@
  */
 #include <assert.h>
 #include <iostream>
-#include <hyperleveldb/db.h>
+#include "leveldb_wt.h"
 
 using namespace std;
 

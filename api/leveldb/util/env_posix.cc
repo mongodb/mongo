@@ -284,7 +284,7 @@ class PosixMmapFile : public WritableFile {
     return s;
   }
 
-#ifndef WITHOUT_HYPERLEVELDB
+#ifdef HAVE_HYPERLEVELDB
   virtual Status WriteAt(uint64_t offset, const Slice& data) { return Status::NotSupported("sorry!"); }
 #endif
 };
@@ -501,7 +501,7 @@ class PosixEnv : public Env {
     usleep(micros);
   }
 
-#ifndef WITHOUT_HYPERLEVELDB
+#ifdef HAVE_HYPERLEVELDB
   virtual Status CopyFile(const std::string&, const std::string&) { return Status::NotSupported("sorry!"); }
   virtual Status LinkFile(const std::string&, const std::string&) { return Status::NotSupported("sorry!"); }
 #endif
