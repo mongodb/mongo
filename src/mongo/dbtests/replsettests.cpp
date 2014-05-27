@@ -45,13 +45,14 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/time_support.h"
 
+using namespace mongo::repl;
 namespace ReplSetTests {
     const int replWriterThreadCount(32);
     const int replPrefetcherThreadCount(32);
-    class ReplSetTest : public mongo::repl::ReplSet {
-        mongo::repl::ReplSetConfig *_config;
-        mongo::repl::ReplSetConfig::MemberCfg *_myConfig;
-        mongo::repl::BackgroundSyncInterface *_syncTail;
+    class ReplSetTest : public ReplSet {
+        ReplSetConfig *_config;
+        ReplSetConfig::MemberCfg *_myConfig;
+        BackgroundSyncInterface *_syncTail;
     public:
         static const int replWriterThreadCount;
         static const int replPrefetcherThreadCount;
@@ -60,7 +61,7 @@ namespace ReplSetTests {
             ret->init();
             // we need to get() the BackgroundSync so that it has its s_instance initialized
             // since applyOps() eventually calls notify() which makes use of the s_instance
-            mongo::repl::BackgroundSync::get();
+            BackgroundSync::get();
             return ret.release();
         }
         virtual ~ReplSetTest() {
@@ -76,10 +77,10 @@ namespace ReplSetTests {
         virtual bool tryToGoLiveAsASecondary(OpTime& minvalid) {
             return false;
         }
-        virtual const mongo::repl::ReplSetConfig& config() {
+        virtual const ReplSetConfig& config() {
             return *_config;
         }
-        virtual const mongo::repl::ReplSetConfig::MemberCfg& myConfig() {
+        virtual const ReplSetConfig::MemberCfg& myConfig() {
             return *_myConfig;
         }
         virtual bool buildIndexes() const {
@@ -95,9 +96,8 @@ namespace ReplSetTests {
         void init() {
             BSONArrayBuilder members;
             members.append(BSON("_id" << 0 << "host" << "host1"));
-            _config = mongo::repl::ReplSetConfig::make(BSON("_id" << "foo"
-                                                            << "members" << members.arr()));
-            _myConfig = new mongo::repl::ReplSetConfig::MemberCfg();
+            _config = ReplSetConfig::make(BSON("_id" << "foo" << "members" << members.arr()));
+            _myConfig = new ReplSetConfig::MemberCfg();
         }
     };
 
@@ -116,7 +116,7 @@ namespace ReplSetTests {
         virtual void consume() {
             _queue.pop();
         }
-        virtual mongo::repl::Member* getSyncTarget() {
+        virtual Member* getSyncTarget() {
             return 0;
         }
         void addDoc(BSONObj doc) {
@@ -186,9 +186,9 @@ namespace ReplSetTests {
             db->dropCollection(&txn, ns());
         }
         static void setup() {
-            mongo::repl::replSettings.replSet = "foo";
-            mongo::repl::replSettings.oplogSize = 5 * 1024 * 1024;
-            mongo::repl::createOplog();
+            replSettings.replSet = "foo";
+            replSettings.oplogSize = 5 * 1024 * 1024;
+            createOplog();
 
             // setup background sync instance
             _bgsync = new BackgroundSyncTest();
@@ -359,7 +359,7 @@ namespace ReplSetTests {
             Client::Context ctx( _cappedNs );
             OperationContextImpl txn;
             // in an annoying twist of api, returns true on failure
-            return !mongo::repl::applyOperation_inlock(&txn, ctx.db(), op, true);
+            return !applyOperation_inlock(&txn, ctx.db(), op, true);
         }
 
         void run() {
@@ -367,7 +367,7 @@ namespace ReplSetTests {
 
             BSONObj op = updateFail();
 
-            mongo::repl::Sync s("");
+            Sync s("");
             verify(!s.shouldRetry(op));
         }
     };
