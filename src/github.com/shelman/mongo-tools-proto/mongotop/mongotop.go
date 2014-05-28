@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Wrapper for the mongotop functionality
 type MongoTop struct {
 	// generic mongo tool options
 	Options *commonopts.MongoToolOptions

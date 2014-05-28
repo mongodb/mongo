@@ -20,14 +20,16 @@ func main() {
 	// parse the options
 	err := opts.ParseAndValidate()
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Error: %v", err))
+		util.Panicf("error in command line options: %v", err)
 	}
 
+	// if appropriate, print help
 	if opts.Help {
 		opts.Usage()
 		return
 	}
 
+	// if appropriate, print the version
 	if opts.Version {
 		fmt.Println("should print mongotop version")
 		return
@@ -39,7 +41,7 @@ func main() {
 		util.Panicf("error initializing database session: %v", err)
 	}
 
-	// instantiate a mongotop instance, and kick it off
+	// instantiate a mongotop instance
 	top := &mongotop.MongoTop{
 		Options:         opts,
 		TopOptions:      topOpts,
@@ -47,8 +49,9 @@ func main() {
 		SessionProvider: sessionProvider,
 	}
 
+	// kick it off
 	if err := top.Run(); err != nil {
-		util.Printlnf("error running mongotop: %v", err)
+		util.Panicf("error running mongotop: %v", err)
 	}
 
 }
