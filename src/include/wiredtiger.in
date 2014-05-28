@@ -2003,7 +2003,7 @@ struct __wt_connection {
  * "shared_cache"\, \c "split"\, \c "verify"\, \c "version"\, \c "write";
  * default empty.}
  * @configend
- * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
+ * Additionally, if files named \c WiredTiger.config or \c WiredTiger.createcfg
  * appear in the WiredTiger home directory, they are read for configuration
  * values (see @ref config_file and @ref config_base for details).
  * Configuration values specified in the \c config argument to the

@@ -653,7 +653,7 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  */
 static int
 __conn_config_file(WT_SESSION_IMPL *session,
-    const char *filename, const char **cfg, WT_ITEM *cbuf)
+    const char *filename, const char **cfg, WT_ITEM *cbuf, int cfgbefore)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -778,8 +778,11 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	/* Move to the end of the list, insert before the last entry. */
 	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
 		;
-	cfgend[1] = *cfgend;
-	*cfgend = cbuf->data;
+	if (cfgbefore) {
+		cfgend[1] = *cfgend;
+		*cfgend = cbuf->data;
+	} else
+		cfgend[1] = cbuf->data;
 
 err:	if (fh != NULL)
 		WT_TRET(__wt_close(session, fh));
@@ -791,7 +794,7 @@ err:	if (fh != NULL)
  *	Read configuration from an environment variable, if set.
  */
 static int
-__conn_config_env(WT_SESSION_IMPL *session, const char *cfg[])
+__conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], int cfgbefore)
 {
 	WT_CONFIG_ITEM cval;
 	const char **cfgend, *env_config;
@@ -816,11 +819,17 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
 
-	/* Move to the end of the list, insert before the last entry. */
+	/* 
+	 * Move to the end of the list, insert before or after the
+	 * last entry based on the arg passed in.
+	 */
 	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
 		;
-	cfgend[1] = *cfgend;
-	*cfgend = env_config;
+	if (cfgbefore) {
+		cfgend[1] = *cfgend;
+		*cfgend = env_config;
+	} else
+		cfgend[1] = env_config;
 	return (0);
 }
 
@@ -1224,7 +1233,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 			WT_ERR_MSG(session, EINVAL,
 			    "WT base config exists on creation");
 	} else
-		WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbbuf));
+		WT_ERR(__conn_config_file(session,
+		    WT_BASECONFIG, cfg, &cbbuf, 1));
+
+	/*
+	 * Read in user's config file and the config environment variable.
+	 */
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf, 0));
+	WT_ERR(__conn_config_env(session, cfg, 0));
 
 	/*
 	 * Configuration ...
@@ -1289,11 +1305,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__conn_statistics_config(session, cfg));
 
-	/*
-	 * Read in user's config file and the config environment variable.
-	 */
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf));
-	WT_ERR(__conn_config_env(session, cfg));
 	/* Write the base configuration file, if we're creating the database. */
 	if (conn->is_new)
 		WT_ERR(__conn_write_config(session, WT_BASECONFIG, config));
