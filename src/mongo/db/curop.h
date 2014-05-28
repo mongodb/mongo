@@ -117,7 +117,7 @@ namespace mongo {
     /* lifespan is different than CurOp because of recursives with DBDirectClient */
     class OpDebug {
     public:
-        OpDebug() : ns(""){ reset(); }
+        OpDebug() : ns(""), planSummary(2048) { reset(); }
 
         void reset();
 
