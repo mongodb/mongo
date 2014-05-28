@@ -981,7 +981,7 @@ env.Library("alltools",
                      "$BUILD_DIR/mongo/db/auth/authmocks",
                      "$BUILD_DIR/mongo/db/auth/authmongod"])
 
-normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
+normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog", "tools" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
 for name in normalTools:
     env.Install( '#/', env.Program("mongo" + name,
