@@ -110,7 +110,7 @@ from packing import pack, unpack
 			/* XXX Is there a way to avoid SWIG's numbering? */
 			pcb->pyasynccb = callback_obj5;
 			Py_XINCREF(pcb->pyasynccb);
-			(*$1)->app_private = pcb;
+			(*$1)->c.lang_private = pcb;
 		}
 	}
 }
@@ -1033,8 +1033,8 @@ pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 
         op = (WT_ASYNC_OP_IMPL *)asyncop;
         session = O2S(op);
-	pcb = (PY_CALLBACK *)asyncop->app_private;
-	asyncop->app_private = NULL;
+	pcb = (PY_CALLBACK *)asyncop->c.lang_private;
+	asyncop->c.lang_private = NULL;
 	ret = 0;
 
 	if (pcb->pyasynccb == NULL)
