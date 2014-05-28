@@ -103,10 +103,13 @@ namespace {
     Status addGeneralServerOptions(moe::OptionSection* options) {
         StringBuilder portInfoBuilder;
         StringBuilder maxConnInfoBuilder;
+        StringBuilder unixSockPermsBuilder;
 
         portInfoBuilder << "specify port number - " << ServerGlobalParams::DefaultDBPort << " by default";
         maxConnInfoBuilder << "max number of simultaneous connections - "
                            << DEFAULT_MAX_CONN << " by default";
+        unixSockPermsBuilder << "permissions to set on UNIX domain socket file - "
+                             << DEFAULT_UNIX_PERMS << " by default";
 
         options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information")
                                   .setSources(moe::SourceAllLegacy);
@@ -235,6 +238,9 @@ namespace {
 
         options->addOptionChaining("net.unixDomainSocket.pathPrefix", "unixSocketPrefix",
                 moe::String, "alternative directory for UNIX domain sockets (defaults to /tmp)");
+
+        options->addOptionChaining("net.unixDomainSocket.filePermissions", "filePermissions",
+                moe::Int, unixSockPermsBuilder.str().c_str() );
 
         options->addOptionChaining("processManagement.fork", "fork", moe::Switch,
                 "fork server process");
@@ -659,6 +665,10 @@ namespace {
 
         if (params.count("net.unixDomainSocket.enabled")) {
             serverGlobalParams.noUnixSocket = !params["net.unixDomainSocket.enabled"].as<bool>();
+        }
+        if (params.count("net.unixDomainSocket.filePermissions")) {
+            serverGlobalParams.unixSocketPermissions =
+                params["net.unixDomainSocket.filePermissions"].as<int>();
         }
 
         if (params.count("processManagement.fork") && !params.count("shutdown")) {
