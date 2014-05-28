@@ -457,7 +457,7 @@ namespace repl {
 
                     setElectionTime(getNextGlobalOptime());
 
-                    rs.assumePrimary();
+                    rs._assumePrimary();
                 }
             }
         }

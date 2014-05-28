@@ -78,7 +78,8 @@ namespace repl {
     /* apply the log op that is in param o
        @return bool success (true) or failure (false)
     */
-    bool SyncTail::syncApply(const BSONObj &op, bool convertUpdateToUpsert) {
+    bool SyncTail::syncApply(
+                        OperationContext* txn, const BSONObj &op, bool convertUpdateToUpsert) {
         const char *ns = op.getStringField("ns");
         verify(ns);
 
@@ -94,25 +95,24 @@ namespace repl {
 
         bool isCommand(op["op"].valuestrsafe()[0] == 'c');
 
-        OperationContextImpl txn;
         boost::scoped_ptr<Lock::ScopedLock> lk;
 
         if(isCommand) {
             // a command may need a global write lock. so we will conservatively go 
             // ahead and grab one here. suboptimal. :-(
-            lk.reset(new Lock::GlobalWrite());
+            lk.reset(new Lock::GlobalWrite(txn->lockState()));
         } else {
             // DB level lock for this operation
-            lk.reset(new Lock::DBWrite(txn.lockState(), ns)); 
+            lk.reset(new Lock::DBWrite(txn->lockState(), ns)); 
         }
 
-        Client::Context ctx(ns, storageGlobalParams.dbpath);
+        Client::Context ctx(ns);
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
-        bool ok = !applyOperation_inlock(&txn, ctx.db(), op, true, convertUpdateToUpsert);
+        bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
         opsAppliedStats.increment();
-        txn.recoveryUnit()->commitIfNeeded();
+        txn->recoveryUnit()->commitIfNeeded();
 
         return ok;
     }
@@ -325,7 +325,9 @@ namespace repl {
                     // become primary
                     if (!theReplSet->isSecondary()) {
                         OpTime minvalid;
-                        theReplSet->tryToGoLiveAsASecondary(minvalid);
+
+                        OperationContextImpl txn;
+                        theReplSet->tryToGoLiveAsASecondary(&txn, minvalid);
                     }
 
                     // normally msgCheckNewState gets called periodically, but in a single node
@@ -555,7 +557,8 @@ namespace repl {
              it != ops.end();
              ++it) {
             try {
-                if (!st->syncApply(*it, convertUpdatesToUpserts)) {
+                OperationContextImpl txn;
+                if (!st->syncApply(&txn, *it, convertUpdatesToUpserts)) {
                     fassertFailedNoTrace(16359);
                 }
             } catch (const DBException& e) {
@@ -573,15 +576,18 @@ namespace repl {
              it != ops.end();
              ++it) {
             try {
-                if (!st->syncApply(*it)) {
+                OperationContextImpl txn;
+
+                if (!st->syncApply(&txn, *it)) {
                     bool status;
                     {
-                        Lock::GlobalWrite lk;
-                        status = st->shouldRetry(*it);
+                        Lock::GlobalWrite lk(txn.lockState());
+                        status = st->shouldRetry(&txn, *it);
                     }
+
                     if (status) {
                         // retry
-                        if (!st->syncApply(*it)) {
+                        if (!st->syncApply(&txn, *it)) {
                             fassertFailedNoTrace(15915);
                         }
                     }

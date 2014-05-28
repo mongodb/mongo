@@ -147,7 +147,8 @@ namespace mongo {
          * Puts into the *dbnames vector the name of every database in the cluster.
          * May take a global lock, so should only be called during startup.
          */
-        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) = 0;
+        virtual Status getAllDatabaseNames(
+                            OperationContext* txn, std::vector<std::string>* dbnames) = 0;
 
         /**
          * Finds a document matching "query" in "collectionName", and store a shared-ownership

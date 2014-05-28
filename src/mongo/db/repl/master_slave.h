@@ -83,12 +83,12 @@ namespace repl {
         void resync(OperationContext* txn, const std::string& dbName);
 
         /** @param alreadyLocked caller already put us in write lock if true */
-        void sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked);
+        void _sync_pullOpLog_applyOperation(OperationContext* txn, BSONObj& op, bool alreadyLocked);
 
         /* pull some operations from the master's oplog, and apply them.
            calls sync_pullOpLog_applyOperation
         */
-        int sync_pullOpLog(int& nApplied);
+        int _sync_pullOpLog(OperationContext* txn, int& nApplied);
 
         /* we only clone one database per pass, even if a lot need done.  This helps us
            avoid overflowing the master's transaction log by doing too much work before going

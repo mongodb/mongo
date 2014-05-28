@@ -239,7 +239,7 @@ namespace mongo {
 
     };
 
-    void logStartup() {
+    static void logStartup() {
         BSONObjBuilder toLog;
         stringstream id;
         id << getHostNameCached() << "-" << jsTime();
@@ -259,14 +259,17 @@ namespace mongo {
 
         BSONObj o = toLog.obj();
 
-        Lock::GlobalWrite lk;
-        DBDirectClient c;
-        const char* name = "local.startup_log";
+        OperationContextImpl txn;
+
+        Lock::GlobalWrite lk(txn.lockState());
+        DBDirectClient c(&txn);
+
+        static const char* name = "local.startup_log";
         c.createCollection( name, 10 * 1024 * 1024, true );
         c.insert( name, o);
     }
 
-    void listen(int port) {
+    static void listen(int port) {
         //testTheDb();
         MessageServer::Options options;
         options.port = port;
@@ -356,11 +359,12 @@ namespace mongo {
 
     // ran at startup.
     static void repairDatabasesAndCheckVersion(bool shouldClearNonLocalTmpCollections) {
-        //        LastError * le = lastError.get( true );
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
-        Lock::GlobalWrite lk;
         OperationContextImpl txn;
+
+        Lock::GlobalWrite lk(txn.lockState());
+
         vector< string > dbNames;
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
@@ -368,7 +372,7 @@ namespace mongo {
             LOG(1) << "\t" << dbName << endl;
 
             Client::Context ctx( dbName );
-            DataFile *p = ctx.db()->getExtentManager()->getFile( &txn, 0 );
+            DataFile *p = ctx.db()->getExtentManager()->getFile(&txn, 0);
             DataFileHeader *h = p->getHeader();
 
             if (repl::replSettings.usingReplSets()) {
@@ -476,10 +480,13 @@ namespace mongo {
      * @returns the number of documents in local.system.replset or 0 if this was started with
      *          --replset.
      */
-    unsigned long long checkIfReplMissingFromCommandLine() {
-        Lock::GlobalWrite lk; // this is helpful for the query below to work as you can't open files when readlocked
+    static unsigned long long checkIfReplMissingFromCommandLine() {
+        OperationContextImpl txn;
+
+        // This is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk(txn.lockState());
         if (!repl::replSettings.usingReplSets()) {
-            DBDirectClient c;
+            DBDirectClient c(&txn);
             return c.count("local.system.replset");
         }
         return 0;

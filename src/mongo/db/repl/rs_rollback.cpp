@@ -428,7 +428,7 @@ namespace repl {
                 ctx.db()->dropCollection(&txn, ns);
                 {
                     string errmsg;
-                    dbtemprelease release;
+                    dbtemprelease release(txn.lockState());
                     bool ok = Cloner::copyCollectionFromRemote(&txn, them->getServerAddress(),
                                                                ns, errmsg);
                     uassert(15909, str::stream() << "replSet rollback error resyncing collection "
@@ -662,8 +662,9 @@ namespace repl {
     void ReplSetImpl::syncRollback(OplogReader& oplogreader) {
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
         // inconsistent state
+        OperationContextImpl txn;
+
         {
-            OperationContextImpl txn;
             Lock::DBRead lk(txn.lockState(), "local.replset.minvalid");
             BSONObj mv;
             if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
@@ -678,18 +679,18 @@ namespace repl {
             }
         }
 
-        unsigned s = _syncRollback(oplogreader);
+        unsigned s = _syncRollback(&txn, oplogreader);
         if (s)
             sleepsecs(s);
     }
 
-    unsigned ReplSetImpl::_syncRollback(OplogReader& oplogreader) {
+    unsigned ReplSetImpl::_syncRollback(OperationContext* txn, OplogReader& oplogreader) {
         verify(!lockedByMe());
         verify(!Lock::isLocked());
 
         sethbmsg("rollback 0");
 
-        writelocktry lk(20000);
+        writelocktry lk(txn->lockState(), 20000);
         if (!lk.got()) {
             sethbmsg("rollback couldn't get write lock in a reasonable time");
             return 2;
@@ -721,7 +722,7 @@ namespace repl {
             }
             catch (DBException& e) {
                 sethbmsg(string("rollback 2 exception ") + e.toString() + "; sleeping 1 min");
-                dbtemprelease release;
+                dbtemprelease release(txn->lockState());
                 sleepsecs(60);
                 throw;
             }

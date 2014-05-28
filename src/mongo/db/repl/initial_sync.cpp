@@ -30,9 +30,11 @@
 
 #include "mongo/db/repl/initial_sync.h"
 
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
+
 
 namespace mongo {
 namespace repl {
@@ -52,7 +54,8 @@ namespace repl {
         }
 
         // create the initial oplog entry
-        syncApply(applyGTEObj);
+        OperationContextImpl txn;
+        syncApply(&txn, applyGTEObj);
         _logOpObjRS(applyGTEObj);
 
         return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);

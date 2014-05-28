@@ -50,7 +50,8 @@ namespace mongo {
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
 
-        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
+        virtual Status getAllDatabaseNames(
+                            OperationContext* txn, std::vector<std::string>* dbnames);
 
         virtual Status findOne(OperationContext* txn,
                                const NamespaceString& collectionName,

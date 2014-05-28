@@ -76,6 +76,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -282,7 +283,7 @@ namespace mongo {
                 case '\0': {
                     // lock_w() can call in this state at times if a commit is needed before attempting 
                     // its lock.
-                    Lock::GlobalRead r;
+                    Lock::GlobalRead r(&cc().lockState());
                     if( commitJob.bytes() < UncommittedBytesLimit ) {
                         // someone else beat us to it
                         //
@@ -307,7 +308,7 @@ namespace mongo {
 
                     LOG(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
                            << endl;
-                    Lock::UpgradeGlobalLockToExclusive ex;
+                    Lock::UpgradeGlobalLockToExclusive ex(&cc().lockState());
                     if (ex.gotUpgrade()) {
                         commitNow();
                     }
@@ -575,7 +576,7 @@ namespace mongo {
             // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
             // also needs to stop greed. our time to work before clearing lk1 is not too bad, so 
             // not super critical, but likely 'correct'.  todo.
-            scoped_ptr<Lock::GlobalRead> lk1( new Lock::GlobalRead() );
+            scoped_ptr<Lock::GlobalRead> lk1(new Lock::GlobalRead(&cc().lockState()));
 
             SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
@@ -774,7 +775,7 @@ namespace mongo {
             // getting a write lock is helpful also as we need to be greedy and not be starved here
             // note our "stopgreed" parm -- to stop greed by others while we are working. you can't write 
             // anytime soon anyway if we are journaling for a while, that was the idea.
-            Lock::GlobalWrite w(/*stopgreed:*/true);
+            Lock::GlobalWrite w(&cc().lockState());
             w.downgrade();
             groupCommit(&w);
         }
@@ -848,7 +849,7 @@ namespace mongo {
             cc().shutdown();
         }
 
-        void recover();
+        void recover(OperationContext* txn);
         void preallocateFiles();
 
         /** at startup, recover, and then start the journal threads */
@@ -872,8 +873,10 @@ namespace mongo {
             DurableInterface::enableDurability();
 
             journalMakeDir();
+
+            OperationContextImpl txn;
             try {
-                recover();
+                recover(&txn);
             }
             catch(DBException& e) {
                 log() << "dbexception during recovery: " << e.toString() << endl;

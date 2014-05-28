@@ -44,6 +44,7 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -130,7 +131,8 @@ namespace mongo {
             else {
                 // the simple fsync command case
                 if (sync) {
-                    Lock::GlobalWrite w; // can this be GlobalRead? and if it can, it should be nongreedy.
+                    // can this be GlobalRead? and if it can, it should be nongreedy.
+                    Lock::GlobalWrite w(txn->lockState());
                     getDur().commitNow();
                 }
                 // question : is it ok this is not in the dblock? i think so but this is a change from past behavior, 
@@ -145,7 +147,10 @@ namespace mongo {
 
     void FSyncLockThread::doRealWork() {
         SimpleMutex::scoped_lock lkf(filesLockedFsync);
-        Lock::GlobalWrite global(true/*stopGreed*/);
+
+        OperationContextImpl txn;   // XXX?
+        Lock::GlobalWrite global(txn.lockState());
+
         SimpleMutex::scoped_lock lk(fsyncCmd.m);
         
         verify( ! fsyncCmd.locked ); // impossible to get here if locked is true

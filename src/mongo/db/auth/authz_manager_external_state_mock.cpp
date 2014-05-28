@@ -131,6 +131,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::getAllDatabaseNames(
+            OperationContext* txn,
             std::vector<std::string>* dbnames) {
         unordered_set<std::string> dbnameSet;
         NamespaceDocumentMap::const_iterator it;

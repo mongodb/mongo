@@ -186,7 +186,9 @@ namespace mongo {
                        IndexCatalogEntry* btreeState,
                        bool mayInterrupt ) {
 
-        string ns = collection->ns().ns(); // our copy
+        const string ns = collection->ns().ns(); // our copy
+        verify(txn->lockState()->isWriteLocked(ns));
+
         const IndexDescriptor* idx = btreeState->descriptor();
         const BSONObj& idxInfo = idx->infoObj();
 
@@ -196,7 +198,6 @@ namespace mongo {
 
         Timer t;
 
-        verify( Lock::isWriteLocked( ns ) );
         // this is so that people know there are more keys to look at when doing
         // things like in place updates, etc...
         collection->infoCache()->addedIndex();

@@ -59,7 +59,10 @@ namespace mongo {
         bool hasAnyReadLock() const; // explicitly rR
         bool hasAnyWriteLock() const; // wW
         
-        bool isLocked( const StringData& ns ); // rwRW
+        bool isLocked(const StringData& ns) const; // rwRW
+        bool isWriteLocked(const StringData& ns);
+        bool isAtLeastReadLocked(const StringData& ns) const;
+        bool isNested() const;
 
         /** pending means we are currently trying to get a lock */
         bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }

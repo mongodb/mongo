@@ -49,7 +49,6 @@ namespace mongo {
     public:
         enum Nestable { notnestable=0, local, admin };
         static int isLocked();      // true if *anything* is locked (by us)
-        static int isReadLocked();  // r or R
         static int somethingWriteLocked(); // w or W
         static bool isW();          // W
         static bool isR();          
@@ -67,9 +66,12 @@ namespace mongo {
 
         // note: avoid TempRelease when possible. not a good thing.
         struct TempRelease {
-            TempRelease(); 
+            TempRelease(LockState* lockState);
             ~TempRelease();
             const bool cant; // true if couldn't because of recursive locking
+
+            // Not owned
+            LockState* _lockState;
             ScopedLock *scopedLk;
         };
 
@@ -101,7 +103,7 @@ namespace mongo {
             void resetTime();
 
         protected:
-            explicit ScopedLock( char type ); 
+            explicit ScopedLock(LockState* lockState, char type ); 
 
         private:
             friend struct TempRelease;
@@ -118,12 +120,13 @@ namespace mongo {
 
             class ParallelBatchWriterSupport : boost::noncopyable {
             public:
-                ParallelBatchWriterSupport();
+                ParallelBatchWriterSupport(LockState* lockState);
 
             private:
                 void tempRelease();
                 void relock();
 
+                LockState* _lockState;
                 scoped_ptr<RWLockRecursive::Shared> _lk;
                 friend class ScopedLock;
             };
@@ -147,11 +150,12 @@ namespace mongo {
         public:
             // stopGreed is removed and does NOT work
             // timeoutms is only for writelocktry -- deprecated -- do not use
-            GlobalWrite(bool stopGreed = false, int timeoutms = -1 ); 
+            GlobalWrite(LockState* lockState, int timeoutms = -1);
             virtual ~GlobalWrite();
             void downgrade(); // W -> R
             void upgrade();   // caution see notes
         };
+
         class GlobalRead : public ScopedLock { // recursive is ok
         public:
             bool noop;
@@ -160,7 +164,7 @@ namespace mongo {
             void _relock();
         public:
             // timeoutms is only for readlocktry -- deprecated -- do not use
-            GlobalRead( int timeoutms = -1 ); 
+            GlobalRead(LockState* lockState, int timeoutms = -1);
             virtual ~GlobalRead();
         };
 
@@ -174,7 +178,7 @@ namespace mongo {
              *   2) unlockDB
              */
 
-            void lockTop(LockState&);
+            void lockTop();
             void lockNestable(Nestable db);
             void lockOther(const StringData& db);
             void lockDB(const std::string& ns);
@@ -198,7 +202,7 @@ namespace mongo {
 
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
-            void lockTop(LockState&);
+            void lockTop();
             void lockNestable(Nestable db);
             void lockOther(const StringData& db);
             void lockDB(const std::string& ns);
@@ -226,12 +230,13 @@ namespace mongo {
          */
         class UpgradeGlobalLockToExclusive : private boost::noncopyable {
         public:
-            UpgradeGlobalLockToExclusive();
+            UpgradeGlobalLockToExclusive(LockState* lockState);
             ~UpgradeGlobalLockToExclusive();
 
             bool gotUpgrade() const { return _gotUpgrade; }
 
         private:
+            LockState* _lockState;
             bool _gotUpgrade;
         };
     };
@@ -240,7 +245,7 @@ namespace mongo {
         bool _got;
         scoped_ptr<Lock::GlobalRead> _dbrlock;
     public:
-        readlocktry( int tryms );
+        readlocktry(LockState* lockState, int tryms);
         ~readlocktry();
         bool got() const { return _got; }
     };
@@ -249,7 +254,7 @@ namespace mongo {
         bool _got;
         scoped_ptr<Lock::GlobalWrite> _dbwlock;
     public:
-        writelocktry( int tryms );
+        writelocktry(LockState* lockState, int tryms);
         ~writelocktry();
         bool got() const { return _got; }
     };

@@ -98,8 +98,8 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
-            std::vector<std::string>* dbnames) {
-        Lock::GlobalRead lk;
+                OperationContext* txn, std::vector<std::string>* dbnames) {
+        Lock::GlobalRead lk(txn->lockState());
         getDatabaseNames(*dbnames);
         return Status::OK();
     }

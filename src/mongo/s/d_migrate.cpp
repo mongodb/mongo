@@ -230,14 +230,14 @@ namespace mongo {
             return true;
         }
 
-        void done() {
+        void done(OperationContext* txn) {
             log() << "MigrateFromStatus::done About to acquire global write lock to exit critical "
                     "section" << endl;
 
 
             _dummyRunner.reset( NULL );
 
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(txn->lockState());
             log() << "MigrateFromStatus::done Global lock acquired" << endl;
 
             {
@@ -667,15 +667,17 @@ namespace mongo {
     }
 
     struct MigrateStatusHolder {
-        MigrateStatusHolder( const std::string& ns ,
+        MigrateStatusHolder( OperationContext* txn,
+                             const std::string& ns ,
                              const BSONObj& min ,
                              const BSONObj& max ,
-                             const BSONObj& shardKeyPattern ) {
+                             const BSONObj& shardKeyPattern )
+                : _txn(txn) {
             _isAnotherMigrationActive = !migrateFromStatus.start(ns, min, max, shardKeyPattern);
         }
         ~MigrateStatusHolder() {
             if (!_isAnotherMigrationActive) {
-                migrateFromStatus.done();
+                migrateFromStatus.done(_txn);
             }
         }
 
@@ -684,6 +686,7 @@ namespace mongo {
         }
 
     private:
+        OperationContext* _txn;
         bool _isAnotherMigrationActive;
     };
 
@@ -1033,7 +1036,7 @@ namespace mongo {
                 return false;
             }
 
-            MigrateStatusHolder statusHolder( ns , min , max , shardKeyPattern );
+            MigrateStatusHolder statusHolder(txn, ns, min, max, shardKeyPattern);
             if (statusHolder.isAnotherMigrationActive()) {
                 errmsg = "moveChunk is already in progress from this shard";
                 warning() << errmsg << endl;
@@ -1241,7 +1244,7 @@ namespace mongo {
                     log() << "moveChunk migrate commit not accepted by TO-shard: " << res
                           << " resetting shard version to: " << startingVersion << migrateLog;
                     {
-                        Lock::GlobalWrite lk;
+                        Lock::GlobalWrite lk(txn->lockState());
                         log() << "moveChunk global lock acquired to reset shard version from "
                               "failed migration"
                               << endl;
@@ -1407,7 +1410,7 @@ namespace mongo {
                           << "failed migration" << endl;
 
                     {
-                        Lock::GlobalWrite lk;
+                        Lock::GlobalWrite lk(txn->lockState());
 
                         // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
@@ -1476,7 +1479,7 @@ namespace mongo {
                 configServer.logChange( "moveChunk.commit" , ns , commitInfo.obj() );
             }
 
-            migrateFromStatus.done();
+            migrateFromStatus.done(txn);
             timing.done(5);
             MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep5);
 
@@ -1847,7 +1850,7 @@ namespace mongo {
                 while ( t.minutes() < 600 ) {
                     log() << "Waiting for replication to catch up before entering critical section"
                           << endl;
-                    if ( flushPendingWrites( lastOpApplied ) )
+                    if ( flushPendingWrites(txn, lastOpApplied ) )
                         break;
                     sleepsecs(1);
                 }
@@ -1886,7 +1889,7 @@ namespace mongo {
                     // 1) The from side has told us that it has locked writes (COMMIT_START)
                     // 2) We've checked at least one more time for un-transmitted mods
                     if ( state == COMMIT_START && transferAfterCommit == true ) {
-                        if ( flushPendingWrites( lastOpApplied ) )
+                        if ( flushPendingWrites(txn, lastOpApplied ) )
                             break;
                     }
                     
@@ -2031,7 +2034,7 @@ namespace mongo {
             return repl::opReplicatedEnough(lastOpApplied, replSetMajorityCount);
         }
 
-        bool flushPendingWrites( const ReplTime& lastOpApplied ) {
+        bool flushPendingWrites(OperationContext* txn, const ReplTime& lastOpApplied ) {
             if ( ! opReplicatedEnough( lastOpApplied ) ) {
                 OpTime op( lastOpApplied );
                 OCCASIONALLY warning() << "migrate commit waiting for " << replSetMajorityCount 
@@ -2044,7 +2047,7 @@ namespace mongo {
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << migrateLog;
 
             {
-                Lock::GlobalRead lk;
+                Lock::GlobalRead lk(txn->lockState());
 
                 // if durability is on, force a write to journal
                 if ( getDur().commitNow() ) {

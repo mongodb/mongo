@@ -108,11 +108,11 @@ namespace mongo {
             }
 
             if(cmdObj.getBoolField("w")) {
-                Lock::GlobalWrite lk;
+                Lock::GlobalWrite lk(txn->lockState());
                 sleepmillis(millis);
             }
             else {
-                Lock::GlobalRead lk;
+                Lock::GlobalRead lk(txn->lockState());
                 sleepmillis(millis);
             }
 

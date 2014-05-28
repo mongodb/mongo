@@ -392,13 +392,11 @@ namespace repl {
     }
     void oldRepl() { _logOp = _logOpOld; }
 
-    void logKeepalive() {
-        OperationContextImpl txn;
-        _logOp(&txn, "n", "", 0, BSONObj(), 0, 0, false);
+    void logKeepalive(OperationContext* txn) {
+        _logOp(txn, "n", "", 0, BSONObj(), 0, 0, false);
     }
-    void logOpComment(const BSONObj& obj) {
-        OperationContextImpl txn;
-        _logOp(&txn, "n", "", 0, obj, 0, 0, false);
+    void logOpComment(OperationContext* txn, const BSONObj& obj) {
+        _logOp(txn, "n", "", 0, obj, 0, 0, false);
     }
     void logOpInitiate(OperationContext* txn, const BSONObj& obj) {
         _logOpRS(txn, "n", "", 0, obj, 0, 0, false);
@@ -433,7 +431,8 @@ namespace repl {
     }
 
     void createOplog() {
-        Lock::GlobalWrite lk;
+        OperationContextImpl txn;
+        Lock::GlobalWrite lk(txn.lockState());
 
         const char * ns = "local.oplog.$main";
 
@@ -442,7 +441,6 @@ namespace repl {
             ns = rsoplog;
 
         Client::Context ctx(ns);
-        OperationContextImpl txn;
         Collection* collection = ctx.db()->getCollection( &txn, ns );
 
         if ( collection ) {
@@ -460,7 +458,7 @@ namespace repl {
 
             if( rs ) return;
 
-            initOpTimeFromOplog(ns);
+            initOpTimeFromOplog(&txn, ns);
             return;
         }
 
@@ -711,12 +709,12 @@ namespace repl {
                 Status status = Command::getStatusFromCommandResult(ob.done());
                 switch (status.code()) {
                 case ErrorCodes::BackgroundOperationInProgressForDatabase: {
-                    dbtemprelease release;
+                    dbtemprelease release(txn->lockState());
                     BackgroundOperation::awaitNoBgOpInProgForDb(nsToDatabaseSubstring(ns));
                     break;
                 }
                 case ErrorCodes::BackgroundOperationInProgressForNamespace: {
-                    dbtemprelease release;
+                    dbtemprelease release(txn->lockState());;
                     Command* cmd = Command::findCommand(o.firstElement().fieldName());
                     invariant(cmd);
                     BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));
@@ -761,8 +759,8 @@ namespace repl {
 
     }
 
-    void initOpTimeFromOplog(const std::string& oplogNS) {
-        DBDirectClient c;
+    void initOpTimeFromOplog(OperationContext* txn, const std::string& oplogNS) {
+        DBDirectClient c(txn);
         BSONObj lastOp = c.findOne(oplogNS,
                                    Query().sort(reverseNaturalObj),
                                    NULL,

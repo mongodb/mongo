@@ -48,13 +48,17 @@ namespace PdfileTests {
     namespace Insert {
         class Base {
         public:
-            Base() : _context( ns() ) {
+            Base() : _lk(_txn.lockState()),
+                     _context(ns()) {
+
             }
+
             virtual ~Base() {
                 if ( !collection() )
                     return;
                 _context.db()->dropCollection( &_txn, ns() );
             }
+
         protected:
             const char *ns() {
                 return "unittests.pdfiletests.Insert";
@@ -63,9 +67,10 @@ namespace PdfileTests {
                 return _context.db()->getCollection( &_txn, ns() );
             }
 
-            Lock::GlobalWrite lk_;
-            Client::Context _context;
             OperationContextImpl _txn;
+            Lock::GlobalWrite _lk;
+
+            Client::Context _context;
         };
 
         class InsertNoId : public Base {

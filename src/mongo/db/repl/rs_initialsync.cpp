@@ -393,6 +393,8 @@ namespace repl {
             return;
         }
 
+        OperationContextImpl txn;
+
         // written by applyToHead calls
         BSONObj minValid;
 
@@ -408,7 +410,7 @@ namespace repl {
             theReplSet->setInitialSyncFlag();
 
             sethbmsg("initial sync drop all databases", 0);
-            dropAllDatabasesExceptLocal();
+            dropAllDatabasesExceptLocal(&txn);
 
             sethbmsg("initial sync clone all databases", 0);
 
@@ -467,7 +469,6 @@ namespace repl {
         verify( !box.getState().primary() ); // wouldn't make sense if we were.
 
         {
-            OperationContextImpl txn;
             Client::WriteContext cx(&txn, "local.");
 
             cx.ctx().db()->flushFiles(true);

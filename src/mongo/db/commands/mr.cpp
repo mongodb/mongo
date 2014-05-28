@@ -495,14 +495,16 @@ namespace mongo {
          * Does post processing on output collection.
          * This may involve replacing, merging or reducing.
          */
-        long long State::postProcessCollection(CurOp* op, ProgressMeterHolder& pm) {
+        long long State::postProcessCollection(
+                                OperationContext* txn, CurOp* op, ProgressMeterHolder& pm) {
+
             if ( _onDisk == false || _config.outputOptions.outType == Config::INMEMORY )
                 return numInMemKeys();
 
             if (_config.outputOptions.outNonAtomic)
-                return postProcessCollectionNonAtomic(op, pm);
-            Lock::GlobalWrite lock; // TODO(erh): this is how it was, but seems it doesn't need to be global
-            return postProcessCollectionNonAtomic(op, pm);
+                return postProcessCollectionNonAtomic(txn, op, pm);
+            Lock::GlobalWrite lock(txn->lockState()); // TODO(erh): this is how it was, but seems it doesn't need to be global
+            return postProcessCollectionNonAtomic(txn, op, pm);
         }
 
         //
@@ -530,14 +532,16 @@ namespace mongo {
         // End SERVER-6116
         //
 
-        long long State::postProcessCollectionNonAtomic(CurOp* op, ProgressMeterHolder& pm) {
+        long long State::postProcessCollectionNonAtomic(
+                                OperationContext* txn, CurOp* op, ProgressMeterHolder& pm) {
 
             if ( _config.outputOptions.finalNamespace == _config.tempNamespace )
                 return _safeCount( _db, _config.outputOptions.finalNamespace );
 
             if (_config.outputOptions.outType == Config::REPLACE ||
                     _safeCount(_db, _config.outputOptions.finalNamespace) == 0) {
-                Lock::GlobalWrite lock; // TODO(erh): why global???
+
+                Lock::GlobalWrite lock(txn->lockState()); // TODO(erh): why global???
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.outputOptions.finalNamespace );
                 BSONObj info;
@@ -577,7 +581,7 @@ namespace mongo {
                                _safeCount(_db, _config.tempNamespace, BSONObj()));
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
-                    Lock::GlobalWrite lock; // TODO(erh) why global?
+                    Lock::GlobalWrite lock(txn->lockState()); // TODO(erh) why global?
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
@@ -1383,7 +1387,7 @@ namespace mongo {
                     timingBuilder.appendNumber("reduceTime", reduceTime / 1000);
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
 
-                    long long finalCount = state.postProcessCollection(op, pm);
+                    long long finalCount = state.postProcessCollection(txn, op, pm);
                     state.appendResults( result );
 
                     timingBuilder.appendNumber( "total" , t.millis() );
@@ -1576,7 +1580,7 @@ namespace mongo {
 
                 result.append( "chunkSizes" , chunkSizes.arr() );
 
-                long long outputCount = state.postProcessCollection(op, pm);
+                long long outputCount = state.postProcessCollection(txn, op, pm);
                 state.appendResults( result );
 
                 BSONObjBuilder countsB(32);

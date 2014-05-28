@@ -51,9 +51,13 @@ namespace repl {
         }
 
         virtual void handle( OperationContext* txn,
-                             const char *rq, const std::string& url, BSONObj params,
-                             string& responseMsg, int& responseCode,
-                             vector<string>& headers,  const SockAddr &from ) {
+                             const char *rq, 
+                             const std::string& url, 
+                             BSONObj params,
+                             string& responseMsg, 
+                             int& responseCode,
+                             vector<string>& headers,  
+                             const SockAddr &from ) {
 
             if( url == "/_replSetOplog" ) {
                 responseMsg = _replSetOplog(params);

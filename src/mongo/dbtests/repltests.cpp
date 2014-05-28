@@ -55,10 +55,18 @@ namespace ReplTests {
     }
 
     class Base {
-        Lock::GlobalWrite lk;
+    protected:
+        mutable OperationContextImpl _txn;
+        Lock::GlobalWrite _lk;
+
+        mutable DBDirectClient _client;
         Client::Context _context;
+
     public:
-        Base() : _context( ns() ) {
+        Base() : _lk(_txn.lockState()),
+                 _client(&_txn),
+                 _context(ns()) {
+
             oldRepl();
             replSettings.replSet = "";
             replSettings.oplogSize = 5 * 1024 * 1024;
@@ -88,15 +96,14 @@ namespace ReplTests {
         static const char *cllNS() {
             return "local.oplog.$main";
         }
-        DBDirectClient *client() const { return &client_; }
         BSONObj one( const BSONObj &query = BSONObj() ) const {
-            return client()->findOne( ns(), query );
+            return _client.findOne( ns(), query );
         }
         void checkOne( const BSONObj &o ) const {
             check( o, one( o ) );
         }
         void checkAll( const BSONObj &o ) const {
-            auto_ptr< DBClientCursor > c = client()->query( ns(), o );
+            auto_ptr< DBClientCursor > c = _client.query( ns(), o );
             verify( c->more() );
             while( c->more() ) {
                 check( o, c->next() );
@@ -110,10 +117,10 @@ namespace ReplTests {
             ASSERT_EQUALS( expected , got );
         }
         BSONObj oneOp() const {
-            return client()->findOne( cllNS(), BSONObj() );
+            return _client.findOne( cllNS(), BSONObj() );
         }
         int count() const {
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx( ns() );
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &_txn, ns() );
@@ -131,9 +138,10 @@ namespace ReplTests {
             return count;
         }
         static int opCount() {
-            Lock::GlobalWrite lk;
-            Client::Context ctx( cllNS() );
             OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+            Client::Context ctx( cllNS() );
+
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, cllNS() );
             if ( !coll ) {
@@ -150,8 +158,9 @@ namespace ReplTests {
             return count;
         }
         static void applyAllOperations() {
-            Lock::GlobalWrite lk;
             OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
@@ -181,9 +190,10 @@ namespace ReplTests {
             }
         }
         static void printAll( const char *ns ) {
-            Lock::GlobalWrite lk;
-            Client::Context ctx( ns );
             OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+            Client::Context ctx( ns );
+
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns );
             if ( !coll ) {
@@ -201,9 +211,10 @@ namespace ReplTests {
         }
         // These deletes don't get logged.
         static void deleteAll( const char *ns ) {
-            Lock::GlobalWrite lk;
-            Client::Context ctx( ns );
             OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+            Client::Context ctx( ns );
+
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns );
             if ( !coll ) {
@@ -222,9 +233,10 @@ namespace ReplTests {
             }
         }
         static void insert( const BSONObj &o ) {
-            Lock::GlobalWrite lk;
-            Client::Context ctx( ns() );
             OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+            Client::Context ctx( ns() );
+
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &txn, ns() );
             if ( !coll ) {
@@ -254,18 +266,14 @@ namespace ReplTests {
         Database* db() {
             return _context.db();
         }
-
-        mutable OperationContextImpl _txn;
-    private:
-        static DBDirectClient client_;
     };
-    DBDirectClient Base::client_;
+
 
     class LogBasic : public Base {
     public:
         void run() {
             ASSERT_EQUALS( 1, opCount() );
-            client()->insert( ns(), fromjson( "{\"a\":\"b\"}" ) );
+            _client.insert( ns(), fromjson( "{\"a\":\"b\"}" ) );
             ASSERT_EQUALS( 2, opCount() );
         }
     };
@@ -304,11 +312,11 @@ namespace ReplTests {
                 BSONObjBuilder b;
                 b.append( "a", 1 );
                 b.appendTimestamp( "t" );
-                client()->insert( ns(), b.done() );
-                date_ = client()->findOne( ns(), QUERY( "a" << 1 ) ).getField( "t" ).date();
+                _client.insert( ns(), b.done() );
+                date_ = _client.findOne( ns(), QUERY( "a" << 1 ) ).getField( "t" ).date();
             }
             void check() const {
-                BSONObj o = client()->findOne( ns(), QUERY( "a" << 1 ) );
+                BSONObj o = _client.findOne( ns(), QUERY( "a" << 1 ) );
                 ASSERT( 0 != o.getField( "t" ).date() );
                 ASSERT_EQUALS( date_, o.getField( "t" ).date() );
             }
@@ -323,7 +331,7 @@ namespace ReplTests {
         public:
             InsertAutoId() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
             void doIt() const {
-                client()->insert( ns(), o_ );
+                _client.insert( ns(), o_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -355,7 +363,7 @@ namespace ReplTests {
                 vector< BSONObj > v;
                 v.push_back( o_ );
                 v.push_back( t_ );
-                client()->insert( ns(), v );
+                _client.insert( ns(), v );
             }
             void check() const {
                 ASSERT_EQUALS( 2, count() );
@@ -374,8 +382,8 @@ namespace ReplTests {
         public:
             InsertTwoIdentical() : o_( fromjson( "{\"a\":\"b\"}" ) ) {}
             void doIt() const {
-                client()->insert( ns(), o_ );
-                client()->insert( ns(), o_ );
+                _client.insert( ns(), o_ );
+                _client.insert( ns(), o_ );
             }
             void check() const {
                 ASSERT_EQUALS( 2, count() );
@@ -393,11 +401,11 @@ namespace ReplTests {
                 BSONObjBuilder b;
                 b.append( "_id", 1 );
                 b.appendTimestamp( "t" );
-                client()->update( ns(), BSON( "_id" << 1 ), b.done() );
-                date_ = client()->findOne( ns(), QUERY( "_id" << 1 ) ).getField( "t" ).date();
+                _client.update( ns(), BSON( "_id" << 1 ), b.done() );
+                date_ = _client.findOne( ns(), QUERY( "_id" << 1 ) ).getField( "t" ).date();
             }
             void check() const {
-                BSONObj o = client()->findOne( ns(), QUERY( "_id" << 1 ) );
+                BSONObj o = _client.findOne( ns(), QUERY( "_id" << 1 ) );
                 ASSERT( 0 != o.getField( "t" ).date() );
                 ASSERT_EQUALS( date_, o.getField( "t" ).date() );
             }
@@ -417,12 +425,12 @@ namespace ReplTests {
                 o2_( wid( "{a:'b'}" ) ),
                 u_( fromjson( "{a:'c'}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 2, count() );
-                ASSERT( !client()->findOne( ns(), q_ ).isEmpty() );
-                ASSERT( !client()->findOne( ns(), u_ ).isEmpty() );
+                ASSERT( !_client.findOne( ns(), q_ ).isEmpty() );
+                ASSERT( !_client.findOne( ns(), u_ ).isEmpty() );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -440,12 +448,12 @@ namespace ReplTests {
                 q_( fromjson( "{a:'b'}" ) ),
                 u_( fromjson( "{'_id':1,a:'c'}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 2, count() );
-                ASSERT( !client()->findOne( ns(), q_ ).isEmpty() );
-                ASSERT( !client()->findOne( ns(), u_ ).isEmpty() );
+                ASSERT( !_client.findOne( ns(), q_ ).isEmpty() );
+                ASSERT( !_client.findOne( ns(), u_ ).isEmpty() );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -462,7 +470,7 @@ namespace ReplTests {
                 o_( fromjson( "{'_id':1,a:'b'}" ) ),
                 u_( fromjson( "{'_id':1,a:'c'}" ) ) {}
             void doIt() const {
-                client()->update( ns(), o_, u_ );
+                _client.update( ns(), o_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -483,7 +491,7 @@ namespace ReplTests {
                 q_( fromjson( "{'_id':1}" ) ),
                 u_( fromjson( "{'_id':1,a:'c'}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -499,13 +507,13 @@ namespace ReplTests {
 
         class UpsertUpdateNoMods : public UpdateDifferentFieldExplicitId {
             void doIt() const {
-                client()->update( ns(), q_, u_, true );
+                _client.update( ns(), q_, u_, true );
             }
         };
 
         class UpsertInsertNoMods : public InsertAutoId {
             void doIt() const {
-                client()->update( ns(), fromjson( "{a:'c'}" ), o_, true );
+                _client.update( ns(), fromjson( "{a:'c'}" ), o_, true );
             }
         };
 
@@ -517,7 +525,7 @@ namespace ReplTests {
                 u_( fromjson( "{$set:{a:7}}" ) ),
                 ou_( fromjson( "{'_id':1,a:7}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -539,7 +547,7 @@ namespace ReplTests {
                 u_( fromjson( "{$inc:{a:3}}" ) ),
                 ou_( fromjson( "{'_id':1,a:8}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -561,7 +569,7 @@ namespace ReplTests {
                 u_( fromjson( "{$inc:{a:3},$set:{x:5}}" ) ),
                 ou_( fromjson( "{'_id':1,a:8,x:5}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -584,7 +592,7 @@ namespace ReplTests {
                 ou_( fromjson( "{'_id':1,a:{b:4},b:{b:2}}" ) )
             {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -607,7 +615,7 @@ namespace ReplTests {
                 ou_( fromjson( "{'_id':1,a:1}") )
             {}
             void doIt() const {
-                client()->update( ns(), q_, u_ );
+                _client.update( ns(), q_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -629,7 +637,7 @@ namespace ReplTests {
                 u_( fromjson( "{$inc:{a:3}}" ) ),
                 ou_( fromjson( "{'_id':5,a:7}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_, true );
+                _client.update( ns(), q_, u_, true );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -649,11 +657,11 @@ namespace ReplTests {
                 u_( fromjson( "{$set:{a:7}}" ) ),
                 ou_( fromjson( "{a:7}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_, true );
+                _client.update( ns(), q_, u_, true );
             }
             void check() const {
                 ASSERT_EQUALS( 2, count() );
-                ASSERT( !client()->findOne( ns(), ou_ ).isEmpty() );
+                ASSERT( !_client.findOne( ns(), ou_ ).isEmpty() );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -670,11 +678,11 @@ namespace ReplTests {
                 u_( fromjson( "{$inc:{a:3}}" ) ),
                 ou_( fromjson( "{a:8}" ) ) {}
             void doIt() const {
-                client()->update( ns(), q_, u_, true );
+                _client.update( ns(), q_, u_, true );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
-                ASSERT( !client()->findOne( ns(), ou_ ).isEmpty() );
+                ASSERT( !_client.findOne( ns(), ou_ ).isEmpty() );
             }
             void reset() const {
                 deleteAll( ns() );
@@ -688,7 +696,7 @@ namespace ReplTests {
 
             string s() const {
                 stringstream ss;
-                auto_ptr<DBClientCursor> cc = client()->query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
+                auto_ptr<DBClientCursor> cc = _client.query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
                 bool first = true;
                 while ( cc->more() ) {
                     if ( first ) first = false;
@@ -701,18 +709,18 @@ namespace ReplTests {
             }
 
             void doIt() const {
-                client()->insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
-                client()->insert( ns(), BSON( "_id" << 2 << "x" << 5 ) );
+                _client.insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
+                _client.insert( ns(), BSON( "_id" << 2 << "x" << 5 ) );
 
                 ASSERT_EQUALS( "1,5" , s() );
 
-                client()->update( ns() , BSON( "_id" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
+                _client.update( ns() , BSON( "_id" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
                 ASSERT_EQUALS( "2,5" , s() );
 
-                client()->update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) );
+                _client.update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) );
                 ASSERT_EQUALS( "3,5" , s() );
 
-                client()->update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , false , true );
+                _client.update( ns() , BSONObj() , BSON( "$inc" << BSON( "x" << 1 ) ) , false , true );
                 check();
             }
 
@@ -732,7 +740,7 @@ namespace ReplTests {
                 u_( fromjson( "{a:5}" ) ),
                 ot_( fromjson( "{b:4}" ) ) {}
             void doIt() const {
-                client()->update( ns(), o_, u_ );
+                _client.update( ns(), o_, u_ );
             }
             void check() const {
                 ASSERT_EQUALS( 2, count() );
@@ -755,7 +763,7 @@ namespace ReplTests {
                 o2_( f( "{\"_id\":\"010101010101010101010102\",\"a\":\"b\"}" ) ),
                 q_( f( "{\"a\":\"b\"}" ) ) {}
             void doIt() const {
-                client()->remove( ns(), q_ );
+                _client.remove( ns(), q_ );
             }
             void check() const {
                 ASSERT_EQUALS( 0, count() );
@@ -771,7 +779,7 @@ namespace ReplTests {
 
         class RemoveOne : public Remove {
             void doIt() const {
-                client()->remove( ns(), q_, true );
+                _client.remove( ns(), q_, true );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -784,8 +792,8 @@ namespace ReplTests {
                 o_( fromjson( "{'_id':1,a:'b'}" ) ),
                 u_( fromjson( "{'_id':1,c:'d'}" ) ) {}
             void doIt() const {
-                client()->update( ns(), o_, u_ );
-                client()->insert( ns(), o_ );
+                _client.update( ns(), o_, u_ );
+                _client.insert( ns(), o_ );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -801,7 +809,7 @@ namespace ReplTests {
         class SetNumToStr : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$set" << BSON( "a" << "bcd" ) ) );
+                _client.update( ns(), BSON( "_id" << 0 ), BSON( "$set" << BSON( "a" << "bcd" ) ) );
             }
             void check() const {
                 ASSERT_EQUALS( 1, count() );
@@ -816,7 +824,7 @@ namespace ReplTests {
         class Push : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
+                _client.update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -832,7 +840,7 @@ namespace ReplTests {
         class PushUpsert : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ), true );
+                _client.update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ), true );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -848,7 +856,7 @@ namespace ReplTests {
         class MultiPush : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) << "$push" << BSON( "b.c" << 6.0 ) ) );
+                _client.update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) << "$push" << BSON( "b.c" << 6.0 ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -864,7 +872,7 @@ namespace ReplTests {
         class EmptyPush : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
+                _client.update( ns(), BSON( "_id" << 0 ), BSON( "$push" << BSON( "a" << 5.0 ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -880,19 +888,19 @@ namespace ReplTests {
         class EmptyPushSparseIndex : public EmptyPush {
         public:
             EmptyPushSparseIndex() {
-                client()->insert( "unittests.system.indexes",
+                _client.insert( "unittests.system.indexes",
                                  BSON( "ns" << ns() << "key" << BSON( "a" << 1 ) <<
                                       "name" << "foo" << "sparse" << true ) );
             }
             ~EmptyPushSparseIndex() {
-                client()->dropIndexes( ns() );
+                _client.dropIndexes( ns() );
             }
         };
 
         class PushAll : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -907,7 +915,7 @@ namespace ReplTests {
 
         class PushWithDollarSigns : public Base {
             void doIt() const {
-                client()->update( ns(),
+                _client.update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$push" << BSON( "a" << BSON( "$foo" << 1 ) ) ) );
             }
@@ -924,7 +932,7 @@ namespace ReplTests {
 
         class PushSlice : public Base {
             void doIt() const {
-                client()->update( ns(),
+                _client.update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$push" <<
                                         BSON( "a" <<
@@ -944,7 +952,7 @@ namespace ReplTests {
 
         class PushSliceInitiallyInexistent : public Base {
             void doIt() const {
-                client()->update( ns(),
+                _client.update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$push" <<
                                         BSON( "a" <<
@@ -964,7 +972,7 @@ namespace ReplTests {
 
         class PushSliceToZero : public Base {
             void doIt() const {
-                client()->update( ns(),
+                _client.update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$push" <<
                                         BSON( "a" <<
@@ -985,7 +993,7 @@ namespace ReplTests {
         class PushAllUpsert : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ), true );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ), true );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1001,7 +1009,7 @@ namespace ReplTests {
         class EmptyPushAll : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$pushAll:{a:[5.0,6.0]}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1017,7 +1025,7 @@ namespace ReplTests {
         class Pull : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$pull" << BSON( "a" << 4.0 ) ) );
+                _client.update( ns(), BSON( "_id" << 0 ), BSON( "$pull" << BSON( "a" << 4.0 ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1033,7 +1041,7 @@ namespace ReplTests {
         class PullNothing : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), BSON( "$pull" << BSON( "a" << 6.0 ) ) );
+                _client.update( ns(), BSON( "_id" << 0 ), BSON( "$pull" << BSON( "a" << 6.0 ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1049,7 +1057,7 @@ namespace ReplTests {
         class PullAll : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pullAll:{a:[4,5]}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$pullAll:{a:[4,5]}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1065,7 +1073,7 @@ namespace ReplTests {
         class Pop : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pop:{a:1}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$pop:{a:1}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1081,7 +1089,7 @@ namespace ReplTests {
         class PopReverse : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$pop:{a:-1}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$pop:{a:-1}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1097,7 +1105,7 @@ namespace ReplTests {
         class BitOp : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$bit:{a:{and:2,or:8}}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$bit:{a:{and:2,or:8}}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1113,8 +1121,8 @@ namespace ReplTests {
         class Rename : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1132,8 +1140,8 @@ namespace ReplTests {
         class RenameReplace : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$set:{a:50}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1151,7 +1159,7 @@ namespace ReplTests {
         class RenameOverwrite : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{a:'b'}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1169,7 +1177,7 @@ namespace ReplTests {
         class NoRename : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{c:'b'},$set:{z:1}}" ) );
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson( "{$rename:{c:'b'},$set:{z:1}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1185,7 +1193,7 @@ namespace ReplTests {
         class NestedNoRename : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ),
+                _client.update( ns(), BSON( "_id" << 0 ),
                                   fromjson( "{$rename:{'a.b':'c.d'},$set:{z:1}}"
                                       ) );
             }
@@ -1203,7 +1211,7 @@ namespace ReplTests {
         class SingletonNoRename : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
+                _client.update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
 
             }
             using ReplTests::Base::check;
@@ -1220,7 +1228,7 @@ namespace ReplTests {
         class IndexedSingletonNoRename : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
+                _client.update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1230,7 +1238,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 // Add an index on 'a'.  This prevents the update from running 'in place'.
-                client()->ensureIndex( ns(), BSON( "a" << 1 ) );
+                _client.ensureIndex( ns(), BSON( "a" << 1 ) );
                 insert( fromjson( "{'_id':0,z:1}" ) );
             }
         };
@@ -1238,7 +1246,7 @@ namespace ReplTests {
         class AddToSetEmptyMissing : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSON( "_id" << 0 ), fromjson(
+                _client.update( ns(), BSON( "_id" << 0 ), fromjson(
                                       "{$addToSet:{a:{$each:[]}}}" ) );
             }
             using ReplTests::Base::check;
@@ -1255,7 +1263,7 @@ namespace ReplTests {
 
         class AddToSetWithDollarSigns : public Base {
             void doIt() const {
-                client()->update( ns(),
+                _client.update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$addToSet" << BSON( "a" << BSON( "$foo" << 1 ) ) ) );
             }
@@ -1277,15 +1285,15 @@ namespace ReplTests {
         class ReplaySetPreexistingNoOpPull : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSONObj(), fromjson( "{$unset:{z:1}}" ));
+                _client.update( ns(), BSONObj(), fromjson( "{$unset:{z:1}}" ));
 
                 // This is logged as {$set:{'a.b':[]},$set:{z:1}}, which might not be
                 // replayable against future versions of a document (here {_id:0,a:1,z:1}) due
                 // to SERVER-4781. As a result the $set:{z:1} will not be replayed in such
                 // cases (and also an exception may abort replication). If this were instead
                 // logged as {$set:{z:1}}, SERVER-4781 would not be triggered.
-                client()->update( ns(), BSONObj(), fromjson( "{$pull:{'a.b':1}, $set:{z:1}}" ) );
-                client()->update( ns(), BSONObj(), fromjson( "{$set:{a:1}}" ) );
+                _client.update( ns(), BSONObj(), fromjson( "{$pull:{'a.b':1}, $set:{z:1}}" ) );
+                _client.update( ns(), BSONObj(), fromjson( "{$set:{a:1}}" ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1301,8 +1309,8 @@ namespace ReplTests {
         class ReplayArrayFieldNotAppended : public Base {
         public:
             void doIt() const {
-                client()->update( ns(), BSONObj(), fromjson( "{$push:{'a.0.b':2}}" ) );
-                client()->update( ns(), BSONObj(), fromjson( "{$set:{'a.0':1}}") );
+                _client.update( ns(), BSONObj(), fromjson( "{$push:{'a.0.b':2}}" ) );
+                _client.update( ns(), BSONObj(), fromjson( "{$set:{'a.0':1}}") );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1323,14 +1331,14 @@ namespace ReplTests {
             insert( BSON( "_id" << 0 << "a" << 10 ) );
             insert( BSON( "_id" << 1 << "a" << 11 ) );
             insert( BSON( "_id" << 3 << "a" << 10 ) );
-            client()->remove( ns(), BSON( "a" << 10 ) );
-            ASSERT_EQUALS( 1U, client()->count( ns(), BSONObj() ) );
+            _client.remove( ns(), BSON( "a" << 10 ) );
+            ASSERT_EQUALS( 1U, _client.count( ns(), BSONObj() ) );
             insert( BSON( "_id" << 0 << "a" << 11 ) );
             insert( BSON( "_id" << 2 << "a" << 10 ) );
             insert( BSON( "_id" << 3 << "a" << 10 ) );
 
             applyAllOperations();
-            ASSERT_EQUALS( 2U, client()->count( ns(), BSONObj() ) );
+            ASSERT_EQUALS( 2U, _client.count( ns(), BSONObj() ) );
             ASSERT( !one( BSON( "_id" << 1 ) ).isEmpty() );
             ASSERT( !one( BSON( "_id" << 2 ) ).isEmpty() );
         }
@@ -1423,12 +1431,12 @@ namespace ReplTests {
 
             // now this should succeed
             SyncTest t;
-            verify(t.shouldRetry(o));
-            verify(!client()->findOne(ns(), BSON("_id" << "on remote")).isEmpty());
+            verify(t.shouldRetry(&_txn, o));
+            verify(!_client.findOne(ns(), BSON("_id" << "on remote")).isEmpty());
 
             // force it not to find an obj
             t.returnEmpty = true;
-            verify(!t.shouldRetry(o));
+            verify(!t.shouldRetry(&_txn, o));
         }
     };
 

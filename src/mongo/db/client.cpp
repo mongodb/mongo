@@ -214,7 +214,7 @@ namespace mongo {
             else if( !Lock::nested() ) { 
                 _lk.reset(0);
                 {
-                    Lock::GlobalWrite w;
+                    Lock::GlobalWrite w(txn->lockState());
                     Context c(ns, storageGlobalParams.dbpath, doVersion);
                 }
 
@@ -285,7 +285,9 @@ namespace mongo {
         _db = dbHolderUnchecked().getOrCreate(&txn, _ns, _path, _justCreated);
         verify(_db);
         if( _doVersion ) checkNotStale();
-        massert( 16107 , str::stream() << "Don't have a lock on: " << _ns , Lock::atLeastReadLocked( _ns ) );
+        massert(16107,
+                str::stream() << "Don't have a lock on: " << _ns,
+                txn.lockState()->isAtLeastReadLocked(_ns));
         _client->_context = this;
         _client->_curOp->enter( this );
     }

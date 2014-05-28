@@ -501,7 +501,7 @@ namespace mongo {
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
-            if ( Lock::isReadLocked() ) {
+            if (txn->lockState()->hasAnyReadLock()) {
                 LOG(1) << "note: not profiling because recursive read lock" << endl;
             }
             else if ( lockedForWriting() ) {
@@ -1074,7 +1074,7 @@ namespace {
                 while( 1 ) {
                     // we may already be in a read lock from earlier in the call stack, so do read lock here 
                     // to be consistent with that.
-                    readlocktry w(20000);
+                    readlocktry w(&cc().lockState(), 20000);
                     if( w.got() ) { 
                         log() << "shutdown: final commit..." << endl;
                         getDur().commitNow();
@@ -1125,7 +1125,7 @@ namespace {
         }
 
         {
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(&cc().lockState());
             log() << "now exiting" << endl;
             dbexit( code );
         }

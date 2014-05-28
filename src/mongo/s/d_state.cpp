@@ -880,7 +880,12 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
-        bool checkConfigOrInit( const string& configdb , bool authoritative , string& errmsg , BSONObjBuilder& result , bool locked=false ) const {
+        bool checkConfigOrInit(OperationContext* txn,
+                               const string& configdb,
+                               bool authoritative,
+                               string& errmsg,
+                               BSONObjBuilder& result,
+                               bool locked = false ) const {
             if ( configdb.size() == 0 ) {
                 errmsg = "no configdb";
                 return false;
@@ -910,8 +915,8 @@ namespace mongo {
                 return true;
             }
 
-            Lock::GlobalWrite lk;
-            return checkConfigOrInit( configdb , authoritative , errmsg , result , true );
+            Lock::GlobalWrite lk(txn->lockState());
+            return checkConfigOrInit(txn, configdb, authoritative, errmsg, result, true);
         }
         
         bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string& errmsg ) {
@@ -959,8 +964,10 @@ namespace mongo {
             bool authoritative = cmdObj.getBoolField( "authoritative" );
             
             // check config server is ok or enable sharding
-            if ( ! checkConfigOrInit( cmdObj["configdb"].valuestrsafe() , authoritative , errmsg , result ) )
+            if (!checkConfigOrInit(
+                        txn, cmdObj["configdb"].valuestrsafe(), authoritative, errmsg, result)) {
                 return false;
+            }
 
             // check shard name is correct
             if ( cmdObj["shard"].type() == String ) {

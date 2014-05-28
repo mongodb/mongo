@@ -200,7 +200,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             // calls renamecollection which does a global lock, so we must too:
             //
-            Lock::GlobalWrite globalWriteLock;
+            Lock::GlobalWrite globalWriteLock(txn->lockState());
             Client::Context ctx(dbname);
 
             Database* db = ctx.db();

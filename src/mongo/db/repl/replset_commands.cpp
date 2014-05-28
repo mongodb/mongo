@@ -186,14 +186,14 @@ namespace repl {
         virtual bool run(OperationContext* txn, const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
             try {
                 rwlock_try_write lk(mutex);
-                return _run(a,b,e,errmsg,c,d);
+                return _run(txn, a,b,e,errmsg,c,d);
             }
             catch(rwlock_try_write::exception&) { }
             errmsg = "a replSetReconfig is already in progress";
             return false;
         }
     private:
-        bool _run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool _run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -220,7 +220,7 @@ namespace repl {
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things
                 // are up - we probably don't want a change to apply 30 minutes after the initial attempt.
                 time_t t = time(0);
-                Lock::GlobalWrite lk;
+                Lock::GlobalWrite lk(txn->lockState());
                 if( time(0)-t > 20 ) {
                     errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
                     return false;

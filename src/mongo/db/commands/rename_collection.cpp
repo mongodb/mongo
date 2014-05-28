@@ -93,7 +93,7 @@ namespace mongo {
         }
 
         virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            Lock::GlobalWrite globalWriteLock;
+            Lock::GlobalWrite globalWriteLock(txn->lockState());
             bool ok = wrappedRun(txn, dbname, cmdObj, errmsg, result, fromRepl);
             if (ok && !fromRepl)
                 repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);

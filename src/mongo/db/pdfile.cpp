@@ -138,9 +138,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    void dropAllDatabasesExceptLocal() {
-        Lock::GlobalWrite lk;
-        OperationContextImpl txn;
+    void dropAllDatabasesExceptLocal(OperationContext* txn) {
+        Lock::GlobalWrite lk(txn->lockState());
 
         vector<string> n;
         getDatabaseNames(n);
@@ -149,7 +148,7 @@ namespace mongo {
         for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
             if( *i != "local" ) {
                 Client::Context ctx(*i);
-                dropDatabase(&txn, ctx.db());
+                dropDatabase(txn, ctx.db());
             }
         }
     }

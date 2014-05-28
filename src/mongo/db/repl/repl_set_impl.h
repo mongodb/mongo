@@ -41,7 +41,9 @@
 #include "mongo/util/concurrency/value.h"
 
 namespace mongo {
+
     class Cloner;
+    class OperationContext;
 
 namespace repl {
 
@@ -118,7 +120,7 @@ namespace repl {
         bool _stepDown(int secs);
         bool _freeze(int secs);
     private:
-        void assumePrimary();
+        void _assumePrimary();
         void loadLastOpTimeWritten(bool quiet=false);
         void changeState(MemberState s);
 
@@ -288,7 +290,7 @@ namespace repl {
         void syncDoInitialSync();
         void _syncThread();
         void syncTail();
-        unsigned _syncRollback(OplogReader& r);
+        unsigned _syncRollback(OperationContext* txn, OplogReader& r);
         void syncFixUp(FixUpInfo& h, OplogReader& r);
 
         // keep a list of hosts that we've tried recently that didn't work
@@ -317,7 +319,7 @@ namespace repl {
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
-        bool tryToGoLiveAsASecondary(OpTime&); // readlocks
+        bool tryToGoLiveAsASecondary(OperationContext* txn, OpTime&); // readlocks
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;

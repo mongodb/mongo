@@ -74,7 +74,7 @@ namespace ReplSetTests {
         virtual bool isPrimary() {
             return false;
         }
-        virtual bool tryToGoLiveAsASecondary(OpTime& minvalid) {
+        virtual bool tryToGoLiveAsASecondary(OperationContext* txn, OpTime& minvalid) {
             return false;
         }
         virtual const ReplSetConfig& config() {
@@ -130,13 +130,16 @@ namespace ReplSetTests {
 
     class Base {
     private:
-        static DBDirectClient client_;
+        DBDirectClient _client;
+
     protected:
         static BackgroundSyncTest* _bgsync;
         static repl::SyncTail* _tailer;
+
     public:
         Base() {
         }
+
         ~Base() {
         }
 
@@ -144,7 +147,7 @@ namespace ReplSetTests {
             return "unittests.repltests";
         }
 
-        DBDirectClient *client() const { return &client_; }
+        DBDirectClient *client() { return &_client; }
 
         static void insert( const BSONObj &o, bool god = false ) {
             OperationContextImpl txn;
@@ -170,7 +173,7 @@ namespace ReplSetTests {
             coll->insertDocument(&txn, b.obj(), true);
         }
 
-        BSONObj findOne( const BSONObj &query = BSONObj() ) const {
+        BSONObj findOne( const BSONObj &query = BSONObj() ) {
             return client()->findOne( ns(), query );
         }
 
@@ -206,7 +209,6 @@ namespace ReplSetTests {
         }
     };
 
-    DBDirectClient Base::client_;
     BackgroundSyncTest* Base::_bgsync = NULL;
     repl::SyncTail* Base::_tailer = NULL;
 
@@ -221,7 +223,7 @@ namespace ReplSetTests {
         bool retry;
 
         // instead of actually applying operations, we return success or failure
-        virtual bool syncApply(const BSONObj& o, bool convertUpdateToUpsert) {
+        virtual bool syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert) {
             step++;
 
             if ((failOnStep == FAIL_FIRST_APPLY && step == 1) ||
@@ -232,7 +234,7 @@ namespace ReplSetTests {
             return true;
         }
 
-        virtual bool shouldRetry(const BSONObj& o) {
+        virtual bool shouldRetry(OperationContext* txn, const BSONObj& o) {
             return retry;
         }
     };
@@ -268,7 +270,7 @@ namespace ReplSetTests {
         bool insertOnRetry;
         SyncTest2() : InitialSync(0), insertOnRetry(false) {}
         virtual ~SyncTest2() {}
-        virtual bool shouldRetry(const BSONObj& o) {
+        virtual bool shouldRetry(OperationContext* txn, const BSONObj& o) {
             if (!insertOnRetry) {
                 return true;
             }
@@ -373,7 +375,7 @@ namespace ReplSetTests {
             BSONObj op = updateFail();
 
             Sync s("");
-            verify(!s.shouldRetry(op));
+            verify(!s.shouldRetry(&txn, op));
         }
     };
 

@@ -296,8 +296,10 @@ namespace mongo {
             /**
                @return number objects in collection
              */
-            long long postProcessCollection( CurOp* op , ProgressMeterHolder& pm );
-            long long postProcessCollectionNonAtomic( CurOp* op , ProgressMeterHolder& pm );
+            long long postProcessCollection(
+                            OperationContext* txn, CurOp* op, ProgressMeterHolder& pm);
+            long long postProcessCollectionNonAtomic(
+                            OperationContext* txn, CurOp* op, ProgressMeterHolder& pm);
 
             /**
              * if INMEMORY will append

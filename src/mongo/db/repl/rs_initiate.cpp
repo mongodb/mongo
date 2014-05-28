@@ -197,7 +197,7 @@ namespace repl {
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things
                 // are up.
                 time_t t = time(0);
-                Lock::GlobalWrite lk;
+                Lock::GlobalWrite lk(txn->lockState());
                 if( time(0)-t > 10 ) {
                     errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
                     return false;
@@ -270,7 +270,7 @@ namespace repl {
 
                 createOplog();
 
-                Lock::GlobalWrite lk;
+                Lock::GlobalWrite lk(txn->lockState());
                 bo comment = BSON( "msg" << "initiating set");
                 newConfig->saveConfigLocally(comment);
                 log() << "replSet replSetInitiate config now saved locally.  "

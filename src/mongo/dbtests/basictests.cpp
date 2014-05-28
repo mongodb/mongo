@@ -376,8 +376,9 @@ namespace BasicTests {
     class DatabaseOwnsNS {
     public:
         void run() {
-            Lock::GlobalWrite lk;
             OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+
             bool isNew = false;
             // this leaks as ~Database is private
             // if that changes, should put this on the stack

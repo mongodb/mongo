@@ -35,7 +35,6 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
@@ -92,11 +91,13 @@ namespace ThreadedTests {
 #endif
         ProgressMeter pm;
         int wToXSuccessfulUpgradeCount, wToXFailedUpgradeCount;
+
     public:
         MongoMutexTest() : pm(N * nthreads) {
             wToXSuccessfulUpgradeCount = 0;
             wToXFailedUpgradeCount = 0;
         }
+
         void run() {
             DEV {
                 // in _DEBUG builds on linux we mprotect each time a writelock
@@ -111,9 +112,9 @@ namespace ThreadedTests {
             ThreadedTest<nthr>::run();
             cout << "MongoMutexTest " << t.millis() << "ms" << endl;
         }
+
     private:
-        virtual void setup() {
-        }
+
         virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
             LockState lockState;
@@ -123,27 +124,27 @@ namespace ThreadedTests {
                 int x = std::rand();
                 bool sometimes = (x % 15 == 0);
                 if( i % 7 == 0 ) {
-                    Lock::GlobalRead r; // nested test
-                    Lock::GlobalRead r2;
+                    Lock::GlobalRead r(&lockState); // nested test
+                    Lock::GlobalRead r2(&lockState);
                     if( sometimes ) {
-                        Lock::TempRelease t;
+                        Lock::TempRelease t(&lockState);
                     }
                 }
                 else if( i % 7 == 1 ) {
-                    Lock::GlobalRead r;
-                    ASSERT( Lock::isReadLocked() );
-                    ASSERT( Lock::isLocked() );
+                    Lock::GlobalRead r(&lockState);
+                    ASSERT(lockState.hasAnyReadLock());
+                    ASSERT(lockState.threadState() != 0);
                     if( sometimes ) {
-                        Lock::TempRelease t;
+                        Lock::TempRelease t(&lockState);
                     }
                 }
                 else if( i % 7 == 4 && 
                          tnumber == 1 /*only one upgrader legal*/ ) {
-                    Lock::GlobalWrite w;
-                    ASSERT( Lock::isW() );
-                    ASSERT( Lock::isW() );
+                    Lock::GlobalWrite w(&lockState);
+                    ASSERT( lockState.isW() );
+                    ASSERT( lockState.isW() );
                     if( i % 7 == 2 ) {
-                        Lock::TempRelease t;
+                        Lock::TempRelease t(&lockState);
                     }
                     if( sometimes ) { 
                         w.downgrade();
@@ -151,30 +152,30 @@ namespace ThreadedTests {
                     }
                 }
                 else if( i % 7 == 2 ) {
-                    Lock::GlobalWrite w;
-                    ASSERT( Lock::isW() );
-                    ASSERT( Lock::isW() );
+                    Lock::GlobalWrite w(&lockState);
+                    ASSERT( lockState.isW() );
+                    ASSERT( lockState.isW() );
                     if( sometimes ) {
-                        Lock::TempRelease t;
+                        Lock::TempRelease t(&lockState);
                     }
                 }
                 else if( i % 7 == 3 ) {
-                    Lock::GlobalWrite w;
+                    Lock::GlobalWrite w(&lockState);
                     {
-                        Lock::TempRelease t;
+                        Lock::TempRelease t(&lockState);
                     }
-                    Lock::GlobalRead r;
-                    ASSERT( Lock::isW() );
-                    ASSERT( Lock::isW() );
+                    Lock::GlobalRead r(&lockState);
+                    ASSERT( lockState.isW() );
+                    ASSERT( lockState.isW() );
                     if( sometimes ) {
-                        Lock::TempRelease t;
+                        Lock::TempRelease t(&lockState);
                     }
                 }
                 else if( i % 7 == 5 ) {
                     {
                         Lock::DBRead r(&lockState, "foo");
                         if( sometimes ) {
-                            Lock::TempRelease t;
+                            Lock::TempRelease t(&lockState);
                         }
                     }
                     {
@@ -187,17 +188,17 @@ namespace ThreadedTests {
                         if( q == 0 ) { 
                             char what = 'r';
                             Lock::DBRead r(&lockState, "foo");
-                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
-                            ASSERT( !Lock::nested() );
+                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
+                            ASSERT( !lockState.isNested() );
                             Lock::DBRead r2(&lockState, "foo");
-                            ASSERT( Lock::nested() );
-                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
+                            ASSERT(lockState.isNested());
+                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
                             Lock::DBRead r3(&lockState, "local");
                             if( sometimes ) {
-                                Lock::TempRelease t;
+                                Lock::TempRelease t(&lockState);
                             }
-                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
-                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("local") );
+                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("local"));
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceeding lock
@@ -205,47 +206,43 @@ namespace ThreadedTests {
                                 Lock::DBRead x(&lockState, "local");
                                 //Lock::DBRead y("q");
                                 if( sometimes ) {
-                                    Lock::TempRelease t; // we don't temprelease (cant=true) here thus this is just a check that nothing weird happens...
+                                    Lock::TempRelease t(&lockState); // we don't temprelease (cant=true) here thus this is just a check that nothing weird happens...
                                 }
                             }
                             {
-                                OperationContextImpl txn;
-                                Lock::DBWrite x(txn.lockState(), "local");
+                                Lock::DBWrite x(&lockState, "local");
                                 if( sometimes ) {
-                                    Lock::TempRelease t;
+                                    Lock::TempRelease t(&lockState);
                                 }
                             }
                         } else if( q == 1 ) {
                                 { Lock::DBRead  x(&lockState, "admin"); }
                             { 
-                                OperationContextImpl txn;
-                                Lock::DBWrite x(txn.lockState(), "admin"); 
+                                Lock::DBWrite x(&lockState, "admin"); 
                             }
                         } else if( q == 2 ) { 
                             /*Lock::DBWrite x("foo");
                             Lock::DBWrite y("admin");
-                            { Lock::TempRelease t; }*/
+                            { Lock::TempRelease t(&lockState); }*/
                         }
                         else if( q == 3 ) {
-                            OperationContextImpl txn;
-                            Lock::DBWrite x(txn.lockState(), "foo");
+                            Lock::DBWrite x(&lockState, "foo");
                             Lock::DBRead y(&lockState, "admin");
-                            { Lock::TempRelease t; }
-                        } 
+                            { Lock::TempRelease t(&lockState); }
+                        }
                         else if( q == 4 ) { 
                             Lock::DBRead x(&lockState, "foo2");
                             Lock::DBRead y(&lockState, "admin");
-                            { Lock::TempRelease t; }
+                            { Lock::TempRelease t(&lockState); }
                         }
                         else if ( q > 4 && q < 8 ) {
                             static const char * const dbnames[] = {
                                 "bar0", "bar1", "bar2", "bar3", "bar4", "bar5",
                                 "bar6", "bar7", "bar8", "bar9", "bar10" };
 
-                            OperationContextImpl txn;
-                            Lock::DBWrite w(txn.lockState(), dbnames[q]);
+                            Lock::DBWrite w(&lockState, dbnames[q]);
                             {
-                                Lock::UpgradeGlobalLockToExclusive wToX;
+                                Lock::UpgradeGlobalLockToExclusive wToX(&lockState);
                                 if (wToX.gotUpgrade()) {
                                     ++wToXSuccessfulUpgradeCount;
                                 }
@@ -255,17 +252,16 @@ namespace ThreadedTests {
                             }
                         }
                         else { 
-                            OperationContextImpl txn;
-                            Lock::DBWrite w(txn.lockState(), "foo");
+                            Lock::DBWrite w(&lockState, "foo");
 
                             {
-                                Lock::TempRelease t;
+                                Lock::TempRelease t(&lockState);
                             }
 
                             Lock::DBRead r2(&lockState, "foo");
                             Lock::DBRead r3(&lockState, "local");
                             if( sometimes ) {
-                                Lock::TempRelease t;
+                                Lock::TempRelease t(&lockState);
                             }
                         }
                     }
@@ -279,15 +275,17 @@ namespace ThreadedTests {
             }
             cc().shutdown();
         }
+
         virtual void validate() {
             mongo::unittest::log() << "mongomutextest validate" << endl;
-            ASSERT( ! Lock::isReadLocked() );
             ASSERT( wToXSuccessfulUpgradeCount >= 39 * N / 2000 );
             {
-                    Lock::GlobalWrite w;
+                LockState ls;
+                Lock::GlobalWrite w(&ls);
             }
             {
-                    Lock::GlobalRead r;
+                LockState ls;
+                Lock::GlobalRead r(&ls);
             }
         }
     };
@@ -407,9 +405,11 @@ namespace ThreadedTests {
             counter.fetchAndAdd(1);
             ASSERT_EQUALS(counter.load(), 0U);
 
-            writelocktry lk( 0 );
+            LockState lockState;
+            writelocktry lk(&lockState, 0);
+
             ASSERT( lk.got() );
-            ASSERT( Lock::isW() );
+            ASSERT( lockState.isW() );
         }
     };
 

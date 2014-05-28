@@ -109,7 +109,7 @@ namespace {
     }
 }
 
-    void ReplSetImpl::assumePrimary() {
+    void ReplSetImpl::_assumePrimary() {
         LOG(1) << "replSet assuming primary" << endl;
         verify(iAmPotentiallyHot());
 
@@ -119,9 +119,11 @@ namespace {
 
         // Lock here to prevent stepping down & becoming primary from getting interleaved
         LOG(1) << "replSet waiting for global write lock";
-        Lock::GlobalWrite lk;
 
-        initOpTimeFromOplog("local.oplog.rs");
+        OperationContextImpl txn;   // XXX?
+        Lock::GlobalWrite lk(txn.lockState());
+
+        initOpTimeFromOplog(&txn, "local.oplog.rs");
 
         // Generate new election unique id
         elect.setElectionId(OID::gen());
@@ -138,8 +140,10 @@ namespace {
 
     bool ReplSetImpl::setMaintenanceMode(const bool inc) {
         lock replLock(this);
+
         // Lock here to prevent state from changing between checking the state and changing it
-        Lock::GlobalWrite writeLock;
+        LockState lockState;
+        Lock::GlobalWrite writeLock(&lockState);
 
         if (box.getState().primary()) {
             return false;
@@ -191,7 +195,8 @@ namespace {
 
     void ReplSetImpl::relinquish() {
         {
-            Lock::GlobalWrite lk; // so we are synchronized with _logOp()
+            LockState lockState;
+            Lock::GlobalWrite writeLock(&lockState);    // so we are synchronized with _logOp()
 
             LOG(2) << "replSet attempting to relinquish" << endl;
             if (box.getState().primary()) {

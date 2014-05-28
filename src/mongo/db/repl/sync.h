@@ -49,7 +49,7 @@ namespace repl {
         /**
          * If applyOperation_inlock should be called again after an update fails.
          */
-        virtual bool shouldRetry(const BSONObj& o);
+        virtual bool shouldRetry(OperationContext* txn, const BSONObj& o);
         void setHostname(const std::string& hostname);
     };
 

@@ -73,7 +73,7 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            repl::logOpComment(dataElement.Obj());
+            repl::logOpComment(txn, dataElement.Obj());
             return true;
         }
 

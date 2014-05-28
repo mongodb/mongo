@@ -297,7 +297,8 @@ namespace mongo {
 
         virtual void run( stringstream& ss ) {
             Timer t;
-            readlocktry lk( 300 );
+            LockState lockState;
+            readlocktry lk(&lockState, 300);
             if ( lk.got() ) {
                 _gotLock( t.millis() , ss );
             }

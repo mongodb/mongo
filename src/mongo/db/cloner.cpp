@@ -104,7 +104,7 @@ namespace mongo {
 
         void operator()( DBClientCursorBatchIterator &i ) {
             // XXX: can probably take dblock instead
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(txn->lockState());
             context.relocked();
 
             bool createdCollection = false;
@@ -221,7 +221,7 @@ namespace mongo {
 
         int options = QueryOption_NoCursorTimeout | ( slaveOk ? QueryOption_SlaveOk : 0 );
         {
-            dbtemprelease r;
+            dbtemprelease r(txn->lockState());
             _conn->query(stdx::function<void(DBClientCursorBatchIterator &)>(f), from_collection,
                          query, 0, options);
         }
@@ -389,7 +389,7 @@ namespace mongo {
             /* todo: we can put these releases inside dbclient or a dbclient specialization.
                or just wait until we get rid of global lock anyway.
                */
-            dbtemprelease r;
+            dbtemprelease r(txn->lockState());
 
             // just using exhaust for collection copying right now
 

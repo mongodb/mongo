@@ -54,13 +54,18 @@ namespace QueryTests {
 
     class Base {
     protected:
-        Lock::GlobalWrite lk;
+        OperationContextImpl _txn;
+        Lock::GlobalWrite _lk;
+
         Client::Context _context;
+
         Database* _database;
         Collection* _collection;
-        OperationContextImpl _txn;
+
     public:
-        Base() : _context( ns() ) {
+        Base() : _lk(_txn.lockState()),
+                 _context(ns()) {
+
             _database = _context.db();
             _collection = _database->getCollection( &_txn, ns() );
             if ( _collection ) {
@@ -155,7 +160,7 @@ namespace QueryTests {
         void run() {
             // We don't normally allow empty objects in the database, but test that we can find
             // an empty object (one might be allowed inside a reserved namespace at some point).
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx( "unittests.querytests" );
 
             Database* db = ctx.db();
@@ -1053,7 +1058,7 @@ namespace QueryTests {
     class DirectLocking : public ClientBase {
     public:
         void run() {
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
             ASSERT_EQUALS( "unittests", ctx.db()->name() );

@@ -140,7 +140,7 @@ namespace mongo {
             // regardless of whether they caught up, we'll shut down
         }
 
-        writelocktry wlt( 2 * 60 * 1000 );
+        writelocktry wlt(txn->lockState(), 2 * 60 * 1000);
         uassert( 13455 , "dbexit timed out getting lock" , wlt.got() );
         return shutdownHelper();
     }
@@ -207,7 +207,7 @@ namespace mongo {
 
                 // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase,
                 // and that may need a global lock.
-                Lock::GlobalWrite lk;
+                Lock::GlobalWrite lk(txn->lockState());
                 Client::Context context(dbname);
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
@@ -284,7 +284,7 @@ namespace mongo {
 
             // SERVER-4328 todo don't lock globally. currently syncDataAndTruncateJournal is being
             // called within, and that requires a global lock i believe.
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(txn->lockState());
             Client::Context context( dbname );
 
             log() << "repairDatabase " << dbname;
@@ -683,7 +683,7 @@ namespace mongo {
             // path != storageGlobalParams.dbpath ??
             set<string> allShortNames;
             {
-                Lock::GlobalRead lk;
+                Lock::GlobalRead lk(txn->lockState());
                 dbHolder().getAllShortNames( allShortNames );
             }
             
@@ -737,7 +737,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            Lock::GlobalWrite globalWriteLock;
+            Lock::GlobalWrite globalWriteLock(txn->lockState());
             Client::Context ctx(dbname);
 
             try {

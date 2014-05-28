@@ -72,7 +72,7 @@ namespace repl {
        readlocks
        @return true if transitioned to SECONDARY
     */
-    bool ReplSetImpl::tryToGoLiveAsASecondary(OpTime& /*out*/ minvalid) {
+    bool ReplSetImpl::tryToGoLiveAsASecondary(OperationContext* txn, OpTime& /*out*/ minvalid) {
         bool golive = false;
 
         lock rsLock( this );
@@ -87,7 +87,7 @@ namespace repl {
             return false;
         }
 
-        Lock::GlobalWrite writeLock;
+        Lock::GlobalWrite writeLock(txn->lockState());
 
         // make sure we're not primary, secondary, rollback, or fatal already
         if (box.getState().primary() || box.getState().secondary() ||

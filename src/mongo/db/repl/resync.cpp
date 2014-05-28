@@ -67,7 +67,7 @@ namespace repl {
                          bool fromRepl) {
 
             const std::string ns = parseNs(dbname, cmdObj);
-            Lock::GlobalWrite globalWriteLock;
+            Lock::GlobalWrite globalWriteLock(txn->lockState());
             Client::Context ctx(ns);
             if (replSettings.usingReplSets()) {
                 if (!theReplSet) {
@@ -83,7 +83,7 @@ namespace repl {
 
             // below this comment pertains only to master/slave replication
             if ( cmdObj.getBoolField( "force" ) ) {
-                if ( !waitForSyncToFinish( errmsg ) )
+                if ( !waitForSyncToFinish(txn, errmsg ) )
                     return false;
                 replAllDead = "resync forced";
             }
@@ -91,14 +91,15 @@ namespace repl {
                 errmsg = "not dead, no need to resync";
                 return false;
             }
-            if ( !waitForSyncToFinish( errmsg ) )
+            if ( !waitForSyncToFinish(txn, errmsg ) )
                 return false;
 
             ReplSource::forceResyncDead( txn, "client" );
             result.append( "info", "triggered resync for all sources" );
             return true;
         }
-        bool waitForSyncToFinish( string &errmsg ) const {
+
+        bool waitForSyncToFinish(OperationContext* txn, string &errmsg) const {
             // Wait for slave thread to finish syncing, so sources will be be
             // reloaded with new saved state on next pass.
             Timer t;
@@ -106,7 +107,7 @@ namespace repl {
                 if ( syncing == 0 || t.millis() > 30000 )
                     break;
                 {
-                    Lock::TempRelease t;
+                    Lock::TempRelease t(txn->lockState());
                     relinquishSyncingSome = 1;
                     sleepmillis(1);
                 }

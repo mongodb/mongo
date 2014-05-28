@@ -155,7 +155,7 @@ namespace mongo {
 
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
             scoped_ptr<Lock::ScopedLock> lk( fromSelf ?
-                                             static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite()) :
+                                             static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite(txn->lockState())) :
                                              static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
 
             Cloner cloner;
@@ -166,7 +166,7 @@ namespace mongo {
                 uassert( 13008, "must call copydbgetnonce first", authConn_.get() );
                 BSONObj ret;
                 {
-                    dbtemprelease t;
+                    dbtemprelease t(txn->lockState());
                     if ( !authConn_->runCommand( cloneOptions.fromDB,
                                                  BSON( "authenticate" << 1 << "user" << username
                                                        << "nonce" << nonce << "key" << key ), ret ) ) {

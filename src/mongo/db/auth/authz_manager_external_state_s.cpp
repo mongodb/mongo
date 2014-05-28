@@ -228,6 +228,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
+            OperationContext* txn,
             std::vector<std::string>* dbnames) {
         try {
             scoped_ptr<ScopedDbConnection> conn(

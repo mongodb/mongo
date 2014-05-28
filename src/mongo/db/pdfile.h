@@ -49,7 +49,7 @@ namespace mongo {
 
     void dropDatabase(OperationContext* txn, Database* db);
 
-    void dropAllDatabasesExceptLocal();
+    void dropAllDatabasesExceptLocal(OperationContext* txn);
 
     Status userCreateNS( OperationContext* txn,
                          Database* db,

@@ -144,7 +144,7 @@ namespace mongo {
                 return dbEval(dbname, cmdObj, result, errmsg);
             }
 
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(txn->lockState());
             Client::Context ctx( dbname );
 
             return dbEval(dbname, cmdObj, result, errmsg);

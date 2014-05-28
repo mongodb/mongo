@@ -249,7 +249,7 @@ namespace repl {
 
         string myMinValid;
         try {
-            readlocktry lk(/*"local.replset.minvalid", */300);
+            readlocktry lk(txn->lockState(), /*"local.replset.minvalid", */300);
             if( lk.got() ) {
                 BSONObj mv;
                 if( Helpers::getSingleton(txn, "local.replset.minvalid", mv) ) {

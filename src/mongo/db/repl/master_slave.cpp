@@ -331,7 +331,7 @@ namespace repl {
     void ReplSource::forceResync( OperationContext* txn, const char *requester ) {
         BSONObj info;
         {
-            dbtemprelease t;
+            dbtemprelease t(txn->lockState());
             if (!oplogReader.connect(hostName, _me)) {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
             }
@@ -445,7 +445,7 @@ namespace repl {
         OpTime lastTime;
         bool dbOk = false;
         {
-            dbtemprelease release;
+            dbtemprelease release(txn->lockState());
         
             // We always log an operation after executing it (never before), so
             // a database list will always be valid as of an oplog entry generated
@@ -512,7 +512,7 @@ namespace repl {
             bool failedUpdate = applyOperation_inlock( txn, db, op );
             if (failedUpdate) {
                 Sync sync(hostName);
-                if (sync.shouldRetry(op)) {
+                if (sync.shouldRetry(txn, op)) {
                     uassert(15914,
                             "Failure retrying initial sync update",
                             !applyOperation_inlock(txn, db, op));
@@ -535,7 +535,7 @@ namespace repl {
 
        @param alreadyLocked caller already put us in write lock if true
     */
-    void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked) {
+    void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* txn, BSONObj& op, bool alreadyLocked) {
         LOG(6) << "processing op: " << op << endl;
 
         if( op.getStringField("op")[0] == 'n' )
@@ -561,8 +561,6 @@ namespace repl {
 
         if ( !only.empty() && only != clientName )
             return;
-
-        OperationContextImpl txn; // XXX?
 
         if (replSettings.pretouch &&
             !alreadyLocked/*doesn't make sense if in write lock already*/) {
@@ -592,17 +590,17 @@ namespace repl {
                         a += m;
                     }
                     // we do one too...
-                    pretouchOperation(&txn, op);
+                    pretouchOperation(txn, op);
                     tp->join();
                     countdown = v.size();
                 }
             }
             else {
-                pretouchOperation(&txn, op);
+                pretouchOperation(txn, op);
             }
         }
 
-        scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
+        scoped_ptr<Lock::GlobalWrite> lk(alreadyLocked ? 0 : new Lock::GlobalWrite(txn->lockState()));
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -610,7 +608,7 @@ namespace repl {
             throw SyncException();
         }
 
-        if ( !handleDuplicateDbName( &txn, op, ns, clientName ) ) {
+        if (!handleDuplicateDbName(txn, op, ns, clientName)) {
             return;   
         }
                 
@@ -625,7 +623,7 @@ namespace repl {
         // always apply admin command command
         // this is a bit hacky -- the semantics of replication/commands aren't well specified
         if ( strcmp( clientName, "admin" ) == 0 && *op.getStringField( "op" ) == 'c' ) {
-            applyOperation( &txn, ctx.db(), op );
+            applyOperation(txn, ctx.db(), op);
             return;
         }
 
@@ -647,14 +645,14 @@ namespace repl {
                 save();
                 Client::Context ctx(ns);
                 nClonedThisPass++;
-                resync(&txn, ctx.db()->name());
+                resync(txn, ctx.db()->name());
                 addDbNextPass.erase(clientName);
                 incompleteCloneDbs.erase( clientName );
             }
             save();
         }
         else {
-            applyOperation( &txn, ctx.db(), op );
+            applyOperation(txn, ctx.db(), op);
             addDbNextPass.erase( clientName );
         }
     }
@@ -723,7 +721,7 @@ namespace repl {
                0 ok, don't sleep
                1 ok, sleep
     */
-    int ReplSource::sync_pullOpLog(int& nApplied) {
+    int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
         int okResultCode = 1;
         string ns = string("local.oplog.$") + sourceName();
         LOG(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
@@ -757,7 +755,7 @@ namespace repl {
                 }
                 // obviously global isn't ideal, but non-repl set is old so 
                 // keeping it simple
-                Lock::GlobalWrite lk;
+                Lock::GlobalWrite lk(txn->lockState());
                 save();
             }
 
@@ -794,7 +792,7 @@ namespace repl {
                 b.append("ns", *i + '.');
                 b.append("op", "db");
                 BSONObj op = b.done();
-                sync_pullOpLog_applyOperation(op, false);
+                _sync_pullOpLog_applyOperation(txn, op, false);
             }
         }
 
@@ -809,7 +807,7 @@ namespace repl {
                 log() << "repl:   " << ns << " oplog is empty" << endl;
             }
             {
-                Lock::GlobalWrite lk;
+                Lock::GlobalWrite lk(txn->lockState());
                 save();
             }
             return okResultCode;
@@ -880,11 +878,11 @@ namespace repl {
                 bool moreInitialSyncsPending = !addDbNextPass.empty() && n; // we need "&& n" to assure we actually process at least one op to get a sync point recorded in the first place.
 
                 if ( moreInitialSyncsPending || !oplogReader.more() ) {
-                    Lock::GlobalWrite lk;
+                    Lock::GlobalWrite lk(txn->lockState());
 
                     // NOTE aaron 2011-03-29 This block may be unnecessary, but I'm leaving it in place to avoid changing timing behavior.
                     {
-                        dbtemprelease t;
+                        dbtemprelease t(txn->lockState());
                         if ( !moreInitialSyncsPending && oplogReader.more() ) {
                             continue;
                         }
@@ -905,7 +903,7 @@ namespace repl {
 
                 OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) {
                     // periodically note our progress, in case we are doing a lot of work and crash
-                    Lock::GlobalWrite lk;
+                    Lock::GlobalWrite lk(txn->lockState());
                     syncedTo = nextOpTime;
                     // can't update local log ts since there are pending operations from our peer
                     save();
@@ -919,7 +917,7 @@ namespace repl {
 
                 int b = replApplyBatchSize.get();
                 bool justOne = b == 1;
-                scoped_ptr<Lock::GlobalWrite> lk( justOne ? 0 : new Lock::GlobalWrite() );
+                scoped_ptr<Lock::GlobalWrite> lk(justOne ? 0 : new Lock::GlobalWrite(txn->lockState()));
                 while( 1 ) {
 
                     BSONElement ts = op.getField("ts");
@@ -944,7 +942,7 @@ namespace repl {
                         verify( justOne );
                         oplogReader.putBack( op );
                         _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
-                        Lock::GlobalWrite lk;
+                        Lock::GlobalWrite lk(txn->lockState());
                         if ( n > 0 ) {
                             syncedTo = last;
                             save();
@@ -955,7 +953,7 @@ namespace repl {
                         return okResultCode;
                     }
 
-                    sync_pullOpLog_applyOperation(op, !justOne);
+                    _sync_pullOpLog_applyOperation(txn, op, !justOne);
                     n++;
 
                     if( --b == 0 )
@@ -1006,7 +1004,8 @@ namespace repl {
             return -1;
         }
 
-        return sync_pullOpLog(nApplied);
+        OperationContextImpl txn; // XXX?
+        return _sync_pullOpLog(&txn, nApplied);
     }
 
     /* --------------------------------------------------------------*/
@@ -1025,8 +1024,9 @@ namespace repl {
         OperationContextImpl txn;
         {
             ReplInfo r("replMain load sources");
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(txn.lockState());
             ReplSource::loadAll(&txn, sources);
+
             replSettings.fastsync = false; // only need this param for initial reset
         }
 
@@ -1089,13 +1089,13 @@ namespace repl {
         return sleepAdvice;
     }
 
-    void replMain() {
+    static void replMain() {
         ReplSource::SourceVector sources;
         while ( 1 ) {
             int s = 0;
             {
-                Lock::GlobalWrite lk;
                 OperationContextImpl txn;
+                Lock::GlobalWrite lk(txn.lockState());
                 if ( replAllDead ) {
                     // throttledForceResyncDead can throw
                     if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( &txn, "auto" ) ) {
@@ -1106,6 +1106,7 @@ namespace repl {
                 verify( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
                 syncing++;
             }
+
             try {
                 int nApplied = 0;
                 s = _replMain(sources, nApplied);
@@ -1122,8 +1123,10 @@ namespace repl {
                 out() << "caught exception in _replMain" << endl;
                 s = 4;
             }
+
             {
-                Lock::GlobalWrite lk;
+                LockState lockState;
+                Lock::GlobalWrite lk(&lockState);
                 verify( syncing == 1 );
                 syncing--;
             }
@@ -1157,14 +1160,15 @@ namespace repl {
                even when things are idle.
             */
             {
-                writelocktry lk(1);
+                OperationContextImpl txn;
+                writelocktry lk(txn.lockState(), 1);
                 if ( lk.got() ) {
                     toSleep = 10;
 
                     replLocalAuth();
 
                     try {
-                        logKeepalive();
+                        logKeepalive(&txn);
                     }
                     catch(...) {
                         log() << "caught exception in replMasterThread()" << endl;
@@ -1178,12 +1182,13 @@ namespace repl {
         }
     }
 
-    void replSlaveThread() {
+    static void replSlaveThread() {
         sleepsecs(1);
         Client::initThread("replslave");
 
         {
-            Lock::GlobalWrite lk;
+            LockState lockState;
+            Lock::GlobalWrite lk(&lockState);
             replLocalAuth();
         }
 
@@ -1217,7 +1222,8 @@ namespace repl {
             return;
 
         {
-            Lock::GlobalWrite lk;
+            LockState lockState;
+            Lock::GlobalWrite lk(&lockState);
             replLocalAuth();
         }
 
@@ -1249,7 +1255,8 @@ namespace repl {
         }
 
         OperationContextImpl txn; // XXX
-        Lock::GlobalRead lk;
+        Lock::GlobalRead lk(txn.lockState());
+
         for( unsigned i = a; i <= b; i++ ) {
             const BSONObj& op = v[i];
             const char *which = "o";

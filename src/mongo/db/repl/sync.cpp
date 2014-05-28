@@ -36,7 +36,6 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -106,16 +105,17 @@ namespace repl {
                     str::stream() << "Can no longer connect to initial sync source: " << hn);
     }
 
-    bool Sync::shouldRetry(const BSONObj& o) {
+    bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
+        invariant(txn->lockState()->hasAnyWriteLock());
+
         // should already have write lock
         const char *ns = o.getStringField("ns");
         Client::Context ctx(ns);
-        OperationContextImpl txn;
 
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
 
-        BSONObj missingObj = getMissingDoc(&txn, ctx.db(), o);
+        BSONObj missingObj = getMissingDoc(txn, ctx.db(), o);
 
         if( missingObj.isEmpty() ) {
             log() << "replication missing object not found on source. presumably deleted later in oplog" << endl;
@@ -125,9 +125,10 @@ namespace repl {
             return false;
         }
         else {
-            Collection* collection = ctx.db()->getOrCreateCollection( &txn, ns );
-            verify( collection ); // should never happen
-            StatusWith<DiskLoc> result = collection->insertDocument( &txn, missingObj, true );
+            Collection* collection = ctx.db()->getOrCreateCollection(txn, ns);
+            invariant(collection != NULL); // should never happen
+
+            StatusWith<DiskLoc> result = collection->insertDocument(txn, missingObj, true);
             uassert(15917,
                     str::stream() << "failed to insert missing doc: " << result.toString(),
                     result.isOK() );

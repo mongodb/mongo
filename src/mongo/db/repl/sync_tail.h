@@ -34,6 +34,9 @@
 #include "mongo/db/repl/sync.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
     class BackgroundSyncInterface;
@@ -46,7 +49,9 @@ namespace repl {
     public:
         SyncTail(BackgroundSyncInterface *q);
         virtual ~SyncTail();
-        virtual bool syncApply(const BSONObj &o, bool convertUpdateToUpsert = false);
+        virtual bool syncApply(OperationContext* txn,
+                               const BSONObj &o,
+                               bool convertUpdateToUpsert = false);
 
         /**
          * Apply ops from applyGTEObj's ts to at least minValidObj's ts.  Note that, due to

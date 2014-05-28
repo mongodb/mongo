@@ -50,7 +50,7 @@ namespace mongo {
     struct dbtemprelease {
         Client::Context * _context;
         scoped_ptr<Lock::TempRelease> tr;
-        dbtemprelease() {
+        dbtemprelease(LockState* lockState) {
             const Client& c = cc();
             _context = c.getContext();
             verify( Lock::isLocked() );
@@ -60,7 +60,7 @@ namespace mongo {
             if ( _context ) {
                 _context->unlocked();
             }
-            tr.reset(new Lock::TempRelease);
+            tr.reset(new Lock::TempRelease(lockState));
             verify( c.curop() );
             c.curop()->yielded();
         }

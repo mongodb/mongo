@@ -578,10 +578,10 @@ namespace mongo {
             called during startup
             throws on error
         */
-        void recover() {
+        void recover(OperationContext* txn) {
             // we use a lock so that exitCleanly will wait for us
             // to finish (or at least to notice what is up and stop)
-            Lock::GlobalWrite lk;
+            Lock::GlobalWrite lk(txn->lockState());
 
             // this is so the mutexdebugger doesn't get confused.  we are actually single threaded 
             // at this point in the program so it wouldn't have been a true problem (I think)

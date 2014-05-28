@@ -134,7 +134,7 @@ namespace mongo {
         if ( !preallocateOnly ) {
             while ( n >= (int) _files.size() ) {
                 verify(this);
-                if( !Lock::isWriteLocked(_dbname) ) {
+                if (!txn->lockState()->isWriteLocked(_dbname)) {
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open";
                     log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string();
                     invariant(false);

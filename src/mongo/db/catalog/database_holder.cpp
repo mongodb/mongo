@@ -58,7 +58,7 @@ namespace mongo {
             // todo: protect against getting sprayed with requests for different db names that DNE -
             //       that would make the DBs map very large.  not clear what to do to handle though,
             //       perhaps just log it, which is what we do here with the "> 40" :
-            bool cant = !Lock::isWriteLocked(ns);
+            bool cant = !txn->lockState()->isWriteLocked(ns);
             if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) ||
                 m.size() > 40 || cant || DEBUG_BUILD ) {
                 log() << "opening db: "

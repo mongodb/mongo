@@ -31,7 +31,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 
@@ -122,7 +122,7 @@ namespace ClientTests {
     public:
         BuildIndex() : Base("buildIndex") {}
         void run() {
-            OperationContextNoop txn;
+            OperationContextImpl txn;
             Client::WriteContext ctx(&txn, ns());
 
             db.insert(ns(), BSON("x" << 1 << "y" << 2));

@@ -37,7 +37,9 @@ namespace OplogStartTests {
 
     class Base {
     public:
-        Base() : _context(ns()) {
+        Base() : _lk(_txn.lockState()),
+                 _context(ns()) {
+
             Collection* c = _context.db()->getCollection(&_txn, ns());
             if (!c) {
                 c = _context.db()->createCollection(&_txn, ns());
@@ -64,7 +66,7 @@ namespace OplogStartTests {
             return _context.db()->getCollection( &_txn, ns() );
         }
 
-        DBDirectClient *client() const { return &_client; }
+        DBDirectClient* client() { return &_client; }
 
         void setupFromQuery(const BSONObj& query) {
             CanonicalQuery* cq;
@@ -88,15 +90,14 @@ namespace OplogStartTests {
         scoped_ptr<OplogStart> _stage;
 
     private:
+        // The order of these is important in order to ensure order of destruction
         OperationContextImpl _txn;
-        Lock::GlobalWrite lk;
+        Lock::GlobalWrite _lk;
         Client::Context _context;
 
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
 
-    // static
-    DBDirectClient Base::_client;
 
     /**
      * When the ts is newer than the oldest document, the OplogStart
