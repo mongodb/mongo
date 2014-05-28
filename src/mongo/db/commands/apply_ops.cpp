@@ -127,7 +127,7 @@ namespace mongo {
                 // operations are applied.  We are already locked globally at this point, so taking
                 // a DBWrite on the namespace creates a nested lock, and yields are disallowed for
                 // operations that hold a nested lock.
-                Lock::DBWrite lk(txn->lockState(), ns);
+                Lock::DBWrite lk(ns);
                 invariant(Lock::nested());
 
                 Client::Context ctx(ns);

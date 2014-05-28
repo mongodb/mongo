@@ -192,12 +192,10 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << " example: { moveprimary : 'foo' , to : 'localhost:9999' }";
             }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn,
                         ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
                         ActionType::moveChunk)) {
                     return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -389,12 +387,10 @@ namespace mongo {
                         << "Enable sharding for a db. (Use 'shardcollection' command afterwards.)\n"
                         << "  { enablesharding : \"<dbname>\" }\n";
             }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn,
                         ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
                         ActionType::enableSharding)) {
                     return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -449,12 +445,10 @@ namespace mongo {
                         << "Shard a collection.  Requires key.  Optional unique. Sharding must already be enabled for the database.\n"
                         << "  { enablesharding : \"<dbname>\" }\n";
             }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn,
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
                         ActionType::enableSharding)) {
@@ -836,12 +830,10 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
             }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn,
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
                         ActionType::getShardVersion)) {
@@ -889,12 +881,10 @@ namespace mongo {
                         << " NOTE: this does not move the chunks, it merely creates a logical separation \n"
                         ;
             }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn,
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
                         ActionType::splitChunk)) {
@@ -1053,12 +1043,10 @@ namespace mongo {
                      << "  { movechunk : 'test.foo' , bounds : [ { num : 0 } , { num : 10 } ] "
                      << " , to : 'shard001' }\n";
             }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn,
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
                         ActionType::moveChunk)) {
@@ -1878,8 +1866,7 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             return Status::OK(); // Require no auth since this command isn't supported in mongos

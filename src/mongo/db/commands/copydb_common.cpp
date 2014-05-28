@@ -42,8 +42,7 @@
 namespace mongo {
 namespace copydb {
 
-    Status checkAuthForCopydbCommand(OperationContext* txn,
-                                     ClientBasic* client,
+    Status checkAuthForCopydbCommand(ClientBasic* client,
                                      const std::string& dbname,
                                      const BSONObj& cmdObj) {
         bool fromSelf = StringData(cmdObj.getStringField("fromhost")).empty();
@@ -66,7 +65,7 @@ namespace copydb {
         actions.addAction(ActionType::insert);
         actions.addAction(ActionType::createIndex);
         if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                txn, ResourcePattern::forDatabaseName(todb), actions)) {
+                ResourcePattern::forDatabaseName(todb), actions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
@@ -74,7 +73,7 @@ namespace copydb {
         actions.addAction(ActionType::insert);
         for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnNamespace(
-                    txn, NamespaceString(todb, legalClientSystemCollections[i]), actions)) {
+                    NamespaceString(todb, legalClientSystemCollections[i]), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
         }
@@ -84,12 +83,12 @@ namespace copydb {
             actions.removeAllActions();
             actions.addAction(ActionType::find);
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    txn, ResourcePattern::forDatabaseName(fromdb), actions)) {
+                    ResourcePattern::forDatabaseName(fromdb), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
             for (size_t i = 0; i < legalClientSystemCollections.size(); ++i) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnNamespace(
-                        txn, NamespaceString(fromdb, legalClientSystemCollections[i]), actions)) {
+                        NamespaceString(fromdb, legalClientSystemCollections[i]), actions)) {
                     return Status(ErrorCodes::Unauthorized, "Unauthorized");
                 }
             }

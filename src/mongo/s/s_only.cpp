@@ -134,7 +134,7 @@ namespace mongo {
             return;
         }
 
-        Status status = _checkAuthorization(txn, c, &client, dbname, cmdObj, fromRepl);
+        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {
             appendCommandStatus(result, status);
             return;

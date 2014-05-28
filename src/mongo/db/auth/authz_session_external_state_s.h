@@ -45,7 +45,7 @@ namespace mongo {
         AuthzSessionExternalStateMongos(AuthorizationManager* authzManager);
         virtual ~AuthzSessionExternalStateMongos();
 
-        virtual void startRequest(OperationContext* txn);
+        virtual void startRequest();
     };
 
 } // namespace mongo

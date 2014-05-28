@@ -54,12 +54,10 @@ namespace mongo {
             return false;
         }
         virtual bool isWriteCommandForConfigServer() const { return true; }
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
-            return rename_collection::checkAuthForRenameCollectionCommand(
-                                        txn, client, dbname, cmdObj);
+            return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
         }
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";

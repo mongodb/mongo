@@ -113,8 +113,8 @@ namespace repl {
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
     void _logOpObjRS(const BSONObj& op) {
+        Lock::DBWrite lk("local");
         OperationContextImpl txn;
-        Lock::DBWrite lk(txn.lockState(), "local");
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -231,7 +231,7 @@ namespace repl {
                          BSONObj *o2,
                          bool *bb,
                          bool fromMigrate ) {
-        Lock::DBWrite lk1(txn->lockState(), "local");
+        Lock::DBWrite lk1("local");
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
@@ -321,7 +321,7 @@ namespace repl {
                           BSONObj *o2,
                           bool *bb,
                           bool fromMigrate ) {
-        Lock::DBWrite lk(txn->lockState(), "local");
+        Lock::DBWrite lk("local");
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {

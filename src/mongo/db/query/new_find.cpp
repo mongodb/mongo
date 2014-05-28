@@ -152,7 +152,7 @@ namespace mongo {
         exhaust = false;
 
         // This is a read lock.
-        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(txn, ns));
+        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(ns));
         Collection* collection = ctx->ctx().db()->getCollection(ns);
         uassert( 17356, "collection dropped between getMore calls", collection );
 
@@ -459,7 +459,7 @@ namespace mongo {
         // This is a read lock.  We require this because if we're parsing a $where, the
         // where-specific parsing code assumes we have a lock and creates execution machinery that
         // requires it.
-        Client::ReadContext ctx(txn, q.ns);
+        Client::ReadContext ctx(q.ns);
         Collection* collection = ctx.ctx().db()->getCollection( ns );
 
         // Parse the qm into a CanonicalQuery.

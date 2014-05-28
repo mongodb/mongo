@@ -45,7 +45,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/max_time.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/net/listen.h"
 
@@ -339,12 +338,10 @@ namespace mongo {
             {
                 scoped_lock lk( _mutex );
 
-                OperationContextNoop txn;
-
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
                     const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
-                            &txn, NamespaceString(i->second->getNS()), ActionType::killCursors);
+                            NamespaceString(i->second->getNS()), ActionType::killCursors);
                     audit::logKillCursorsAuthzCheck(
                             client,
                             NamespaceString(i->second->getNS()),
@@ -365,7 +362,7 @@ namespace mongo {
                 }
                 verify(refsNSIt != _refsNS.end());
                 const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
-                        &txn, NamespaceString(refsNSIt->second), ActionType::killCursors);
+                        NamespaceString(refsNSIt->second), ActionType::killCursors);
                 audit::logKillCursorsAuthzCheck(
                         client,
                         NamespaceString(refsNSIt->second),

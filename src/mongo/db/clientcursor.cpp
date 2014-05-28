@@ -45,7 +45,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 
@@ -220,10 +219,8 @@ namespace mongo {
         Client& client = cc();
         Timer t;
         const int Secs = 4;
-        while (!inShutdown()) {
-            OperationContextImpl txn;
-            cursorStatsTimedOut.increment(
-                        CollectionCursorCache::timeoutCursorsGlobal(&txn, t.millisReset()));
+        while ( ! inShutdown() ) {
+            cursorStatsTimedOut.increment( CollectionCursorCache::timeoutCursorsGlobal( t.millisReset() ) );
             sleepsecs(Secs);
         }
         client.shutdown();

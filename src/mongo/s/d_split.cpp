@@ -119,7 +119,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::ReadContext ctx(txn, ns);
+            Client::ReadContext ctx( ns );
             Collection* collection = ctx.ctx().db()->getCollection( ns );
             if ( !collection ) {
                 errmsg = "ns not found";
@@ -223,12 +223,10 @@ namespace mongo {
                  "  'force' will produce one split point even if data is small; defaults to false\n"
                  "NOTE: This command may take a while to run";
         }
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    txn,
                     ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                     ActionType::splitVector)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -277,7 +275,7 @@ namespace mongo {
 
             {
                 // Get the size estimate for this namespace
-                Client::ReadContext ctx(txn, ns);
+                Client::ReadContext ctx( ns );
                 Collection* collection = ctx.ctx().db()->getCollection( ns );
                 if ( !collection ) {
                     errmsg = "ns not found";
@@ -517,12 +515,10 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    txn,
                     ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                     ActionType::splitChunk)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -828,7 +824,7 @@ namespace mongo {
             maxVersion.incMinor();
             
             {
-                Lock::DBWrite writeLk(txn->lockState(), ns);
+                Lock::DBWrite writeLk( ns );
                 shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
             }
 
@@ -862,7 +858,7 @@ namespace mongo {
                 // If one of the chunks has only one object in it we should move it
                 for (int i=1; i >= 0 ; i--){ // high chunk more likely to have only one obj
 
-                    Client::ReadContext ctx(txn, ns);
+                    Client::ReadContext ctx( ns );
                     Collection* collection = ctx.ctx().db()->getCollection( ns );
                     verify( collection );
 

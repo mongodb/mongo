@@ -96,7 +96,7 @@ namespace mongo {
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
             for ( ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i ) {
                 if ( all || cmdObj.hasElement( i->first.c_str() ) ) {
-                    i->second->append(txn, result, i->second->name() );
+                    i->second->append( result, i->second->name() );
                 }
             }
 
@@ -177,7 +177,7 @@ namespace mongo {
                 }
 
                 if ( s == 0 )
-                    j->second->append(txn, result, "was" );
+                    j->second->append( result, "was" );
 
                 Status status = j->second->set( e );
                 if ( status.isOK() ) {
@@ -203,7 +203,7 @@ namespace mongo {
         public:
             LogLevelSetting() : ServerParameter(ServerParameterSet::getGlobal(), "logLevel") {}
 
-            virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+            virtual void append(BSONObjBuilder& b, const std::string& name) {
                 b << name << logger::globalLogDomain()->getMinimumLogSeverity().toInt();
             }
 
@@ -257,8 +257,7 @@ namespace mongo {
                 }
             }
 
-            virtual void append(
-                            OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+            virtual void append(BSONObjBuilder& b, const std::string& name) {
                 b << name << sslModeStr();
             }
 
@@ -325,8 +324,7 @@ namespace mongo {
                 }
             }
 
-            virtual void append(
-                            OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+            virtual void append(BSONObjBuilder& b, const std::string& name) {
                 b << name << clusterAuthModeStr();
             }
 

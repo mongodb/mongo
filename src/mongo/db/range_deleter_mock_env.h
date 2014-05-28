@@ -139,7 +139,7 @@ namespace mongo {
          * RangeDeleterEnv::getCursorIds. The cursors returned can be modified with
          * the setCursorId and clearCursorMap methods.
          */
-        void getCursorIds(OperationContext* txn, const StringData& ns, std::set<CursorId>* in);
+        void getCursorIds(const StringData& ns, std::set<CursorId>* in);
 
     private:
         // mutex acquisition ordering:

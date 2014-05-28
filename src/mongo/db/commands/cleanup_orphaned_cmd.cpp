@@ -158,12 +158,11 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool localHostOnlyIfNoAuth( const BSONObj& cmdObj ) { return false; }
 
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj ) {
+        virtual Status checkAuthForCommand( ClientBasic* client,
+                                            const std::string& dbname,
+                                            const BSONObj& cmdObj ) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn, ResourcePattern::forClusterResource(), ActionType::cleanupOrphaned)) {
+                        ResourcePattern::forClusterResource(), ActionType::cleanupOrphaned)) {
                 return Status(ErrorCodes::Unauthorized,
                               "Not authorized for cleanupOrphaned command.");
             }

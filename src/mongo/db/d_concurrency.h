@@ -112,8 +112,6 @@ namespace mongo {
             virtual void _tempRelease() = 0;
             virtual void _relock() = 0;
 
-            LockState* _lockState;
-
         private:
 
             class ParallelBatchWriterSupport : boost::noncopyable {
@@ -185,7 +183,7 @@ namespace mongo {
             void _relock();
 
         public:
-            DBWrite(LockState* lockState, const StringData& dbOrNs);
+            DBWrite(const StringData& dbOrNs);
             virtual ~DBWrite();
 
         private:
@@ -209,7 +207,7 @@ namespace mongo {
             void _relock();
 
         public:
-            DBRead(LockState* lockState, const StringData& dbOrNs);
+            DBRead(const StringData& dbOrNs);
             virtual ~DBRead();
 
         private:

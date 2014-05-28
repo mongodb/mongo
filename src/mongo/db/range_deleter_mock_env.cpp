@@ -139,8 +139,7 @@ namespace mongo {
         return true;
     }
 
-    void RangeDeleterMockEnv::getCursorIds(
-                    OperationContext* txn, const StringData& ns, set<CursorId>* in) {
+    void RangeDeleterMockEnv::getCursorIds(const StringData& ns, set<CursorId>* in) {
         {
             scoped_lock sl(_cursorMapMutex);
             const set<CursorId>& _cursors = _cursorMap[ns.toString()];

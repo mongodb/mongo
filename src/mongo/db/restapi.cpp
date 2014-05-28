@@ -260,9 +260,9 @@ namespace mongo {
 
     } restHandler;
 
-    bool RestAdminAccess::haveAdminUsers(OperationContext* txn) const {
+    bool RestAdminAccess::haveAdminUsers() const {
         AuthorizationSession* authzSession = cc().getAuthorizationSession();
-        return authzSession->getAuthorizationManager().hasAnyPrivilegeDocuments(txn);
+        return authzSession->getAuthorizationManager().hasAnyPrivilegeDocuments();
     }
 
     class LowLevelMongodStatus : public WebStatusPlugin {

@@ -76,9 +76,7 @@ namespace mongo {
          * One action type defined for index filter commands:
          * - planCacheIndexFilter
          */
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
-                                           const std::string& dbname,
+        virtual Status checkAuthForCommand(ClientBasic* client, const std::string& dbname,
                                            const BSONObj& cmdObj);
 
         /**
@@ -87,9 +85,7 @@ namespace mongo {
          * Should contain just enough logic to invoke run*Command() function
          * in query_settings.h
          */
-        virtual Status runIndexFilterCommand(OperationContext* txn,
-                                             const std::string& ns,
-                                             BSONObj& cmdObj,
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj,
                                              BSONObjBuilder* bob) = 0;
 
     private:
@@ -106,10 +102,7 @@ namespace mongo {
     public:
         ListFilters();
 
-        virtual Status runIndexFilterCommand(OperationContext* txn,
-                                             const std::string& ns,
-                                             BSONObj& cmdObj,
-                                             BSONObjBuilder* bob);
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
          * Looks up index filters from collection's query settings.
@@ -128,10 +121,7 @@ namespace mongo {
     public:
         ClearFilters();
 
-        virtual Status runIndexFilterCommand(OperationContext* txn,
-                                             const std::string& ns,
-                                             BSONObj& cmdObj,
-                                             BSONObjBuilder* bob);
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
          * If query shape is provided, clears index filter for a query.
@@ -159,10 +149,7 @@ namespace mongo {
     public:
         SetFilter();
 
-        virtual Status runIndexFilterCommand(OperationContext* txn,
-                                             const std::string& ns,
-                                             BSONObj& cmdObj,
-                                             BSONObjBuilder* bob);
+        virtual Status runIndexFilterCommand(const std::string& ns, BSONObj& cmdObj, BSONObjBuilder* bob);
 
         /**
          * Sets index filter for a query shape.

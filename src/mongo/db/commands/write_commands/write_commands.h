@@ -65,8 +65,7 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const;
 
-        virtual Status checkAuthForCommand( OperationContext* txn,
-                                            ClientBasic* client,
+        virtual Status checkAuthForCommand( ClientBasic* client,
                                             const std::string& dbname,
                                             const BSONObj& cmdObj );
 

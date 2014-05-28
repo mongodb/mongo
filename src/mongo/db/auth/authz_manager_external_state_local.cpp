@@ -59,11 +59,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(
-                            OperationContext* txn, int* outVersion) {
+    Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(int* outVersion) {
         BSONObj versionDoc;
-        Status status = findOne(txn,
-                                AuthorizationManager::versionCollectionNamespace,
+        Status status = findOne(AuthorizationManager::versionCollectionNamespace,
                                 AuthorizationManager::versionDocumentQuery,
                                 &versionDoc);
         if (status.isOK()) {
@@ -87,7 +85,7 @@ namespace mongo {
             }
         }
         else if (status == ErrorCodes::NoMatchingDocument) {
-            if (hasAnyPrivilegeDocuments(txn)) {
+            if (hasAnyPrivilegeDocuments()) {
                 *outVersion = AuthorizationManager::schemaVersion24;
             }
             else {
@@ -138,12 +136,11 @@ namespace {
 }  // namespace
 
     Status AuthzManagerExternalStateLocal::getUserDescription(
-            OperationContext* txn,
             const UserName& userName,
             BSONObj* result) {
 
         BSONObj userDoc;
-        Status status = _getUserDocument(txn, userName, &userDoc);
+        Status status = _getUserDocument(userName, &userDoc);
         if (!status.isOK())
             return status;
 

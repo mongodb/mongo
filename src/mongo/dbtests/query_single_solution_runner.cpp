@@ -39,7 +39,6 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QuerySingleSolutionRunner {
@@ -148,7 +147,7 @@ namespace QuerySingleSolutionRunner {
         static const char* ns() { return "unittests.QueryStageSingleSolutionRunner"; }
 
         size_t numCursors() {
-            Client::ReadContext ctx(&_txn, ns() );
+            Client::ReadContext ctx( ns() );
             Collection* collection = ctx.ctx().db()->getCollection( ns() );
             if ( !collection )
                 return 0;
@@ -156,19 +155,16 @@ namespace QuerySingleSolutionRunner {
         }
 
         void registerRunner( Runner* runner ) {
-            Client::ReadContext ctx(&_txn, ns());
+            Client::ReadContext ctx( ns() );
             Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns() );
             return collection->cursorCache()->registerRunner( runner );
         }
 
         void deregisterRunner( Runner* runner ) {
-            Client::ReadContext ctx(&_txn, ns());
+            Client::ReadContext ctx( ns() );
             Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns() );
             return collection->cursorCache()->deregisterRunner( runner );
         }
-
-    protected:
-        OperationContextImpl _txn;
 
     private:
         IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
@@ -176,8 +172,10 @@ namespace QuerySingleSolutionRunner {
             return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
-        DBDirectClient _client;
+        static DBDirectClient _client;
     };
+
+    DBDirectClient SingleSolutionRunnerBase::_client;
 
     /**
      * Test dropping the collection while the
@@ -186,7 +184,7 @@ namespace QuerySingleSolutionRunner {
     class DropCollScan : public SingleSolutionRunnerBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             insert(BSON("_id" << 1));
             insert(BSON("_id" << 2));
 
@@ -214,7 +212,7 @@ namespace QuerySingleSolutionRunner {
     class DropIndexScan : public SingleSolutionRunnerBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             insert(BSON("_id" << 1 << "a" << 6));
             insert(BSON("_id" << 2 << "a" << 7));
             insert(BSON("_id" << 3 << "a" << 8));
@@ -285,7 +283,7 @@ namespace QuerySingleSolutionRunner {
     class SnapshotControl : public SnapshotBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             setupCollection();
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
@@ -310,7 +308,7 @@ namespace QuerySingleSolutionRunner {
     class SnapshotTest : public SnapshotBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             setupCollection();
             BSONObj indexSpec = BSON("_id" << 1);
             addIndex(indexSpec);
@@ -341,7 +339,7 @@ namespace QuerySingleSolutionRunner {
         class Invalidate : public SingleSolutionRunnerBase {
         public:
             void run() {
-                Client::WriteContext ctx(&_txn, ns());
+                Client::WriteContext ctx(ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
@@ -366,7 +364,7 @@ namespace QuerySingleSolutionRunner {
         class InvalidatePinned : public SingleSolutionRunnerBase {
         public:
             void run() {
-                Client::WriteContext ctx(&_txn, ns());
+                Client::WriteContext ctx(ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
                 Collection* collection = ctx.ctx().db()->getCollection(ns());
@@ -404,12 +402,12 @@ namespace QuerySingleSolutionRunner {
         public:
             void run() {
                 {
-                    Client::WriteContext ctx(&_txn, ns());
+                    Client::WriteContext ctx(ns());
                     insert(BSON("a" << 1 << "b" << 1));
                 }
 
                 {
-                    Client::ReadContext ctx(&_txn, ns());
+                    Client::ReadContext ctx(ns());
                     Collection* collection = ctx.ctx().db()->getCollection(ns());
 
                     BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
@@ -422,7 +420,7 @@ namespace QuerySingleSolutionRunner {
                 // There should be one cursor before timeout,
                 // and zero cursors after timeout.
                 ASSERT_EQUALS(1U, numCursors());
-                CollectionCursorCache::timeoutCursorsGlobal(&_txn, 600001);
+                CollectionCursorCache::timeoutCursorsGlobal(600001);
                 ASSERT_EQUALS(0U, numCursors());
             }
         };

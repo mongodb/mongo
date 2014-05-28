@@ -48,7 +48,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/db.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/client/connpool.h"
@@ -61,6 +60,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
+using namespace std;
 
 namespace mongo {
 
@@ -558,8 +558,7 @@ namespace mongo {
         {
             // DBLock needed since we're now potentially changing the metadata, and don't want
             // reads/writes to be ongoing.
-            OperationContextImpl txn;
-            Lock::DBWrite writeLk(txn.lockState(), ns );
+            Lock::DBWrite writeLk( ns );
 
             //
             // Get the metadata now that the load has completed
@@ -1184,12 +1183,10 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    txn,
                     ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                     ActionType::getShardVersion)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -1244,7 +1241,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(dbname);
 
             shardingState.appendInfo( result );

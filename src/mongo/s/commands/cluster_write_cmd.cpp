@@ -62,13 +62,11 @@ namespace mongo {
 
         bool isWriteCommandForConfigServer() const { return false; }
 
-        Status checkAuthForCommand( OperationContext* txn,
-                                    ClientBasic* client,
+        Status checkAuthForCommand( ClientBasic* client,
                                     const std::string& dbname,
                                     const BSONObj& cmdObj ) {
 
-            Status status = auth::checkAuthForWriteCommand( txn,
-                                                            client->getAuthorizationSession(),
+            Status status = auth::checkAuthForWriteCommand( client->getAuthorizationSession(),
                                                             _writeType,
                                                             NamespaceString( parseNs( dbname,
                                                                                       cmdObj ) ),

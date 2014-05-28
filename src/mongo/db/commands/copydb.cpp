@@ -108,11 +108,10 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
-            return copydb::checkAuthForCopydbCommand(txn, client, dbname, cmdObj);
+            return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
         }
 
         virtual void help( stringstream &help ) const {
@@ -156,8 +155,8 @@ namespace mongo {
 
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
             scoped_ptr<Lock::ScopedLock> lk( fromSelf ?
-                                             static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite()) :
-                                             static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
+                                             static_cast<Lock::ScopedLock*>( new Lock::DBWrite( todb ) ) );
 
             Cloner cloner;
             string username = cmdObj.getStringField( "username" );

@@ -232,10 +232,7 @@ namespace mongo {
             _stats->incPendingDeletes_inlock();
         }
 
-        {
-            boost::scoped_ptr<OperationContext> txn(transactionFactory());
-            _env->getCursorIds(txn.get(), ns, &toDelete->cursorsToWait);
-        }
+        _env->getCursorIds(ns, &toDelete->cursorsToWait);
 
         {
             scoped_lock sl(_queueMutex);
@@ -287,7 +284,7 @@ namespace mongo {
         }
 
         set<CursorId> cursorsToWait;
-        _env->getCursorIds(txn, ns, &cursorsToWait);
+        _env->getCursorIds(ns, &cursorsToWait);
 
         long long checkIntervalMillis = 5;
 
@@ -298,7 +295,7 @@ namespace mongo {
 
         while (!cursorsToWait.empty()) {
             set<CursorId> cursorsNow;
-            _env->getCursorIds(txn, ns, &cursorsNow);
+            _env->getCursorIds(ns, &cursorsNow);
 
             set<CursorId> cursorsLeft;
             std::set_intersection(cursorsToWait.begin(),
@@ -441,11 +438,7 @@ namespace mongo {
                             RangeDeleteEntry* entry = *iter;
 
                             set<CursorId> cursorsNow;
-                            {
-                                boost::scoped_ptr<OperationContext> txn(
-                                                        entry->transactionFactory()); // XXX?
-                                _env->getCursorIds(txn.get(), entry->ns, &cursorsNow);
-                            }
+                            _env->getCursorIds(entry->ns, &cursorsNow);
 
                             set<CursorId> cursorsLeft;
                             std::set_intersection(entry->cursorsToWait.begin(),

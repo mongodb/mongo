@@ -35,7 +35,6 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/d_concurrency.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
@@ -116,8 +115,6 @@ namespace ThreadedTests {
         }
         virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
-            LockState lockState;
-
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {
                 int x = std::rand();
@@ -172,13 +169,13 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 5 ) {
                     {
-                        Lock::DBRead r(&lockState, "foo");
+                        Lock::DBRead r("foo");
                         if( sometimes ) {
                             Lock::TempRelease t;
                         }
                     }
                     {
-                        Lock::DBRead r(&lockState, "bar");
+                        Lock::DBRead r("bar");
                     }
                 }
                 else if( i % 7 == 6 ) {
@@ -186,13 +183,13 @@ namespace ThreadedTests {
                         int q = i % 11;
                         if( q == 0 ) { 
                             char what = 'r';
-                            Lock::DBRead r(&lockState, "foo");
+                            Lock::DBRead r("foo");
                             ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
                             ASSERT( !Lock::nested() );
-                            Lock::DBRead r2(&lockState, "foo");
+                            Lock::DBRead r2("foo");
                             ASSERT( Lock::nested() );
                             ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
-                            Lock::DBRead r3(&lockState, "local");
+                            Lock::DBRead r3("local");
                             if( sometimes ) {
                                 Lock::TempRelease t;
                             }
@@ -202,48 +199,41 @@ namespace ThreadedTests {
                         else if( q == 1 ) {
                             // test locking local only -- with no preceeding lock
                             { 
-                                Lock::DBRead x(&lockState, "local");
+                                Lock::DBRead x("local"); 
                                 //Lock::DBRead y("q");
                                 if( sometimes ) {
                                     Lock::TempRelease t; // we don't temprelease (cant=true) here thus this is just a check that nothing weird happens...
                                 }
                             }
-                            {
-                                OperationContextImpl txn;
-                                Lock::DBWrite x(txn.lockState(), "local");
+                            { 
+                                Lock::DBWrite x("local"); 
                                 if( sometimes ) {
                                     Lock::TempRelease t;
                                 }
                             }
                         } else if( q == 1 ) {
-                                { Lock::DBRead  x(&lockState, "admin"); }
-                            { 
-                                OperationContextImpl txn;
-                                Lock::DBWrite x(txn.lockState(), "admin"); 
-                            }
+                            { Lock::DBRead  x("admin"); }
+                            { Lock::DBWrite x("admin"); }
                         } else if( q == 2 ) { 
                             /*Lock::DBWrite x("foo");
                             Lock::DBWrite y("admin");
                             { Lock::TempRelease t; }*/
                         }
                         else if( q == 3 ) {
-                            OperationContextImpl txn;
-                            Lock::DBWrite x(txn.lockState(), "foo");
-                            Lock::DBRead y(&lockState, "admin");
+                            Lock::DBWrite x("foo");
+                            Lock::DBRead y("admin");
                             { Lock::TempRelease t; }
                         } 
                         else if( q == 4 ) { 
-                            Lock::DBRead x(&lockState, "foo2");
-                            Lock::DBRead y(&lockState, "admin");
+                            Lock::DBRead x("foo2");
+                            Lock::DBRead y("admin");
                             { Lock::TempRelease t; }
                         }
                         else if ( q > 4 && q < 8 ) {
                             static const char * const dbnames[] = {
                                 "bar0", "bar1", "bar2", "bar3", "bar4", "bar5",
                                 "bar6", "bar7", "bar8", "bar9", "bar10" };
-
-                            OperationContextImpl txn;
-                            Lock::DBWrite w(txn.lockState(), dbnames[q]);
+                            Lock::DBWrite w(dbnames[q]);
                             {
                                 Lock::UpgradeGlobalLockToExclusive wToX;
                                 if (wToX.gotUpgrade()) {
@@ -255,24 +245,21 @@ namespace ThreadedTests {
                             }
                         }
                         else { 
-                            OperationContextImpl txn;
-                            Lock::DBWrite w(txn.lockState(), "foo");
-
+                            Lock::DBWrite w("foo");
                             {
                                 Lock::TempRelease t;
                             }
-
-                            Lock::DBRead r2(&lockState, "foo");
-                            Lock::DBRead r3(&lockState, "local");
+                            Lock::DBRead r2("foo");
+                            Lock::DBRead r3("local");
                             if( sometimes ) {
                                 Lock::TempRelease t;
                             }
                         }
                     }
                     else { 
-                        Lock::DBRead r(&lockState, "foo");
-                        Lock::DBRead r2(&lockState, "foo");
-                        Lock::DBRead r3(&lockState, "local");
+                        Lock::DBRead r("foo");
+                        Lock::DBRead r2("foo");
+                        Lock::DBRead r3("local");
                     }
                 }
                 pm.hit();

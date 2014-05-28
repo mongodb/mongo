@@ -75,7 +75,7 @@ namespace mongo {
                 MONGO_TLOG(0) << "CMD: validate " << ns << endl;
             }
 
-            Client::ReadContext ctx(txn, ns_string.ns());
+            Client::ReadContext ctx(ns_string.ns());
 
             Database* db = ctx.ctx().db();
             if ( !db ) {

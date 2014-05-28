@@ -33,7 +33,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
@@ -47,7 +46,7 @@ namespace QueryStageTests {
     class IndexScanBase {
     public:
         IndexScanBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 BSONObjBuilder bob;
@@ -62,17 +61,17 @@ namespace QueryStageTests {
         }
 
         virtual ~IndexScanBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             _client.dropCollection(ns());
         }
 
         void addIndex(const BSONObj& obj) {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             _client.ensureIndex(ns(), obj);
         }
 
         int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
-            Client::ReadContext ctx(&_txn, ns());
+            Client::ReadContext ctx(ns());
 
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
@@ -92,7 +91,7 @@ namespace QueryStageTests {
         }
 
         void makeGeoData() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 double lat = double(rand()) / RAND_MAX;
@@ -102,7 +101,7 @@ namespace QueryStageTests {
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
-            Client::ReadContext ctx(&_txn, ns());
+            Client::ReadContext ctx(ns());
             Collection* collection = ctx.ctx().db()->getCollection( ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
@@ -110,12 +109,11 @@ namespace QueryStageTests {
         static int numObj() { return 50; }
         static const char* ns() { return "unittests.IndexScan"; }
 
-    protected:
-        OperationContextImpl _txn;
-
     private:
-        DBDirectClient _client;
+        static DBDirectClient _client;
     };
+
+    DBDirectClient IndexScanBase::_client;
 
     class QueryStageIXScanBasic : public IndexScanBase {
     public:

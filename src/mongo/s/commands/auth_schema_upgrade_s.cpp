@@ -157,7 +157,7 @@ namespace {
                 return appendCommandStatus(result, status);
             }
 
-            status = authzManager->upgradeSchema(txn, maxSteps, writeConcern);
+            status = authzManager->upgradeSchema(maxSteps, writeConcern);
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 

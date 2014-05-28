@@ -109,12 +109,11 @@ namespace QueryStageAnd {
 
         static const char* ns() { return "unittests.QueryStageAnd"; }
 
-    protected:
-        OperationContextImpl _txn;
-
     private:
-        DBDirectClient _client;
+        static DBDirectClient _client;
     };
+
+    DBDirectClient QueryStageAndBase::_client;
 
     //
     // Hash AND tests
@@ -127,12 +126,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashInvalidation : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -229,12 +228,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashInvalidateLookahead : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -315,12 +314,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashTwoLeaf : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -364,12 +363,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashTwoLeafFirstChildLargeKeys : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Generate large keys for {foo: 1, big: 1} index.
@@ -416,12 +415,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashTwoLeafLastChildLargeKeys : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Generate large keys for {baz: 1, big: 1} index.
@@ -467,12 +466,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashThreeLeaf : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -528,12 +527,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashThreeLeafMiddleChildLargeKeys : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Generate large keys for {bar: 1, big: 1} index.
@@ -587,12 +586,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashWithNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -646,12 +645,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashProducesNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 10; ++i) {
@@ -694,12 +693,12 @@ namespace QueryStageAnd {
     class QueryStageAndHashWithMatcher : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -750,12 +749,12 @@ namespace QueryStageAnd {
     class QueryStageAndSortedInvalidation : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Insert a bunch of data
@@ -867,12 +866,12 @@ namespace QueryStageAnd {
     class QueryStageAndSortedThreeLeaf : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             // Insert a bunch of data
@@ -920,12 +919,12 @@ namespace QueryStageAnd {
     class QueryStageAndSortedWithNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
 
@@ -965,12 +964,12 @@ namespace QueryStageAnd {
     class QueryStageAndSortedProducesNothing : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -1013,12 +1012,12 @@ namespace QueryStageAnd {
     class QueryStageAndSortedWithMatcher : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {
@@ -1058,12 +1057,12 @@ namespace QueryStageAnd {
     class QueryStageAndSortedByLastChild : public QueryStageAndBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
-                coll = db->createCollection(&_txn, ns());
+                coll = db->createCollection(&txn, ns());
             }
 
             for (int i = 0; i < 50; ++i) {

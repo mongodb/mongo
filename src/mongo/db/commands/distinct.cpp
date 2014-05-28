@@ -90,7 +90,7 @@ namespace mongo {
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
 
-            Client::ReadContext ctx(txn, ns);
+            Client::ReadContext ctx(ns);
 
             Collection* collection = ctx.ctx().db()->getCollection( ns );
 

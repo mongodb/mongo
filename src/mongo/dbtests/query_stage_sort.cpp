@@ -169,9 +169,10 @@ namespace QueryStageSortTests {
 
         static const char* ns() { return "unittests.QueryStageSort"; }
     private:
-        DBDirectClient _client;
+        static DBDirectClient _client;
     };
 
+    DBDirectClient QueryStageSortTestBase::_client;
 
     // Sort some small # of results in increasing order.
     class QueryStageSortInc: public QueryStageSortTestBase {
@@ -179,9 +180,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -199,9 +199,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -228,9 +227,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 10000; }
 
         void run() {
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -248,9 +246,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 2000; }
 
         void run() {
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
-            
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -339,9 +336,8 @@ namespace QueryStageSortTests {
         virtual int numObj() { return 100; }
 
         void run() {
+            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
-            
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {

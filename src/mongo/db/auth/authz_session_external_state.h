@@ -39,7 +39,6 @@
 namespace mongo {
 
     class Principal;
-    class OperationContext;
 
     /**
      * Public interface for a class that encapsulates all the session information related to system
@@ -69,7 +68,7 @@ namespace mongo {
 
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
-        virtual void startRequest(OperationContext* txn) = 0;
+        virtual void startRequest() = 0;
 
     protected:
         // This class should never be instantiated directly.

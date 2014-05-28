@@ -116,7 +116,7 @@ namespace mongo {
             string collName = collElt.String();
 
             // Need a context to get the actual Collection*
-            Client::ReadContext ctx(txn, dbname);
+            Client::ReadContext ctx(dbname);
 
             // Make sure the collection is valid.
             Database* db = ctx.ctx().db();

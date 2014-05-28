@@ -37,12 +37,10 @@
 namespace mongo {
 
     class ClientBasic;
-    class OperationContext;
 
 namespace rename_collection {
 
-    Status checkAuthForRenameCollectionCommand(OperationContext* txn,
-                                               ClientBasic* client,
+    Status checkAuthForRenameCollectionCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj);
 

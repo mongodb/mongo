@@ -171,7 +171,7 @@ namespace repl {
             }
         }
 
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const string& name) {
+        virtual void append( BSONObjBuilder& b, const string& name ) {
             b.append( name, _value() );
         }
 

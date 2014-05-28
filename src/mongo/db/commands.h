@@ -141,8 +141,7 @@ namespace mutablebson {
          * Checks if the given client is authorized to run this command on database "dbname"
          * with the invocation described by "cmdObj".
          */
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj);
 
@@ -257,8 +256,7 @@ namespace mutablebson {
          * ErrorCodes::Unauthorized otherwise, but any return other than Status::OK implies not
          * authorized.
          */
-        static Status _checkAuthorization(OperationContext* txn,
-                                          Command* c,
+        static Status _checkAuthorization(Command* c,
                                           ClientBasic* client,
                                           const std::string& dbname,
                                           const BSONObj& cmdObj,

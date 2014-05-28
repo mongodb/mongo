@@ -76,7 +76,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::ReadContext ctx(txn, ns);
+            Client::ReadContext ctx(ns);
 
             Database* db = ctx.ctx().db();
             if ( !db ) {

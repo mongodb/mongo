@@ -38,7 +38,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -93,8 +92,7 @@ namespace QueryMultiPlanRunner {
     class MPRCollectionScanVsHighlySelectiveIXScan : public MultiPlanRunnerBase {
     public:
         void run() {
-            OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, ns());
+            Client::WriteContext ctx(ns());
 
             const int N = 5000;
             for (int i = 0; i < N; ++i) {

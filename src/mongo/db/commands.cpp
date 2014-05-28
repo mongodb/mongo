@@ -255,15 +255,13 @@ namespace mongo {
         return Status(ErrorCodes::Error(code), errmsg);
     }
 
-    Status Command::checkAuthForCommand(OperationContext* txn,
-                                        ClientBasic* client,
+    Status Command::checkAuthForCommand(ClientBasic* client,
                                         const std::string& dbname,
                                         const BSONObj& cmdObj) {
         std::vector<Privilege> privileges;
         this->addRequiredPrivileges(dbname, cmdObj, &privileges);
-        if (client->getAuthorizationSession()->isAuthorizedForPrivileges(txn, privileges)) {
+        if (client->getAuthorizationSession()->isAuthorizedForPrivileges(privileges))
             return Status::OK();
-        }
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
@@ -276,8 +274,7 @@ namespace mongo {
         }
     }
 
-    static Status _checkAuthorizationImpl(OperationContext* txn,
-                                          Command* c,
+    static Status _checkAuthorizationImpl(Command* c,
                                           ClientBasic* client,
                                           const std::string& dbname,
                                           const BSONObj& cmdObj,
@@ -288,7 +285,7 @@ namespace mongo {
                           " may only be run against the admin database.");
         }
         if (client->getAuthorizationSession()->getAuthorizationManager().isAuthEnabled()) {
-            Status status = c->checkAuthForCommand(txn, client, dbname, cmdObj);
+            Status status = c->checkAuthForCommand(client, dbname, cmdObj);
             if (status == ErrorCodes::Unauthorized) {
                 mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
                 c->redactForLogging(&cmdToLog);
@@ -310,14 +307,13 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status Command::_checkAuthorization(OperationContext* txn,
-                                        Command* c,
+    Status Command::_checkAuthorization(Command* c,
                                         ClientBasic* client,
                                         const std::string& dbname,
                                         const BSONObj& cmdObj,
                                         bool fromRepl) {
         namespace mmb = mutablebson;
-        Status status = _checkAuthorizationImpl(txn, c, client, dbname, cmdObj, fromRepl);
+        Status status = _checkAuthorizationImpl(c, client, dbname, cmdObj, fromRepl);
         if (!status.isOK()) {
             log() << status << std::endl;
         }

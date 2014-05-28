@@ -82,10 +82,7 @@ namespace mongo {
             return 0;
         }
 
-        Database* getOrCreate(OperationContext* txn,
-                              const std::string& ns,
-                              const std::string& path,
-                              bool& justCreated);
+        Database* getOrCreate( const std::string& ns , const std::string& path , bool& justCreated );
 
         void erase( const std::string& ns , const std::string& path ) {
             SimpleMutex::scoped_lock lk(_m);

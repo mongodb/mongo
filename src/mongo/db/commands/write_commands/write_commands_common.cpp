@@ -44,8 +44,7 @@ namespace auth {
     using std::string;
     using std::vector;
 
-    Status checkAuthForWriteCommand( OperationContext* txn,
-                                     AuthorizationSession* authzSession,
+    Status checkAuthForWriteCommand( AuthorizationSession* authzSession,
                                      BatchedCommandRequest::BatchType cmdType,
                                      const NamespaceString& cmdNSS,
                                      const BSONObj& cmdObj ) {
@@ -90,9 +89,8 @@ namespace auth {
                                              ActionType::remove ) );
         }
 
-        if (authzSession->isAuthorizedForPrivileges(txn, privileges)) {
+        if ( authzSession->isAuthorizedForPrivileges( privileges ) )
             return Status::OK();
-        }
 
         return Status( ErrorCodes::Unauthorized, "unauthorized" );
     }

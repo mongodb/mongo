@@ -164,8 +164,7 @@ namespace PdfileTests {
         void run() {
             SmallFilesControl c;
 
-            OperationContextImpl txn;
-            Client::ReadContext ctx(&txn, "local");
+            Client::ReadContext ctx( "local" );
             Database* db = ctx.ctx().db();
             ExtentManager* em = db->getExtentManager();
 

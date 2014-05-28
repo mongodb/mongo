@@ -160,7 +160,7 @@ namespace mongo {
         if (mechanism.empty()) {
             mechanism = "MONGODB-CR";
         }
-        Status status = _authenticate(txn, mechanism, user, cmdObj);
+        Status status = _authenticate(mechanism, user, cmdObj);
         audit::logAuthentication(ClientBasic::getCurrent(),
                                  mechanism,
                                  user,
@@ -184,13 +184,12 @@ namespace mongo {
         return true;
     }
 
-    Status CmdAuthenticate::_authenticate(OperationContext* txn,
-                                          const std::string& mechanism,
+    Status CmdAuthenticate::_authenticate(const std::string& mechanism,
                                           const UserName& user,
                                           const BSONObj& cmdObj) {
 
         if (mechanism == "MONGODB-CR") {
-            return _authenticateCR(txn, user, cmdObj);
+            return _authenticateCR(user, cmdObj);
         }
 #ifdef MONGO_SSL
         if (mechanism == "MONGODB-X509") {
@@ -200,8 +199,7 @@ namespace mongo {
         return Status(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
     }
 
-    Status CmdAuthenticate::_authenticateCR(
-                OperationContext* txn, const UserName& user, const BSONObj& cmdObj) {
+    Status CmdAuthenticate::_authenticateCR(const UserName& user, const BSONObj& cmdObj) {
 
         if (user == internalSecurity.user->getName() &&
             serverGlobalParams.clusterAuthMode.load() == 
@@ -248,7 +246,7 @@ namespace mongo {
         }
 
         User* userObj;
-        Status status = getGlobalAuthorizationManager()->acquireUser(txn, user, &userObj);
+        Status status = getGlobalAuthorizationManager()->acquireUser(user, &userObj);
         if (!status.isOK()) {
             // Failure to find the privilege document indicates no-such-user, a fact that we do not
             // wish to reveal to the client.  So, we return AuthenticationFailed rather than passing
@@ -277,7 +275,7 @@ namespace mongo {
 
         AuthorizationSession* authorizationSession =
             ClientBasic::getCurrent()->getAuthorizationSession();
-        status = authorizationSession->addAndAuthorizeUser(txn, user);
+        status = authorizationSession->addAndAuthorizeUser(user);
         if (!status.isOK()) {
             return status;
         }

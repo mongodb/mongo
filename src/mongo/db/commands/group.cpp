@@ -56,13 +56,12 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "http://dochub.mongodb.org/core/aggregation";
         }
-        Status checkAuthForCommand(OperationContext* txn,
-                                   ClientBasic* client,
+        Status checkAuthForCommand(ClientBasic* client,
                                    const std::string& dbname,
                                    const BSONObj& cmdObj) {
             std::string ns = parseNs(dbname, cmdObj);
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnNamespace(
-                    txn, NamespaceString(ns), ActionType::find)) {
+                    NamespaceString(ns), ActionType::find)) {
                 return Status(ErrorCodes::Unauthorized, "unauthorized");
             }
             return Status::OK();
@@ -255,7 +254,7 @@ namespace mongo {
                 finalize = p["finalize"]._asCode();
 
             const string ns = parseNs(dbname, jsobj);
-            Client::ReadContext ctx(txn, ns);
+            Client::ReadContext ctx(ns);
 
             return group( ctx.ctx().db() , ns , q ,
                           key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,

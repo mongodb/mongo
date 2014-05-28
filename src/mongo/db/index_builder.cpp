@@ -55,8 +55,6 @@ namespace mongo {
     void IndexBuilder::run() {
         LOG(2) << "IndexBuilder building index " << _index;
 
-        OperationContextImpl txn;
-
         Client::initThread(name().c_str());
         Lock::ParallelBatchWriterMode::iAmABatchParticipant();
 
@@ -64,7 +62,8 @@ namespace mongo {
 
         cc().curop()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
-        Client::WriteContext ctx(&txn, ns.getSystemIndexesCollection());
+        Client::WriteContext ctx(ns.getSystemIndexesCollection());
+        OperationContextImpl txn;
 
         Database* db = dbHolder().get(ns.db().toString(), storageGlobalParams.dbpath);
 

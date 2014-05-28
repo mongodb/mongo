@@ -63,9 +63,7 @@ namespace mongo {
             for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
                  dbName < dbNames.end();
                  dbName++) {
-                OperationContextImpl txn;
-                Client::ReadContext ctx(&txn, *dbName);
-
+                Client::ReadContext ctx(*dbName);
                 Database* db = ctx.ctx().db();
                 db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
             }
@@ -90,11 +88,10 @@ namespace mongo {
 
             LOG(3) << "IndexRebuilder::checkNS: " << ns;
 
-            OperationContextImpl txn;  // XXX???
-
             // This write lock is held throughout the index building process
             // for this namespace.
-            Client::WriteContext ctx(&txn, ns);
+            Client::WriteContext ctx(ns);
+            OperationContextImpl txn;  // XXX???
 
             Collection* collection = ctx.ctx().db()->getCollection( ns );
             if ( collection == NULL )

@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-    class OperationContext;
-
     /**
      * Public interface for a class that encapsulates all the information related to system
      * state not stored in AuthorizationManager.  This is primarily to make AuthorizationManager
@@ -66,7 +64,7 @@ namespace mongo {
          * Retrieves the schema version of the persistent data describing users and roles.
          * Will leave *outVersion unmodified on non-OK status return values.
          */
-        virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion) = 0;
+        virtual Status getStoredAuthorizationVersion(int* outVersion) = 0;
 
         /**
          * Writes into "result" a document describing the named user and returns Status::OK().  The
@@ -78,8 +76,7 @@ namespace mongo {
          *
          * If the user does not exist, returns ErrorCodes::UserNotFound.
          */
-        virtual Status getUserDescription(
-                            OperationContext* txn, const UserName& userName, BSONObj* result) = 0;
+        virtual Status getUserDescription(const UserName& userName, BSONObj* result) = 0;
 
         /**
          * Writes into "result" a document describing the named role and returns Status::OK().  The
@@ -122,15 +119,13 @@ namespace mongo {
          * On success, returns Status::OK() and stores a shared-ownership copy of the document into
          * "result".
          */
-        Status getPrivilegeDocumentV1(OperationContext* txn,
-                                      const StringData& dbname,
-                                      const UserName& userName,
-                                      BSONObj* result);
+        Status getPrivilegeDocumentV1(
+                const StringData& dbname, const UserName& userName, BSONObj* result);
 
         /**
          * Returns true if there exists at least one privilege document in the system.
          */
-        bool hasAnyPrivilegeDocuments(OperationContext* txn);
+        bool hasAnyPrivilegeDocuments();
 
         /**
          * Creates the given user object in the given database.
@@ -169,8 +164,7 @@ namespace mongo {
          * Returns Status::OK() on success.  If no match is found, returns
          * ErrorCodes::NoMatchingDocument.  Other errors returned as appropriate.
          */
-        virtual Status findOne(OperationContext* txn,
-                               const NamespaceString& collectionName,
+        virtual Status findOne(const NamespaceString& collectionName,
                                const BSONObj& query,
                                BSONObj* result) = 0;
 

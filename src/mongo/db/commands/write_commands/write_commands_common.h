@@ -38,13 +38,9 @@
  */
 
 namespace mongo {
-
-    class OperationContext;
-
 namespace auth {
 
-    Status checkAuthForWriteCommand( OperationContext* txn,
-                                     AuthorizationSession* authzSession,
+    Status checkAuthForWriteCommand( AuthorizationSession* authzSession,
                                      BatchedCommandRequest::BatchType cmdType,
                                      const NamespaceString& cmdNSS,
                                      const BSONObj& cmdObj );

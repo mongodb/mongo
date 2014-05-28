@@ -94,7 +94,6 @@ namespace repl {
 
         bool isCommand(op["op"].valuestrsafe()[0] == 'c');
 
-        OperationContextImpl txn;
         boost::scoped_ptr<Lock::ScopedLock> lk;
 
         if(isCommand) {
@@ -103,10 +102,11 @@ namespace repl {
             lk.reset(new Lock::GlobalWrite());
         } else {
             // DB level lock for this operation
-            lk.reset(new Lock::DBWrite(txn.lockState(), ns)); 
+            lk.reset(new Lock::DBWrite(ns)); 
         }
 
         Client::Context ctx(ns, storageGlobalParams.dbpath);
+        OperationContextImpl txn;
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
@@ -126,9 +126,8 @@ namespace repl {
             try {
                 // one possible tweak here would be to stay in the read lock for this database 
                 // for multiple prefetches if they are for the same database.
-                OperationContextImpl txn;
-                Client::ReadContext ctx(&txn, ns);
-                prefetchPagesForReplicatedOp(&txn, ctx.ctx().db(), op);
+                Client::ReadContext ctx(ns);
+                prefetchPagesForReplicatedOp(ctx.ctx().db(), op);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;
@@ -476,9 +475,7 @@ namespace repl {
 
     void SyncTail::applyOpsToOplog(std::deque<BSONObj>* ops) {
         {
-            OperationContextImpl txn; // XXX?
-            Lock::DBWrite lk(txn.lockState(), "local");
-
+            Lock::DBWrite lk("local");
             while (!ops->empty()) {
                 const BSONObj& op = ops->front();
                 // this updates theReplSet->lastOpTimeWritten

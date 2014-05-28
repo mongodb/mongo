@@ -166,7 +166,7 @@ namespace DocumentSourceTests {
                 _registration.reset();
                 _runner.reset();
 
-                Client::WriteContext ctx(&_opCtx, ns);
+                Client::WriteContext ctx (ns);
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
                 Runner* runnerBare;

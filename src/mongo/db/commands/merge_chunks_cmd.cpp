@@ -52,12 +52,10 @@ namespace mongo {
               << " (opt) shardName : <shard name> }";
         }
 
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    txn,
                     ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                     ActionType::splitChunk)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");

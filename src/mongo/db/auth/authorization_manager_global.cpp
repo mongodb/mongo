@@ -33,7 +33,6 @@
 #include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 
@@ -45,7 +44,7 @@ namespace {
         MONGO_DISALLOW_COPYING(AuthzVersionParameter);
     public:
         AuthzVersionParameter(ServerParameterSet* sps, const std::string& name);
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
+        virtual void append(BSONObjBuilder& b, const std::string& name);
         virtual Status set(const BSONElement& newValueElement);
         virtual Status setFromString(const std::string& str);
     };
@@ -61,11 +60,9 @@ namespace {
     AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name) :
         ServerParameter(sps, name, false, false) {}
 
-    void AuthzVersionParameter::append(
-                    OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+    void AuthzVersionParameter::append(BSONObjBuilder& b, const std::string& name) {
         int authzVersion;
-        uassertStatusOK(
-                getGlobalAuthorizationManager()->getAuthorizationVersion(txn, &authzVersion));
+        uassertStatusOK(getGlobalAuthorizationManager()->getAuthorizationVersion(&authzVersion));
         b.append(name, authzVersion);
     }
 

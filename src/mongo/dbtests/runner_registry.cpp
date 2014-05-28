@@ -51,7 +51,7 @@ namespace RunnerRegistry {
     class RunnerRegistryBase {
     public:
         RunnerRegistryBase() {
-            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
+            _ctx.reset(new Client::WriteContext(ns()));
             _client.dropCollection(ns());
 
             for (int i = 0; i < N(); ++i) {
@@ -269,7 +269,7 @@ namespace RunnerRegistry {
             // requires a "global write lock."
             _ctx.reset();
             _client.dropDatabase("somesillydb");
-            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
+            _ctx.reset(new Client::WriteContext(ns()));
 
             // Unregister and restore state.
             deregisterRunner(run.get());
@@ -285,7 +285,7 @@ namespace RunnerRegistry {
             // Drop our DB.  Once again, must give up the lock.
             _ctx.reset();
             _client.dropDatabase("unittests");
-            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
+            _ctx.reset(new Client::WriteContext(ns()));
 
             // Unregister and restore state.
             deregisterRunner(run.get());

@@ -92,7 +92,7 @@ namespace mongo {
                 projection = cmdObj["project"].Obj();
             }
 
-            return _run( txn, dbname, cmdObj, options,
+            return _run( dbname, cmdObj, options,
                          ns, search, language, limit, filter, projection, errmsg, result );
         }
 

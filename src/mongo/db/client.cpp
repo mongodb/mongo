@@ -55,7 +55,6 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
@@ -192,13 +191,14 @@ namespace mongo {
     /** "read lock, and set my context, all in one operation" 
      *  This handles (if not recursively locked) opening an unopened database.
      */
-    Client::ReadContext::ReadContext(
-                OperationContext* txn, const string& ns, bool doVersion) {
+    Client::ReadContext::ReadContext(const string& ns,
+                                     const std::string& path,
+                                     bool doVersion) {
         {
-            _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-            Database *db = dbHolder().get(ns, storageGlobalParams.dbpath);
+            lk.reset( new Lock::DBRead(ns) );
+            Database *db = dbHolder().get(ns, path);
             if( db ) {
-                _c.reset(new Context(storageGlobalParams.dbpath, ns, db, doVersion));
+                c.reset( new Context(path, ns, db, doVersion) );
                 return;
             }
         }
@@ -209,18 +209,17 @@ namespace mongo {
             if( Lock::isW() ) { 
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                _c.reset(new Context(ns, storageGlobalParams.dbpath, doVersion));
+                c.reset(new Context(ns, path, doVersion));
             }
             else if( !Lock::nested() ) { 
-                _lk.reset(0);
+                lk.reset(0);
                 {
                     Lock::GlobalWrite w;
-                    Context c(ns, storageGlobalParams.dbpath, doVersion);
+                    Context c(ns, path, doVersion);
                 }
-
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
-                _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-                _c.reset(new Context(ns, storageGlobalParams.dbpath, doVersion));
+                lk.reset( new Lock::DBRead(ns) );
+                c.reset(new Context(ns, path, doVersion));
             }
             else { 
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
@@ -232,10 +231,9 @@ namespace mongo {
         //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
 
-    Client::WriteContext::WriteContext(
-                OperationContext* opCtx, const std::string& ns, bool doVersion)
-        : _lk(opCtx->lockState(), ns),
-          _c(ns, storageGlobalParams.dbpath, doVersion) {
+    Client::WriteContext::WriteContext(const string& ns, const std::string& path, bool doVersion)
+        : _lk( ns ) ,
+          _c(ns, path, doVersion) {
     }
 
 
@@ -281,8 +279,7 @@ namespace mongo {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
         
-        OperationContextImpl txn; // TODO get rid of this once reads require transactions
-        _db = dbHolderUnchecked().getOrCreate(&txn, _ns, _path, _justCreated);
+        _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
         verify(_db);
         if( _doVersion ) checkNotStale();
         massert( 16107 , str::stream() << "Don't have a lock on: " << _ns , Lock::atLeastReadLocked( _ns ) );

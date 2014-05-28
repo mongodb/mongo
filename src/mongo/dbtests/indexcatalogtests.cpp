@@ -31,25 +31,22 @@ namespace IndexCatalogTests {
     class IndexIteratorTests {
     public:
         IndexIteratorTests() {
+            Client::WriteContext ctx(_ns);
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
-
             _db = ctx.ctx().db();
             _coll = _db->createCollection(&txn, _ns);
             _catalog = _coll->getIndexCatalog();
         }
 
         ~IndexIteratorTests() {
+            Client::WriteContext ctx(_ns);
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
-
             _db->dropCollection(&txn, _ns);
         }
 
         void run() {
+            Client::WriteContext ctx(_ns);
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
-
             int numFinishedIndexesStart = _catalog->numIndexesReady();
 
             BSONObjBuilder b1;

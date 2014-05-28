@@ -40,8 +40,6 @@
 
 namespace mongo {
 
-    class OperationContext;
-
     namespace fts {
 
         class FTSCommand : public Command {
@@ -66,8 +64,7 @@ namespace mongo {
                      bool fromRepl);
 
         protected:
-            bool _run( OperationContext* txn,
-                       const std::string& dbName,
+            bool _run( const std::string& dbName,
                        BSONObj& cmdObj,
                        int cmdOptions,
                        const std::string& ns,

@@ -40,7 +40,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/max_time.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/structure/catalog/index_details.h"
 #include "mongo/db/namespace_string.h"
@@ -128,9 +127,7 @@ namespace mongo {
         NamespaceString ns(q.ns);
         ClientBasic* client = ClientBasic::getCurrent();
         AuthorizationSession* authSession = client->getAuthorizationSession();
-
-        OperationContextNoop txn;
-        Status status = authSession->checkAuthForQuery(&txn, ns, q.query);
+        Status status = authSession->checkAuthForQuery(ns, q.query);
         audit::logQueryAuthzCheck(client, ns, q.query, status.code());
         uassertStatusOK(status);
 
@@ -302,9 +299,8 @@ namespace mongo {
         ClientBasic* client = ClientBasic::getCurrent();
         AuthorizationSession* authSession = client->getAuthorizationSession();
         if ( strcmp( ns , "inprog" ) == 0 ) {
-            OperationContextNoop txn;
             const bool isAuthorized = authSession->isAuthorizedForActionsOnResource(
-                    &txn, ResourcePattern::forClusterResource(), ActionType::inprog);
+                    ResourcePattern::forClusterResource(), ActionType::inprog);
             audit::logInProgAuthzCheck(
                     client, q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
             uassert(ErrorCodes::Unauthorized, "not authorized to run inprog", isAuthorized);
@@ -346,9 +342,8 @@ namespace mongo {
             arr.done();
         }
         else if ( strcmp( ns , "killop" ) == 0 ) {
-            OperationContextNoop txn;
             const bool isAuthorized = authSession->isAuthorizedForActionsOnResource(
-                    &txn, ResourcePattern::forClusterResource(), ActionType::killop);
+                    ResourcePattern::forClusterResource(), ActionType::killop);
             audit::logKillOpAuthzCheck(
                     client,
                     q.query,
@@ -458,9 +453,7 @@ namespace mongo {
         ClientBasic* client = ClientBasic::getCurrent();
         NamespaceString nsString(ns);
         AuthorizationSession* authSession = client->getAuthorizationSession();
-
-        OperationContextNoop txn;
-        Status status = authSession->checkAuthForGetMore(&txn, nsString, id );
+        Status status = authSession->checkAuthForGetMore( nsString, id );
         audit::logGetMoreAuthzCheck( client, nsString, id, status.code() );
         uassertStatusOK(status);
 

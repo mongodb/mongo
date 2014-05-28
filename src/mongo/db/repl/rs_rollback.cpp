@@ -654,8 +654,7 @@ namespace repl {
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
         // inconsistent state
         {
-            OperationContextImpl txn;
-            Lock::DBRead lk(txn.lockState(), "local.replset.minvalid");
+            Lock::DBRead lk("local.replset.minvalid");
             BSONObj mv;
             if (Helpers::getSingleton("local.replset.minvalid", mv)) {
                 OpTime minvalid = mv["ts"]._opTime();

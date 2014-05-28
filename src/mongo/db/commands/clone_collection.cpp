@@ -71,8 +71,7 @@ namespace mongo {
             return parseNsFullyQualified(dbname, cmdObj);
         }
 
-        virtual Status checkAuthForCommand(OperationContext* txn,
-                                           ClientBasic* client,
+        virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) {
             std::string ns = parseNs(dbname, cmdObj);
@@ -82,7 +81,7 @@ namespace mongo {
             actions.addAction(ActionType::createIndex); // SERVER-11418
 
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                    txn, ResourcePattern::forExactNamespace(NamespaceString(ns)), actions)) {
+                    ResourcePattern::forExactNamespace(NamespaceString(ns)), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
             return Status::OK();

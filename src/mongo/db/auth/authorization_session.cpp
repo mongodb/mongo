@@ -67,15 +67,14 @@ namespace {
         return _externalState->getAuthorizationManager();
     }
 
-    void AuthorizationSession::startRequest(OperationContext* txn) {
-        _externalState->startRequest(txn);
-        _refreshUserInfoAsNeeded(txn);
+    void AuthorizationSession::startRequest() {
+        _externalState->startRequest();
+        _refreshUserInfoAsNeeded();
     }
 
-    Status AuthorizationSession::addAndAuthorizeUser(
-                        OperationContext* txn, const UserName& userName) {
+    Status AuthorizationSession::addAndAuthorizeUser(const UserName& userName) {
         User* user;
-        Status status = getAuthorizationManager().acquireUser(txn, userName, &user);
+        Status status = getAuthorizationManager().acquireUser(userName, &user);
         if (!status.isOK()) {
             return status;
         }
@@ -161,32 +160,29 @@ namespace {
         return defaultPrivileges;
     }
 
-    Status AuthorizationSession::checkAuthForQuery(OperationContext* txn,
-                                                   const NamespaceString& ns,
+    Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns,
                                                    const BSONObj& query) {
         if (MONGO_unlikely(ns.isCommand())) {
             return Status(ErrorCodes::InternalError, mongoutils::str::stream() <<
                           "Checking query auth on command namespace " << ns.ns());
         }
-        if (!isAuthorizedForActionsOnNamespace(txn, ns, ActionType::find)) {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized,
                           mongoutils::str::stream() << "not authorized for query on " << ns.ns());
         }
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForGetMore(OperationContext* txn,
-                                                     const NamespaceString& ns,
+    Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
                                                      long long cursorID) {
-        if (!isAuthorizedForActionsOnNamespace(txn, ns, ActionType::find)) {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized,
                           mongoutils::str::stream() << "not authorized for getmore on " << ns.ns());
         }
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForInsert(OperationContext* txn,
-                                                    const NamespaceString& ns,
+    Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
                                                     const BSONObj& document) {
         if (ns.coll() == StringData("system.indexes", StringData::LiteralTag())) {
             BSONElement nsElement = document["ns"];
@@ -195,13 +191,13 @@ namespace {
                               "system.indexes documents without a string-typed \"ns\" field.");
             }
             NamespaceString indexNS(nsElement.str());
-            if (!isAuthorizedForActionsOnNamespace(txn, indexNS, ActionType::createIndex)) {
+            if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::createIndex)) {
                 return Status(ErrorCodes::Unauthorized,
                               mongoutils::str::stream() << "not authorized to create index on " <<
                               indexNS.ns());
             }
         } else {
-            if (!isAuthorizedForActionsOnNamespace(txn, ns, ActionType::insert)) {
+            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
                 return Status(ErrorCodes::Unauthorized,
                               mongoutils::str::stream() << "not authorized for insert on " <<
                               ns.ns());
@@ -211,13 +207,12 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForUpdate(OperationContext* txn, 
-                                                    const NamespaceString& ns,
+    Status AuthorizationSession::checkAuthForUpdate(const NamespaceString& ns,
                                                     const BSONObj& query,
                                                     const BSONObj& update,
                                                     bool upsert) {
         if (!upsert) {
-            if (!isAuthorizedForActionsOnNamespace(txn, ns, ActionType::update)) {
+            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::update)) {
                 return Status(ErrorCodes::Unauthorized,
                               mongoutils::str::stream() << "not authorized for update on " <<
                               ns.ns());
@@ -227,7 +222,7 @@ namespace {
             ActionSet required;
             required.addAction(ActionType::update);
             required.addAction(ActionType::insert);
-            if (!isAuthorizedForActionsOnNamespace(txn, ns, required)) {
+            if (!isAuthorizedForActionsOnNamespace(ns, required)) {
                 return Status(ErrorCodes::Unauthorized,
                               mongoutils::str::stream() << "not authorized for upsert on " <<
                               ns.ns());
@@ -236,22 +231,19 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForDelete(OperationContext* txn, 
-                                                    const NamespaceString& ns,
+    Status AuthorizationSession::checkAuthForDelete(const NamespaceString& ns,
                                                     const BSONObj& query) {
-        if (!isAuthorizedForActionsOnNamespace(txn, ns, ActionType::remove)) {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
             return Status(ErrorCodes::Unauthorized,
                           mongoutils::str::stream() << "not authorized to remove from " << ns.ns());
         }
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthorizedToGrantPrivilege(
-                    OperationContext* txn, const Privilege& privilege) {
+    Status AuthorizationSession::checkAuthorizedToGrantPrivilege(const Privilege& privilege) {
         const ResourcePattern& resource = privilege.getResourcePattern();
         if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
             if (!isAuthorizedForActionsOnResource(
-                    txn,
                     ResourcePattern::forDatabaseName(resource.databaseToMatch()),
                     ActionType::grantRole)) {
                 return Status(ErrorCodes::Unauthorized,
@@ -259,9 +251,7 @@ namespace {
                                       << resource.databaseToMatch() << "database");
             }
         } else if (!isAuthorizedForActionsOnResource(
-                        txn,
-                        ResourcePattern::forDatabaseName("admin"),
-                        ActionType::grantRole)) {
+                ResourcePattern::forDatabaseName("admin"), ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           "To grant privileges affecting multiple databases or the cluster,"
                           " must be authorized to grant roles from the admin database");
@@ -270,12 +260,10 @@ namespace {
     }
 
 
-    Status AuthorizationSession::checkAuthorizedToRevokePrivilege(
-                OperationContext* txn, const Privilege& privilege) {
+    Status AuthorizationSession::checkAuthorizedToRevokePrivilege(const Privilege& privilege) {
         const ResourcePattern& resource = privilege.getResourcePattern();
         if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
             if (!isAuthorizedForActionsOnResource(
-                    txn,
                     ResourcePattern::forDatabaseName(resource.databaseToMatch()),
                     ActionType::revokeRole)) {
                 return Status(ErrorCodes::Unauthorized,
@@ -283,9 +271,7 @@ namespace {
                                       << resource.databaseToMatch() << "database");
             }
         } else if (!isAuthorizedForActionsOnResource(
-                        txn,
-                        ResourcePattern::forDatabaseName("admin"),
-                        ActionType::revokeRole)) {
+                ResourcePattern::forDatabaseName("admin"), ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           "To revoke privileges affecting multiple databases or the cluster,"
                           " must be authorized to revoke roles from the admin database");
@@ -293,62 +279,55 @@ namespace {
         return Status::OK();
     }
 
-    bool AuthorizationSession::isAuthorizedToGrantRole(
-                    OperationContext* txn, const RoleName& role) {
+    bool AuthorizationSession::isAuthorizedToGrantRole(const RoleName& role) {
         return isAuthorizedForActionsOnResource(
-                    txn,
-                    ResourcePattern::forDatabaseName(role.getDB()),
-                    ActionType::grantRole);
+                ResourcePattern::forDatabaseName(role.getDB()),
+                ActionType::grantRole);
     }
 
-    bool AuthorizationSession::isAuthorizedToRevokeRole(
-                    OperationContext* txn, const RoleName& role) {
+    bool AuthorizationSession::isAuthorizedToRevokeRole(const RoleName& role) {
         return isAuthorizedForActionsOnResource(
-                    txn,
-                    ResourcePattern::forDatabaseName(role.getDB()),
-                    ActionType::revokeRole);
+                ResourcePattern::forDatabaseName(role.getDB()),
+                ActionType::revokeRole);
     }
 
-    bool AuthorizationSession::isAuthorizedForPrivilege(
-                    OperationContext* txn, const Privilege& privilege) {
+    bool AuthorizationSession::isAuthorizedForPrivilege(const Privilege& privilege) {
         if (_externalState->shouldIgnoreAuthChecks())
             return true;
 
-        return _isAuthorizedForPrivilege(txn, privilege);
+        return _isAuthorizedForPrivilege(privilege);
     }
 
-    bool AuthorizationSession::isAuthorizedForPrivileges(
-                    OperationContext* txn, const vector<Privilege>& privileges) {
+    bool AuthorizationSession::isAuthorizedForPrivileges(const vector<Privilege>& privileges) {
         if (_externalState->shouldIgnoreAuthChecks())
             return true;
 
         for (size_t i = 0; i < privileges.size(); ++i) {
-            if (!_isAuthorizedForPrivilege(txn, privileges[i]))
+            if (!_isAuthorizedForPrivilege(privileges[i]))
                 return false;
         }
 
         return true;
     }
 
-    bool AuthorizationSession::isAuthorizedForActionsOnResource(
-            OperationContext* txn, const ResourcePattern& resource, ActionType action) {
-        return isAuthorizedForPrivilege(txn, Privilege(resource, action));
+    bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+                                                                ActionType action) {
+        return isAuthorizedForPrivilege(Privilege(resource, action));
     }
 
-    bool AuthorizationSession::isAuthorizedForActionsOnResource(
-            OperationContext* txn, const ResourcePattern& resource, const ActionSet& actions) {
-        return isAuthorizedForPrivilege(txn, Privilege(resource, actions));
+    bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+                                                                const ActionSet& actions) {
+        return isAuthorizedForPrivilege(Privilege(resource, actions));
     }
 
-    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(
-            OperationContext* txn, const NamespaceString& ns, ActionType action) {
-        return isAuthorizedForPrivilege(txn, Privilege(ResourcePattern::forExactNamespace(ns), action));
+    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                                                 ActionType action) {
+        return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), action));
     }
 
-    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(
-            OperationContext* txn, const NamespaceString& ns, const ActionSet& actions) {
-        return isAuthorizedForPrivilege(
-                    txn, Privilege(ResourcePattern::forExactNamespace(ns), actions));
+    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                                                const ActionSet& actions) {
+        return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), actions));
     }
 
     static const int resourceSearchListCapacity = 5;
@@ -443,7 +422,7 @@ namespace {
         return false;
     }
 
-    void AuthorizationSession::_refreshUserInfoAsNeeded(OperationContext* txn) {
+    void AuthorizationSession::_refreshUserInfoAsNeeded() {
         AuthorizationManager& authMan = getAuthorizationManager();
         UserSet::iterator it = _authenticatedUsers.begin();
         while (it != _authenticatedUsers.end()) {
@@ -455,7 +434,7 @@ namespace {
                 UserName name = user->getName();
                 User* updatedUser;
 
-                Status status = authMan.acquireUser(txn, name, &updatedUser);
+                Status status = authMan.acquireUser(name, &updatedUser);
                 switch (status.code()) {
                 case ErrorCodes::OK: {
                     // Success! Replace the old User object with the updated one.
@@ -484,8 +463,7 @@ namespace {
         }
     }
 
-    bool AuthorizationSession::_isAuthorizedForPrivilege(
-                    OperationContext* txn, const Privilege& privilege) {
+    bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
         const ResourcePattern& target(privilege.getResourcePattern());
 
         ResourcePattern resourceSearchList[resourceSearchListCapacity];
@@ -520,7 +498,6 @@ namespace {
                 UserName name = user->getName();
                 User* updatedUser;
                 Status status = getAuthorizationManager().acquireV1UserProbedForDb(
-                        txn,
                         name,
                         target.databaseToMatch(),
                         &updatedUser);

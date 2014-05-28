@@ -147,10 +147,9 @@ namespace ReplSetTests {
         DBDirectClient *client() const { return &client_; }
 
         static void insert( const BSONObj &o, bool god = false ) {
-            OperationContextImpl txn;
-            Lock::DBWrite lk(txn.lockState(), ns());
+            Lock::DBWrite lk(ns());
             Client::Context ctx(ns());
-            
+            OperationContextImpl txn;
             Database* db = ctx.db();
             Collection* coll = db->getCollection(ns());
             if (!coll) {
@@ -175,8 +174,8 @@ namespace ReplSetTests {
         }
 
         void drop() {
+            Client::WriteContext c(ns());
             OperationContextImpl txn;
-            Client::WriteContext c(&txn, ns());
 
             Database* db = c.ctx().db();
 
@@ -307,8 +306,6 @@ namespace ReplSetTests {
 
     class CappedInitialSync : public Base {
         string _cappedNs;
-
-        OperationContextImpl _txn;
         Lock::DBWrite _lk;
 
         string spec() const {
@@ -345,8 +342,7 @@ namespace ReplSetTests {
             return o;
         }
     public:
-        CappedInitialSync() : 
-                _cappedNs("unittests.foo.bar"), _lk(_txn.lockState(), _cappedNs) {
+        CappedInitialSync() : _cappedNs("unittests.foo.bar"), _lk(_cappedNs) {
             dropCapped();
             create();
         }
@@ -367,8 +363,7 @@ namespace ReplSetTests {
         }
 
         void run() {
-            OperationContextImpl txn;
-            Lock::DBWrite lk(txn.lockState(), _cappedNs);
+            Lock::DBWrite lk(_cappedNs);
 
             BSONObj op = updateFail();
 

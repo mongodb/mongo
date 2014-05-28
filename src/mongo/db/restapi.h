@@ -43,7 +43,7 @@ namespace mongo {
     public:
         virtual ~RestAdminAccess() { }
 
-        virtual bool haveAdminUsers(OperationContext* txn) const;
+        virtual bool haveAdminUsers() const;
     };
 
 } // namespace mongo

@@ -55,12 +55,8 @@ namespace mongo {
                                                     "repl.preload.docs",
                                                     &prefetchDocStats );
 
-    void prefetchIndexPages(Collection* collection, const BSONObj& obj);
-    void prefetchRecordPages(OperationContext* txn, const char* ns, const BSONObj& obj);
-
-
     // prefetch for an oplog operation
-    void prefetchPagesForReplicatedOp(OperationContext* txn, Database* db, const BSONObj& op) {
+    void prefetchPagesForReplicatedOp(Database* db, const BSONObj& op) {
         const char *opField;
         const char *opType = op.getStringField("op");
         switch (*opType) {
@@ -114,11 +110,10 @@ namespace mongo {
             // do not prefetch the data for capped collections because
             // they typically do not have an _id index for findById() to use.
             !collection->isCapped()) {
-            prefetchRecordPages(txn, ns, obj);
+            prefetchRecordPages(ns, obj);
         }
     }
 
-    // page in pages needed for all index lookups on a given object
     void prefetchIndexPages(Collection* collection, const BSONObj& obj) {
         DiskLoc unusedDl; // unused
         BSONObjSet unusedKeys;
@@ -175,8 +170,8 @@ namespace mongo {
         }
     }
 
-    // page in the data pages for a record associated with an object
-    void prefetchRecordPages(OperationContext* txn, const char* ns, const BSONObj& obj) {
+
+    void prefetchRecordPages(const char* ns, const BSONObj& obj) {
         BSONElement _id;
         if( obj.getObjectID(_id) ) {
             TimerHolder timer(&prefetchDocStats);
@@ -186,7 +181,7 @@ namespace mongo {
             try {
                 // we can probably use Client::Context here instead of ReadContext as we
                 // have locked higher up the call stack already
-                Client::ReadContext ctx(txn, ns);
+                Client::ReadContext ctx( ns );
                 if( Helpers::findById(ctx.ctx().db(), ns, builder.done(), result) ) {
                     // do we want to use Record::touch() here?  it's pretty similar.
                     volatile char _dummy_char = '\0';

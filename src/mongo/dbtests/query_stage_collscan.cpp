@@ -315,7 +315,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollectionScanBase {
     public:
         QueryStageCollectionScanBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 BSONObjBuilder bob;
@@ -325,7 +325,7 @@ namespace QueryStageCollectionScan {
         }
 
         virtual ~QueryStageCollectionScanBase() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             _client.dropCollection(ns());
         }
 
@@ -334,7 +334,7 @@ namespace QueryStageCollectionScan {
         }
 
         int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-            Client::ReadContext ctx(&_txn, ns());
+            Client::ReadContext ctx(ns());
 
             // Configure the scan.
             CollectionScanParams params;
@@ -384,13 +384,11 @@ namespace QueryStageCollectionScan {
 
         static const char* ns() { return "unittests.QueryStageCollectionScan"; }
 
-    protected:
-        OperationContextImpl _txn;
-
     private:
-        DBDirectClient _client;
+        static DBDirectClient _client;
     };
 
+    DBDirectClient QueryStageCollectionScanBase::_client;
 
     //
     // Go forwards, get everything.
@@ -444,7 +442,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(&_txn, ns());
+            Client::ReadContext ctx(ns());
 
             // Configure the scan.
             CollectionScanParams params;
@@ -475,7 +473,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(&_txn, ns());
+            Client::ReadContext ctx(ns());
 
             CollectionScanParams params;
             params.collection = ctx.ctx().db()->getCollection( ns() );
@@ -504,7 +502,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
 
             Collection* coll = ctx.ctx().db()->getCollection( ns() );
 
@@ -566,7 +564,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
+            Client::WriteContext ctx(ns());
             Collection* coll = ctx.ctx().db()->getCollection(ns());
 
             // Get the DiskLocs that would be returned by an in-order scan.

@@ -598,29 +598,22 @@ namespace mongo {
         class CreateCmd : public PublicGridCommand {
         public:
             CreateCmd() : PublicGridCommand( "create" ) {}
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 AuthorizationSession* authzSession = client->getAuthorizationSession();
                 if (cmdObj["capped"].trueValue()) {
                     if (!authzSession->isAuthorizedForActionsOnResource(
-                            txn, 
-                            parseResourcePattern(dbname, cmdObj), 
-                            ActionType::convertToCapped)) {
+                            parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
                         return Status(ErrorCodes::Unauthorized, "unauthorized");
                     }
                 }
 
                 // ActionType::createCollection or ActionType::insert are both acceptable
                 if (authzSession->isAuthorizedForActionsOnResource(
-                        txn,
-                        parseResourcePattern(dbname, cmdObj),
-                        ActionType::createCollection) ||
+                        parseResourcePattern(dbname, cmdObj), ActionType::createCollection) ||
                     authzSession->isAuthorizedForActionsOnResource(
-                        txn,
-                        parseResourcePattern(dbname, cmdObj),
-                        ActionType::insert)) {
+                        parseResourcePattern(dbname, cmdObj), ActionType::insert)) {
                     return Status::OK();
                 }
 
@@ -756,12 +749,12 @@ namespace mongo {
         class RenameCollectionCmd : public PublicGridCommand {
         public:
             RenameCollectionCmd() : PublicGridCommand( "renameCollection" ) {}
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
-                return rename_collection::checkAuthForRenameCollectionCommand(
-                                                txn, client, dbname, cmdObj);
+                return rename_collection::checkAuthForRenameCollectionCommand(client,
+                                                                              dbname,
+                                                                              cmdObj);
             }
             virtual bool adminOnly() const {
                 return true;
@@ -794,11 +787,10 @@ namespace mongo {
             virtual bool adminOnly() const {
                 return true;
             }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
-                return copydb::checkAuthForCopydbCommand(txn, client, dbname, cmdObj);
+                return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
             }
             bool run(OperationContext* txn, const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string todb = cmdObj.getStringField("todb");
@@ -1275,12 +1267,10 @@ namespace mongo {
         public:
             SplitVectorCmd() : NotAllowedOnShardedCollectionCmd("splitVector") {}
             virtual bool passOptions() const { return true; }
-            virtual Status checkAuthForCommand(OperationContext* txn,
-                                               ClientBasic* client,
+            virtual Status checkAuthForCommand(ClientBasic* client,
                                                const std::string& dbname,
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        txn,
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
                         ActionType::splitVector)) {

@@ -317,7 +317,7 @@ namespace {
                 // sharding version that we synchronize on here. This is also why we always need to
                 // create a ClientCursor even when we aren't outputting to a cursor. See the comment
                 // on ShardFilterStage for more details.
-                Client::ReadContext ctx(txn, ns);
+                Client::ReadContext ctx(ns);
 
                 Collection* collection = ctx.ctx().db()->getCollection(ns);
 

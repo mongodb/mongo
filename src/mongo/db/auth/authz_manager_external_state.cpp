@@ -40,8 +40,7 @@ namespace mongo {
     AuthzManagerExternalState::AuthzManagerExternalState() {}
     AuthzManagerExternalState::~AuthzManagerExternalState() {}
 
-    Status AuthzManagerExternalState::getPrivilegeDocumentV1(OperationContext* txn,
-                                                             const StringData& dbname,
+    Status AuthzManagerExternalState::getPrivilegeDocumentV1(const StringData& dbname,
                                                              const UserName& userName,
                                                              BSONObj* result) {
         if (userName == internalSecurity.user->getName()) {
@@ -70,7 +69,7 @@ namespace mongo {
 
         // Query for the privilege document
         BSONObj userBSONObj;
-        Status found = findOne(txn, usersNamespace, queryBuilder.done(), &userBSONObj);
+        Status found = findOne(usersNamespace, queryBuilder.done(), &userBSONObj);
         if (!found.isOK()) {
             if (found.code() == ErrorCodes::NoMatchingDocument) {
                 // Return more detailed status that includes user name.
@@ -98,10 +97,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthzManagerExternalState::hasAnyPrivilegeDocuments(OperationContext* txn) {
+    bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() {
         BSONObj userBSONObj;
         Status status = findOne(
-                txn,
                 AuthorizationManager::usersCollectionNamespace,
                 BSONObj(),
                 &userBSONObj);

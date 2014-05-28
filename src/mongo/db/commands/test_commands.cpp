@@ -62,7 +62,7 @@ namespace mongo {
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
 
-            Lock::DBWrite lk(txn->lockState(), ns);
+            Lock::DBWrite lk(ns);
             Client::Context ctx( ns );
             Database* db = ctx.db();
             Collection* collection = db->getCollection( ns );
@@ -140,7 +140,7 @@ namespace mongo {
             int n = cmdObj.getIntField( "n" );
             bool inc = cmdObj.getBoolField( "inc" ); // inclusive range?
 
-            Client::WriteContext ctx(txn,  nss.ns() );
+            Client::WriteContext ctx( nss.ns() );
             Collection* collection = ctx.ctx().db()->getCollection( nss.ns() );
             massert( 13417, "captrunc collection not found or empty", collection);
 
@@ -185,7 +185,7 @@ namespace mongo {
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
             NamespaceString nss( dbname, coll );
 
-            Client::WriteContext ctx(txn,  nss.ns() );
+            Client::WriteContext ctx( nss.ns() );
             Database* db = ctx.ctx().db();
             Collection* collection = db->getCollection( nss.ns() );
             massert( 13429, "emptycapped no such collection", collection );

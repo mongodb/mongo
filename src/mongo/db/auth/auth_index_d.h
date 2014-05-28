@@ -50,7 +50,7 @@ namespace authindex {
      * It is appropriate to call this function on new or existing databases, though it is
      * primarily intended for use on existing databases.
      */
-    void configureSystemIndexes(OperationContext* txn, const StringData& dbname);
+    void configureSystemIndexes(const StringData& dbname);
 
 }  // namespace authindex
 }  // namespace mongo

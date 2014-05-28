@@ -93,7 +93,7 @@ namespace mongo {
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBWrite dbXLock(dbname);
             bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
             if (ok && !fromRepl)
                 repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
@@ -220,7 +220,7 @@ namespace mongo {
 
             MONGO_TLOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBWrite dbXLock(dbname);
             Client::Context ctx(toDeleteNs);
 
             Collection* collection = ctx.db()->getCollection( toDeleteNs );

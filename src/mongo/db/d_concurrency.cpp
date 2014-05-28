@@ -583,12 +583,12 @@ namespace mongo {
             lockNestable(nested);
     }
 
-    Lock::DBWrite::DBWrite(LockState* lockState, const StringData& ns)
+    Lock::DBWrite::DBWrite( const StringData& ns )
         : ScopedLock( 'w' ), _what(ns.toString()), _nested(false) {
         lockDB( _what );
     }
 
-    Lock::DBRead::DBRead(LockState* lockState, const StringData& ns)
+    Lock::DBRead::DBRead( const StringData& ns )
         : ScopedLock( 'r' ), _what(ns.toString()), _nested(false) {
         lockDB( _what );
     }

@@ -101,9 +101,8 @@ namespace mongo {
                 
                 std::vector<Privilege> requiredPrivileges;
                 section->addRequiredPrivileges(&requiredPrivileges);
-                if (!authSession->isAuthorizedForPrivileges(txn, requiredPrivileges)) {
+                if (!authSession->isAuthorizedForPrivileges(requiredPrivileges))
                     continue;
-                }
 
                 bool include = section->includeByDefault();
                 
