@@ -258,6 +258,7 @@ namespace mongo {
                         errmsg = s.toString();
                         break;
                     }
+                    getDur().commitIfNeeded();
                 }
             }
 
