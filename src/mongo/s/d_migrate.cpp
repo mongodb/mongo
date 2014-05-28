@@ -96,9 +96,9 @@ namespace mongo {
 
     class MoveTimingHelper {
     public:
-        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max , int total , string& cmdErrmsg )
+        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max ,
+                          int total , string* cmdErrmsg )
             : _where( where ) , _ns( ns ) , _next( 0 ) , _total( total ) , _cmdErrmsg( cmdErrmsg ) {
-            _nextNote = 0;
             _b.append( "min" , min );
             _b.append( "max" , max );
         }
@@ -108,13 +108,14 @@ namespace mongo {
             // sigh
             try {
                 if ( _next != _total ) {
-                    note( "aborted" );
+                    _b.append( "note" , "aborted" );
                 }
-                if ( _cmdErrmsg.size() ) {
-                    note( _cmdErrmsg );
-                    warning() << "got error doing chunk migrate: " << _cmdErrmsg << endl;
+                else {
+                    _b.append( "note" , "success" );
                 }
-                    
+                if ( !_cmdErrmsg->empty() ) {
+                    _b.append( "errmsg" , *_cmdErrmsg );
+                }
                 configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
             }
             catch ( const std::exception& e ) {
@@ -148,19 +149,6 @@ namespace mongo {
 #endif
         }
 
-
-        void note( const string& s ) {
-            string field = "note";
-            if ( _nextNote > 0 ) {
-                StringBuilder buf;
-                buf << "note" << _nextNote;
-                field = buf.str();
-            }
-            _nextNote++;
-
-            _b.append( field , s );
-        }
-
     private:
         Timer _t;
 
@@ -169,9 +157,8 @@ namespace mongo {
 
         int _next;
         int _total; // expected # of steps
-        int _nextNote;
 
-        string _cmdErrmsg;
+        const string* _cmdErrmsg;
 
         BSONObjBuilder _b;
 
@@ -888,7 +875,7 @@ namespace mongo {
                 ShardingState::initialize(configdb);
             }
 
-            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , errmsg );
+            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , &errmsg );
 
             // Make sure we're as up-to-date as possible with shard information
             // This catches the case where we had to previously changed a shard's host by
@@ -911,6 +898,7 @@ namespace mongo {
             
             if ( migrateFromStatus.isActive() ) {
                 errmsg = "migration already in progress";
+                warning() << errmsg << endl;
                 return false;
             }
 
@@ -922,11 +910,13 @@ namespace mongo {
             }
             catch( LockException& e ){
                 errmsg = str::stream() << "error locking distributed lock for migration " << "migrate-" << min.toString() << causedBy( e );
+                warning() << errmsg << endl;
                 return false;
             }
 
             if ( ! dlk.got() ) {
                 errmsg = str::stream() << "the collection metadata could not be locked with lock " << "migrate-" << min.toString();
+                warning() << errmsg << endl;
                 result.append( "who" , dlk.other() );
                 return false;
             }
@@ -1039,18 +1029,21 @@ namespace mongo {
             BSONObj shardKeyPattern = origCollMetadata->getKeyPattern();
             if ( shardKeyPattern.isEmpty() ){
                 errmsg = "no shard key found";
+                warning() << errmsg << endl;
                 return false;
             }
 
             MigrateStatusHolder statusHolder( ns , min , max , shardKeyPattern );
             if (statusHolder.isAnotherMigrationActive()) {
                 errmsg = "moveChunk is already in progress from this shard";
+                warning() << errmsg << endl;
                 return false;
             }
 
             {
                 // this gets a read lock, so we know we have a checkpoint for mods
                 if (!migrateFromStatus.storeCurrentLocs(txn, maxChunkSize, errmsg, result)) {
+                    warning() << errmsg << endl;
                     return false;
                 }
 
@@ -1620,7 +1613,7 @@ namespace mongo {
                   << " at epoch " << epoch.toString() << endl;
 
             string errmsg;
-            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , errmsg );
+            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , &errmsg );
 
             ScopedDbConnection conn(from);
             conn->getLastError(); // just test connection
@@ -1821,7 +1814,6 @@ namespace mongo {
                     int i;
                     for ( i=0;i<maxIterations; i++) {
                         if ( state == ABORT ) {
-                            timing.note( "aborted" );
                             return;
                         }
                         
@@ -1887,7 +1879,6 @@ namespace mongo {
                         continue;
 
                     if ( state == ABORT ) {
-                        timing.note( "aborted" );
                         return;
                     }
                     
