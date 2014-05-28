@@ -88,7 +88,7 @@ namespace mongo {
                     return false;
                 }
             }
-            else if ( update.isEmpty() ) {
+            else if ( !cmdObj.hasField("update") ) {
                 errmsg = "need remove or update";
                 return false;
             }
