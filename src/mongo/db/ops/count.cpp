@@ -34,7 +34,9 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/type_explain.h"
 
 namespace mongo {
 
@@ -93,6 +95,18 @@ namespace mongo {
 
         uassertStatusOK(getRunnerCount(collection, query, hintObj, &rawRunner));
         auto_ptr<Runner> runner(rawRunner);
+
+        // Store the plan summary string in CurOp.
+        Client& client = cc();
+        CurOp* currentOp = client.curop();
+        if (NULL != currentOp) {
+            PlanInfo* rawInfo;
+            Status s = runner->getInfo(NULL, &rawInfo);
+            if (s.isOK()) {
+                scoped_ptr<PlanInfo> planInfo(rawInfo);
+                currentOp->debug().planSummary = planInfo->planSummary.c_str();
+            }
+        }
 
         try {
             const ScopedRunnerRegistration safety(runner.get());
