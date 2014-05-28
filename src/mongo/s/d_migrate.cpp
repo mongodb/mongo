@@ -459,10 +459,11 @@ namespace mongo {
             runner.reset();
 
             if ( isLargeChunk ) {
-                warning() << "can't move chunk of size (approximately) " << recCount * avgRecSize
-                          << " because maximum size allowed to move is " << maxChunkSize
-                          << " ns: " << _ns << " " << _min << " -> " << _max
-                          << migrateLog;
+                warning() << "cannot move chunk: the maximum number of documents for a chunk is "
+                          << maxRecsWhenFull << " , the maximum chunk size is " << maxChunkSize
+                          << " , average document size is " << avgRecSize << ". Found "
+                          << recCount << " documents in chunk " << " ns: " << _ns << " " << _min
+                          << " -> " << _max << migrateLog;
                 result.appendBool( "chunkTooBig" , true );
                 result.appendNumber( "estimatedChunkSize" , (long long)(recCount * avgRecSize) );
                 errmsg = "chunk too big to move";
