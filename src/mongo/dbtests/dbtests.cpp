@@ -36,6 +36,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/exception_filter_win32.h"
@@ -53,6 +55,7 @@ int dbtestsMain( int argc, char** argv, char** envp ) {
     static StaticObserver StaticObserver;
     setWindowsUnhandledExceptionFilter();
     setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
+    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock());
     Command::testCommandsEnabled = 1;
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     StartupTest::runTests();

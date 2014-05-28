@@ -33,6 +33,7 @@
 
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/stdx/functional.h"
@@ -102,11 +103,11 @@ namespace repl {
             replSet = true;
             ReplSetCmdline *replSetCmdline = new ReplSetCmdline(replSettings.replSet);
             boost::thread t( stdx::bind( &startReplSets, replSetCmdline) );
-
-            return;
+        } else {
+            startMasterSlave();
         }
 
-        startMasterSlave();
+        getGlobalReplicationCoordinator()->startReplication();
     }
 
 } // namespace repl

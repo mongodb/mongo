@@ -570,6 +570,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/repl/rs.cpp",
                     "db/repl/consensus.cpp",
                     "db/repl/rs_initiate.cpp",
+                    "db/repl/repl_coordinator_legacy.cpp",
                     "db/repl/repl_set_health_poll_task.cpp",
                     "db/repl/repl_set_impl.cpp",
                     "db/repl/replset_commands.cpp",
@@ -913,6 +914,7 @@ env.Library("serveronly", serverOnlyFiles,
                      "db/exec/working_set",
                      "db/exec/exec",
                      "db/query/query",
+                     "db/repl/repl_coordinator_global",
                      'db/storage/extent',
                      'db/structure/record_store',
                      'db/structure/record_store_v1',
@@ -993,7 +995,9 @@ env.Library("alltools",
                      "signal_handlers",
                      "$BUILD_DIR/mongo/util/options_parser/options_parser",
                      "$BUILD_DIR/mongo/db/auth/authmocks",
-                     "$BUILD_DIR/mongo/db/auth/authmongod"])
+                     "$BUILD_DIR/mongo/db/auth/authmongod",
+                     "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
+                     "$BUILD_DIR/mongo/db/repl/replmocks"])
 
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
@@ -1085,7 +1089,9 @@ test = testEnv.Install(
                        "mocklib",
                        "db/exec/mock_stage",
                        "$BUILD_DIR/mongo/db/auth/authmocks",
-                       "$BUILD_DIR/mongo/db/query/query"]))
+                       "$BUILD_DIR/mongo/db/query/query",
+                       "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
+                       "$BUILD_DIR/mongo/db/repl/replmocks"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "dbtest", "#/${PROGPREFIX}dbtest${PROGSUFFIX}" )

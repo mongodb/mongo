@@ -43,6 +43,8 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/json.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_mock.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/platform/posix_fadvise.h"
@@ -69,9 +71,10 @@ namespace mongo {
             delete _conn;
     }
 
-    MONGO_INITIALIZER(ToolAuthExternalState)(InitializerContext*) {
+    MONGO_INITIALIZER(ToolMocks)(InitializerContext*) {
         setGlobalAuthorizationManager(new AuthorizationManager(
                 new AuthzManagerExternalStateMock()));
+        repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock());
         return Status::OK();
     }
 

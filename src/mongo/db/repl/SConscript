@@ -17,3 +17,14 @@ env.Library('replication_executor',
 env.CppUnitTest('replication_executor_test',
                 'replication_executor_test.cpp',
                 LIBDEPS=['replication_executor'])
+
+env.Library('repl_coordinator_interface',
+            'repl_coordinator.cpp')
+
+env.Library('repl_coordinator_global',
+            'repl_coordinator_global.cpp',
+            LIBDEPS=['repl_coordinator_interface'])
+
+env.Library('replmocks',
+            'repl_coordinator_mock.cpp',
+            LIBDEPS=['repl_coordinator_interface'])

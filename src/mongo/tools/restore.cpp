@@ -59,7 +59,7 @@ namespace {
     const char* OPLOG_SENTINEL = "$oplog";  // compare by ptr not strcmp
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RestoreAuthExternalState, ("ToolAuthExternalState"))(
+MONGO_INITIALIZER_WITH_PREREQUISITES(RestoreAuthExternalState, ("ToolMocks"))(
         InitializerContext* context) {
     // Give restore the mongod implementation of AuthorizationManager so that it can run
     // the _mergeAuthzCollections command directly against the data files

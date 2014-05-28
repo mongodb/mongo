@@ -69,6 +69,8 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_legacy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/rs.h"
@@ -946,6 +948,13 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
 
 MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
     setGlobalEnvironment(new GlobalEnvironmentMongoD());
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_GENERAL(CreateReplicationManager,
+                          MONGO_NO_PREREQUISITES,
+                          MONGO_NO_DEPENDENTS)(InitializerContext* context) {
+    repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator());
     return Status::OK();
 }
 
