@@ -485,8 +485,8 @@ namespace mongo {
                 
                 // Warn for keys that are more numerous than maxChunkSize allows.
                 for ( set<BSONObj>::const_iterator it = tooFrequentKeys.begin(); it != tooFrequentKeys.end(); ++it ) {
-                    warning() << "chunk is larger than " << maxChunkSize
-                              << " bytes because of key " << prettyKey(idx->keyPattern(), *it ) << endl;
+                    warning() << "possible low cardinality key detected in " << ns
+                              << " - key is " << prettyKey(idx->keyPattern(), *it ) << endl;
                 }
                 
                 // Remove the sentinel at the beginning before returning
