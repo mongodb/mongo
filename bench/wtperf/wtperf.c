@@ -2090,7 +2090,7 @@ start_threads(CONFIG *cfg,
 		 */
 		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
-		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
+		if ((thread->value_buf = calloc(cfg->value_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
 		/*
 		 * Initialize and then toss in a bit of random values if needed.
