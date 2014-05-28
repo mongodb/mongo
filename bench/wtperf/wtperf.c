@@ -126,12 +126,18 @@ randomize_value(CONFIG *cfg, char *value_buf)
 	uint32_t i;
 
 	/*
-	 * Each time we're called overwrite value_buf[0] and one
-	 * other randomly chosen uint32_t.
+	 * Each time we're called overwrite value_buf[0] and one other
+	 * randomly chosen byte (other than the trailing NUL).
+	 * Make sure we don't write a NUL: keep the value the same length.
+	 * Keep the bytes printable: that makes debugging easier.
 	 */
-	i = __wt_random() % (cfg->value_sz / sizeof(uint32_t));
-	value_buf[0] = __wt_random();
-	value_buf[i] = __wt_random();
+	i = __wt_random() % (cfg->value_sz - 1);
+	while (value_buf[i] == '\0' && i > 0)
+		--i;
+	if (i > 0) {
+		value_buf[0] = 'A' + (__wt_random() % ('z' - 'A' + 1));
+		value_buf[i] = 'A' + (__wt_random() % ('z' - 'A' + 1));
+	}
 	return;
 }
 
@@ -532,7 +538,12 @@ worker(void *arg)
 					    "get_value in update.");
 					goto err;
 				}
-				memcpy(value_buf, value, strlen(value));
+				/*
+				 * Copy as much of the previous value as is
+				 * safe, and be sure to NUL-terminate.
+				 */
+				strncpy(value_buf, value, cfg->value_sz);
+				value_buf[cfg->value_sz - 1] = '\0';
 				if (value_buf[0] == 'a')
 					value_buf[0] = 'b';
 				else
@@ -2090,7 +2101,7 @@ start_threads(CONFIG *cfg,
 		 */
 		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
-		if ((thread->value_buf = calloc(cfg->value_sz + 1, 1)) == NULL)
+		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
 		/*
 		 * Initialize and then toss in a bit of random values if needed.
