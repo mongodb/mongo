@@ -583,6 +583,18 @@ struct __wt_async_op {
 	 */
 	const char *value_format;
 
+	/*
+	 * Don't expose app_private to non-C language bindings - they have
+	 * their own way to attach data to an operation.
+	 */
+#if !defined(SWIG)
+	/*!
+	 * A location for applications to store information that will be
+	 * available in the callback from an async operation.
+	 */
+	void *app_private;
+#endif
+
 	/*!
 	 * @name Data access
 	 * @{
@@ -791,7 +803,6 @@ struct __wt_async_op {
 	 * functions to manage them.
 	 */
 #if !defined(SWIG) && !defined(DOXYGEN)
-#define	async_app_private	c.lang_private
 	WT_CURSOR	c;
 #endif
 };
