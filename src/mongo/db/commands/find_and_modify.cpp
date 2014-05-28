@@ -347,16 +347,19 @@ namespace mongo {
                     return false;
                 }
 
-                if (cmdObj["new"].trueValue()) {
-                    BSONObjBuilder bob;
-                    BSONElement _id = gle[kUpsertedFieldName];
-                    if (!_id.eoo())
-                        bob.appendAs(_id, "_id");
-                    else
-                        bob.appendAs(origQuery["_id"], "_id");
-
-                    out = db.findOne(ns, bob.done(), fields);
+                if (!cmdObj["new"].trueValue()) {
+                    result.appendNull("value");
+                    return true;
                 }
+
+                BSONObjBuilder bob;
+                BSONElement _id = gle[kUpsertedFieldName];
+                if (!_id.eoo())
+                    bob.appendAs(_id, "_id");
+                else
+                    bob.appendAs(origQuery["_id"], "_id");
+
+                out = db.findOne(ns, bob.done(), fields);
 
             }
             else {
