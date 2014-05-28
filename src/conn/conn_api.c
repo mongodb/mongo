@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-#define	WT_BASECONFIG	"WiredTiger.basecfg"
+#define	WT_BASECONFIG	"WiredTiger.createcfg"
 #define	WT_USERCONFIG	"WiredTiger.config"
 
 static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
@@ -1148,6 +1148,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ITEM cbbuf, cubuf;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int exist;
 	/* Leave space for optional additional configuration. */
 	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
 
@@ -1204,20 +1205,26 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 *
 	 * 1. default wiredtiger_open configuration
 	 * 2. base configuration file, created with the database (optional)
-	 * 3. user configuration file (optional)
-	 * 4. environment variable settings (optional)
-	 * 5. the config passed in by the application.
+	 * 3. the config passed in by the application.
+	 * 4. user configuration file (optional)
+	 * 5. environment variable settings (optional)
 	 *
 	 * Track the end of the stack, which always points to the config passed
 	 * by the application.
 	 */
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbbuf));
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf));
-	WT_ERR(__conn_config_env(session, cfg));
 
-	/* Write the base configuration file, if we're creating the database. */
-	if (conn->is_new)
-		WT_ERR(__conn_write_config(session, WT_BASECONFIG, config));
+	/*
+	 * The base configuration should not exist if we are creating this
+	 * database.
+	 */
+	exist = 0;
+	if (conn->is_new) {
+		WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
+		if (exist)
+			WT_ERR_MSG(session, EINVAL,
+			    "WT base config exists on creation");
+	} else
+		WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbbuf));
 
 	/*
 	 * Configuration ...
@@ -1281,6 +1288,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->mmap = cval.val == 0 ? 0 : 1;
 
 	WT_ERR(__conn_statistics_config(session, cfg));
+
+	/*
+	 * Read in user's config file and the config environment variable.
+	 */
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf));
+	WT_ERR(__conn_config_env(session, cfg));
+	/* Write the base configuration file, if we're creating the database. */
+	if (conn->is_new)
+		WT_ERR(__conn_write_config(session, WT_BASECONFIG, config));
 
 	/* Now that we know if verbose is configured, output the version. */
 	WT_ERR(__wt_verbose(
