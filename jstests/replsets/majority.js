@@ -8,7 +8,7 @@ var testInsert = function() {
 var num = 7;
 var host = getHostName();
 var name = "tags";
-var timeout = 60000;
+var timeout = 20000;
 
 var replTest = new ReplSetTest( {name: name, nodes: num, startPort:31000} );
 var nodes = replTest.startSet();
@@ -18,10 +18,10 @@ var config = {_id : name, members :
          {_id:0, host : host+":"+port[0], priority : 2},
          {_id:1, host : host+":"+port[1]},
          {_id:2, host : host+":"+port[2]},
-         {_id:3, host : host+":"+port[3], arbiterOnly : true, votes: 0},
-         {_id:4, host : host+":"+port[4], arbiterOnly : true, votes: 0},
-         {_id:5, host : host+":"+port[5], arbiterOnly : true, votes: 0},
-         {_id:6, host : host+":"+port[6], arbiterOnly : true, votes: 0},
+         {_id:3, host : host+":"+port[3], arbiterOnly : true},
+         {_id:4, host : host+":"+port[4], arbiterOnly : true},
+         {_id:5, host : host+":"+port[5], arbiterOnly : true},
+         {_id:6, host : host+":"+port[6], arbiterOnly : true},
         ],
              };
 replTest.initiate(config);
@@ -53,14 +53,16 @@ replTest.restart(3);
 replTest.restart(4);
 
 print("remove 2 of the arbiters");
-config.version = 2;
+config = master.getDB("local").system.replset.findOne();
+config.version++;
 config.members.pop();
 config.members.pop();
 
 // wait for nodes 3 and 4 to come back as arbiters
 assert.soon(function() {
+    master = replTest.getMaster();
     var status = master.getDB("admin").runCommand({replSetGetStatus:1});
-    return status.members[3].state == 7 && status.members[4].state == 7;
+    return status.members[3].state === 7 && status.members[4].state === 7;
 });
 
 try {
@@ -88,13 +90,13 @@ assert.contains(config.members[0], result);
 assert.contains(config.members[1], result);
 assert.contains(config.members[2], result);
 
-print("setup: 0,1 | 2,3,4");
+print("setup: 0,1,4 | 2,3");
 replTest.partition(0,2);
 replTest.partition(0,3);
-replTest.partition(0,4);
 replTest.partition(1,2);
 replTest.partition(1,3);
-replTest.partition(1,4);
+replTest.partition(4,2);
+replTest.partition(4,3);
 
 print("make sure majority doesn't work");
 // primary should now be 2
@@ -108,7 +110,6 @@ assert.contains(config.members[1], result);
 print("bring set back together");
 replTest.unPartition(0,2);
 replTest.unPartition(0,3);
-replTest.unPartition(1,4);
 
 master = replTest.getMaster();
 
