@@ -45,6 +45,7 @@ namespace mongo {
         TopTool() : Tool() {
             _autoreconnect = true;
         }
+        static std::auto_ptr<Tool> createInstanceOfThisTool();
 
         virtual void printHelp( ostream & out ) {
             printMongoTopHelp(&out);

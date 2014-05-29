@@ -962,7 +962,7 @@ mongod = env.Install(
 Default( mongod )
 
 # tools
-allToolFiles = ["tools/tool.cpp",
+allToolFiles = [#"tools/tool.cpp",
                 "tools/stat_util.cpp",
                 "tools/tool_logger.cpp"]
 env.Library("tool_options", "tools/tool_options.cpp",
@@ -981,15 +981,37 @@ env.Library("alltools",
                      "$BUILD_DIR/mongo/db/auth/authmocks",
                      "$BUILD_DIR/mongo/db/auth/authmongod"])
 
-normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog", "tools" ]
+
+normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
+
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
 for name in normalTools:
-    env.Install( '#/', env.Program("mongo" + name,
-                                   ["tools/" + name + ".cpp", "tools/mongo" + name + "_options_init.cpp"],
-                                   LIBDEPS=["alltools", "mongo" + name + "_options"]) )
     env.Library("mongo" + name + "_options", ["tools/mongo" + name + "_options.cpp"],
                 LIBDEPS=['tool_options'])
+#env.Library("mongotool", ["tools/tool.cpp"] + map(lambda x: "tools/" + x + ".cpp", normalTools), LIBDEPS=['tool_options'])
 
+#for name in normalTools:
+#	env.Install( '#/', env.Program("mongo" + name,
+#                                   ["tools/" + name + ".cpp", "tools/mongo" + name + "_options_init.cpp"],
+#                                   LIBDEPS=["alltools", "mongo" + name + "_options"]) )
+
+deps = ["tools/tool.cpp", "tools/tool_options_init.cpp"]
+libdeps = ["alltools"]
+for name in normalTools:
+	deps.append("tools/" + name + ".cpp")
+	#deps.append("tools/mongo" + name + "_options_init.cpp")
+	libdeps.append("mongo" + name + "_options")
+
+tools = env.Install( '#/', env.Program("mongotools",
+								   deps,
+								   LIBDEPS=libdeps))
+
+#for name in normalTools:
+#	env.Install( '#/', env.Program("mongo" + name,
+#                                   ["tools/" + name + ".cpp"] + deps,
+#                                   LIBDEPS=libdeps) )
+
+"""
 #some special tools
 env.Library("mongofiles_options", ["tools/mongofiles_options.cpp"],
             LIBDEPS=['tool_options'])
@@ -1008,7 +1030,7 @@ env.Install( '#/', [
         env.Program( "mongoperf", "client/examples/mongoperf.cpp",
                      LIBDEPS=["serveronly", "coreserver", "coredb"] ),
         ] )
-
+"""
 # mongos options
 env.Library("mongos_options", ["s/mongos_options.cpp"],
             LIBDEPS=['mongoscore',
@@ -1185,7 +1207,7 @@ def installBinary( e, name ):
     if nix:
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongoperf" ]:
+for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongoperf", "mongotools" ]:
     installBinary( env, t )
     env.Alias("tools", '#/' + add_exe(t))
 

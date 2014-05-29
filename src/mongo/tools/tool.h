@@ -51,7 +51,21 @@ namespace mongo {
         Tool();
         virtual ~Tool();
 
-        static std::auto_ptr<Tool> (*createInstance)();
+        typedef std::auto_ptr<Tool> (*InstanceFunction)();
+        static std::map < std::string, InstanceFunction> tools;
+        static void mapTools();
+
+        static std::auto_ptr<Tool> createInstanceOfThisTool();
+        static std::auto_ptr<Tool> (*createBSONDumpInstance)();
+        static std::auto_ptr<Tool> (*createDumpInstance)();
+        static std::auto_ptr<Tool> (*createExportInstance)();
+        static std::auto_ptr<Tool> (*createFilesInstance)();
+        static std::auto_ptr<Tool> (*createImportInstance)();
+        static std::auto_ptr<Tool> (*createOplogToolInstance)();
+        static std::auto_ptr<Tool> (*createRestoreInstance)();
+        static std::auto_ptr<Tool> (*createSnifferInstance)();
+        static std::auto_ptr<Tool> (*createStatInstance)();
+        static std::auto_ptr<Tool> (*createTopToolInstance)();
 
         int main( int argc , char ** argv, char ** envp );
 
@@ -104,6 +118,8 @@ namespace mongo {
 
 }
 
+#define createInstance(TOKEN) create##TOKEN##Instance
+
 #define REGISTER_MONGO_TOOL(TYPENAME) \
-    std::auto_ptr<Tool> createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
-    std::auto_ptr<Tool> (*Tool::createInstance)() = createInstanceOfThisTool;
+    std::auto_ptr<Tool> TYPENAME::createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
+    std::auto_ptr<Tool> (*Tool::createInstance(TYPENAME))() = TYPENAME::createInstanceOfThisTool;

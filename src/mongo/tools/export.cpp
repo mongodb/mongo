@@ -45,6 +45,7 @@ using namespace mongo;
 class Export : public Tool {
 public:
     Export() : Tool() { }
+    static std::auto_ptr<Tool> createInstanceOfThisTool();
 
     virtual void printHelp( ostream & out ) {
         printMongoExportHelp(&out);
