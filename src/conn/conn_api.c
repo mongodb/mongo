@@ -648,16 +648,27 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __conn_config_append --
+ *	Append an entry to a config stack.
+ */
+static inline void
+__conn_config_append(const char *cfg[], const char *config)
+{
+	while (*cfg != NULL)
+		++cfg;
+	*cfg = config;
+}
+
+/*
  * __conn_config_file --
  *	Read in any WiredTiger_config file in the home directory.
  */
 static int
 __conn_config_file(WT_SESSION_IMPL *session,
-    const char *filename, const char **cfg, WT_ITEM *cbuf, int cfgbefore)
+    const char *filename, const char **cfg, WT_ITEM *cbuf)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
-	const char **cfgend;
 	off_t size;
 	size_t len;
 	int exist, quoted;
@@ -775,14 +786,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), cbuf->data, 0));
 
-	/* Move to the end of the list, insert before the last entry. */
-	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
-		;
-	if (cfgbefore) {
-		cfgend[1] = *cfgend;
-		*cfgend = cbuf->data;
-	} else
-		cfgend[1] = cbuf->data;
+	/* Append it to the stack. */
+	__conn_config_append(cfg, cbuf->data);
 
 err:	if (fh != NULL)
 		WT_TRET(__wt_close(session, fh));
@@ -794,10 +799,10 @@ err:	if (fh != NULL)
  *	Read configuration from an environment variable, if set.
  */
 static int
-__conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], int cfgbefore)
+__conn_config_env(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	const char **cfgend, *env_config;
+	const char *env_config;
 
 	if ((env_config = getenv("WIREDTIGER_CONFIG")) == NULL ||
 	    strlen(env_config) == 0)
@@ -819,17 +824,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], int cfgbefore)
 	WT_RET(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
 
-	/* 
-	 * Move to the end of the list, insert before or after the
-	 * last entry based on the arg passed in.
-	 */
-	for (cfgend = cfg + 1; cfgend[1] != NULL; ++cfgend)
-		;
-	if (cfgbefore) {
-		cfgend[1] = *cfgend;
-		*cfgend = env_config;
-	} else
-		cfgend[1] = env_config;
+	__conn_config_append(cfg, env_config);
 	return (0);
 }
 
@@ -1218,9 +1213,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * 4. user configuration file (optional)
 	 * 5. environment variable settings (optional)
 	 *
-	 * Track the end of the stack, which always points to the config passed
-	 * by the application.
+	 * Clear the entry we added to the stack, we're going to build it in
+	 * order.
 	 */
+	cfg[1] = NULL;
 
 	/*
 	 * The base configuration should not exist if we are creating this
@@ -1231,16 +1227,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
 		if (exist)
 			WT_ERR_MSG(session, EINVAL,
-			    "WT base config exists on creation");
+			    "%s exists on creation", WT_BASECONFIG);
 	} else
-		WT_ERR(__conn_config_file(session,
-		    WT_BASECONFIG, cfg, &cbbuf, 1));
+		WT_ERR(__conn_config_file(session, WT_BASECONFIG, cfg, &cbbuf));
+
+	/* Add the config string passed in by the application. */
+	__conn_config_append(cfg, config);
 
 	/*
 	 * Read in user's config file and the config environment variable.
 	 */
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf, 0));
-	WT_ERR(__conn_config_env(session, cfg, 0));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, cfg, &cubuf));
+	WT_ERR(__conn_config_env(session, cfg));
 
 	/*
 	 * Configuration ...
