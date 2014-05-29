@@ -13,7 +13,7 @@ import (
 func main() {
 
 	// initialize command-line opts
-	opts := commonopts.GetMongoToolOptions("mongotop", "0.0.1")
+	opts := commonopts.New("mongotop", "0.0.1", "<options> <sleeptime>")
 
 	// add mongotop-specific options
 	topOpts := &options.MongoTopOptions{}

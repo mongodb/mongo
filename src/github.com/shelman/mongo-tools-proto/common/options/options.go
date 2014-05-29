@@ -9,12 +9,25 @@ import (
 	"github.com/jessevdk/go-flags"
 )
 
-type MongoToolOptions struct {
-	*GeneralOptions
-	*VerbosityOptions
-	*ConnectionOptions
-	*SSLOptions
-	*AuthOptions
+// Struct holding all of the options that are reused across tools: "help",
+// "version", verbosity settings, ssl settings, etc.
+type ToolOptions struct {
+
+	// The name of the tool
+	AppName string
+
+	// The version of the tool
+	VersionStr string
+
+	// String describing usage, not including the tool name
+	UsageStr string
+
+	// Sub-option types
+	*General
+	*Verbosity
+	*Connection
+	*SSL
+	*Auth
 
 	////////
 
@@ -22,14 +35,11 @@ type MongoToolOptions struct {
 	DB         string
 	Collection string
 
-	AppName    string
-	VersionStr string
-
 	// TODO below: kill this?
 
 	// Extra tool-specific options that can be specified by calling
 	// AddOptions
-	ExtraOptions
+	Extra []ExtraOptions
 
 	// Bookkeeping for filtering on database and collection
 	FilterNS       string // the full namespace for filtering
@@ -40,23 +50,27 @@ type MongoToolOptions struct {
 	parser *flags.Parser
 }
 
-type GeneralOptions struct {
+// Struct holding generic options
+type General struct {
 	Help    bool `long:"help" description:"Print usage"`
 	Version bool `long:"version" description:"Print the version"`
 }
 
-type VerbosityOptions struct {
+// Struct holding verbosity-related options
+type Verbosity struct {
 	Verbose []bool `short:"v" long:"verbose" description:"Set verbosity level"`
 	Quiet   bool   `long:"quiet" description:"Run in quiet mode, attempting to limit the amount of output"`
 }
 
-type ConnectionOptions struct {
+// Struct holding connection-related options
+type Connection struct {
 	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost"`
 	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening" default:"27017"`
 	IPV6 bool   `long:"ipv6" description:"Enable ipv6 support"`
 }
 
-type SSLOptions struct {
+// Struct holding ssl-related options
+type SSL struct {
 	SSL               bool   `long:"ssl" description:"Enable connection to a mongod or mongos that has ssl enabled"`
 	SSLCAFile         string `long:"sslCAFile" description:"Specify the .pem file containing the root certificate chain from the certificate authority"`
 	SSLPEMKeyFile     string `long:"sslPEMKeyFile" description:"Specify the .pem file containing the certificate and key"`
@@ -66,67 +80,73 @@ type SSLOptions struct {
 	SSLFipsMode       bool   `long:"sslFIPSMode" description:"Use FIPS mode of the installed openssl library"`
 }
 
-type AuthOptions struct {
+// Struct holding auth-related options
+type Auth struct {
 	Username      string `short:"u" long:"username" description:"Specify a user name for authentication"`
 	Password      string `short:"p" long:"password" description:"Specify a password for authentication"`
 	AuthDB        string `long:"authenticationDatabase" description:"Specify the database that holds the user's credentials"`
 	AuthMechanism string `long:"authenticationMechanism" description:"Specify the authentication mechanism to be used"`
 }
 
+// Ask for a new instance of tool options
+func New(appName, versionStr, usageStr string) *ToolOptions {
+	return &ToolOptions{
+		AppName:    appName,
+		VersionStr: versionStr,
+		UsageStr:   usageStr,
+
+		General:    &General{},
+		Verbosity:  &Verbosity{},
+		Connection: &Connection{},
+		SSL:        &SSL{},
+		Auth:       &Auth{},
+	}
+}
+
+// Add extra command line options into the tool options
+func (self *ToolOptions) AddOptions(opts ExtraOptions) {
+	self.Extra = append(self.Extra, opts)
+}
+
+// Interface for extra options that need to be used by specific tools
 type ExtraOptions interface {
+	// Name specifying what type of options these are
+	Name() string
+
+	// Parsing / validation functions
 	PostParse() error
 	Validate() error
 }
 
-func (self *MongoToolOptions) AddOptions(opts ExtraOptions) {
-	self.ExtraOptions = opts
-}
-
-// Register the command line flags to be parsed into the options
-func GetMongoToolOptions(appName, versionStr string) *MongoToolOptions {
-
-	// options bound to the command line flags
-	options := &MongoToolOptions{
-		AppName:    appName,
-		VersionStr: versionStr,
-
-		GeneralOptions:    &GeneralOptions{},
-		VerbosityOptions:  &VerbosityOptions{},
-		ConnectionOptions: &ConnectionOptions{},
-		SSLOptions:        &SSLOptions{},
-		AuthOptions:       &AuthOptions{},
-	}
-
-	return options
-}
-
-func (self *MongoToolOptions) PrintHelp() bool {
+// Print the usage message for the tool to stdout
+func (self *ToolOptions) PrintHelp() bool {
 	if self.Help {
 		self.parser.WriteHelp(os.Stdout)
 	}
 	return self.Help
 }
 
-func (self *MongoToolOptions) PrintVersion() bool {
+// Print the tool version to stdout
+func (self *ToolOptions) PrintVersion() bool {
 	if self.Version {
 		util.Printlnf("%v version: %v", self.AppName, self.VersionStr)
 	}
 	return self.Version
 }
 
-// Parse the command line args into the mongo options
-func (self *MongoToolOptions) ParseAndValidate() error {
+// Parse the command line args, and run any necessary validation logic
+func (self *ToolOptions) ParseAndValidate() error {
 
 	// init a parser for the flags
 	self.parser = flags.NewNamedParser(self.AppName, flags.None)
-	self.parser.Usage = "<options> <sleeptime>"
+	self.parser.Usage = self.UsageStr
 
 	// register self to receive the flags
-	_, err := self.parser.AddGroup("general options", "", self.GeneralOptions)
-	_, err = self.parser.AddGroup("verbosity options", "", self.VerbosityOptions)
-	_, err = self.parser.AddGroup("connection options", "", self.ConnectionOptions)
-	_, err = self.parser.AddGroup("ssl options", "", self.SSLOptions)
-	_, err = self.parser.AddGroup("authentication options", "", self.AuthOptions)
+	_, err := self.parser.AddGroup("general options", "", self.General)
+	_, err = self.parser.AddGroup("verbosity options", "", self.Verbosity)
+	_, err = self.parser.AddGroup("connection options", "", self.Connection)
+	_, err = self.parser.AddGroup("ssl options", "", self.SSL)
+	_, err = self.parser.AddGroup("authentication options", "", self.Auth)
 
 	// parse
 	_, err = self.parser.Parse()
@@ -134,54 +154,48 @@ func (self *MongoToolOptions) ParseAndValidate() error {
 		return err
 	}
 
+	return nil
+}
+
+/////
+
+// Run the post-parse logic
+func (self *ToolOptions) PostParse() error {
+	// build the filter string and options based on the db and collection
+	// specified, if any
+
 	/*
-		// run post-parse logic
-		if err := self.PostParse(); err != nil {
-			return fmt.Errorf("error post-processing tool params: %v", err)
+		if self.DB != "" {
+			self.FilterNS = self.DB + "."
+			if self.Collection != "" {
+				self.FilterBoth = true
+				self.FilterNS += self.Collection
+			}
+		} else if self.Collection != "" {
+			self.FilterOnlyColl = true
+			self.FilterNS = "." + self.Collection
 		}
 
-		// run validation logic
-		if err := self.Validate(); err != nil {
-			return fmt.Errorf("validating tool params failed: %v", err)
+		// post-parse the extra params
+		if self.ExtraOptions != nil {
+			if err := self.ExtraOptions.PostParse(); err != nil {
+				return err
+			}
 		}
 	*/
 
 	return nil
 }
 
-// Run the post-parse logic
-func (self *MongoToolOptions) PostParse() error {
-	// build the filter string and options based on the db and collection
-	// specified, if any
-	if self.DB != "" {
-		self.FilterNS = self.DB + "."
-		if self.Collection != "" {
-			self.FilterBoth = true
-			self.FilterNS += self.Collection
-		}
-	} else if self.Collection != "" {
-		self.FilterOnlyColl = true
-		self.FilterNS = "." + self.Collection
-	}
-
-	// post-parse the extra params
-	if self.ExtraOptions != nil {
-		if err := self.ExtraOptions.PostParse(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // Run the validation logic
-func (self *MongoToolOptions) Validate() error {
-
-	if self.ExtraOptions != nil {
-		if err := self.ExtraOptions.Validate(); err != nil {
-			return err
+func (self *ToolOptions) Validate() error {
+	/*
+		if self.ExtraOptions != nil {
+			if err := self.ExtraOptions.Validate(); err != nil {
+				return err
+			}
 		}
-	}
+	*/
 
 	return nil
 }

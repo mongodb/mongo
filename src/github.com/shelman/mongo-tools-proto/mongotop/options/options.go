@@ -16,6 +16,10 @@ type MongoTopOptions struct {
 	SleepTime  int
 }
 
+func (self *MongoTopOptions) Name() string {
+	return "mongotop"
+}
+
 func (self *MongoTopOptions) PostParse() error {
 
 	// TODO: clean this up
