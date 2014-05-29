@@ -83,6 +83,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_async_destroy(conn));
 	WT_TRET(__wt_checkpoint_server_destroy(conn));
 	WT_TRET(__wt_statlog_destroy(conn));
+	WT_TRET(__wt_sweep_destroy(conn));
 
 	/* Clean up open LSM handles. */
 	WT_TRET(__wt_lsm_tree_close_all(session));
@@ -214,6 +215,11 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_thread_create(session,
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 	conn->cache_evict_tid_set = 1;
+
+	/*
+	 * Start the handle sweep thread.
+	 */
+	WT_RET(__wt_sweep_create(conn));
 
 	/*
 	 * Start the optional statistics thread.  Start statistics first so that

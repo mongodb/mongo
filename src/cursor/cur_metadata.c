@@ -40,6 +40,14 @@
 } while (0)
 
 /*
+ * Check if a key matches the metadata.  The public value is "metadata:",
+ * but also check for the internal version of the URI.
+ */
+#define	WT_KEY_IS_METADATA(key)						\
+	(WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) ||\
+	 WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1))
+
+/*
  * __curmetadata_metadata_search --
  *	Retrieve the metadata for the metadata table
  */
@@ -53,23 +61,19 @@ __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	mdc = (WT_CURSOR_METADATA *)cursor;
 
 	/* The metadata search interface allocates a new string in value. */
-	WT_RET(__wt_metadata_search(session, WT_METADATA_URI, &value));
+	WT_RET(__wt_metadata_search(session, WT_METAFILE_URI, &value));
 
 	/*
 	 * Copy the value to the underlying btree cursor's tmp item which will
 	 * be freed when the cursor is closed.
 	 */
-	if (F_ISSET(mdc, WT_MDC_TMP_USED))
-		__wt_buf_free(session, &mdc->tmp_val);
-	ret = __wt_buf_set(session, &mdc->tmp_val, value, strlen(value));
+	ret = __wt_buf_setstr(session, &cursor->value, value);
 	__wt_free(session, value);
 	WT_RET(ret);
 
-	cursor->key.data = WT_METADATA_URI;
-	cursor->key.size = strlen(WT_METADATA_URI);
-	cursor->value.data = mdc->tmp_val.data;
-	cursor->value.size = mdc->tmp_val.size;
-	F_SET(mdc, WT_MDC_ONMETADATA | WT_MDC_POSITIONED | WT_MDC_TMP_USED);
+	WT_RET(__wt_buf_setstr(session, &cursor->key, WT_METADATA_URI));
+
+	F_SET(mdc, WT_MDC_ONMETADATA | WT_MDC_POSITIONED);
 	F_SET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 	return (0);
 }
@@ -231,8 +235,7 @@ __curmetadata_search(WT_CURSOR *cursor)
 
 	WT_MD_CURSOR_NEEDKEY(cursor);
 
-	if (WT_STRING_MATCH(
-	    (char *)cursor->key.data, "metadata:", cursor->key.size - 1))
+	if (WT_KEY_IS_METADATA(&cursor->key))
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 	else {
 		WT_ERR(file_cursor->search(file_cursor));
@@ -266,8 +269,7 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 
 	WT_MD_CURSOR_NEEDKEY(cursor);
 
-	if (WT_STRING_MATCH(
-	    (char *)cursor->key.data, "metadata:", cursor->key.size - 1)) {
+	if (WT_KEY_IS_METADATA(&cursor->key)) {
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 		*exact = 1;
 	} else {

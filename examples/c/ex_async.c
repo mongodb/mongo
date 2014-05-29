@@ -34,21 +34,32 @@
 
 #include <wiredtiger.h>
 
+#if defined(_lint)
+#define	ATOMIC_ADD(v, val)      ((v) += (val), (v))
+#else
+#define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
+#endif
+
 const char *home = NULL;
 const char *uri = "table:async";
 int global_error = 0;
 
 /*! [example callback implementation] */
+typedef struct {
+	WT_ASYNC_CALLBACK iface;
+	uint32_t num_keys;
+} ASYNC_KEYS;
+
 static int
 cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 {
+	ASYNC_KEYS *asynckey = (ASYNC_KEYS *)cb;
 	WT_ASYNC_OPTYPE type;
 	WT_ITEM k, v;
 	const char *key, *value;
 	uint64_t id;
 	int t_ret;
 
-	(void)cb;
 	(void)flags;
 	/*! [Get type] */
 	type = op->get_type(op);
@@ -70,13 +81,15 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		/*! [Get the operation's string value] */
 		t_ret = op->get_value(op, &v);
 		value = v.data;
+		ATOMIC_ADD(asynckey->num_keys, 1);
 		/*! [Get the operation's string value] */
 		printf("Id %" PRIu64 " got record: %s : %s\n", id, key, value);
 	}
 	return (t_ret);
 }
 
-static WT_ASYNC_CALLBACK cb = { cb_asyncop };
+static ASYNC_KEYS ex_asynckeys = { {cb_asyncop}, 0 };
+
 /*! [example callback implementation] */
 #define	MAX_KEYS	15
 
@@ -108,7 +121,8 @@ int main(void)
 		/*! [Allocate a handle] */
 		op = NULL;
 retry:
-		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
+		ret = wt_conn->async_new_op(wt_conn, uri, NULL,
+		    &ex_asynckeys.iface, &op);
 		if (ret != 0) {
 			/*
 			 * If we used up all the ops, pause and retry to
@@ -137,14 +151,16 @@ retry:
 	wt_conn->async_flush(wt_conn);
 	/*! [flush] */
 	/*! [Compact a table] */
-	ret = wt_conn->async_new_op(wt_conn, uri, "timeout=10", &cb, &op);
+	ret = wt_conn->async_new_op(wt_conn, uri, "timeout=10",
+	    &ex_asynckeys.iface, &op);
 	op->compact(op);
 	/*! [Compact a table] */
 
 	for (i = 0; i < MAX_KEYS; i++) {
 		op = NULL;
 retry2:
-		ret = wt_conn->async_new_op(wt_conn, uri, NULL, &cb, &op);
+		ret = wt_conn->async_new_op(wt_conn, uri, NULL,
+		    &ex_asynckeys.iface, &op);
 		if (ret != 0) {
 			/*
 			 * If we used up all the ops, pause and retry to
@@ -162,6 +178,8 @@ retry2:
 		/*! [search] */
 	}
 
+	wt_conn->async_flush(wt_conn);
+	printf("Searched for %d keys\n", ex_asynckeys.num_keys);
 	/*! [example close] */
 	/*
 	 * Connection close automatically does an async_flush so it will

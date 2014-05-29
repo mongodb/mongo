@@ -1,3 +1,81 @@
+WiredTiger release 2.2.0, 2014-05-21
+------------------------------------
+
+The WiredTiger 2.2.0 release contains new features, performance enhancements
+and bug fixes. Significant changes include:
+
+Changes relevant for upgrading applications:
+
+Update the table create API to disable prefix compression by default.
+Applications generally see better performance without prefix compression,
+choosing space saving over performance is up to the application. [#981]
+
+Change the default leaf_page_max setting from 1MB to 32KB. Choosing a large
+default leaf_page_max led to poor performance in out of cache workloads.
+
+Remove the `--enable-debug` option to configure. It is more standard to set
+`CFLAGS="-g"` variable instead.
+
+Save the wiredtiger_open configuration when a database is created, so that
+settings like cache size, extensions and logging are set consistently by all
+subsequent users of the database.
+
+Add an `--enable-verbose` option to configure. In order to access the verbose
+message functionality available as part of the wiredtiger_open and
+WT_CONNECTION::reconfigure APIs, it is necessary to pass the `--enable-verbose`
+option to configure.
+
+Enhance the metadata cursor implementation (i.e: cursors created with a
+"metadata:" prefix) so that they can be used to inspect metadata for internal
+tables and now support altering the metadata. Add a new "read_only" flag to
+cursor configuration that defaults to false for metadata cursors.
+
+Fix several bugs in raw compression, including one that could cause data
+corruption and some that triggered poor performance.
+[#984][#991][#1007][#1008][#1013]
+
+Improve the performance of recovery - we no longer need to scan all log files
+looking for the last checkpoint.
+
+Improve performance of read-only transactions, by deferring the allocation
+of transaction IDs. [#978]
+
+Several bug fixes in hot backup related to log
+files, including:
+ * Always choose the right metadata version in the backup [#972]
+ * Don't require that hot backup copies log files in order [#976]
+ * Always copy log files before data files [#976]
+ * Fix a bug where recovery returned an error if the last log record was
+   incomplete [#994]
+
+Speed up checkpoints by doing a better job of skipping pages that can't
+contain changes that need to be included. [#954][#963][#1001]
+
+Add ability to store zero length data items into LSM trees. [#540]
+
+Add an asynchronous data access/manipulation API to WiredTiger. [#933]
+
+Add the ability to configure multiple eviction server threads, to help with
+keeping space available in the cache. [#918]
+
+Add the ability to reconfigure the checkpoint and statistics log servers.
+[#997][#1004]
+
+Improve the performance of retrieving data for in cache workloads. [#970]
+
+Improve the structure of the in-memory tree we are generating, by allowing
+internal pages to be split. This significantly improves query performance
+in some workloads. [#876]
+
+Work around a bug in posix_fallocate on Linux, where it could corrupt already
+written data.
+
+Add the ability to leak memory on connection close via new leak_memory option
+to WT_CONNECTION::close API. This allows for faster shutdown if a process is
+going to exit when the WiredTiger connection is closing.
+
+Allow salvage to run on any table type.
+
 WiredTiger release 2.1.2, 2014-03-27
 ------------------------------------
 
@@ -1406,8 +1484,8 @@ the end of every test.
 WiredTiger release 1.1.1, 2012-03-12
 ------------------------------------
 
-Default to a verbose build: that can be switched off by running "configure
---enable-silent-rules").
+Default to a verbose build: that can be switched off by running `configure
+--enable-silent-rules`).
 
 Account for all memory allocated when reading a page into cache.  Total memory
 usage is now much closer to the cache size when using many small keys and

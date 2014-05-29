@@ -620,17 +620,24 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	}
 
 	/* dump */
+	/*
+	 * If an index cursor is opened with dump, then this
+	 * function is called on the index files, with the dump
+	 * config string, and with the index cursor as an owner.
+	 * We don't want to create a dump cursor in that case, because
+	 * we'll create the dump cursor on the index cursor itself.
+	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "dump", 0, &cval));
-	if (cval.len != 0) {
-		/*
-		 * Dump cursors should not have owners: only the top-level
-		 * cursor should be wrapped in a dump cursor.
-		 */
-		WT_ASSERT(session, owner == NULL);
-
+	if (cval.len != 0 && owner == NULL) {
 		F_SET(cursor,
-		    WT_STRING_MATCH("print", cval.str, cval.len) ?
-		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
+		    WT_STRING_MATCH("json", cval.str, cval.len) ?
+		    WT_CURSTD_DUMP_JSON :
+		    (WT_STRING_MATCH("print", cval.str, cval.len) ?
+		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX));
+		/*
+		 * Dump cursors should not have owners: only the
+		 * top-level cursor should be wrapped in a dump cursor.
+		 */
 		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
 		owner = cdump;
 	} else

@@ -95,11 +95,13 @@ Eron
 FALLTHROUGH
 FH
 FLD
+FLS
 FNV
 FORALL
 FOREACH
 FREELIST
 Fasttrack
+Fk
 FreeBSD
 FreeBSD's
 Freelist
@@ -337,6 +339,7 @@ btree
 btrees
 buf
 bufs
+bufsz
 builtin
 bytelock
 bytestring
@@ -578,6 +581,8 @@ inuse
 io
 ip
 ispo
+jrx
+json
 kb
 kcell
 keycmp
@@ -800,6 +805,7 @@ searchable
 sed
 serializable
 sessionp
+setstr
 setv
 sfence
 sii

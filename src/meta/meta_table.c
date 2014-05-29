@@ -16,7 +16,7 @@ __metadata_turtle(const char *key)
 {
 	switch (key[0]) {
 	case 'f':
-		if (strcmp(key, WT_METADATA_URI) == 0)
+		if (strcmp(key, WT_METAFILE_URI) == 0)
 			return (1);
 		break;
 	case 'W':
@@ -39,7 +39,7 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	if (session->metafile != NULL)
 		return (0);
 
-	WT_RET(__wt_session_get_btree(session, WT_METADATA_URI, NULL, NULL, 0));
+	WT_RET(__wt_session_get_btree(session, WT_METAFILE_URI, NULL, NULL, 0));
 
 	session->metafile = S2BT(session);
 	WT_ASSERT(session, session->metafile != NULL);

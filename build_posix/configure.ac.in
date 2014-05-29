@@ -98,14 +98,16 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <pthread.h>]],[[
 
 AC_C_BIGENDIAN
 
-# Linux requires _GNU_SOURCE to be defined and buffers aligned to 4KB
-# boundaries for O_DIRECT to work.
+# Linux requires _GNU_SOURCE to be defined
+case "$host_os" in
+linux*)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE" ;;
+esac
+
+# Linux requires buffers aligned to 4KB boundaries for O_DIRECT to work.
 BUFFER_ALIGNMENT=0
 if test "$ac_cv_func_posix_memalign" = "yes" ; then
 	case "$host_os" in
-	linux*)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
-		BUFFER_ALIGNMENT=4096
-		;;
+	linux*)	BUFFER_ALIGNMENT=4096 ;;
 	esac
 fi
 AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,

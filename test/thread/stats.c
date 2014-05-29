@@ -34,12 +34,13 @@
 void
 stats(void)
 {
-	WT_CURSOR *cursor;
-	uint64_t v;
-	const char *pval, *desc;
-	WT_SESSION *session;
 	FILE *fp;
+	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	uint64_t v;
 	int ret;
+	char name[64];
+	const char *pval, *desc;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
@@ -62,21 +63,23 @@ stats(void)
 		die("cursor.close", ret);
 
 	/* File statistics. */
-	if ((ret = session->open_cursor(session,
-	    "statistics:" FNAME, NULL, NULL, &cursor)) != 0)
-		die("session.open_cursor", ret);
+	if (!multiple_files) {
+		(void)snprintf(name, sizeof(name), "statistics:" FNAME, 0);
+		if ((ret = session->open_cursor(
+		    session, name, NULL, NULL, &cursor)) != 0)
+			die("session.open_cursor", ret);
 
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-		(void)fprintf(fp, "%s=%s\n", desc, pval);
+		while ((ret = cursor->next(cursor)) == 0 &&
+		    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+			(void)fprintf(fp, "%s=%s\n", desc, pval);
 
-	if (ret != WT_NOTFOUND)
-		die("cursor.next", ret);
-	if ((ret = cursor->close(cursor)) != 0)
-		die("cursor.close", ret);
+		if (ret != WT_NOTFOUND)
+			die("cursor.next", ret);
+		if ((ret = cursor->close(cursor)) != 0)
+			die("cursor.close", ret);
 
-	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
-
+		if ((ret = session->close(session, NULL)) != 0)
+			die("session.close", ret);
+	}
 	(void)fclose(fp);
 }

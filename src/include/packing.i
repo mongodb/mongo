@@ -37,6 +37,14 @@ typedef struct {
 #define	WT_PACK_INIT    { NULL, NULL, NULL, NULL, 0, WT_PACK_VALUE_INIT }
 #define	WT_DECL_PACK(pack)  WT_PACK pack = WT_PACK_INIT
 
+typedef struct {
+	WT_CONFIG config;
+	char buf[20];
+	int count;
+	int iskey;
+	int genname;
+} WT_PACK_NAME;
+
 /*
  * __pack_initn --
  *      Initialize a pack iterator with the specified string and length.
@@ -68,8 +76,51 @@ __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
 }
 
 /*
- * __pack_next --
+ * __pack_name_init --
+ *      Initialize the name of a pack iterator.
+ */
+static inline int
+__pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names,
+    int iskey, WT_PACK_NAME *pn)
+{
+	WT_CLEAR(*pn);
+	pn->iskey = iskey;
+
+	if (names->str != NULL)
+		WT_RET(__wt_config_subinit(session, &pn->config, names));
+	else
+		pn->genname = 1;
+
+	return (0);
+}
+
+/*
+ * __pack_name_next --
  *      Get the next field type from a pack iterator.
+ */
+static inline int
+__pack_name_next(WT_PACK_NAME *pn, WT_CONFIG_ITEM *name)
+{
+	WT_CONFIG_ITEM ignore;
+
+	if (pn->genname) {
+		(void)snprintf(pn->buf, sizeof(pn->buf),
+		    (pn->iskey ? "key%d" : "value%d"), pn->count);
+		WT_CLEAR(*name);
+		name->str = pn->buf;
+		name->len = strlen(pn->buf);
+		name->type = WT_CONFIG_ITEM_STRING;
+		pn->count++;
+	}
+	else
+		WT_RET(__wt_config_next(&pn->config, name, &ignore));
+
+	return (0);
+}
+
+/*
+ * __pack_next --
+ *      Next pack iterator.
  */
 static inline int
 __pack_next(WT_PACK *pack, WT_PACK_VALUE *pv)
@@ -192,7 +243,6 @@ next:	if (pack->cur == pack->end)
 static inline size_t
 __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 {
-	const char *p, *start, *end;
 	size_t s, pad;
 
 	switch (pv->type) {
@@ -200,22 +250,11 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (pv->size);
 	case 's':
 	case 'S':
-		/*
-		 * XXX if pv->havesize, only want to know if there is a
-		 * '\0' in the first pv->size characters.
-		 */
-		if (pv->type == 's' || pv->havesize) {
-			p = start = (const char *)pv->u.s;
-			end = start + pv->size;
-			while (p < end && *p != '\0')
-				p++;
-			s = (size_t)(p - start);
-			pad = pv->size - s;
-		} else {
-			s = strlen(pv->u.s);
-			pad = 1;
-		}
-		return (s + pad);
+		if (pv->type == 's' || pv->havesize)
+			s = pv->size;
+		else
+			s = strlen(pv->u.s) + 1;
+		return (s);
 	case 'U':
 	case 'u':
 		s = pv->u.item.size;
@@ -394,12 +433,12 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'b':
 		/* Translate to maintain ordering with the sign bit. */
 		WT_SIZE_CHECK(1, maxlen);
-		pv->u.i = (int8_t)(**pp++ - 0x80);
+		pv->u.i = (int8_t)(*(*pp)++ - 0x80);
 		break;
 	case 'B':
 	case 't':
 		WT_SIZE_CHECK(1, maxlen);
-		pv->u.u = **pp++;
+		pv->u.u = *(*pp)++;
 		break;
 	case 'h':
 	case 'i':

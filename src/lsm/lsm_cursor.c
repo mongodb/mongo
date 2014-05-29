@@ -213,7 +213,7 @@ __clsm_deleted_encode(WT_SESSION_IMPL *session,
 		memcpy(tmp->mem, value->data, value->size);
 		memcpy((uint8_t *)tmp->mem + value->size, __tombstone.data, 1);
 		final_value->data = tmp->mem;
-		final_value->size = value->size + __tombstone.size;
+		final_value->size = value->size + 1;
 	} else {
 		final_value->data = value->data;
 		final_value->size = value->size;
@@ -321,17 +321,26 @@ __clsm_open_cursors(
 	 * create one.
 	 *
 	 * !!!
-	 * It is exceeding unlikely that we get here at all, but if there is a
-	 * transaction in progress and it rolls back, it would leave the
-	 * metadata inconsistent.
+	 * It is exceeding unlikely that we get here at all, but if we were to
+	 * switch chunks in this thread and our transaction roll back, it would
+	 * leave the metadata inconsistent.  Signal for the LSM worker thread
+	 * to create the chunk instead to avoid the issue.
 	 */
 	if (update && (lsm_tree->nchunks == 0 ||
 	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) == NULL ||
 	    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))) {
 		/* Release our lock because switch will get a write lock. */
+		F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 		locked = 0;
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
-		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
+		WT_ERR(__wt_cond_signal(session, lsm_tree->work_cond));
+
+		/*
+		 * Give the worker thread a chance to run before locking the
+		 * tree again -- we will loop in __clsm_enter until there is an
+		 * in-memory chunk in the tree.
+		 */
+		__wt_sleep(0, 1000);
 		WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 0));
 		locked = 1;
 	}

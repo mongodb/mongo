@@ -150,7 +150,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	(void)flags;
 	type = op->get_type(op);
 	if (type != WT_AOP_COMPACT) {
-		thread = (CONFIG_THREAD *)op->c.lang_private;
+		thread = (CONFIG_THREAD *)op->app_private;
 		cfg = thread->cfg;
 	}
 	trk = NULL;
@@ -174,7 +174,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 			trk = &thread->update;
 			break;
 		case WT_AOP_COMPACT:
-			tables = (uint32_t *)op->c.lang_private;
+			tables = (uint32_t *)op->app_private;
 			ATOMIC_ADD(*tables, (uint32_t)-1);
 			break;
 		case WT_AOP_REMOVE:
@@ -337,7 +337,7 @@ retry:		if ((ret = conn->async_new_op(
 			(void)usleep(10000);
 			goto retry;
 		}
-		asyncop->c.lang_private = thread;
+		asyncop->app_private = thread;
 		asyncop->set_key(asyncop, key_buf);
 		switch (*op) {
 		case WORKER_READ:
@@ -911,7 +911,7 @@ retry:		if ((ret = conn->async_new_op(
 			(void)usleep(10000);
 			goto retry;
 		}
-		asyncop->c.lang_private = thread;
+		asyncop->app_private = thread;
 
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 		asyncop->set_key(asyncop, key_buf);
@@ -1288,7 +1288,7 @@ retry:			 if ((ret = cfg->conn->async_new_op(cfg->conn,
 				}
 				return (ret);
 			}
-			asyncop->c.lang_private = &tables;
+			asyncop->app_private = &tables;
 			if ((ret = asyncop->compact(asyncop)) != 0) {
 				lprintf(cfg, ret, 0, "Async compact failed.");
 				return (ret);
@@ -1865,10 +1865,10 @@ int
 main(int argc, char *argv[])
 {
 	CONFIG *cfg, _cfg;
-	size_t cc_len, req_len, tc_len;
+	size_t req_len;
 	int ch, monitor_set, ret;
 	const char *opts = "C:H:h:m:O:o:T:";
-	const char *config_opts, *sep;
+	const char *config_opts;
 	char *cc_buf, *tc_buf, *user_cconfig, *user_tconfig;
 
 	monitor_set = ret = 0;
@@ -1885,17 +1885,14 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'C':
-			if (user_cconfig == NULL) {
-				sep = "";
-				cc_len = 0;
-			} else {
-				sep = ",";
-				cc_len = strlen(user_cconfig);
+			if (user_cconfig == NULL)
+				user_cconfig = strdup(optarg);
+			else {
+				user_cconfig = realloc(user_cconfig,
+				    strlen(user_cconfig) + strlen(optarg) + 2);
+				strcat(user_cconfig, ",");
+				strcat(user_cconfig, optarg);
 			}
-			user_cconfig = realloc(user_cconfig,
-			    cc_len + strlen(optarg) + strlen(sep) + 1);
-			strncat(user_cconfig, sep, strlen(sep));
-			strncat(user_cconfig, optarg, strlen(optarg));
 			break;
 		case 'H':
 			cfg->helium_mount = optarg;
@@ -1904,17 +1901,14 @@ main(int argc, char *argv[])
 			config_opts = optarg;
 			break;
 		case 'T':
-			if (user_tconfig == NULL) {
-				sep = "";
-				tc_len = 0;
-			} else {
-				sep = ",";
-				tc_len = strlen(user_tconfig);
+			if (user_tconfig == NULL)
+				user_tconfig = strdup(optarg);
+			else {
+				user_tconfig = realloc(user_tconfig,
+				    strlen(user_tconfig) + strlen(optarg) + 2);
+				strcat(user_tconfig, ",");
+				strcat(user_tconfig, optarg);
 			}
-			user_tconfig = realloc(user_tconfig,
-			    tc_len + strlen(optarg) + strlen(sep) + 1);
-			strncat(user_tconfig, sep, strlen(sep));
-			strncat(user_tconfig, optarg, strlen(optarg));
 			break;
 		case 'h':
 			cfg->home = optarg;
@@ -2090,7 +2084,7 @@ start_threads(CONFIG *cfg,
 		 */
 		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
-		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
+		if ((thread->value_buf = calloc(cfg->value_sz + 1, 1)) == NULL)
 			return (enomem(cfg));
 		/*
 		 * Initialize and then toss in a bit of random values if needed.

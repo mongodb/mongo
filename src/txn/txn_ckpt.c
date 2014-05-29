@@ -472,8 +472,7 @@ __checkpoint_worker(
 	 * nature of the checkpoint.
 	 */
 	if (!btree->modified && !is_checkpoint)
-		return (__wt_bt_cache_op(
-		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
+		return (__wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
 	 * Get the list of checkpoints for this file.  If there's no reference
@@ -483,8 +482,7 @@ __checkpoint_worker(
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
 		WT_ASSERT(session, session->dhandle->session_ref == 0);
-		return (__wt_bt_cache_op(
-		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
+		return (__wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
 	}
 	WT_ERR(ret);
 
@@ -755,7 +753,7 @@ __checkpoint_worker(
 	if (is_checkpoint)
 		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
 	else
-		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_DISCARD));
+		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CLOSE));
 
 	/*
 	 * All blocks being written have been written; set the object's write
@@ -861,8 +859,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session)
 	 * otherwise there's no work to do.
 	 */
 	if (session->dhandle->checkpoint != NULL)
-		return (
-		    __wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD_NOWRITE));
+		return (__wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
 	 * Otherwise, checkpoint the file and, if it was modified, optionally

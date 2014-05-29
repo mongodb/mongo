@@ -110,11 +110,8 @@ connection_stats = [
 	##########################################
 	# Dhandle statistics
 	##########################################
-	Stat('dh_conn_handles', 'dhandle: connection dhandles swept'),
-	Stat('dh_conn_sweeps', 'dhandle: connection sweep attempts'),
 	Stat('dh_session_handles', 'dhandle: session dhandles swept'),
 	Stat('dh_session_sweeps', 'dhandle: session sweep attempts'),
-	Stat('dh_sweep_evict', 'dhandle: sweeps conflicting with evict'),
 
 	##########################################
 	# Logging statistics
