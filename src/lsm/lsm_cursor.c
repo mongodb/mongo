@@ -213,7 +213,7 @@ __clsm_deleted_encode(WT_SESSION_IMPL *session,
 		memcpy(tmp->mem, value->data, value->size);
 		memcpy((uint8_t *)tmp->mem + value->size, __tombstone.data, 1);
 		final_value->data = tmp->mem;
-		final_value->size = value->size + __tombstone.size;
+		final_value->size = value->size + 1;
 	} else {
 		final_value->data = value->data;
 		final_value->size = value->size;
