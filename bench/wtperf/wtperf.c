@@ -2178,12 +2178,12 @@ wtperf_rand(CONFIG *cfg)
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
 		S2 = wtperf_value_range(cfg) * 0.2 * (PARETO_SHAPE - 1);
-		U = 1 - (double)rval / (double)RAND_MAX;
+		U = 1 - (double)rval / (double)UINT32_MAX;
 		rval = (pow(U, S1) - 1) * S2;
 		/*
 		 * This Pareto calculation chooses out of range values about
 		 * about 2% of the time, from my testing. That will lead to the
-		 * last item in the table being "hot".
+		 * first item in the table being "hot".
 		 */
 		if (rval > wtperf_value_range(cfg))
 			rval = wtperf_value_range(cfg);
