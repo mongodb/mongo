@@ -1,26 +1,19 @@
 package options
 
 import (
-	"flag"
+	//	"flag"
 	"fmt"
+	//	flag "github.com/ogier/pflag"
 	"os"
 	"strconv"
 	"strings"
 )
 
 type MongoTopOptions struct {
-	Locks      bool
+	Locks      bool `long:"locks" description:"Report on use of per-database locks"`
 	DB         string
 	Collection string
 	SleepTime  int
-}
-
-func (self *MongoTopOptions) Usage() {
-	fmt.Println("blecch... more usage")
-}
-
-func (self *MongoTopOptions) Register() {
-	flag.BoolVar(&(self.Locks), "locks", false, "Report on lock usage")
 }
 
 func (self *MongoTopOptions) PostParse() error {

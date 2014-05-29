@@ -1,49 +1,31 @@
 package options
 
 import (
-	"flag"
-	"fmt"
+	//	"flag"
+	//	"fmt"
+	"github.com/shelman/mongo-tools-proto/common/util"
+	"os"
+	//	flag "github.com/ogier/pflag"
+	"github.com/jessevdk/go-flags"
 )
 
 type MongoToolOptions struct {
-	// Print help and exit
-	Help bool
+	*GeneralOptions
+	*VerbosityOptions
+	*ConnectionOptions
+	*SSLOptions
+	*AuthOptions
 
-	// How verbose to be
-	V1 bool
-	V2 bool
-	V3 bool
-	V4 bool
-	V5 bool
-
-	// Suppress output
-	Quiet bool
-
-	// Print version
-	Version bool
-
-	// Host to connect to
-	Host string
-
-	// Port to use
-	Port string
+	////////
 
 	// Specified database and collection
 	DB         string
 	Collection string
 
-	// Specify authentication credentials and database
-	Username string
-	Password string
+	AppName    string
+	VersionStr string
 
-	// SSL options
-	SSL                         bool
-	SSLCAFile                   string
-	SSLPEMKeyFile               string
-	SSLPEMKeyPassword           string
-	SSLCRLFile                  string
-	SSLAllowInvalidCertificates bool
-	SSLFipsMode                 bool
+	// TODO below: kill this?
 
 	// Extra tool-specific options that can be specified by calling
 	// AddOptions
@@ -54,103 +36,115 @@ type MongoToolOptions struct {
 	FilterOnlyColl bool   // filter only on collection
 	FilterBoth     bool   // filter on both db and collection
 
+	// for caching the parser
+	parser *flags.Parser
 }
 
-func (self *MongoToolOptions) Usage() {
-	fmt.Println("blah blah blah usage")
-	self.ExtraOptions.Usage()
+type GeneralOptions struct {
+	Help    bool `long:"help" description:"Print usage"`
+	Version bool `long:"version" description:"Print the version"`
+}
+
+type VerbosityOptions struct {
+	Verbose []bool `short:"v" long:"verbose" description:"Set verbosity level"`
+	Quiet   bool   `long:"quiet" description:"Run in quiet mode, attempting to limit the amount of output"`
+}
+
+type ConnectionOptions struct {
+	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost"`
+	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening" default:"27017"`
+	IPV6 bool   `long:"ipv6" description:"Enable ipv6 support"`
+}
+
+type SSLOptions struct {
+	SSL               bool   `long:"ssl" description:"Enable connection to a mongod or mongos that has ssl enabled"`
+	SSLCAFile         string `long:"sslCAFile" description:"Specify the .pem file containing the root certificate chain from the certificate authority"`
+	SSLPEMKeyFile     string `long:"sslPEMKeyFile" description:"Specify the .pem file containing the certificate and key"`
+	SSLPEMKeyPassword string `long:"sslPEMKeyPassword" description:"Specify the password to decrypt the sslPEMKeyFile, if necessary"`
+	SSLCRLFile        string `long:"sslCRLFile" description:"Specify the .pem file containing the certificate revocation list"`
+	SSLAllowInvalid   bool   `long:"sslAllowInvalidCertificates" description:"Bypass the validation for server certificates"`
+	SSLFipsMode       bool   `long:"sslFIPSMode" description:"Use FIPS mode of the installed openssl library"`
+}
+
+type AuthOptions struct {
+	Username      string `short:"u" long:"username" description:"Specify a user name for authentication"`
+	Password      string `short:"p" long:"password" description:"Specify a password for authentication"`
+	AuthDB        string `long:"authenticationDatabase" description:"Specify the database that holds the user's credentials"`
+	AuthMechanism string `long:"authenticationMechanism" description:"Specify the authentication mechanism to be used"`
 }
 
 type ExtraOptions interface {
-	Register()
 	PostParse() error
 	Validate() error
-	Usage()
 }
 
 func (self *MongoToolOptions) AddOptions(opts ExtraOptions) {
-	opts.Register()
 	self.ExtraOptions = opts
 }
 
 // Register the command line flags to be parsed into the options
-func GetMongoToolOptions() *MongoToolOptions {
+func GetMongoToolOptions(appName, versionStr string) *MongoToolOptions {
 
 	// options bound to the command line flags
-	options := &MongoToolOptions{}
+	options := &MongoToolOptions{
+		AppName:    appName,
+		VersionStr: versionStr,
 
-	flag.BoolVar(&(options.Help), "help", false, "Return information on the"+
-		" options and usage of mongotop")
-
-	flag.BoolVar(&(options.V1), "verbose", false, "Verbosity level 1")
-	flag.BoolVar(&(options.V1), "v", false, "Verbosity level 1")
-	flag.BoolVar(&(options.V2), "vv", false, "Verbosity level 2")
-	flag.BoolVar(&(options.V3), "vvv", false, "Verbosity level 3")
-	flag.BoolVar(&(options.V4), "vvvv", false, "Verbosity level 4")
-	flag.BoolVar(&(options.V5), "vvvvv", false, "Verbosity level 5")
-
-	flag.BoolVar(&(options.Quiet), "quiet", false, "Runs the mongotop in a"+
-		" quiet mode that attempts to limit the amount of output")
-
-	flag.BoolVar(&(options.Version), "version", false, "Returns the mongotop"+
-		" release number")
-
-	flag.StringVar(&(options.Host), "host", "127.0.0.1:27017", "Specifies a"+
-		" resolvable hostname for the mongod to which to connect")
-	flag.StringVar(&(options.Host), "h", "127.0.0.1:27017", "Specifies a"+
-		" resolvable hostname for the mongod to which to connect")
-
-	flag.StringVar(&(options.Port), "port", "", "Specifies the TCP port"+
-		" on which the MongoDB instance listens for client connections")
-
-	flag.StringVar(&(options.DB), "db", "", "Filter by database")
-	flag.StringVar(&(options.DB), "d", "", "Filter by database")
-
-	flag.StringVar(&(options.Collection), "collection", "",
-		"Filter by collection")
-	flag.StringVar(&(options.Collection), "c", "", "Filter by collection")
-
-	flag.StringVar(&(options.Username), "username", "", "Specify username for"+
-		" authentication")
-	flag.StringVar(&(options.Username), "u", "", "Specify username for"+
-		" authentication")
-
-	flag.StringVar(&(options.Password), "password", "", "Specify password for"+
-		" authentication")
-	flag.StringVar(&(options.Password), "p", "", "Specify password for"+
-		" authentication")
-
-	flag.BoolVar(&(options.SSL), "ssl", false, "Use ssl")
-	flag.StringVar(&(options.SSLCAFile), "sslCAFile", "", "Specify a .pem file")
-	flag.StringVar(&(options.SSLPEMKeyFile), "sslPEMKeyFile", "", "Specify a"+
-		" .pem key file")
-	flag.StringVar(&(options.SSLPEMKeyPassword), "sslPEMKeyPassword", "",
-		"Specify a password to decrypt the file")
-	flag.StringVar(&(options.SSLCRLFile), "sslCRLFile", "", "Specify a crl"+
-		" file")
-	flag.BoolVar(&(options.SSLAllowInvalidCertificates),
-		"sslAllowInvalidCertificates", false, "Allow invalid certs")
-	flag.BoolVar(&(options.SSLFipsMode), "sslFIPSMode", false, "Use fips mode")
+		GeneralOptions:    &GeneralOptions{},
+		VerbosityOptions:  &VerbosityOptions{},
+		ConnectionOptions: &ConnectionOptions{},
+		SSLOptions:        &SSLOptions{},
+		AuthOptions:       &AuthOptions{},
+	}
 
 	return options
+}
 
+func (self *MongoToolOptions) PrintHelp() bool {
+	if self.Help {
+		self.parser.WriteHelp(os.Stdout)
+	}
+	return self.Help
+}
+
+func (self *MongoToolOptions) PrintVersion() bool {
+	if self.Version {
+		util.Printlnf("%v version: %v", self.AppName, self.VersionStr)
+	}
+	return self.Version
 }
 
 // Parse the command line args into the mongo options
 func (self *MongoToolOptions) ParseAndValidate() error {
 
+	// init a parser for the flags
+	self.parser = flags.NewNamedParser(self.AppName, flags.None)
+	self.parser.Usage = "<options> <sleeptime>"
+
+	// register self to receive the flags
+	_, err := self.parser.AddGroup("general options", "", self.GeneralOptions)
+	_, err = self.parser.AddGroup("verbosity options", "", self.VerbosityOptions)
+	_, err = self.parser.AddGroup("connection options", "", self.ConnectionOptions)
+	_, err = self.parser.AddGroup("ssl options", "", self.SSLOptions)
+	_, err = self.parser.AddGroup("authentication options", "", self.AuthOptions)
+
 	// parse
-	flag.Parse()
-
-	// run post-parse logic
-	if err := self.PostParse(); err != nil {
-		return fmt.Errorf("error post-processing tool params: %v", err)
+	_, err = self.parser.Parse()
+	if err != nil {
+		return err
 	}
 
-	// run validation logic
-	if err := self.Validate(); err != nil {
-		return fmt.Errorf("validating tool params failed: %v", err)
-	}
+	/*
+		// run post-parse logic
+		if err := self.PostParse(); err != nil {
+			return fmt.Errorf("error post-processing tool params: %v", err)
+		}
+
+		// run validation logic
+		if err := self.Validate(); err != nil {
+			return fmt.Errorf("validating tool params failed: %v", err)
+		}
+	*/
 
 	return nil
 }
