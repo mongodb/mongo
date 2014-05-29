@@ -1,3 +1,5 @@
+#include "mongo/tools/tool.h"
+
 #include "mongo/tools/mongotop_options.h"
 
 #include "mongo/util/options_parser/startup_option_init.h"
@@ -22,7 +24,7 @@ namespace mongo
     }
 	Status _mongoInitializerFunction_MongoTopOptions_Validate(InitializerContext* context)
 	{
-	    if (!handlePreValidationMongoTopOptions(moe::startupOptionsParsed))
+	    if (!Tool::handlePreValidationMongoOptions(moe::startupOptionsParsed))
 	    {
 	        ::_exit(0);
 	    }
@@ -41,7 +43,7 @@ namespace mongo
     }
 	Status _mongoInitializerFunction_MongoTopOptions_Store(InitializerContext* context) 
 	{
-	    Status ret = storeMongoTopOptions(moe::startupOptionsParsed, context->args());
+	    Status ret = Tool::storeMongoOptions(moe::startupOptionsParsed, context->args());
 	    if (!ret.isOK()) {
 	        std::cerr << ret.toString() << std::endl;
 	        std::cerr << "try '" << context->args()[0] << " --help' for more information"

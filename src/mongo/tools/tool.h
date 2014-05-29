@@ -45,6 +45,15 @@
 using std::string;
 
 namespace mongo {
+    typedef mongo::Status (*StoreOptions)(const mongo::moe::Environment& params, const std::vector<std::string>& args);
+    typedef bool (*HandleOptions)(const mongo::moe::Environment& params);
+    typedef mongo::Status (*AddOptions)(mongo::moe::OptionSection* options);
+    
+    struct OptionHandler {
+        StoreOptions store;
+        HandleOptions handle;
+        AddOptions add;
+    };
 
     class Tool {
     public:
@@ -52,8 +61,11 @@ namespace mongo {
         virtual ~Tool();
 
         typedef std::auto_ptr<Tool> (*InstanceFunction)();
+
         static std::map < std::string, InstanceFunction> tools;
+        static std::map < std::string, OptionHandler> options;
         static void mapTools();
+        static void mapOptions();
 
         static std::auto_ptr<Tool> createInstanceOfThisTool();
         static std::auto_ptr<Tool> (*createBSONDumpInstance)();
@@ -66,6 +78,10 @@ namespace mongo {
         static std::auto_ptr<Tool> (*createSnifferInstance)();
         static std::auto_ptr<Tool> (*createStatInstance)();
         static std::auto_ptr<Tool> (*createTopToolInstance)();
+
+        static StoreOptions storeMongoOptions;
+        static AddOptions addMongoOptions;
+        static HandleOptions handlePreValidationMongoOptions;
 
         int main( int argc , char ** argv, char ** envp );
 
@@ -123,3 +139,6 @@ namespace mongo {
 #define REGISTER_MONGO_TOOL(TYPENAME) \
     std::auto_ptr<Tool> TYPENAME::createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
     std::auto_ptr<Tool> (*Tool::createInstance(TYPENAME))() = TYPENAME::createInstanceOfThisTool;
+
+#define REGISTER_OPTION_HANDLER(NAME) \
+    storeMongo##NAME##Options, handlePreValidationMongo##NAME##Options, addMongo##NAME##Options
