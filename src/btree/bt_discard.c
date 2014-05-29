@@ -113,7 +113,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	/* Discard any disk image. */
 	dsk = (WT_PAGE_HEADER *)page->dsk;
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
-		__wt_overwrite_and_free_len(session, dsk, page->dsk->mem_size);
+		__wt_overwrite_and_free_len(session, dsk, dsk->mem_size);
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
 		(void)__wt_mmap_discard(session, dsk, dsk->mem_size);
 
@@ -248,7 +248,7 @@ __wt_free_ref(
 		__wt_free(session, ref->page_del);
 	}
 
-	__wt_overwrite_and_free_len(session, ref, sizeof(*ref));
+	__wt_overwrite_and_free(session, ref);
 }
 
 /*
