@@ -5,7 +5,9 @@
  * See the file LICENSE for redistribution information.
  */
 #include "leveldb_wt.h"
+#include <sstream>
 
+using leveldb::Cache;
 using leveldb::FilterPolicy;
 using leveldb::Iterator;
 using leveldb::Options;
@@ -25,7 +27,7 @@ using leveldb::Value;
 #endif
 
 #define	WT_URI	"table:data"
-#define	WT_CONFIG	"type=lsm,leaf_page_max=4KB,leaf_item_max=1KB"
+#define	WT_CONFIG	"type=lsm,leaf_page_max=4KB,leaf_item_max=1KB,"
 
 /* Destructors required for interfaces. */
 leveldb::DB::~DB() {}
@@ -90,13 +92,36 @@ Iterator* NewErrorIterator(const Status& status) {
   return new EmptyIterator(status);
 }
 
+namespace {
+class FilterPolicyImpl : public FilterPolicy {
+public:
+	FilterPolicyImpl(int bits_per_key) : bits_per_key_(bits_per_key) {}
+	~FilterPolicyImpl() {}
+	virtual const char *Name() const { return "FilterPolicyImpl"; }
+	virtual void CreateFilter(const Slice *keys, int n, std::string *dst) const {}
+	virtual bool KeyMayMatch(const Slice &key, const Slice &filter) const {}
+
+	int bits_per_key_;
+};
+
+class CacheImpl : public Cache {
+public:
+	CacheImpl(size_t capacity) : capacity_(capacity) {}
+
+	size_t capacity_;
+};
+};
+
+
 namespace leveldb {
+FilterPolicy::~FilterPolicy() {}
+
 const FilterPolicy *NewBloomFilterPolicy(int bits_per_key) {
-  return 0;
+  return new FilterPolicyImpl(bits_per_key);
 }
 
 Cache *NewLRUCache(size_t capacity) {
-  return 0;
+  return new CacheImpl(capacity);
 }
 
 Status DestroyDB(const std::string& name, const Options& options) {
@@ -288,17 +313,46 @@ private:
 Status
 leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB **dbptr)
 {
+	// Build the wiredtiger_open config.
+	std::stringstream s_conn;
+	if (options.create_if_missing)
+		s_conn << "create,";
+	if (options.error_if_exists)
+		s_conn << "exclusive,";
+	if (options.compression == kSnappyCompression)
+		s_conn << "extensions=[libwiredtiger_snappy.so],";
+	if (options.block_cache)
+		s_conn << "cache_size=" << ((CacheImpl *)options.block_cache)->capacity_ << ",";
+	std::string conn_config = s_conn.str();
+
 	WT_CONNECTION *conn;
-	int ret = ::wiredtiger_open(name.c_str(), NULL, "create", &conn);
+	int ret = ::wiredtiger_open(name.c_str(), NULL, conn_config.c_str(), &conn);
 	assert(ret == 0);
 
-	WT_SESSION *session;
-	ret = conn->open_session(conn, NULL, NULL, &session);
-	assert(ret == 0);
-	ret = session->create(session, WT_URI, WT_CONFIG);
-	assert(ret == 0);
-	ret = session->close(session, NULL);
-	assert(ret == 0);
+	if (options.create_if_missing) {
+		std::stringstream s_table(WT_CONFIG);
+		s_table << "internal_page_max=" << options.block_size << ",";
+		s_table << "leaf_page_max=" << options.block_size << ",";
+		if (options.compression == kSnappyCompression)
+			s_table << "block_compressor=snappy,";
+		s_table << "lsm=(";
+		s_table << "chunk_size=" << options.write_buffer_size << ",";
+		if (options.filter_policy) {
+			int bits = ((FilterPolicyImpl *)options.filter_policy)->bits_per_key_;
+			s_table << "bloom_bit_count=" << bits << ",";
+			// Approximate the optimal number of hashes
+			s_table << "bloom_hash_count=" << (int)(0.6 * bits) << ",";
+		}
+		s_table << "),";
+		WT_SESSION *session/;
+		std::string table_config = s_table.str();
+		ret = conn->open_session(conn, NULL, NULL, &session);
+		assert(ret == 0);
+		ret = session->create(session, WT_URI, table_config.c_str());
+		assert(ret == 0);
+		ret = session->close(session, NULL);
+		assert(ret == 0);
+	}
 
 	*dbptr = new DbImpl(conn);
 	return Status::OK();
