@@ -61,6 +61,7 @@ class Dump : public Tool {
     };
 public:
     Dump() : Tool() { }
+    static std::auto_ptr<Tool> createInstanceOfThisTool();
 
     virtual void printHelp(ostream& out) {
         printMongoDumpHelp(&out);
@@ -516,4 +517,4 @@ public:
     BSONObj _query;
 };
 
-REGISTER_MONGO_TOOL(Dump);
+REGISTER_MONGO_TOOL(Dump)

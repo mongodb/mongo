@@ -58,6 +58,19 @@ using namespace std;
 using namespace mongo;
 
 namespace mongo {
+    typedef std::auto_ptr<Tool> (*InstanceFunction)();
+    std::map < std::string, InstanceFunction> Tool::tools;
+
+    void Tool::mapTools()
+    {
+        Tool::tools["dump"] = *Tool::createDumpInstance;
+        Tool::tools["export"] = *Tool::createExportInstance;
+        Tool::tools["import"] = *Tool::createImportInstance;
+        Tool::tools["stat"] = *Tool::createStatInstance;
+        Tool::tools["oplog"] = *Tool::createOplogToolInstance;
+        Tool::tools["restore"] = *Tool::createRestoreInstance;
+        Tool::tools["top"] = *Tool::createTopToolInstance;
+    }
 
     Tool::Tool() :
         _autoreconnect(false), _conn(0), _slaveConn(0) { }
@@ -75,7 +88,6 @@ namespace mongo {
 
     int Tool::main( int argc , char ** argv, char ** envp ) {
         static StaticObserver staticObserver;
-
         mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
         // hide password from ps output
@@ -87,7 +99,7 @@ namespace mongo {
                 }
             }
         }
-
+        
         if (!toolGlobalParams.useDirectClient) {
             if (toolGlobalParams.noconnection) {
                 // do nothing
@@ -396,7 +408,20 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
 
 #else
 int main(int argc, char* argv[], char** envp) {
-    auto_ptr<Tool> instance = (*Tool::createInstance)();
-    ::_exit(instance->main(argc, argv, envp));
+    Tool::mapTools();
+    char* newargv[argc - 1];
+    newargv[0] = argv[0];
+    for (int i = 2; i < argc; ++i) {
+        newargv[i - 1] = argv[i];
+    }
+
+    if(Tool::tools.find(argv[1]) == Tool::tools.end())
+    {
+        std::cout<<std::string(argv[1]) + " is not a tool."<<endl;
+        ::_exit(EXIT_FAILURE);
+    }
+
+    auto_ptr<Tool> instance = Tool::tools[argv[1]]();
+    ::_exit(instance->main(argc - 1, newargv, envp));
 }
 #endif
