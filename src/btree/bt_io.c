@@ -54,8 +54,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 * We're allocating the exact number of bytes we're expecting
 		 * from decompression.
 		 */
-		WT_ERR(__wt_buf_init(session, buf, dsk->mem_size));
-		buf->size = dsk->mem_size;
+		WT_ERR(__wt_buf_initsize(session, buf, dsk->mem_size));
 
 		/*
 		 * Note the source length is NOT the number of compressed bytes,
