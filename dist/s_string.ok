@@ -315,6 +315,7 @@ async
 asyncopp
 autockpt
 autocommit
+basecfg
 bdb
 bigram
 bitcnt
@@ -394,7 +395,6 @@ copyout
 cp
 cpuid
 crc
-createcfg
 cref
 ctime
 ctype

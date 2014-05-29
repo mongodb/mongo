@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-#define	WT_BASECONFIG	"WiredTiger.createcfg"
+#define	WT_BASECONFIG	"WiredTiger.basecfg"
 #define	WT_USERCONFIG	"WiredTiger.config"
 
 static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);

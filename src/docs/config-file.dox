@@ -15,9 +15,9 @@ database is subsequently opened.
 When a database is created or opened, the order of configuration is:
 
 - Any \c WiredTiger.basecfg file,
+- which is overridden by the ::wiredtiger_open configuration string argument.
 - which is overridden by the \c WiredTiger.config file,
 - which is overridden by the \c WIREDTIGER_CONFIG environment variable,
-- which is overridden by the ::wiredtiger_open configuration string argument.
 
 @section config_env WIREDTIGER_CONFIG environment variable
 

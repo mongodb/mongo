@@ -2003,12 +2003,10 @@ struct __wt_connection {
  * "shared_cache"\, \c "split"\, \c "verify"\, \c "version"\, \c "write";
  * default empty.}
  * @configend
- * Additionally, if files named \c WiredTiger.config or \c WiredTiger.createcfg
+ * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
  * appear in the WiredTiger home directory, they are read for configuration
  * values (see @ref config_file and @ref config_base for details).
- * Configuration values specified in the \c config argument to the
- * ::wiredtiger_open function override configuration values specified in config
- * files.
+ * See @ref config_order for ordering of the configuration mechanisms.
  * @param[out] connectionp A pointer to the newly opened connection handle
  * @errors
  */
