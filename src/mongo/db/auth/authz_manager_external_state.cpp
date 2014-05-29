@@ -40,63 +40,6 @@ namespace mongo {
     AuthzManagerExternalState::AuthzManagerExternalState() {}
     AuthzManagerExternalState::~AuthzManagerExternalState() {}
 
-    Status AuthzManagerExternalState::getPrivilegeDocumentV1(const StringData& dbname,
-                                                             const UserName& userName,
-                                                             BSONObj* result) {
-        if (userName == internalSecurity.user->getName()) {
-            return Status(ErrorCodes::InternalError,
-                          "Requested privilege document for the internal user");
-        }
-
-        if (!NamespaceString::validDBName(dbname)) {
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Bad database name \"" << dbname << "\"");
-        }
-
-        const bool isUserFromTargetDB = (dbname == userName.getDB());
-
-        // Build the query needed to get the privilege document
-
-        BSONObjBuilder queryBuilder;
-        const NamespaceString usersNamespace(dbname, "system.users");
-        queryBuilder.append(AuthorizationManager::V1_USER_NAME_FIELD_NAME, userName.getUser());
-        if (isUserFromTargetDB) {
-            queryBuilder.appendNull(AuthorizationManager::V1_USER_SOURCE_FIELD_NAME);
-        }
-        else {
-            queryBuilder.append(AuthorizationManager::V1_USER_SOURCE_FIELD_NAME, userName.getDB());
-        }
-
-        // Query for the privilege document
-        BSONObj userBSONObj;
-        Status found = findOne(usersNamespace, queryBuilder.done(), &userBSONObj);
-        if (!found.isOK()) {
-            if (found.code() == ErrorCodes::NoMatchingDocument) {
-                // Return more detailed status that includes user name.
-                return Status(ErrorCodes::UserNotFound,
-                              mongoutils::str::stream() << "auth: couldn't find user " <<
-                              userName.toString() << ", " << usersNamespace.ns(),
-                              0);
-            } else {
-                return found;
-            }
-        }
-
-        if (isUserFromTargetDB) {
-            if (userBSONObj[AuthorizationManager::PASSWORD_FIELD_NAME].eoo()) {
-                return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
-                              "User documents with schema version " <<
-                              AuthorizationManager::schemaVersion24 <<
-                              " must have a \"" <<
-                              AuthorizationManager::PASSWORD_FIELD_NAME <<
-                              "\" field.");
-            }
-        }
-
-        *result = userBSONObj.getOwned();
-        return Status::OK();
-    }
-
     bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() {
         BSONObj userBSONObj;
         Status status = findOne(

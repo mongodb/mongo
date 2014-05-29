@@ -491,32 +491,6 @@ namespace {
                 it != _authenticatedUsers.end(); ++it) {
             User* user = *it;
 
-            if (user->getSchemaVersion() == AuthorizationManager::schemaVersion24 &&
-                (target.isDatabasePattern() || target.isExactNamespacePattern()) &&
-                !user->hasProbedV1(target.databaseToMatch())) {
-
-                UserName name = user->getName();
-                User* updatedUser;
-                Status status = getAuthorizationManager().acquireV1UserProbedForDb(
-                        name,
-                        target.databaseToMatch(),
-                        &updatedUser);
-                if (status.isOK()) {
-                    if (user != updatedUser) {
-                        LOG(1) << "Updated session cache with privileges on the " <<
-                                target.databaseToMatch() << " database for V1 user " << name;
-                        fassert(17226, _authenticatedUsers.replaceAt(it, updatedUser) == user);
-                    }
-                    getAuthorizationManager().releaseUser(user);
-                    user = updatedUser;
-                }
-                else if (status != ErrorCodes::UserNotFound) {
-                    warning() << "Could not fetch updated user privilege information for V1-style "
-                        "user " << name << "; continuing to use old information.  Reason is "
-                              << status;
-                }
-            }
-
             for (int i = 0; i < resourceSearchListLength; ++i) {
                 ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
                 unmetRequirements.removeAllActionsFromSet(userActions);

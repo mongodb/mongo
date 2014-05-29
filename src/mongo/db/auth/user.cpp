@@ -43,7 +43,6 @@ namespace mongo {
 
     User::User(const UserName& name) :
         _name(name),
-        _schemaVersion(AuthorizationManager::schemaVersion26Final),
         _refCount(0),
         _isValid(1) {}
 
@@ -87,9 +86,7 @@ namespace mongo {
         std::auto_ptr<User> result(new User(_name));
         result->_privileges = _privileges;
         result->_roles = _roles;
-        result->_probedDatabases = _probedDatabases;
         result->_credentials = _credentials;
-        result->_schemaVersion = _schemaVersion;
         return result.release();
     }
 
@@ -138,21 +135,6 @@ namespace mongo {
                 it != privileges.end(); ++it) {
             addPrivilege(*it);
         }
-    }
-
-    void User::setSchemaVersion1() {
-        _schemaVersion = AuthorizationManager::schemaVersion24;
-    }
-
-    void User::markProbedV1(const StringData& dbname) {
-        dassert(_schemaVersion == AuthorizationManager::schemaVersion24);
-        if (!hasProbedV1(dbname))
-            _probedDatabases.push_back(dbname.toString());
-    }
-
-    bool User::hasProbedV1(const StringData& dbname) const {
-        dassert(_schemaVersion == AuthorizationManager::schemaVersion24);
-        return sequenceContains(_probedDatabases, dbname);
     }
 
     void User::invalidate() {

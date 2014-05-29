@@ -112,17 +112,6 @@ namespace mongo {
                                                 std::vector<BSONObj>* result) = 0;
 
         /**
-         * Gets the privilege document for "userName" stored in the system.users collection of
-         * database "dbname".  Useful only for schemaVersion24 user documents.  For newer schema
-         * versions, use getUserDescription().
-         *
-         * On success, returns Status::OK() and stores a shared-ownership copy of the document into
-         * "result".
-         */
-        Status getPrivilegeDocumentV1(
-                const StringData& dbname, const UserName& userName, BSONObj* result);
-
-        /**
          * Returns true if there exists at least one privilege document in the system.
          */
         bool hasAnyPrivilegeDocuments();
