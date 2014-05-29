@@ -138,7 +138,7 @@ namespace repl {
         int nClonedThisPass;
 
         typedef std::vector< shared_ptr< ReplSource > > SourceVector;
-        static void loadAll(SourceVector&);
+        static void loadAll(OperationContext* txn, SourceVector&);
         explicit ReplSource(BSONObj);
 
         /* -1 = error */

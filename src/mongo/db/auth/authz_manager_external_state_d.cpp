@@ -39,6 +39,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -112,7 +113,8 @@ namespace mongo {
         Client::ReadContext ctx(txn, collectionName.ns());
 
         BSONObj found;
-        if (Helpers::findOne(ctx.ctx().db()->getCollection(collectionName),
+        if (Helpers::findOne(txn,
+                             ctx.ctx().db()->getCollection(txn, collectionName),
                              query,
                              found)) {
             *result = found.getOwned();

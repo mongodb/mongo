@@ -160,7 +160,7 @@ namespace mongo {
                                          const StringData& ns,
                                          std::set<CursorId>* openCursors) {
         Client::ReadContext ctx(txn, ns.toString());
-        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
         if ( !collection )
             return;
 

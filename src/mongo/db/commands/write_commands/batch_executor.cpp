@@ -917,7 +917,7 @@ namespace mongo {
                                            false /* don't check version */));
         Database* database = _context->db();
         dassert(database);
-        _collection = database->getCollection(request->getTargetingNS());
+        _collection = database->getCollection(txn, request->getTargetingNS());
         if (!_collection) {
             // Implicitly create if it doesn't exist
             _collection = database->createCollection(txn, request->getTargetingNS());

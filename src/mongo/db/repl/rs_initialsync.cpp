@@ -133,7 +133,7 @@ namespace repl {
         OperationContextImpl txn;
         Client::WriteContext ctx(&txn, rsoplog);
 
-        Collection* collection = ctx.ctx().db()->getCollection(rsoplog);
+        Collection* collection = ctx.ctx().db()->getCollection(&txn, rsoplog);
 
         // temp
         if( collection->numRecords() == 0 )

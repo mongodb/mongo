@@ -57,7 +57,6 @@ namespace ReplTests {
     class Base {
         Lock::GlobalWrite lk;
         Client::Context _context;
-        mutable OperationContextImpl _txn;
     public:
         Base() : _context( ns() ) {
             oldRepl();
@@ -66,7 +65,7 @@ namespace ReplTests {
             replSettings.master = true;
             createOplog();
 
-            Collection* c = _context.db()->getCollection( ns() );
+            Collection* c = _context.db()->getCollection( &_txn, ns() );
             if ( ! c ) {
                 c = _context.db()->createCollection( &_txn, ns() );
             }
@@ -136,7 +135,7 @@ namespace ReplTests {
             Client::Context ctx( cllNS() );
             OperationContextImpl txn;
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( cllNS() );
+            Collection* coll = db->getCollection( &txn, cllNS() );
             if ( !coll ) {
                 coll = db->createCollection( &txn, cllNS() );
             }
@@ -157,7 +156,7 @@ namespace ReplTests {
             {
                 Client::Context ctx( cllNS() );
                 Database* db = ctx.db();
-                Collection* coll = db->getCollection( cllNS() );
+                Collection* coll = db->getCollection( &txn, cllNS() );
 
                 RecordIterator* it = coll->getIterator( DiskLoc(), false,
                                                             CollectionScanParams::FORWARD );
@@ -186,7 +185,7 @@ namespace ReplTests {
             Client::Context ctx( ns );
             OperationContextImpl txn;
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( ns );
+            Collection* coll = db->getCollection( &txn, ns );
             if ( !coll ) {
                 coll = db->createCollection( &txn, ns );
             }
@@ -206,7 +205,7 @@ namespace ReplTests {
             Client::Context ctx( ns );
             OperationContextImpl txn;
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( ns );
+            Collection* coll = db->getCollection( &txn, ns );
             if ( !coll ) {
                 coll = db->createCollection( &txn, ns );
             }
@@ -227,7 +226,7 @@ namespace ReplTests {
             Client::Context ctx( ns() );
             OperationContextImpl txn;
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( ns() );
+            Collection* coll = db->getCollection( &txn, ns() );
             if ( !coll ) {
                 coll = db->createCollection( &txn, ns() );
             }
@@ -255,6 +254,8 @@ namespace ReplTests {
         Database* db() {
             return _context.db();
         }
+
+        mutable OperationContextImpl _txn;
     private:
         static DBDirectClient client_;
     };
@@ -1395,7 +1396,7 @@ namespace ReplTests {
         bool returnEmpty;
         SyncTest() : Sync(""), returnEmpty(false) {}
         virtual ~SyncTest() {}
-        virtual BSONObj getMissingDoc(Database* db, const BSONObj& o) {
+        virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
             if (returnEmpty) {
                 BSONObj o;
                 return o;
@@ -1413,7 +1414,7 @@ namespace ReplTests {
             // this should fail because we can't connect
             try {
                 Sync badSource("localhost:123");
-                badSource.getMissingDoc(db(), o);
+                badSource.getMissingDoc(&_txn, db(), o);
             }
             catch (DBException&) {
                 threw = true;

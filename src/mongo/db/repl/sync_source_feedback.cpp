@@ -70,7 +70,7 @@ namespace repl {
             Client::WriteContext ctx(&txn, "local");
 
             // local.me is an identifier for a server for getLastError w:2+
-            if (!Helpers::getSingleton("local.me", _me) ||
+            if (!Helpers::getSingleton(&txn, "local.me", _me) ||
                 !_me.hasField("host") ||
                 _me["host"].String() != myname) {
 

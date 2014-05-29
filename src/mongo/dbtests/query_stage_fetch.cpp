@@ -91,7 +91,7 @@ namespace QueryStageFetch {
             Client::WriteContext ctx(&txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
                 coll = db->createCollection(&txn, ns());
             }
@@ -150,7 +150,7 @@ namespace QueryStageFetch {
             Client::WriteContext ctx(&txn, ns());
 
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
                 coll = db->createCollection(&txn, ns());
             }

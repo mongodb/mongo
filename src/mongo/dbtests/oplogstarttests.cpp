@@ -38,12 +38,11 @@ namespace OplogStartTests {
     class Base {
     public:
         Base() : _context(ns()) {
-            OperationContextImpl txn;
-            Collection* c = _context.db()->getCollection(&txn, ns());
+            Collection* c = _context.db()->getCollection(&_txn, ns());
             if (!c) {
-                c = _context.db()->createCollection(&txn, ns());
+                c = _context.db()->createCollection(&_txn, ns());
             }
-            c->getIndexCatalog()->ensureHaveIdIndex(&txn);
+            c->getIndexCatalog()->ensureHaveIdIndex(&_txn);
         }
 
         ~Base() {
@@ -62,7 +61,7 @@ namespace OplogStartTests {
         }
 
         Collection* collection() {
-            return _context.db()->getCollection( ns() );
+            return _context.db()->getCollection( &_txn, ns() );
         }
 
         DBDirectClient *client() const { return &_client; }
@@ -89,6 +88,7 @@ namespace OplogStartTests {
         scoped_ptr<OplogStart> _stage;
 
     private:
+        OperationContextImpl _txn;
         Lock::GlobalWrite lk;
         Client::Context _context;
 

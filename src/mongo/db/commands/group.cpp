@@ -87,7 +87,8 @@ namespace mongo {
             return obj.extractFields( keyPattern , true ).getOwned();
         }
 
-        bool group( Database* db,
+        bool group( OperationContext* txn,
+                    Database* db,
                     const std::string& ns,
                     const BSONObj& query,
                     BSONObj keyPattern,
@@ -131,7 +132,7 @@ namespace mongo {
             double keysize = keyPattern.objsize() * 3;
             double keynum = 1;
 
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
 
             const WhereCallbackReal whereCallback(StringData(db->name()));
 
@@ -256,7 +257,7 @@ namespace mongo {
             const string ns = parseNs(dbname, jsobj);
             Client::ReadContext ctx(txn, ns);
 
-            return group( ctx.ctx().db() , ns , q ,
+            return group( txn, ctx.ctx().db() , ns , q ,
                           key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,
                           initial.embeddedObject() , finalize ,
                           errmsg , result );

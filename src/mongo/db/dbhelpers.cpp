@@ -81,11 +81,12 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    bool Helpers::findOne(Collection* collection, 
+    bool Helpers::findOne(OperationContext* txn,
+                          Collection* collection, 
                           const BSONObj &query, 
                           BSONObj& result, 
                           bool requireIndex) {
-        DiskLoc loc = findOne( collection, query, requireIndex );
+        DiskLoc loc = findOne( txn, collection, query, requireIndex );
         if ( loc.isNull() )
             return false;
         result = collection->docFor(loc);
@@ -95,7 +96,10 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    DiskLoc Helpers::findOne(Collection* collection, const BSONObj &query, bool requireIndex) {
+    DiskLoc Helpers::findOne(OperationContext* txn,
+                             Collection* collection,
+                             const BSONObj &query,
+                             bool requireIndex) {
         if ( !collection )
             return DiskLoc();
 
@@ -119,12 +123,17 @@ namespace mongo {
         return DiskLoc();
     }
 
-    bool Helpers::findById(Database* database, const char *ns, BSONObj query, BSONObj& result ,
-                           bool* nsFound , bool* indexFound ) {
+    bool Helpers::findById(OperationContext* txn,
+                           Database* database,
+                           const char *ns,
+                           BSONObj query,
+                           BSONObj& result,
+                           bool* nsFound,
+                           bool* indexFound) {
         Lock::assertAtLeastReadLocked(ns);
         invariant( database );
 
-        Collection* collection = database->getCollection( ns );
+        Collection* collection = database->getCollection( txn, ns );
         if ( !collection ) {
             return false;
         }
@@ -152,7 +161,9 @@ namespace mongo {
         return true;
     }
 
-    DiskLoc Helpers::findById(Collection* collection, const BSONObj& idquery) {
+    DiskLoc Helpers::findById(OperationContext* txn,
+                              Collection* collection,
+                              const BSONObj& idquery) {
         verify(collection);
         IndexCatalog* catalog = collection->getIndexCatalog();
         const IndexDescriptor* desc = catalog->findIdIndex();
@@ -163,57 +174,24 @@ namespace mongo {
         return accessMethod->findSingle( idquery["_id"].wrap() );
     }
 
-    vector<BSONObj> Helpers::findAll( const string& ns , const BSONObj& query ) {
-        Lock::assertAtLeastReadLocked(ns);
-        Client::Context ctx(ns);
-
-        CanonicalQuery* cq;
-        const NamespaceString nss(ns);
-        const WhereCallbackReal whereCallback(nss.db());
-
-        uassert(17236, "Could not canonicalize " + query.toString(),
-            CanonicalQuery::canonicalize(ns, query, &cq, whereCallback).isOK());
-
-        Runner* rawRunner;
-        uassert(17237, "Could not get runner for query " + query.toString(),
-                getRunner(ctx.db()->getCollection( ns ), cq, &rawRunner).isOK());
-
-        vector<BSONObj> all;
-
-        auto_ptr<Runner> runner(rawRunner);
-        Runner::RunnerState state;
-        BSONObj obj;
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
-            all.push_back(obj);
-        }
-
-        return all;
-    }
-
-    bool Helpers::isEmpty(const char *ns) {
-        Client::Context context(ns, storageGlobalParams.dbpath);
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
-                                                                context.db()->getCollection(ns)));
-        return Runner::RUNNER_EOF == runner->getNext(NULL, NULL);
-    }
-
     /* Get the first object from a collection.  Generally only useful if the collection
        only ever has a single object -- which is a "singleton collection.
 
        Returns: true if object exists.
     */
-    bool Helpers::getSingleton(const char *ns, BSONObj& result) {
+    bool Helpers::getSingleton(OperationContext* txn, const char *ns, BSONObj& result) {
         Client::Context context(ns);
         auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
-                                                                context.db()->getCollection(ns)));
+                                                                context.db()->getCollection(txn,
+                                                                                            ns)));
         Runner::RunnerState state = runner->getNext(&result, NULL);
         context.getClient()->curop()->done();
         return Runner::RUNNER_ADVANCED == state;
     }
 
-    bool Helpers::getLast(const char *ns, BSONObj& result) {
+    bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
         Client::Context ctx(ns);
-        Collection* coll = ctx.db()->getCollection( ns );
+        Collection* coll = ctx.db()->getCollection( txn, ns );
         auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns,
                                                                 coll,
                                                                 InternalPlanner::BACKWARD));
@@ -303,7 +281,7 @@ namespace mongo {
                                          BSONObj* indexPattern ) {
 
         Client::ReadContext context(txn, ns);
-        Collection* collection = context.ctx().db()->getCollection( ns );
+        Collection* collection = context.ctx().db()->getCollection( txn, ns );
         if ( !collection )
             return false;
 
@@ -492,7 +470,7 @@ namespace mongo {
         *numDocs = 0;
 
         Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
         if ( !collection ) return Status( ErrorCodes::NamespaceNotFound, ns );
 
         // Require single key

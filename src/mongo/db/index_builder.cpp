@@ -79,9 +79,9 @@ namespace mongo {
     Status IndexBuilder::build(OperationContext* txn, Database* db) const {
         const string ns = _index["ns"].String();
 
-        Collection* c = db->getCollection( ns );
+        Collection* c = db->getCollection( txn, ns );
         if ( !c ) {
-            c = db->getOrCreateCollection( ns );
+            c = db->getOrCreateCollection( txn, ns );
             verify(c);
         }
 

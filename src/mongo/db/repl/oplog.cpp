@@ -422,7 +422,7 @@ namespace repl {
             _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
-        logOpForSharding(opstr, ns, obj, patt, fromMigrate);
+        logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
         logOpForDbHash(ns);
         getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
 
@@ -672,9 +672,9 @@ namespace repl {
                     // thus this is not ideal.
                     else {
                         if (collection == NULL ||
-                            (indexCatalog->haveIdIndex() && Helpers::findById(collection, updateCriteria).isNull()) ||
+                            (indexCatalog->haveIdIndex() && Helpers::findById(txn, collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
-                            (!indexCatalog->haveIdIndex() && Helpers::findOne(collection, updateCriteria, false).isNull())) {
+                            (!indexCatalog->haveIdIndex() && Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
                             failedUpdate = true;
                             log() << "replication couldn't find doc: " << op.toString() << endl;
                         }

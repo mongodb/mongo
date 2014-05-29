@@ -99,7 +99,7 @@ namespace mongo {
             }
         }
 
-        Collection* collection = db->getCollection(ns.ns());
+        Collection* collection = db->getCollection(txn, ns.ns());
         if (NULL == collection) {
             return 0;
         }

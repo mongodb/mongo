@@ -162,7 +162,7 @@ namespace QueryStageCollectionScan {
 
         Database* db() { return _context.db(); }
         ExtentManager* extentManager() { return db()->getExtentManager(); }
-        Collection* collection() { return db()->getCollection( ns() ); }
+        Collection* collection() { return db()->getCollection( &_txn, ns() ); }
         NamespaceDetails *nsd() { return collection()->detailsWritable(); }
 
     protected:
@@ -338,7 +338,7 @@ namespace QueryStageCollectionScan {
 
             // Configure the scan.
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( ns() );
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = direction;
             params.tailable = false;
 
@@ -448,7 +448,7 @@ namespace QueryStageCollectionScan {
 
             // Configure the scan.
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( ns() );
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
@@ -478,7 +478,7 @@ namespace QueryStageCollectionScan {
             Client::ReadContext ctx(&_txn, ns());
 
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( ns() );
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
@@ -506,7 +506,7 @@ namespace QueryStageCollectionScan {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
 
-            Collection* coll = ctx.ctx().db()->getCollection( ns() );
+            Collection* coll = ctx.ctx().db()->getCollection( &_txn, ns() );
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
@@ -567,7 +567,7 @@ namespace QueryStageCollectionScan {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Collection* coll = ctx.ctx().db()->getCollection(ns());
+            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;

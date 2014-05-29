@@ -231,12 +231,13 @@ namespace repl {
     int getRBID(DBClientConnection*);
 
     static void syncRollbackFindCommonPoint(DBClientConnection* them, FixUpInfo& fixUpInfo) {
+        OperationContextImpl txn; // XXX
         verify(Lock::isLocked());
         Client::Context ctx(rsoplog);
 
         boost::scoped_ptr<Runner> runner(
                 InternalPlanner::collectionScan(rsoplog,
-                                                ctx.db()->getCollection(rsoplog),
+                                                ctx.db()->getCollection(&txn, rsoplog),
                                                 InternalPlanner::BACKWARD));
 
         BSONObj ourObj;
@@ -484,7 +485,7 @@ namespace repl {
 
         sethbmsg("rollback 4.7");
         Client::Context ctx(rsoplog);
-        Collection* oplogCollection = ctx.db()->getCollection(rsoplog);
+        Collection* oplogCollection = ctx.db()->getCollection(&txn, rsoplog);
         uassert(13423,
                 str::stream() << "replSet error in rollback can't find " << rsoplog,
                 oplogCollection);
@@ -516,7 +517,7 @@ namespace repl {
 
                 // Add the doc to our rollback file
                 BSONObj obj;
-                bool found = Helpers::findOne(ctx.db()->getCollection(doc.ns), pattern, obj, false);
+                bool found = Helpers::findOne(&txn, ctx.db()->getCollection(&txn, doc.ns), pattern, obj, false);
                 if (found) {
                     removeSaver->goingToDelete(obj);
                 }
@@ -529,7 +530,7 @@ namespace repl {
                     // TODO 1.6 : can't delete from a capped collection.  need to handle that here.
                     deletes++;
 
-                    Collection* collection = ctx.db()->getCollection(doc.ns);
+                    Collection* collection = ctx.db()->getCollection(&txn, doc.ns);
                     if (collection) {
                         if (collection->isCapped()) {
                             // can't delete from a capped collection - so we truncate instead. if
@@ -538,7 +539,7 @@ namespace repl {
                                 // TODO: IIRC cappedTruncateAfter does not handle completely empty.
                                 // this will crazy slow if no _id index.
                                 long long start = Listener::getElapsedTimeMillis();
-                                DiskLoc loc = Helpers::findOne(collection, pattern, false);
+                                DiskLoc loc = Helpers::findOne(&txn, collection, pattern, false);
                                 if (Listener::getElapsedTimeMillis() - start > 200)
                                     log() << "replSet warning roll back slow no _id index for "
                                           << doc.ns << " perhaps?" << rsLog;
@@ -657,7 +658,7 @@ namespace repl {
             OperationContextImpl txn;
             Lock::DBRead lk(txn.lockState(), "local.replset.minvalid");
             BSONObj mv;
-            if (Helpers::getSingleton("local.replset.minvalid", mv)) {
+            if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
                 OpTime minvalid = mv["ts"]._opTime();
                 if (minvalid > lastOpTimeWritten) {
                     log() << "replSet need to rollback, but in inconsistent state";

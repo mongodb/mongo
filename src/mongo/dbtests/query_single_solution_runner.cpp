@@ -36,10 +36,9 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/single_solution_runner.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QuerySingleSolutionRunner {
@@ -82,7 +81,7 @@ namespace QuerySingleSolutionRunner {
         SingleSolutionRunner* makeCollScanRunner(Client::Context& ctx,
                                                  BSONObj& filterObj) {
             CollectionScanParams csparams;
-            csparams.collection = ctx.db()->getCollection( ns() );
+            csparams.collection = ctx.db()->getCollection( &_txn, ns() );
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> ws(new WorkingSet());
             // Parse the filter.
@@ -97,7 +96,7 @@ namespace QuerySingleSolutionRunner {
             verify(NULL != cq);
 
             // Hand the plan off to the single solution runner.
-            SingleSolutionRunner* ssr = new SingleSolutionRunner(ctx.db()->getCollection(ns()),
+            SingleSolutionRunner* ssr = new SingleSolutionRunner(ctx.db()->getCollection(&_txn, ns()),
                                                                  cq,
                                                                  new QuerySolution(),
                                                                  root.release(),
@@ -129,7 +128,7 @@ namespace QuerySingleSolutionRunner {
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
 
-            const Collection* coll = context.db()->getCollection(ns());
+            const Collection* coll = context.db()->getCollection(&_txn, ns());
 
             auto_ptr<WorkingSet> ws(new WorkingSet());
             IndexScan* ix = new IndexScan(ixparams, ws.get(), NULL);
@@ -149,7 +148,7 @@ namespace QuerySingleSolutionRunner {
 
         size_t numCursors() {
             Client::ReadContext ctx(&_txn, ns() );
-            Collection* collection = ctx.ctx().db()->getCollection( ns() );
+            Collection* collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             if ( !collection )
                 return 0;
             return collection->cursorCache()->numCursors();
@@ -157,13 +156,13 @@ namespace QuerySingleSolutionRunner {
 
         void registerRunner( Runner* runner ) {
             Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns() );
+            Collection* collection = ctx.ctx().db()->getOrCreateCollection( &_txn, ns() );
             return collection->cursorCache()->registerRunner( runner );
         }
 
         void deregisterRunner( Runner* runner ) {
             Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getOrCreateCollection( ns() );
+            Collection* collection = ctx.ctx().db()->getOrCreateCollection( &_txn, ns() );
             return collection->cursorCache()->deregisterRunner( runner );
         }
 
@@ -172,7 +171,7 @@ namespace QuerySingleSolutionRunner {
 
     private:
         IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-            Collection* collection = db->getCollection( ns() );
+            Collection* collection = db->getCollection( &_txn, ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
@@ -348,13 +347,13 @@ namespace QuerySingleSolutionRunner {
                 SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
 
                 // Make a client cursor from the runner.
-                new ClientCursor(ctx.ctx().db()->getCollection(ns()),
+                new ClientCursor(ctx.ctx().db()->getCollection(&_txn, ns()),
                                  ssr, 0, BSONObj());
 
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
                 ASSERT_EQUALS(1U, numCursors());
-                ctx.ctx().db()->getCollection( ns() )->cursorCache()->invalidateAll(false);
+                ctx.ctx().db()->getCollection( &_txn, ns() )->cursorCache()->invalidateAll(false);
                 ASSERT_EQUALS(0U, numCursors());
             }
         };
@@ -369,7 +368,7 @@ namespace QuerySingleSolutionRunner {
                 Client::WriteContext ctx(&_txn, ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
-                Collection* collection = ctx.ctx().db()->getCollection(ns());
+                Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
                 SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);
@@ -410,7 +409,7 @@ namespace QuerySingleSolutionRunner {
 
                 {
                     Client::ReadContext ctx(&_txn, ns());
-                    Collection* collection = ctx.ctx().db()->getCollection(ns());
+                    Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
 
                     BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
                     SingleSolutionRunner* ssr = makeCollScanRunner(ctx.ctx(),filterObj);

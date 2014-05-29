@@ -63,7 +63,7 @@ namespace IndexUpdateTests {
             killCurrentOp.reset();
         }
         Collection* collection() {
-            return _ctx.ctx().db()->getCollection( _ns );
+            return _ctx.ctx().db()->getCollection( &_txn, _ns );
         }
     protected:
     // QUERY_MIGRATION

@@ -153,7 +153,7 @@ namespace mongo {
 
         // This is a read lock.
         scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(txn, ns));
-        Collection* collection = ctx->ctx().db()->getCollection(ns);
+        Collection* collection = ctx->ctx().db()->getCollection(txn, ns);
         uassert( 17356, "collection dropped between getMore calls", collection );
 
         QLOG() << "Running getMore, cursorid: " << cursorid << endl;
@@ -460,7 +460,7 @@ namespace mongo {
         // where-specific parsing code assumes we have a lock and creates execution machinery that
         // requires it.
         Client::ReadContext ctx(txn, q.ns);
-        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
 
         // Parse the qm into a CanonicalQuery.
         CanonicalQuery* cq;
@@ -675,7 +675,7 @@ namespace mongo {
             // If we're tailing a capped collection, we don't bother saving the cursor if the
             // collection is empty. Otherwise, the semantics of the tailable cursor is that the
             // client will keep trying to read from it. So we'll keep it around.
-            Collection* collection = ctx.ctx().db()->getCollection(cq->ns());
+            Collection* collection = ctx.ctx().db()->getCollection(txn, cq->ns());
             if (collection && collection->numRecords() != 0 && pq.getNumToReturn() != 1) {
                 saveClientCursor = true;
             }

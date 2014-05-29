@@ -105,9 +105,10 @@ namespace mongo {
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }
 
-        void getStats( BSONObjBuilder* output, double scale = 1 );
+        void getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale = 1 );
 
-        long long getIndexSizeForCollection( Collection* collections,
+        long long getIndexSizeForCollection( OperationContext* opCtx,
+                                             Collection* collections,
                                              BSONObjBuilder* details = NULL,
                                              int scale = 1 );
 
@@ -127,20 +128,13 @@ namespace mongo {
 
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
-         * The methods without a transaction are deprecated.
-         * TODO remove deprecated method once we require reads to have Transaction objects.
          */
-        Collection* getCollection( const StringData& ns );
-
-        Collection* getCollection( const NamespaceString& ns ) { return getCollection( ns.ns() ); }
-
         Collection* getCollection( OperationContext* txn, const StringData& ns );
 
         Collection* getCollection( OperationContext* txn, const NamespaceString& ns ) {
             return getCollection( txn, ns.ns() );
         }
 
-        Collection* getOrCreateCollection( const StringData& ns );
         Collection* getOrCreateCollection( OperationContext* txn, const StringData& ns );
 
         Status renameCollection( OperationContext* txn,

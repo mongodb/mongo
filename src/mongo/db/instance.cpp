@@ -793,7 +793,7 @@ namespace mongo {
             string targetNS = js["ns"].String();
             uassertStatusOK( userAllowedWriteNS( targetNS ) );
 
-            Collection* collection = ctx.db()->getCollection( targetNS );
+            Collection* collection = ctx.db()->getCollection( txn, targetNS );
             if ( !collection ) {
                 // implicitly create
                 collection = ctx.db()->createCollection( txn, targetNS );
@@ -822,7 +822,7 @@ namespace mongo {
         if ( !fixed.getValue().isEmpty() )
             js = fixed.getValue();
 
-        Collection* collection = ctx.db()->getCollection( ns );
+        Collection* collection = ctx.db()->getCollection( txn, ns );
         if ( !collection ) {
             collection = ctx.db()->createCollection( txn, ns );
             verify( collection );
@@ -937,7 +937,7 @@ namespace mongo {
             {
                 Lock::DBRead lk(txn->lockState(), repl::rsoplog);
                 BSONObj o;
-                if( Helpers::getFirst(repl::rsoplog, o) )
+                if( Helpers::getFirst(txn, repl::rsoplog, o) )
                     return true;
             }
         }
@@ -1018,11 +1018,10 @@ namespace {
             skip = 0;
         }
 
-        OperationContextImpl txn;
-        Lock::DBRead lk(txn.lockState(), ns);
+        Lock::DBRead lk(_txn->lockState(), ns);
         string errmsg;
         int errCode;
-        long long res = runCount( ns, _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );
+        long long res = runCount( _txn, ns, _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );
         if ( res == -1 ) {
             // namespace doesn't exist
             return 0;

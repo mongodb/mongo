@@ -88,7 +88,7 @@ namespace PlanRankingTests {
          */
         QuerySolution* pickBestPlan(CanonicalQuery* cq) {
             Client::ReadContext ctx(&_txn, ns);
-            Collection* collection = ctx.ctx().db()->getCollection(ns);
+            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns);
 
             QueryPlannerParams plannerParams;
             fillOutPlannerParams(collection, cq, &plannerParams);

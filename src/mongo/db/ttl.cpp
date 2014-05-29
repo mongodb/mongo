@@ -117,7 +117,7 @@ namespace mongo {
 
                     OperationContextImpl txn;
                     Client::WriteContext ctx(&txn,  ns );
-                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( &txn, ns );
                     if ( !collection ) {
                         // collection was dropped
                         continue;

@@ -59,7 +59,7 @@ namespace repl {
                 responseMsg = _replSetOplog(params);
             }
             else
-                responseMsg = _replSet();
+                responseMsg = _replSet(txn);
             responseCode = 200;
         }
 
@@ -93,7 +93,7 @@ namespace repl {
         }
 
         /* /_replSet show replica set status in html format */
-        string _replSet() {
+        string _replSet(OperationContext* txn) {
             stringstream s;
             s << start("Replica Set Status " + prettyHostName());
             s << p( a("/", "back", "Home") + " | " +
@@ -112,7 +112,7 @@ namespace repl {
             }
             else {
                 try {
-                    theReplSet->summarizeAsHtml(s);
+                    theReplSet->summarizeAsHtml(txn, s);
                 }
                 catch(...) { s << "error summarizing replset status\n"; }
             }

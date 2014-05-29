@@ -62,7 +62,7 @@ namespace mongo {
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    string DBHashCmd::hashCollection( Database* db, const string& fullCollectionName, bool* fromCache ) {
+    string DBHashCmd::hashCollection( OperationContext* opCtx, Database* db, const string& fullCollectionName, bool* fromCache ) {
 
         scoped_ptr<scoped_lock> cachedHashedLock;
 
@@ -76,7 +76,7 @@ namespace mongo {
         }
 
         *fromCache = false;
-        Collection* collection = db->getCollection( fullCollectionName );
+        Collection* collection = db->getCollection( opCtx, fullCollectionName );
         if ( !collection )
             return "";
 
@@ -176,7 +176,7 @@ namespace mongo {
                 continue;
 
             bool fromCache = false;
-            string hash = hashCollection( db, fullCollectionName, &fromCache );
+            string hash = hashCollection( txn, db, fullCollectionName, &fromCache );
 
             bb.append( shortCollectionName, hash );
 

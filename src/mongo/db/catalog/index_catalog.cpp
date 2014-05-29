@@ -227,8 +227,9 @@ namespace mongo {
 
         fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
 
-        auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName,
-                                                                  db->getCollection( db->_indexesName ) ) );
+        auto_ptr<Runner> runner(
+            InternalPlanner::collectionScan(db->_indexesName,
+                                            db->getCollection(txn, db->_indexesName)));
 
         BSONObj index;
         Runner::RunnerState state;
@@ -689,7 +690,7 @@ namespace mongo {
         long long numSystemIndexesEntries = 0;
         {
             Collection* systemIndexes =
-                _collection->_database->getCollection( _collection->_database->_indexesName );
+                _collection->_database->getCollection( txn, _collection->_database->_indexesName );
             if ( systemIndexes ) {
                 EqualityMatchExpression expr;
                 BSONObj nsBSON = BSON( "ns" << _collection->ns() );

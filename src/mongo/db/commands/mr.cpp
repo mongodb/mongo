@@ -366,7 +366,7 @@ namespace mongo {
                 // copy indexes into temporary storage
                 Client::WriteContext finalCtx(_txn, _config.outputOptions.finalNamespace);
                 Collection* finalColl =
-                    finalCtx.ctx().db()->getCollection( _config.outputOptions.finalNamespace );
+                    finalCtx.ctx().db()->getCollection(_txn, _config.outputOptions.finalNamespace);
                 if ( finalColl ) {
                     IndexCatalog::IndexIterator ii =
                         finalColl->getIndexCatalog()->getIndexIterator( true );
@@ -584,8 +584,10 @@ namespace mongo {
                     bool found;
                     {
                         Client::Context tx( _config.outputOptions.finalNamespace );
-                        Collection* coll = tx.db()->getCollection( _config.outputOptions.finalNamespace );
-                        found = Helpers::findOne(coll,
+                        Collection* coll =
+                            tx.db()->getCollection(_txn, _config.outputOptions.finalNamespace);
+                        found = Helpers::findOne(_txn,
+                                                 coll,
                                                  temp["_id"].wrap(),
                                                  old,
                                                  true);
@@ -620,7 +622,7 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx(_txn,  ns );
-            Collection* coll = ctx.ctx().db()->getCollection( ns );
+            Collection* coll = ctx.ctx().db()->getCollection( _txn, ns );
             if ( !coll )
                 uasserted(13630, str::stream() << "attempted to insert into nonexistent" <<
                                                   " collection during a mr operation." <<
@@ -646,7 +648,7 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx(_txn,  _config.incLong );
-            Collection* coll = ctx.ctx().db()->getCollection( _config.incLong );
+            Collection* coll = ctx.ctx().db()->getCollection( _txn, _config.incLong );
             if ( !coll )
                 uasserted(13631, str::stream() << "attempted to insert into nonexistent"
                                                   " collection during a mr operation." <<
@@ -922,7 +924,7 @@ namespace mongo {
 
             {
                 Client::WriteContext incCtx(_txn, _config.incLong );
-                Collection* incColl = incCtx.ctx().db()->getCollection( _config.incLong );
+                Collection* incColl = incCtx.ctx().db()->getCollection( _txn, _config.incLong );
 
                 bool foundIndex = false;
                 IndexCatalog::IndexIterator ii =
@@ -961,7 +963,7 @@ namespace mongo {
                                                 whereCallback).isOK());
 
             Runner* rawRunner;
-            verify(getRunner(ctx->ctx().db()->getCollection(_config.incLong),
+            verify(getRunner(ctx->ctx().db()->getCollection(_txn, _config.incLong),
                              cq, &rawRunner, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<Runner> runner(rawRunner);
@@ -1217,7 +1219,7 @@ namespace mongo {
                 auto_ptr<RangePreserver> rangePreserver;
                 {
                     Client::ReadContext ctx(txn, config.ns);
-                    Collection* collection = ctx.ctx().db()->getCollection( config.ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( txn, config.ns );
                     if ( collection )
                         rangePreserver.reset(new RangePreserver(collection));
 
@@ -1299,7 +1301,7 @@ namespace mongo {
                         }
 
                         Runner* rawRunner;
-                        if (!getRunner(ctx->db()->getCollection( config.ns), cq, &rawRunner).isOK()) {
+                        if (!getRunner(ctx->db()->getCollection(txn, config.ns), cq, &rawRunner).isOK()) {
                             uasserted(17239, "Can't get runner for query " + config.filter.toString());
                             return 0;
                         }

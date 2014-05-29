@@ -217,7 +217,7 @@ namespace repl {
         }
     }
 
-    void ReplSetImpl::_summarizeAsHtml(stringstream& s) const {
+    void ReplSetImpl::_summarizeAsHtml(OperationContext* txn, stringstream& s) const {
         s << table(0, false);
         s << tr("Set name:", _name);
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
@@ -252,7 +252,7 @@ namespace repl {
             readlocktry lk(/*"local.replset.minvalid", */300);
             if( lk.got() ) {
                 BSONObj mv;
-                if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
+                if( Helpers::getSingleton(txn, "local.replset.minvalid", mv) ) {
                     myMinValid = "minvalid:" + mv["ts"]._opTime().toString();
                 }
             }

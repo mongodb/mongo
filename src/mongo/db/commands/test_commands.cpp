@@ -65,7 +65,7 @@ namespace mongo {
             Lock::DBWrite lk(txn->lockState(), ns);
             Client::Context ctx( ns );
             Database* db = ctx.db();
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
             if ( !collection ) {
                 collection = db->createCollection( txn, ns );
                 if ( !collection ) {
@@ -141,7 +141,7 @@ namespace mongo {
             bool inc = cmdObj.getBoolField( "inc" ); // inclusive range?
 
             Client::WriteContext ctx(txn,  nss.ns() );
-            Collection* collection = ctx.ctx().db()->getCollection( nss.ns() );
+            Collection* collection = ctx.ctx().db()->getCollection( txn, nss.ns() );
             massert( 13417, "captrunc collection not found or empty", collection);
 
             boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(nss.ns(),
@@ -170,14 +170,15 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
 
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db, 
                                                      const BSONObj& cmdObj) {
             std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             std::string ns = db->name() + '.' + coll;
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -187,10 +188,10 @@ namespace mongo {
 
             Client::WriteContext ctx(txn,  nss.ns() );
             Database* db = ctx.ctx().db();
-            Collection* collection = db->getCollection( nss.ns() );
+            Collection* collection = db->getCollection( txn, nss.ns() );
             massert( 13429, "emptycapped no such collection", collection );
 
-            std::vector<BSONObj> indexes = stopIndexBuilds(db, cmdObj);
+            std::vector<BSONObj> indexes = stopIndexBuilds(txn, db, cmdObj);
 
             Status status = collection->truncate(txn);
             if ( !status.isOK() )

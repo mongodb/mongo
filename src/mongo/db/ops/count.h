@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    class OperationContext;
+
     /**
      * 'ns' is the namespace we're counting on.
      *
@@ -40,6 +42,10 @@ namespace mongo {
      * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the
      * match count.
      */
-    long long runCount(const std::string& ns, const BSONObj& cmd, std::string& err, int& errCode );
+    long long runCount(OperationContext* txn,
+                       const std::string& ns,
+                       const BSONObj& cmd,
+                       std::string& err,
+                       int& errCode);
 
 } // namespace mongo

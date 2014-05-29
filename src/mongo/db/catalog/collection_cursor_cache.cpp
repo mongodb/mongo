@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/startup_test.h"
@@ -191,7 +192,7 @@ namespace mongo {
         if ( !db )
             return false;
         Client::Context context( ns, db );
-        Collection* collection = db->getCollection( ns );
+        Collection* collection = db->getCollection( txn, ns );
         if ( !collection ) {
             if ( checkAuth )
                 audit::logKillCursorsAuthzCheck( currentClient.get(),
@@ -221,7 +222,7 @@ namespace mongo {
             if ( !db )
                 continue;
             Client::Context context( ns, db );
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
             if ( collection == NULL ) {
                 continue;
             }

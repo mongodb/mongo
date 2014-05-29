@@ -164,7 +164,8 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return true; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db, 
                                                      const BSONObj& cmdObj) {
             invariant(db);
             std::list<std::string> collections;
@@ -179,7 +180,7 @@ namespace mongo {
                 IndexCatalog::IndexKillCriteria criteria;
                 criteria.ns = ns;
                 std::vector<BSONObj> killedIndexes = 
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
                 allKilledIndexes.insert(allKilledIndexes.end(), 
                                         killedIndexes.begin(), 
                                         killedIndexes.end());
@@ -211,7 +212,7 @@ namespace mongo {
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
-                stopIndexBuilds(context.db(), cmdObj);
+                stopIndexBuilds(txn, context.db(), cmdObj);
                 dropDatabase(txn, context.db());
 
                 log() << "dropDatabase " << dbname << " finished";
@@ -250,7 +251,8 @@ namespace mongo {
 
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db, 
                                                      const BSONObj& cmdObj) {
             invariant(db);
             std::list<std::string> collections;
@@ -265,7 +267,7 @@ namespace mongo {
                 IndexCatalog::IndexKillCriteria criteria;
                 criteria.ns = ns;
                 std::vector<BSONObj> killedIndexes = 
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
                 allKilledIndexes.insert(allKilledIndexes.end(), 
                                         killedIndexes.begin(), 
                                         killedIndexes.end());
@@ -286,7 +288,7 @@ namespace mongo {
             Client::Context context( dbname );
 
             log() << "repairDatabase " << dbname;
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(context.db(), cmdObj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, context.db(), cmdObj);
 
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
@@ -437,13 +439,14 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return true; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db, 
                                                      const BSONObj& cmdObj) {
             std::string nsToDrop = db->name() + '.' + cmdObj.firstElement().valuestr();
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = nsToDrop;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, nsToDrop), criteria);
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -470,7 +473,7 @@ namespace mongo {
 
             int numIndexes = coll->getIndexCatalog()->numIndexesTotal();
 
-            stopIndexBuilds(db, cmdObj);
+            stopIndexBuilds(txn, db, cmdObj);
 
             result.append( "ns", nsToDrop );
             result.append( "nIndexesWas", numIndexes );
@@ -532,7 +535,7 @@ namespace mongo {
 
             string err;
             int errCode;
-            long long n = runCount(ns, cmdObj, err, errCode);
+            long long n = runCount(txn, ns, cmdObj, err, errCode);
 
             long long retVal = n;
             bool ok = true;
@@ -813,7 +816,7 @@ namespace mongo {
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
             Client::ReadContext ctx(txn, ns);
-            Collection* coll = ctx.ctx().db()->getCollection(ns);
+            Collection* coll = ctx.ctx().db()->getCollection(txn, ns);
 
             CanonicalQuery* cq;
             if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
@@ -922,7 +925,7 @@ namespace mongo {
 
             Client::ReadContext ctx(txn, ns);
 
-            Collection* collection = ctx.ctx().db()->getCollection( ns );
+            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
 
             if ( !collection || collection->numRecords() == 0 ) {
                 result.appendNumber( "size" , 0 );
@@ -1039,7 +1042,7 @@ namespace mongo {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::ReadContext cx(txn, ns);
             Database* db = cx.ctx().db();
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
             if ( !collection ) {
                 errmsg = "Collection [" + ns + "] not found.";
                 return false;
@@ -1078,7 +1081,8 @@ namespace mongo {
             collection->getRecordStore()->appendCustomStats( &result, scale );
 
             BSONObjBuilder indexSizes;
-            result.appendNumber( "totalIndexSize" , db->getIndexSizeForCollection(collection,
+            result.appendNumber( "totalIndexSize" , db->getIndexSizeForCollection(txn,
+                                                                                  collection,
                                                                                   &indexSizes,
                                                                                   scale) / scale );
             result.append("indexSizes", indexSizes.obj());
@@ -1117,7 +1121,7 @@ namespace mongo {
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx( ns );
 
-            Collection* coll = ctx.db()->getCollection( ns );
+            Collection* coll = ctx.db()->getCollection( txn, ns );
             if ( !coll ) {
                 errmsg = "ns does not exist";
                 return false;
@@ -1247,7 +1251,7 @@ namespace mongo {
             Client::ReadContext ctx(txn, ns);
             Database* d = ctx.ctx().db();
 
-            d->getStats( &result, scale );
+            d->getStats( txn, &result, scale );
 
             return true;
         }

@@ -301,8 +301,11 @@ public:
      * NOTE: The "outfile" parameter passed in should actually represent a directory, but it is
      * called "outfile" because we append the filename and use it as our output file.
      */
-    void _repair( Database* db , string ns , boost::filesystem::path outfile ){
-        Collection* collection = db->getCollection( ns );
+    void _repair(OperationContext* opCtx,
+                 Database* db,
+                 string ns,
+                 boost::filesystem::path outfile) {
+        Collection* collection = db->getCollection(opCtx, ns);
         toolInfoLog() << "nrecords: " << collection->numRecords()
                       << " datasize: " << collection->dataSize()
                       << std::endl;
@@ -363,7 +366,7 @@ public:
             
             LogIndentLevel lil1;
             try {
-                _repair( db , ns , root );
+                _repair( &txn, db , ns , root );
             }
             catch ( DBException& e ){
                 toolError() << "ERROR recovering: " << ns << " " << e.toString() << std::endl;

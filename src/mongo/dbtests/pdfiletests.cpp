@@ -60,7 +60,7 @@ namespace PdfileTests {
                 return "unittests.pdfiletests.Insert";
             }
             Collection* collection() {
-                return _context.db()->getCollection( ns() );
+                return _context.db()->getCollection( &_txn, ns() );
             }
 
             Lock::GlobalWrite lk_;

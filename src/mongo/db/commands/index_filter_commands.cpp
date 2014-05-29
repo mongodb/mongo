@@ -65,12 +65,12 @@ namespace {
     /**
      * Retrieves a collection's query settings and plan cache from the database.
      */
-    Status getQuerySettingsAndPlanCache(Database* db, const string& ns,
+    Status getQuerySettingsAndPlanCache(OperationContext* txn, Database* db, const string& ns,
                                         QuerySettings** querySettingsOut,
                                         PlanCache** planCacheOut) {
         invariant(db);
 
-        Collection* collection = db->getCollection(ns);
+        Collection* collection = db->getCollection(txn, ns);
         if (NULL == collection) {
             return Status(ErrorCodes::BadValue, "no such collection");
         }
@@ -169,7 +169,7 @@ namespace mongo {
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
         PlanCache* unused;
-        Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &unused);
+        Status status = getQuerySettingsAndPlanCache(txn, ctx.db(), ns, &querySettings, &unused);
         if (!status.isOK()) {
             // No collection - return empty array of filters.
             BSONArrayBuilder hintsBuilder(bob->subarrayStart("filters"));
@@ -231,7 +231,7 @@ namespace mongo {
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
         PlanCache* planCache;
-        Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &planCache);
+        Status status = getQuerySettingsAndPlanCache(txn, ctx.db(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
             // No collection - do nothing.
             return Status::OK();
@@ -322,7 +322,7 @@ namespace mongo {
         Client::Context& ctx = readCtx.ctx();
         QuerySettings* querySettings;
         PlanCache* planCache;
-        Status status = getQuerySettingsAndPlanCache(ctx.db(), ns, &querySettings, &planCache);
+        Status status = getQuerySettingsAndPlanCache(txn, ctx.db(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
             return status;
         }

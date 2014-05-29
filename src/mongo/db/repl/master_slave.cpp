@@ -165,7 +165,7 @@ namespace repl {
             OperationContextImpl txn;
             Client::WriteContext ctx(&txn, "local");
             // local.me is an identifier for a server for getLastError w:2+
-            if (!Helpers::getSingleton("local.me", _me) ||
+            if (!Helpers::getSingleton(&txn, "local.me", _me) ||
                 !_me.hasField("host") ||
                 _me["host"].String() != myname) {
 
@@ -231,7 +231,7 @@ namespace repl {
     /* we reuse our existing objects so that we can keep our existing connection
        and cursor in effect.
     */
-    void ReplSource::loadAll(SourceVector &v) {
+    void ReplSource::loadAll(OperationContext* txn, SourceVector &v) {
         const char* localSources = "local.sources";
         Client::Context ctx(localSources);
         SourceVector old = v;
@@ -242,8 +242,9 @@ namespace repl {
             // check that no items are in sources other than that
             // add if missing
             int n = 0;
-            auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
-                                                                    ctx.db()->getCollection(localSources)));
+            auto_ptr<Runner> runner(
+                InternalPlanner::collectionScan(localSources,
+                                                ctx.db()->getCollection(txn, localSources)));
             BSONObj obj;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -285,8 +286,9 @@ namespace repl {
             }
         }
 
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
-                                                                ctx.db()->getCollection(localSources)));
+        auto_ptr<Runner> runner(
+            InternalPlanner::collectionScan(localSources,
+                                            ctx.db()->getCollection(txn, localSources)));
         BSONObj obj;
         Runner::RunnerState state;
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -318,7 +320,7 @@ namespace repl {
         if ( !replAllDead )
             return;
         SourceVector sources;
-        ReplSource::loadAll(sources);
+        ReplSource::loadAll(txn, sources);
         for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
             log() << requester << " forcing resync from "  << (*i)->hostName << endl;
             (*i)->forceResync( txn, requester );
@@ -1020,10 +1022,11 @@ namespace repl {
                 1 = special sentinel indicating adaptive sleep recommended
     */
     int _replMain(ReplSource::SourceVector& sources, int& nApplied) {
+        OperationContextImpl txn;
         {
             ReplInfo r("replMain load sources");
             Lock::GlobalWrite lk;
-            ReplSource::loadAll(sources);
+            ReplSource::loadAll(&txn, sources);
             replSettings.fastsync = false; // only need this param for initial reset
         }
 
@@ -1245,6 +1248,7 @@ namespace repl {
             c = &cc();
         }
 
+        OperationContextImpl txn; // XXX
         Lock::GlobalRead lk;
         for( unsigned i = a; i <= b; i++ ) {
             const BSONObj& op = v[i];
@@ -1267,7 +1271,7 @@ namespace repl {
                     b.append(_id);
                     BSONObj result;
                     Client::Context ctx( ns );
-                    if( Helpers::findById(ctx.db(), ns, b.done(), result) )
+                    if( Helpers::findById(&txn, ctx.db(), ns, b.done(), result) )
                         _dummy_z += result.objsize(); // touch
                 }
             }
@@ -1301,7 +1305,7 @@ namespace repl {
                 b.append(_id);
                 BSONObj result;
                 Client::ReadContext ctx(txn, ns );
-                if( Helpers::findById(ctx.ctx().db(), ns, b.done(), result) )
+                if( Helpers::findById(txn, ctx.ctx().db(), ns, b.done(), result) )
                     _dummy_z += result.objsize(); // touch
             }
         }

@@ -62,10 +62,10 @@ namespace {
     /**
      * Retrieves a collection's plan cache from the database.
      */
-    Status getPlanCache(Database* db, const string& ns, PlanCache** planCacheOut) {
+    Status getPlanCache(OperationContext* txn, Database* db, const string& ns, PlanCache** planCacheOut) {
         invariant(db);
 
-        Collection* collection = db->getCollection(ns);
+        Collection* collection = db->getCollection(txn, ns);
         if (NULL == collection) {
             return Status(ErrorCodes::BadValue, "no such collection");
         }
@@ -215,7 +215,7 @@ namespace mongo {
         Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - return results with empty shapes array.
             BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
@@ -263,7 +263,7 @@ namespace mongo {
         Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - nothing to do. Return OK status.
             return Status::OK();
@@ -334,7 +334,7 @@ namespace mongo {
         Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
-        Status status = getPlanCache(ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - return empty plans array.
             BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));

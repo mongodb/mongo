@@ -62,7 +62,7 @@ namespace QueryTests {
     public:
         Base() : _context( ns() ) {
             _database = _context.db();
-            _collection = _database->getCollection( ns() );
+            _collection = _database->getCollection( &_txn, ns() );
             if ( _collection ) {
                 _database->dropCollection( &_txn, ns() );
             }
@@ -118,10 +118,10 @@ namespace QueryTests {
             BSONObj query = fromjson( "{$or:[{b:2},{c:3}]}" );
             BSONObj ret;
             // Check findOne() returning object.
-            ASSERT( Helpers::findOne( _collection, query, ret, true ) );
+            ASSERT( Helpers::findOne( &_txn, _collection, query, ret, true ) );
             ASSERT_EQUALS( string( "b" ), ret.firstElement().fieldName() );
             // Cross check with findOne() returning location.
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, true)));
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, true)));
         }
     };
     
@@ -133,20 +133,20 @@ namespace QueryTests {
             BSONObj ret;
 
             // Check findOne() returning object, allowing unindexed scan.
-            ASSERT( Helpers::findOne( _collection, query, ret, false ) );
+            ASSERT( Helpers::findOne( &_txn, _collection, query, ret, false ) );
             // Check findOne() returning location, allowing unindexed scan.
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, false)));
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, false)));
             
             // Check findOne() returning object, requiring indexed scan without index.
-            ASSERT_THROWS( Helpers::findOne( _collection, query, ret, true ), MsgAssertionException );
+            ASSERT_THROWS( Helpers::findOne( &_txn, _collection, query, ret, true ), MsgAssertionException );
             // Check findOne() returning location, requiring indexed scan without index.
-            ASSERT_THROWS( Helpers::findOne( _collection, query, true ), MsgAssertionException );
+            ASSERT_THROWS( Helpers::findOne( &_txn, _collection, query, true ), MsgAssertionException );
 
             addIndex( BSON( "b" << 1 ) );
             // Check findOne() returning object, requiring indexed scan with index.
-            ASSERT( Helpers::findOne( _collection, query, ret, true ) );
+            ASSERT( Helpers::findOne( &_txn, _collection, query, ret, true ) );
             // Check findOne() returning location, requiring indexed scan with index.
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, true)));
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, true)));
         }
     };
     
@@ -159,7 +159,7 @@ namespace QueryTests {
             Client::Context ctx( "unittests.querytests" );
 
             Database* db = ctx.db();
-            if ( db->getCollection( ns() ) ) {
+            if ( db->getCollection( &_txn, ns() ) ) {
                 _collection = NULL;
                 db->dropCollection( &_txn, ns() );
             }
@@ -174,9 +174,9 @@ namespace QueryTests {
             insert( BSONObj() );
             BSONObj query;
             BSONObj ret;
-            ASSERT( Helpers::findOne( _collection, query, ret, false ) );
+            ASSERT( Helpers::findOne( &_txn, _collection, query, ret, false ) );
             ASSERT( ret.isEmpty() );
-            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(_collection, query, false)));
+            ASSERT_EQUALS(ret, _collection->docFor(Helpers::findOne(&_txn, _collection, query, false)));
         }
     };
     
@@ -244,7 +244,7 @@ namespace QueryTests {
                 // Check internal server handoff to getmore.
                 Lock::DBWrite lk(_txn.lockState(), ns);
                 Client::Context ctx( ns );
-                ClientCursorPin clientCursor( ctx.db()->getCollection(ns), cursorId );
+                ClientCursorPin clientCursor( ctx.db()->getCollection(&_txn, ns), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
                 // ASSERT( clientCursor.c()->pq );
                 // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
@@ -301,7 +301,7 @@ namespace QueryTests {
             // Check that the cursor has been removed.
             {
                 Client::ReadContext ctx(&_txn, ns);
-                ASSERT( 0 == ctx.ctx().db()->getCollection( ns )->cursorCache()->numCursors() );
+                ASSERT(0 == ctx.ctx().db()->getCollection(&_txn, ns)->cursorCache()->numCursors());
             }
 
             ASSERT_FALSE(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId));
@@ -351,8 +351,8 @@ namespace QueryTests {
             // Check that the cursor still exists
             {
                 Client::ReadContext ctx(&_txn, ns);
-                ASSERT( 1 == ctx.ctx().db()->getCollection( ns )->cursorCache()->numCursors() );
-                ASSERT( ctx.ctx().db()->getCollection( ns )->cursorCache()->find( cursorId, false ) );
+                ASSERT( 1 == ctx.ctx().db()->getCollection( &_txn, ns )->cursorCache()->numCursors() );
+                ASSERT( ctx.ctx().db()->getCollection( &_txn, ns )->cursorCache()->find( cursorId, false ) );
             }
 
             // Check that the cursor can be iterated until all documents are returned.
@@ -612,7 +612,7 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            ClientCursorPin clientCursor( ctx.db()->getCollection( ns ), cursorId );
+            ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns ), cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
     };
@@ -1138,7 +1138,7 @@ namespace QueryTests {
 
         size_t numCursorsOpen() {
             Client::ReadContext ctx(&_txn, _ns);
-            Collection* collection = ctx.ctx().db()->getCollection( _ns );
+            Collection* collection = ctx.ctx().db()->getCollection( &_txn, _ns );
             if ( !collection )
                 return 0;
             return collection->cursorCache()->numCursors();
@@ -1237,14 +1237,14 @@ namespace QueryTests {
             ASSERT_EQUALS( 50 , count() );
 
             BSONObj res;
-            ASSERT( Helpers::findOne( ctx.ctx().db()->getCollection( ns() ),
+            ASSERT( Helpers::findOne( &_txn, ctx.ctx().db()->getCollection( &_txn, ns() ),
                                       BSON( "_id" << 20 ) , res , true ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
+            ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
-            ASSERT( ! Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 200 ) , res ) );
+            ASSERT( ! Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 200 ) , res ) );
 
             long long slow;
             long long fast;
@@ -1254,7 +1254,7 @@ namespace QueryTests {
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findOne( ctx.ctx().db()->getCollection(ns()),
+                    ASSERT( Helpers::findOne( &_txn, ctx.ctx().db()->getCollection(&_txn, ns()),
                                               BSON( "_id" << 20 ), res, true ) );
                 }
                 slow = t.micros();
@@ -1262,7 +1262,7 @@ namespace QueryTests {
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
+                    ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
                 }
                 fast = t.micros();
             }
@@ -1290,7 +1290,7 @@ namespace QueryTests {
 
             BSONObj res;
             for ( int i=0; i<1000; i++ ) {
-                bool found = Helpers::findById( ctx.ctx().db(), ns() , BSON( "_id" << i ) , res );
+                bool found = Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << i ) , res );
                 ASSERT_EQUALS( i % 2 , int(found) );
             }
 
@@ -1463,7 +1463,7 @@ namespace QueryTests {
             ClientCursor *clientCursor = 0;
             {
                 Client::ReadContext ctx(&_txn, ns());
-                ClientCursorPin clientCursorPointer( ctx.ctx().db()->getCollection( ns() ),
+                ClientCursorPin clientCursorPointer( ctx.ctx().db()->getCollection( &_txn, ns() ),
                                                      cursorId );
                 clientCursor = clientCursorPointer.c();
                 // clientCursorPointer destructor unpins the cursor.
@@ -1501,7 +1501,7 @@ namespace QueryTests {
             
             {
                 Client::WriteContext ctx(&_txn,  ns() );
-                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( ns() ), cursorId );
+                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( &_txn, ns() ), cursorId );
  
                 ASSERT_THROWS(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId),
                               MsgAssertionException);

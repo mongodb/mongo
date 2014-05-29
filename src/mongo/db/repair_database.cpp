@@ -326,7 +326,7 @@ namespace mongo {
             {
                 string ns = dbName + ".system.namespaces";
                 Client::Context ctx( ns );
-                Collection* coll = originalDatabase->getCollection( ns );
+                Collection* coll = originalDatabase->getCollection( txn, ns );
                 if ( coll ) {
                     scoped_ptr<RecordIterator> it( coll->getIterator( DiskLoc(),
                                                                           false,

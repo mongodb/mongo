@@ -81,7 +81,7 @@ namespace QueryStageTests {
             WorkingSet* ws = new WorkingSet();
             PlanExecutor runner(ws, 
                                 new IndexScan(params, ws, filterExpr.get()), 
-                                ctx.ctx().db()->getCollection(ns()));
+                                ctx.ctx().db()->getCollection(&_txn, ns()));
 
             int count = 0;
             for (DiskLoc dl; Runner::RUNNER_ADVANCED == runner.getNext(NULL, &dl); ) {
@@ -103,7 +103,7 @@ namespace QueryStageTests {
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
             Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getCollection( ns() );
+            Collection* collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
 

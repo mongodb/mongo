@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+    class OperationContext;
     class PseudoRandom;
     class Runner;
 

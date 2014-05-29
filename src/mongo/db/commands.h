@@ -198,7 +198,8 @@ namespace mutablebson {
 
     public:
         // Stops all index builds required to run this command and returns index builds killed.
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db, 
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db, 
                                                      const BSONObj& cmdObj);
 
         static const std::map<std::string,Command*>* commandsByBestName() { return _commandsByBestName; }

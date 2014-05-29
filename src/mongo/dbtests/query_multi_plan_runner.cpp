@@ -67,8 +67,8 @@ namespace QueryMultiPlanRunner {
             _client.ensureIndex(ns(), obj);
         }
 
-        IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-            const Collection* collection = db->getCollection( ns() );
+        IndexDescriptor* getIndex(OperationContext* txn, Database* db, const BSONObj& obj) {
+            const Collection* collection = db->getCollection( txn, ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
         }
 
@@ -107,14 +107,14 @@ namespace QueryMultiPlanRunner {
             // Every call to work() returns something so this should clearly win (by current scoring
             // at least).
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(ctx.ctx().db(), BSON("foo" << 1));
+            ixparams.descriptor = getIndex(&txn, ctx.ctx().db(), BSON("foo" << 1));
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << 7);
             ixparams.bounds.endKey = BSON("" << 7);
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
 
-            const Collection* coll = ctx.ctx().db()->getCollection(ns());
+            const Collection* coll = ctx.ctx().db()->getCollection(&txn, ns());
 
             auto_ptr<WorkingSet> sharedWs(new WorkingSet());
             IndexScan* ix = new IndexScan(ixparams, sharedWs.get(), NULL);
@@ -122,7 +122,7 @@ namespace QueryMultiPlanRunner {
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
-            csparams.collection = ctx.ctx().db()->getCollection( ns() );
+            csparams.collection = ctx.ctx().db()->getCollection( &txn, ns() );
             csparams.direction = CollectionScanParams::FORWARD;
 
             // Make the filter.
@@ -139,7 +139,7 @@ namespace QueryMultiPlanRunner {
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
 
-            MultiPlanStage* mps = new MultiPlanStage(ctx.ctx().db()->getCollection(ns()),cq);
+            MultiPlanStage* mps = new MultiPlanStage(ctx.ctx().db()->getCollection(&txn, ns()),cq);
             mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
             mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
@@ -149,7 +149,7 @@ namespace QueryMultiPlanRunner {
             ASSERT_EQUALS(0, mps->bestPlanIdx());
 
             SingleSolutionRunner sr(
-                ctx.ctx().db()->getCollection(ns()),
+                ctx.ctx().db()->getCollection(&txn, ns()),
                 cq,
                 mps->bestSolution(),
                 mps,

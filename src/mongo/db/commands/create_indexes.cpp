@@ -133,7 +133,7 @@ namespace mongo {
                 // lock for common calls. We only take write lock if needed.
                 // Note: createIndexes command does not currently respect shard versioning.
                 Client::ReadContext readContext(txn, ns, false /* doVersion */);
-                const Collection* collection = readContext.ctx().db()->getCollection( ns.ns() );
+                const Collection* collection = readContext.ctx().db()->getCollection(txn, ns.ns());
                 if ( collection ) {
                     for ( size_t i = 0; i < specs.size(); i++ ) {
                         BSONObj spec = specs[i];

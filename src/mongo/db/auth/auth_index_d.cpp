@@ -84,16 +84,16 @@ namespace {
             NamespaceString systemUsers(dbname, "system.users");
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            OperationContextImpl txn;
-            Client::WriteContext wctx(&txn, systemUsers);
-            Collection* collection = wctx.ctx().db()->getCollection(NamespaceString(systemUsers));
+            Client::WriteContext wctx(txn, systemUsers);
+            Collection* collection = wctx.ctx().db()->getCollection(txn,
+                                                                    NamespaceString(systemUsers));
             if (!collection) {
                 return;
             }
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             IndexDescriptor* oldIndex = NULL;
             while ((oldIndex = indexCatalog->findIndexByKeyPattern(v1SystemUsersKeyPattern))) {
-                indexCatalog->dropIndex(&txn, oldIndex);
+                indexCatalog->dropIndex(txn, oldIndex);
             }
         }
     }

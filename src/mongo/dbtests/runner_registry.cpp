@@ -74,23 +74,24 @@ namespace RunnerRegistry {
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             // Owns all args
-            auto_ptr<Runner> run(new SingleSolutionRunner(_ctx->ctx().db()->getCollection( ns() ),
+            auto_ptr<Runner> run(new SingleSolutionRunner(_ctx->ctx().db()->getCollection( &_opCtx,
+                                                                                           ns() ),
                                                           cq, NULL, scan.release(), ws.release()));
             return run.release();
         }
 
         void registerRunner( Runner* runner ) {
-            _ctx->ctx().db()->getOrCreateCollection( ns() )->cursorCache()->registerRunner( runner );
+            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->registerRunner( runner );
         }
 
         void deregisterRunner( Runner* runner ) {
-            _ctx->ctx().db()->getOrCreateCollection( ns() )->cursorCache()->deregisterRunner( runner );
+            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->deregisterRunner( runner );
         }
 
         int N() { return 50; }
 
         Collection* collection() {
-            return _ctx->ctx().db()->getCollection( ns() );
+            return _ctx->ctx().db()->getCollection( &_opCtx, ns() );
         }
 
         static const char* ns() { return "unittests.RunnerRegistryDiskLocInvalidation"; }

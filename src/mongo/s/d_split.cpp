@@ -120,7 +120,7 @@ namespace mongo {
             }
 
             Client::ReadContext ctx(txn, ns);
-            Collection* collection = ctx.ctx().db()->getCollection( ns );
+            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
             if ( !collection ) {
                 errmsg = "ns not found";
                 return false;
@@ -276,7 +276,7 @@ namespace mongo {
             {
                 // Get the size estimate for this namespace
                 Client::ReadContext ctx(txn, ns);
-                Collection* collection = ctx.ctx().db()->getCollection( ns );
+                Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                 if ( !collection ) {
                     errmsg = "ns not found";
                     return false;
@@ -859,7 +859,7 @@ namespace mongo {
                 for (int i=1; i >= 0 ; i--){ // high chunk more likely to have only one obj
 
                     Client::ReadContext ctx(txn, ns);
-                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                     verify( collection );
 
                     // Allow multiKey based on the invariant that shard keys must be

@@ -438,7 +438,7 @@ namespace {
         OperationContextImpl txn; // XXX?
         Lock::DBRead lk(txn.lockState(), rsoplog);
         BSONObj o;
-        if (Helpers::getLast(rsoplog, o)) {
+        if (Helpers::getLast(&txn, rsoplog, o)) {
             lastH = o["h"].numberLong();
             lastOpTimeWritten = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
@@ -449,7 +449,8 @@ namespace {
         OperationContextImpl txn; // XXX?
         Lock::DBRead lk(txn.lockState(), rsoplog);
         BSONObj o;
-        uassert(17347, "Problem reading earliest entry from oplog", Helpers::getFirst(rsoplog, o));
+        uassert(17347, "Problem reading earliest entry from oplog",
+                Helpers::getFirst(&txn, rsoplog, o));
         return o["ts"]._opTime();
     }
 
@@ -876,7 +877,7 @@ namespace {
         OperationContextImpl txn; // XXX?
         Lock::DBRead lk (txn.lockState(), "local");
         BSONObj mv;
-        if (Helpers::getSingleton("local.replset.minvalid", mv)) {
+        if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
             return mv[_initialSyncFlagString].trueValue();
         }
         return false;
@@ -897,7 +898,7 @@ namespace {
         OperationContextImpl txn; // XXX?
         Lock::DBRead lk(txn.lockState(), "local.replset.minvalid");
         BSONObj mv;
-        if (Helpers::getSingleton("local.replset.minvalid", mv)) {
+        if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
             return mv["ts"]._opTime();
         }
         return OpTime();

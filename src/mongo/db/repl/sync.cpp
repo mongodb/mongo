@@ -48,12 +48,12 @@ namespace repl {
         hn = hostname;
     }
 
-    BSONObj Sync::getMissingDoc(Database* db, const BSONObj& o) {
+    BSONObj Sync::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
         OplogReader missingObjReader; // why are we using OplogReader to run a non-oplog query?
         const char *ns = o.getStringField("ns");
 
         // capped collections
-        Collection* collection = db->getCollection(ns);
+        Collection* collection = db->getCollection(txn, ns);
         if ( collection && collection->isCapped() ) {
             log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
             return BSONObj();
@@ -115,7 +115,7 @@ namespace repl {
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
 
-        BSONObj missingObj = getMissingDoc(ctx.db(), o);
+        BSONObj missingObj = getMissingDoc(&txn, ctx.db(), o);
 
         if( missingObj.isEmpty() ) {
             log() << "replication missing object not found on source. presumably deleted later in oplog" << endl;
@@ -125,7 +125,7 @@ namespace repl {
             return false;
         }
         else {
-            Collection* collection = ctx.db()->getOrCreateCollection( ns );
+            Collection* collection = ctx.db()->getOrCreateCollection( &txn, ns );
             verify( collection ); // should never happen
             StatusWith<DiskLoc> result = collection->insertDocument( &txn, missingObj, true );
             uassert(15917,

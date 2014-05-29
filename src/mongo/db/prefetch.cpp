@@ -79,7 +79,7 @@ namespace mongo {
         BSONObj obj = op.getObjectField(opField);
         const char *ns = op.getStringField("ns");
 
-        Collection* collection = db->getCollection( ns );
+        Collection* collection = db->getCollection( txn, ns );
         if ( !collection )
             return;
 
@@ -187,7 +187,7 @@ namespace mongo {
                 // we can probably use Client::Context here instead of ReadContext as we
                 // have locked higher up the call stack already
                 Client::ReadContext ctx(txn, ns);
-                if( Helpers::findById(ctx.ctx().db(), ns, builder.done(), result) ) {
+                if( Helpers::findById(txn, ctx.ctx().db(), ns, builder.done(), result) ) {
                     // do we want to use Record::touch() here?  it's pretty similar.
                     volatile char _dummy_char = '\0';
                     // Touch the first word on every page in order to fault it into memory

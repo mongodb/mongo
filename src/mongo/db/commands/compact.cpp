@@ -71,14 +71,15 @@ namespace mongo {
         }
         CompactCmd() : Command("compact") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db,
                                                      const BSONObj& cmdObj) {
             std::string coll = cmdObj.firstElement().valuestr();
             std::string ns = db->name() + "." + coll;
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
         }
 
         virtual bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -144,7 +145,7 @@ namespace mongo {
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
             Client::Context ctx(ns);
 
-            Collection* collection = ctx.db()->getCollection(ns.ns());
+            Collection* collection = ctx.db()->getCollection(txn, ns.ns());
             if( ! collection ) {
                 errmsg = "namespace does not exist";
                 return false;
@@ -157,7 +158,7 @@ namespace mongo {
 
             log() << "compact " << ns << " begin, options: " << compactOptions.toString();
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(ctx.db(), cmdObj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, ctx.db(), cmdObj);
 
             StatusWith<CompactStats> status = collection->compact( txn, &compactOptions );
             if ( !status.isOK() )

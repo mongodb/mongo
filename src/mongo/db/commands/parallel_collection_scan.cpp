@@ -168,7 +168,7 @@ namespace mongo {
             Client::ReadContext ctx(txn, ns.ns());
 
             Database* db = ctx.ctx().db();
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
 
             if ( !collection )
                 return appendCommandStatus( result,
