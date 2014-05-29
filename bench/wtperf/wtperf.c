@@ -129,14 +129,13 @@ randomize_value(CONFIG *cfg, char *value_buf)
 	 * Each time we're called overwrite value_buf[0] and one other
 	 * randomly chosen byte (other than the trailing NUL).
 	 * Make sure we don't write a NUL: keep the value the same length.
-	 * Keep the bytes printable: that makes debugging easier.
 	 */
 	i = __wt_random() % (cfg->value_sz - 1);
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
 	if (i > 0) {
-		value_buf[0] = 'A' + (__wt_random() % ('z' - 'A' + 1));
-		value_buf[i] = 'A' + (__wt_random() % ('z' - 'A' + 1));
+		value_buf[0] = (__wt_random() % 255) + 1;
+		value_buf[i] = (__wt_random() % 255) + 1;
 	}
 	return;
 }
