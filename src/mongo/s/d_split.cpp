@@ -533,8 +533,8 @@ namespace mongo {
                 return false;
             }
 
-            const string from = cmdObj["from"].str();
-            if ( from.empty() ) {
+            const string shardName = cmdObj["from"].str();
+            if ( shardName.empty() ) {
                 errmsg = "need specify server to split chunk at";
                 return false;
             }
@@ -556,133 +556,98 @@ namespace mongo {
                 return false;
             }
 
-            // It is possible that this is the first sharded command this mongod is asked to perform. If so,
-            // start sharding apparatus. We'd still be missing some more shard-related info but we'll get it
-            // in step 2. below.
+            //
+            // Get sharding state up-to-date
+            //
+
+            // This could be the first call that enables sharding - make sure we initialize the
+            // sharding state for this shard.
             if ( ! shardingState.enabled() ) {
                 if ( cmdObj["configdb"].type() != String ) {
                     errmsg = "sharding not enabled";
+                    warning() << errmsg << endl;
                     return false;
                 }
                 string configdb = cmdObj["configdb"].String();
                 ShardingState::initialize(configdb);
             }
 
-            Shard myShard( from );
+            // Initialize our current shard name in the shard state if needed
+            shardingState.gotShardName(shardName);
 
-            log() << "received splitChunk request: " << cmdObj << endl;
+            ConnectionString configLoc = ConnectionString::parse(shardingState.getConfigServer(),
+                                                                 errmsg);
+            if (!configLoc.isValid()) {
+                warning() << errmsg;
+                return false;
+            }
+
+            log() << "received splitChunk request: " << cmdObj;
 
             //
             // 2. lock the collection's metadata and get highest version for the current shard
             //
 
-            DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC) , ns );
-            dist_lock_try dlk;
+            ScopedDistributedLock collLock(configLoc, ns);
+            collLock.setLockMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
+                                                  << ") in " << ns);
 
-            try{
-            	dlk = dist_lock_try( &lockSetup, string("split-") + min.toString() );
-            }
-            catch( LockException& e ){
-            	errmsg = str::stream() << "Error locking distributed lock for split." << causedBy( e );
-            	return false;
-            }
+            if (!collLock.tryAcquire(&errmsg)) {
 
-            if ( ! dlk.got() ) {
-                errmsg = "the collection's metadata lock is taken";
-                result.append( "who" , dlk.other() );
+                errmsg = str::stream() << "could not acquire collection lock for " << ns
+                                       << " to split chunk [" << minKey << "," << maxKey << ")"
+                                       << causedBy(errmsg);
+
+                warning() << errmsg;
                 return false;
             }
 
-            // TODO This is a check migrate does to the letter. Factor it out and share. 2010-10-22
+            // Always check our version remotely
+            ChunkVersion shardVersion;
+            Status refreshStatus = shardingState.refreshMetadataNow(txn, ns, &shardVersion);
 
-            ChunkVersion maxVersion;
-            ChunkType origChunk;
-            {
-                ScopedDbConnection conn(shardingState.getConfigServer(), 30);
+            if (!refreshStatus.isOK()) {
 
-                BSONObj x = conn->findOne(ChunkType::ConfigNS,
-                                          Query(BSON(ChunkType::ns(ns)))
-                                              .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+                errmsg = str::stream() << "splitChunk cannot split chunk " << "[" << minKey << ","
+                                       << maxKey << ")" << causedBy(refreshStatus.reason());
 
-                maxVersion = ChunkVersion::fromBSON(x, ChunkType::DEPRECATED_lastmod());
-
-                BSONObj currChunk =
-                    conn->findOne(ChunkType::ConfigNS,
-                                  shardId.wrap(ChunkType::name().c_str())).getOwned();
-                conn.done();
-
-                if (!origChunk.parseBSON(currChunk, &errmsg)) {
-                    return false;
-                }
-
-                const BSONObj currMin = origChunk.getMin();
-                const BSONObj currMax = origChunk.getMax();
-                if ( currMin.woCompare( min ) || currMax.woCompare( max ) ) {
-                    errmsg = "chunk boundaries are outdated (likely a split occurred)";
-                    result.append( "currMin" , currMin );
-                    result.append( "currMax" , currMax );
-                    result.append( "requestedMin" , min );
-                    result.append( "requestedMax" , max );
-
-                    warning() << "aborted split because " << errmsg << ": " << min << "->" << max
-                              << " is now " << currMin << "->" << currMax << endl;
-                    return false;
-                }
-
-                if (origChunk.getShard() != myShard.getName()) {
-                    errmsg = "location is outdated (likely balance or migrate occurred)";
-                    result.append( "from" , myShard.getName() );
-                    result.append("official", origChunk.getShard());
-
-                    warning() << "aborted split because " << errmsg
-                              << ": chunk is at " << origChunk.getShard()
-                              << " and not at " << myShard.getName() << endl;
-                    return false;
-                }
-
-                if ( maxVersion < shardingState.getVersion( ns ) ) {
-                    errmsg = "official version less than mine?";
-                    maxVersion.addToBSON( result, "officialVersion" );
-                    shardingState.getVersion( ns ).addToBSON( result, "myVersion" );
-
-                    warning() << "aborted split because " << errmsg << ": official " << maxVersion
-                              << " mine: " << shardingState.getVersion(ns) << endl;
-                    return false;
-                }
-
-                // since this could be the first call that enable sharding we also make sure to load
-                // the shard's metadata
-                shardingState.gotShardName(origChunk.getShard());
-
-                // Always check our version remotely.
-                // TODO: Make this less expensive by using the incoming request's shard version.
-                // TODO: The above checks should be removed, we should only have one refresh
-                // mechanism.
-                ChunkVersion shardVersion;
-                Status status = shardingState.refreshMetadataNow(txn, ns, &shardVersion);
-
-                if (!status.isOK()) {
-                    errmsg = str::stream() << "splitChunk cannot split chunk "
-                                           << "[" << currMin << "," << currMax << ")"
-                                           << causedBy( status.reason() );
-
-                    warning() << errmsg << endl;
-                    return false;
-                }
-
-                if ( shardVersion.majorVersion() == 0 ) {
-                    // It makes no sense to split if our version is zero and we have no chunks
-                    errmsg = str::stream() << "splitChunk cannot split chunk "
-                                           << "[" << currMin << "," << currMax << ")"
-                                           << " with zero shard version";
-
-                    warning() << errmsg << endl;
-                    return false;
-                }
-
-                log() << "splitChunk accepted at version " << shardVersion << endl;
-
+                warning() << errmsg;
+                return false;
             }
+
+            if (shardVersion.majorVersion() == 0) {
+
+                // It makes no sense to split if our version is zero and we have no chunks
+                errmsg = str::stream() << "splitChunk cannot split chunk " << "[" << minKey << ","
+                                       << maxKey << ")" << " with zero shard version";
+
+                warning() << errmsg;
+                return false;
+            }
+
+            // Get collection metadata
+            const CollectionMetadataPtr collMetadata(shardingState.getCollectionMetadata(ns));
+            // With nonzero shard version, we must have metadata
+            invariant(NULL != collMetadata);
+
+            ChunkVersion collVersion = collMetadata->getCollVersion();
+            // With nonzero shard version, we must have a coll version >= our shard version
+            invariant(collVersion >= shardVersion);
+
+            ChunkType origChunk;
+            if (!collMetadata->getNextChunk(min, &origChunk)
+                || origChunk.getMin().woCompare(min) || origChunk.getMax().woCompare(max)) {
+
+                // Our boundaries are different from those passed in
+                errmsg = str::stream() << "splitChunk cannot find chunk "
+                                       << "[" << minKey << "," << maxKey << ")"
+                                       << " to split, the chunk boundaries may be stale";
+
+                warning() << errmsg;
+                return false;
+            }
+
+            log() << "splitChunk accepted at version " << shardVersion;
 
             //
             // 3. create the batch of updates to metadata ( the new chunks ) to be applied via 'applyOps' command
@@ -693,7 +658,7 @@ namespace mongo {
             LOG(1) << "before split on " << origChunk << endl;
             OwnedPointerVector<ChunkType> newChunks;
 
-            ChunkVersion myVersion = maxVersion;
+            ChunkVersion nextChunkVersion = collVersion;
             BSONObj startKey = min;
             splitKeys.push_back( max ); // makes it easier to have 'max' in the next loop. remove later.
 
@@ -712,14 +677,13 @@ namespace mongo {
                     return false;
                 }
 
-                CollectionMetadataPtr metadata(shardingState.getCollectionMetadata(ns));
-                if (!isShardDocSizeValid(metadata->getKeyPattern(), endKey, &errmsg)) {
+                if (!isShardDocSizeValid(collMetadata->getKeyPattern(), endKey, &errmsg)) {
                     warning() << errmsg << endl;
                     return false;
                 }
 
                 // splits only update the 'minor' portion of version
-                myVersion.incMinor();
+                nextChunkVersion.incMinor();
 
                 // build an update operation against the chunks collection of the config database with
                 // upsert true
@@ -731,11 +695,11 @@ namespace mongo {
                 // add the modified (new) chunk information as the update object
                 BSONObjBuilder n( op.subobjStart( "o" ) );
                 n.append(ChunkType::name(), Chunk::genID(ns, startKey));
-                myVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
+                nextChunkVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
                 n.append(ChunkType::ns(), ns);
                 n.append(ChunkType::min(), startKey);
                 n.append(ChunkType::max(), endKey);
-                n.append(ChunkType::shard(), origChunk.getShard());
+                n.append(ChunkType::shard(), shardName);
                 n.done();
 
                 // add the chunk's _id as the query part of the update statement
@@ -749,12 +713,14 @@ namespace mongo {
                 auto_ptr<ChunkType> chunk(new ChunkType());
                 chunk->setMin(startKey);
                 chunk->setMax(endKey);
-                chunk->setVersion(myVersion);
+                chunk->setVersion(nextChunkVersion);
 
                 newChunks.push_back(chunk.release());
 
                 startKey = endKey;
             }
+
+            splitKeys.pop_back(); // 'max' was used as sentinel
 
             updates.done();
 
@@ -767,7 +733,7 @@ namespace mongo {
                 {
                     BSONObjBuilder bb( b.subobjStart( "res" ) );
                     // TODO: For backwards compatibility, we can't yet require an epoch here
-                    bb.appendTimestamp(ChunkType::DEPRECATED_lastmod(), maxVersion.toLong());
+                    bb.appendTimestamp(ChunkType::DEPRECATED_lastmod(), collVersion.toLong());
                     bb.done();
                 }
                 preCond.append( b.obj() );
@@ -800,13 +766,20 @@ namespace mongo {
             //
             // Install chunk metadata with knowledge about newly split chunks in this shard's state
             //
-
-            splitKeys.pop_back(); // 'max' was used as sentinel
-            maxVersion.incMinor();
             
             {
                 Lock::DBWrite writeLk(txn->lockState(), ns);
-                shardingState.splitChunk(txn, ns, min, max, splitKeys, maxVersion);
+
+                // NOTE: The newShardVersion resulting from this split is higher than any other
+                // chunk version, so it's also implicitly the newCollVersion
+                ChunkVersion newShardVersion = collVersion;
+
+                // Increment the minor version once, shardingState.splitChunk increments once per
+                // split point (resulting in the correct final shard/collection version)
+                // TODO: Revisit this interface, it's a bit clunky
+                newShardVersion.incMinor();
+
+                shardingState.splitChunk(txn, ns, min, max, splitKeys, newShardVersion);
             }
 
             //
@@ -880,7 +853,8 @@ namespace mongo {
             BSONObjBuilder bb(b);
             bb.append(ChunkType::min(), chunk.getMin());
             bb.append(ChunkType::max(), chunk.getMax());
-            chunk.getVersion().addToBSON(bb, ChunkType::DEPRECATED_lastmod());
+            if (chunk.isVersionSet())
+                chunk.getVersion().addToBSON(bb, ChunkType::DEPRECATED_lastmod());
             bb.done();
         }
 

@@ -837,17 +837,14 @@ namespace mongo {
 
             // 1.
             string ns = parseNs(dbname, cmdObj);
-            string to = cmdObj["to"].str();
-            string from = cmdObj["from"].str(); // my public address, a tad redundant, but safe
 
-            // fromShard and toShard needed so that 2.2 mongos can interact with either 2.0 or 2.2 mongod
-            if( cmdObj["fromShard"].type() == String ){
-                from = cmdObj["fromShard"].String();
-            }
+            // The shard addresses, redundant, but allows for validation
+            string toShardHost = cmdObj["to"].str();
+            string fromShardHost = cmdObj["from"].str();
 
-            if( cmdObj["toShard"].type() == String ){
-                to = cmdObj["toShard"].String();
-            }
+            // The shard names
+            string toShardName = cmdObj["toShard"].str();
+            string fromShardName = cmdObj["fromShard"].str();
 
             // Process secondary throttle settings and assign defaults if necessary.
             BSONObj secThrottleObj;
@@ -894,11 +891,11 @@ namespace mongo {
                 return false;
             }
 
-            if ( to.empty() ) {
+            if ( toShardName.empty() ) {
                 errmsg = "need to specify shard to move chunk to";
                 return false;
             }
-            if ( from.empty() ) {
+            if ( fromShardName.empty() ) {
                 errmsg = "need to specify shard to move chunk from";
                 return false;
             }
@@ -924,28 +921,36 @@ namespace mongo {
             }
             const long long maxChunkSize = maxSizeElem.numberLong(); // in bytes
 
+            // This could be the first call that enables sharding - make sure we initialize the
+            // sharding state for this shard.
             if ( ! shardingState.enabled() ) {
                 if ( cmdObj["configdb"].type() != String ) {
                     errmsg = "sharding not enabled";
+                    warning() << errmsg << endl;
                     return false;
                 }
                 string configdb = cmdObj["configdb"].String();
                 ShardingState::initialize(configdb);
             }
 
-            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , &errmsg );
+            // Initialize our current shard name in the shard state if needed
+            shardingState.gotShardName(fromShardName);
 
             // Make sure we're as up-to-date as possible with shard information
             // This catches the case where we had to previously changed a shard's host by
             // removing/adding a shard with the same name
             Shard::reloadShardInfo();
+            Shard toShard(toShardName);
+            Shard fromShard(fromShardName);
 
-            // So 2.2 mongod can interact with 2.0 mongos, mongod needs to handle either a conn
-            // string or a shard in the to/from fields.  The Shard constructor handles this,
-            // eventually we should break the compatibility.
+            ConnectionString configLoc = ConnectionString::parse(shardingState.getConfigServer(),
+                                                                 errmsg);
+            if (!configLoc.isValid()) {
+                warning() << errmsg;
+                return false;
+            }
 
-            Shard fromShard( from );
-            Shard toShard( to );
+            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , &errmsg );
 
             log() << "received moveChunk request: " << cmdObj << migrateLog;
 
@@ -960,138 +965,88 @@ namespace mongo {
                 return false;
             }
 
-            DistributedLock lockSetup( ConnectionString( shardingState.getConfigServer() , ConnectionString::SYNC ) , ns );
-            dist_lock_try dlk;
+            //
+            // Get the distributed lock
+            //
 
-            try{
-                dlk = dist_lock_try( &lockSetup , (string)"migrate-" + min.toString(), 30.0 /*timeout*/ );
-            }
-            catch( LockException& e ){
-                errmsg = str::stream() << "error locking distributed lock for migration " << "migrate-" << min.toString() << causedBy( e );
-                warning() << errmsg << endl;
+            ScopedDistributedLock collLock(configLoc, ns);
+            collLock.setLockMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
+                                                  << ") in " << ns);
+
+            if (!collLock.tryAcquire(&errmsg)) {
+
+                errmsg = str::stream() << "could not acquire collection lock for " << ns
+                                       << " to migrate chunk [" << minKey << "," << maxKey << ")"
+                                       << causedBy(errmsg);
+
+                warning() << errmsg;
                 return false;
             }
 
-            if ( ! dlk.got() ) {
-                errmsg = str::stream() << "the collection metadata could not be locked with lock " << "migrate-" << min.toString();
-                warning() << errmsg << endl;
-                result.append( "who" , dlk.other() );
+            BSONObj chunkInfo =
+                BSON("min" << min << "max" << max <<
+                     "from" << fromShard.getName() << "to" << toShard.getName());
+            configServer.logChange("moveChunk.start", ns, chunkInfo);
+
+            // Always refresh our metadata remotely
+            ChunkVersion origShardVersion;
+            Status refreshStatus = shardingState.refreshMetadataNow(txn, ns, &origShardVersion);
+
+            if (!refreshStatus.isOK()) {
+
+                errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
+                                       << "[" << minKey << "," << maxKey << ")"
+                                       << causedBy(refreshStatus.reason());
+
+                warning() << errmsg;
                 return false;
             }
 
-            BSONObj chunkInfo = BSON("min" << min << "max" << max << "from" << fromShard.getName() << "to" << toShard.getName() );
-            configServer.logChange( "moveChunk.start" , ns , chunkInfo );
+            if (origShardVersion.majorVersion() == 0) {
 
-            ChunkVersion maxVersion;
-            ChunkVersion startingVersion;
-            string myOldShard;
-            {
-                ScopedDbConnection conn(shardingState.getConfigServer(), 30);
+                // It makes no sense to migrate if our version is zero and we have no chunks
+                errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
+                                       << "[" << minKey << "," << maxKey << ")"
+                                       << " with zero shard version";
 
-                BSONObj x;
-                BSONObj currChunk;
-                try{
-                    x = conn->findOne(ChunkType::ConfigNS,
-                                             Query(BSON(ChunkType::ns(ns)))
-                                                  .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
-
-                    currChunk = conn->findOne(ChunkType::ConfigNS,
-                                                     shardId.wrap(ChunkType::name().c_str()));
-                }
-                catch( DBException& e ){
-                    errmsg = str::stream() << "aborted moveChunk because could not get chunk data from config server " << shardingState.getConfigServer() << causedBy( e );
-                    warning() << errmsg << endl;
-                    return false;
-                }
-
-                maxVersion = ChunkVersion::fromBSON(x, ChunkType::DEPRECATED_lastmod());
-                verify(currChunk[ChunkType::shard()].type());
-                verify(currChunk[ChunkType::min()].type());
-                verify(currChunk[ChunkType::max()].type());
-                myOldShard = currChunk[ChunkType::shard()].String();
-                conn.done();
-
-                BSONObj currMin = currChunk[ChunkType::min()].Obj();
-                BSONObj currMax = currChunk[ChunkType::max()].Obj();
-                if ( currMin.woCompare( min ) || currMax.woCompare( max ) ) {
-                    errmsg = "boundaries are outdated (likely a split occurred)";
-                    result.append( "currMin" , currMin );
-                    result.append( "currMax" , currMax );
-                    result.append( "requestedMin" , min );
-                    result.append( "requestedMax" , max );
-
-                    warning() << "aborted moveChunk because" <<  errmsg << ": " << min << "->" << max
-                                      << " is now " << currMin << "->" << currMax << migrateLog;
-                    return false;
-                }
-
-                if ( myOldShard != fromShard.getName() ) {
-                    errmsg = "location is outdated (likely balance or migrate occurred)";
-                    result.append( "from" , fromShard.getName() );
-                    result.append( "official" , myOldShard );
-
-                    warning() << "aborted moveChunk because " << errmsg << ": chunk is at " << myOldShard
-                                      << " and not at " << fromShard.getName() << migrateLog;
-                    return false;
-                }
-
-                if ( maxVersion < shardingState.getVersion( ns ) ) {
-                    errmsg = "official version less than mine?";
-                    maxVersion.addToBSON( result, "officialVersion" );
-                    shardingState.getVersion( ns ).addToBSON( result, "myVersion" );
-
-                    warning() << "aborted moveChunk because " << errmsg << ": official " << maxVersion
-                                      << " mine: " << shardingState.getVersion(ns) << migrateLog;
-                    return false;
-                }
-
-                // since this could be the first call that enable sharding we also make sure to
-                // load the shard's metadata, if we don't have it
-                shardingState.gotShardName( myOldShard );
-
-                // Always refresh our metadata remotely
-                // TODO: The above checks should be removed, we should only have one refresh
-                // mechanism.
-                ChunkVersion startingVersion;
-                Status status = shardingState.refreshMetadataNow(txn, ns, &startingVersion );
-
-                if (!status.isOK()) {
-                    errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
-                                           << "[" << currMin << "," << currMax << ")"
-                                           << causedBy( status.reason() );
-
-                    warning() << errmsg << endl;
-                    return false;
-                }
-
-                if (startingVersion.majorVersion() == 0) {
-                    // It makes no sense to migrate if our version is zero and we have no chunks
-                    errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
-                                           << "[" << currMin << "," << currMax << ")"
-                                           << " with zero shard version";
-
-                    warning() << errmsg << endl;
-                    return false;
-                }
-
-                log() << "moveChunk request accepted at version " << startingVersion << migrateLog;
+                warning() << errmsg;
+                return false;
             }
+
+            // Get collection metadata
+            const CollectionMetadataPtr origCollMetadata(shardingState.getCollectionMetadata(ns));
+            // With nonzero shard version, we must have metadata
+            invariant(NULL != origCollMetadata);
+
+            ChunkVersion origCollVersion = origCollMetadata->getCollVersion();
+            BSONObj shardKeyPattern = origCollMetadata->getKeyPattern();
+
+            // With nonzero shard version, we must have a coll version >= our shard version
+            invariant(origCollVersion >= origShardVersion);
+            // With nonzero shard version, we must have a shard key
+            invariant(!shardKeyPattern.isEmpty());
+
+            ChunkType origChunk;
+            if (!origCollMetadata->getNextChunk(min, &origChunk)
+                || origChunk.getMin().woCompare(min) || origChunk.getMax().woCompare(max)) {
+
+                // Our boundaries are different from those passed in
+                errmsg = str::stream() << "moveChunk cannot find chunk "
+                                       << "[" << minKey << "," << maxKey << ")"
+                                       << " to migrate, the chunk boundaries may be stale";
+
+                warning() << errmsg;
+                return false;
+            }
+
+            log() << "moveChunk request accepted at version " << origShardVersion;
 
             timing.done(2);
             MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep2);
 
             // 3.
-
-            const CollectionMetadataPtr origCollMetadata( shardingState.getCollectionMetadata( ns ) );
-            verify( origCollMetadata != NULL );
-            BSONObj shardKeyPattern = origCollMetadata->getKeyPattern();
-            if ( shardKeyPattern.isEmpty() ){
-                errmsg = "no shard key found";
-                warning() << errmsg << endl;
-                return false;
-            }
-
             MigrateStatusHolder statusHolder(txn, ns, min, max, shardKeyPattern);
+            
             if (statusHolder.isAnotherMigrationActive()) {
                 errmsg = "moveChunk is already in progress from this shard";
                 warning() << errmsg << endl;
@@ -1132,7 +1087,7 @@ namespace mongo {
                 }
                 catch( DBException& e ){
                     errmsg = str::stream() << "moveChunk could not contact to: shard "
-                                           << to << " to start transfer" << causedBy( e );
+                                           << toShardName << " to start transfer" << causedBy( e );
                     warning() << errmsg << endl;
                     return false;
                 }
@@ -1170,7 +1125,7 @@ namespace mongo {
                     res = res.getOwned();
                 }
                 catch( DBException& e ){
-                    errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to monitor transfer" << causedBy( e );
+                    errmsg = str::stream() << "moveChunk could not contact to: shard " << toShardName << " to monitor transfer" << causedBy( e );
                     warning() << errmsg << endl;
                     return false;
                 }
@@ -1254,7 +1209,7 @@ namespace mongo {
 
             // Ensure distributed lock still held
             string lockHeldMsg;
-            bool lockHeld = dlk.isLockHeld( 30.0 /* timeout */, &lockHeldMsg );
+            bool lockHeld = collLock.verifyLockHeld(&lockHeldMsg);
             if ( !lockHeld ) {
                 errmsg = str::stream() << "not entering migrate critical section because "
                                        << lockHeldMsg;
@@ -1269,7 +1224,7 @@ namespace mongo {
                 // we're under the collection lock here, so no other migrate can change maxVersion
                 // or CollectionMetadata state
                 migrateFromStatus.setInCriticalSection( true );
-                ChunkVersion myVersion = maxVersion;
+                ChunkVersion myVersion = origCollVersion;
                 myVersion.incMajor();
 
                 {
@@ -1306,7 +1261,7 @@ namespace mongo {
 
                 if ( !ok || MONGO_FAIL_POINT(failMigrationCommit) ) {
                     log() << "moveChunk migrate commit not accepted by TO-shard: " << res
-                          << " resetting shard version to: " << startingVersion << migrateLog;
+                          << " resetting shard version to: " << origShardVersion << migrateLog;
                     {
                         Lock::GlobalWrite lk(txn->lockState());
                         log() << "moveChunk global lock acquired to reset shard version from "
@@ -1426,7 +1381,7 @@ namespace mongo {
                     {
                         BSONObjBuilder bb( b.subobjStart( "res" ) );
                         // TODO: For backwards compatibility, we can't yet require an epoch here
-                        bb.appendTimestamp(ChunkType::DEPRECATED_lastmod(), maxVersion.toLong());
+                        bb.appendTimestamp(ChunkType::DEPRECATED_lastmod(), origCollVersion.toLong());
                         bb.done();
                     }
                     preCond.append( b.obj() );

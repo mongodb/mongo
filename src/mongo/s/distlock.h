@@ -318,25 +318,22 @@ namespace mongo {
     class MONGO_CLIENT_API ScopedDistributedLock {
     public:
 
+        static const long long kDefaultLockTryIntervalMillis;
+        static const long long kDefaultSocketTimeoutMillis;
+
         ScopedDistributedLock(const ConnectionString& conn, const std::string& name);
 
-        virtual ~ScopedDistributedLock();
+        ~ScopedDistributedLock();
 
         /**
          * Tries once to obtain a lock, and can fail with an error message.
-         *
-         * Subclasses of this lock can override this method (and are also required to call the base
-         * in the overridden method).
-         *
-         * @return if the lock was successfully acquired
+         * Returns true if the lock was successfully acquired.
          */
-        virtual bool tryAcquire(std::string* errMsg);
+        bool tryAcquire(std::string* errMsg);
 
         /**
          * Tries to unlock the lock if acquired.  Cannot report an error or block indefinitely
          * (though it may log messages or continue retrying in a non-blocking way).
-         *
-         * Subclasses should define their own destructor unlockXXX() methods.
          */
         void unlock();
 
@@ -350,6 +347,12 @@ namespace mongo {
          * @return true if the lock was acquired
          */
         bool acquire(long long waitForMillis, std::string* errMsg);
+
+        /**
+         * If lock is held, remotely verifies that the lock has not been forced as a sanity check.
+         * If the lock is not held or cannot be verified, returns false with errMsg.
+         */
+        bool verifyLockHeld(std::string* errMsg);
 
         bool isAcquired() const {
             return _acquired;
@@ -375,10 +378,19 @@ namespace mongo {
             return _why;
         }
 
+        void setSocketTimeoutMillis(long long socketTimeoutMillis) {
+            _socketTimeoutMillis = socketTimeoutMillis;
+        }
+
+        long long getSocketTimeoutMillis() const {
+            return _socketTimeoutMillis;
+        }
+
     private:
         DistributedLock _lock;
         std::string _why;
         long long _lockTryIntervalMillis;
+        long long _socketTimeoutMillis;
 
         bool _acquired;
         BSONObj _other;
