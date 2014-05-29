@@ -322,7 +322,7 @@ namespace mongo {
         for ( size_t i = 0; i < indexSpecs.size(); i++ ) {
             BSONObj info = indexSpecs[i];
             StatusWith<BSONObj> statusWithInfo =
-                _collection->getIndexCatalog()->prepareSpecForCreate( info );
+                _collection->getIndexCatalog()->prepareSpecForCreate( _txn, info );
             Status status = statusWithInfo.getStatus();
             if ( !status.isOK() )
                 return status;

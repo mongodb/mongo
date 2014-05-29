@@ -151,7 +151,7 @@ namespace mongo {
             // this index.
             // NOTE A local copy of 'missingField' is made because indices may be
             // invalidated during a db lock yield.
-            BSONObj missingFieldObj = IndexLegacy::getMissingField(collection,idx->infoObj());
+            BSONObj missingFieldObj = IndexLegacy::getMissingField(txn, collection, idx->infoObj());
             BSONElement missingField = missingFieldObj.firstElement();
             
             // for now, the only check is that all shard keys are filled

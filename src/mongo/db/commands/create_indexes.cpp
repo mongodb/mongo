@@ -138,7 +138,7 @@ namespace mongo {
                     for ( size_t i = 0; i < specs.size(); i++ ) {
                         BSONObj spec = specs[i];
                         StatusWith<BSONObj> statusWithSpec =
-                            collection->getIndexCatalog()->prepareSpecForCreate( spec );
+                            collection->getIndexCatalog()->prepareSpecForCreate( txn, spec );
                         status = statusWithSpec.getStatus();
                         if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
                             specs.erase( specs.begin() + i );

@@ -53,7 +53,6 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
@@ -319,7 +318,7 @@ namespace mongo {
         BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
         if ( !empty ) {
             int major, minor;
-            getFileFormat( &major, &minor );
+            getFileFormat( opCtx, &major, &minor );
             dataFileVersion.append( "major", major );
             dataFileVersion.append( "minor", minor );
         }
@@ -733,14 +732,13 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Database::getFileFormat( int* major, int* minor ) {
+    void Database::getFileFormat( OperationContext* txn, int* major, int* minor ) {
         if ( getExtentManager()->numFiles() == 0 ) {
             *major = 0;
             *minor = 0;
             return;
         }
-        OperationContextImpl txn; // TODO get rid of this once reads need transactions
-        const DataFile* df = getExtentManager()->getFile( &txn, 0 );
+        const DataFile* df = getExtentManager()->getFile( txn, 0 );
         *major = df->getHeader()->version;
         *minor = df->getHeader()->versionMinor;
     }

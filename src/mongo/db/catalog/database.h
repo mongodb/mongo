@@ -83,7 +83,7 @@ namespace mongo {
 
         int numFiles() const;
 
-        void getFileFormat( int* major, int* minor );
+        void getFileFormat( OperationContext* txn, int* major, int* minor );
 
         /**
          * @return true if success.  false if bad level or error creating profile ns

@@ -53,11 +53,13 @@ namespace mongo {
     }
 
     // static
-    BSONObj IndexLegacy::getMissingField(Collection* collection, const BSONObj& infoObj) {
+    BSONObj IndexLegacy::getMissingField(OperationContext* txn,
+                                         Collection* collection,
+                                         const BSONObj& infoObj) {
         BSONObj keyPattern = infoObj.getObjectField( "key" );
         string accessMethodName;
         if ( collection )
-            accessMethodName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
+            accessMethodName = collection->getIndexCatalog()->getAccessMethodName(txn, keyPattern);
         else
             accessMethodName = IndexNames::findPluginName(keyPattern);
 
