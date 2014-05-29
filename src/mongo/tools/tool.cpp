@@ -54,12 +54,40 @@
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
+#include "mongo/tools/tool_options.h"
+#include "mongo/tools/mongotop_options.h"
+#include "mongo/tools/mongostat_options.h"
+#include "mongo/tools/mongorestore_options.h"
+#include "mongo/tools/mongooplog_options.h"
+#include "mongo/tools/mongoimport_options.h"
+#include "mongo/tools/mongofiles_options.h"
+#include "mongo/tools/mongoexport_options.h"
+#include "mongo/tools/mongodump_options.h"
+#include "mongo/tools/mongobridge_options.h"
+
 using namespace std;
 using namespace mongo;
 
 namespace mongo {
     typedef std::auto_ptr<Tool> (*InstanceFunction)();
+
     std::map < std::string, InstanceFunction> Tool::tools;
+    std::map < std::string, OptionHandler> Tool::options;
+
+    StoreOptions Tool::storeMongoOptions;
+    AddOptions Tool::addMongoOptions;
+    HandleOptions Tool::handlePreValidationMongoOptions;
+
+    void Tool::mapOptions()
+    {
+        Tool::options["dump"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Dump) };
+        Tool::options["export"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Export) };
+        Tool::options["import"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Import) };
+        Tool::options["stat"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Stat) };
+        Tool::options["oplog"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Oplog) };
+        Tool::options["restore"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Restore) };
+        Tool::options["top"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Top) };
+    }
 
     void Tool::mapTools()
     {
@@ -409,6 +437,8 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
 #else
 int main(int argc, char* argv[], char** envp) {
     Tool::mapTools();
+    Tool::mapOptions();
+
     char* newargv[argc - 1];
     newargv[0] = argv[0];
     for (int i = 2; i < argc; ++i) {
@@ -420,6 +450,11 @@ int main(int argc, char* argv[], char** envp) {
         std::cout<<std::string(argv[1]) + " is not a tool."<<endl;
         ::_exit(EXIT_FAILURE);
     }
+
+    OptionHandler o = Tool::options[argv[1]];
+    Tool::storeMongoOptions = o.store;
+    Tool::handlePreValidationMongoOptions = o.handle;
+    Tool::addMongoOptions = o.add;
 
     auto_ptr<Tool> instance = Tool::tools[argv[1]]();
     ::_exit(instance->main(argc - 1, newargv, envp));
