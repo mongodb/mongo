@@ -1,5 +1,18 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_221 Upgrading to Version 2.2.1
+<dl>
+
+<dt>::wiredtiger_open configuration parsing order changed</dt>
+<dd>
+In the 2.2.1 release, the order that configuration strings are
+parsed and override earlier values changed.  The new order is
+the configuration at database creation, then any configuration
+string passed to ::wiredtiger_open.  That is overridden by the
+user configuration file \c Wiredtiger.config.  Finally, that is
+overridden by the user environment variable \c WIREDTIGER_CONFIG.
+</dd>
+
 @section version_220 Upgrading to Version 2.2.0
 <dl>
 
