@@ -70,11 +70,6 @@ namespace mongo {
         virtual ~DBTryLockTimeoutException() throw() { }
     };
 
-    namespace dur { 
-        void assertNothingSpooled();
-        void releasingWriteLock();
-    }
-
     /* dbname->lock
        Currently these are never deleted - will linger if db was closed. (that should be fine.)
        We don't put the lock inside the Database object as those can come and go with open and 
@@ -98,10 +93,6 @@ namespace mongo {
     LockStat* Lock::nestableLockStat( Nestable db ) {
         return &nestableLocks[db]->getStats();
     }
-
-    static void locked_W();
-    static void unlocking_w();
-    static void unlocking_W();
 
     class WrapperForQLock { 
         QLock q;
@@ -139,7 +130,6 @@ namespace mongo {
             {
                 q.lock_W();
             }
-            locked_W();
         }
 
         // how to count try's that fail is an interesting question. we should get rid of try().
@@ -156,7 +146,6 @@ namespace mongo {
             bool got = q.lock_W_try(millis); 
             if( got ) {
                 lockState().lockedStart( 'W' );
-                locked_W();
             }
             return got;
         }
@@ -168,7 +157,6 @@ namespace mongo {
         }
 
         void unlock_w() {
-            unlocking_w();
             wassert( threadState() == 'w' );
             lockState().unlocked();
             q.unlock_w(); 
@@ -178,7 +166,6 @@ namespace mongo {
 
         void unlock_W() {
             wassert( threadState() == 'W' );
-            unlocking_W();
             lockState().unlocked();
             q.unlock_W(); 
         }
@@ -770,16 +757,6 @@ namespace mongo {
         _got = true;
     }
     readlocktry::~readlocktry() { 
-    }
-
-    void locked_W() {
-    }
-    void unlocking_w() {
-        // we can't commit early in this case; so a bit more to do here.
-        dur::releasingWriteLock();
-    }
-    void unlocking_W() {
-        dur::releasingWriteLock();
     }
 
     class GlobalLockServerStatusSection : public ServerStatusSection {

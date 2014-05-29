@@ -126,8 +126,6 @@ namespace mongo {
             }
         }
 
-        void assertNothingSpooled();
-
         /** basic write ops / write intents.  note there is no particular order to these : if we have
             two writes to the same location during the group commit interval, it is likely
             (although not assured) that it is journaled here once.
@@ -139,7 +137,6 @@ namespace mongo {
             // switches will be rare as we sort by memory location first and we batch commit.
             RelativePath lastDbPath;
 
-            assertNothingSpooled();
             const vector<WriteIntent>& _intents = commitJob.getIntentsSorted();
 
             // right now the durability code assumes there is at least one write intent

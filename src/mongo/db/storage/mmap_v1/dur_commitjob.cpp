@@ -39,109 +39,14 @@
 
 namespace mongo {
 
-#if defined(_DEBUG) && (defined(_WIN64) || !defined(_WIN32))
-#define CHECK_SPOOLING 1
-#endif
-
     namespace dur {
-
-        ThreadLocalIntents::ThreadLocalIntents() { 
-            intents.reserve(N); 
-        }
-
-        ThreadLocalIntents::~ThreadLocalIntents() {
-            fassert( 16731, intents.size() == 0 );
-        }
-
-        void ThreadLocalIntents::push(const WriteIntent& x) {
-            intents.push_back( x );
-#if( CHECK_SPOOLING )
-            nSpooled++;
-#endif
-            if( intents.size() == N ) {
-                if ( !condense() ) {
-                    unspool();
-                }
-            }
-        }
-
-        // we are in groupCommitMutex when this is called
-        void ThreadLocalIntents::_unspool() {
-            dassert( intents.size() );
-
-            commitJob._hasWritten = true;
-
-            for( unsigned j = 0; j < intents.size(); j++ ) {
-                commitJob.note(intents[j].start(), intents[j].length());
-            }
-
-#if( CHECK_SPOOLING )
-            nSpooled.signedAdd( -1 * static_cast<int>(intents.size()) );
-#endif
-
-            intents.clear();
-        }
-
-        bool ThreadLocalIntents::condense() {
-            std::sort( intents.begin(), intents.end() );
-
-            bool didAnything = false;
-
-            for ( unsigned x = 0; x < intents.size() - 1 ; x++ ) {
-                if ( intents[x].overlaps( intents[x+1] ) ) {
-                    intents[x].absorb( intents[x+1] );
-                    intents.erase( intents.begin() + x + 1 );
-                    x--;
-                    didAnything = true;
-#if( CHECK_SPOOLING )
-                    nSpooled.signedAdd(-1);
-#endif
-                }
-            }
-
-            return didAnything;
-        }
-
-        void ThreadLocalIntents::unspool() {
-            if ( intents.size() ) {
-                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
-                _unspool();
-            }
-        }
-        AtomicUInt ThreadLocalIntents::nSpooled;
-    }
-
-    TSP_DECLARE(dur::ThreadLocalIntents,tlIntents)
-    TSP_DEFINE(dur::ThreadLocalIntents,tlIntents)
-
-    namespace dur {
-
-        void assertNothingSpooled() { 
-#if( CHECK_SPOOLING )
-            if( ThreadLocalIntents::nSpooled != 0 ) {
-                log() << ThreadLocalIntents::nSpooled.get() << endl;
-                if( tlIntents.get() )
-                    log() << "me:" << tlIntents.get()->n_informational() << endl;
-                else 
-                    log() << "no tlIntent for my thread" << endl;
-                verify(false);
-            }
-#endif
-        }
-        // when we release our w or W lock this is invoked
-        void unspoolWriteIntents() { 
-            ThreadLocalIntents *t = tlIntents.get();
-            if( t ) 
-                t->unspool();
-        }
 
         /** base declare write intent function that all the helpers call. */
         /** we batch up our write intents so that we do not have to synchronize too often */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
             dassert( Lock::somethingWriteLocked() );
             MemoryMappedFile::makeWritable(p, len);
-            ThreadLocalIntents *t = tlIntents.getMake();
-            t->push(WriteIntent(p,len));
+            commitJob.note(p, len);
         }
 
         BOOST_STATIC_ASSERT( UncommittedBytesLimit > BSONObjMaxInternalSize * 3 );
@@ -202,7 +107,6 @@ namespace mongo {
             _intentsAndDurOps.clear();
             privateMapBytes += _bytes;
             _bytes = 0;
-            _nSinceCommitIfNeededCall = 0;
         }
 
         CommitJob::CommitJob() : 
@@ -211,14 +115,12 @@ namespace mongo {
         { 
             _commitNumber = 0;
             _bytes = 0;
-            _nSinceCommitIfNeededCall = 0;
         }
 
         void CommitJob::note(void* p, int len) {
             dassert( Lock::somethingWriteLocked() );
-            groupCommitMutex.dassertLocked();
-
-            dassert( _hasWritten );
+            SimpleMutex::scoped_lock lk(groupCommitMutex);
+            _hasWritten = true;
 
             // from the point of view of the dur module, it would be fine (i think) to only
             // be read locked here.  but must be at least read locked to avoid race with
@@ -262,18 +164,7 @@ namespace mongo {
                         lastPos = x;
                         unsigned b = (len+4095) & ~0xfff;
                         _bytes += b;
-#if defined(_DEBUG)
-                        _nSinceCommitIfNeededCall++;
-                        if( _nSinceCommitIfNeededCall >= 80 ) {
-                            if( _nSinceCommitIfNeededCall % 40 == 0 ) {
-                                log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
-                                if( _nSinceCommitIfNeededCall == 240 || _nSinceCommitIfNeededCall == 1200 ) {
-                                    log() << "_DEBUG printing stack given high nsinccommitifneeded number" << endl;
-                                    printStackTrace();
-                                }
-                            }
-                        }
-#endif
+
                         if (_bytes > UncommittedBytesLimit * 3) {
                             static time_t lastComplain;
                             static unsigned nComplains;

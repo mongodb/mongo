@@ -268,6 +268,7 @@ namespace mongo {
                         errmsg = s.toString();
                         break;
                     }
+                    txn->recoveryUnit()->commitIfNeeded();
                 }
             }
 

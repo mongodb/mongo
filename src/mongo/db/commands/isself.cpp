@@ -207,11 +207,6 @@ namespace mongo {
         int _p = port();
         int p = _p == -1 ? ServerGlobalParams::DefaultDBPort : _p;
 
-        if (p != serverGlobalParams.port) {
-            // shortcut - ports have to match at the very least
-            return false;
-        }
-
         string host = str::stream() << this->host() << ":" << p;
 
         {
@@ -226,22 +221,27 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
         // on linux and os x we can do a quick check for an ip match
 
-        const vector<string> myaddrs = getMyAddrs();
-        const vector<string> addrs = getAllIPs(_host);
+        // no need for ip match if the ports do not match
+        if (p == serverGlobalParams.port) {
+            const vector<string> myaddrs = getMyAddrs();
+            const vector<string> addrs = getAllIPs(_host);
 
-        for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end(); i!=iend; ++i) {
-            for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end(); j!=jend; ++j) {
-                string a = *i;
-                string b = *j;
+            for (vector<string>::const_iterator i=myaddrs.begin(), iend=myaddrs.end();
+                 i!=iend; ++i) {
+                for (vector<string>::const_iterator j=addrs.begin(), jend=addrs.end();
+                     j!=jend; ++j) {
+                    string a = *i;
+                    string b = *j;
 
-                if ( a == b ||
-                        ( str::startsWith( a , "127." ) && str::startsWith( b , "127." ) )  // 127. is all loopback
-                   ) {
+                    if ( a == b || ( str::startsWith( a , "127." ) &&
+                                     str::startsWith( b , "127." ) )  // 127. is all loopback
+                       ) {
 
-                    // add to cache
-                    scoped_lock lk( isSelfCommand._cacheLock );
-                    isSelfCommand._cache[host] = true;
-                    return true;
+                        // add to cache
+                        scoped_lock lk( isSelfCommand._cacheLock );
+                        isSelfCommand._cache[host] = true;
+                        return true;
+                    }
                 }
             }
         }

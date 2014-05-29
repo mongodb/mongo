@@ -333,16 +333,6 @@ namespace mongo {
         void releaseUser(User* user);
 
         /**
-         * Returns a User object for a V1-style user with the given "userName" in "*acquiredUser",
-         * On success, "acquiredUser" will have any privileges that the named user has on
-         * database "dbname".
-         *
-         * Bumps the returned **acquiredUser's reference count on success.
-         */
-        Status acquireV1UserProbedForDb(
-                const UserName& userName, const StringData& dbname, User** acquiredUser);
-
-        /**
          * Marks the given user as invalid and removes it from the user cache.
          */
         void invalidateUserByName(const UserName& user);
@@ -459,13 +449,6 @@ namespace mongo {
          * and stores a pointer to a new user object into *acquiredUser on success.
          */
         Status _fetchUserV2(const UserName& userName, std::auto_ptr<User>* acquiredUser);
-
-        /**
-         * Fetches user information from a v1-schema user document for the named user, possibly
-         * examining system.users collections from userName.getDB() and admin.system.users in the
-         * process.  Stores a pointer to a new user object into *acquiredUser on success.
-         */
-        Status _fetchUserV1(const UserName& userName, std::auto_ptr<User>* acquiredUser);
 
         /**
          * True if access control enforcement is enabled in this AuthorizationManager.

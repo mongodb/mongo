@@ -95,9 +95,6 @@ namespace mongo {
 
     namespace dur {
 
-        void assertNothingSpooled();
-        void unspoolWriteIntents();
-
         void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
         void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed);
         void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed);
@@ -269,8 +266,6 @@ namespace mongo {
         }
 
         bool DurableImpl::isCommitNeeded() const {
-            DEV commitJob._nSinceCommitIfNeededCall = 0;
-            unspoolWriteIntents();
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
@@ -348,8 +343,6 @@ namespace mongo {
             // spot in an operation to be terminated.
             cc().checkpointHappened();
 
-            unspoolWriteIntents();
-            DEV commitJob._nSinceCommitIfNeededCall = 0;
             if( likely( commitJob.bytes() < UncommittedBytesLimit && !force ) ) {
                 return false;
             }
@@ -574,7 +567,6 @@ namespace mongo {
         static AlignedBuilder __theBuilder(4 * 1024 * 1024);
 
         static bool _groupCommitWithLimitedLocks() {
-            unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
             AlignedBuilder &ab = __theBuilder;
 
             verify( ! Lock::isLocked() );
@@ -663,9 +655,6 @@ namespace mongo {
 
             // We are 'R' or 'W'
             assertLockedForCommitting();
-
-            unspoolWriteIntents(); // in case we were doing some writing ourself
-
             {
                 AlignedBuilder &ab = __theBuilder;
 
@@ -860,11 +849,6 @@ namespace mongo {
         }
 
         void recover();
-
-        void releasingWriteLock() {
-            unspoolWriteIntents();
-        }
-
         void preallocateFiles();
 
         /** at startup, recover, and then start the journal threads */
