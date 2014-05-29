@@ -103,13 +103,6 @@ public:
 
 	int bits_per_key_;
 };
-
-class CacheImpl : public Cache {
-public:
-	CacheImpl(size_t capacity) : capacity_(capacity) {}
-
-	size_t capacity_;
-};
 };
 
 
@@ -120,8 +113,15 @@ const FilterPolicy *NewBloomFilterPolicy(int bits_per_key) {
   return new FilterPolicyImpl(bits_per_key);
 }
 
+class Cache {
+public:
+	Cache(size_t capacity) : capacity_(capacity) {}
+
+	size_t capacity_;
+};
+
 Cache *NewLRUCache(size_t capacity) {
-  return new CacheImpl(capacity);
+  return new Cache(capacity);
 }
 
 Status DestroyDB(const std::string& name, const Options& options) {
@@ -322,7 +322,7 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 	if (options.compression == kSnappyCompression)
 		s_conn << "extensions=[libwiredtiger_snappy.so],";
 	if (options.block_cache)
-		s_conn << "cache_size=" << ((CacheImpl *)options.block_cache)->capacity_ << ",";
+		s_conn << "cache_size=" << ((Cache *)options.block_cache)->capacity_ << ",";
 	std::string conn_config = s_conn.str();
 
 	WT_CONNECTION *conn;
@@ -344,7 +344,7 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 			s_table << "bloom_hash_count=" << (int)(0.6 * bits) << ",";
 		}
 		s_table << "),";
-		WT_SESSION *session/;
+		WT_SESSION *session;
 		std::string table_config = s_table.str();
 		ret = conn->open_session(conn, NULL, NULL, &session);
 		assert(ret == 0);

@@ -1,3 +1,5 @@
+#include "wiredtiger_config.h"
+
 #ifdef HAVE_HYPERLEVELDB
 #include <hyperleveldb/comparator.h>
 #include <hyperleveldb/db.h>

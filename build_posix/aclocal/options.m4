@@ -67,19 +67,20 @@ hyper)	wt_cv_enable_leveldb=yes
 	wt_cv_enable_hyperleveldb=yes;;
 *)	wt_cv_enable_leveldb=yes;;
 esac
+AH_TEMPLATE(HAVE_HYPERLEVELDB, [Build the LevelDB API with HyperLevelDB support.])
 AC_MSG_RESULT($wt_cv_enable_leveldb)
 if test "$wt_cv_enable_hyperleveldb" = "yes"; then
 	AC_LANG_PUSH([C++])
 	AC_CHECK_HEADER(hyperleveldb/db.h,,
 	    [AC_MSG_ERROR([--enable-leveldb=hyper requires hyperleveldb/db.h])])
 	AC_LANG_POP([C++])
+	AC_DEFINE(HAVE_HYPERLEVELDB)
 elif test "$wt_cv_enable_leveldb" = "yes"; then
 	AC_LANG_PUSH([C++])
 	AC_CHECK_HEADER(leveldb/db.h,,
 	    [AC_MSG_ERROR([--enable-leveldb requires leveldb/db.h])])
 	AC_LANG_POP([C++])
 fi
-AM_CONDITIONAL([HYPERLEVELDB], [test "$wt_cv_enable_hyperleveldb" = "yes"])
 AM_CONDITIONAL([LEVELDB], [test "$wt_cv_enable_leveldb" = "yes"])
 
 AC_MSG_CHECKING(if --enable-python option specified)
