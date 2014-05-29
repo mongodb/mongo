@@ -120,6 +120,13 @@ async_next_incr(uint64_t *val)
 	return (ATOMIC_ADD_PTR(val, 1));
 }
 
+static inline void
+generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
+{
+	snprintf(key_buf, cfg->key_sz,
+	    "%0*" PRIu64, cfg->key_sz - 1, keyno);
+}
+
 static void
 randomize_value(CONFIG *cfg, char *value_buf)
 {
@@ -326,7 +333,7 @@ worker_async(void *arg)
 			goto err;		/* can't happen */
 		}
 
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+		generate_key(cfg, key_buf, next_val);
 
 		/*
 		 * Spread the data out around the multiple databases.
@@ -471,7 +478,7 @@ worker(void *arg)
 			goto err;		/* can't happen */
 		}
 
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
+		generate_key(cfg, key_buf, next_val);
 
 		/*
 		 * Spread the data out around the multiple databases.
@@ -794,7 +801,7 @@ populate_thread(void *arg)
 		 * Figure out which table this op belongs to.
 		 */
 		cursor = cursors[op % cfg->table_count];
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
+		generate_key(cfg, key_buf, op);
 		measure_latency = 
 		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
@@ -923,7 +930,7 @@ retry:		if ((ret = conn->async_new_op(
 		}
 		asyncop->app_private = thread;
 
-		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
+		generate_key(cfg, key_buf, op);
 		asyncop->set_key(asyncop, key_buf);
 		if (cfg->random_value)
 			randomize_value(cfg, value_buf);
@@ -2090,9 +2097,10 @@ start_threads(CONFIG *cfg,
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
 		 * to distinguish between threads needing them and threads that
-		 * don't, it's not enough memory to bother.
+		 * don't, it's not enough memory to bother.  These buffers hold
+		 * strings: trailing NUL is included in the size.
 		 */
-		if ((thread->key_buf = calloc(cfg->key_sz + 1, 1)) == NULL)
+		if ((thread->key_buf = calloc(cfg->key_sz, 1)) == NULL)
 			return (enomem(cfg));
 		if ((thread->value_buf = calloc(cfg->value_sz, 1)) == NULL)
 			return (enomem(cfg));
@@ -2188,7 +2196,5 @@ wtperf_rand(CONFIG *cfg)
 		if (rval > wtperf_value_range(cfg))
 			rval = wtperf_value_range(cfg);
 	}
-	/* Avoid zero - LSM doesn't like it. */
-	rval = (rval % wtperf_value_range(cfg)) + 1;
 	return (rval);
 }
