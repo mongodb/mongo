@@ -68,7 +68,7 @@ type Connection struct {
 
 // Struct holding ssl-related options
 type SSL struct {
-	SSL               bool   `long:"ssl" description:"Enable connection to a mongod or mongos that has ssl enabled"`
+	UseSSL            bool   `long:"ssl" description:"Enable connection to a mongod or mongos that has ssl enabled"`
 	SSLCAFile         string `long:"sslCAFile" description:"Specify the .pem file containing the root certificate chain from the certificate authority"`
 	SSLPEMKeyFile     string `long:"sslPEMKeyFile" description:"Specify the .pem file containing the certificate and key"`
 	SSLPEMKeyPassword string `long:"sslPEMKeyPassword" description:"Specify the password to decrypt the sslPEMKeyFile, if necessary"`
