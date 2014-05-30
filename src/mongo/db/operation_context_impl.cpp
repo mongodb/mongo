@@ -50,11 +50,19 @@ namespace mongo {
         return &cc().lockState();
     }
 
-    ProgressMeter* OperationContextImpl::setMessage(const char* msg,
-                                              const std::string& name,
-                                              unsigned long long progressMeterTotal,
-                                              int secondsBetween) {
-        return &cc().curop()->setMessage( msg, name, progressMeterTotal, secondsBetween );
+    ProgressMeter* OperationContextImpl::setMessage(const char * msg,
+                                                    const std::string &name,
+                                                    unsigned long long progressMeterTotal,
+                                                    int secondsBetween) {
+        return &getCurOp()->setMessage(msg, name, progressMeterTotal, secondsBetween);
+    }
+
+    const char* OperationContextImpl::getNS() const {
+        return getCurOp()->getNS();
+    }
+
+    CurOp* OperationContextImpl::getCurOp() const {
+        return cc().curop();
     }
 
     void OperationContextImpl::checkForInterrupt(bool heedMutex) const {

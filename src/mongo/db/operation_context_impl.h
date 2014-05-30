@@ -46,9 +46,13 @@ namespace mongo {
         virtual LockState* lockState() const;
 
         virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name ,
+                                          const std::string& name,
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween);
+
+        virtual const char * getNS() const;
+
+        virtual CurOp* getCurOp() const;
 
         virtual void checkForInterrupt(bool heedMutex = true) const;
 

@@ -86,7 +86,7 @@ namespace mongo {
         }
 
         // Show which index we're building in the curop display.
-        cc().curop()->setQuery(_index);
+        txn->getCurOp()->setQuery(_index);
 
         Status status = c->getIndexCatalog()->createIndex( txn,
                                                            _index, 

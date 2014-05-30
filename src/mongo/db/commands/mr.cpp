@@ -1204,8 +1204,7 @@ namespace mongo {
 
             bool run(OperationContext* txn, const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
-                Client& client = cc();
-                CurOp * op = client.curop();
+                CurOp* op = txn->getCurOp();
 
                 Config config( dbname , cmd );
 

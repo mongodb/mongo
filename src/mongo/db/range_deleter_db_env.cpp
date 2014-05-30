@@ -72,7 +72,7 @@ namespace mongo {
             Helpers::RemoveSaver removeSaver("moveChunk", ns.toString(), "post-cleanup");
 
             // log the opId so the user can use it to cancel the delete using killOp.
-            unsigned int opId = cc().curop()->opNum();
+            unsigned int opId = txn->getCurOp()->opNum();
             log() << "Deleter starting delete for: " << ns
                   << " from " << inclusiveLower
                   << " -> " << exclusiveUpper

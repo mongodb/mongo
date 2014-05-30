@@ -31,11 +31,12 @@
 #include "mongo/db/structure/record_store_v1_base.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/storage/record.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/structure/record_store_v1_repair_iterator.h"
+#include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
@@ -806,19 +807,17 @@ namespace mongo {
             }
         }
 
-        /* TODO(ERH)
-        std::string progress_msg = "touch " + ns + " extents";
-        ProgressMeterHolder pm(cc().curop()->setMessage(progress_msg.c_str(),
-                                                        "Touch Progress",
-                                                        ranges.size()));
-        */
+        std::string progress_msg = "touch " + std::string(txn->getNS()) + " extents";
+        ProgressMeterHolder pm(*txn->setMessage(progress_msg.c_str(),
+                                                "Touch Progress",
+                                                ranges.size()));
 
         for ( std::vector<touch_location>::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
             touch_pages( it->root, it->length );
-            //pm.hit();
+            pm.hit();
             txn->checkForInterrupt();
         }
-        //pm.finished();
+        pm.finished();
 
         if ( output ) {
             output->append( "numRanges", static_cast<int>( ranges.size() ) );

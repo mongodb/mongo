@@ -257,7 +257,7 @@ namespace mongo {
 
             stats.append("avgDistance", totalDistance / results);
             stats.append("maxDistance", farthestDist);
-            stats.append("time", cc().curop()->elapsedMillis());
+            stats.append("time", txn->getCurOp()->elapsedMillis());
             stats.done();
 
             return true;

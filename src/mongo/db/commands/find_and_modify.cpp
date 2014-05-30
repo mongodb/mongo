@@ -252,7 +252,11 @@ namespace mongo {
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = mongo::update(txn, cx.db(), request, &cc().curop()->debug());
+                    UpdateResult res = mongo::update(txn,
+                                                     cx.db(),
+                                                     request,
+                                                     &txn->getCurOp()->debug());
+
                     if ( !collection ) {
                         // collection created by an upsert
                         collection = cx.db()->getCollection( txn, ns );

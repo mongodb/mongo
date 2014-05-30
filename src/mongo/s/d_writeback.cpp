@@ -172,8 +172,8 @@ namespace mongo {
         }
         bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
-            cc().curop()->suppressFromCurop();
-            cc().curop()->setExpectedLatencyMs( 30000 );
+            txn->getCurOp()->suppressFromCurop();
+            txn->getCurOp()->setExpectedLatencyMs( 30000 );
 
             BSONElement e = cmdObj.firstElement();
             if ( e.type() != jstOID ) {

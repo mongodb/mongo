@@ -804,9 +804,9 @@ namespace mongo {
             // insert comes from a socket client request rather than a
             // parent operation using the client interface.  The parent
             // operation might not support interrupts.
-            bool mayInterrupt = cc().curop()->parent() == NULL;
+            bool mayInterrupt = txn->getCurOp()->parent() == NULL;
 
-            cc().curop()->setQuery(js);
+            txn->getCurOp()->setQuery(js);
             Status status = collection->getIndexCatalog()->createIndex(txn, js, mayInterrupt);
 
             if ( status.code() == ErrorCodes::IndexAlreadyExists )

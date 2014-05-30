@@ -27,8 +27,11 @@
  */
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 
 #include "mongo/db/storage/recovery_unit_noop.h"
+#pragma once
 
 namespace mongo {
 
@@ -40,6 +43,11 @@ namespace mongo {
 
         virtual ~OperationContextNoop() { }
 
+        CurOp* getCurOp() const {
+            invariant(false);
+            return NULL;
+        }
+
         virtual RecoveryUnit* recoveryUnit() const {
             return _recoveryUnit.get();
         }
@@ -50,8 +58,8 @@ namespace mongo {
             return NULL;
         }
 
-        virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name ,
+        virtual ProgressMeter* setMessage(const char * msg,
+                                          const std::string &name,
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween) {
             invariant(false);
@@ -67,6 +75,10 @@ namespace mongo {
         virtual bool isPrimaryFor( const StringData& ns ) {
             return true;
         }
+
+        virtual const char * getNS() const {
+            return NULL;
+        };
 
     private:
         boost::scoped_ptr<RecoveryUnitNoop> _recoveryUnit;

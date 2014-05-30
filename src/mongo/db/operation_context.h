@@ -39,6 +39,7 @@
 
 namespace mongo {
 
+    class CurOp;
     class ProgressMeter;
 
     /**
@@ -80,12 +81,27 @@ namespace mongo {
         virtual Status checkForInterruptNoAssert() const = 0;
 
         /**
-         * TODO(ERH): this should move to some CurOp like context.
+         * Delegates to CurOp, but is included here to break dependencies.
+         * Caller does not own the pointer.
          */
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name = "Progress",
                                           unsigned long long progressMeterTotal = 0,
                                           int secondsBetween = 3) = 0;
+
+        /**
+         * Delegates to CurOp, but is included here to break dependencies
+         */
+        virtual const char * getNS() const = 0;
+
+        //
+        // CurOp
+        //
+
+        /**
+         * Returns CurOp. Caller does not own pointer
+         */
+        virtual CurOp* getCurOp() const = 0;
 
         /**
          * @return true if this instance is primary for this namespace
