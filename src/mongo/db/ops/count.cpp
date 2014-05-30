@@ -34,7 +34,35 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/get_runner.h"
+#include "mongo/db/query/type_explain.h"
+
+namespace {
+
+    using namespace mongo;
+
+    /**
+     * Ask 'runner' for a summary of the plan it is using to run the count command,
+     * and store this information in 'currentOp'.
+     *
+     * Returns true if the planSummary was copied to 'currentOp' and false otherwise.
+     */
+    bool setPlanSummary(Runner* runner, CurOp* currentOp) {
+        if (NULL != currentOp) {
+            PlanInfo* rawInfo;
+            Status s = runner->getInfo(NULL, &rawInfo);
+            if (s.isOK()) {
+                scoped_ptr<PlanInfo> planInfo(rawInfo);
+                currentOp->debug().planSummary = planInfo->planSummary.c_str();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+} // namespace
 
 namespace mongo {
 
@@ -94,6 +122,19 @@ namespace mongo {
         uassertStatusOK(getRunnerCount(collection, query, hintObj, &rawRunner));
         auto_ptr<Runner> runner(rawRunner);
 
+        // Get a pointer to the current operation. We will try to copy the planSummary
+        // there so that it appears in db.currentOp() and the slow query log.
+        Client& client = cc();
+        CurOp* currentOp = client.curop();
+
+        // Have we copied the planSummary to 'currentOp' yet?
+        bool gotPlanSummary = false;
+
+        // Try to copy the plan summary to the 'currentOp'.
+        if (!gotPlanSummary) {
+            gotPlanSummary = setPlanSummary(runner.get(), currentOp);
+        }
+
         try {
             const ScopedRunnerRegistration safety(runner.get());
             runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -101,6 +142,13 @@ namespace mongo {
             long long count = 0;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, NULL))) {
+                // Try to copy the plan summary to the 'currentOp'. We need to try again
+                // here because we might not have chosen a plan until after the first
+                // call to getNext(...).
+                if (!gotPlanSummary) {
+                    gotPlanSummary = setPlanSummary(runner.get(), currentOp);
+                }
+
                 if (skip > 0) {
                     --skip;
                 }
@@ -112,6 +160,12 @@ namespace mongo {
                         break;
                     }
                 }
+            }
+
+            // Try to copy the plan summary to the 'currentOp', if we haven't already. This
+            // could happen if, for example, the count is 0.
+            if (!gotPlanSummary) {
+                gotPlanSummary = setPlanSummary(runner.get(), currentOp);
             }
 
             // Emulate old behavior and return the count even if the runner was killed.  This
