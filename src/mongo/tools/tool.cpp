@@ -431,6 +431,7 @@ namespace mongo {
 int mongoPerfMain(int argc, char*argv[]);
 int snifferToolMain(int argc, char **argv, char** envp);
 int bridgeToolMain(int argc, char **argv, char** envp);
+int startProg(int argc, char* argv[], char** envp);
 
 #if defined(_WIN32)
 // In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
@@ -441,13 +442,16 @@ int bridgeToolMain(int argc, char **argv, char** envp);
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     setWindowsUnhandledExceptionFilter();
     mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    auto_ptr<Tool> instance = (*Tool::createInstance)();
-    int exitCode = instance->main(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    int exitCode = startProg(argc, wcl.argv(), wcl.envp());
 }
 
 #else
 int main(int argc, char* argv[], char** envp) {
+    startProg(argc, argv, envp);
+}
+#endif
+
+int startProg(int argc, char* argv[], char** envp) {
     Tool::mapTools();
     Tool::mapOptions();
 
@@ -500,4 +504,4 @@ int main(int argc, char* argv[], char** envp) {
     auto_ptr<Tool> instance = Tool::tools[argv[1]]();
     ::_exit(instance->main(argc - 1, newargv, envp));
 }
-#endif
+
