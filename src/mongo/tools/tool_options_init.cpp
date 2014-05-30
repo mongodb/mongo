@@ -1,28 +1,27 @@
 #include "mongo/tools/tool.h"
 
-#include "mongo/tools/mongotop_options.h"
-
+#include "mongo/tools/tool_options.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo 
 {
-    Status _mongoInitializerFunction_MongoTopOptions_Register(InitializerContext*);
+    Status _mongoInitializerFunction_MongoOptions_Register(InitializerContext*);
     namespace 
     { 
-    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoTopOptions_Register( "MongoTopOptions_Register", _mongoInitializerFunction_MongoTopOptions_Register, _makeStringVector(0, "BeginGeneralStartupOptionRegistration", __null), _makeStringVector(0, "EndGeneralStartupOptionRegistration", __null)); 
+    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Register( "MongoOptions_Register", _mongoInitializerFunction_MongoOptions_Register, _makeStringVector(0, "BeginGeneralStartupOptionRegistration", __null), _makeStringVector(0, "EndGeneralStartupOptionRegistration", __null)); 
     }
-    Status _mongoInitializerFunction_MongoTopOptions_Register(InitializerContext* context)
+    Status _mongoInitializerFunction_MongoOptions_Register(InitializerContext* context)
     {
         return Tool::addMongoOptions(&moe::startupOptions);
     }
 
-    Status _mongoInitializerFunction_MongoTopOptions_Validate(InitializerContext*);
+    Status _mongoInitializerFunction_MongoOptions_Validate(InitializerContext*);
     namespace
     {
-    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoTopOptions_Validate( "MongoTopOptions_Validate", _mongoInitializerFunction_MongoTopOptions_Validate, _makeStringVector(0, "BeginStartupOptionValidation", __null), _makeStringVector(0, "EndStartupOptionValidation", __null));
+    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Validate( "MongoOptions_Validate", _mongoInitializerFunction_MongoOptions_Validate, _makeStringVector(0, "BeginStartupOptionValidation", __null), _makeStringVector(0, "EndStartupOptionValidation", __null));
     }
-	Status _mongoInitializerFunction_MongoTopOptions_Validate(InitializerContext* context)
+	Status _mongoInitializerFunction_MongoOptions_Validate(InitializerContext* context)
 	{
 	    if (!Tool::handlePreValidationMongoOptions(moe::startupOptionsParsed))
 	    {
@@ -36,12 +35,12 @@ namespace mongo
 	    return Status::OK();
     }
 
-    Status _mongoInitializerFunction_MongoTopOptions_Store(InitializerContext*);
+    Status _mongoInitializerFunction_MongoOptions_Store(InitializerContext*);
     namespace
     {
-    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoTopOptions_Store( "MongoTopOptions_Store", _mongoInitializerFunction_MongoTopOptions_Store, _makeStringVector(0, "BeginStartupOptionStorage", __null), _makeStringVector(0, "EndStartupOptionStorage", __null));
+    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Store( "MongoOptions_Store", _mongoInitializerFunction_MongoOptions_Store, _makeStringVector(0, "BeginStartupOptionStorage", __null), _makeStringVector(0, "EndStartupOptionStorage", __null));
     }
-	Status _mongoInitializerFunction_MongoTopOptions_Store(InitializerContext* context) 
+	Status _mongoInitializerFunction_MongoOptions_Store(InitializerContext* context) 
 	{
 	    Status ret = Tool::storeMongoOptions(moe::startupOptionsParsed, context->args());
 	    if (!ret.isOK()) {

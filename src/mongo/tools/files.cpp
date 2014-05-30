@@ -43,7 +43,8 @@ using namespace mongo;
 class Files : public Tool {
 public:
     Files() : Tool() { }
-
+    static std::auto_ptr<Tool> createInstanceOfThisTool();
+    
     virtual void printHelp( ostream & out ) {
         printMongoFilesHelp(&out);
     }
