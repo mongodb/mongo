@@ -64,7 +64,6 @@ type Verbosity struct {
 type Connection struct {
 	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost:27017"`
 	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening"`
-	IPV6 bool   `long:"ipv6" description:"Enable ipv6 support"`
 }
 
 // Struct holding ssl-related options
