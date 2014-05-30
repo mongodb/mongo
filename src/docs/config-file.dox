@@ -10,14 +10,20 @@ to ::wiredtiger_open is saved to a WiredTiger home directory file named
 \c WiredTiger.basecfg, and that configuration file is read whenever the
 database is subsequently opened.
 
+The configuration string to the ::wiredtiger_open call allows applications
+to do per run settings (such as with or without statistics) or override
+original creation settings.  The user config file and the environment
+variable allow system administrators to override application settings
+without recompilation.
+
 @section config_order Configuration ordering
 
 When a database is created or opened, the order of configuration is:
 
 - Any \c WiredTiger.basecfg file,
+- which is overridden by the ::wiredtiger_open configuration string argument.
 - which is overridden by the \c WiredTiger.config file,
 - which is overridden by the \c WIREDTIGER_CONFIG environment variable,
-- which is overridden by the ::wiredtiger_open configuration string argument.
 
 @section config_env WIREDTIGER_CONFIG environment variable
 
