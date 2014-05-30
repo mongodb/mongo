@@ -46,6 +46,7 @@ class BSONDump : public BSONTool {
 public:
 
     BSONDump() : BSONTool() { }
+    static std::auto_ptr<Tool> createInstanceOfThisTool();
 
     virtual void printHelp(ostream& out) {
         printBSONDumpHelp(&out);

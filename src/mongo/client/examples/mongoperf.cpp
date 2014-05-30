@@ -237,7 +237,7 @@ void go() {
     }
 }
 
-int main(int argc, char *argv[]) {
+int mongoPerfMain(int argc, char *argv[]) {
 
     try {
         cout << "mongoperf" << endl;

@@ -48,7 +48,7 @@ namespace mongo {
     typedef mongo::Status (*StoreOptions)(const mongo::moe::Environment& params, const std::vector<std::string>& args);
     typedef bool (*HandleOptions)(const mongo::moe::Environment& params);
     typedef mongo::Status (*AddOptions)(mongo::moe::OptionSection* options);
-    
+
     struct OptionHandler {
         StoreOptions store;
         HandleOptions handle;
@@ -140,5 +140,8 @@ namespace mongo {
     std::auto_ptr<Tool> TYPENAME::createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
     std::auto_ptr<Tool> (*Tool::createInstance(TYPENAME))() = TYPENAME::createInstanceOfThisTool;
 
+#define REGISTER_MONGOOPTION_HANDLER(NAME)\
+    REGISTER_OPTION_HANDLER(Mongo##NAME)
+
 #define REGISTER_OPTION_HANDLER(NAME) \
-    storeMongo##NAME##Options, handlePreValidationMongo##NAME##Options, addMongo##NAME##Options
+    store##NAME##Options, handlePreValidation##NAME##Options, add##NAME##Options

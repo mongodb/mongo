@@ -982,12 +982,15 @@ env.Library("alltools",
                      "$BUILD_DIR/mongo/db/auth/authmongod"])
 
 
-normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
+normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog", "files", "bridge" ]
 
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
 for name in normalTools:
     env.Library("mongo" + name + "_options", ["tools/mongo" + name + "_options.cpp"],
                 LIBDEPS=['tool_options'])
+
+env.Library("bsondump_options", ["tools/bsondump_options.cpp"], LIBDEPS=['tool_options'])
+
 #env.Library("mongotool", ["tools/tool.cpp"] + map(lambda x: "tools/" + x + ".cpp", normalTools), LIBDEPS=['tool_options'])
 
 #for name in normalTools:
@@ -995,8 +998,8 @@ for name in normalTools:
 #                                   ["tools/" + name + ".cpp", "tools/mongo" + name + "_options_init.cpp"],
 #                                   LIBDEPS=["alltools", "mongo" + name + "_options"]) )
 
-deps = ["tools/tool.cpp", "tools/tool_options_init.cpp"]
-libdeps = ["alltools"]
+deps = ["tools/tool.cpp", "tools/tool_options_init.cpp", "tools/bsondump.cpp", "client/examples/mongoperf.cpp"]
+libdeps = ["alltools", "gridfs", "bsondump_options", "serveronly", "coreserver", "coredb"]
 for name in normalTools:
 	deps.append("tools/" + name + ".cpp")
 	#deps.append("tools/mongo" + name + "_options_init.cpp")

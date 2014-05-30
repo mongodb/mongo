@@ -64,6 +64,7 @@
 #include "mongo/tools/mongoexport_options.h"
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/mongobridge_options.h"
+#include "mongo/tools/bsondump_options.h"
 
 using namespace std;
 using namespace mongo;
@@ -80,13 +81,16 @@ namespace mongo {
 
     void Tool::mapOptions()
     {
-        Tool::options["dump"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Dump) };
-        Tool::options["export"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Export) };
-        Tool::options["import"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Import) };
-        Tool::options["stat"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Stat) };
-        Tool::options["oplog"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Oplog) };
-        Tool::options["restore"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Restore) };
-        Tool::options["top"] = (OptionHandler){ REGISTER_OPTION_HANDLER(Top) };
+        Tool::options["dump"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Dump) };
+        Tool::options["export"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Export) };
+        Tool::options["import"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Import) };
+        Tool::options["stat"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Stat) };
+        Tool::options["oplog"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Oplog) };
+        Tool::options["restore"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Restore) };
+        Tool::options["top"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Top) };
+        Tool::options["files"] = (OptionHandler) { REGISTER_MONGOOPTION_HANDLER(Files) };
+        Tool::options["bsondump"] = (OptionHandler) { REGISTER_OPTION_HANDLER(BSONDump) };
+        Tool::options["bridge"] = (OptionHandler) { REGISTER_MONGOOPTION_HANDLER(Bridge) };
     }
 
     void Tool::mapTools()
@@ -98,6 +102,10 @@ namespace mongo {
         Tool::tools["oplog"] = *Tool::createOplogToolInstance;
         Tool::tools["restore"] = *Tool::createRestoreInstance;
         Tool::tools["top"] = *Tool::createTopToolInstance;
+        Tool::tools["files"] = *Tool::createFilesInstance;
+        Tool::tools["bsondump"] = *Tool::createBSONDumpInstance;
+        Tool::tools["bridge"] = 0;
+        Tool::tools["perf"] = 0;
     }
 
     Tool::Tool() :
@@ -420,6 +428,10 @@ namespace mongo {
 
 }
 
+int mongoPerfMain(int argc, char*argv[]);
+int snifferToolMain(int argc, char **argv, char** envp);
+int bridgeToolMain(int argc, char **argv, char** envp);
+
 #if defined(_WIN32)
 // In Windows, wmain() is an alternate entry point for main(), and receives the same parameters
 // as main() but encoded in Windows Unicode (UTF-16); "wide" 16-bit wchar_t characters.  The
@@ -439,10 +451,34 @@ int main(int argc, char* argv[], char** envp) {
     Tool::mapTools();
     Tool::mapOptions();
 
+    if (argc == 1 || std::string("help") == argv[1])
+    {
+        if (argc > 2)
+        {
+            argv[1] = argv[2];
+            char help[7] = {'-', '-', 'h', 'e', 'l', 'p', 0};
+            argv[2] = help;
+        }
+        else
+        {
+            std::cout << "Valid commands: " << endl;
+            for(std::map<std::string, InstanceFunction>::iterator iter = Tool::tools.begin(); iter != Tool::tools.end(); ++iter)
+            {
+                std::cout << iter->first << endl;
+            }
+            ::_exit(EXIT_CLEAN);
+        }
+    }
+
     char* newargv[argc - 1];
     newargv[0] = argv[0];
     for (int i = 2; i < argc; ++i) {
         newargv[i - 1] = argv[i];
+    }
+
+    if (strcmp(argv[1], "perf") == 0)
+    {
+        ::_exit(mongoPerfMain(argc - 1, newargv));
     }
 
     if(Tool::tools.find(argv[1]) == Tool::tools.end())
@@ -455,6 +491,11 @@ int main(int argc, char* argv[], char** envp) {
     Tool::storeMongoOptions = o.store;
     Tool::handlePreValidationMongoOptions = o.handle;
     Tool::addMongoOptions = o.add;
+
+    if (strcmp(argv[1], "bridge") == 0)
+    {
+        ::_exit(bridgeToolMain(argc - 1, newargv, envp));
+    }
 
     auto_ptr<Tool> instance = Tool::tools[argv[1]]();
     ::_exit(instance->main(argc - 1, newargv, envp));
