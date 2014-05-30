@@ -5,7 +5,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-static inline int  __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *, WT_ITEM *);
 static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);

@@ -34,7 +34,6 @@ static void __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, const WT_PAGE_HEADER *);
 static void __debug_dsk_col_fix(WT_DBG *, const WT_PAGE_HEADER *);
-static void __debug_ikey(WT_DBG *, WT_IKEY *);
 static void __debug_item(WT_DBG *, const char *, const void *, size_t);
 static int  __debug_page(WT_DBG *, WT_PAGE *, uint32_t);
 static void __debug_page_col_fix(WT_DBG *, WT_PAGE *);
@@ -780,11 +779,13 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_IKEY *ikey;
 	WT_INSERT_HEAD *insert;
+	WT_ITEM key;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
-	void *ripkey;
+	void *copy;
 
 	unpack = &_unpack;
 
@@ -797,11 +798,15 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		ripkey = WT_ROW_KEY_COPY(rip);
-		if (__wt_off_page(page, ripkey))
-			__debug_ikey(ds, ripkey);
-		else {
-			__wt_cell_unpack(ripkey, unpack);
+		copy = WT_ROW_KEY_COPY(rip);
+		if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
+			__wt_row_leaf_direct(page, copy, &key);
+			__debug_item(ds, "K", key.data, key.size);
+		} else if (__wt_off_page(page, copy)) {
+			ikey = copy;
+			__debug_item(ds, "K", WT_IKEY_DATA(ikey), ikey->size);
+		} else {
+			__wt_cell_unpack(copy, unpack);
 			WT_RET(__debug_cell_data(
 			    ds, page, WT_PAGE_ROW_LEAF, "K", unpack));
 		}
@@ -1053,16 +1058,6 @@ __debug_cell_data(WT_DBG *ds,
 	}
 
 	return (ret);
-}
-
-/*
- * __debug_ikey --
- *	Dump a single WT_IKEY in debugging mode, with an optional tag.
- */
-static void
-__debug_ikey(WT_DBG *ds, WT_IKEY *ikey)
-{
-	__debug_item(ds, "K", WT_IKEY_DATA(ikey), ikey->size);
 }
 
 /*

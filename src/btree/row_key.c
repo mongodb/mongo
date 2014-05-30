@@ -25,7 +25,8 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	btree = S2BT(session);
 
-	if (page->pg_row_entries == 0) {		/* Just checking... */
+	if (page->pg_row_entries == 0 ||		/* Just checking... */
+	    F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
 		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 		return (0);
 	}
@@ -109,21 +110,21 @@ __inmem_row_leaf_slots(
  */
 int
 __wt_row_leaf_key_copy(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *keyb)
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_ITEM *key)
 {
-	WT_RET(__wt_row_leaf_key_work(session, page, rip_arg, keyb, 0));
+	WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
 
 	/* The return buffer may only hold a reference to a key, copy it. */
-	if (!WT_DATA_IN_ITEM(keyb))
-		WT_RET(__wt_buf_set(session, keyb, keyb->data, keyb->size));
+	if (!WT_DATA_IN_ITEM(key))
+		WT_RET(__wt_buf_set(session, key, key->data, key->size));
 
 	return (0);
 }
 
 /*
  * __wt_row_leaf_key_work --
- *	Return a reference to, or copy of, a row-store leaf-page key.
- * Optionally instantiate the key into the in-memory page.
+ *	Return a reference to, a row-store leaf-page key, optionally instantiate
+ * the key into the in-memory page.
  */
 int
 __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
@@ -141,6 +142,14 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 	int jump_slot_offset, slot_offset;
 	void *key;
 	const void *p;
+
+	/*
+	 * !!!
+	 * It is unusual to call this function: most code should be calling the
+	 * front-end, __wt_row_leaf_key, be careful if you're calling this code
+	 * directly.
+	 */
+	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY));
 
 	btree = S2BT(session);
 	unpack = &_unpack;

@@ -11,9 +11,9 @@ static void __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static void __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
-static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __inmem_row_leaf_entries(
-	WT_SESSION_IMPL *, const WT_PAGE_HEADER *, uint32_t *);
+	WT_SESSION_IMPL *, const WT_PAGE_HEADER *, int *, uint32_t *);
 
 /*
  * __wt_page_in_func --
@@ -231,16 +231,20 @@ int
 __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_REF *ref, const void *image, uint32_t flags, WT_PAGE **pagep)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	const WT_PAGE_HEADER *dsk;
 	uint32_t alloc_entries;
 	size_t size;
+	int direct_key;
 
 	*pagep = NULL;
 
+	btree = S2BT(session);
 	dsk = image;
 	alloc_entries = 0;
+	direct_key = 0;
 
 	/*
 	 * Figure out how many underlying objects the page references so we can
@@ -271,6 +275,18 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
+		 * High-performance applications will turn off Huffman encoding
+		 * and prefix-compression, and won't have overflow keys.  In
+		 * those cases, we'd like to reference the key on the leaf page
+		 * from our row-store index instead of the cell, then we don't
+		 * have to unpack the cell every time we look at a key.  Assume
+		 * the fast configuration is more likely (note it's the default
+		 * configuration), and correct course if we're wrong.
+		 */
+		direct_key =
+		    btree->huffman_key || btree->prefix_compression ? 0 : 1;
+
+		/*
 		 * If the "no empty values" flag is set, row-store leaf page
 		 * entries map one-to-one to the number of physical entries
 		 * on the page (each physical entry is a key or value item).
@@ -283,7 +299,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 			alloc_entries = dsk->u.entries / 2;
 		else
 			WT_RET(__inmem_row_leaf_entries(
-			    session, dsk, &alloc_entries));
+			    session, dsk, &direct_key, &alloc_entries));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -314,7 +330,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 		WT_ERR(__inmem_row_int(session, page, &size));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__inmem_row_leaf(session, page));
+		WT_ERR(__inmem_row_leaf(session, page, direct_key));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
@@ -592,8 +608,8 @@ err:	__wt_scr_free(&current);
  *	Return the number of entries for row-store leaf pages.
  */
 static int
-__inmem_row_leaf_entries(
-    WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint32_t *nindxp)
+__inmem_row_leaf_entries(WT_SESSION_IMPL *session,
+    const WT_PAGE_HEADER *dsk, int *direct_keyp, uint32_t *nindxp)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -618,8 +634,10 @@ __inmem_row_leaf_entries(
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
-		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
+			*direct_keyp = 0;
+			/* FALLTHROUGH */
+		case WT_CELL_KEY:
 			++nindx;
 			break;
 		case WT_CELL_VALUE:
@@ -638,7 +656,7 @@ __inmem_row_leaf_entries(
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, int direct_key)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -651,14 +669,28 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	dsk = page->dsk;
 	unpack = &_unpack;
 
+restart:
 	/* Walk the page, building indices. */
 	rip = page->pg_row_d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
-		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
-			WT_ROW_KEY_SET(rip, cell);
+			/*
+			 * If we've been preparing a fast-path to instantiating
+			 * leaf page keys, we have a problem, overflow keys make
+			 * that impossible.  Restart without direct-key set.
+			 */
+			if (direct_key) {
+				direct_key = 0;
+				goto restart;
+			}
+			/* FALLTHROUGH */
+		case WT_CELL_KEY:
+			if (direct_key)
+				__wt_row_leaf_key_onpage_set(page, rip, unpack);
+			else
+				__wt_row_leaf_key_onpage_set_cell(rip, cell);
 			++rip;
 			break;
 		case WT_CELL_VALUE:
@@ -667,6 +699,13 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 	}
+
+	/*
+	 * Set the direct access flag if we read the page's keys and found no
+	 * problems.
+	 */
+	if (direct_key)
+		F_SET_ATOMIC(page, WT_PAGE_DIRECT_KEY);
 
 	/*
 	 * We do not currently instantiate keys on leaf pages when the page is

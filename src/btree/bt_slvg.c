@@ -1598,7 +1598,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
+		WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 		WT_ERR(WT_LEX_CMP(session, btree->collator, key, stop, cmp));
 		if (cmp > 0) {
 			found = 1;
@@ -1764,8 +1764,7 @@ __slvg_row_build_leaf(
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
-			WT_ERR(
-			    __wt_row_leaf_key_work(session, page, rip, key, 0));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 
 			/*
 			 * >= is correct: see the comment above.
@@ -1788,8 +1787,7 @@ __slvg_row_build_leaf(
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
-			WT_ERR(
-			    __wt_row_leaf_key_work(session, page, rip, key, 0));
+			WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 
 			/*
 			 * < is correct: see the comment above.
@@ -1822,7 +1820,7 @@ __slvg_row_build_leaf(
 	 * a copy from the page.
 	 */
 	rip = page->pg_row_d + skip_start;
-	WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
+	WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
 	WT_ERR(__wt_row_ikey_incr(session,
 	    ref->home, 0, key->data, key->size, &ref->key.ikey));
 
@@ -1909,22 +1907,26 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 	unpack = &_unpack;
 
 	for (rip = page->pg_row_d + start; start < stop; ++start) {
-		ikey = WT_ROW_KEY_COPY(rip);
-		if (__wt_off_page(page, ikey))
-			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-		else
-			cell = (WT_CELL *)ikey;
-		__wt_cell_unpack(cell, unpack);
-		if (unpack->type == WT_CELL_KEY_OVFL) {
-			WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
-			    "%s merge discard freed overflow reference %s",
-			    __wt_addr_string(session,
-			    trk->addr.addr, trk->addr.size, trk->ss->tmp1),
-			    __wt_addr_string(session,
-			    unpack->data, unpack->size, trk->ss->tmp2)));
+		if (!F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY)) {
+			ikey = WT_ROW_KEY_COPY(rip);
+			if (__wt_off_page(page, ikey))
+				cell =
+				    WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
+			else
+				cell = (WT_CELL *)ikey;
+			__wt_cell_unpack(cell, unpack);
+			if (unpack->type == WT_CELL_KEY_OVFL) {
+				WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
+				    "%s merge discard freed overflow "
+				    "reference %s",
+				    __wt_addr_string(session, trk->addr.addr,
+				    trk->addr.size, trk->ss->tmp1),
+				    __wt_addr_string(session, unpack->data,
+				    unpack->size, trk->ss->tmp2)));
 
 			WT_RET(bm->free(
 			    bm, session, unpack->data, unpack->size));
+			}
 		}
 
 		if ((cell = __wt_row_leaf_value(page, rip)) == NULL)

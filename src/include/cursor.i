@@ -177,6 +177,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	int key_unpacked;
+	void *copy;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = S2BT(session);
@@ -189,26 +190,27 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	vb = &cbt->iface.value;
 
 	/*
-	 * Return the WT_ROW slot's K/V pair.
+	 * The row-store key can change underfoot; explicitly take a copy.
 	 */
+	copy = WT_ROW_KEY_COPY(rip);
 
-	ikey = WT_ROW_KEY_COPY(rip);
 	/*
-	 * Key copied.
-	 *
 	 * Get a reference to the key, ideally without doing a copy: we could
 	 * call __wt_row_leaf_key, but if a cursor is running through the tree,
 	 * we actually have more information here than that function has, we
 	 * may have the prefix-compressed key that comes immediately before the
 	 * one we want.
 	 *
-	 * If the key has been instantiated (the key points off-page), we don't
-	 * have any work to do.
+	 * If the key can be accessed directly, or has been instantiated (the
+	 * key points off-page), we don't have any work to do.
 	 *
 	 * If the key points on-page, we have a copy of a WT_CELL value that can
 	 * be processed, regardless of what any other thread is doing.
 	 */
-	if (__wt_off_page(page, ikey)) {
+	if (F_ISSET_ATOMIC(page, WT_PAGE_DIRECT_KEY))
+		__wt_row_leaf_direct(page, copy, kb);
+	else if (__wt_off_page(page, copy)) {
+		ikey = copy;
 		kb->data = WT_IKEY_DATA(ikey);
 		kb->size = ikey->size;
 	} else {
@@ -220,7 +222,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
-		__wt_cell_unpack_with_value(page, (WT_CELL *)ikey, unpack);
+		__wt_cell_unpack_with_value(page, copy, unpack);
 		key_unpacked = 1;
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
 			cbt->tmp.data = unpack->data;
