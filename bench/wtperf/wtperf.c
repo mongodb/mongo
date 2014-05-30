@@ -2196,7 +2196,10 @@ wtperf_rand(CONFIG *cfg)
 		if (rval > wtperf_value_range(cfg))
 			rval = wtperf_value_range(cfg);
 	}
-	/* Avoid zero: we never insert that key. */
+	/*
+	 * Wrap the key to within the expected range and avoid zero: we never
+	 * insert that key.
+	 */
 	rval = (rval % wtperf_value_range(cfg)) + 1;
 	return (rval);
 }
