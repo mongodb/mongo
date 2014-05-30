@@ -108,7 +108,7 @@ namespace mongo {
             BSONElement e = jsobj.firstElement();
             const string toDeleteNs = dbname + '.' + e.valuestr();
             if (!serverGlobalParams.quiet) {
-                MONGO_TLOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
+                LOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
 
             Client::Context ctx(toDeleteNs);
@@ -220,7 +220,7 @@ namespace mongo {
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
 
-            MONGO_TLOG(0) << "CMD: reIndex " << toDeleteNs << endl;
+            LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(toDeleteNs);

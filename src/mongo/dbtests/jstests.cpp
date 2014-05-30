@@ -150,15 +150,12 @@ namespace JSTests {
     class LogRecordingScope {
     public:
         LogRecordingScope() :
-            _oldTLogLevel(tlogLevel),
             _logged(false),
             _handle(mongo::logger::globalLogDomain()->attachAppender(
                             mongo::logger::MessageLogDomain::AppenderAutoPtr(new Tee(this)))) {
-            tlogLevel = 0;
         }
         ~LogRecordingScope() {
             mongo::logger::globalLogDomain()->detachAppender(_handle);
-            tlogLevel = _oldTLogLevel;
         }
         /** @return most recent log entry. */
         bool logged() const { return _logged; }
@@ -174,7 +171,6 @@ namespace JSTests {
         private:
             LogRecordingScope* _scope;
         };
-        int _oldTLogLevel;
         bool _logged;
         mongo::logger::MessageLogDomain::AppenderHandle _handle;
     };

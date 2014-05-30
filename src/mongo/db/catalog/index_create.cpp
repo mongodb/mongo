@@ -192,8 +192,8 @@ namespace mongo {
         const IndexDescriptor* idx = btreeState->descriptor();
         const BSONObj& idxInfo = idx->infoObj();
 
-        MONGO_TLOG(0) << "build index on: " << ns
-                      << " properties: " << idx->toString() << endl;
+        LOG(0) << "build index on: " << ns
+               << " properties: " << idx->toString() << endl;
         audit::logCreateIndex( currentClient.get(), &idxInfo, idx->indexName(), ns );
 
         Timer t;
@@ -207,7 +207,7 @@ namespace mongo {
             massert( 17343,
                      str::stream() << "IndexAccessMethod::initializeAsEmpty failed" << status.toString(),
                      status.isOK() );
-            MONGO_TLOG(0) << "\t added index to empty collection";
+            LOG(0) << "\t added index to empty collection";
             return;
         }
 
@@ -285,8 +285,8 @@ namespace mongo {
         }
 
         verify( !btreeState->head().isNull() );
-        MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. "
-                      << t.millis() / 1000.0 << " secs" << endl;
+        LOG(0) << "build index done.  scanned " << n << " total records. "
+               << t.millis() / 1000.0 << " secs" << endl;
 
         // this one is so people know that the index is finished
         collection->infoCache()->addedIndex();

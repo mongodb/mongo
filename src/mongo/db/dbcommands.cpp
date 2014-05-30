@@ -411,7 +411,7 @@ namespace mongo {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
             _diaglog.flush();
             if (!serverGlobalParams.quiet) {
-                MONGO_TLOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
+                LOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
             }
             result.append( "was" , was );
             return true;
@@ -452,7 +452,7 @@ namespace mongo {
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
             if (!serverGlobalParams.quiet) {
-                MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
+                LOG(0) << "CMD: drop " << nsToDrop << endl;
             }
 
             if ( nsToDrop.find( '$' ) != string::npos ) {

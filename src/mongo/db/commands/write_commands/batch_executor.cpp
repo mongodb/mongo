@@ -592,8 +592,8 @@ namespace mongo {
             currentOp->debug().exceptionInfo = ExceptionInfo( opError->getErrMessage(),
                                                               opError->getErrCode() );
 
-            MONGO_TLOG(3) << " Caught Assertion in " << opToString( currentOp->getOp() )
-                          << ", continuing " << causedBy( opError->getErrMessage() ) << endl;
+            LOG(3) << " Caught Assertion in " << opToString( currentOp->getOp() )
+                   << ", continuing " << causedBy( opError->getErrMessage() ) << endl;
         }
 
         bool logAll = logger::globalLogDomain()->shouldLog( logger::LogSeverity::Debug( 1 ) );
@@ -601,7 +601,7 @@ namespace mongo {
                        > ( serverGlobalParams.slowMS + currentOp->getExpectedLatencyMs() );
 
         if ( logAll || logSlow ) {
-            MONGO_TLOG(0) << currentOp->debug().report( *currentOp ) << endl;
+            LOG(0) << currentOp->debug().report( *currentOp ) << endl;
         }
 
         if ( currentOp->shouldDBProfile( executionTime ) ) {

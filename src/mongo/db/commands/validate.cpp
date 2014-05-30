@@ -72,7 +72,7 @@ namespace mongo {
             }
 
             if (!serverGlobalParams.quiet) {
-                MONGO_TLOG(0) << "CMD: validate " << ns << endl;
+                LOG(0) << "CMD: validate " << ns << endl;
             }
 
             Client::ReadContext ctx(txn, ns_string.ns());

@@ -478,13 +478,13 @@ namespace mongo {
                 }
             }
             catch ( UserException& ue ) {
-                MONGO_TLOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
-                        << ue.toString() << endl;
+                LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                       << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
             }
             catch ( AssertionException& e ) {
-                MONGO_TLOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
-                        << e.toString() << endl;
+                LOG(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                       << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
                 shouldLog = true;
             }
@@ -496,7 +496,7 @@ namespace mongo {
         logThreshold += currentOp.getExpectedLatencyMs();
 
         if ( shouldLog || debug.executionTime > logThreshold ) {
-            MONGO_TLOG(0) << debug.report( currentOp ) << endl;
+            LOG(0) << debug.report( currentOp ) << endl;
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {

@@ -68,11 +68,8 @@ namespace mongo {
     // Noop unless on *NIX and compiled with _DEBUG
     void setupSIGTRAPforGDB();
 
-    extern int tlogLevel;
     void mongo_breakpoint();
     inline void breakpoint() {
-        if ( tlogLevel < 0 )
-            return;
         mongo_breakpoint();
     }
 } // namespace mongo

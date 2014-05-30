@@ -744,7 +744,7 @@ namespace mongo {
                     }
                 }
 
-                MONGO_TLOG(0) << "CMD: shardcollection: " << cmdObj << endl;
+                LOG(0) << "CMD: shardcollection: " << cmdObj << endl;
 
                 audit::logShardCollection(ClientBasic::getCurrent(), ns, proposedKey, careAboutUnique);
                 config->shardCollection( ns , proposedKey , careAboutUnique , &initSplits );
@@ -1121,7 +1121,7 @@ namespace mongo {
                     return false;
                 }
 
-                MONGO_TLOG(0) << "CMD: movechunk: " << cmdObj << endl;
+                LOG(0) << "CMD: movechunk: " << cmdObj << endl;
 
                 StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(cmdObj);
 

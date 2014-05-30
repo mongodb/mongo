@@ -66,8 +66,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    int tlogLevel = 0; // test log level. so we avoid overchattiness (somewhat) in the c++ unit tests
-
     bool rotateLogs() {
         using logger::RotatableFileManager;
         RotatableFileManager* manager = logger::globalRotatableFileManager();

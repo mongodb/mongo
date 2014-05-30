@@ -90,12 +90,6 @@ namespace logger {
      */
     inline LogstreamBuilder out() { return log(); }
 
-    /**
-     * For logging which we may not want during unit tests (dbtests) runs.  Set tlogLevel to -1 to
-     * suppress MONGO_TLOG() output in a test program.
-     */
-    extern int tlogLevel;
-
 #define MONGO_LOG(DLEVEL) \
     if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
     else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
@@ -104,10 +98,6 @@ namespace logger {
 
 #define MONGO_DLOG(DLEVEL) \
     if (!(DEBUG_BUILD) && !::mongo::logger::globalLogDomain()->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
-
-#define MONGO_TLOG(DLEVEL) \
-    if ((!::mongo::debug && ((DLEVEL) > tlogLevel)) || !::mongo::logger::globalLogDomain()->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
     else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
 
     inline LogstreamBuilder problem() {

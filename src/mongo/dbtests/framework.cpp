@@ -117,8 +117,6 @@ namespace mongo {
             TestWatchDog twd;
             twd.go();
 
-            // set tlogLevel to -1 to suppress MONGO_TLOG(0) output in a test program
-            tlogLevel = -1;
 
             int ret = ::mongo::unittest::Suite::run(frameworkGlobalParams.suites,
                                                     frameworkGlobalParams.filter,
