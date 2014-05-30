@@ -460,7 +460,7 @@ int startProg(int argc, char* argv[], char** envp) {
         if (argc > 2)
         {
             argv[1] = argv[2];
-            char help[7] = {'-', '-', 'h', 'e', 'l', 'p', 0};
+            char help[7] = {'-', '-', 'h', 'e', 'l', 'p', (char)NULL};
             argv[2] = help;
         }
         else
