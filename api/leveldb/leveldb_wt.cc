@@ -180,11 +180,14 @@ public:
 	}
 
 	~OperationContext() {
+#ifdef WANT_SHUTDOWN_RACES
 		int ret = session_->close(session_, NULL);
 		assert(ret == 0);
+#endif
 	}
 
 	WT_CURSOR *getCursor() { return cursor_; }
+	WT_SESSION *getSession() { return session_; }
 
 private:
 	WT_SESSION *session_;
@@ -330,7 +333,8 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 	assert(ret == 0);
 
 	if (options.create_if_missing) {
-		std::stringstream s_table(WT_CONFIG);
+		std::stringstream s_table;
+		s_table << WT_CONFIG;
 		s_table << "internal_page_max=" << options.block_size << ",";
 		s_table << "leaf_page_max=" << options.block_size << ",";
 		if (options.compression == kSnappyCompression)
@@ -578,8 +582,9 @@ DbImpl::GetApproximateSizes(const Range* range, int n,
 void
 DbImpl::CompactRange(const Slice* begin, const Slice* end)
 {
-	/* Not supported */
-	assert(0);
+	WT_SESSION *session = getContext()->getSession();
+	int ret = session->compact(session, WT_URI, NULL);
+	assert(ret == 0);
 }
 
 // Suspends the background compaction thread.  This methods
@@ -588,7 +593,6 @@ void
 DbImpl::SuspendCompactions()
 {
 	/* Not supported */
-	assert(0);
 }
 
 // Resumes a suspended background compation thread.
@@ -596,7 +600,6 @@ void
 DbImpl::ResumeCompactions()
 {
 	/* Not supported */
-	assert(0);
 }
 
 // Position at the first key in the source.  The iterator is Valid()
