@@ -339,11 +339,16 @@ namespace mongo {
         massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
         string todb = context.db()->name();
+#if !defined(_WIN32) && !defined(__sunos__)
+        // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
+        bool masterSameProcess = HostAndPort(masterHost).isSelf();
+#else
         stringstream a,b;
         a << "localhost:" << serverGlobalParams.port;
         b << "127.0.0.1:" << serverGlobalParams.port;
-        bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
-        if ( masterSameProcess ) {
+        bool masterSameProcess = (a.str() == masterHost || b.str() == masterHost);
+#endif
+        if (masterSameProcess) {
             if (opts.fromDB == todb && context.db()->path() == storageGlobalParams.dbpath) {
                 // guard against an "infinite" loop
                 /* if you are replicating, the local.sources config may be wrong if you get this */

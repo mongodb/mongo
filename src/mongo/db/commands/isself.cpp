@@ -233,10 +233,7 @@ namespace mongo {
                     string a = *i;
                     string b = *j;
 
-                    if ( a == b || ( str::startsWith( a , "127." ) &&
-                                     str::startsWith( b , "127." ) )  // 127. is all loopback
-                       ) {
-
+                    if (a == b) {
                         // add to cache
                         scoped_lock lk( isSelfCommand._cacheLock );
                         isSelfCommand._cache[host] = true;
