@@ -140,8 +140,11 @@ namespace mongo {
     std::auto_ptr<Tool> TYPENAME::createInstanceOfThisTool() {return std::auto_ptr<Tool>(new TYPENAME());} \
     std::auto_ptr<Tool> (*Tool::createInstance(TYPENAME))() = TYPENAME::createInstanceOfThisTool;
 
-#define REGISTER_MONGOOPTION_HANDLER(NAME)\
-    REGISTER_OPTION_HANDLER(Mongo##NAME)
+#define REGISTER_MONGOOPTION_HANDLER( TARGET, NAME )\
+    REGISTER_OPTION_HANDLER(TARGET, Mongo##NAME)
 
-#define REGISTER_OPTION_HANDLER(NAME) \
-    store##NAME##Options, handlePreValidation##NAME##Options, add##NAME##Options
+#define REGISTER_OPTION_HANDLER( TARGET, NAME ) \
+	OptionHandler& TARGET = Tool::options[#TARGET]; \
+	TARGET##.store = store##NAME##Options; \
+	TARGET##.add = add##NAME##Options; \
+	TARGET##.handle = handlePreValidation##NAME##Options;
