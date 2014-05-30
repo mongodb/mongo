@@ -9,7 +9,7 @@ namespace mongo
     Status _mongoInitializerFunction_MongoOptions_Register(InitializerContext*);
     namespace 
     { 
-    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Register( "MongoOptions_Register", _mongoInitializerFunction_MongoOptions_Register, _makeStringVector(0, "BeginGeneralStartupOptionRegistration", __null), _makeStringVector(0, "EndGeneralStartupOptionRegistration", __null)); 
+    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Register( "MongoOptions_Register", _mongoInitializerFunction_MongoOptions_Register, _makeStringVector(0, "BeginGeneralStartupOptionRegistration", NULL), _makeStringVector(0, "EndGeneralStartupOptionRegistration", NULL)); 
     }
     Status _mongoInitializerFunction_MongoOptions_Register(InitializerContext* context)
     {
@@ -19,7 +19,7 @@ namespace mongo
     Status _mongoInitializerFunction_MongoOptions_Validate(InitializerContext*);
     namespace
     {
-    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Validate( "MongoOptions_Validate", _mongoInitializerFunction_MongoOptions_Validate, _makeStringVector(0, "BeginStartupOptionValidation", __null), _makeStringVector(0, "EndStartupOptionValidation", __null));
+    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Validate( "MongoOptions_Validate", _mongoInitializerFunction_MongoOptions_Validate, _makeStringVector(0, "BeginStartupOptionValidation", NULL), _makeStringVector(0, "EndStartupOptionValidation", NULL));
     }
 	Status _mongoInitializerFunction_MongoOptions_Validate(InitializerContext* context)
 	{
@@ -38,7 +38,7 @@ namespace mongo
     Status _mongoInitializerFunction_MongoOptions_Store(InitializerContext*);
     namespace
     {
-    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Store( "MongoOptions_Store", _mongoInitializerFunction_MongoOptions_Store, _makeStringVector(0, "BeginStartupOptionStorage", __null), _makeStringVector(0, "EndStartupOptionStorage", __null));
+    	GlobalInitializerRegisterer _mongoInitializerRegisterer_MongoOptions_Store( "MongoOptions_Store", _mongoInitializerFunction_MongoOptions_Store, _makeStringVector(0, "BeginStartupOptionStorage", NULL), _makeStringVector(0, "EndStartupOptionStorage", NULL));
     }
 	Status _mongoInitializerFunction_MongoOptions_Store(InitializerContext* context) 
 	{
