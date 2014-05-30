@@ -18,7 +18,7 @@ const (
 
 // Interface to output the results of the top command.
 type Outputter interface {
-	Output(*result.TopResults, *commonopts.MongoToolOptions) error
+	Output(*result.TopResults, *commonopts.ToolOptions) error
 }
 
 // Outputter that formats the results and prints them to the terminal.
@@ -28,7 +28,7 @@ type TerminalOutputter struct {
 // Implementation of Output.  Formats the results and prints them to stdout
 // as a table.
 func (self *TerminalOutputter) Output(results *result.TopResults,
-	opts *commonopts.MongoToolOptions) error {
+	opts *commonopts.ToolOptions) error {
 
 	// bookkeep the longest member of each column, for spacing
 	longestNS := len("ns")
@@ -123,7 +123,7 @@ func timeOutputField(timeVal int) string {
 
 // Whether or not the given namespace should be skipped (not displayed)
 // in the output.
-func skipNamespace(ns string, opts *commonopts.MongoToolOptions) bool {
+func skipNamespace(ns string, opts *commonopts.ToolOptions) bool {
 	if opts.FilterNS != "" {
 		if opts.FilterBoth {
 			return ns != opts.FilterNS

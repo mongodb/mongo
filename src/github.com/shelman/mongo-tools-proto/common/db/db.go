@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"labix.org/v2/mgo"
+	"strings"
 	"sync"
 	"time"
 )
@@ -34,18 +35,14 @@ type SessionProvider struct {
 
 // Initialize a session provider to connect to the database server, based on
 // the options passed in.  Returns a fully initialized provider.
-func InitSessionProvider(opts *options.MongoToolOptions) (*SessionProvider,
+func InitSessionProvider(opts *options.ToolOptions) (*SessionProvider,
 	error) {
 
 	// create the provider
 	provider := &SessionProvider{}
 
 	// create the addresses to be used to connect
-	connectionAddrs, err := createConnectionAddrs(opts)
-	if err != nil {
-		return nil, fmt.Errorf("error building server connection addresses:"+
-			" %v", err)
-	}
+	connectionAddrs := createConnectionAddrs(opts.Host, opts.Port)
 
 	// create the necessary dial info
 	provider.dialInfo = &mgo.DialInfo{
@@ -58,15 +55,37 @@ func InitSessionProvider(opts *options.MongoToolOptions) (*SessionProvider,
 
 // Using the options passed in, build the slice of addresses to be used to
 // connect to the db server.
-func createConnectionAddrs(opts *options.MongoToolOptions) ([]string, error) {
-	// TODO: repl setting, more validation
+func createConnectionAddrs(host, port string) []string {
 
-	url := opts.Host
-	if opts.Port != "" {
-		url += ":" + opts.Port
+	// parse the host string into the individual hosts
+	addrs := parseHost(host)
+
+	// if a port is specified, append it to all the hosts
+	if port != "" {
+		for idx, addr := range addrs {
+			addrs[idx] = fmt.Sprintf("%v:%v", addr, port)
+		}
 	}
 
-	return []string{url}, nil
+	return addrs
+}
+
+// Helper function for parsing the host string into addresses.  Returns a slice
+// of the individual addresses to use to connect, as well as an error if the url
+// is malformed.
+func parseHost(host string) []string {
+
+	// strip off the replica set name from the beginning
+	slashIndex := strings.Index(host, "/")
+	if slashIndex != -1 {
+		if slashIndex == len(host)-1 {
+			return []string{""}
+		}
+		host = host[slashIndex+1:]
+	}
+
+	// split into the individual hosts
+	return strings.Split(host, ",")
 }
 
 // Returns a session connected to the database server for which the

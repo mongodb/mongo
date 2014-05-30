@@ -1,15 +1,13 @@
 package options
 
 import (
-	//	"flag"
-	//	"fmt"
+	"fmt"
+	"github.com/jessevdk/go-flags"
 	"github.com/shelman/mongo-tools-proto/common/util"
 	"os"
-	//	flag "github.com/ogier/pflag"
-	"github.com/jessevdk/go-flags"
 )
 
-// Struct holding all of the options that are reused across tools: "help",
+// Struct encompassing all of the options that are reused across tools: "help",
 // "version", verbosity settings, ssl settings, etc.
 type ToolOptions struct {
 
@@ -29,6 +27,13 @@ type ToolOptions struct {
 	*SSL
 	*Auth
 
+	// Extra tool-specific options that can be specified by calling
+	// AddOptions
+	Extra []ExtraOptions
+
+	// for caching the parser
+	parser *flags.Parser
+
 	////////
 
 	// Specified database and collection
@@ -37,17 +42,10 @@ type ToolOptions struct {
 
 	// TODO below: kill this?
 
-	// Extra tool-specific options that can be specified by calling
-	// AddOptions
-	Extra []ExtraOptions
-
 	// Bookkeeping for filtering on database and collection
 	FilterNS       string // the full namespace for filtering
 	FilterOnlyColl bool   // filter only on collection
 	FilterBoth     bool   // filter on both db and collection
-
-	// for caching the parser
-	parser *flags.Parser
 }
 
 // Struct holding generic options
@@ -64,8 +62,8 @@ type Verbosity struct {
 
 // Struct holding connection-related options
 type Connection struct {
-	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost"`
-	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening" default:"27017"`
+	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost:27017"`
+	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening"`
 	IPV6 bool   `long:"ipv6" description:"Enable ipv6 support"`
 }
 
@@ -103,22 +101,8 @@ func New(appName, versionStr, usageStr string) *ToolOptions {
 	}
 }
 
-// Add extra command line options into the tool options
-func (self *ToolOptions) AddOptions(opts ExtraOptions) {
-	self.Extra = append(self.Extra, opts)
-}
-
-// Interface for extra options that need to be used by specific tools
-type ExtraOptions interface {
-	// Name specifying what type of options these are
-	Name() string
-
-	// Parsing / validation functions
-	PostParse() error
-	Validate() error
-}
-
-// Print the usage message for the tool to stdout
+// Print the usage message for the tool to stdout.  Returns whether or not the
+// help flag is specified.
 func (self *ToolOptions) PrintHelp() bool {
 	if self.Help {
 		self.parser.WriteHelp(os.Stdout)
@@ -126,7 +110,8 @@ func (self *ToolOptions) PrintHelp() bool {
 	return self.Help
 }
 
-// Print the tool version to stdout
+// Print the tool version to stdout.  Returns whether or not the version flag
+// is specified.
 func (self *ToolOptions) PrintVersion() bool {
 	if self.Version {
 		util.Printlnf("%v version: %v", self.AppName, self.VersionStr)
@@ -134,8 +119,20 @@ func (self *ToolOptions) PrintVersion() bool {
 	return self.Version
 }
 
-// Parse the command line args, and run any necessary validation logic
-func (self *ToolOptions) ParseAndValidate() error {
+// Interface for extra options that need to be used by specific tools
+type ExtraOptions interface {
+	// Name specifying what type of options these are
+	Name() string
+}
+
+// Add extra command line options into the tool options
+func (self *ToolOptions) AddOptions(opts ExtraOptions) {
+	self.Extra = append(self.Extra, opts)
+}
+
+// Parse the command line args.  Returns any extra args not accounted for by
+// parsing, as well as an error if the parsing returns an error.
+func (self *ToolOptions) Parse() ([]string, error) {
 
 	// init a parser for the flags
 	self.parser = flags.NewNamedParser(self.AppName, flags.None)
@@ -148,16 +145,20 @@ func (self *ToolOptions) ParseAndValidate() error {
 	_, err = self.parser.AddGroup("ssl options", "", self.SSL)
 	_, err = self.parser.AddGroup("authentication options", "", self.Auth)
 
-	// parse
-	_, err = self.parser.Parse()
-	if err != nil {
-		return err
+	// register all of the extra options
+	for _, eo := range self.Extra {
+		_, err = self.parser.AddGroup(eo.Name()+" options", "", eo)
+		if err != nil {
+			return nil, fmt.Errorf("error setting command line options for"+
+				" %v: %v", eo.Name(), err)
+		}
 	}
 
-	return nil
+	// parse
+	return self.parser.Parse()
 }
 
-/////
+////////////
 
 // Run the post-parse logic
 func (self *ToolOptions) PostParse() error {

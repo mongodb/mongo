@@ -1,13 +1,17 @@
 package main
 
 import (
-	//	"fmt"
-	//	"github.com/shelman/mongo-tools-proto/common/db"
+	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/util"
-	//"github.com/shelman/mongo-tools-proto/mongotop"
+	"github.com/shelman/mongo-tools-proto/mongotop"
 	"github.com/shelman/mongo-tools-proto/mongotop/options"
-	//"github.com/shelman/mongo-tools-proto/mongotop/output"
+	"github.com/shelman/mongo-tools-proto/mongotop/output"
+	"time"
+)
+
+const (
+	DEFAULT_SLEEP_TIME = 1 * time.Second
 )
 
 func main() {
@@ -16,62 +20,39 @@ func main() {
 	opts := commonopts.New("mongotop", "0.0.1", "<options> <sleeptime>")
 
 	// add mongotop-specific options
-	topOpts := &options.MongoTopOptions{}
-	opts.AddOptions(topOpts)
+	outputOpts := &options.Output{}
+	opts.AddOptions(outputOpts)
 
-	if err := opts.ParseAndValidate(); err != nil {
+	_, err := opts.Parse()
+	if err != nil {
 		util.Panicf("error parsing command line options: %v", err)
 	}
 
+	// print help, if specified
 	if opts.PrintHelp() {
 		return
 	}
 
+	// print version, if specified
 	if opts.PrintVersion() {
 		return
 	}
 
-	/*
-		// register command-line options, and add mongotop-specific options
-		opts := commonopts.GetMongoToolOptions()
-		topOpts := &options.MongoTopOptions{}
-		opts.AddOptions(topOpts)
+	// create a session provider to connect to the db
+	sessionProvider, err := db.InitSessionProvider(opts)
+	if err != nil {
+		util.Panicf("error initializing database session: %v", err)
+	}
 
-		// parse the options
-		err := opts.ParseAndValidate()
-		if err != nil {
-			util.Panicf("error in command line options: %v", err)
-		}
+	// instantiate a mongotop instance
+	top := &mongotop.MongoTop{
+		Options:         opts,
+		Outputter:       &output.TerminalOutputter{},
+		SessionProvider: sessionProvider,
+	}
 
-		// if appropriate, print help
-		if opts.Help {
-			opts.Usage()
-			return
-		}
-
-		// if appropriate, print the version
-		if opts.Version {
-			fmt.Println("should print mongotop version")
-			return
-		}
-
-		// create a session provider to connect to the db
-		sessionProvider, err := db.InitSessionProvider(opts)
-		if err != nil {
-			util.Panicf("error initializing database session: %v", err)
-		}
-
-		// instantiate a mongotop instance
-		top := &mongotop.MongoTop{
-			Options:         opts,
-			TopOptions:      topOpts,
-			Outputter:       &output.TerminalOutputter{},
-			SessionProvider: sessionProvider,
-		}
-
-		// kick it off
-		if err := top.Run(); err != nil {
-			util.Panicf("error running mongotop: %v", err)
-		}
-	*/
+	// kick it off
+	if err := top.Run(); err != nil {
+		util.Panicf("error running mongotop: %v", err)
+	}
 }

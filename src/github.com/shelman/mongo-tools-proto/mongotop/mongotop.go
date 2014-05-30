@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
-	"github.com/shelman/mongo-tools-proto/mongotop/options"
 	"github.com/shelman/mongo-tools-proto/mongotop/output"
 	"github.com/shelman/mongo-tools-proto/mongotop/result"
 	"time"
 )
 
+const (
+	DEFAULT_SLEEP_TIME = 1 * time.Second
+)
+
 // Wrapper for the mongotop functionality
 type MongoTop struct {
 	// generic mongo tool options
-	Options *commonopts.MongoToolOptions
-
-	// mongotop-specific options
-	TopOptions *options.MongoTopOptions
+	Options *commonopts.ToolOptions
 
 	// for connecting to the db
 	SessionProvider *db.SessionProvider
@@ -55,7 +55,7 @@ func (self *MongoTop) Run() error {
 		previousResults = topResults
 
 		// sleep
-		time.Sleep(time.Duration(self.TopOptions.SleepTime) * time.Second)
+		time.Sleep(DEFAULT_SLEEP_TIME)
 	}
 
 	return nil
