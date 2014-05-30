@@ -223,7 +223,8 @@ namespace repl {
         for( Member *m = rs.head(); m; m=m->next() )
             vTot += m->config().votes;
         if( vTot % 2 == 0 && vTot && complain++ == 0 )
-            log() << "replSet " /*buildbot! warning */ "total number of votes is even - add arbiter or give one member an extra vote" << rsLog;
+            log() << "replSet warning: even number of voting members in replica set config - "
+                     "add an arbiter or set votes to 0 on one of the extisting members" << rsLog;
         return vTot;
     }
 
