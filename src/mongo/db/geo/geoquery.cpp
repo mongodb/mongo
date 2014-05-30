@@ -343,14 +343,25 @@ namespace mongo {
             if (box.inside(other._min) && box.inside(other._max)) {
                 return true;
             }
-        } else if (_geometry->_cap && FLAT == _geometry->_cap->crs) {
+        }
+
+        // Fast bounds check
+        if (!_bounds.contains(other)) return false;
+
+        if ( _geometry->_cap && FLAT == _geometry->_cap->crs ) {
             const Circle& circle = _geometry->_cap->circle;
             const Point& a = other._min;
             const Point& b = other._max;
-            return distanceWithin(circle.center, a, circle.radius)
-                    && distanceWithin(circle.center, b, circle.radius)
-                    && distanceWithin(circle.center, Point(a.x, b.y), circle.radius)
-                    && distanceWithin(circle.center, Point(b.x, a.y), circle.radius);
+            return distanceWithin( circle.center, a, circle.radius )
+                && distanceWithin( circle.center, b, circle.radius )
+                && distanceWithin( circle.center, Point( a.x, b.y ), circle.radius )
+                && distanceWithin( circle.center, Point( b.x, a.y ), circle.radius );
+        }
+
+        if (_geometry->_polygon && FLAT == _geometry->_polygon->crs) {
+            const Polygon& polygon = _geometry->_polygon->oldPolygon;
+            // Exact test
+            return polygonContainsBox(polygon, other);
         }
 
         // Not sure
@@ -358,9 +369,20 @@ namespace mongo {
     }
 
     bool GeometryContainer::R2BoxRegion::fastDisjoint(const Box& other) const {
-
         if (!_bounds.intersects(other))
             return true;
+
+        if (_geometry->_cap && FLAT == _geometry->_cap->crs) {
+            const Circle& circle = _geometry->_cap->circle;
+            // Exact test
+            return !circleIntersectsWithBox(circle, other);
+        }
+
+        if (_geometry->_polygon && FLAT == _geometry->_polygon->crs) {
+            const Polygon& polygon = _geometry->_polygon->oldPolygon;
+            // Exact test
+            return !polygonIntersectsWithBox(polygon, other);
+        }
 
         // Not sure
         return false;

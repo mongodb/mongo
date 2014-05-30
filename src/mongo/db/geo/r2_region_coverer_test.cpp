@@ -33,9 +33,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/geo/geoquery.h" // TODO: Move GeometryContainer out of geoquery.h
 
-using namespace mongo;
-
 namespace {
+
+    using namespace mongo;
+    using mongo::Polygon; // "windows.h" has another Polygon for Windows GDI.
 
     //
     // GeoHash
@@ -269,6 +270,254 @@ namespace {
                coverer.getCovering(region, &covering);
                checkCovering(converter, region, coverer, covering);
            }
-       }
+    }
+
+    //
+    // Shape Intersection
+    //
+    TEST(ShapeIntersection, Lines) {
+        /*
+         *    E     |D
+         *  A___B   |C   G
+         *    F
+         */
+        Point a(0, 0), b(1, 0), c(2, 0), d(2, 1);
+        Point e(0.5, 1), f(0.5, -0.5), g(3, 0);
+
+        /*
+         * Basic disjoint
+         *   / |
+         *  /  |
+         */
+        ASSERT_FALSE(linesIntersect(a, d, c, b));
+        ASSERT_FALSE(linesIntersect(c, b, a, d)); // commutative
+
+        /*
+         * Basic disjoint (axis aligned)
+         *     |
+         * ___ |
+         */
+        ASSERT_FALSE(linesIntersect(a, b, c, d));
+        ASSERT_FALSE(linesIntersect(c, d, a, b)); // commutative
+
+        /*
+         * Basic intersection
+         * \/
+         * /\
+         */
+        ASSERT_TRUE(linesIntersect(e, c, f, d));
+        ASSERT_TRUE(linesIntersect(f, d, e, c)); // commutative
+
+        /*
+         * Basic intersection (axis aligned)
+         *  _|_
+         *   |
+         */
+        ASSERT_TRUE(linesIntersect(a, b, e, f));
+        ASSERT_TRUE(linesIntersect(f, e, b, a)); // commutative
+
+        /*
+         * One vertex on the line
+         *        \
+         *  ____   \
+         */
+        ASSERT_FALSE(linesIntersect(a, b, e, c));
+        ASSERT_FALSE(linesIntersect(e, c, a, b)); // commutative
+
+        /*
+         * One vertex on the segment
+         *    \
+         *  ___\___
+         */
+        ASSERT_TRUE(linesIntersect(a, c, b, e));
+        ASSERT_TRUE(linesIntersect(e, b, a, c)); // commutative
+
+        /*
+         * Two segments share one vertex
+         *    /
+         *   /____
+         */
+        ASSERT_TRUE(linesIntersect(a, c, a, e));
+        ASSERT_TRUE(linesIntersect(a, e, a, c)); // commutative
+
+        /*
+         * Intersected segments on the same line
+         * A___B===C---G
+         */
+        ASSERT_TRUE(linesIntersect(a, c, b, g));
+        ASSERT_TRUE(linesIntersect(b, g, c, a)); // commutative
+
+        /*
+         * Disjoint segments on the same line
+         * A___B   C---G
+         */
+        ASSERT_FALSE(linesIntersect(a, b, c, g));
+        ASSERT_FALSE(linesIntersect(c, g, a, b)); // commutative
+
+        /*
+         * Segments on the same line share one vertex.
+         *        /D
+         *       /B
+         *     F/
+         */
+        ASSERT_TRUE(linesIntersect(d, b, b, f));
+        ASSERT_TRUE(linesIntersect(f, b, d, b)); // commutative
+        // axis aligned
+        ASSERT_TRUE(linesIntersect(a, c, g, c));
+        ASSERT_TRUE(linesIntersect(c, g, a, c)); // commutative
+    }
+
+    TEST(ShapeIntersection, Polygons) {
+        // Convex polygon (triangle)
+
+        /*
+         * Disjoint, bounds disjoint
+         *        /|
+         *       / |  []
+         *      /__|
+         */
+        vector<Point> triangleVetices;
+        triangleVetices.push_back(Point(0, 0));
+        triangleVetices.push_back(Point(1, 0));
+        triangleVetices.push_back(Point(1, 4));
+        Polygon triangle(triangleVetices);
+        Box box;
+
+        box = Box(1.5, 1.5, 1);
+        ASSERT_FALSE(edgesIntersectsWithBox(triangle.points(), box));
+        ASSERT_FALSE(polygonIntersectsWithBox(triangle, box));
+        ASSERT_FALSE(polygonContainsBox(triangle, box));
+
+        /*
+         * Disjoint, bounds intersect
+         *     [] /|
+         *       / |
+         *      /__|
+         */
+        box = Box(-0.5, 3.5, 1);
+        ASSERT_FALSE(edgesIntersectsWithBox(triangle.points(), box));
+        ASSERT_FALSE(polygonIntersectsWithBox(triangle, box));
+        ASSERT_FALSE(polygonContainsBox(triangle, box));
+
+        /*
+         * Intersect on one polygon vertex
+         *      _____
+         *     |     |
+         *     |_ /|_|
+         *       / |
+         *      /__|
+         */
+        box = Box(0, 3, 2);
+        ASSERT_TRUE(edgesIntersectsWithBox(triangle.points(), box));
+        ASSERT_TRUE(polygonIntersectsWithBox(triangle, box));
+        ASSERT_FALSE(polygonContainsBox(triangle, box));
+
+        /*
+         * Box contains polygon
+         *   __________
+         *  |          |
+         *  |     /|   |
+         *  |    / |   |
+         *  |   /__|   |
+         *  |__________|
+         */
+        box = Box(-1, -1, 6);
+        ASSERT_FALSE(edgesIntersectsWithBox(triangle.points(), box));
+        ASSERT_TRUE(polygonIntersectsWithBox(triangle, box));
+        ASSERT_FALSE(polygonContainsBox(triangle, box));
+
+        /*
+         * Polygon contains box
+         *        /|
+         *       / |
+         *      /  |
+         *     / []|
+         *    /____|
+         */
+        box = Box(0.1, 0.1, 0.2);
+        ASSERT_FALSE(edgesIntersectsWithBox(triangle.points(), box));
+        ASSERT_TRUE(polygonIntersectsWithBox(triangle, box));
+        ASSERT_TRUE(polygonContainsBox(triangle, box));
+
+        /*
+         * Intersect, but no vertex is contained by the other shape.
+         *    ___ /|_
+         *   |   / | |
+         *   |  /  | |
+         *   |_/___|_|
+         *    /____|
+         */
+        box = Box(0, 1, 2);
+        ASSERT_TRUE(edgesIntersectsWithBox(triangle.points(), box));
+        ASSERT_TRUE(polygonIntersectsWithBox(triangle, box));
+        ASSERT_FALSE(polygonContainsBox(triangle, box));
+
+        // Concave polygon
+
+        /*
+         * (0,4)
+         * |\
+         * | \(1,1)
+         * |  `.
+         * |____`. (4,0)
+         * (0,0)
+         */
+        vector<Point> concaveVetices;
+        concaveVetices.push_back(Point(0, 0));
+        concaveVetices.push_back(Point(4, 0));
+        concaveVetices.push_back(Point(1, 1));
+        concaveVetices.push_back(Point(0, 4));
+        Polygon concave(concaveVetices);
+
+        /*
+         * Disjoint
+         * |\
+         * | \
+         * |  `.
+         * |____`.
+         *   []
+         */
+        box = Box(1, -1, 0.9);
+        ASSERT_FALSE(edgesIntersectsWithBox(concave.points(), box));
+        ASSERT_FALSE(polygonIntersectsWithBox(concave, box));
+        ASSERT_FALSE(polygonContainsBox(concave, box));
+
+        /*
+         * Disjoint, bounds intersect
+         * |\
+         * | \[]
+         * |  `.
+         * |____`.
+         */
+        box = Box(1.1, 1.1, 0.2);
+        ASSERT_FALSE(edgesIntersectsWithBox(concave.points(), box));
+        ASSERT_FALSE(polygonIntersectsWithBox(concave, box));
+        ASSERT_FALSE(polygonContainsBox(concave, box));
+
+        /*
+         * Intersect, one box vertex is contained by the polygon.
+         *  |\
+         *  |+\+ (1.5, 1.5)
+         *  |+-`.
+         *  |____`.
+         */
+        box = Box(0.5, 0.5, 1);
+        ASSERT_TRUE(edgesIntersectsWithBox(concave.points(), box));
+        ASSERT_TRUE(polygonIntersectsWithBox(concave, box));
+        ASSERT_FALSE(polygonContainsBox(concave, box));
+
+        /*
+         * Intersect, no vertex is contained by the other shape.
+         *  |\
+         * +| \--+
+         * ||  `.|
+         * ||____`.
+         * +-----+
+         */
+        box = Box(-0.5, -0.5, 3);
+        ASSERT_TRUE(edgesIntersectsWithBox(concave.points(), box));
+        ASSERT_TRUE(polygonIntersectsWithBox(concave, box));
+        ASSERT_FALSE(polygonContainsBox(concave, box));
+    }
 
 } // namespace

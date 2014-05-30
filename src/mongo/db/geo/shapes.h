@@ -43,11 +43,20 @@
 namespace mongo {
 
     struct Point;
+    struct Circle;
+    class Box;
+    class Polygon;
+
     double distance(const Point& p1, const Point &p2);
     bool distanceWithin(const Point &p1, const Point &p2, double radius);
     void checkEarthBounds(const Point &p);
     double spheredist_rad(const Point& p1, const Point& p2);
     double spheredist_deg(const Point& p1, const Point& p2);
+    bool linesIntersect(const Point& pA, const Point& pB, const Point& pC, const Point& pD);
+    bool circleIntersectsWithBox(const Circle& circle, const Box& box);
+    bool edgesIntersectsWithBox(const vector<Point>& vertices, const Box& box);
+    bool polygonContainsBox(const Polygon& polygon, const Box& box);
+    bool polygonIntersectsWithBox(const Polygon& polygon, const Box& box);
 
     struct Point {
         Point();
@@ -130,6 +139,7 @@ namespace mongo {
          */
         const Point& centroid() const;
         const Box& bounds() const;
+        const std::vector<Point>& points() const { return _points; }
 
     private:
 

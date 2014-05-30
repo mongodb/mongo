@@ -486,4 +486,121 @@ namespace mongo {
         return sqrt((a * a) + (b * b));
     }
 
+    static inline Vector2_d toVector2(const Point& p) {
+        return Vector2_d(p.x, p.y);
+    }
+
+    // Given a segment (A, B) and a segment (C, D), check whether they intersect.
+    bool linesIntersect(const Point& pA, const Point& pB, const Point& pC, const Point& pD) {
+        Vector2_d a = toVector2(pA);
+        Vector2_d b = toVector2(pB);
+        Vector2_d c = toVector2(pC);
+        Vector2_d d = toVector2(pD);
+
+        // The normal of line AB
+        Vector2_d normalAB = (b - a).Ortho();
+
+        // Dot products of AC and the normal of AB
+        // = 0 : C is on the line AB
+        // > 0 : C is on one side
+        // < 0 : C is on the other side
+        double dotProdNormalAB_AC = normalAB.DotProd(c - a);
+        double dotProdNormalAB_AD = normalAB.DotProd(d - a);
+
+        // C and D can not on the same side of line AB
+        if (dotProdNormalAB_AC * dotProdNormalAB_AD > 0) return false;
+
+        // AB and CD are on the same line
+        if (dotProdNormalAB_AC == 0 && dotProdNormalAB_AD == 0) {
+            // Test if C or D is on segment AB.
+            return (c - a).DotProd(c - b) <= 0 || (d - a).DotProd(d - b) <= 0;
+        }
+
+        // Check if A and B are on different sides of line CD.
+        Vector2_d normalCD = (d - c).Ortho();
+        double dotProdNormalCD_CA = normalCD.DotProd(a - c);
+        double dotProdNormalCD_CB = normalCD.DotProd(b - c);
+        return dotProdNormalCD_CA * dotProdNormalCD_CB <= 0; // Perhaps A or B is on line CD
+    }
+
+    // Check the intersection by measuring the distance between circle center and box center.
+    bool circleIntersectsWithBox(const Circle& circle, const Box& box) {
+        /* Collapses the four quadrants down into one.
+         *   ________
+         * r|___B___ \  <- a quarter round corner here. Let's name it "D".
+         *  |       | |
+         * h|       | |
+         *  |   A   |C|
+         *  |_______|_|
+         *      w    r
+         */
+
+        Point boxCenter = box.center();
+        double dx = abs(circle.center.x - boxCenter.x);
+        double dy = abs(circle.center.y - boxCenter.y);
+        double w = (box._max.x - box._min.x) / 2;
+        double h = (box._max.y - box._min.y) / 2;
+        const double& r = circle.radius;
+
+        // Check if circle.center is in A, B or C.
+        // The circle center could be above the box (B) or right to the box (C), but close enough.
+        if ((dx <= w + r && dy <= h) || (dx <= w && dy <= h + r)) return true;
+
+        // Now check if circle.center is in the round corner "D".
+        return distanceWithin(Point(dx, dy), Point(w, h), r);
+    }
+
+    bool lineIntersectsWithBox(const Point& a, const Point& b, const Box& box) {
+        Point upperLeft(box._min.x, box._max.y);
+        Point lowerRight(box._max.x, box._min.y);
+
+        return linesIntersect(a, b, upperLeft, box._min)
+                || linesIntersect(a, b, box._min, lowerRight)
+                || linesIntersect(a, b, lowerRight, box._max)
+                || linesIntersect(a, b, box._max, upperLeft);
+    }
+
+    // Doc: The last point specified is always implicitly connected to the first.
+    // [[ 0 , 0 ], [ 3 , 6 ], [ 6 , 0 ]]
+    bool edgesIntersectsWithBox(const vector<Point>& vertices, const Box& box) {
+        for (size_t i = 0; i < vertices.size() - 1; i++) {
+            if (lineIntersectsWithBox(vertices[i], vertices[i+1], box)) return true;
+        }
+        // The last point and first point.
+        return lineIntersectsWithBox(vertices[vertices.size() - 1], vertices[0], box);
+    }
+
+    bool polygonContainsBox(const Polygon& polygon, const Box& box) {
+        // All vertices of box have to be inside the polygon.
+        if (!polygon.contains(box._min)
+                || !polygon.contains(box._max)
+                || !polygon.contains(Point(box._min.x, box._max.y))
+                || !polygon.contains(Point(box._max.x, box._min.y)))
+            return false;
+
+        // No intersection between the polygon edges and the box.
+        return !edgesIntersectsWithBox(polygon.points(), box);
+    }
+
+    bool polygonIntersectsWithBox(const Polygon& polygon, const Box& box) {
+        // 1. Polygon contains the box.
+        // Check the relaxed condition that whether the polygon include any vertex of the box.
+        if (polygon.contains(box._min)
+                || polygon.contains(box._max)
+                || polygon.contains(Point(box._min.x, box._max.y))
+                || polygon.contains(Point(box._max.x, box._min.y)))
+            return true;
+
+        // 2. Box contains polygon.
+        // Check the relaxed condition that whether the box include any vertex of the polygon.
+        for (vector<Point>::const_iterator it = polygon.points().begin();
+                it != polygon.points().end(); it++) {
+            if (box.inside(*it)) return true;
+        }
+
+        // 3. Otherwise they intersect on a portion of both shapes.
+        // Edges intersects
+        return edgesIntersectsWithBox(polygon.points(), box);
+    }
+
 }  // namespace mongo
