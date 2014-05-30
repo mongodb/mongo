@@ -51,11 +51,11 @@ namespace mongo {
          * X have tighter or looser bounds than predicate Y?".
          */
         enum BoundsTightness {
-            // Index bounds are inexact, but no fetch is required
-            INEXACT_COVERED = 0,
-
             // Index bounds are inexact, and a fetch is required.
-            INEXACT_FETCH = 1,
+            INEXACT_FETCH = 0,
+
+            // Index bounds are inexact, but no fetch is required
+            INEXACT_COVERED = 1,
 
             // Index bounds are exact.
             EXACT = 2

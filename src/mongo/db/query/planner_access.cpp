@@ -422,16 +422,31 @@ namespace mongo {
     }
 
     // static
+    bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
+        if (scanState->loosestBounds == IndexBoundsBuilder::EXACT) {
+            return false;
+        }
+        else if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_FETCH) {
+            return true;
+        }
+        else {
+            invariant(scanState->loosestBounds == IndexBoundsBuilder::INEXACT_COVERED);
+            const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
+            return index.multikey;
+        }
+    }
+
+    // static
     void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
                                                  vector<QuerySolutionNode*>* out) {
         finishLeafNode(scanState->currentScan.get(),
                        scanState->indices[scanState->currentIndexNumber]);
 
         if (MatchExpression::OR == scanState->root->matchType()) {
-            if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_FETCH) {
-                // This is an $or where at least one predicate has inexact bounds. In this
-                // case we must add a fetch node above the index scan whose filter includes
-                // *all* of the predicates used to generate the ixscan.
+            if (orNeedsFetch(scanState)) {
+                // In order to correctly evaluate the predicates for this index, we have to
+                // fetch the full documents. Add a fetch node above the index scan whose filter
+                // includes *all* of the predicates used to generate the ixscan.
                 FetchNode* fetch = new FetchNode();
                 // Takes ownership.
                 fetch->filter.reset(scanState->curOr.release());
