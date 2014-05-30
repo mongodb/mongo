@@ -146,13 +146,13 @@ namespace mongo {
          */
         class ReadContext : boost::noncopyable { 
         public:
-            ReadContext(const std::string& ns,
-                        const std::string& path=storageGlobalParams.dbpath,
+            ReadContext(OperationContext* txn,
+                        const std::string& ns,
                         bool doVersion = true);
-            Context& ctx() { return *c.get(); }
+            Context& ctx() { return *_c.get(); }
         private:
-            scoped_ptr<Lock::DBRead> lk;
-            scoped_ptr<Context> c;
+            scoped_ptr<Lock::DBRead> _lk;
+            scoped_ptr<Context> _c;
         };
 
         /* Set database we want to use, then, restores when we finish (are out of scope)
@@ -219,10 +219,9 @@ namespace mongo {
 
         class WriteContext : boost::noncopyable {
         public:
-            WriteContext(const std::string& ns,
-                         const std::string& path=storageGlobalParams.dbpath,
-                         bool doVersion = true);
+            WriteContext(OperationContext* opCtx, const std::string& ns, bool doVersion = true);
             Context& ctx() { return _c; }
+
         private:
             Lock::DBWrite _lk;
             Context _c;

@@ -188,7 +188,8 @@ namespace mongo {
          * @return IndexNotFound if the index pattern doesn't match any indexes
          * @return InvalidLength if the estimated size exceeds maxChunkSizeBytes
          */
-        static Status getLocsInRange( const KeyRange& range,
+        static Status getLocsInRange( OperationContext* txn,
+                                      const KeyRange& range,
                                       long long maxChunkSizeBytes,
                                       std::set<DiskLoc>* locs,
                                       long long* numDocs,

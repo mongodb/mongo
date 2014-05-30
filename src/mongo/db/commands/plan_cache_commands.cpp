@@ -118,7 +118,7 @@ namespace mongo {
                                string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         string ns = parseNs(dbname, cmdObj);
 
-        Status status = runPlanCacheCommand(ns, cmdObj, &result);
+        Status status = runPlanCacheCommand(txn, ns, cmdObj, &result);
 
         if (!status.isOK()) {
             addStatus(status, result);
@@ -138,7 +138,8 @@ namespace mongo {
         ss << helpText;
     }
 
-    Status PlanCacheCommand::checkAuthForCommand(ClientBasic* client, const std::string& dbname,
+    Status PlanCacheCommand::checkAuthForCommand(ClientBasic* client,
+                                                 const std::string& dbname,
                                                  const BSONObj& cmdObj) {
         AuthorizationSession* authzSession = client->getAuthorizationSession();
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
@@ -206,10 +207,12 @@ namespace mongo {
         "Displays all query shapes in a collection.",
         ActionType::planCacheRead) { }
 
-    Status PlanCacheListQueryShapes::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
+    Status PlanCacheListQueryShapes::runPlanCacheCommand(OperationContext* txn,
+                                                         const string& ns,
+                                                         BSONObj& cmdObj,
                                                          BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(ns);
+        Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
@@ -252,10 +255,12 @@ namespace mongo {
         "Drops one or all cached queries in a collection.",
         ActionType::planCacheWrite) { }
 
-    Status PlanCacheClear::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
+    Status PlanCacheClear::runPlanCacheCommand(OperationContext* txn,
+                                               const std::string& ns,
+                                               BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(ns);
+        Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
@@ -322,9 +327,11 @@ namespace mongo {
         "Displays the cached plans for a query shape.",
         ActionType::planCacheRead) { }
 
-    Status PlanCacheListPlans::runPlanCacheCommand(const string& ns, BSONObj& cmdObj,
+    Status PlanCacheListPlans::runPlanCacheCommand(OperationContext* txn,
+                                                   const std::string& ns,
+                                                   BSONObj& cmdObj,
                                                    BSONObjBuilder* bob) {
-        Client::ReadContext readCtx(ns);
+        Client::ReadContext readCtx(txn, ns);
         Client::Context& ctx = readCtx.ctx();
         PlanCache* planCache;
         Status status = getPlanCache(ctx.db(), ns, &planCache);

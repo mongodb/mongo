@@ -99,13 +99,17 @@ namespace mongo {
             ss << "</pre>";
         }
 
-        void _authorizePrincipal(const UserName& userName) {
-            Status status = cc().getAuthorizationSession()->addAndAuthorizeUser(userName);
+        void _authorizePrincipal(OperationContext* txn, const UserName& userName) {
+            Status status = cc().getAuthorizationSession()->addAndAuthorizeUser(txn, userName);
             uassertStatusOK(status);
         }
 
-        bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
-            if ( from.isLocalHost() || !_webUsers->haveAdminUsers() ) {
+        bool allowed(OperationContext* txn,
+                     const char * rq,
+                     vector<string>& headers,
+                     const SockAddr &from) {
+
+            if ( from.isLocalHost() || !_webUsers->haveAdminUsers(txn) ) {
                 // TODO(spencer): should the above check use "&&" not "||"?  Currently this is much
                 // more permissive than the server's localhost auth bypass.
                 cc().getAuthorizationSession()->grantInternalAuthorization();
@@ -131,7 +135,7 @@ namespace mongo {
                 User* user;
                 AuthorizationManager& authzManager =
                         cc().getAuthorizationSession()->getAuthorizationManager();
-                Status status = authzManager.acquireUser(userName, &user);
+                Status status = authzManager.acquireUser(txn, userName, &user);
                 if (!status.isOK()) {
                     if (status.code() != ErrorCodes::UserNotFound) {
                         uasserted(17051, status.reason());
@@ -159,7 +163,7 @@ namespace mongo {
                     string r1 = md5simpledigest( r.str() );
 
                     if ( r1 == parms["response"] ) {
-                        _authorizePrincipal(userName);
+                        _authorizePrincipal(txn, userName);
                         return true;
                     }
                 }
@@ -191,7 +195,7 @@ namespace mongo {
 
             if ( url.size() > 1 ) {
 
-                if ( ! allowed( rq , headers, from ) ) {
+                if (!allowed(txn.get(), rq, headers, from)) {
                     responseCode = 401;
                     headers.push_back( "Content-Type: text/plain;charset=utf-8" );
                     responseMsg = "not allowed\n";
@@ -240,7 +244,7 @@ namespace mongo {
 
             // generate home page
 
-            if ( ! allowed( rq , headers, from ) ) {
+            if (!allowed(txn.get(), rq, headers, from)) {
                 responseCode = 401;
                 headers.push_back( "Content-Type: text/plain;charset=utf-8" );
                 responseMsg = "not allowed\n";

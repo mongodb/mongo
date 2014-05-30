@@ -93,7 +93,7 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(ns);
             
             return runNoDirectClient( txn, ns , 
@@ -133,7 +133,7 @@ namespace mongo {
                                       BSONObjBuilder& result,
                                       string& errmsg) {
 
-            Lock::DBWrite lk( ns );
+            Lock::DBWrite lk(txn->lockState(), ns);
             Client::Context cx( ns );
             Collection* collection = cx.db()->getCollection( txn, ns );
 
@@ -325,7 +325,7 @@ namespace mongo {
                 }
             }
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(ns);
 
             BSONObj out = db.findOne(ns, q, fields);

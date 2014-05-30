@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
 
@@ -186,8 +187,10 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("role" << "clusterAdmin" << "db" << "admin"))),
                 BSONObj()));
 
+        OperationContextNoop txn;
+
         User* v2read;
-        ASSERT_OK(authzManager->acquireUser(UserName("v2read", "test"), &v2read));
+        ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2read", "test"), &v2read));
         ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
         ASSERT(v2read->isValid());
         ASSERT_EQUALS(1U, v2read->getRefCount());
@@ -198,7 +201,7 @@ namespace {
         authzManager->releaseUser(v2read);
 
         User* v2cluster;
-        ASSERT_OK(authzManager->acquireUser(UserName("v2cluster", "admin"), &v2cluster));
+        ASSERT_OK(authzManager->acquireUser(&txn, UserName("v2cluster", "admin"), &v2cluster));
         ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
         ASSERT(v2cluster->isValid());
         ASSERT_EQUALS(1U, v2cluster->getRefCount());

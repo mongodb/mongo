@@ -301,7 +301,7 @@ namespace mongo {
                                 bool copyIndexes,
                                 bool logForRepl) {
 
-        Client::WriteContext ctx(ns);
+        Client::WriteContext ctx(txn, ns);
 
         // config
         string temp = ctx.ctx().db()->name() + ".system.namespaces";

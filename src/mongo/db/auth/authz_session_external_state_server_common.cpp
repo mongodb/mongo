@@ -49,7 +49,7 @@ namespace {
                     _allowLocalhost(enableLocalhostAuthBypass) {}
     AuthzSessionExternalStateServerCommon::~AuthzSessionExternalStateServerCommon() {}
 
-    void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost() {
+    void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost(OperationContext* txn) {
         if (!_authzManager->isAuthEnabled())
             return;
         // If we know that an admin user exists, don't re-check.
@@ -61,7 +61,7 @@ namespace {
             return;
         }
 
-        _allowLocalhost = !_authzManager->hasAnyPrivilegeDocuments();
+        _allowLocalhost = !_authzManager->hasAnyPrivilegeDocuments(txn);
         if (_allowLocalhost) {
             ONCE {
                 log() << "note: no users configured in admin.system.users, allowing localhost "

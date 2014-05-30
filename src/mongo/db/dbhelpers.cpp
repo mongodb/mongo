@@ -297,10 +297,12 @@ namespace mongo {
         return kpBuilder.obj();
     }
 
-    bool findShardKeyIndexPattern( const string& ns,
-                                   const BSONObj& shardKeyPattern,
-                                   BSONObj* indexPattern ) {
-        Client::ReadContext context( ns );
+    static bool findShardKeyIndexPattern(OperationContext* txn,
+                                         const string& ns,
+                                         const BSONObj& shardKeyPattern,
+                                         BSONObj* indexPattern ) {
+
+        Client::ReadContext context(txn, ns);
         Collection* collection = context.ctx().db()->getCollection( ns );
         if ( !collection )
             return false;
@@ -332,7 +334,8 @@ namespace mongo {
         // The IndexChunk has a keyPattern that may apply to more than one index - we need to
         // select the index and get the full index keyPattern here.
         BSONObj indexKeyPatternDoc;
-        if ( !findShardKeyIndexPattern( ns,
+        if ( !findShardKeyIndexPattern( txn,
+                                        ns,
                                         range.keyPattern,
                                         &indexKeyPatternDoc ) )
         {
@@ -366,7 +369,7 @@ namespace mongo {
         while ( 1 ) {
             // Scoping for write lock.
             {
-                Client::WriteContext ctx(ns);
+                Client::WriteContext ctx(txn, ns);
                 Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                 if ( !collection )
                     break;
@@ -476,7 +479,9 @@ namespace mongo {
 
     // Used by migration clone step
     // TODO: Cannot hook up quite yet due to _trackerLocks in shared migration code.
-    Status Helpers::getLocsInRange( const KeyRange& range,
+    // TODO: This function is not used outside of tests
+    Status Helpers::getLocsInRange( OperationContext* txn,
+                                    const KeyRange& range,
                                     long long maxChunkSizeBytes,
                                     set<DiskLoc>* locs,
                                     long long* numDocs,
@@ -486,7 +491,7 @@ namespace mongo {
         *estChunkSizeBytes = 0;
         *numDocs = 0;
 
-        Client::ReadContext ctx( ns );
+        Client::ReadContext ctx(txn, ns);
         Collection* collection = ctx.ctx().db()->getCollection( ns );
         if ( !collection ) return Status( ErrorCodes::NamespaceNotFound, ns );
 

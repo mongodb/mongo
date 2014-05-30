@@ -109,15 +109,15 @@ namespace mongo {
 
         // ----------------------
 
-        static int eraseCursorGlobalIfAuthorized( int n, long long* ids );
-        static bool eraseCursorGlobalIfAuthorized( CursorId id );
+        static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, long long* ids);
+        static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
 
-        static bool eraseCursorGlobal( CursorId id );
+        static bool eraseCursorGlobal(OperationContext* txn, CursorId id);
 
         /**
          * @return number timed out
          */
-        static std::size_t timeoutCursorsGlobal( int millisSinceLastCall );
+        static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
 
     private:
         CursorId _allocateCursorId_inlock();

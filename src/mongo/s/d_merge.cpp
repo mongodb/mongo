@@ -28,6 +28,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/distlock.h"
@@ -290,7 +291,8 @@ namespace mongo {
         //
 
         {
-            Lock::DBWrite writeLk( nss.ns() );
+            OperationContextImpl txn; // XXX?
+            Lock::DBWrite writeLk(txn.lockState(), nss.ns());
             shardingState.mergeChunks( nss.ns(), minKey, maxKey, mergeVersion );
         }
 

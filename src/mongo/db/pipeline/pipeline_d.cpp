@@ -64,7 +64,7 @@ namespace {
         }
 
         bool isCapped(const NamespaceString& ns) {
-            Client::ReadContext ctx(ns.ns());
+            Client::ReadContext ctx(_ctx->opCtx, ns.ns());
             Collection* collection = ctx.ctx().db()->getCollection(ns);
             return collection && collection->isCapped();
         }

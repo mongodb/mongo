@@ -37,6 +37,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/dbtests/dbtests.h"
@@ -51,7 +52,7 @@ namespace QueryStageCount {
         CountBase() { }
 
         virtual ~CountBase() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -92,11 +93,13 @@ namespace QueryStageCount {
 
         static const char* ns() { return "unittests.QueryStageCount"; }
 
+    protected:
+        OperationContextImpl _txn;
+
     private:
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
-    
-    DBDirectClient CountBase::_client;
+   
 
     //
     // Check that dups are properly identified
@@ -104,7 +107,7 @@ namespace QueryStageCount {
     class QueryStageCountDups : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert some docs
             insert(BSON("a" << BSON_ARRAY(5 << 7)));
@@ -136,7 +139,7 @@ namespace QueryStageCount {
     class QueryStageCountInclusiveBounds : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert some docs
             for (int i = 0; i < 10; ++i) {
@@ -168,7 +171,7 @@ namespace QueryStageCount {
     class QueryStageCountExclusiveBounds : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert some docs
             for (int i = 0; i < 10; ++i) {
@@ -200,7 +203,7 @@ namespace QueryStageCount {
     class QueryStageCountLowerBound : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert doc, add index
             insert(BSON("a" << 2));
@@ -228,7 +231,7 @@ namespace QueryStageCount {
     class QueryStageCountNothingInInterval : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert documents, add index
             insert(BSON("a" << 2));
@@ -258,7 +261,7 @@ namespace QueryStageCount {
     class QueryStageCountNothingInIntervalFirstMatchTooHigh : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert some documents, add index
             insert(BSON("a" << 2));
@@ -288,7 +291,7 @@ namespace QueryStageCount {
     class QueryStageCountNoChangeDuringYield : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert documents, add index
             for (int i = 0; i < 10; ++i) {
@@ -339,7 +342,7 @@ namespace QueryStageCount {
     class QueryStageCountDeleteDuringYield : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert documents, add index
             for (int i = 0; i < 10; ++i) {
@@ -393,7 +396,7 @@ namespace QueryStageCount {
     class QueryStageCountInsertNewDocsDuringYield : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert documents, add index
             for (int i = 0; i < 10; ++i) {
@@ -450,7 +453,7 @@ namespace QueryStageCount {
     class QueryStageCountBecomesMultiKeyDuringYield : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert documents, add index
             for (int i = 0; i < 10; ++i) {
@@ -503,7 +506,7 @@ namespace QueryStageCount {
     class QueryStageCountUnusedKeys : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert docs, add index
             for (int i = 0; i < 10; ++i) {
@@ -538,7 +541,7 @@ namespace QueryStageCount {
     class QueryStageCountUnusedEndKey : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert docs, add index
             for (int i = 0; i < 10; ++i) {
@@ -571,7 +574,7 @@ namespace QueryStageCount {
     class QueryStageCountKeyBecomesUnusedDuringYield : public CountBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             // Insert documents, add index
             for (int i = 0; i < 10; ++i) {

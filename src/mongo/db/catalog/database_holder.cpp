@@ -41,8 +41,7 @@
 
 namespace mongo {
 
-    Database* DatabaseHolder::getOrCreate( const string& ns, const string& path, bool& justCreated ) {
-        OperationContextImpl txn; // TODO get rid of this once reads require transactions
+    Database* DatabaseHolder::getOrCreate(OperationContext* txn, const string& ns, const string& path, bool& justCreated) {
         string dbname = _todb( ns );
         {
             SimpleMutex::scoped_lock lk(_m);
@@ -74,7 +73,7 @@ namespace mongo {
         cc().writeHappened();
 
         // this locks _m for defensive checks, so we don't want to be locked right here :
-        Database *db = new Database( &txn, dbname.c_str() , justCreated , path );
+        Database *db = new Database(txn, dbname.c_str(), justCreated, path);
 
         {
             SimpleMutex::scoped_lock lk(_m);

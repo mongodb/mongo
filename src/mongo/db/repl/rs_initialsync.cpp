@@ -99,8 +99,8 @@ namespace repl {
             else
                 sethbmsg( str::stream() << "initial sync cloning indexes for : " << db , 0);
 
-            Client::WriteContext ctx(db);
             OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, db);
 
             string err;
             int errCode;
@@ -130,8 +130,9 @@ namespace repl {
     void _logOpObjRS(const BSONObj& op);
 
     static void emptyOplog() {
-        Client::WriteContext ctx(rsoplog);
         OperationContextImpl txn;
+        Client::WriteContext ctx(&txn, rsoplog);
+
         Collection* collection = ctx.ctx().db()->getCollection(rsoplog);
 
         // temp
@@ -321,7 +322,8 @@ namespace repl {
 
                 log() << "replSet cleaning up [1]" << rsLog;
                 {
-                    Client::WriteContext cx( "local." );
+                    OperationContextImpl txn; // XXX?
+                    Client::WriteContext cx(&txn, "local.");
                     cx.ctx().db()->flushFiles(true);
                 }
                 log() << "replSet cleaning up [2]" << rsLog;
@@ -465,7 +467,9 @@ namespace repl {
         verify( !box.getState().primary() ); // wouldn't make sense if we were.
 
         {
-            Client::WriteContext cx( "local." );
+            OperationContextImpl txn;
+            Client::WriteContext cx(&txn, "local.");
+
             cx.ctx().db()->flushFiles(true);
             try {
                 log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;

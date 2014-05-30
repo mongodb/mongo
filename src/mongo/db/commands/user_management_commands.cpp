@@ -118,12 +118,13 @@ namespace mongo {
         return Status::OK();
     }
 
-    static Status getCurrentUserRoles(AuthorizationManager* authzManager,
+    static Status getCurrentUserRoles(OperationContext* txn,
+                                      AuthorizationManager* authzManager,
                                       const UserName& userName,
                                       unordered_set<RoleName>* roles) {
         User* user;
         authzManager->invalidateUserByName(userName); // Need to make sure cache entry is up to date
-        Status status = authzManager->acquireUser(userName, &user);
+        Status status = authzManager->acquireUser(txn, userName, &user);
         if (!status.isOK()) {
             return status;
         }
@@ -265,9 +266,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    static Status requireAuthSchemaVersion26Final(AuthorizationManager* authzManager) {
+    static Status requireAuthSchemaVersion26Final(OperationContext* txn,
+                                                  AuthorizationManager* authzManager) {
         int foundSchemaVersion;
-        Status status = authzManager->getAuthorizationVersion(&foundSchemaVersion);
+        Status status = authzManager->getAuthorizationVersion(txn, &foundSchemaVersion);
         if (!status.isOK()) {
             return status;
         }
@@ -282,9 +284,10 @@ namespace mongo {
         return authzManager->writeAuthSchemaVersionIfNeeded();
     }
 
-    static Status requireAuthSchemaVersion26UpgradeOrFinal(AuthorizationManager* authzManager) {
+    static Status requireAuthSchemaVersion26UpgradeOrFinal(OperationContext* txn,
+                                                           AuthorizationManager* authzManager) {
         int foundSchemaVersion;
-        Status status = authzManager->getAuthorizationVersion(&foundSchemaVersion);
+        Status status = authzManager->getAuthorizationVersion(txn, &foundSchemaVersion);
         if (!status.isOK()) {
             return status;
         }
@@ -434,7 +437,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = requireAuthSchemaVersion26Final(authzManager);
+            status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -579,7 +582,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = requireAuthSchemaVersion26Final(authzManager);
+            status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -668,7 +671,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -754,7 +757,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -836,7 +839,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -856,7 +859,7 @@ namespace mongo {
 
             UserName userName(userNameString, dbname);
             unordered_set<RoleName> userRoles;
-            status = getCurrentUserRoles(authzManager, userName, &userRoles);
+            status = getCurrentUserRoles(txn, authzManager, userName, &userRoles);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -934,7 +937,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -954,7 +957,7 @@ namespace mongo {
 
             UserName userName(userNameString, dbname);
             unordered_set<RoleName> userRoles;
-            status = getCurrentUserRoles(authzManager, userName, &userRoles);
+            status = getCurrentUserRoles(txn, authzManager, userName, &userRoles);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1049,7 +1052,8 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            status = requireAuthSchemaVersion26UpgradeOrFinal(getGlobalAuthorizationManager());
+            status = requireAuthSchemaVersion26UpgradeOrFinal(txn,
+                                                              getGlobalAuthorizationManager());
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1068,7 +1072,7 @@ namespace mongo {
                 for (size_t i = 0; i < args.userNames.size(); ++i) {
                     BSONObj userDetails;
                     status = getGlobalAuthorizationManager()->getUserDescription(
-                            args.userNames[i], &userDetails);
+                            txn, args.userNames[i], &userDetails);
                     if (status.code() == ErrorCodes::UserNotFound) {
                         continue;
                     }
@@ -1107,7 +1111,7 @@ namespace mongo {
 
                 AuthorizationManager* authzManager = getGlobalAuthorizationManager();
                 int authzVersion;
-                Status status = authzManager->getAuthorizationVersion(&authzVersion);
+                Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
@@ -1252,7 +1256,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = requireAuthSchemaVersion26Final(authzManager);
+            status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1369,7 +1373,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = requireAuthSchemaVersion26Final(authzManager);
+            status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1459,7 +1463,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1595,7 +1599,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1755,7 +1759,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = requireAuthSchemaVersion26Final(authzManager);
+            status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1851,7 +1855,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1970,7 +1974,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            Status status = requireAuthSchemaVersion26Final(authzManager);
+            Status status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -2146,7 +2150,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = requireAuthSchemaVersion26Final(authzManager);
+            status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -2292,7 +2296,8 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            status = requireAuthSchemaVersion26UpgradeOrFinal(getGlobalAuthorizationManager());
+            status = requireAuthSchemaVersion26UpgradeOrFinal(txn,
+                                                              getGlobalAuthorizationManager());
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -2840,7 +2845,7 @@ namespace mongo {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = requireAuthSchemaVersion26Final(authzManager);
+            status = requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }

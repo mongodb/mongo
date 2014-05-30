@@ -71,13 +71,13 @@ namespace mongo {
         // Should be called at the beginning of every new request.  This performs the checks
         // necessary to determine if localhost connections should be given full access.
         // TODO: try to eliminate the need for this call.
-        void startRequest();
+        void startRequest(OperationContext* txn);
 
         /**
          * Adds the User identified by "UserName" to the authorization session, acquiring privileges
          * for it in the process.
          */
-        Status addAndAuthorizeUser(const UserName& userName);
+        Status addAndAuthorizeUser(OperationContext* txn, const UserName& userName);
 
         // Returns the authenticated user with the given name.  Returns NULL
         // if no such user is found.
@@ -182,7 +182,8 @@ namespace mongo {
 
         // Utility function for
         // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), actions).
-        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, const ActionSet& actions);
+        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                               const ActionSet& actions);
 
         // Replaces the vector of UserNames that a system user is impersonating with a new vector.
         // The auditing system adds these to each audit record in the log.
@@ -203,7 +204,7 @@ namespace mongo {
 
         // If any users authenticated on this session are marked as invalid this updates them with
         // up-to-date information. May require a read lock on the "admin" db to read the user data.
-        void _refreshUserInfoAsNeeded();
+        void _refreshUserInfoAsNeeded(OperationContext* txn);
 
         // Checks if this connection is authorized for the given Privilege, ignoring whether or not
         // we should even be doing authorization checks in general.  Note: this may acquire a read

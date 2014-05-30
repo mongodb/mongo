@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
@@ -52,6 +53,8 @@ namespace mongo {
         verify( _d.getns() );
         _id = _m.header()->id;
 
+        _txn.reset(new OperationContextNoop());
+
         _clientInfo = ClientInfo::get();
         if ( p ) {
             _clientInfo->newPeerRequest( p->remote() );
@@ -66,7 +69,7 @@ namespace mongo {
             return;
         _didInit = true;
         reset();
-        _clientInfo->getAuthorizationSession()->startRequest();
+        _clientInfo->getAuthorizationSession()->startRequest(_txn.get());
     }
 
     // Deprecated, will move to the strategy itself

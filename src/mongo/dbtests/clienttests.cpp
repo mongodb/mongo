@@ -1,3 +1,5 @@
+// client.cpp
+
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -26,15 +28,12 @@
  *    then also delete it in the license file.
  */
 
-// client.cpp
-
-#include "mongo/pch.h"
-
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/d_concurrency.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/dbtests/dbtests.h"
+
 
 namespace ClientTests {
 
@@ -123,8 +122,8 @@ namespace ClientTests {
     public:
         BuildIndex() : Base("buildIndex") {}
         void run() {
-            Lock::DBWrite lock(ns());
-            Client::WriteContext ctx(ns());
+            OperationContextNoop txn;
+            Client::WriteContext ctx(&txn, ns());
 
             db.insert(ns(), BSON("x" << 1 << "y" << 2));
             db.insert(ns(), BSON("x" << 2 << "y" << 2));

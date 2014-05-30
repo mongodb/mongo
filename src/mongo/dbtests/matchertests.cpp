@@ -33,6 +33,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -216,7 +217,9 @@ namespace MatcherTests {
     class WhereSimple1 {
     public:
         void run() {
-            Client::ReadContext ctx( "unittests.matchertests" );
+            OperationContextImpl txn;
+            Client::ReadContext ctx(&txn, "unittests.matchertests");
+
             M m(BSON("$where" << "function(){ return this.a == 1; }"),
                 WhereCallbackReal(StringData("unittests")));
             ASSERT( m.matches( BSON( "a" << 1 ) ) );

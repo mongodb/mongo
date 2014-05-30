@@ -60,7 +60,7 @@
 namespace mongo {
 namespace repl {
 
-    void pretouchOperation(const BSONObj& op);
+    void pretouchOperation(OperationContext* txn, const BSONObj& op);
     void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
 
     /* if 1 sync() is running */
@@ -162,8 +162,8 @@ namespace repl {
     void ReplSource::ensureMe() {
         string myname = getHostName();
         {
-            Client::WriteContext ctx("local");
             OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, "local");
             // local.me is an identifier for a server for getLastError w:2+
             if (!Helpers::getSingleton("local.me", _me) ||
                 !_me.hasField("host") ||
@@ -560,6 +560,8 @@ namespace repl {
         if ( !only.empty() && only != clientName )
             return;
 
+        OperationContextImpl txn; // XXX?
+
         if (replSettings.pretouch &&
             !alreadyLocked/*doesn't make sense if in write lock already*/) {
             if (replSettings.pretouch > 1) {
@@ -588,18 +590,17 @@ namespace repl {
                         a += m;
                     }
                     // we do one too...
-                    pretouchOperation(op);
+                    pretouchOperation(&txn, op);
                     tp->join();
                     countdown = v.size();
                 }
             }
             else {
-                pretouchOperation(op);
+                pretouchOperation(&txn, op);
             }
         }
 
         scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
-        OperationContextImpl txn; // XXX?
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -679,7 +680,7 @@ namespace repl {
 
         int get() const { return _value; }
 
-        virtual void append( BSONObjBuilder& b, const string& name ) {
+        virtual void append(OperationContext* txn, BSONObjBuilder& b, const string& name) {
             b.append( name, _value );
         }
 
@@ -1276,7 +1277,7 @@ namespace repl {
         }
     }
 
-    void pretouchOperation(const BSONObj& op) {
+    void pretouchOperation(OperationContext* txn, const BSONObj& op) {
 
         if( Lock::somethingWriteLocked() )
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
@@ -1299,7 +1300,7 @@ namespace repl {
                 BSONObjBuilder b;
                 b.append(_id);
                 BSONObj result;
-                Client::ReadContext ctx( ns );
+                Client::ReadContext ctx(txn, ns );
                 if( Helpers::findById(ctx.ctx().db(), ns, b.done(), result) )
                     _dummy_z += result.objsize(); // touch
             }

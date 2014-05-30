@@ -40,9 +40,10 @@ namespace mongo {
     AuthzManagerExternalState::AuthzManagerExternalState() {}
     AuthzManagerExternalState::~AuthzManagerExternalState() {}
 
-    bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() {
+    bool AuthzManagerExternalState::hasAnyPrivilegeDocuments(OperationContext* txn) {
         BSONObj userBSONObj;
         Status status = findOne(
+                txn,
                 AuthorizationManager::usersCollectionNamespace,
                 BSONObj(),
                 &userBSONObj);

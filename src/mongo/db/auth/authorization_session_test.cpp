@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
 
@@ -53,7 +54,8 @@ namespace {
 
         void setFindsShouldFail(bool enable) { _findsShouldFail = enable; }
 
-        virtual Status findOne(const NamespaceString& collectionName,
+        virtual Status findOne(OperationContext* txn,
+                               const NamespaceString& collectionName,
                                const BSONObj& query,
                                BSONObj* result) {
             if (_findsShouldFail &&
@@ -62,7 +64,7 @@ namespace {
                 return Status(ErrorCodes::UnknownError,
                               "findOne on admin.system.users set to fail in mock.");
             }
-            return AuthzManagerExternalStateMock::findOne(collectionName, query, result);
+            return AuthzManagerExternalStateMock::findOne(txn, collectionName, query, result);
         }
 
     private:
@@ -72,6 +74,7 @@ namespace {
     class AuthorizationSessionTest : public ::mongo::unittest::Test {
     public:
         FailureCapableAuthzManagerExternalStateMock* managerState;
+        OperationContextNoop _txn;
         AuthzSessionExternalStateMock* sessionState;
         scoped_ptr<AuthorizationManager> authzManager;
         scoped_ptr<AuthorizationSession> authzSession;
@@ -129,7 +132,7 @@ namespace {
 
         // Check that you can't authorize a user that doesn't exist.
         ASSERT_EQUALS(ErrorCodes::UserNotFound,
-                      authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+                      authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
 
         // Add a user with readWrite and dbAdmin on the test DB
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
@@ -141,7 +144,7 @@ namespace {
                                            BSON("role" << "dbAdmin" <<
                                                 "db" << "test"))),
                 BSONObj()));
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::insert));
@@ -158,7 +161,7 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("role" << "readWriteAnyDatabase" <<
                                                 "db" << "admin"))),
                 BSONObj()));
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("admin", "admin")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("admin", "admin")));
 
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             ResourcePattern::forExactNamespace(
@@ -203,7 +206,7 @@ namespace {
                                            BSON("role" << "readWrite" <<
                                                 "db" << "test"))),
                 BSONObj()));
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::insert));
@@ -247,7 +250,7 @@ namespace {
                                                 "db" << "admin"))),
                 BSONObj()));
 
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("rwany", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("rwany", "test")));
 
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                              testUsersCollResource, ActionType::insert));
@@ -267,7 +270,7 @@ namespace {
                              otherProfileCollResource, ActionType::find));
 
         // Logging in as useradminany@test implicitly logs out rwany@test.
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("useradminany", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("useradminany", "test")));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                              testUsersCollResource, ActionType::insert));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
@@ -286,7 +289,7 @@ namespace {
                              otherProfileCollResource, ActionType::find));
 
         // Logging in as rw@test implicitly logs out useradminany@test.
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("rw", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("rw", "test")));
 
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                              testUsersCollResource, ActionType::insert));
@@ -307,7 +310,7 @@ namespace {
 
 
         // Logging in as useradmin@test implicitly logs out rw@test.
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("useradmin", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("useradmin", "test")));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                              testUsersCollResource, ActionType::insert));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
@@ -335,7 +338,7 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("role" << "readWrite" <<
                                                 "db" << "test"))),
                 BSONObj()));
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
@@ -362,7 +365,7 @@ namespace {
 
         // Make sure that invalidating the user causes the session to reload its privileges.
         authzManager->invalidateUserByName(user->getName());
-        authzSession->startRequest(); // Refreshes cached data for invalid users
+        authzSession->startRequest(&_txn); // Refreshes cached data for invalid users
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
@@ -379,7 +382,7 @@ namespace {
                 &ignored);
         // Make sure that invalidating the user causes the session to reload its privileges.
         authzManager->invalidateUserByName(user->getName());
-        authzSession->startRequest(); // Refreshes cached data for invalid users
+        authzSession->startRequest(&_txn); // Refreshes cached data for invalid users
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
@@ -396,7 +399,7 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("role" << "readWrite" <<
                                                 "db" << "test"))),
                 BSONObj()));
-        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
@@ -426,7 +429,7 @@ namespace {
         // document lookup to fail, the authz session should continue to use its known out-of-date
         // privilege data.
         authzManager->invalidateUserByName(user->getName());
-        authzSession->startRequest(); // Refreshes cached data for invalid users
+        authzSession->startRequest(&_txn); // Refreshes cached data for invalid users
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
@@ -435,7 +438,7 @@ namespace {
         // Once we configure document lookup to succeed again, authorization checks should
         // observe the new values.
         managerState->setFindsShouldFail(false);
-        authzSession->startRequest(); // Refreshes cached data for invalid users
+        authzSession->startRequest(&_txn); // Refreshes cached data for invalid users
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(

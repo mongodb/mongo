@@ -32,6 +32,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/catalog/collection.h"
@@ -48,22 +49,22 @@ namespace QueryStageDistinct {
         DistinctBase() { }
 
         virtual ~DistinctBase() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
         void addIndex(const BSONObj& obj) {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.ensureIndex(ns(), obj);
         }
 
         void insert(const BSONObj& obj) {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.insert(ns(), obj);
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
             Collection* collection = ctx.ctx().db()->getCollection( ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
         }
@@ -96,11 +97,13 @@ namespace QueryStageDistinct {
 
         static const char* ns() { return "unittests.QueryStageDistinct"; }
 
+    protected:
+        OperationContextImpl _txn;
+
     private:
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
 
-    DBDirectClient DistinctBase::_client;
 
     // Tests distinct with single key indices.
     class QueryStageDistinctBasic : public DistinctBase {
@@ -121,7 +124,7 @@ namespace QueryStageDistinct {
             // Make an index on a:1
             addIndex(BSON("a" << 1));
 
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             // Set up the distinct stage.
             DistinctParams params;
@@ -184,7 +187,7 @@ namespace QueryStageDistinct {
             // Make an index on a:1
             addIndex(BSON("a" << 1));
 
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             // Set up the distinct stage.
             DistinctParams params;

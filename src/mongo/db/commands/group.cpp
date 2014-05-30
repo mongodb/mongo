@@ -254,7 +254,7 @@ namespace mongo {
                 finalize = p["finalize"]._asCode();
 
             const string ns = parseNs(dbname, jsobj);
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
 
             return group( ctx.ctx().db() , ns , q ,
                           key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,
