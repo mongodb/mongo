@@ -94,7 +94,6 @@ namespace mongo {
             return Status( ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist" );
 
         if( !mmf.open(filename,false) ) {
-            MONGO_DLOG(2) << "info couldn't open " << filename << " probably end of datafile list" << endl;
             return Status( ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed" );
         }
         _mb = mmf.getView(); verify(_mb);

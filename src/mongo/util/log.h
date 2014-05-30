@@ -96,10 +96,6 @@ namespace logger {
 
 #define LOG MONGO_LOG
 
-#define MONGO_DLOG(DLEVEL) \
-    if (!(DEBUG_BUILD) && !::mongo::logger::globalLogDomain()->shouldLog(::mongo::LogstreamBuilder::severityCast(DLEVEL))) {} \
-    else LogstreamBuilder(::mongo::logger::globalLogDomain(), getThreadName(), ::mongo::LogstreamBuilder::severityCast(DLEVEL))
-
     inline LogstreamBuilder problem() {
         return log();
     }
