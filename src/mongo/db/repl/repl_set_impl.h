@@ -198,7 +198,7 @@ namespace repl {
         MemberState state() const { return box.getState(); }
         void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
-        void _summarizeAsHtml(stringstream&) const;
+        void _summarizeAsHtml(OperationContext* txn, stringstream&) const;
         void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
 
         /* call afer constructing to start - returns fairly quickly after launching its threads */

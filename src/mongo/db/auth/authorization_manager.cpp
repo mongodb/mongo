@@ -258,14 +258,14 @@ namespace mongo {
         }
     }
 
-    Status AuthorizationManager::getAuthorizationVersion(int* version) {
+    Status AuthorizationManager::getAuthorizationVersion(OperationContext* txn, int* version) {
         CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
         int newVersion = _version;
         if (schemaVersionInvalid == newVersion) {
             while (guard.otherUpdateInFetchPhase())
                 guard.wait();
             guard.beginFetchPhase();
-            Status status = _externalState->getStoredAuthorizationVersion(&newVersion);
+            Status status = _externalState->getStoredAuthorizationVersion(txn, &newVersion);
             guard.endFetchPhase();
             if (!status.isOK()) {
                 warning() << "Problem fetching the stored schema version of authorization data: "
@@ -295,8 +295,8 @@ namespace mongo {
         return _authEnabled;
     }
 
-    bool AuthorizationManager::hasAnyPrivilegeDocuments() const {
-        return _externalState->hasAnyPrivilegeDocuments();
+    bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) const {
+        return _externalState->hasAnyPrivilegeDocuments(txn);
     }
 
     Status AuthorizationManager::writeAuthSchemaVersionIfNeeded() {
@@ -493,8 +493,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status AuthorizationManager::getUserDescription(const UserName& userName, BSONObj* result) {
-        return _externalState->getUserDescription(userName, result);
+    Status AuthorizationManager::getUserDescription(OperationContext* txn,
+                                                    const UserName& userName,
+                                                    BSONObj* result) {
+        return _externalState->getUserDescription(txn, userName, result);
     }
 
     Status AuthorizationManager::getRoleDescription(const RoleName& roleName,
@@ -513,7 +515,8 @@ namespace mongo {
                                                         result);
     }
 
-    Status AuthorizationManager::acquireUser(const UserName& userName, User** acquiredUser) {
+    Status AuthorizationManager::acquireUser(
+                OperationContext* txn, const UserName& userName, User** acquiredUser) {
         if (userName == internalSecurity.user->getName()) {
             *acquiredUser = internalSecurity.user;
             return Status::OK();
@@ -549,7 +552,7 @@ namespace mongo {
         Status status = Status::OK();
         for (int i = 0; i < maxAcquireRetries; ++i) {
             if (authzVersion == schemaVersionInvalid) {
-                Status status = _externalState->getStoredAuthorizationVersion(&authzVersion);
+                Status status = _externalState->getStoredAuthorizationVersion(txn, &authzVersion);
                 if (!status.isOK())
                     return status;
             }
@@ -562,7 +565,7 @@ namespace mongo {
                 break;
             case schemaVersion26Final:
             case schemaVersion26Upgrade:
-                status = _fetchUserV2(userName, &user);
+                status = _fetchUserV2(txn, userName, &user);
                 break;
             case schemaVersion24:
                 status = Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
@@ -600,10 +603,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status AuthorizationManager::_fetchUserV2(const UserName& userName,
+    Status AuthorizationManager::_fetchUserV2(OperationContext* txn,
+                                              const UserName& userName,
                                               std::auto_ptr<User>* acquiredUser) {
         BSONObj userObj;
-        Status status = getUserDescription(userName, &userObj);
+        Status status = getUserDescription(txn, userName, &userObj);
         if (!status.isOK()) {
             return status;
         }
@@ -700,9 +704,10 @@ namespace mongo {
         return _externalState->releaseAuthzUpdateLock();
     }
 
-    Status AuthorizationManager::upgradeSchemaStep(const BSONObj& writeConcern, bool* isDone) {
+    Status AuthorizationManager::upgradeSchemaStep(
+                            OperationContext* txn, const BSONObj& writeConcern, bool* isDone) {
         int authzVersion;
-        Status status = getAuthorizationVersion(&authzVersion);
+        Status status = getAuthorizationVersion(txn, &authzVersion);
         if (!status.isOK()) {
             return status;
         }
@@ -717,7 +722,8 @@ namespace mongo {
         }
     }
 
-    Status AuthorizationManager::upgradeSchema(int maxSteps, const BSONObj& writeConcern) {
+    Status AuthorizationManager::upgradeSchema(
+                OperationContext* txn, int maxSteps, const BSONObj& writeConcern) {
 
         if (maxSteps < 1) {
             return Status(ErrorCodes::BadValue,
@@ -726,7 +732,7 @@ namespace mongo {
         invalidateUserCache();
         for (int i = 0; i < maxSteps; ++i) {
             bool isDone;
-            Status status = upgradeSchemaStep(writeConcern, &isDone);
+            Status status = upgradeSchemaStep(txn, writeConcern, &isDone);
             invalidateUserCache();
             if (!status.isOK() || isDone) {
                 return status;

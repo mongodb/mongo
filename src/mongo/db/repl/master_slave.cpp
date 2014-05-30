@@ -60,7 +60,7 @@
 namespace mongo {
 namespace repl {
 
-    void pretouchOperation(const BSONObj& op);
+    void pretouchOperation(OperationContext* txn, const BSONObj& op);
     void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
 
     /* if 1 sync() is running */
@@ -162,10 +162,10 @@ namespace repl {
     void ReplSource::ensureMe() {
         string myname = getHostName();
         {
-            Client::WriteContext ctx("local");
             OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, "local");
             // local.me is an identifier for a server for getLastError w:2+
-            if (!Helpers::getSingleton("local.me", _me) ||
+            if (!Helpers::getSingleton(&txn, "local.me", _me) ||
                 !_me.hasField("host") ||
                 _me["host"].String() != myname) {
 
@@ -231,7 +231,7 @@ namespace repl {
     /* we reuse our existing objects so that we can keep our existing connection
        and cursor in effect.
     */
-    void ReplSource::loadAll(SourceVector &v) {
+    void ReplSource::loadAll(OperationContext* txn, SourceVector &v) {
         const char* localSources = "local.sources";
         Client::Context ctx(localSources);
         SourceVector old = v;
@@ -242,8 +242,9 @@ namespace repl {
             // check that no items are in sources other than that
             // add if missing
             int n = 0;
-            auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
-                                                                    ctx.db()->getCollection(localSources)));
+            auto_ptr<Runner> runner(
+                InternalPlanner::collectionScan(localSources,
+                                                ctx.db()->getCollection(txn, localSources)));
             BSONObj obj;
             Runner::RunnerState state;
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -285,8 +286,9 @@ namespace repl {
             }
         }
 
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
-                                                                ctx.db()->getCollection(localSources)));
+        auto_ptr<Runner> runner(
+            InternalPlanner::collectionScan(localSources,
+                                            ctx.db()->getCollection(txn, localSources)));
         BSONObj obj;
         Runner::RunnerState state;
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -318,7 +320,7 @@ namespace repl {
         if ( !replAllDead )
             return;
         SourceVector sources;
-        ReplSource::loadAll(sources);
+        ReplSource::loadAll(txn, sources);
         for( SourceVector::iterator i = sources.begin(); i != sources.end(); ++i ) {
             log() << requester << " forcing resync from "  << (*i)->hostName << endl;
             (*i)->forceResync( txn, requester );
@@ -560,6 +562,8 @@ namespace repl {
         if ( !only.empty() && only != clientName )
             return;
 
+        OperationContextImpl txn; // XXX?
+
         if (replSettings.pretouch &&
             !alreadyLocked/*doesn't make sense if in write lock already*/) {
             if (replSettings.pretouch > 1) {
@@ -588,18 +592,17 @@ namespace repl {
                         a += m;
                     }
                     // we do one too...
-                    pretouchOperation(op);
+                    pretouchOperation(&txn, op);
                     tp->join();
                     countdown = v.size();
                 }
             }
             else {
-                pretouchOperation(op);
+                pretouchOperation(&txn, op);
             }
         }
 
         scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
-        OperationContextImpl txn; // XXX?
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -679,7 +682,7 @@ namespace repl {
 
         int get() const { return _value; }
 
-        virtual void append( BSONObjBuilder& b, const string& name ) {
+        virtual void append(OperationContext* txn, BSONObjBuilder& b, const string& name) {
             b.append( name, _value );
         }
 
@@ -1019,10 +1022,11 @@ namespace repl {
                 1 = special sentinel indicating adaptive sleep recommended
     */
     int _replMain(ReplSource::SourceVector& sources, int& nApplied) {
+        OperationContextImpl txn;
         {
             ReplInfo r("replMain load sources");
             Lock::GlobalWrite lk;
-            ReplSource::loadAll(sources);
+            ReplSource::loadAll(&txn, sources);
             replSettings.fastsync = false; // only need this param for initial reset
         }
 
@@ -1244,6 +1248,7 @@ namespace repl {
             c = &cc();
         }
 
+        OperationContextImpl txn; // XXX
         Lock::GlobalRead lk;
         for( unsigned i = a; i <= b; i++ ) {
             const BSONObj& op = v[i];
@@ -1266,7 +1271,7 @@ namespace repl {
                     b.append(_id);
                     BSONObj result;
                     Client::Context ctx( ns );
-                    if( Helpers::findById(ctx.db(), ns, b.done(), result) )
+                    if( Helpers::findById(&txn, ctx.db(), ns, b.done(), result) )
                         _dummy_z += result.objsize(); // touch
                 }
             }
@@ -1276,7 +1281,7 @@ namespace repl {
         }
     }
 
-    void pretouchOperation(const BSONObj& op) {
+    void pretouchOperation(OperationContext* txn, const BSONObj& op) {
 
         if( Lock::somethingWriteLocked() )
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
@@ -1299,8 +1304,8 @@ namespace repl {
                 BSONObjBuilder b;
                 b.append(_id);
                 BSONObj result;
-                Client::ReadContext ctx( ns );
-                if( Helpers::findById(ctx.ctx().db(), ns, b.done(), result) )
+                Client::ReadContext ctx(txn, ns );
+                if( Helpers::findById(txn, ctx.ctx().db(), ns, b.done(), result) )
                     _dummy_z += result.objsize(); // touch
             }
         }

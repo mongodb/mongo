@@ -54,7 +54,8 @@ namespace mongo {
             double score;
         };
 
-        bool FTSCommand::_run(const string& dbName,
+        bool FTSCommand::_run(OperationContext* txn,
+                              const string& dbName,
                               BSONObj& cmdObj,
                               int cmdOptions,
                               const string& ns,

@@ -54,7 +54,8 @@ namespace mongo {
          * @param fromRepl
          * @return true if successful, false otherwise
          */
-        bool FTSCommand::_run(const string& dbname,
+        bool FTSCommand::_run(OperationContext* txn,
+                              const string& dbname,
                               BSONObj& cmdObj,
                               int cmdOptions,
                               const string& ns,
@@ -92,7 +93,7 @@ namespace mongo {
             projBob.appendElements(sortSpec);
             BSONObj projObj = projBob.obj();
 
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
 
             CanonicalQuery* cq;
             Status canonicalizeStatus = 
@@ -111,7 +112,7 @@ namespace mongo {
             }
 
             Runner* rawRunner;
-            Status getRunnerStatus = getRunner(ctx.ctx().db()->getCollection(ns), cq, &rawRunner);
+            Status getRunnerStatus = getRunner(ctx.ctx().db()->getCollection(txn, ns), cq, &rawRunner);
             if (!getRunnerStatus.isOK()) {
                 errmsg = getRunnerStatus.reason();
                 return false;

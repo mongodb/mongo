@@ -39,6 +39,7 @@
 namespace mongo {
 
     class ServerParameterSet;
+    class OperationContext;
 
     /**
      * Lets you make server level settings easily configurable.
@@ -66,7 +67,7 @@ namespace mongo {
         bool allowedToChangeAtRuntime() const { return _allowedToChangeAtRuntime; }
 
 
-        virtual void append( BSONObjBuilder& b, const std::string& name ) = 0;
+        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name ) = 0;
 
         virtual Status set( const BSONElement& newValueElement ) = 0;
 
@@ -114,7 +115,7 @@ namespace mongo {
               _value( value ) {}
         virtual ~ExportedServerParameter() {}
 
-        virtual void append( BSONObjBuilder& b, const std::string& name ) {
+        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
             b.append( name, *_value );
         }
 

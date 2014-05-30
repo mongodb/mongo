@@ -320,7 +320,7 @@ namespace mongo {
         fassert( 17401, repairDatabase( &txn, dbName ) );
     }
 
-    void checkForIdIndexes( Database* db ) {
+    void checkForIdIndexes( OperationContext* txn, Database* db ) {
 
         if ( db->name() == "local") {
             // we do not need an _id index on anything in the local database
@@ -337,7 +337,7 @@ namespace mongo {
             if ( ns.isSystem() )
                 continue;
 
-            Collection* coll = db->getCollection( collectionName );
+            Collection* coll = db->getCollection( txn, collectionName );
             if ( !coll )
                 continue;
 
@@ -373,7 +373,7 @@ namespace mongo {
 
             if (repl::replSettings.usingReplSets()) {
                 // we only care about the _id index if we are in a replset
-                checkForIdIndexes(ctx.db());
+                checkForIdIndexes(&txn, ctx.db());
             }
 
             if (shouldClearNonLocalTmpCollections || dbName == "local")
@@ -412,7 +412,7 @@ namespace mongo {
             }
             else {
                 const string systemIndexes = ctx.db()->name() + ".system.indexes";
-                Collection* coll = ctx.db()->getCollection( systemIndexes );
+                Collection* coll = ctx.db()->getCollection( &txn, systemIndexes );
                 auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes,coll));
                 BSONObj index;
                 Runner::RunnerState state;
@@ -752,14 +752,17 @@ namespace mongo {
 #ifndef _WIN32
         mongo::signalForkSuccess();
 #endif
+        {
+            OperationContextImpl txn;
 
-        if(getGlobalAuthorizationManager()->isAuthEnabled()) {
-            // open admin db in case we need to use it later. TODO this is not the right way to
-            // resolve this.
-            Client::WriteContext c("admin", storageGlobalParams.dbpath);
+            if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+                // open admin db in case we need to use it later. TODO this is not the right way to
+                // resolve this.
+                Client::WriteContext ctx(&txn, "admin");
+            }
+
+            authindex::configureSystemIndexes(&txn, "admin");
         }
-
-        authindex::configureSystemIndexes("admin");
 
         getDeleter()->startWorkers();
 

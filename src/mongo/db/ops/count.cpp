@@ -66,10 +66,14 @@ namespace mongo {
         return num;
     }
 
-    long long runCount( const string& ns, const BSONObj &cmd, string &err, int &errCode ) {
+    long long runCount(OperationContext* txn,
+                       const string& ns,
+                       const BSONObj &cmd,
+                       string &err,
+                       int &errCode) {
         // Lock 'ns'.
         Client::Context cx(ns);
-        Collection* collection = cx.db()->getCollection(ns);
+        Collection* collection = cx.db()->getCollection(txn, ns);
 
         if (NULL == collection) {
             err = "ns missing";

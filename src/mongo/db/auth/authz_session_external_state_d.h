@@ -47,7 +47,7 @@ namespace mongo {
 
         virtual bool shouldIgnoreAuthChecks() const;
 
-        virtual void startRequest();
+        virtual void startRequest(OperationContext* txn);
     };
 
 } // namespace mongo

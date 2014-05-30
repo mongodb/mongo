@@ -72,9 +72,10 @@ namespace {
 
 }  // namespace
 
-    void configureSystemIndexes(const StringData& dbname) {
+    void configureSystemIndexes(OperationContext* txn, const StringData& dbname) {
         int authzVersion;
-        Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(&authzVersion);
+        Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(
+                                                                txn, &authzVersion);
         if (!status.isOK()) {
             return;
         }
@@ -83,16 +84,16 @@ namespace {
             NamespaceString systemUsers(dbname, "system.users");
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            Client::WriteContext wctx(systemUsers);
-            OperationContextImpl txn;
-            Collection* collection = wctx.ctx().db()->getCollection(NamespaceString(systemUsers));
+            Client::WriteContext wctx(txn, systemUsers);
+            Collection* collection = wctx.ctx().db()->getCollection(txn,
+                                                                    NamespaceString(systemUsers));
             if (!collection) {
                 return;
             }
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             IndexDescriptor* oldIndex = NULL;
             while ((oldIndex = indexCatalog->findIndexByKeyPattern(v1SystemUsersKeyPattern))) {
-                indexCatalog->dropIndex(&txn, oldIndex);
+                indexCatalog->dropIndex(txn, oldIndex);
             }
         }
     }

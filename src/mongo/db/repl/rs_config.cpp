@@ -28,8 +28,6 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
-
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/db/dbhelpers.h"
@@ -82,8 +80,8 @@ namespace repl {
         log() << "replSet info saving a newer config version to local.system.replset: "
               << newConfigBSON << rsLog;
         {
-            Client::WriteContext cx( rsConfigNs );
             OperationContextImpl txn;
+            Client::WriteContext cx(&txn, rsConfigNs);
 
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
@@ -188,6 +186,7 @@ namespace repl {
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
         uassert(13477, "priority must be 0 when buildIndexes=false", buildIndexes || priority == 0);
+        uassert(17492, "arbiter must vote (cannot have 0 votes)", !arbiterOnly || votes > 0);
     }
 /*
     string ReplSetConfig::TagSubgroup::toString() const {

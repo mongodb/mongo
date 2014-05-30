@@ -51,7 +51,7 @@ namespace RunnerRegistry {
     class RunnerRegistryBase {
     public:
         RunnerRegistryBase() {
-            _ctx.reset(new Client::WriteContext(ns()));
+            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
             _client.dropCollection(ns());
 
             for (int i = 0; i < N(); ++i) {
@@ -74,23 +74,24 @@ namespace RunnerRegistry {
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             // Owns all args
-            auto_ptr<Runner> run(new SingleSolutionRunner(_ctx->ctx().db()->getCollection( ns() ),
+            auto_ptr<Runner> run(new SingleSolutionRunner(_ctx->ctx().db()->getCollection( &_opCtx,
+                                                                                           ns() ),
                                                           cq, NULL, scan.release(), ws.release()));
             return run.release();
         }
 
         void registerRunner( Runner* runner ) {
-            _ctx->ctx().db()->getOrCreateCollection( ns() )->cursorCache()->registerRunner( runner );
+            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->registerRunner( runner );
         }
 
         void deregisterRunner( Runner* runner ) {
-            _ctx->ctx().db()->getOrCreateCollection( ns() )->cursorCache()->deregisterRunner( runner );
+            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->deregisterRunner( runner );
         }
 
         int N() { return 50; }
 
         Collection* collection() {
-            return _ctx->ctx().db()->getCollection( ns() );
+            return _ctx->ctx().db()->getCollection( &_opCtx, ns() );
         }
 
         static const char* ns() { return "unittests.RunnerRegistryDiskLocInvalidation"; }
@@ -269,7 +270,7 @@ namespace RunnerRegistry {
             // requires a "global write lock."
             _ctx.reset();
             _client.dropDatabase("somesillydb");
-            _ctx.reset(new Client::WriteContext(ns()));
+            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
 
             // Unregister and restore state.
             deregisterRunner(run.get());
@@ -285,7 +286,7 @@ namespace RunnerRegistry {
             // Drop our DB.  Once again, must give up the lock.
             _ctx.reset();
             _client.dropDatabase("unittests");
-            _ctx.reset(new Client::WriteContext(ns()));
+            _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
 
             // Unregister and restore state.
             deregisterRunner(run.get());

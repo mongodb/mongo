@@ -71,11 +71,14 @@ namespace mongo {
          * mechanism, and ProtocolError, indicating an error in the use of the authentication
          * protocol.
          */
-        Status _authenticate(const std::string& mechanism,
+        Status _authenticate(OperationContext* txn,
+                             const std::string& mechanism,
                              const UserName& user,
                              const BSONObj& cmdObj);
-        Status _authenticateCR(const UserName& user, const BSONObj& cmdObj);
-        Status _authenticateX509(const UserName& user, const BSONObj& cmdObj);
+        Status _authenticateCR(
+                    OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
+        Status _authenticateX509(
+                    OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
         bool _clusterIdMatch(const std::string& subjectName, const std::string& srvSubjectName);
     };
 

@@ -182,6 +182,7 @@ namespace mongo {
         DbMessage d(m);
         QueryMessage q(d);
         BSONObj obj;
+
         const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::killop);
         audit::logKillOpAuthzCheck(&cc(),
@@ -210,6 +211,7 @@ namespace mongo {
     bool _unlockFsync();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
+
         const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::unlock);
         audit::logFsyncUnlockAuthzCheck(
@@ -341,7 +343,7 @@ namespace mongo {
 
         Client& c = cc();
         if (!c.isGod())
-            c.getAuthorizationSession()->startRequest();
+            c.getAuthorizationSession()->startRequest(txn);
 
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
@@ -528,7 +530,7 @@ namespace mongo {
             verify( n < 30000 );
         }
 
-        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(n, (long long *) x);
+        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(txn, n, (long long *) x);
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
@@ -603,7 +605,7 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(ns.ns());
+        Lock::DBWrite lk(txn->lockState(), ns.ns());
 
         // if this ever moves to outside of lock, need to adjust check
         // Client::Context::_finishInit
@@ -643,7 +645,7 @@ namespace mongo {
         request.setUpdateOpLog(true);
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
-        Lock::DBWrite lk(ns.ns());
+        Lock::DBWrite lk(txn->lockState(), ns.ns());
 
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
         if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
@@ -717,7 +719,7 @@ namespace mongo {
                     // because it may now be out of sync with the client's iteration state.
                     // SERVER-7952
                     // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                    CollectionCursorCache::eraseCursorGlobal( cursorid );
+                    CollectionCursorCache::eraseCursorGlobal(txn, cursorid );
                 }
                 ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
                 ok = false;
@@ -791,7 +793,7 @@ namespace mongo {
             string targetNS = js["ns"].String();
             uassertStatusOK( userAllowedWriteNS( targetNS ) );
 
-            Collection* collection = ctx.db()->getCollection( targetNS );
+            Collection* collection = ctx.db()->getCollection( txn, targetNS );
             if ( !collection ) {
                 // implicitly create
                 collection = ctx.db()->createCollection( txn, targetNS );
@@ -820,7 +822,7 @@ namespace mongo {
         if ( !fixed.getValue().isEmpty() )
             js = fixed.getValue();
 
-        Collection* collection = ctx.db()->getCollection( ns );
+        Collection* collection = ctx.db()->getCollection( txn, ns );
         if ( !collection ) {
             collection = ctx.db()->createCollection( txn, ns );
             verify( collection );
@@ -880,7 +882,7 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
-        Lock::DBWrite lk(ns);
+        Lock::DBWrite lk(txn->lockState(), ns);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
@@ -924,7 +926,7 @@ namespace mongo {
        local database does NOT count except for rsoplog collection.
        used to set the hasData field on replset heartbeat command response
     */
-    bool replHasDatabases() {
+    bool replHasDatabases(OperationContext* txn) {
         vector<string> names;
         getDatabaseNames(names);
         if( names.size() >= 2 ) return true;
@@ -933,9 +935,9 @@ namespace mongo {
                 return true;
             // we have a local database.  return true if oplog isn't empty
             {
-                Lock::DBRead lk(repl::rsoplog);
+                Lock::DBRead lk(txn->lockState(), repl::rsoplog);
                 BSONObj o;
-                if( Helpers::getFirst(repl::rsoplog, o) )
+                if( Helpers::getFirst(txn, repl::rsoplog, o) )
                     return true;
             }
         }
@@ -1002,7 +1004,9 @@ namespace {
     }
 
     void DBDirectClient::killCursor( long long id ) {
-        CollectionCursorCache::eraseCursorGlobal( id );
+        // The killCursor command on the DB client is only used by sharding,
+        // so no need to have it for MongoD.
+        verify(!"killCursor should not be used in MongoD");
     }
 
     HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
@@ -1013,10 +1017,11 @@ namespace {
                 << " to zero in query: " << query << endl;
             skip = 0;
         }
-        Lock::DBRead lk( ns );
+
+        Lock::DBRead lk(_txn->lockState(), ns);
         string errmsg;
         int errCode;
-        long long res = runCount( ns, _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );
+        long long res = runCount( _txn, ns, _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );
         if ( res == -1 ) {
             // namespace doesn't exist
             return 0;

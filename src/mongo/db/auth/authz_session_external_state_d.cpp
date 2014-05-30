@@ -45,9 +45,9 @@ namespace mongo {
                 AuthzSessionExternalStateServerCommon(authzManager) {}
     AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
-    void AuthzSessionExternalStateMongod::startRequest() {
+    void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
         if (!Lock::isLocked()) {
-            _checkShouldAllowLocalhost();
+            _checkShouldAllowLocalhost(txn);
         }
     }
 

@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/startup_test.h"
@@ -98,11 +99,11 @@ namespace mongo {
         /**
          * works globally
          */
-        bool eraseCursor( CursorId id, bool checkAuth );
+        bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth);
 
         void appendStats( BSONObjBuilder& builder );
 
-        std::size_t timeoutCursors( int millisSinceLastCall );
+        std::size_t timeoutCursors(OperationContext* txn, int millisSinceLastCall);
 
         int64_t nextSeed();
 
@@ -159,7 +160,7 @@ namespace mongo {
         _idToNS.erase( id );
     }
 
-    bool GlobalCursorIdCache::eraseCursor(CursorId id, bool checkAuth) {
+    bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
         string ns;
         {
             SimpleMutex::scoped_lock lk( _mutex );
@@ -175,8 +176,8 @@ namespace mongo {
 
         if ( checkAuth ) {
             AuthorizationSession* as = cc().getAuthorizationSession();
-            bool isAuthorized = as->isAuthorizedForActionsOnNamespace(nss,
-                                                                      ActionType::killCursors);
+            bool isAuthorized = as->isAuthorizedForActionsOnNamespace(
+                                                nss, ActionType::killCursors);
             if ( !isAuthorized ) {
                 audit::logKillCursorsAuthzCheck( currentClient.get(),
                                                  nss,
@@ -186,12 +187,12 @@ namespace mongo {
             }
         }
 
-        Lock::DBRead lock( ns );
-        Database* db = dbHolder().get( ns, storageGlobalParams.dbpath );
+        Lock::DBRead lock(txn->lockState(), ns);
+        Database* db = dbHolder().get(ns, storageGlobalParams.dbpath);
         if ( !db )
             return false;
         Client::Context context( ns, db );
-        Collection* collection = db->getCollection( ns );
+        Collection* collection = db->getCollection( txn, ns );
         if ( !collection ) {
             if ( checkAuth )
                 audit::logKillCursorsAuthzCheck( currentClient.get(),
@@ -204,7 +205,7 @@ namespace mongo {
         return collection->cursorCache()->eraseCursor( id, checkAuth );
     }
 
-    std::size_t GlobalCursorIdCache::timeoutCursors( int millisSinceLastCall ) {
+    std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
         vector<string> todo;
         {
             SimpleMutex::scoped_lock lk( _mutex );
@@ -216,12 +217,12 @@ namespace mongo {
 
         for ( unsigned i = 0; i < todo.size(); i++ ) {
             const string& ns = todo[i];
-            Lock::DBRead lock( ns );
+            Lock::DBRead lock(txn->lockState(), ns);
             Database* db = dbHolder().get( ns, storageGlobalParams.dbpath );
             if ( !db )
                 continue;
             Client::Context context( ns, db );
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
             if ( collection == NULL ) {
                 continue;
             }
@@ -235,25 +236,25 @@ namespace mongo {
 
     // ---
 
-    std::size_t CollectionCursorCache::timeoutCursorsGlobal( int millisSinceLastCall ) {
-        return _globalCursorIdCache.timeoutCursors( millisSinceLastCall );
+    std::size_t CollectionCursorCache::timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall) {;
+    return _globalCursorIdCache.timeoutCursors(txn, millisSinceLastCall);
     }
 
-    int CollectionCursorCache::eraseCursorGlobalIfAuthorized(int n, long long* ids) {
+    int CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, long long* ids) {
         int numDeleted = 0;
         for ( int i = 0; i < n; i++ ) {
-            if ( eraseCursorGlobalIfAuthorized( ids[i] ) )
+            if ( eraseCursorGlobalIfAuthorized(txn, ids[i] ) )
                 numDeleted++;
             if ( inShutdown() )
                 break;
         }
         return numDeleted;
     }
-    bool CollectionCursorCache::eraseCursorGlobalIfAuthorized(CursorId id) {
-        return _globalCursorIdCache.eraseCursor( id, true );
+    bool CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id) {
+        return _globalCursorIdCache.eraseCursor(txn, id, true);
     }
-    bool CollectionCursorCache::eraseCursorGlobal( CursorId id ) {
-        return _globalCursorIdCache.eraseCursor( id, false );
+    bool CollectionCursorCache::eraseCursorGlobal(OperationContext* txn, CursorId id) {
+        return _globalCursorIdCache.eraseCursor(txn, id, false );
     }
 
 

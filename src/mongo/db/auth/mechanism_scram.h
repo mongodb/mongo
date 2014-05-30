@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2009 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,45 +28,22 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
+#include <string>
+
 #include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authz_session_external_state.h"
 
 namespace mongo {
-
-    /**
-     * Mock of the AuthzSessionExternalState class used only for testing.
+    const int scramHashSize = 20;
+    
+    /* 
+     * Compute the SCRAM secrets storedKey and serverKey
+     * as defined in RFC5802 
      */
-    class AuthzSessionExternalStateMock : public AuthzSessionExternalState {
-        MONGO_DISALLOW_COPYING(AuthzSessionExternalStateMock);
-
-    public:
-        AuthzSessionExternalStateMock(AuthorizationManager* authzManager) :
-            AuthzSessionExternalState(authzManager), _ignoreAuthChecksReturnValue(false),
-            _allowLocalhostReturnValue(false) {}
-
-        virtual bool shouldIgnoreAuthChecks() const {
-            return _ignoreAuthChecksReturnValue;
-        }
-
-        virtual bool shouldAllowLocalhost() const {
-            return _allowLocalhostReturnValue;
-        }
-
-        void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
-            _ignoreAuthChecksReturnValue = returnValue;
-        }
-
-        void setReturnValueForShouldAllowLocalhost(bool returnValue) {
-            _allowLocalhostReturnValue = returnValue;
-        }
-
-        virtual void startRequest(OperationContext* txn) {}
-
-    private:
-        bool _ignoreAuthChecksReturnValue;
-        bool _allowLocalhostReturnValue;
-    };
+    void computeSCRAMProperties(const std::string& password,
+                                       const unsigned char salt[],
+                                       size_t saltLen,
+                                       size_t iterationCount,
+                                       unsigned char storedKey[scramHashSize],
+                                       unsigned char serverKey[scramHashSize]);
 
 } // namespace mongo

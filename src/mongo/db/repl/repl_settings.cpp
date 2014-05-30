@@ -40,6 +40,7 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -55,7 +56,7 @@ namespace repl {
         return replSettings.slave || replSettings.master || theReplSet;
     }
 
-    void appendReplicationInfo(BSONObjBuilder& result, int level) {
+    void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int level) {
         if ( replSet ) {
             if( theReplSet == 0 || theReplSet->state().shunned() ) {
                 result.append("ismaster", false);
@@ -88,9 +89,11 @@ namespace repl {
             list<BSONObj> src;
             {
                 const char* localSources = "local.sources";
-                Client::ReadContext ctx(localSources, storageGlobalParams.dbpath);
-                auto_ptr<Runner> runner(InternalPlanner::collectionScan(localSources,
-                                                                        ctx.ctx().db()->getCollection(localSources)));
+                Client::ReadContext ctx(txn, localSources);
+                auto_ptr<Runner> runner(
+                    InternalPlanner::collectionScan(localSources,
+                                                    ctx.ctx().db()->getCollection(txn,
+                                                                                  localSources)));
                 BSONObj obj;
                 Runner::RunnerState state;
                 while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
@@ -151,7 +154,9 @@ namespace repl {
             int level = configElement.numberInt();
             
             BSONObjBuilder result;
-            appendReplicationInfo(result, level);
+
+            OperationContextImpl txn;   // XXX?
+            appendReplicationInfo(&txn, result, level);
             return result.obj();
         }
     } replicationInfoServerStatus;
@@ -196,7 +201,7 @@ namespace repl {
             if ( cmdObj["forShell"].trueValue() )
                 lastError.disableForCommand();
 
-            appendReplicationInfo(result, 0);
+            appendReplicationInfo(txn, result, 0);
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);

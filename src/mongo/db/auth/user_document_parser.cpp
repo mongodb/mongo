@@ -51,6 +51,7 @@ namespace {
     const std::string ROLE_NAME_FIELD_NAME = "role";
     const std::string ROLE_SOURCE_FIELD_NAME = "db";
     const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
+    const std::string SCRAM_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1";
     const std::string MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external";
 
     inline Status _badValue(const char* reason, int location) {
@@ -101,7 +102,8 @@ namespace {
             } else {
                 credentials.isExternal = true;
             }
-        } else {
+        } 
+        else {
             return Status(ErrorCodes::UnsupportedFormat,
                           "Invalid user document: must have one of \"pwd\" and \"userSource\"");
         }
@@ -270,16 +272,26 @@ namespace {
                 return _badValue("User documents for users defined on '$external' must have "
                         "'credentials' field set to {external: true}", 0);
             }
-        } else {
-            BSONElement MongoCRElement = credentialsObj[MONGODB_CR_CREDENTIAL_FIELD_NAME];
-            if (MongoCRElement.eoo()) {
-                return _badValue("User document must provide MONGODB-CR credential to all "
-                        "non-external users", 0);
+        } 
+        else {
+            BSONElement scramElement = credentialsObj[SCRAM_CREDENTIAL_FIELD_NAME];
+            BSONElement mongoCRElement = credentialsObj[MONGODB_CR_CREDENTIAL_FIELD_NAME];
+            
+            if (!mongoCRElement.eoo()) {
+                if (mongoCRElement.type() != String ||
+                    makeStringDataFromBSONElement(mongoCRElement).empty()) {
+                    return _badValue("MONGODB-CR credential must to be a non-empty string"
+                                     ", if present", 0);
+                }
             }
-            if (MongoCRElement.type() != String ||
-                    makeStringDataFromBSONElement(MongoCRElement).empty()) {
-                return _badValue("MONGODB-CR credential must to be a non-empty string, if present",
-                                 0);
+            else if (!scramElement.eoo()) {
+                if (scramElement.type() != Object) {
+                    return _badValue("SCRAM credential must be an object, if present", 0);
+                }
+            }
+            else {
+                return _badValue("User document must provide credentials for all "
+                        "non-external users", 0);
             }
         }
 
@@ -323,22 +335,56 @@ namespace {
                                   "credentials to {external:true}");
                 }
             } else {
+                                       
+                BSONElement scramElement =
+                        credentialsElement.Obj()[SCRAM_CREDENTIAL_FIELD_NAME];
                 BSONElement mongoCRCredentialElement =
                         credentialsElement.Obj()[MONGODB_CR_CREDENTIAL_FIELD_NAME];
+                
+                if (scramElement.eoo() && mongoCRCredentialElement.eoo()) {
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  "User documents must provide credentials for SCRAM-SHA-1 "
+                                  "or MONGODB-CR authentication");
+                }
+
+                if (!scramElement.eoo()) {
+                    // We are asserting rather then returning errors since these
+                    // fields should have been prepopulated by the calling code.
+                    credentials.scram.iterationCount = 
+                        scramElement.Obj()["iterationCount"].numberInt();
+                    uassert(17501, "Invalid or missing SCRAM iteration count", 
+                            credentials.scram.iterationCount > 0);
+
+                    credentials.scram.salt = 
+                        scramElement.Obj()["salt"].str();
+                    uassert(17502, "Missing SCRAM salt", 
+                            !credentials.scram.salt.empty());
+
+                    credentials.scram.serverKey = 
+                        scramElement["serverKey"].str();
+                    uassert(17503, "Missing SCRAM serverKey", 
+                            !credentials.scram.serverKey.empty());
+                    
+                    credentials.scram.storedKey = 
+                        scramElement["storedKey"].str();
+                    uassert(17504, "Missing SCRAM storedKey", 
+                            !credentials.scram.storedKey.empty());
+                }
+                
                 if (!mongoCRCredentialElement.eoo()) {
                     if (mongoCRCredentialElement.type() != String ||
                             makeStringDataFromBSONElement(mongoCRCredentialElement).empty()) {
                         return Status(ErrorCodes::UnsupportedFormat,
                                       "MONGODB-CR credentials must be non-empty strings");
                     } else {
-                        credentials.isExternal = false;
                         credentials.password = mongoCRCredentialElement.String();
+                        if (credentials.password.empty()) {
+                            return Status(ErrorCodes::UnsupportedFormat,
+                                  "User documents must provide authentication credentials");
+                        }
                     }
-                } else {
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  "User documents must provide credentials for MONGODB-CR"
-                                  " authentication");
                 }
+                credentials.isExternal = false;
             }
         } else {
                 return Status(ErrorCodes::UnsupportedFormat,

@@ -48,6 +48,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/db.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/client/connpool.h"
@@ -60,7 +61,6 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
-using namespace std;
 
 namespace mongo {
 
@@ -558,7 +558,8 @@ namespace mongo {
         {
             // DBLock needed since we're now potentially changing the metadata, and don't want
             // reads/writes to be ongoing.
-            Lock::DBWrite writeLk( ns );
+            OperationContextImpl txn;
+            Lock::DBWrite writeLk(txn.lockState(), ns );
 
             //
             // Get the metadata now that the load has completed
@@ -1241,7 +1242,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(dbname);
 
             shardingState.appendInfo( result );

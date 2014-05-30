@@ -104,10 +104,11 @@ namespace QueryStageKeep {
     class KeepStageBasic : public QueryStageKeepBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
+
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
                 coll = db->createCollection(&txn, ns());
             }

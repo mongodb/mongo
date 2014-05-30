@@ -267,7 +267,8 @@ namespace mongo {
             _inCriticalSectionCV.notify_all();
         }
 
-        void logOp(const char* opstr,
+        void logOp(OperationContext* txn,
+                   const char* opstr,
                    const char* ns,
                    const BSONObj& obj,
                    BSONObj* patt,
@@ -321,7 +322,7 @@ namespace mongo {
 
             case 'u':
                 Client::Context ctx( _ns );
-                if ( ! Helpers::findById( ctx.db(), _ns.c_str(), ide.wrap(), it ) ) {
+                if ( ! Helpers::findById( txn, ctx.db(), _ns.c_str(), ide.wrap(), it ) ) {
                     warning() << "logOpForSharding couldn't find: " << ide << " even though should have" << migrateLog;
                     return;
                 }
@@ -336,7 +337,7 @@ namespace mongo {
             _memoryUsed += ide.size() + 5;
         }
 
-        void xfer( Database* db, list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ) {
+        void xfer( OperationContext* txn, Database* db, list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ) {
             const long long maxSize = 1024 * 1024;
 
             if ( l->size() == 0 || size > maxSize )
@@ -350,7 +351,7 @@ namespace mongo {
                 BSONObj t = *i;
                 if ( explode ) {
                     BSONObj it;
-                    if ( Helpers::findById( db , _ns.c_str() , t, it ) ) {
+                    if ( Helpers::findById( txn, db , _ns.c_str() , t, it ) ) {
                         arr.append( it );
                         size += it.objsize();
                     }
@@ -369,7 +370,7 @@ namespace mongo {
          * called from the dest of a migrate
          * transfers mods from src to dest
          */
-        bool transferMods( string& errmsg , BSONObjBuilder& b ) {
+        bool transferMods(OperationContext* txn, string& errmsg, BSONObjBuilder& b) {
             if ( ! _getActive() ) {
                 errmsg = "no active migration!";
                 return false;
@@ -378,10 +379,10 @@ namespace mongo {
             long long size = 0;
 
             {
-                Client::ReadContext cx( _ns );
+                Client::ReadContext cx(txn, _ns);
 
-                xfer( cx.ctx().db(), &_deleted, b, "deleted", size, false );
-                xfer( cx.ctx().db(), &_reload, b, "reload", size, true );
+                xfer( txn, cx.ctx().db(), &_deleted, b, "deleted", size, false );
+                xfer( txn, cx.ctx().db(), &_reload, b, "reload", size, true );
             }
 
             b.append( "size" , size );
@@ -396,16 +397,19 @@ namespace mongo {
          * @param errmsg filled with textual description of error if this call return false
          * @return false if approximate chunk size is too big to move or true otherwise
          */
-        bool storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
-            Client::ReadContext ctx( _ns );
-            Collection* collection = ctx.ctx().db()->getCollection( _ns );
+        bool storeCurrentLocs(OperationContext* txn,
+                              long long maxChunkSize,
+                              string& errmsg,
+                              BSONObjBuilder& result ) {
+            Client::ReadContext ctx(txn, _ns);
+            Collection* collection = ctx.ctx().db()->getCollection( txn, _ns );
             if ( !collection ) {
                 errmsg = "ns not found, should be impossible";
                 return false;
             }
 
             invariant( _dummyRunner.get() == NULL );
-            _dummyRunner.reset( new DummyRunner( _ns, collection ) );
+            _dummyRunner.reset(new DummyRunner(txn, _ns, collection));
 
             // Allow multiKey based on the invariant that shard keys must be single-valued.
             // Therefore, any multi-key index prefixed by shard key cannot be multikey over
@@ -459,10 +463,11 @@ namespace mongo {
             runner.reset();
 
             if ( isLargeChunk ) {
-                warning() << "can't move chunk of size (approximately) " << recCount * avgRecSize
-                          << " because maximum size allowed to move is " << maxChunkSize
-                          << " ns: " << _ns << " " << _min << " -> " << _max
-                          << migrateLog;
+                warning() << "cannot move chunk: the maximum number of documents for a chunk is "
+                          << maxRecsWhenFull << " , the maximum chunk size is " << maxChunkSize
+                          << " , average document size is " << avgRecSize << ". Found "
+                          << recCount << " documents in chunk " << " ns: " << _ns << " " << _min
+                          << " -> " << _max << migrateLog;
                 result.appendBool( "chunkTooBig" , true );
                 result.appendNumber( "estimatedChunkSize" , (long long)(recCount * avgRecSize) );
                 errmsg = "chunk too big to move";
@@ -476,7 +481,7 @@ namespace mongo {
             return true;
         }
 
-        bool clone( string& errmsg , BSONObjBuilder& result ) {
+        bool clone(OperationContext* txn, string& errmsg , BSONObjBuilder& result ) {
             if ( ! _getActive() ) {
                 errmsg = "not active";
                 return false;
@@ -486,8 +491,8 @@ namespace mongo {
 
             int allocSize;
             {
-                Client::ReadContext ctx( _ns );
-                Collection* collection = ctx.ctx().db()->getCollection( _ns );
+                Client::ReadContext ctx(txn, _ns);
+                Collection* collection = ctx.ctx().db()->getCollection( txn, _ns );
                 verify( collection );
                 scoped_spinlock lk( _trackerLocks );
                 allocSize =
@@ -499,8 +504,8 @@ namespace mongo {
             while ( 1 ) {
                 bool filledBuffer = false;
                 
-                Client::ReadContext ctx( _ns );
-                Collection* collection = ctx.ctx().db()->getCollection( _ns );
+                Client::ReadContext ctx(txn, _ns);
+                Collection* collection = ctx.ctx().db()->getCollection( txn, _ns );
 
                 scoped_spinlock lk( _trackerLocks );
                 set<DiskLoc>::iterator i = _cloneLocs.begin();
@@ -613,17 +618,19 @@ namespace mongo {
 
         class DummyRunner : public Runner {
         public:
-            DummyRunner( const StringData& ns,
-                         Collection* collection ) {
+            DummyRunner(OperationContext* txn,
+                        const StringData& ns,
+                        Collection* collection ) {
                 _ns = ns.toString();
+                _txn = txn;
                 _collection = collection;
                 _collection->cursorCache()->registerRunner( this );
             }
             ~DummyRunner() {
                 if ( !_collection )
                     return;
-                Client::ReadContext ctx( _ns );
-                Collection* collection = ctx.ctx().db()->getCollection( _ns );
+                Client::ReadContext ctx(_txn, _ns);
+                Collection* collection = ctx.ctx().db()->getCollection( _txn, _ns );
                 invariant( _collection == collection );
                 _collection->cursorCache()->deregisterRunner( this );
             }
@@ -657,6 +664,7 @@ namespace mongo {
 
         private:
             string _ns;
+            OperationContext* _txn;
             Collection* _collection;
         };
 
@@ -692,12 +700,13 @@ namespace mongo {
         bool _isAnotherMigrationActive;
     };
 
-    void logOpForSharding(const char * opstr,
+    void logOpForSharding(OperationContext* txn,
+                          const char * opstr,
                           const char * ns,
                           const BSONObj& obj,
                           BSONObj * patt,
                           bool notInActiveChunk) {
-        migrateFromStatus.logOp(opstr, ns, obj, patt, notInActiveChunk);
+        migrateFromStatus.logOp(txn, opstr, ns, obj, patt, notInActiveChunk);
     }
 
     class TransferModsCommand : public ChunkCommandHelper {
@@ -712,7 +721,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            return migrateFromStatus.transferMods( errmsg, result );
+            return migrateFromStatus.transferMods(txn, errmsg, result);
         }
     } transferModsCommand;
 
@@ -729,7 +738,7 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            return migrateFromStatus.clone( errmsg, result );
+            return migrateFromStatus.clone(txn, errmsg, result);
         }
     } initialCloneCommand;
 
@@ -1041,8 +1050,9 @@ namespace mongo {
 
             {
                 // this gets a read lock, so we know we have a checkpoint for mods
-                if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
+                if (!migrateFromStatus.storeCurrentLocs(txn, maxChunkSize, errmsg, result)) {
                     return false;
+                }
 
                 ScopedDbConnection connTo(toShard.getConnString());
                 BSONObj res;
@@ -1203,7 +1213,7 @@ namespace mongo {
                 myVersion.incMajor();
 
                 {
-                    Lock::DBWrite lk( ns );
+                    Lock::DBWrite lk(txn->lockState(), ns );
                     verify( myVersion > shardingState.getVersion( ns ) );
 
                     // bump the metadata's version up and "forget" about the chunk being moved
@@ -1586,7 +1596,7 @@ namespace mongo {
 
             if ( state != DONE ) {
                 // Unprotect the range if needed/possible on unsuccessful TO migration
-                Lock::DBWrite lk( ns );
+                Lock::DBWrite lk(txn->lockState(), ns);
                 string errMsg;
                 if ( !shardingState.forgetPending( ns, min, max, epoch, &errMsg ) ) {
                     warning() << errMsg << endl;
@@ -1617,10 +1627,10 @@ namespace mongo {
 
             {
                 // 0. copy system.namespaces entry if collection doesn't already exist
-                Client::WriteContext ctx( ns );
+                Client::WriteContext ctx(txn,  ns );
                 // Only copy if ns doesn't already exist
                 Database* db = ctx.ctx().db();
-                Collection* collection = db->getCollection( ns );
+                Collection* collection = db->getCollection( txn, ns );
 
                 if ( !collection ) {
                     string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
@@ -1652,7 +1662,7 @@ namespace mongo {
 
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
-                    Client::WriteContext ctx( ns );
+                    Client::WriteContext ctx(txn,  ns );
                     Database* db = ctx.ctx().db();
                     Collection* collection = db->getCollection( txn, ns );
                     if ( !collection ) {
@@ -1702,7 +1712,7 @@ namespace mongo {
 
                 {
                     // Protect the range by noting that we're now starting a migration to it
-                    Lock::DBWrite lk( ns );
+                    Lock::DBWrite lk(txn->lockState(), ns);
                     if ( !shardingState.notePending( ns, min, max, epoch, &errmsg ) ) {
                         warning() << errmsg << endl;
                         state = FAIL;
@@ -1748,10 +1758,10 @@ namespace mongo {
                     while( i.more() ) {
                         BSONObj o = i.next().Obj();
                         {
-                            Client::WriteContext cx( ns );
+                            Client::WriteContext cx(txn, ns );
 
                             BSONObj localDoc;
-                            if ( willOverrideLocalId( cx.ctx().db(), o, &localDoc ) ) {
+                            if ( willOverrideLocalId( txn, cx.ctx().db(), o, &localDoc ) ) {
                                 string errMsg =
                                     str::stream() << "cannot migrate chunk, local document "
                                     << localDoc
@@ -1943,13 +1953,13 @@ namespace mongo {
 
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {
-                    Client::WriteContext cx(ns);
+                    Client::WriteContext cx(txn, ns);
 
                     BSONObj id = i.next().Obj();
 
                     // do not apply deletes if they do not belong to the chunk being migrated
                     BSONObj fullObj;
-                    if ( Helpers::findById( cx.ctx().db(), ns.c_str(), id, fullObj ) ) {
+                    if ( Helpers::findById( txn, cx.ctx().db(), ns.c_str(), id, fullObj ) ) {
                         if ( ! isInRange( fullObj , min , max , shardKeyPattern ) ) {
                             log() << "not applying out of range deletion: " << fullObj << migrateLog;
 
@@ -1978,12 +1988,12 @@ namespace mongo {
             if ( xfer["reload"].isABSONObj() ) {
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ) {
-                    Client::WriteContext cx(ns);
+                    Client::WriteContext cx(txn, ns);
 
                     BSONObj it = i.next().Obj();
 
                     BSONObj localDoc;
-                    if ( willOverrideLocalId( cx.ctx().db(), it, &localDoc ) ) {
+                    if ( willOverrideLocalId( txn, cx.ctx().db(), it, &localDoc ) ) {
                         string errMsg =
                             str::stream() << "cannot migrate chunk, local document "
                                           << localDoc
@@ -2013,10 +2023,10 @@ namespace mongo {
          * Must be in WriteContext to avoid races and DBHelper errors.
          * TODO: Could optimize this check out if sharding on _id.
          */
-        bool willOverrideLocalId( Database* db, BSONObj remoteDoc, BSONObj* localDoc ) {
+        bool willOverrideLocalId( OperationContext* txn, Database* db, BSONObj remoteDoc, BSONObj* localDoc ) {
 
             *localDoc = BSONObj();
-            if ( Helpers::findById( db, ns.c_str(), remoteDoc, *localDoc ) ) {
+            if ( Helpers::findById( txn, db, ns.c_str(), remoteDoc, *localDoc ) ) {
                 return !isInRange( *localDoc , min , max , shardKeyPattern );
             }
 

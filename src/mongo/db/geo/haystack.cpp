@@ -71,7 +71,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int,
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const string ns = dbname + "." + cmdObj.firstElement().valuestr();
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
 
             Database* db = ctx.ctx().db();
             if ( !db ) {
@@ -79,7 +79,7 @@ namespace mongo {
                 return false;
             }
 
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
             if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;

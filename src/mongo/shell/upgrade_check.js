@@ -69,10 +69,22 @@ var collUpgradeCheck = function(collObj) {
         }
     });
 
-    // do not validate the documents in config dbs, oplog, or system collections
-    if (collName.indexOf("system.") === 0 ||
-        dbName === "config" ||
-        (dbName === "local" && collName.indexOf("oplog.") === 0)) {
+    // do not validate the documents in system collections
+    if (collName.indexOf("system.") === 0) {
+        return goodSoFar;
+    }
+    // do not validate the documents in config dbs
+    if (dbName === "config") {
+        return goodSoFar;
+    }
+
+    // do not validate the documents in the oplog collection
+    if (dbName === "local" && collName.indexOf("oplog.") === 0) {
+        return goodSoFar;
+    }
+
+    // do not validate the documents in the minvalid collection
+    if (dbName === "local" && collName.indexOf("replset.minvalid") === 0) {
         return goodSoFar;
     }
 

@@ -104,10 +104,10 @@ namespace mongo {
                 return false;
             }
 
-            Client::ReadContext context( nss.ns() );
+            Client::ReadContext context(txn, nss.ns());
 
             Database* db = context.ctx().db();
-            Collection* collection = db->getCollection( nss.ns() );
+            Collection* collection = db->getCollection( txn, nss.ns() );
             if ( !collection ) {
                 errmsg = "collection not found";
                 return false;

@@ -1060,14 +1060,11 @@ namespace UpdateTests {
 
                 BSONObj result;
                 BSONObj expected;
-                switch ( i ) {
-                default:
-                    client().update( ns(), Query(), getUpdate(i) );
-                    result = client().findOne( ns(), Query() );
-                    expected = fromjson( "{'_id':0,x:[]}" );
-                    ASSERT_EQUALS( result, expected );
-                    break;
-                }
+
+                client().update( ns(), Query(), getUpdate(i) );
+                result = client().findOne( ns(), Query() );
+                expected = fromjson( "{'_id':0,x:[]}" );
+                ASSERT_EQUALS( result, expected );
             }
         }
     };
@@ -1092,14 +1089,11 @@ namespace UpdateTests {
 
                 BSONObj result;
                 BSONObj expected;
-                switch ( i ) {
-                default:
-                    client().update( ns(), Query(), getUpdate(i) );
-                    result = client().findOne( ns(), Query() );
-                    expected = fromjson( "{'_id':0,x:[]}" );
-                    ASSERT_EQUALS( result, expected );
-                    break;
-                }
+
+                client().update( ns(), Query(), getUpdate(i) );
+                result = client().findOne( ns(), Query() );
+                expected = fromjson( "{'_id':0,x:[]}" );
+                ASSERT_EQUALS( result, expected );
             }
         }
     };

@@ -155,8 +155,8 @@ namespace mongo {
 
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
             scoped_ptr<Lock::ScopedLock> lk( fromSelf ?
-                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
-                                             static_cast<Lock::ScopedLock*>( new Lock::DBWrite( todb ) ) );
+                                             static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite()) :
+                                             static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
 
             Cloner cloner;
             string username = cmdObj.getStringField( "username" );

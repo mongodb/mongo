@@ -162,7 +162,7 @@ namespace QueryStageCollectionScan {
 
         Database* db() { return _context.db(); }
         ExtentManager* extentManager() { return db()->getExtentManager(); }
-        Collection* collection() { return db()->getCollection( ns() ); }
+        Collection* collection() { return db()->getCollection( &_txn, ns() ); }
         NamespaceDetails *nsd() { return collection()->detailsWritable(); }
 
     protected:
@@ -315,7 +315,7 @@ namespace QueryStageCollectionScan {
     class QueryStageCollectionScanBase {
     public:
         QueryStageCollectionScanBase() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
             for (int i = 0; i < numObj(); ++i) {
                 BSONObjBuilder bob;
@@ -325,7 +325,7 @@ namespace QueryStageCollectionScan {
         }
 
         virtual ~QueryStageCollectionScanBase() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
         }
 
@@ -334,11 +334,11 @@ namespace QueryStageCollectionScan {
         }
 
         int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             // Configure the scan.
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( ns() );
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = direction;
             params.tailable = false;
 
@@ -384,11 +384,13 @@ namespace QueryStageCollectionScan {
 
         static const char* ns() { return "unittests.QueryStageCollectionScan"; }
 
+    protected:
+        OperationContextImpl _txn;
+
     private:
-        static DBDirectClient _client;
+        DBDirectClient _client;
     };
 
-    DBDirectClient QueryStageCollectionScanBase::_client;
 
     //
     // Go forwards, get everything.
@@ -442,11 +444,11 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             // Configure the scan.
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( ns() );
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
@@ -473,10 +475,10 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(ns());
+            Client::ReadContext ctx(&_txn, ns());
 
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( ns() );
+            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
@@ -502,9 +504,9 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
+            Client::WriteContext ctx(&_txn, ns());
 
-            Collection* coll = ctx.ctx().db()->getCollection( ns() );
+            Collection* coll = ctx.ctx().db()->getCollection( &_txn, ns() );
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
@@ -564,8 +566,8 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
-            Collection* coll = ctx.ctx().db()->getCollection(ns());
+            Client::WriteContext ctx(&_txn, ns());
+            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;

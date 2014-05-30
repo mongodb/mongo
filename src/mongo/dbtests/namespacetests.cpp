@@ -61,8 +61,9 @@ namespace NamespaceTests {
         class BtreeIndexMissingField {
         public:
             void run() {
+                OperationContextImpl txn;
                 BSONObj spec( BSON("key" << BSON( "a" << 1 ) ));
-                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(NULL,spec).firstElement().type());
+                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(&txn, NULL,spec).firstElement().type());
             }
         };
         
@@ -70,8 +71,9 @@ namespace NamespaceTests {
         class TwoDIndexMissingField {
         public:
             void run() {
+                OperationContextImpl txn;
                 BSONObj spec( BSON("key" << BSON( "a" << "2d" ) ));
-                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(NULL,spec).firstElement().type());
+                ASSERT_EQUALS(jstNULL, IndexLegacy::getMissingField(&txn, NULL,spec).firstElement().type());
             }
         };
 
@@ -79,6 +81,7 @@ namespace NamespaceTests {
         class HashedIndexMissingField {
         public:
             void run() {
+                OperationContextImpl txn;
                 BSONObj spec( BSON("key" << BSON( "a" << "hashed" ) ));
                 BSONObj nullObj = BSON( "a" << BSONNULL );
 
@@ -90,7 +93,7 @@ namespace NamespaceTests {
                 ASSERT_EQUALS( ExpressionKeysPrivate::makeSingleHashKey( nullObj.firstElement(), 0, 0 ),
                                nullFieldFromKey.Long() );
 
-                BSONObj missingField = IndexLegacy::getMissingField(NULL,spec);
+                BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL,spec);
                 ASSERT_EQUALS( NumberLong, missingField.firstElement().type() );
                 ASSERT_EQUALS( nullFieldFromKey, missingField.firstElement());
             }
@@ -103,6 +106,7 @@ namespace NamespaceTests {
         class HashedIndexMissingFieldAlternateSeed {
         public:
             void run() {
+                OperationContextImpl txn;
                 BSONObj spec( BSON("key" << BSON( "a" << "hashed" ) <<  "seed" << 0x5eed ));
                 BSONObj nullObj = BSON( "a" << BSONNULL );
 
@@ -115,7 +119,7 @@ namespace NamespaceTests {
 
                 // Ensure that getMissingField recognizes that the seed is different (and returns
                 // the right key).
-                BSONObj missingField = IndexLegacy::getMissingField(NULL,spec);
+                BSONObj missingField = IndexLegacy::getMissingField(&txn, NULL,spec);
                 ASSERT_EQUALS( NumberLong, missingField.firstElement().type());
                 ASSERT_EQUALS( nullFieldFromKey, missingField.firstElement());
             }

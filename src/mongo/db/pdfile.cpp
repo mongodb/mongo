@@ -111,7 +111,7 @@ namespace mongo {
             return Status( ErrorCodes::InvalidNamespace,
                            str::stream() << "invalid ns: " << ns );
 
-        Collection* collection = db->getCollection( ns );
+        Collection* collection = db->getCollection( txn, ns );
 
         if ( collection )
             return Status( ErrorCodes::NamespaceExists,

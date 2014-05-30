@@ -52,8 +52,9 @@ namespace mongo {
         virtual ~AuthzManagerExternalStateMongos();
 
         virtual Status initialize();
-        virtual Status getStoredAuthorizationVersion(int* outVersion);
-        virtual Status getUserDescription(const UserName& userName, BSONObj* result);
+        virtual Status getStoredAuthorizationVersion(OperationContext* txn, int* outVersion);
+        virtual Status getUserDescription(
+                            OperationContext* txn, const UserName& userName, BSONObj* result);
         virtual Status getRoleDescription(const RoleName& roleName,
                                           bool showPrivileges,
                                           BSONObj* result);
@@ -70,7 +71,8 @@ namespace mongo {
          * NOTE: The data returned from this helper may be from any config server or replica set
          * node.  The first config server or primary node is preferred, when available.
          */
-        virtual Status findOne(const NamespaceString& collectionName,
+        virtual Status findOne(OperationContext* txn,
+                               const NamespaceString& collectionName,
                                const BSONObj& query,
                                BSONObj* result);
 

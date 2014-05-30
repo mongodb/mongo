@@ -435,9 +435,10 @@ namespace {
     }
 
     void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
-        Lock::DBRead lk(rsoplog);
+        OperationContextImpl txn; // XXX?
+        Lock::DBRead lk(txn.lockState(), rsoplog);
         BSONObj o;
-        if (Helpers::getLast(rsoplog, o)) {
+        if (Helpers::getLast(&txn, rsoplog, o)) {
             lastH = o["h"].numberLong();
             lastOpTimeWritten = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
@@ -445,9 +446,11 @@ namespace {
     }
 
     OpTime ReplSetImpl::getEarliestOpTimeWritten() const {
-        Lock::DBRead lk(rsoplog);
+        OperationContextImpl txn; // XXX?
+        Lock::DBRead lk(txn.lockState(), rsoplog);
         BSONObj o;
-        uassert(17347, "Problem reading earliest entry from oplog", Helpers::getFirst(rsoplog, o));
+        uassert(17347, "Problem reading earliest entry from oplog",
+                Helpers::getFirst(&txn, rsoplog, o));
         return o["ts"]._opTime();
     }
 
@@ -859,21 +862,22 @@ namespace {
     const BSONObj ReplSetImpl::_initialSyncFlag(BSON(_initialSyncFlagString << true));
 
     void ReplSetImpl::clearInitialSyncFlag() {
-        Lock::DBWrite lk("local");
         OperationContextImpl txn; // XXX?
+        Lock::DBWrite lk(txn.lockState(), "local");
         Helpers::putSingleton(&txn, "local.replset.minvalid", BSON("$unset" << _initialSyncFlag));
     }
 
     void ReplSetImpl::setInitialSyncFlag() {
-        Lock::DBWrite lk("local");
         OperationContextImpl txn; // XXX?
+        Lock::DBWrite lk(txn.lockState(), "local");
         Helpers::putSingleton(&txn, "local.replset.minvalid", BSON("$set" << _initialSyncFlag));
     }
 
     bool ReplSetImpl::getInitialSyncFlag() {
-        Lock::DBRead lk ("local");
+        OperationContextImpl txn; // XXX?
+        Lock::DBRead lk (txn.lockState(), "local");
         BSONObj mv;
-        if (Helpers::getSingleton("local.replset.minvalid", mv)) {
+        if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
             return mv[_initialSyncFlagString].trueValue();
         }
         return false;
@@ -884,15 +888,17 @@ namespace {
         BSONObjBuilder subobj(builder.subobjStart("$set"));
         subobj.appendTimestamp("ts", obj["ts"].date());
         subobj.done();
-        Lock::DBWrite lk("local");
+
         OperationContextImpl txn; // XXX?
+        Lock::DBWrite lk(txn.lockState(), "local");
         Helpers::putSingleton(&txn, "local.replset.minvalid", builder.obj());
     }
 
     OpTime ReplSetImpl::getMinValid() {
-        Lock::DBRead lk("local.replset.minvalid");
+        OperationContextImpl txn; // XXX?
+        Lock::DBRead lk(txn.lockState(), "local.replset.minvalid");
         BSONObj mv;
-        if (Helpers::getSingleton("local.replset.minvalid", mv)) {
+        if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
             return mv["ts"]._opTime();
         }
         return OpTime();

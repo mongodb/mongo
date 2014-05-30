@@ -147,11 +147,12 @@ namespace ReplSetTests {
         DBDirectClient *client() const { return &client_; }
 
         static void insert( const BSONObj &o, bool god = false ) {
-            Lock::DBWrite lk(ns());
-            Client::Context ctx(ns());
             OperationContextImpl txn;
+            Lock::DBWrite lk(txn.lockState(), ns());
+            Client::Context ctx(ns());
+            
             Database* db = ctx.db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
                 coll = db->createCollection(&txn, ns());
             }
@@ -174,12 +175,12 @@ namespace ReplSetTests {
         }
 
         void drop() {
-            Client::WriteContext c(ns());
             OperationContextImpl txn;
+            Client::WriteContext c(&txn, ns());
 
             Database* db = c.ctx().db();
 
-            if ( db->getCollection( ns() ) == NULL ) {
+            if ( db->getCollection( &txn, ns() ) == NULL ) {
                 return;
             }
 
@@ -306,6 +307,8 @@ namespace ReplSetTests {
 
     class CappedInitialSync : public Base {
         string _cappedNs;
+
+        OperationContextImpl _txn;
         Lock::DBWrite _lk;
 
         string spec() const {
@@ -342,7 +345,8 @@ namespace ReplSetTests {
             return o;
         }
     public:
-        CappedInitialSync() : _cappedNs("unittests.foo.bar"), _lk(_cappedNs) {
+        CappedInitialSync() : 
+                _cappedNs("unittests.foo.bar"), _lk(_txn.lockState(), _cappedNs) {
             dropCapped();
             create();
         }
@@ -363,7 +367,8 @@ namespace ReplSetTests {
         }
 
         void run() {
-            Lock::DBWrite lk(_cappedNs);
+            OperationContextImpl txn;
+            Lock::DBWrite lk(txn.lockState(), _cappedNs);
 
             BSONObj op = updateFail();
 
@@ -386,35 +391,36 @@ namespace ReplSetTests {
             verify(apply(b.obj()));
         }
 
-        void insert() {
+        void insert(OperationContext* txn) {
             Client::Context ctx(cappedNs());
-            OperationContextImpl txn;
             Database* db = ctx.db();
-            Collection* coll = db->getCollection(&txn, cappedNs());
+            Collection* coll = db->getCollection(txn, cappedNs());
             if (!coll) {
-                coll = db->createCollection(&txn, cappedNs());
+                coll = db->createCollection(txn, cappedNs());
             }
 
             BSONObj o = BSON(GENOID << "x" << 456);
-            DiskLoc loc = coll->insertDocument(&txn, o, true).getValue();
+            DiskLoc loc = coll->insertDocument(txn, o, true).getValue();
             verify(!loc.isNull());
         }
     public:
         virtual ~CappedUpdate() {}
         void run() {
+            OperationContextImpl txn;
+
             // RARELY shoud be once/128x
             for (int i=0; i<150; i++) {
-                insert();
+                insert(&txn);
                 updateSucceed();
             }
 
-            DBDirectClient client;
+            DBDirectClient client(&txn);
             int count = (int) client.count(cappedNs(), BSONObj());
             verify(count > 1);
 
             // check _id index created
             Client::Context ctx(cappedNs());
-            Collection* collection = ctx.db()->getCollection( cappedNs() );
+            Collection* collection = ctx.db()->getCollection( &txn, cappedNs() );
             verify(collection->getIndexCatalog()->findIdIndex());
         }
     };
@@ -433,6 +439,7 @@ namespace ReplSetTests {
     public:
         virtual ~CappedInsert() {}
         void run() {
+            OperationContextImpl txn;
             // This will succeed, but not insert anything because they are changed to upserts
             for (int i=0; i<150; i++) {
                 insertSucceed();
@@ -441,7 +448,7 @@ namespace ReplSetTests {
             // this changed in 2.1.2
             // we now have indexes on capped collections
             Client::Context ctx(cappedNs());
-            Collection* collection = ctx.db()->getCollection( cappedNs() );
+            Collection* collection = ctx.db()->getCollection( &txn, cappedNs() );
             verify(collection->getIndexCatalog()->findIdIndex());
         }
     };

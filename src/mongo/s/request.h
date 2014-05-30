@@ -41,6 +41,8 @@ namespace mongo {
 
     class OpCounters;
     class ClientInfo;
+    class OperationContext;
+
 
     class Request : boost::noncopyable {
     public:
@@ -92,6 +94,8 @@ namespace mongo {
         ClientInfo * _clientInfo;
 
         OpCounters* _counter;
+
+        boost::scoped_ptr<OperationContext> _txn;
 
         bool _didInit;
     };

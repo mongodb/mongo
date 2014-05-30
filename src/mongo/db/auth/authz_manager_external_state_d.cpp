@@ -39,6 +39,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -47,12 +48,13 @@ namespace mongo {
     AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
-    Status AuthzManagerExternalStateMongod::_getUserDocument(const UserName& userName,
-                                                             BSONObj* userDoc) {
+    Status AuthzManagerExternalStateMongod::_getUserDocument(
+                OperationContext* txn, const UserName& userName, BSONObj* userDoc) {
 
-        Client::ReadContext ctx("admin");
+        Client::ReadContext ctx(txn, "admin");
+
         int authzVersion;
-        Status status = getStoredAuthorizationVersion(&authzVersion);
+        Status status = getStoredAuthorizationVersion(txn, &authzVersion);
         if (!status.isOK())
             return status;
 
@@ -67,6 +69,7 @@ namespace mongo {
         }
 
         status = findOne(
+                txn,
                 (authzVersion == AuthorizationManager::schemaVersion26Final ?
                  AuthorizationManager::usersCollectionNamespace :
                  AuthorizationManager::usersAltCollectionNamespace),
@@ -102,13 +105,16 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::findOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             BSONObj* result) {
 
-        Client::ReadContext ctx(collectionName.ns());
+        Client::ReadContext ctx(txn, collectionName.ns());
+
         BSONObj found;
-        if (Helpers::findOne(ctx.ctx().db()->getCollection(collectionName),
+        if (Helpers::findOne(txn,
+                             ctx.ctx().db()->getCollection(txn, collectionName),
                              query,
                              found)) {
             *result = found.getOwned();

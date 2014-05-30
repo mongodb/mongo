@@ -519,8 +519,8 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                      print("ReplSetTest awaitReplication: secondary #" + secondaryCount
                            + ", " + name + ", has config version #" + slaveConfigVersion
                            + ", but expected config version #" + configVersion);
-                     var masterVersion =
-                           this.liveNodes.master.getDB("local")['system.replset'].findOne().version;
+                     master = this.getMaster();
+                     var masterVersion = master.getDB("local")['system.replset'].findOne().version;
                      if (slaveConfigVersion > configVersion
                          && slaveConfigVersion === masterVersion) {
                          configVersion = slaveConfigVersion;

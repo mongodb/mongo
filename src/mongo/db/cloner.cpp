@@ -111,7 +111,7 @@ namespace mongo {
             Collection* collection = NULL;
 
             if ( isindex == false ) {
-                collection = context.db()->getCollection( to_collection );
+                collection = context.db()->getCollection( txn, to_collection );
                 if ( !collection ) {
                     massert( 17321,
                              str::stream()
@@ -301,7 +301,7 @@ namespace mongo {
                                 bool copyIndexes,
                                 bool logForRepl) {
 
-        Client::WriteContext ctx(ns);
+        Client::WriteContext ctx(txn, ns);
 
         // config
         string temp = ctx.ctx().db()->name() + ".system.namespaces";
@@ -491,7 +491,7 @@ namespace mongo {
                 bool old = inDBRepair;
                 try {
                     inDBRepair = true;
-                    Collection* c = context.db()->getCollection( to_name );
+                    Collection* c = context.db()->getCollection( txn, to_name );
                     if ( c )
                         c->getIndexCatalog()->ensureHaveIdIndex(txn);
                     inDBRepair = old;

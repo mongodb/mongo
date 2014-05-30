@@ -101,7 +101,7 @@ namespace mongo {
 
             BSONObj keyPattern = spec.getObjectField("key");
             IndexDescriptor* descriptor = new IndexDescriptor( _collection,
-                                                               _getAccessMethodName(keyPattern),
+                                                               _getAccessMethodName(txn, keyPattern),
                                                                spec );
             IndexCatalogEntry* entry = _setupInMemoryStructures( txn, descriptor );
 
@@ -163,14 +163,15 @@ namespace mongo {
                        << " ns: " << _collection->ns().ns() );
     }
 
-    bool IndexCatalog::_shouldOverridePlugin(const BSONObj& keyPattern) const {
+    bool IndexCatalog::_shouldOverridePlugin(OperationContext* txn,
+                                             const BSONObj& keyPattern) const {
         string pluginName = IndexNames::findPluginName(keyPattern);
         bool known = IndexNames::isKnownName(pluginName);
 
         int majorVersion;
         int minorVersion;
 
-        _collection->_database->getFileFormat( &majorVersion, &minorVersion );
+        _collection->_database->getFileFormat( txn, &majorVersion, &minorVersion );
             
         if (minorVersion == PDFILE_VERSION_MINOR_24_AND_NEWER) {
             // RulesFor24
@@ -199,8 +200,9 @@ namespace mongo {
         return false;
     }
 
-    string IndexCatalog::_getAccessMethodName(const BSONObj& keyPattern) const {
-        if ( _shouldOverridePlugin(keyPattern) ) {
+    string IndexCatalog::_getAccessMethodName(OperationContext* txn,
+                                              const BSONObj& keyPattern) const {
+        if ( _shouldOverridePlugin(txn, keyPattern) ) {
             return "";
         }
 
@@ -227,8 +229,9 @@ namespace mongo {
 
         fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
 
-        auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName,
-                                                                  db->getCollection( db->_indexesName ) ) );
+        auto_ptr<Runner> runner(
+            InternalPlanner::collectionScan(db->_indexesName,
+                                            db->getCollection(txn, db->_indexesName)));
 
         BSONObj index;
         Runner::RunnerState state;
@@ -256,7 +259,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate( const BSONObj& original ) const {
+    StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate( OperationContext* txn,
+                                                            const BSONObj& original ) const {
         Status status = _isSpecOk( original );
         if ( !status.isOK() )
             return StatusWith<BSONObj>( status );
@@ -268,7 +272,7 @@ namespace mongo {
         if ( !status.isOK() )
             return StatusWith<BSONObj>( status );
 
-        status = _doesSpecConflictWithExisting( fixed );
+        status = _doesSpecConflictWithExisting( txn, fixed );
         if ( !status.isOK() )
             return StatusWith<BSONObj>( status );
 
@@ -286,7 +290,7 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate( spec );
+        StatusWith<BSONObj> statusWithSpec = prepareSpecForCreate( txn, spec );
         status = statusWithSpec.getStatus();
         if ( !status.isOK() )
             return status;
@@ -543,7 +547,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status IndexCatalog::_doesSpecConflictWithExisting( const BSONObj& spec ) const {
+    Status IndexCatalog::_doesSpecConflictWithExisting( OperationContext* txn,
+                                                        const BSONObj& spec ) const {
         const char *name = spec.getStringField("name");
         invariant( name[0] );
 
@@ -563,7 +568,7 @@ namespace mongo {
                                    << " vs existing spec " << desc->keyPattern() );
 
                 IndexDescriptor temp( _collection,
-                                      _getAccessMethodName( key ),
+                                      _getAccessMethodName( txn, key ),
                                       spec );
                 if ( !desc->areIndexOptionsEquivalent( &temp ) )
                     return Status( ErrorCodes::IndexOptionsConflict,
@@ -584,7 +589,7 @@ namespace mongo {
                         << ' ' << key << endl;
 
                 IndexDescriptor temp( _collection,
-                                      _getAccessMethodName( key ),
+                                      _getAccessMethodName( txn, key ),
                                       spec );
                 if ( !desc->areIndexOptionsEquivalent( &temp ) )
                     return Status( ErrorCodes::IndexOptionsConflict,
@@ -689,7 +694,7 @@ namespace mongo {
         long long numSystemIndexesEntries = 0;
         {
             Collection* systemIndexes =
-                _collection->_database->getCollection( _collection->_database->_indexesName );
+                _collection->_database->getCollection( txn, _collection->_database->_indexesName );
             if ( systemIndexes ) {
                 EqualityMatchExpression expr;
                 BSONObj nsBSON = BSON( "ns" << _collection->ns() );
@@ -828,7 +833,7 @@ namespace mongo {
             BSONObj spec = toReturn[i];
 
             BSONObj keyPattern = spec.getObjectField("key");
-            IndexDescriptor desc( _collection, _getAccessMethodName(keyPattern), spec );
+            IndexDescriptor desc( _collection, _getAccessMethodName(txn, keyPattern), spec );
 
             _deleteIndexFromDisk( txn,
                                   desc.indexName(),

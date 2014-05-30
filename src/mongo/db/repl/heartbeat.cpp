@@ -112,7 +112,7 @@ namespace repl {
 
             result.append("rs", true);
             if( cmdObj["checkEmpty"].trueValue() ) {
-                result.append("hasData", replHasDatabases());
+                result.append("hasData", replHasDatabases(txn));
             }
             if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
                 string from( cmdObj.getStringField("from") );

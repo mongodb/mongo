@@ -113,10 +113,11 @@ namespace mongo {
 
                 long long n = 0;
                 {
-                    string ns = idx["ns"].String();
-                    Client::WriteContext ctx( ns );
+                    const string ns = idx["ns"].String();
+
                     OperationContextImpl txn;
-                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    Client::WriteContext ctx(&txn,  ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( &txn, ns );
                     if ( !collection ) {
                         // collection was dropped
                         continue;
@@ -171,7 +172,8 @@ namespace mongo {
 
                 set<string> dbs;
                 {
-                    Lock::DBRead lk( "local" );
+                    OperationContextImpl txn;   // XXX?
+                    Lock::DBRead lk(txn.lockState(), "local");
                     dbHolder().getAllShortNames( dbs );
                 }
                 

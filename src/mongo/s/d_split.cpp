@@ -119,8 +119,8 @@ namespace mongo {
                 return false;
             }
 
-            Client::ReadContext ctx( ns );
-            Collection* collection = ctx.ctx().db()->getCollection( ns );
+            Client::ReadContext ctx(txn, ns);
+            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
             if ( !collection ) {
                 errmsg = "ns not found";
                 return false;
@@ -151,7 +151,7 @@ namespace mongo {
             // this index.
             // NOTE A local copy of 'missingField' is made because indices may be
             // invalidated during a db lock yield.
-            BSONObj missingFieldObj = IndexLegacy::getMissingField(collection,idx->infoObj());
+            BSONObj missingFieldObj = IndexLegacy::getMissingField(txn, collection, idx->infoObj());
             BSONElement missingField = missingFieldObj.firstElement();
             
             // for now, the only check is that all shard keys are filled
@@ -275,8 +275,8 @@ namespace mongo {
 
             {
                 // Get the size estimate for this namespace
-                Client::ReadContext ctx( ns );
-                Collection* collection = ctx.ctx().db()->getCollection( ns );
+                Client::ReadContext ctx(txn, ns);
+                Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                 if ( !collection ) {
                     errmsg = "ns not found";
                     return false;
@@ -824,7 +824,7 @@ namespace mongo {
             maxVersion.incMinor();
             
             {
-                Lock::DBWrite writeLk( ns );
+                Lock::DBWrite writeLk(txn->lockState(), ns);
                 shardingState.splitChunk( ns , min , max , splitKeys , maxVersion );
             }
 
@@ -858,8 +858,8 @@ namespace mongo {
                 // If one of the chunks has only one object in it we should move it
                 for (int i=1; i >= 0 ; i--){ // high chunk more likely to have only one obj
 
-                    Client::ReadContext ctx( ns );
-                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    Client::ReadContext ctx(txn, ns);
+                    Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
                     verify( collection );
 
                     // Allow multiKey based on the invariant that shard keys must be

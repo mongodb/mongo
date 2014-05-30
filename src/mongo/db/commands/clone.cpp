@@ -118,7 +118,7 @@ namespace mongo {
 
             set<string> clonedColls;
 
-            Lock::DBWrite dbXLock(dbname);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context context( dbname );
 
             Cloner cloner;

@@ -35,6 +35,7 @@ namespace mongo {
 
     class Collection;
     class IndexDescriptor;
+    class OperationContext;
 
     /**
      * There has been some behavior concerning indexed access patterns -- both pre and post-index
@@ -66,7 +67,9 @@ namespace mongo {
          *
          * This is a significant leak of index functionality out of the index layer.
          */
-        static BSONObj getMissingField(Collection* collection, const BSONObj& infoObj);
+        static BSONObj getMissingField(OperationContext* txn,
+                                       Collection* collection,
+                                       const BSONObj& infoObj);
 
     };
 

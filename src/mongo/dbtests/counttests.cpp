@@ -41,15 +41,10 @@
 namespace CountTests {
 
     class Base {
-        Lock::DBWrite lk;
-        Client::Context _context;
-        Database* _database;
-        Collection* _collection;
-        OperationContextImpl _txn;
     public:
-        Base() : lk(ns()), _context( ns() ) {
+        Base() : lk(_txn.lockState(), ns()), _context( ns() ) {
             _database = _context.db();
-            _collection = _database->getCollection( ns() );
+            _collection = _database->getCollection( &_txn, ns() );
             if ( _collection ) {
                 _database->dropCollection( &_txn, ns() );
             }
@@ -97,6 +92,17 @@ namespace CountTests {
         static BSONObj countCommand( const BSONObj &query ) {
             return BSON( "query" << query );
         }
+
+        OperationContextImpl _txn;
+
+    private:
+        Lock::DBWrite lk;
+
+        Client::Context _context;
+
+        Database* _database;
+        Collection* _collection;
+
     };
     
     class Basic : public Base {
@@ -106,7 +112,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -119,7 +125,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 2, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -131,7 +137,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 2, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -144,7 +150,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
     
@@ -156,7 +162,7 @@ namespace CountTests {
             BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
             string err;
             int errCode;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
         }
     };
 

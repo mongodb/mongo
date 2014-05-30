@@ -97,10 +97,11 @@ namespace {
                           BSONObj()));
     }
 
-    Status AuthzManagerExternalStateMock::_getUserDocument(const UserName& userName,
+    Status AuthzManagerExternalStateMock::_getUserDocument(OperationContext* txn,
+                                                           const UserName& userName,
                                                            BSONObj* userDoc) {
         int authzVersion;
-        Status status = getStoredAuthorizationVersion(&authzVersion);
+        Status status = getStoredAuthorizationVersion(txn, &authzVersion);
         if (!status.isOK())
             return status;
 
@@ -115,6 +116,7 @@ namespace {
         }
 
         status = findOne(
+                txn,
                 (authzVersion == AuthorizationManager::schemaVersion26Final ?
                  AuthorizationManager::usersCollectionNamespace :
                  AuthorizationManager::usersAltCollectionNamespace),
@@ -139,18 +141,8 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMock::_findUser(
-            const std::string& usersNamespace,
-            const BSONObj& query,
-            BSONObj* result) {
-        if (!findOne(NamespaceString(usersNamespace), query, result).isOK()) {
-            return Status(ErrorCodes::UserNotFound,
-                          "No matching user for query " + query.toString());
-        }
-        return Status::OK();
-    }
-
     Status AuthzManagerExternalStateMock::findOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             BSONObj* result) {

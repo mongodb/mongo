@@ -90,9 +90,9 @@ namespace mongo {
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
 
-            Client::ReadContext ctx(ns);
+            Client::ReadContext ctx(txn, ns);
 
-            Collection* collection = ctx.ctx().db()->getCollection( ns );
+            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
 
             if (!collection) {
                 result.appendArray( "values" , BSONObj() );

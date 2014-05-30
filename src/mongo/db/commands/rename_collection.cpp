@@ -63,7 +63,8 @@ namespace mongo {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
+        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
+                                                     Database* db,
                                                      const BSONObj& cmdObj) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
@@ -71,7 +72,7 @@ namespace mongo {
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = source;
             std::vector<BSONObj> prelim = 
-                IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
+                IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, source), criteria);
 
             std::vector<BSONObj> indexes;
 
@@ -139,7 +140,7 @@ namespace mongo {
 
             {
                 Client::Context srcCtx( source );
-                Collection* sourceColl = srcCtx.db()->getCollection( source );
+                Collection* sourceColl = srcCtx.db()->getCollection( txn, source );
 
                 if ( !sourceColl ) {
                     errmsg = "source namespace does not exist";
@@ -172,7 +173,7 @@ namespace mongo {
 
                 {
 
-                    indexesInProg = stopIndexBuilds( srcCtx.db(), cmdObj );
+                    indexesInProg = stopIndexBuilds( txn, srcCtx.db(), cmdObj );
                     capped = sourceColl->isCapped();
                     if ( capped ) {
                         size = sourceColl->getRecordStore()->storageSize();
@@ -185,7 +186,7 @@ namespace mongo {
 
                 // Check if the target namespace exists and if dropTarget is true.
                 // If target exists and dropTarget is not true, return false.
-                if ( ctx.db()->getCollection( target ) ) {
+                if ( ctx.db()->getCollection( txn, target ) ) {
                     if ( !cmdObj["dropTarget"].trueValue() ) {
                         errmsg = "target namespace exists";
                         return false;
@@ -245,7 +246,7 @@ namespace mongo {
 
             {
                 Client::Context srcCtx( source );
-                sourceColl = srcCtx.db()->getCollection( source );
+                sourceColl = srcCtx.db()->getCollection( txn, source );
                 sourceIt.reset( sourceColl->getIterator( DiskLoc(), false, CollectionScanParams::FORWARD ) );
             }
 
@@ -260,7 +261,7 @@ namespace mongo {
                 {
                     Client::Context ctx( target );
                     if ( !targetColl )
-                        targetColl = ctx.db()->getCollection( target );
+                        targetColl = ctx.db()->getCollection( txn, target );
                     // No logOp necessary because the entire renameCollection command is one logOp.
                     Status s = targetColl->insertDocument( txn, o, true ).getStatus();
                     if ( !s.isOK() ) {
@@ -314,7 +315,7 @@ namespace mongo {
             {
                 Client::Context ctx( target );
                 if ( !targetColl )
-                    targetColl = ctx.db()->getCollection( target );
+                    targetColl = ctx.db()->getCollection( txn, target );
 
                 for ( vector<BSONObj>::iterator it = copiedIndexes.begin();
                                                 it != copiedIndexes.end(); ++it ) {

@@ -439,7 +439,7 @@ namespace mongo {
         const NamespaceString& nsString = request.getNamespaceString();
         UpdateLifecycle* lifecycle = request.getLifecycle();
 
-        Collection* collection = db->getCollection(nsString.ns());
+        Collection* collection = db->getCollection(txn, nsString.ns());
 
         validateUpdate(nsString.ns().c_str(), request.getUpdates(), request.getQuery());
 
@@ -765,7 +765,7 @@ namespace mongo {
 
         // Only create the collection if the doc will be inserted.
         if (!collection) {
-            collection = db->getCollection(request.getNamespaceString().ns());
+            collection = db->getCollection(txn, request.getNamespaceString().ns());
             if (!collection) {
                 collection = db->createCollection(txn, request.getNamespaceString().ns());
             }

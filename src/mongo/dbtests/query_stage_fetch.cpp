@@ -87,10 +87,11 @@ namespace QueryStageFetch {
     class FetchStageAlreadyFetched : public QueryStageFetchBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
+
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
                 coll = db->createCollection(&txn, ns());
             }
@@ -145,10 +146,11 @@ namespace QueryStageFetch {
     class FetchStageFilter : public QueryStageFetchBase {
     public:
         void run() {
-            Client::WriteContext ctx(ns());
             OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, ns());
+
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(ns());
+            Collection* coll = db->getCollection(&txn, ns());
             if (!coll) {
                 coll = db->createCollection(&txn, ns());
             }

@@ -34,6 +34,7 @@
 
 namespace mongo {
     class Database;
+    class OperationContext;
 
 namespace repl {
 
@@ -43,7 +44,7 @@ namespace repl {
     public:
         Sync(const std::string& hostname) : hn(hostname) {}
         virtual ~Sync() {}
-        virtual BSONObj getMissingDoc(Database* db, const BSONObj& o);
+        virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o);
 
         /**
          * If applyOperation_inlock should be called again after an update fails.

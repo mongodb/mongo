@@ -95,6 +95,96 @@ namespace mongo {
     class QueryPlannerAccess {
     public:
         /**
+         * Building the leaves (i.e. the index scans) is done by looping through
+         * predicates one at a time. During the process, there is a fair amount of state
+         * information to keep track of, which we consolidate into this data structure.
+         */
+        struct ScanBuildingState {
+
+            ScanBuildingState(MatchExpression* theRoot,
+                              bool inArrayOp,
+                              const std::vector<IndexEntry>& indexList)
+                : root(theRoot),
+                  inArrayOperator(inArrayOp),
+                  indices(indexList),
+                  currentScan(NULL),
+                  curChild(0),
+                  currentIndexNumber(IndexTag::kNoIndex),
+                  ixtag(NULL),
+                  tightness(IndexBoundsBuilder::INEXACT_FETCH),
+                  curOr(NULL),
+                  loosestBounds(IndexBoundsBuilder::EXACT) {
+            }
+
+            /**
+             * Reset the scan building state in preparation for building a new scan.
+             *
+             * This always should be called prior to allocating a new 'currentScan'.
+             */
+            void resetForNextScan(IndexTag* newTag) {
+                currentScan.reset(NULL);
+                currentIndexNumber = newTag->index;
+                tightness = IndexBoundsBuilder::INEXACT_FETCH;
+                loosestBounds = IndexBoundsBuilder::EXACT;
+
+                if (MatchExpression::OR == root->matchType()) {
+                    curOr.reset(new OrMatchExpression());
+                }
+            }
+
+            // The root of the MatchExpression tree for which we are currently building index
+            // scans. Should be either an AND node or an OR node.
+            MatchExpression* root;
+
+            // Are we inside an array operator such as $elemMatch or $all?
+            bool inArrayOperator;
+
+            // A list of relevant indices which 'root' may be tagged to use.
+            const std::vector<IndexEntry>& indices;
+
+            // The index access node that we are currently constructing. We may merge
+            // multiple tagged predicates into a single index scan.
+            std::auto_ptr<QuerySolutionNode> currentScan;
+
+            // An index into the child vector of 'root'. Indicates the child MatchExpression
+            // for which we are currently either constructing a new scan or which we are about
+            // to merge with 'currentScan'.
+            size_t curChild;
+
+            // An index into the 'indices', so that 'indices[currentIndexNumber]' gives the
+            // index used by 'currentScan'. If there is no currentScan, this should be set
+            // to 'IndexTag::kNoIndex'.
+            size_t currentIndexNumber;
+
+            // The tag on 'curChild'.
+            IndexTag* ixtag;
+
+            // Whether the bounds for predicate 'curChild' are exact, inexact and covered by
+            // the index, or inexact with a fetch required.
+            IndexBoundsBuilder::BoundsTightness tightness;
+
+            // If 'root' is an $or, the child predicates which are tagged with the same index are
+            // detached from the original root and added here. 'curOr' may be attached as a filter
+            // later on, or ignored and cleaned up by the auto_ptr.
+            std::auto_ptr<MatchExpression> curOr;
+
+            // The values of BoundsTightness range from loosest to tightest in this order:
+            //
+            //   INEXACT_FETCH < INEXACT_COVERED < EXACT
+            //
+            // 'loosestBounds' stores the smallest of these three values encountered so far for
+            // the current scan. If at least one of the child predicates assigned to the current
+            // index is INEXACT_FETCH, then 'loosestBounds' is INEXACT_FETCH. If at least one of
+            // the child predicates assigned to the current index is INEXACT_COVERED but none are
+            // INEXACT_FETCH, then 'loosestBounds' is INEXACT_COVERED.
+            IndexBoundsBuilder::BoundsTightness loosestBounds;
+
+        private:
+            // Default constructor is not allowed.
+            ScanBuildingState();
+        };
+
+        /**
          * Return a CollectionScanNode that scans as requested in 'query'.
          */
         static QuerySolutionNode* makeCollectionScan(const CanonicalQuery& query,
@@ -192,6 +282,27 @@ namespace mongo {
                                       const std::vector<IndexEntry>& indices,
                                       std::vector<QuerySolutionNode*>* out);
 
+        /**
+         * Used by processIndexScans(...) in order to recursively build a data access
+         * plan for a "subnode", a node in the MatchExpression tree which is indexed by
+         * virtue of its children.
+         *
+         * The resulting scans are outputted in the out-parameter 'out'.
+         */
+        static bool processIndexScansSubnode(const CanonicalQuery& query,
+                                             ScanBuildingState* scanState,
+                                             std::vector<QuerySolutionNode*>* out);
+
+        /**
+         * Used by processIndexScansSubnode(...) to build the leaves of the solution tree for an
+         * ELEM_MATCH_OBJECT node beneath an AND.
+         *
+         * The resulting scans are outputted in the out-parameter 'out'.
+         */
+        static bool processIndexScansElemMatch(const CanonicalQuery& query,
+                                               ScanBuildingState* scanState,
+                                               std::vector<QuerySolutionNode*>* out);
+
         //
         // Helpers for creating an index scan.
         //
@@ -214,29 +325,16 @@ namespace mongo {
         /**
          * Merge the predicate 'expr' with the leaf node 'node'.
          */
-        static void mergeWithLeafNode(MatchExpression* expr,
-                                      const IndexEntry& index,
-                                      size_t pos,
-                                      IndexBoundsBuilder::BoundsTightness* tightnessOut,
-                                      QuerySolutionNode* node,
-                                      MatchExpression::MatchType mergeType);
+        static void mergeWithLeafNode(MatchExpression* expr, ScanBuildingState* scanState);
 
         /**
          * Determines whether it is safe to merge the expression 'expr' with
-         * the leaf node of the query solution, 'node'.
-         *
-         * 'index' provides information about the index used by 'node'.
-         * 'pos' gives the position in the index (for compound indices) that
-         * 'expr' needs to use. Finally, 'mergeType' indicates whether we
-         * will try to merge using an AND or OR.
+         * the leaf node of the query solution contained in 'scanState'.
          *
          * Does not take ownership of its arguments.
          */
         static bool shouldMergeWithLeaf(const MatchExpression* expr,
-                                        const IndexEntry& index,
-                                        size_t pos,
-                                        QuerySolutionNode* node,
-                                        MatchExpression::MatchType mergeType);
+                                        const ScanBuildingState& scanState);
 
         /**
          * If index scan (regular or expression index), fill in any bounds that are missing in
@@ -247,9 +345,19 @@ namespace mongo {
          */
         static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
 
+        /**
+         * Fills in any missing bounds by calling finishLeafNode(...) for the scan contained in
+         * 'scanState'. The resulting scan is outputted in the out-parameter 'out', transferring
+         * ownership in the process.
+         *
+         * If 'scanState' is building an index scan for OR-related predicates, filters
+         * may be affixed to the scan as necessary.
+         */
+        static void finishAndOutputLeaf(ScanBuildingState* scanState,
+                                        std::vector<QuerySolutionNode*>* out);
+
         static void finishTextNode(QuerySolutionNode* node, const IndexEntry& index);
 
-    private:
         /**
          * Add the filter 'match' to the query solution node 'node'. Takes
          * ownership of 'match'.
@@ -257,8 +365,35 @@ namespace mongo {
          * The MatchType, 'type', indicates whether 'match' is a child of an
          * AND or an OR match expression.
          */
-        static void _addFilterToSolutionNode(QuerySolutionNode* node, MatchExpression* match,
-                                             MatchExpression::MatchType type);
+        static void addFilterToSolutionNode(QuerySolutionNode* node, MatchExpression* match,
+                                            MatchExpression::MatchType type);
+
+        /**
+         * Once a predicate is merged into the current scan, there are a few things we might
+         * want to do with the filter:
+         *   1) Detach the filter from its parent and delete it because the predicate is
+         *   answered by exact index bounds.
+         *   2) Leave the filter alone so that it can be affixed as part of a fetch node later.
+         *   3) Detach the filter from its parent and attach it directly to an index scan node.
+         *   We can sometimes due this for INEXACT_COVERED predicates which are not answered exactly
+         *   by the bounds, but can be answered by examing the data in the index key.
+         *   4) Detach the filter from its parent and attach it as a child of a separate
+         *   MatchExpression tree. This is done for proper handling of inexact bounds for $or
+         *   queries.
+         *
+         * This executes one of the four options above, according to the data in 'scanState'.
+         */
+        static void handleFilter(ScanBuildingState* scanState);
+
+        /**
+         * Implements handleFilter(...) for OR queries.
+         */
+        static void handleFilterAnd(ScanBuildingState* scanState);
+
+        /**
+         * Implements handleFilter(...) for AND queries.
+         */
+        static void handleFilterOr(ScanBuildingState* scanState);
     };
 
 }  // namespace mongo

@@ -317,9 +317,9 @@ namespace {
                 // sharding version that we synchronize on here. This is also why we always need to
                 // create a ClientCursor even when we aren't outputting to a cursor. See the comment
                 // on ShardFilterStage for more details.
-                Client::ReadContext ctx(ns);
+                Client::ReadContext ctx(txn, ns);
 
-                Collection* collection = ctx.ctx().db()->getCollection(ns);
+                Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
 
                 // This does mongod-specific stuff like creating the input Runner and adding to the
                 // front of the pipeline if needed.

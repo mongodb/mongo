@@ -113,8 +113,8 @@ namespace repl {
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
     void _logOpObjRS(const BSONObj& op) {
-        Lock::DBWrite lk("local");
         OperationContextImpl txn;
+        Lock::DBWrite lk(txn.lockState(), "local");
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -231,7 +231,7 @@ namespace repl {
                          BSONObj *o2,
                          bool *bb,
                          bool fromMigrate ) {
-        Lock::DBWrite lk1("local");
+        Lock::DBWrite lk1(txn->lockState(), "local");
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
@@ -321,7 +321,7 @@ namespace repl {
                           BSONObj *o2,
                           bool *bb,
                           bool fromMigrate ) {
-        Lock::DBWrite lk("local");
+        Lock::DBWrite lk(txn->lockState(), "local");
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -422,7 +422,7 @@ namespace repl {
             _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
-        logOpForSharding(opstr, ns, obj, patt, fromMigrate);
+        logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
         logOpForDbHash(ns);
         getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
 
@@ -672,9 +672,9 @@ namespace repl {
                     // thus this is not ideal.
                     else {
                         if (collection == NULL ||
-                            (indexCatalog->haveIdIndex() && Helpers::findById(collection, updateCriteria).isNull()) ||
+                            (indexCatalog->haveIdIndex() && Helpers::findById(txn, collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
-                            (!indexCatalog->haveIdIndex() && Helpers::findOne(collection, updateCriteria, false).isNull())) {
+                            (!indexCatalog->haveIdIndex() && Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
                             failedUpdate = true;
                             log() << "replication couldn't find doc: " << op.toString() << endl;
                         }

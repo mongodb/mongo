@@ -58,8 +58,15 @@ namespace mongo {
     class User {
         MONGO_DISALLOW_COPYING(User);
     public:
+        struct SCRAMCredentials {
+            int iterationCount;
+            std::string salt;
+            std::string serverKey;
+            std::string storedKey;
+        }; 
         struct CredentialData {
             std::string password;
+            SCRAMCredentials scram;
             bool isExternal;
         };
 

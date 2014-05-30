@@ -146,7 +146,8 @@ namespace mongo {
                             bool mayInterrupt,
                             ShutdownBehavior shutdownBehavior = SHUTDOWN_CLEANUP );
 
-        StatusWith<BSONObj> prepareSpecForCreate( const BSONObj& original ) const;
+        StatusWith<BSONObj> prepareSpecForCreate( OperationContext* txn,
+                                                  const BSONObj& original ) const;
 
         Status dropAllIndexes(OperationContext* txn,
                               bool includingIdIndex );
@@ -250,8 +251,8 @@ namespace mongo {
 
         // ------- temp internal -------
 
-        std::string getAccessMethodName(const BSONObj& keyPattern) {
-            return _getAccessMethodName( keyPattern );
+        std::string getAccessMethodName(OperationContext* txn, const BSONObj& keyPattern) {
+            return _getAccessMethodName( txn, keyPattern );
         }
 
         Status _upgradeDatabaseMinorVersionIfNeeded( OperationContext* txn,
@@ -264,14 +265,14 @@ namespace mongo {
     private:
         typedef unordered_map<IndexDescriptor*, Client*> InProgressIndexesMap;
 
-        bool _shouldOverridePlugin( const BSONObj& keyPattern ) const;
+        bool _shouldOverridePlugin( OperationContext* txn, const BSONObj& keyPattern ) const;
 
         /**
          * This differs from IndexNames::findPluginName in that returns the plugin name we *should*
          * use, not the plugin name inside of the provided key pattern.  To understand when these
          * differ, see shouldOverridePlugin.
          */
-        std::string _getAccessMethodName(const BSONObj& keyPattern) const;
+        std::string _getAccessMethodName(OperationContext* txn, const BSONObj& keyPattern) const;
 
         void _checkMagic() const;
 
@@ -311,7 +312,7 @@ namespace mongo {
 
         Status _isSpecOk( const BSONObj& spec ) const;
 
-        Status _doesSpecConflictWithExisting( const BSONObj& spec ) const;
+        Status _doesSpecConflictWithExisting( OperationContext* txn, const BSONObj& spec ) const;
 
         int _magic;
         Collection* _collection;

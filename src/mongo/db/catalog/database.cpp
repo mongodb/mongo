@@ -53,7 +53,6 @@
 #include "mongo/db/storage/data_file.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage_options.h"
@@ -233,7 +232,8 @@ namespace mongo {
         return true;
     }
 
-    long long Database::getIndexSizeForCollection(Collection* coll,
+    long long Database::getIndexSizeForCollection(OperationContext* opCtx,
+                                                  Collection* coll,
                                                   BSONObjBuilder* details,
                                                   int scale ) {
         if ( !coll )
@@ -247,7 +247,9 @@ namespace mongo {
         while ( ii.more() ) {
             IndexDescriptor* d = ii.next();
             string indNS = d->indexNamespace();
-            Collection* indColl = getCollection( indNS ); // XXX
+
+            // XXX creating a Collection for an index which isn't a Collection
+            Collection* indColl = getCollection( opCtx, indNS );
             if ( ! indColl ) {
                 log() << "error: have index descriptor ["  << indNS
                       << "] but no entry in the index collection." << endl;
@@ -262,7 +264,7 @@ namespace mongo {
         return totalSize;
     }
 
-    void Database::getStats( BSONObjBuilder* output, double scale ) {
+    void Database::getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale ) {
         bool empty = isEmpty() || getExtentManager()->numFiles() == 0;
 
         list<string> collections;
@@ -280,7 +282,7 @@ namespace mongo {
         for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
             const string ns = *it;
 
-            Collection* collection = getCollection( ns );
+            Collection* collection = getCollection( opCtx, ns );
             if ( !collection )
                 continue;
 
@@ -293,7 +295,7 @@ namespace mongo {
             numExtents += temp.obj()["numExtents"].numberInt(); // XXX
 
             indexes += collection->getIndexCatalog()->numIndexesTotal();
-            indexSize += getIndexSizeForCollection(collection);
+            indexSize += getIndexSizeForCollection(opCtx, collection);
         }
 
         output->append      ( "db" , _name );
@@ -316,7 +318,7 @@ namespace mongo {
         BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
         if ( !empty ) {
             int major, minor;
-            getFileFormat( &major, &minor );
+            getFileFormat( opCtx, &major, &minor );
             dataFileVersion.append( "major", major );
             dataFileVersion.append( "minor", minor );
         }
@@ -428,11 +430,6 @@ namespace mongo {
         _collections.erase( it );
     }
 
-    Collection* Database::getCollection( const StringData& ns ) {
-        OperationContextImpl txn; // TODO remove once we require reads to have transactions
-        return getCollection(&txn, ns);
-    }
-
     Collection* Database::getCollection( OperationContext* txn, const StringData& ns ) {
         invariant( _name == nsToDatabaseSubstring( ns ) );
 
@@ -489,7 +486,7 @@ namespace mongo {
 
         // move index namespaces
         BSONObj oldIndexSpec;
-        while (Helpers::findOne(systemIndexCollection, BSON("ns" << fromNS), oldIndexSpec)) {
+        while (Helpers::findOne(txn, systemIndexCollection, BSON("ns" << fromNS), oldIndexSpec)) {
             oldIndexSpec = oldIndexSpec.getOwned();
 
             BSONObj newIndexSpec;
@@ -597,7 +594,7 @@ namespace mongo {
         {
 
             BSONObj oldSpec;
-            if ( !Helpers::findOne( getCollection( txn, _namespacesName ),
+            if ( !Helpers::findOne( txn, getCollection( txn, _namespacesName ),
                                     BSON( "name" << fromNS ),
                                     oldSpec ) )
                 return Status( ErrorCodes::InternalError, "can't find system.namespaces entry" );
@@ -624,10 +621,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    Collection* Database::getOrCreateCollection( const StringData& ns ) {
-        OperationContextImpl txn; // TODO remove once we require reads to have transactions
-        return getOrCreateCollection(&txn, ns);
-    }
     Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
         Collection* c = getCollection( txn, ns );
         if ( !c ) {
@@ -641,7 +634,7 @@ namespace mongo {
                                             const CollectionOptions& options,
                                             bool allocateDefaultSpace,
                                             bool createIdIndex ) {
-        massert( 17399, "collection already exists", getCollection( ns ) == NULL );
+        massert( 17399, "collection already exists", getCollection( txn, ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
 
         if ( serverGlobalParams.configsvr &&
@@ -739,14 +732,13 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Database::getFileFormat( int* major, int* minor ) {
+    void Database::getFileFormat( OperationContext* txn, int* major, int* minor ) {
         if ( getExtentManager()->numFiles() == 0 ) {
             *major = 0;
             *minor = 0;
             return;
         }
-        OperationContextImpl txn; // TODO get rid of this once reads need transactions
-        const DataFile* df = getExtentManager()->getFile( &txn, 0 );
+        const DataFile* df = getExtentManager()->getFile( txn, 0 );
         *major = df->getHeader()->version;
         *minor = df->getHeader()->versionMinor;
     }

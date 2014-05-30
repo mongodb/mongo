@@ -54,7 +54,7 @@ namespace mongo {
 
         bool isCachable( const StringData& ns ) const;
 
-        std::string hashCollection( Database* db, const std::string& fullCollectionName, bool* fromCache );
+        std::string hashCollection( OperationContext* opCtx, Database* db, const std::string& fullCollectionName, bool* fromCache );
 
         std::map<std::string,std::string> _cachedHashed;
         mutex _cachedHashedMutex;

@@ -60,7 +60,7 @@ namespace PdfileTests {
                 return "unittests.pdfiletests.Insert";
             }
             Collection* collection() {
-                return _context.db()->getCollection( ns() );
+                return _context.db()->getCollection( &_txn, ns() );
             }
 
             Lock::GlobalWrite lk_;
@@ -164,7 +164,8 @@ namespace PdfileTests {
         void run() {
             SmallFilesControl c;
 
-            Client::ReadContext ctx( "local" );
+            OperationContextImpl txn;
+            Client::ReadContext ctx(&txn, "local");
             Database* db = ctx.ctx().db();
             ExtentManager* em = db->getExtentManager();
 

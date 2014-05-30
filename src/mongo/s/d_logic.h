@@ -42,6 +42,7 @@ namespace mongo {
 
     class Database;
     class DiskLoc;
+    class OperationContext;
 
     // --------------
     // --- global state ---
@@ -370,7 +371,8 @@ namespace mongo {
      * if it's relevant. The entries saved here are later transferred to the receiving side of
      * the migration. A relevant entry is an insertion, a deletion, or an update.
      */
-    void logOpForSharding( const char * opstr,
+    void logOpForSharding( OperationContext* txn,
+                           const char * opstr,
                            const char * ns,
                            const BSONObj& obj,
                            BSONObj * patt,

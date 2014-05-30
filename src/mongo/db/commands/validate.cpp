@@ -75,7 +75,7 @@ namespace mongo {
                 MONGO_TLOG(0) << "CMD: validate " << ns << endl;
             }
 
-            Client::ReadContext ctx(ns_string.ns());
+            Client::ReadContext ctx(txn, ns_string.ns());
 
             Database* db = ctx.ctx().db();
             if ( !db ) {
@@ -83,7 +83,7 @@ namespace mongo {
                 return false;
             }
 
-            Collection* collection = db->getCollection( ns );
+            Collection* collection = db->getCollection( txn, ns );
             if ( !collection ) {
                 errmsg = "collection not found";
                 return false;
