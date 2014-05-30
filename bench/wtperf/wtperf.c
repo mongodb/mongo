@@ -123,8 +123,7 @@ async_next_incr(uint64_t *val)
 static inline void
 generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 {
-	snprintf(key_buf, cfg->key_sz,
-	    "%0*" PRIu64, cfg->key_sz - 1, keyno);
+	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
 }
 
 static void
