@@ -30,17 +30,111 @@
 
 #include "mongo/db/storage/mmap_v1/dur.h"
 
+// Remove once we are ready to enable
+#define ROLLBACK_ENABLED false
+
 namespace mongo {
 
     DurRecoveryUnit::DurRecoveryUnit() {
         _hasWrittenSinceCheckpoint = false;
     }
 
+    void DurRecoveryUnit::beginUnitOfWork() {
+#if ROLLBACK_ENABLED
+        _nestingLevel++;
+#endif
+    }
+
+    void DurRecoveryUnit::commitUnitOfWork() {
+#if ROLLBACK_ENABLED
+        invariant(_state != MUST_ROLLBACK);
+        invariant(_nestingLevel > 0);
+
+        if (_nestingLevel != 1) {
+            // If we are nested, punt to outer UnitOfWork. These changes will only be pushed to the
+            // global damages list when the outer UnitOfWork commits (which it must now do).
+            if (haveUncommitedChanges())
+                _state = MUST_COMMIT;
+            return;
+        }
+
+        publishChanges();
+#endif
+
+        // global journal flush
+        getDur().commitIfNeeded();
+    }
+
+    void DurRecoveryUnit::endUnitOfWork() {
+#if ROLLBACK_ENABLED
+        invariant(_nestingLevel > 0);
+
+        if (--_nestingLevel != 0) {
+            // If we are nested, punt to outer UnitOfWork. These changes will only be rolled back
+            // when the outer UnitOfWork rolls back (which it must now do).
+            if (haveUncommitedChanges()) {
+                invariant(_state != MUST_COMMIT);
+                _state = MUST_ROLLBACK;
+            }
+            return;
+        }
+
+        rollbackChanges();
+#endif
+    }
+
+    void DurRecoveryUnit::publishChanges() {
+        invariant(_state != MUST_ROLLBACK);
+
+        if (getDur().isDurable()) {
+            for (Changes::iterator it=_changes.begin(), end=_changes.end(); it != end; ++it) {
+                // TODO don't go through getDur() interface.
+                getDur().writingPtr(it->base, it->preimage.size());
+            }
+        }
+
+        reset();
+    }
+
+    void DurRecoveryUnit::rollbackChanges() {
+        invariant(_state != MUST_COMMIT);
+
+        for (Changes::reverse_iterator it=_changes.rbegin(), end=_changes.rend(); it != end; ++it) {
+            // TODO need to add these pages to our "dirty count" somehow.
+            it->preimage.copy(it->base, it->preimage.size());
+        }
+
+        reset();
+    }
+
+    void DurRecoveryUnit::recordPreimage(char* data, size_t len) {
+        invariant(len > 0);
+
+        Change change;
+        change.base = data;
+        change.preimage.assign(data, len);
+        _changes.push_back(change);
+    }
+
+    void DurRecoveryUnit::reset() {
+        _state = NORMAL;
+        _changes.clear();
+    }
+
     bool DurRecoveryUnit::awaitCommit() {
+#if ROLLBACK_ENABLED
+        invariant(_state != MUST_ROLLBACK);
+        publishChanges();
+        _state = NORMAL;
+#endif
         return getDur().awaitCommit();
     }
 
     bool DurRecoveryUnit::commitIfNeeded(bool force) {
+#if ROLLBACK_ENABLED
+        invariant(_state != MUST_ROLLBACK);
+        publishChanges();
+#endif
         _hasWrittenSinceCheckpoint = false;
         return getDur().commitIfNeeded(force);
     }
@@ -50,15 +144,23 @@ namespace mongo {
     }
 
     void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
+#if ROLLBACK_ENABLED
+        invariant(_nestingLevel >= 1);
+        invariant(_state != MUST_ROLLBACK);
+        recordPreimage(static_cast<char*>(data), len);
+        _hasWrittenSinceCheckpoint = true;
+        return data;
+#else
         _hasWrittenSinceCheckpoint = true;
         return getDur().writingPtr(data, len);
-    }
-
-    void DurRecoveryUnit::createdFile(const std::string& filename, unsigned long long len) {
-        getDur().createdFile(filename, len);
+#endif
     }
 
     void DurRecoveryUnit::syncDataAndTruncateJournal() {
+#if ROLLBACK_ENABLED
+        invariant(_state != MUST_ROLLBACK);
+        publishChanges();
+#endif
         return getDur().syncDataAndTruncateJournal();
     }
 

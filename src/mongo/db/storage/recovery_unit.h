@@ -29,6 +29,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <string>
 
 #include "mongo/base/disallow_copying.h"
 
@@ -44,6 +45,36 @@ namespace mongo {
         virtual ~RecoveryUnit() { }
 
         /**
+         * These should be called through WriteUnitOfWork rather than directly.
+         *
+         * begin and end mark the begining and end of a unit of work. Each call to begin must be
+         * matched with exactly one call to end. commit can be called any number of times between
+         * begin and end but must not be called outside. When end() is called, all changes since the
+         * last commit (if any) will be rolled back.
+         *
+         * If UnitsOfWork nest (ie begin is called twice before a call to end), the prior paragraph
+         * describes the behavior of the outermost UnitOfWork. Inner UnitsOfWork neither commit nor
+         * rollback on their own but rely on the outermost to do it. If an inner UnitOfWork commits
+         * any changes, it is illegal for an outer unit to rollback. If an inner UnitOfWork
+         * rollsback any changes, it is illegal for an outer UnitOfWork to do anything other than
+         * rollback.
+         *
+         * The goal is not to fully support nested transaction, instead we want to allow delaying
+         * commit on a unit if it is part of a larger atomic unit.
+         *
+         * TODO see if we can get rid of nested UnitsOfWork.
+         */
+        virtual void beginUnitOfWork() = 0;
+        virtual void commitUnitOfWork() = 0;
+        virtual void endUnitOfWork() = 0;
+
+        // WARNING: "commit" in functions below refers to a global journal flush which implicitly
+        // commits the current UnitOfWork as well. They are actually stronger than commitUnitOfWork
+        // as they can commit even if the UnitOfWork is nested. That is because we have already
+        // verified that the db will be left in a valid state at these commit points.
+        // TODO clean up the naming and semantics.
+
+        /**
          * XXX: document
          */
         virtual bool awaitCommit() = 0;
@@ -56,23 +87,19 @@ namespace mongo {
         virtual bool commitIfNeeded(bool force = false) = 0;
 
         /**
-         * Returns true if a commit is needed but does not commit.
+         * Returns true if a global commit of the journal is needed but does not commit.
          */
         virtual bool isCommitNeeded() const = 0;
+
+
+        //
+        // The remaining methods probably belong on DurRecoveryUnit rather than on the interface.
+        //
 
         /**
          * Declare that the data at [x, x + len) is being written.
          */
         virtual void* writingPtr(void* data, size_t len) = 0;
-
-        /**
-         * Declare that a file has been created
-         *
-         * Normally writes are applied only after journaling, for safety.  But here the file
-         * is created first, and the journal will just replay the creation if the create didn't
-         * happen because of crashing.
-         */
-        virtual void createdFile(const std::string& filename, unsigned long long len) = 0;
 
         /**
          * Commits pending changes, flushes all changes to main data files, then removes the
@@ -108,6 +135,17 @@ namespace mongo {
 
     protected:
         RecoveryUnit() { }
+    };
+
+    class WriteUnitOfWork {
+        MONGO_DISALLOW_COPYING(WriteUnitOfWork);
+    public:
+        WriteUnitOfWork(RecoveryUnit* ru) : _ru(ru) { _ru->beginUnitOfWork(); }
+        ~WriteUnitOfWork(){ _ru->endUnitOfWork(); }
+
+        void commit() { _ru->commitUnitOfWork(); }
+
+        RecoveryUnit* const _ru;
     };
 
 }  // namespace mongo
