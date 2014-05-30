@@ -81,16 +81,16 @@ namespace mongo {
 
     void Tool::mapOptions()
     {
-        Tool::options["dump"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Dump) };
-        Tool::options["export"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Export) };
-        Tool::options["import"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Import) };
-        Tool::options["stat"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Stat) };
-        Tool::options["oplog"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Oplog) };
-        Tool::options["restore"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Restore) };
-        Tool::options["top"] = (OptionHandler){ REGISTER_MONGOOPTION_HANDLER(Top) };
-        Tool::options["files"] = (OptionHandler) { REGISTER_MONGOOPTION_HANDLER(Files) };
-        Tool::options["bsondump"] = (OptionHandler) { REGISTER_OPTION_HANDLER(BSONDump) };
-        Tool::options["bridge"] = (OptionHandler) { REGISTER_MONGOOPTION_HANDLER(Bridge) };
+		REGISTER_MONGOOPTION_HANDLER(dump, Dump)
+        REGISTER_MONGOOPTION_HANDLER(export, Export)
+        REGISTER_MONGOOPTION_HANDLER(import, Import)
+        REGISTER_MONGOOPTION_HANDLER(stat, Stat)
+        REGISTER_MONGOOPTION_HANDLER(oplog, Oplog)
+        REGISTER_MONGOOPTION_HANDLER(restore, Restore)
+        REGISTER_MONGOOPTION_HANDLER(top, Top)
+        REGISTER_MONGOOPTION_HANDLER(files, Files)
+        REGISTER_OPTION_HANDLER(bsondump, BSONDump)
+        REGISTER_MONGOOPTION_HANDLER(bridge, Bridge)
     }
 
     void Tool::mapTools()
@@ -474,15 +474,9 @@ int startProg(int argc, char* argv[], char** envp) {
         }
     }
 
-    char* newargv[argc - 1];
-    newargv[0] = argv[0];
-    for (int i = 2; i < argc; ++i) {
-        newargv[i - 1] = argv[i];
-    }
-
     if (strcmp(argv[1], "perf") == 0)
     {
-        ::_exit(mongoPerfMain(argc - 1, newargv));
+        ::_exit(mongoPerfMain(argc - 1, &argv[1]));
     }
 
     if(Tool::tools.find(argv[1]) == Tool::tools.end())
@@ -498,10 +492,10 @@ int startProg(int argc, char* argv[], char** envp) {
 
     if (strcmp(argv[1], "bridge") == 0)
     {
-        ::_exit(bridgeToolMain(argc - 1, newargv, envp));
+        ::_exit(bridgeToolMain(argc - 1, &argv[1], envp));
     }
 
     auto_ptr<Tool> instance = Tool::tools[argv[1]]();
-    ::_exit(instance->main(argc - 1, newargv, envp));
+    ::_exit(instance->main(argc - 1, &argv[1], envp));
 }
 
