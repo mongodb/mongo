@@ -252,9 +252,8 @@ add_option( "dbg", "Enable runtime debugging checks", "?", True, "dbg",
 add_option( "opt", "Enable compile-time optimization", "?", True, "opt",
             type="choice", choices=["on", "off"], const="on" )
 
-sanitizer_choices = ["address", "memory", "thread", "undefined"]
-add_option( "sanitize", "enable selected sanitizer", 1, True,
-            type="choice", choices=sanitizer_choices, default=None )
+add_option( "sanitize", "enable selected sanitizers", 1, True, metavar="san1,san2,...sanN" )
+add_option( "llvm-symbolizer", "name of (or path to) the LLVM symbolizer", 1, False, default="llvm-symbolizer" )
 
 add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
 add_option( "durableDefaultOff" , "have durable default to off" , 0 , True )
@@ -1345,16 +1344,47 @@ def doConfigure(myenv):
     conf.Finish()
 
     if has_option('sanitize'):
+
         if not (using_clang() or using_gcc()):
             print( 'sanitize is only supported with clang or gcc')
             Exit(1)
-        sanitizer_option = '-fsanitize=' + GetOption('sanitize')
+
+        sanitizer_list = get_option('sanitize').split(',')
+
+        using_asan = 'address' in sanitizer_list or 'leak' in sanitizer_list
+        if using_asan:
+            if get_option('allocator') == 'tcmalloc':
+                print("Cannot use address or leak sanitizer with tcmalloc")
+                Exit(1)
+
+        # If the user asked for leak sanitizer turn on the detect_leaks
+        # ASAN_OPTION. If they asked for address sanitizer as well, drop
+        # 'leak', because -fsanitize=leak means no address.
+        #
+        # --sanitize=leak:           -fsanitize=leak, detect_leaks=1
+        # --sanitize=address,leak:   -fsanitize=address, detect_leaks=1
+        # --sanitize=address:        -fsanitize=address
+        #
+        if 'leak' in sanitizer_list:
+            myenv['ENV']['ASAN_OPTIONS'] = "detect_leaks=1"
+            if 'address' in sanitizer_list:
+                sanitizer_list.remove('leak')
+
+        sanitizer_option = '-fsanitize=' + ','.join(sanitizer_list)
+
         if AddToCCFLAGSIfSupported(myenv, sanitizer_option):
             myenv.Append(LINKFLAGS=[sanitizer_option])
             myenv.Append(CCFLAGS=['-fno-omit-frame-pointer'])
         else:
-            print( 'Failed to enable sanitizer with flag: ' + sanitizer_option )
+            print( 'Failed to enable sanitizers with flag: ' + sanitizer_option )
             Exit(1)
+
+        llvm_symbolizer = get_option('llvm-symbolizer')
+        if not os.path.isabs(llvm_symbolizer):
+            llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
+        if llvm_symbolizer:
+            if using_asan:
+                myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
 
     # When using msvc, check for VS 2013 Update 2+ so we can use new compiler flags
     if using_msvc():
