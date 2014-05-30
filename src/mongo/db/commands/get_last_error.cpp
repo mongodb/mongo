@@ -231,7 +231,7 @@ namespace mongo {
                 }
             }
 
-            cc().curop()->setMessage( "waiting for write concern" );
+            txn->setMessage( "waiting for write concern" );
 
             WriteConcernResult wcResult;
             status = waitForWriteConcern( txn, writeConcern, lastOpTime, &wcResult );

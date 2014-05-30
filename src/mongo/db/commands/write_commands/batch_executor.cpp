@@ -897,7 +897,7 @@ namespace mongo {
 
     bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result) {
         if (hasLock()) {
-            cc().curop()->enter(_context.get());
+            txn->getCurOp()->enter(_context.get());
             return true;
         }
 
@@ -1079,7 +1079,7 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
         request.setLifecycle(&updateLifecycle);
 
-        UpdateExecutor executor(&request, &cc().curop()->debug());
+        UpdateExecutor executor(&request, &txn->getCurOp()->debug());
         Status status = executor.prepare();
         if (!status.isOK()) {
             result->setError(toWriteError(status));

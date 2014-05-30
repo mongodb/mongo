@@ -356,6 +356,11 @@ namespace mongo {
         static void finishAndOutputLeaf(ScanBuildingState* scanState,
                                         std::vector<QuerySolutionNode*>* out);
 
+        /**
+         * Returns true if the current scan in 'scanState' requires a FetchNode.
+         */
+        static bool orNeedsFetch(const ScanBuildingState* scanState);
+
         static void finishTextNode(QuerySolutionNode* node, const IndexEntry& index);
 
         /**

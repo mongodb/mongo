@@ -93,10 +93,9 @@ namespace mongo {
             curopMessage = ss.str();
         }
 
-        ProgressMeter& progress =
-            cc().curop()->setMessage( curopMessage.c_str(),
-                                      curopMessage,
-                                      collection->numRecords() );
+        ProgressMeter* progress = txn->setMessage(curopMessage.c_str(),
+                                                  curopMessage,
+                                                  collection->numRecords());
 
         unsigned long long n = 0;
         unsigned long long numDropped = 0;
@@ -157,7 +156,7 @@ namespace mongo {
             }
 
             n++;
-            progress.hit();
+            progress->hit();
 
             txn->recoveryUnit()->commitIfNeeded();
 
@@ -170,10 +169,10 @@ namespace mongo {
                 txn->checkForInterrupt();
             }
 
-            progress.setTotalWhileRunning( collection->numRecords() );
+            progress->setTotalWhileRunning( collection->numRecords() );
         }
 
-        progress.finished();
+        progress->finished();
         if ( dropDups && numDropped )
             log() << "\t index build dropped: " << numDropped << " dups";
         return n;

@@ -111,10 +111,10 @@ namespace IndexUpdateTests {
             IndexDescriptor* id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            ProgressMeterHolder pm (cc().curop()->setMessage("AddKeysToPhaseOne",
-                                                             "AddKeysToPhaseOne Progress",
-                                                             nDocs,
-                                                             nDocs));
+            ProgressMeterHolder pm (txn->setMessage("AddKeysToPhaseOne",
+                                                    "AddKeysToPhaseOne Progress",
+                                                    nDocs,
+                                                    nDocs));
             // Add keys to phaseOne.
             BtreeBasedBuilder::addKeysToPhaseOne( collection(),
                                                   id,
@@ -142,12 +142,12 @@ namespace IndexUpdateTests {
             IndexDescriptor* id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            ProgressMeterHolder pm (cc().curop()->setMessage("InterruptAddKeysToPhaseOne",
-                                                             "InterruptAddKeysToPhaseOne Progress",
-                                                             nDocs,
-                                                             nDocs));
+            ProgressMeterHolder pm (txn->setMessage("InterruptAddKeysToPhaseOne",
+                                                    "InterruptAddKeysToPhaseOne Progress",
+                                                    nDocs,
+                                                    nDocs));
             // Register a request to kill the current operation.
-            cc().curop()->kill();
+            txn.getCurOp()->kill();
             if ( _mayInterrupt ) {
                 // Add keys to phaseOne.
                 ASSERT_THROWS( BtreeBasedBuilder::addKeysToPhaseOne( collection(),
@@ -197,7 +197,7 @@ namespace IndexUpdateTests {
             phaseOne.sorter->sort( false );
             // Set up remaining arguments.
             set<DiskLoc> dups;
-            CurOp* op = cc().curop();
+            CurOp* op = txn.getCurOp();
             ProgressMeterHolder pm (op->setMessage("BuildBottomUp",
                                                    "BuildBottomUp Progress",
                                                    nKeys,
@@ -263,7 +263,7 @@ namespace IndexUpdateTests {
             phaseOne.sorter->sort( false );
             // Set up remaining arguments.
             set<DiskLoc> dups;
-            CurOp* op = cc().curop();
+            CurOp* op = txn.getCurOp();
             ProgressMeterHolder pm (op->setMessage("InterruptBuildBottomUp",
                                                    "InterruptBuildBottomUp Progress",
                                                    nKeys,
@@ -273,7 +273,7 @@ namespace IndexUpdateTests {
             // The index's root has not yet been set.
             ASSERT( id->getHead().isNull() );
             // Register a request to kill the current operation.
-            cc().curop()->kill();
+            txn.getCurOp()->kill();
             if ( _mayInterrupt ) {
                 // The build is aborted due to the kill request.
                 ASSERT_THROWS
@@ -328,7 +328,7 @@ namespace IndexUpdateTests {
                 coll->insertDocument( &_txn, BSON( "a" << i ), true );
             }
             // Initialize curop.
-            cc().curop()->reset();
+            _txn.getCurOp()->reset();
             // Request an interrupt.
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
@@ -357,7 +357,7 @@ namespace IndexUpdateTests {
                 coll->insertDocument( &_txn, BSON( "a" << i ), true );
             }
             // Initialize curop.
-            cc().curop()->reset();
+            _txn.getCurOp()->reset();
             // Request an interrupt.
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
@@ -389,7 +389,7 @@ namespace IndexUpdateTests {
                 coll->insertDocument( &_txn, BSON( "_id" << i ), true );
             }
             // Initialize curop.
-            cc().curop()->reset();
+            _txn.getCurOp()->reset();
             // Request an interrupt.
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
@@ -423,7 +423,7 @@ namespace IndexUpdateTests {
                 coll->insertDocument( &_txn, BSON( "_id" << i ), true );
             }
             // Initialize curop.
-            cc().curop()->reset();
+            _txn.getCurOp()->reset();
             // Request an interrupt.
             killCurrentOp.killAll();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
@@ -449,7 +449,7 @@ namespace IndexUpdateTests {
                 _client.insert( _ns, BSON( "a" << i ) );
             }
             // Initialize curop.
-            cc().curop()->reset();
+            _txn.getCurOp()->reset();
             // Request an interrupt.  killAll() rather than kill() is required because the direct
             // client will build the index using a new opid.
             killCurrentOp.killAll();
@@ -475,7 +475,7 @@ namespace IndexUpdateTests {
                 _client.insert( _ns, BSON( "a" << i ) );
             }
             // Initialize curop.
-            cc().curop()->reset();
+            txn.getCurOp()->reset();
             // Request an interrupt.
             killCurrentOp.killAll();
             // The call is not interrupted.

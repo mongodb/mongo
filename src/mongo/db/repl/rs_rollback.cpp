@@ -493,9 +493,18 @@ namespace repl {
         map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
 
         unsigned deletes = 0, updates = 0;
+        time_t lastProgressUpdate = time(0);
+        time_t progressUpdateGap = 10;
         for (list<pair<DocID, BSONObj> >::iterator it = goodVersions.begin();
                 it != goodVersions.end();
                 it++) {
+            time_t now = time(0);
+            if (now - lastProgressUpdate > progressUpdateGap) {
+                log() << "replSet " << deletes << " delete and "
+                      << updates << " update operations processed out of "
+                      << goodVersions.size() << " total operations";
+                lastProgressUpdate = now;
+            }
             const DocID& doc = it->first;
             BSONObj pattern = doc._id.wrap(); // { _id : ... }
             try {
@@ -566,7 +575,6 @@ namespace repl {
                             }
                         }
                         else {
-                            deletes++;
                             deleteObjects(&txn, 
                                           ctx.db(),
                                           doc.ns,

@@ -1273,7 +1273,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            BSONObj info = cc().curop()->info();
+            BSONObj info = txn->getCurOp()->info();
             result << "you" << info[ "client" ];
             return true;
         }

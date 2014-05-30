@@ -132,7 +132,7 @@ namespace mongo {
 
         DiskLoc rloc;
         Runner::RunnerState state;
-        CurOp* curOp = cc().curop();
+        CurOp* curOp = txn->getCurOp();
         int oldYieldCount = curOp->numYields();
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &rloc))) {
             if (oldYieldCount != curOp->numYields()) {
