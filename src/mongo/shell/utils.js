@@ -988,6 +988,9 @@ rs.add = function (hostport, arb) {
         if (arb)
             cfg.arbiterOnly = true;
     }
+    if (cfg._id == null || cfg._id === undefined){
+        cfg._id = max+1;
+    }
     c.members.push(cfg);
     return this._runCmd({ replSetReconfig: c });
 }
