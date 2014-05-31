@@ -454,14 +454,16 @@ int main(int argc, char* argv[], char** envp) {
 int startProg(int argc, char* argv[], char** envp) {
     Tool::mapTools();
     Tool::mapOptions();
-
+	
+    char help[7] = {'-', '-', 'h', 'e', 'l', 'p', '\0' };
     if (argc == 1 || std::string("help") == argv[1])
     {
         if (argc > 2)
         {
             argv[1] = argv[2];
-            char help[7] = {'-', '-', 'h', 'e', 'l', 'p', 0 };
             argv[2] = help;
+
+			//std::cout << argv[1] << " " << argv[2] << endl;
         }
         else
         {
@@ -484,6 +486,13 @@ int startProg(int argc, char* argv[], char** envp) {
         std::cout<<std::string(argv[1]) + " is not a tool."<<endl;
         ::_exit(EXIT_FAILURE);
     }
+
+	/*
+	std::cout << "Count: " << argc << endl;
+	for(int i = 0; i < argc; i++) {
+		std::cout << "  Arg " << i << ": " << argv[i] << endl;
+	}
+	*/
 
     OptionHandler o = Tool::options[argv[1]];
     Tool::storeMongoOptions = o.store;
