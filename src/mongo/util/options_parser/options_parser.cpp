@@ -75,8 +75,110 @@ namespace optionenvironment {
         //         b. A function to iterate a variables_map, convert the boost::any elements to
         //            Values, and add them to our Environment (addBoostVariablesToEnvironment)
 
+        // Attempts to convert a string to a value of the given type.
+        Status stringToValue(const std::string& stringVal,
+                             const OptionType& type,
+                             const Key& key, Value* value) {
+
+            Status ret = Status::OK();
+            switch (type) {
+                double doubleVal;
+                int intVal;
+                long longVal;
+                unsigned long long unsignedLongLongVal;
+                unsigned unsignedVal;
+                case Switch:
+                    if (stringVal == "true") {
+                        *value = Value(true);
+                        return Status::OK();
+                    }
+                    else if (stringVal == "false") {
+                        *value = Value(false);
+                        return Status::OK();
+                    }
+                    else {
+                        StringBuilder sb;
+                        sb << "Expected boolean switch but found string: " << stringVal
+                           << " for option: " << key;
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                case Bool:
+                    if (stringVal == "true") {
+                        *value = Value(true);
+                        return Status::OK();
+                    }
+                    else if (stringVal == "false") {
+                        *value = Value(false);
+                        return Status::OK();
+                    }
+                    else {
+                        StringBuilder sb;
+                        sb << "Expected boolean but found string: " << stringVal
+                           << " for option: " << key;
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                case Double:
+                    ret = parseNumberFromString(stringVal, &doubleVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as double in: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(doubleVal);
+                    return Status::OK();
+                case Int:
+                    ret = parseNumberFromString(stringVal, &intVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as int: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(intVal);
+                    return Status::OK();
+                case Long:
+                    ret = parseNumberFromString(stringVal, &longVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as long: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(longVal);
+                    return Status::OK();
+                case String:
+                    *value = Value(stringVal);
+                    return Status::OK();
+                case UnsignedLongLong:
+                    ret = parseNumberFromString(stringVal, &unsignedLongLongVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as unsigned long long: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(unsignedLongLongVal);
+                    return Status::OK();
+                case Unsigned:
+                    ret = parseNumberFromString(stringVal, &unsignedVal);
+                    if (!ret.isOK()) {
+                        StringBuilder sb;
+                        sb << "Error parsing option \"" << key
+                           << "\" as unsigned int: " << ret.reason();
+                        return Status(ErrorCodes::BadValue, sb.str());
+                    }
+                    *value = Value(unsignedVal);
+                    return Status::OK();
+                default: /* XXX: should not get here */
+                    return Status(ErrorCodes::InternalError, "Unrecognized option type");
+            }
+        }
+
         // Convert a boost::any to a Value.  See comments at the beginning of this section.
-        Status boostAnyToValue(const boost::any& anyValue, Value* value) {
+        Status boostAnyToValue(const boost::any& anyValue,
+                               const OptionType& type,
+                               const Key& key, Value* value) {
             try {
                 if (anyValue.type() == typeid(StringVector_t)) {
                     *value = Value(boost::any_cast<StringVector_t>(anyValue));
@@ -84,23 +186,19 @@ namespace optionenvironment {
                 else if (anyValue.type() == typeid(bool)) {
                     *value = Value(boost::any_cast<bool>(anyValue));
                 }
-                else if (anyValue.type() == typeid(double)) {
-                    *value = Value(boost::any_cast<double>(anyValue));
-                }
-                else if (anyValue.type() == typeid(int)) {
-                    *value = Value(boost::any_cast<int>(anyValue));
-                }
-                else if (anyValue.type() == typeid(long)) {
-                    *value = Value(boost::any_cast<long>(anyValue));
-                }
                 else if (anyValue.type() == typeid(std::string)) {
-                    *value = Value(boost::any_cast<std::string>(anyValue));
+                    return stringToValue(boost::any_cast<std::string>(anyValue), type, key, value);
                 }
-                else if (anyValue.type() == typeid(unsigned long long)) {
-                    *value = Value(boost::any_cast<unsigned long long>(anyValue));
-                }
-                else if (anyValue.type() == typeid(unsigned)) {
-                    *value = Value(boost::any_cast<unsigned>(anyValue));
+                // We should not be telling boost about numerical type information.  Instead, for
+                // any numerical type we tell boost to read a string value and parse it manually,
+                // since boost's parsing is not consistent with ours.  See SERVER-14110.
+                else if (anyValue.type() == typeid(double) || anyValue.type() == typeid(int) ||
+                         anyValue.type() == typeid(long) || anyValue.type() == typeid(unsigned) ||
+                         anyValue.type() == typeid(unsigned long long)) {
+                    StringBuilder sb;
+                    sb << "Found int type: " << anyValue.type().name() <<
+                        " in any to Value conversion, which is not supported";
+                    return Status(ErrorCodes::InternalError, sb.str());
                 }
                 else {
                     StringBuilder sb;
@@ -219,100 +317,9 @@ namespace optionenvironment {
                 return Status::OK();
             }
 
-            Status ret = Status::OK();
+            // Our YAML parser reads everything as a string, so we need to parse it ourselves.
             std::string stringVal = YAMLNode.Scalar();
-            switch (type) {
-                double doubleVal;
-                int intVal;
-                long longVal;
-                unsigned long long unsignedLongLongVal;
-                unsigned unsignedVal;
-                case Switch:
-                    if (stringVal == "true") {
-                        *value = Value(true);
-                        return Status::OK();
-                    }
-                    else if (stringVal == "false") {
-                        *value = Value(false);
-                        return Status::OK();
-                    }
-                    else {
-                        StringBuilder sb;
-                        sb << "Expected boolean switch but found string: " << stringVal
-                           << " for option: " << key;
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                case Bool:
-                    if (stringVal == "true") {
-                        *value = Value(true);
-                        return Status::OK();
-                    }
-                    else if (stringVal == "false") {
-                        *value = Value(false);
-                        return Status::OK();
-                    }
-                    else {
-                        StringBuilder sb;
-                        sb << "Expected boolean but found string: " << stringVal
-                           << " for option: " << key;
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                case Double:
-                    ret = parseNumberFromString(stringVal, &doubleVal);
-                    if (!ret.isOK()) {
-                        StringBuilder sb;
-                        sb << "Error parsing option \"" << key
-                           << "\" as double in config file: " << ret.reason();
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                    *value = Value(doubleVal);
-                    return Status::OK();
-                case Int:
-                    ret = parseNumberFromString(stringVal, &intVal);
-                    if (!ret.isOK()) {
-                        StringBuilder sb;
-                        sb << "Error parsing option \"" << key
-                           << "\" as int in config file: " << ret.reason();
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                    *value = Value(intVal);
-                    return Status::OK();
-                case Long:
-                    ret = parseNumberFromString(stringVal, &longVal);
-                    if (!ret.isOK()) {
-                        StringBuilder sb;
-                        sb << "Error parsing option \"" << key
-                           << "\" as long in config file: " << ret.reason();
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                    *value = Value(longVal);
-                    return Status::OK();
-                case String:
-                    *value = Value(stringVal);
-                    return Status::OK();
-                case UnsignedLongLong:
-                    ret = parseNumberFromString(stringVal, &unsignedLongLongVal);
-                    if (!ret.isOK()) {
-                        StringBuilder sb;
-                        sb << "Error parsing option \"" << key
-                           << "\" as unsigned long long in config file: " << ret.reason();
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                    *value = Value(unsignedLongLongVal);
-                    return Status::OK();
-                case Unsigned:
-                    ret = parseNumberFromString(stringVal, &unsignedVal);
-                    if (!ret.isOK()) {
-                        StringBuilder sb;
-                        sb << "Error parsing option \"" << key
-                           << "\" as unsigned int in config file: " << ret.reason();
-                        return Status(ErrorCodes::BadValue, sb.str());
-                    }
-                    *value = Value(unsignedVal);
-                    return Status::OK();
-                default: /* XXX: should not get here */
-                    return Status(ErrorCodes::InternalError, "Unrecognized option type");
-            }
+            return stringToValue(stringVal, type, key, value);
         }
 
         // Add all the values in the given variables_map to our environment.  See comments at the
@@ -349,7 +356,8 @@ namespace optionenvironment {
 
                 if (vm.count(long_name)) {
                     Value optionValue;
-                    Status ret = boostAnyToValue(vm[long_name].value(), &optionValue);
+                    Status ret = boostAnyToValue(vm[long_name].value(), iterator->_type, long_name,
+                                                 &optionValue);
                     if (!ret.isOK()) {
                         return ret;
                     }

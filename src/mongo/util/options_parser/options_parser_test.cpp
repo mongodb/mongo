@@ -3900,4 +3900,466 @@ namespace {
         ASSERT_EQUALS(numOptions, 1);
     }
 
+    TEST(NumericalBaseParsing, CommandLine) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("doubleVal", "doubleVal", moe::Double, "DoubleVal");
+        testOpts.addOptionChaining("intVal", "intVal", moe::Int, "IntVal");
+        testOpts.addOptionChaining("longVal", "longVal", moe::Long, "LongVal");
+        testOpts.addOptionChaining("unsignedLongLongVal", "unsignedLongLongVal",
+                                   moe::UnsignedLongLong, "UnsignedLongLongVal");
+        testOpts.addOptionChaining("unsignedVal", "unsignedVal", moe::Unsigned, "UnsignedVal");
+
+        // Bad values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--doubleVal");
+        argv.push_back("monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--intVal");
+        argv.push_back("monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--longVal");
+        argv.push_back("monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--unsignedLongLongVal");
+        argv.push_back("monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--unsignedVal");
+        argv.push_back("monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // Decimal values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--doubleVal");
+        argv.push_back("16.1");
+        argv.push_back("--intVal");
+        argv.push_back("16");
+        argv.push_back("--longVal");
+        argv.push_back("16");
+        argv.push_back("--unsignedLongLongVal");
+        argv.push_back("16");
+        argv.push_back("--unsignedVal");
+        argv.push_back("16");
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        double doubleVal;
+        int intVal;
+        long longVal;
+        unsigned long long unsignedLongLongVal;
+        unsigned unsignedVal;
+
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 16.1);
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 16);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 16);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 16ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 16U);
+
+        // Octal values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--doubleVal");
+        argv.push_back("020.1");
+        argv.push_back("--intVal");
+        argv.push_back("020");
+        argv.push_back("--longVal");
+        argv.push_back("020");
+        argv.push_back("--unsignedLongLongVal");
+        argv.push_back("020");
+        argv.push_back("--unsignedVal");
+        argv.push_back("020");
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 020.1);
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 020);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 020);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 020ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 020U);
+
+        // Hex values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+#if !(defined(_WIN32) || defined(__sunos__))
+        // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
+        // build, so we cannot read hex doubles from the command line on those platforms.
+        // See SERVER-14131.
+
+        argv.push_back("--doubleVal");
+        argv.push_back("0x10.1");
+#endif
+        argv.push_back("--intVal");
+        argv.push_back("0x10");
+        argv.push_back("--longVal");
+        argv.push_back("0x10");
+        argv.push_back("--unsignedLongLongVal");
+        argv.push_back("0x10");
+        argv.push_back("--unsignedVal");
+        argv.push_back("0x10");
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+#if !(defined(_WIN32) || defined(__sunos__))
+        // See SERVER-14131.
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 0x10.1p0);
+#endif
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 0x10);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 0x10);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 0x10ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 0x10U);
+    }
+
+    TEST(NumericalBaseParsing, INIConfigFile) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("doubleVal", "doubleVal", moe::Double, "DoubleVal");
+        testOpts.addOptionChaining("intVal", "intVal", moe::Int, "IntVal");
+        testOpts.addOptionChaining("longVal", "longVal", moe::Long, "LongVal");
+        testOpts.addOptionChaining("unsignedLongLongVal", "unsignedLongLongVal",
+                                   moe::UnsignedLongLong, "UnsignedLongLongVal");
+        testOpts.addOptionChaining("unsignedVal", "unsignedVal", moe::Unsigned, "UnsignedVal");
+
+        // Bad values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+
+        parser.setConfig("config.ini", "doubleVal=monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.ini", "intVal=monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.ini", "longVal=monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.ini", "unsignedLongLongVal=monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.ini", "unsignedVal=monkeys");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // Decimal values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+        parser.setConfig("config.ini", "doubleVal=16.1\nintVal=16\nlongVal=16\n"
+                                       "unsignedLongLongVal=16\nunsignedVal=16\n");
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        double doubleVal;
+        int intVal;
+        long longVal;
+        unsigned long long unsignedLongLongVal;
+        unsigned unsignedVal;
+
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 16.1);
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 16);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 16);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 16ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 16U);
+
+        // Octal values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+        parser.setConfig("config.ini", "doubleVal=020.1\nintVal=020\nlongVal=020\n"
+                                       "unsignedLongLongVal=020\nunsignedVal=020\n");
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 020.1);
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 020);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 020);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 020ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 020U);
+
+        // Hex values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+#if !(defined(_WIN32) || defined(__sunos__))
+        // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
+        // build, so we cannot read hex doubles from a config file on those platforms.
+        // See SERVER-14131.
+
+        parser.setConfig("config.ini", "doubleVal=0x10.1\nintVal=0x10\nlongVal=0x10\n"
+                                       "unsignedLongLongVal=0x10\nunsignedVal=0x10\n");
+#else
+        parser.setConfig("config.ini", "intVal=0x10\nlongVal=0x10\n"
+                                       "unsignedLongLongVal=0x10\nunsignedVal=0x10\n");
+#endif
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+#if !(defined(_WIN32) || defined(__sunos__))
+        // See SERVER-14131.
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 0x10.1p0);
+#endif
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 0x10);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 0x10);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 0x10ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 0x10U);
+    }
+
+    TEST(NumericalBaseParsing, YAMLConfigFile) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("doubleVal", "doubleVal", moe::Double, "DoubleVal");
+        testOpts.addOptionChaining("intVal", "intVal", moe::Int, "IntVal");
+        testOpts.addOptionChaining("longVal", "longVal", moe::Long, "LongVal");
+        testOpts.addOptionChaining("unsignedLongLongVal", "unsignedLongLongVal",
+                                   moe::UnsignedLongLong, "UnsignedLongLongVal");
+        testOpts.addOptionChaining("unsignedVal", "unsignedVal", moe::Unsigned, "UnsignedVal");
+
+        // Bad values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+
+        parser.setConfig("config.yaml", "doubleVal: \"monkeys\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.yaml", "intVal: \"monkeys\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.yaml", "longVal: \"monkeys\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.yaml", "unsignedLongLongVal: \"monkeys\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        parser.setConfig("config.yaml", "unsignedVal: \"monkeys\"");
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        // Decimal values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        parser.setConfig("config.yaml", "doubleVal: 16.1\nintVal: 16\nlongVal: 16\n"
+                                        "unsignedLongLongVal: 16\nunsignedVal: 16\n");
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        double doubleVal;
+        int intVal;
+        long longVal;
+        unsigned long long unsignedLongLongVal;
+        unsigned unsignedVal;
+
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 16.1);
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 16);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 16);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 16ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 16U);
+
+        // Octal values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+        parser.setConfig("config.yaml", "doubleVal: 020.1\nintVal: 020\nlongVal: 020\n"
+                                        "unsignedLongLongVal: 020\nunsignedVal: 020\n");
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 020.1);
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 020);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 020);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 020ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 020U);
+
+        // Hex values
+        argv = std::vector<std::string>();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.yaml");
+#if !(defined(_WIN32) || defined(__sunos__))
+        // Hex doubles are not parseable by the Windows SDK libc or the Solaris libc in the mode we
+        // build, so we cannot read hex doubles from a config file on those platforms.
+        // See SERVER-14131.
+
+        parser.setConfig("config.yaml", "doubleVal: 0x10.1\nintVal: 0x10\nlongVal: 0x10\n"
+                                        "unsignedLongLongVal: 0x10\nunsignedVal: 0x10\n");
+#else
+        parser.setConfig("config.yaml", "intVal: 0x10\nlongVal: 0x10\n"
+                                        "unsignedLongLongVal: 0x10\nunsignedVal: 0x10\n");
+#endif
+        environment = moe::Environment();
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+#if !(defined(_WIN32) || defined(__sunos__))
+        // See SERVER-14131.
+        ASSERT_OK(environment.get(moe::Key("doubleVal"), &value));
+        ASSERT_OK(value.get(&doubleVal));
+        ASSERT_EQUALS(doubleVal, 0x10.1p0);
+#endif
+
+        ASSERT_OK(environment.get(moe::Key("intVal"), &value));
+        ASSERT_OK(value.get(&intVal));
+        ASSERT_EQUALS(intVal, 0x10);
+
+        ASSERT_OK(environment.get(moe::Key("longVal"), &value));
+        ASSERT_OK(value.get(&longVal));
+        ASSERT_EQUALS(longVal, 0x10);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedLongLongVal"), &value));
+        ASSERT_OK(value.get(&unsignedLongLongVal));
+        ASSERT_EQUALS(unsignedLongLongVal, 0x10ULL);
+
+        ASSERT_OK(environment.get(moe::Key("unsignedVal"), &value));
+        ASSERT_OK(value.get(&unsignedVal));
+        ASSERT_EQUALS(unsignedVal, 0x10U);
+    }
+
 } // unnamed namespace

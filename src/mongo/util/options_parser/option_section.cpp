@@ -88,6 +88,50 @@ namespace optionenvironment {
     // Stuff for dealing with Boost
 
     namespace {
+
+        /*
+         * Helper for option types that should be interpreted as a string by boost.  We do this to
+         * take the responsibility away from boost for handling type conversions, since sometimes
+         * those conversions are inconsistent with our own.  See SERVER-14110 For an example.
+         */
+        template <typename Type>
+        Status typeToBoostStringType(std::auto_ptr<po::value_semantic>* boostType,
+                                     const Value defaultValue = Value(),
+                                     const Value implicitValue = Value()) {
+            std::auto_ptr<po::typed_value<std::string> >
+                            boostTypeBuilder(po::value<std::string>());
+
+            if (!implicitValue.isEmpty()) {
+                Type implicitValueType;
+                Status ret = implicitValue.get(&implicitValueType);
+                if(!ret.isOK()) {
+                    StringBuilder sb;
+                    sb << "Error getting implicit value: " << ret.toString();
+                    return Status(ErrorCodes::InternalError, sb.str());
+                }
+                StringBuilder sb;
+                sb << implicitValueType;
+                boostTypeBuilder->implicit_value(sb.str());
+            }
+
+            if (!defaultValue.isEmpty()) {
+                Type defaultValueType;
+                Status ret = defaultValue.get(&defaultValueType);
+                if(!ret.isOK()) {
+                    StringBuilder sb;
+                    sb << "Error getting default value: " << ret.toString();
+                    return Status(ErrorCodes::InternalError, sb.str());
+                }
+                StringBuilder sb;
+                sb << defaultValueType;
+                boostTypeBuilder->default_value(sb.str());
+            }
+
+            *boostType = boostTypeBuilder;
+
+            return Status::OK();
+        }
+
         /** Helper function to convert the values of our OptionType enum into the classes that
          *  boost::program_option uses to pass around this information
          */
@@ -187,190 +231,20 @@ namespace optionenvironment {
 
                         return Status::OK();
                     }
-                case Double:
-                    {
-                        std::auto_ptr<po::typed_value<double> >
-                                        boostTypeBuilder(po::value<double>());
-
-                        if (!implicitValue.isEmpty()) {
-                            double implicitValueType;
-                            Status ret = implicitValue.get(&implicitValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting implicit value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->implicit_value(implicitValueType);
-                        }
-
-                        if (!defaultValue.isEmpty()) {
-                            double defaultValueType;
-                            Status ret = defaultValue.get(&defaultValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting default value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->default_value(defaultValueType);
-                        }
-
-                        *boostType = boostTypeBuilder;
-
-                        return Status::OK();
-                    }
-                case Int:
-                    {
-                        std::auto_ptr<po::typed_value<int> > boostTypeBuilder(po::value<int>());
-
-                        if (!implicitValue.isEmpty()) {
-                            int implicitValueType;
-                            Status ret = implicitValue.get(&implicitValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting implicit value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->implicit_value(implicitValueType);
-                        }
-
-                        if (!defaultValue.isEmpty()) {
-                            int defaultValueType;
-                            Status ret = defaultValue.get(&defaultValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting default value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->default_value(defaultValueType);
-                        }
-
-                        *boostType = boostTypeBuilder;
-
-                        return Status::OK();
-                    }
-                case Long:
-                    {
-                        std::auto_ptr<po::typed_value<long> > boostTypeBuilder(po::value<long>());
-
-                        if (!implicitValue.isEmpty()) {
-                            long implicitValueType;
-                            Status ret = implicitValue.get(&implicitValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting implicit value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->implicit_value(implicitValueType);
-                        }
-
-                        if (!defaultValue.isEmpty()) {
-                            long defaultValueType;
-                            Status ret = defaultValue.get(&defaultValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting default value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->default_value(defaultValueType);
-                        }
-
-                        *boostType = boostTypeBuilder;
-
-                        return Status::OK();
-                    }
                 case String:
-                    {
-                        std::auto_ptr<po::typed_value<std::string> >
-                                        boostTypeBuilder(po::value<std::string>());
-
-                        if (!implicitValue.isEmpty()) {
-                            std::string implicitValueType;
-                            Status ret = implicitValue.get(&implicitValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting implicit value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->implicit_value(implicitValueType);
-                        }
-
-                        if (!defaultValue.isEmpty()) {
-                            std::string defaultValueType;
-                            Status ret = defaultValue.get(&defaultValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting default value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->default_value(defaultValueType);
-                        }
-
-                        *boostType = boostTypeBuilder;
-
-                        return Status::OK();
-                    }
+                    return typeToBoostStringType<std::string>(boostType, defaultValue,
+                                                              implicitValue);
+                case Double:
+                    return typeToBoostStringType<double>(boostType, defaultValue, implicitValue);
+                case Int:
+                    return typeToBoostStringType<int>(boostType, defaultValue, implicitValue);
+                case Long:
+                    return typeToBoostStringType<long>(boostType, defaultValue, implicitValue);
                 case UnsignedLongLong:
-                    {
-                        std::auto_ptr<po::typed_value<unsigned long long> >
-                                        boostTypeBuilder(po::value<unsigned long long>());
-
-                        if (!implicitValue.isEmpty()) {
-                            unsigned long long implicitValueType;
-                            Status ret = implicitValue.get(&implicitValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting implicit value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->implicit_value(implicitValueType);
-                        }
-
-                        if (!defaultValue.isEmpty()) {
-                            unsigned long long defaultValueType;
-                            Status ret = defaultValue.get(&defaultValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting default value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->default_value(defaultValueType);
-                        }
-
-                        *boostType = boostTypeBuilder;
-
-                        return Status::OK();
-                    }
+                    return typeToBoostStringType<unsigned long long>(boostType, defaultValue,
+                                                                     implicitValue);
                 case Unsigned:
-                    {
-                        std::auto_ptr<po::typed_value<unsigned> >
-                                        boostTypeBuilder(po::value<unsigned>());
-
-                        if (!implicitValue.isEmpty()) {
-                            unsigned implicitValueType;
-                            Status ret = implicitValue.get(&implicitValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting implicit value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->implicit_value(implicitValueType);
-                        }
-
-                        if (!defaultValue.isEmpty()) {
-                            unsigned defaultValueType;
-                            Status ret = defaultValue.get(&defaultValueType);
-                            if(!ret.isOK()) {
-                                StringBuilder sb;
-                                sb << "Error getting default value: " << ret.toString();
-                                return Status(ErrorCodes::InternalError, sb.str());
-                            }
-                            boostTypeBuilder->default_value(defaultValueType);
-                        }
-
-                        *boostType = boostTypeBuilder;
-
-                        return Status::OK();
-                    }
+                    return typeToBoostStringType<unsigned>(boostType, defaultValue, implicitValue);
                 default:
                     {
                         StringBuilder sb;
