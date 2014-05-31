@@ -123,6 +123,9 @@ async_next_incr(uint64_t *val)
 static inline void
 generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 {
+	/*
+	 * Don't change to snprintf, sprintf is faster in some tests.
+	 */
 	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
 }
 
@@ -1671,8 +1674,8 @@ start_all_runs(CONFIG *cfg)
 			ret = ENOMEM;
 			goto err;
 		}
-		sprintf(new_home, "%s/D%02d", cfg->home, (int)i);
-		next_cfg->home = (const char *)new_home;
+		snprintf(new_home, home_len + 5, "%s/D%02d", cfg->home, (int)i);
+		next_cfg->home = new_home;
 
 		/* If the monitor dir is default, update it too. */
 		if (strcmp(cfg->monitor_dir, cfg->home) == 0)
