@@ -140,7 +140,7 @@ namespace mongo {
                 }
                 if ( bestmatchlen < INT_MAX && --extra <= 0 )
                     break;
-                if ( ++chain > 30 && b < MaxBucket ) {
+                if ( ++chain > 30 && b <= MaxBucket ) {
                     // too slow, force move to next bucket to grab a big chunk
                     //b++;
                     freelistIterations.increment( chain );
