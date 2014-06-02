@@ -749,6 +749,42 @@ namespace mongo {
         return collection;
     }
 
+    void Database::cleanUpOrphanIndexesOnSystemCollection() {
+        Collection* namespacesCollection = getCollection( _namespacesName );
+        if ( !namespacesCollection ) {
+            return;
+        }
+        Collection* systemCollection = getCollection( _name + ".system" ); // May be NULL.
+        Collection* indexesCollection = getCollection( _indexesName ); // May be NULL.
+        scoped_ptr<CollectionIterator> it(
+            namespacesCollection->getIterator( DiskLoc(), false, CollectionScanParams::FORWARD ) );
+        while ( !it->isEOF() ) {
+            NamespaceString ns( namespacesCollection->docFor( it->getNext() )["name"].String() );
+            if ( ns.coll().startsWith( "system.$" ) ) {
+                // Found an index on collection named "system".
+                StringData indexName = ns.coll().substr( strlen( "system.$" ) );
+                if ( systemCollection &&
+                     systemCollection->getIndexCatalog()->findIndexByName( indexName, true ) ) {
+                    // Index is not an orphan, ignore it.
+                    continue;
+                }
+                if ( indexesCollection && !Helpers::findOne( indexesCollection->ns().ns(),
+                                                             BSON( "name" << indexName <<
+                                                                   "ns" << ( _name + ".system" ) ),
+                                                             false ).isNull() ) {
+                    // Index is listed in system.indexes, but isn't in the catalog.  Log a startup
+                    // warning.
+                    warning() << "found an index missing from catalog: " << ns.ns()
+                              << startupWarningsLog;
+                    continue;
+                }
+                // This index is an orphan.  Either the "system" collection doesn't exist, or the
+                // "system" collection exists but the index isn't in the catalog.  Clean it up.
+                log() << "dropping orphaned index: " << ns.ns();
+                fassert( 17492, _dropNS( ns.ns() ) );
+            }
+        }
+    }
 
     void Database::_addNamespaceToCatalog( const StringData& ns, const BSONObj* options ) {
         LOG(1) << "Database::_addNamespaceToCatalog ns: " << ns << endl;

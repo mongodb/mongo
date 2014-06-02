@@ -190,6 +190,13 @@ namespace mongo {
         static Status validateDBName( const StringData& dbname );
 
         const string& getSystemIndexesName() const { return _indexesName; }
+
+        /**
+         * Search system.namespaces for indexes on collection "system" that don't exist in the index
+         * catalog, and clean up any that are found.  These would exist due to a bug in 2.4
+         * (SERVER-13975).
+         */
+        void cleanUpOrphanIndexesOnSystemCollection();
     private:
 
         void _clearCollectionCache( const StringData& fullns );

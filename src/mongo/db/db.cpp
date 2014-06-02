@@ -445,6 +445,10 @@ namespace mongo {
                     warning() << "Internal error while reading collection " << systemIndexes;
                 }
 
+                // 2.4 does not properly drop indexes on collections named "system".  Check for
+                // orphaned indexes and clean up any if found.
+                ctx.db()->cleanUpOrphanIndexesOnSystemCollection();
+
                 Database::closeDatabase(dbName.c_str(), storageGlobalParams.dbpath);
             }
         }
