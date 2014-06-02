@@ -3,8 +3,10 @@ package db
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/options"
+	"github.com/shelman/mongo-tools-proto/common/util"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"net"
@@ -167,7 +169,7 @@ func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
 			}
 		}
 
-		// TODO: support non-pem encoded ca files
+		// TODO: support non-pem encoded ca files?
 
 		// set up the root cas
 		config.RootCAs = pool
@@ -178,17 +180,83 @@ func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
 	if opts.SSLPEMKeyFile != "" {
 
 		// read in the file
-		_, err := ioutil.ReadFile(opts.SSLPEMKeyFile)
+		fileBytes, err := ioutil.ReadFile(opts.SSLPEMKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("error reading in key file %v: %v",
 				opts.SSLPEMKeyFile, err)
 		}
 
+		// parse out the cert and private key
+		certPEMBlock, keyPEMBlock, err := sslKeyPairFromBytes(fileBytes)
+		if err != nil {
+			return nil, fmt.Errorf("ssl cert / private key file %v is"+
+				" malformed: %v", opts.SSLPEMKeyFile, err)
+		}
+
+		// create a new certificate
+		clientCert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client certificate: %v")
+		}
+
+		// add the certificate in
+		config.Certificates = append(config.Certificates, clientCert)
+
 	}
 
 	// return the dialing func
 	return func(addr *mgo.ServerAddr) (net.Conn, error) {
-		return tls.Dial("tcp", addr.String(), config)
+		conn, err := tls.Dial("tcp", addr.String(), config)
+		if err != nil {
+			util.Printlnf("Error dialing %v: %v", addr.String(), err)
+		}
+		return conn, err
 	}, nil
+
+}
+
+// Helper to parse out a pem-encoded certificate and private key from a chunk
+// of bytes.  Returns the pem-encoded cert, the pem-encoded private key, and
+// an error, if any occurs.
+func sslKeyPairFromBytes(data []byte) ([]byte, []byte, error) {
+
+	// to be returned
+	var certPEMBlock []byte
+	var keyPEMBlock []byte
+
+	// loop, decoding
+	for {
+		// grab the next pem-encoded block from the data
+		block, extra := pem.Decode(data)
+
+		// if there are no more blocks, make sure we've got the two items we
+		// need, and return appropriately
+		if block == nil {
+			if certPEMBlock != nil && keyPEMBlock != nil {
+				return certPEMBlock, keyPEMBlock, nil
+			} else {
+				return nil, nil, fmt.Errorf("the file must contain both a" +
+					" certificate and a private key")
+			}
+		}
+
+		switch block.Type {
+		case "CERTIFICATE":
+			if certPEMBlock != nil {
+				return nil, nil, fmt.Errorf("cannot specify multiple" +
+					" certificates in the pem key file")
+			}
+			certPEMBlock = pem.EncodeToMemory(block)
+		case "PRIVATE KEY":
+			if keyPEMBlock != nil {
+				return nil, nil, fmt.Errorf("cannot specify multiple private" +
+					" keys in the pem key file")
+			}
+			keyPEMBlock = pem.EncodeToMemory(block)
+		}
+
+		// chop off the decoded block
+		data = extra
+	}
 
 }
