@@ -5,6 +5,7 @@
  * See the file LICENSE for redistribution information.
  */
 #include "leveldb_wt.h"
+#include <sys/stat.h>
 #include <sstream>
 
 using leveldb::Cache;
@@ -126,7 +127,19 @@ Cache *NewLRUCache(size_t capacity) {
 
 Status DestroyDB(const std::string& name, const Options& options) {
   fprintf(stderr, "DestroyDB %s", name.c_str());
-  return Status::NotSupported("sorry!");
+  WT_CONNECTION *conn;
+  int ret = ::wiredtiger_open(name.c_str(), NULL, NULL, &conn);
+  /* If the database cannot be opened, there is nothing to destroy. */
+  if (ret != 0)
+	  return Status::OK();
+  WT_SESSION *session;
+  ret = conn->open_session(conn, NULL, NULL, &session);
+  assert(ret == 0);
+  ret = session->drop(session, WT_URI, "force");
+  assert(ret == 0);
+  ret = conn->close(conn, NULL);
+  assert(ret == 0);
+  return Status::OK();
 }
 
 Status RepairDB(const std::string& dbname, const Options& options) {
@@ -318,8 +331,10 @@ leveldb::DB::Open(const Options &options, const std::string &name, leveldb::DB *
 {
 	// Build the wiredtiger_open config.
 	std::stringstream s_conn;
-	if (options.create_if_missing)
+	if (options.create_if_missing) {
+		(void)mkdir(name.c_str(), 0777);
 		s_conn << "create,";
+	}
 	if (options.error_if_exists)
 		s_conn << "exclusive,";
 	if (options.compression == kSnappyCompression)
